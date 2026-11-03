@@ -1,4 +1,4 @@
--- 초기 데이터: 공통코드·운영 기준값·역할·메뉴·역할별 권한 처음 값
+-- 초기 데이터: 공통코드·운영 기준값·역할·메뉴·역할별 권한 처음 값·첫 시스템 관리자 계정
 -- 근거: 06 5장(공통코드 초기값)·6장(운영 기준값 초기값), 04 SFR-124-01~04(역할·권한 처음 값), 04 SFR-125-01·03·06(메뉴), 시안 v1.7
 -- 실행 순서: 07_DDL_PostgreSQL.sql → 이 파일 → 07_DML_행정구역_초기데이터.sql(순서는 서로 상관없음)
 -- 운영 기준값의 적용 시작월(APLY_BGN_YM)은 시스템을 쓰기 시작한 달(CASH_BASE_YM과 같게)로 둔다. 다른 달에 시작하면 이 파일의 202601을 모두 바꾼다
@@ -715,5 +715,16 @@ INSERT INTO TB_SY_ROLE_MENU_AUTH (ROLE_ID, MENU_ID, INQ_YN, REG_YN, UPD_YN, DEL_
 ('PM', 'M028', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'SYSTEM'),
 ('PM', 'M029', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'SYSTEM'),
 ('PM', 'M030', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'SYSTEM');
+
+-- 7. 첫 시스템 관리자 계정 (2026-11-03 사용자 결정)
+--    아이디 admin, 임시 비밀번호 a1234!!!! (PWD_HASH = BCrypt 강도 10 해시, 06 D-8)
+--    TEMP_PWD_YN='Y'라 첫 로그인 때 새 비밀번호(SFR-007-06 규칙: 8자 이상, 영문·숫자·특수문자)로 바꾸게 한다(SFR-007-04)
+--    시스템 관리자라 2단계 인증(MFA_USE_YN='Y', 이메일 인증번호, SFR-007-07)
+--    이메일 admin@example.com은 예시 주소다. 실제 관리자 이메일로 바꿔서 넣는다
+INSERT INTO TB_SY_USER (USER_ID, USER_NM, EMAIL_ADDR, PWD_HASH, TEMP_PWD_YN, PWD_ERR_CNT, USER_STAT_CD, MFA_USE_YN, MFA_ERR_CNT, REG_USER_ID) VALUES
+('admin', '시스템 관리자', 'admin@example.com', '$2a$10$u/nzt6Qi.JlrzTbVt7RIB.Ye.erc30wfwKBTqbxIkbzurq2i4QuIe', 'Y', 0, 'USE', 'Y', 0, 'SYSTEM');
+
+INSERT INTO TB_SY_USER_ROLE (USER_ID, ROLE_ID, REG_USER_ID) VALUES
+('admin', 'ADMIN', 'SYSTEM');
 
 COMMIT;

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cost.shell.menu.MenuMapper">
+    <resultMap id="menuRow" type="com.cost.shell.menu.MenuRow" autoMapping="false">
+        <constructor>
+            <idArg column="menuId" javaType="java.lang.String"/>
+            <arg column="upperMenuId" javaType="java.lang.String"/>
+            <arg column="menuNm" javaType="java.lang.String"/>
+            <arg column="scrnId" javaType="java.lang.String"/>
+            <arg column="menuLvl" javaType="_int"/>
+            <arg column="sortOrd" javaType="_int"/>
+            <arg column="pcOnlyYn" javaType="java.lang.String"/>
+            <arg column="iconNm" javaType="java.lang.String"/>
+            <arg column="useYn" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+    <select id="findAll" resultMap="menuRow">
+        SELECT MENU_ID AS "menuId",
+               UPPER_MENU_ID AS "upperMenuId",
+               MENU_NM AS "menuNm",
+               SCRN_ID AS "scrnId",
+               MENU_LVL AS "menuLvl",
+               SORT_ORD AS "sortOrd",
+               PC_ONLY_YN AS "pcOnlyYn",
+               ICON_NM AS "iconNm",
+               USE_YN AS "useYn"
+        FROM TB_SY_MENU
+        ORDER BY SORT_ORD, MENU_ID
+    </select>
+</mapper>

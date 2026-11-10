@@ -1,0 +1,47 @@
+services:
+  database:
+    image: postgres:16.6-alpine3.20
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cost}
+      POSTGRES_USER: ${POSTGRES_USER:-cost_app}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - menu-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  backend:
+    image: cost-common-backend:1.0.0
+    build:
+      context: ../backend
+    pull_policy: build
+    environment:
+      SERVER_ADDRESS: 0.0.0.0
+      DB_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:-cost}
+      DB_USER: ${POSTGRES_USER:-cost_app}
+      DB_PASSWORD: ""
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
+  frontend:
+    image: cost-common-frontend:1.0.0
+    build:
+      context: ../frontend
+    pull_policy: build
+    ports:
+      - "127.0.0.1:3000:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+volumes:
+  menu-data:

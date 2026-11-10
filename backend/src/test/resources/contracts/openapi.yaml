@@ -1,0 +1,418 @@
+openapi: 3.0.3
+info:
+  title: 공통 메뉴 조회 HTTP 계약
+  version: 0.1.0
+  description: 설계 후보이며 구현 준비 완료가 아니다. 승인된 spec.md·plan.md·tasks.md와 원장 65개 항목을 보존한다. OQ-003·OQ-005·OQ-006·OQ-007 및 기술 충돌 승인
+    전 최종 API 계약으로 채택하지 않는다.
+x-contract-status: clarification_required
+x-source-documents:
+- SPEC-REQUEST.md:1-414
+- spec.md
+- plan.md
+- tasks.md
+- requirement-registry.json
+x-open-questions:
+- id: OQ-003
+  canonical_ids:
+  - REQ-008
+  missing_fact: 원문 최상위 JSON 배열 및 []과 공통 ApiResponse 봉투의 충돌 해결 승인
+  effect: 200의 allOf 봉투는 현 생성 지시를 표현한 미승인 후보이며 원문 배열 계약을 변경 승인한 것이 아니다. 서버·클라이언트 파서 구현 확정 차단.
+- id: OQ-005
+  canonical_ids:
+  - REQ-026
+  - REQ-028
+  missing_fact: 조회에서 제외된 비활성 화면과 미등록 주소의 구별 데이터 전달 방식
+  effect: USE_YN 공개나 신규 detail API를 추가하지 않는다. 주소 표시 판정 구현은 승인 대기.
+- id: OQ-006
+  canonical_ids:
+  - REQ-006
+  - REQ-008
+  - REQ-018
+  missing_fact: operationId·pagination/filtering·정정 가능한 입력 오류와 4xx의 원문 근거
+  effect: 전체 계층을 임의 페이지로 자르지 않는다. 입력 파라미터·400·401·403 및 인프라 예외 사유를 발명하지 않는다. 계약 게이트 미충족으로 남긴다.
+- id: OQ-007
+  canonical_ids:
+  - REQ-037
+  missing_fact: /api/health의 HTTP method·성공 결과·인증·DB 점검·오류
+  effect: Path Item으로 경로만 보존한다. 임의 GET/200이나 빈 응답 데이터 객체를 승인 계약으로 작성하지 않는다.
+paths:
+  /api/common/menus:
+    get:
+      operationId: listCommonMenus
+      summary: 공통 메뉴 목록 조회
+      description: SPEC-REQUEST.md:39-45,403의 단일 업무 조회다. 내구 실행 계약의 operationId는 listCommonMenus다. requestBody는
+        없다. 서버는 PC_ONLY_YN 값을 제공하고 브라우저가 폭별 화면 메뉴를 숨긴다. 메뉴 요청은 seed 실행 진입점이 아니다.
+      x-related-requirements:
+      - REQ-005
+      - REQ-006
+      - REQ-007
+      - REQ-008
+      - REQ-009
+      - REQ-016
+      - REQ-018
+      - REQ-021
+      - REQ-022
+      - REQ-025
+      x-business-rules:
+      - 'REQ-005: 로컬 PostgreSQL TB_SY_MENU만 메뉴 원천으로 사용하며 예시 목록으로 대체하지 않는다.'
+      - 'REQ-006: USE_YN=''Y''이며 유효한 조상 분기만 반환하고 UPPER_MENU_ID 계층, SORT_ORD 및 동률 MENU_ID 순서를 보존한다.'
+      - 'REQ-007: USE_YN=''N'' 메뉴뿐 아니라 그 자손도 제외한다. 활성 자식만 선행 조회하여 비활성 조상 정보를 잃지 않는다.'
+      - 'REQ-021: 빈 UPPER_MENU_ID는 정상 루트다. 부모 부재·자기 참조·다중 순환 노드와 그 자손은 제외하되 정상 분기는 유지한다.'
+      - 'REQ-008: 공개 필드는 menuId, upperMenuId, menuNm, scrnId, menuLvl, sortOrd, pcOnlyYn, iconNm이며 정상 0건도 200이다. 최상위 응답 모양은
+        OQ-003 승인 대기다.'
+      - 'REQ-009: DB 조회 오류는 500으로 반환하며 정상 빈 목록으로 위장하지 않는다.'
+      - 'REQ-018: 로그인 정보 없이 호출한다. REQ-033의 localhost 경계는 네트워크 바인딩이며 HTTP 역할 인가가 아니다.'
+      - 'REQ-012: LOCK_YN을 필터·인가에 사용하지 않는다. REQ-011의 휴대폰 폭 필터는 브라우저 표시 책임이다.'
+      x-side-effects:
+      - 'REQ-022: 고아·자기 참조·다중 순환 메뉴를 발견하면 서버 경고를 남긴다. 형식·빈도·보관은 OQ-011이다.'
+      - 'REQ-025: SCRN_ID와 자식이 함께 있는 혼합 노드를 발견하면 서버 경고를 남긴다.'
+      - 'REQ-032: 조회는 업무 행·메뉴 상태를 저장하지 않고 초기값을 삽입하지 않는다.'
+      x-required-tests:
+      - 'happy: 원문 초기값과 정상 DB에서 GET /api/common/menus 호출 -> 200이며 공개 목록에서 G001과 M001의 부모 관계 및 SORT_ORD 동률 MENU_ID 순서가 DB와
+        일치한다.'
+      - 'auth: 로그인 정보 없는 localhost 요청과 정상 DB -> 200이며 로그인 리다이렉트·401·403을 요구하지 않는다(REQ-018).'
+      - 'validation: 고아·자기 참조·다중 순환 노드 및 각 자손이 있는 격리 DB에서 조회 -> 해당 menuId는 결과에 없고 정상 루트는 남으며 서버 경고를 읽을 수 있다(REQ-021, REQ-022).'
+      - 'business: USE_YN=''N'' 조상과 USE_YN=''Y'' 자손이 있는 DB에서 조회 -> 두 노드 모두 반환 목록에서 제외되고 TB_SY_MENU 행은 전후 동일하다(REQ-007).'
+      - 'side-effect: SCRN_ID와 자식을 함께 가진 노드를 조회 -> 혼합 노드 서버 경고가 존재하고 감사·알림 행 및 메뉴 데이터 쓰기는 발생하지 않는다(REQ-025, REQ-032).'
+      - 'empty: 초기화가 끝난 실행 중 정상 조회 결과가 0건 -> 200과 빈 메뉴 결과이며 초기값이 재삽입되지 않는다; 최상위 []/data 배열 판정은 OQ-003 확정 후 검사한다.'
+      - 'error: 메뉴 DB 연결 실패 상태에서 조회 -> 500이며 성공 빈 결과가 아니고, 복구 후 다시 조회하면 실제 목록을 반환한다(REQ-009, REQ-016).'
+      x-source-response:
+        source: SPEC-REQUEST.md:41
+        success_status: 200
+        shape: 최상위 JSON 배열; 빈 경우 []
+        item_schema: '#/components/schemas/MenuItem'
+        approval: 원문 계약 보존; 공통 봉투와의 조정 미승인(OQ-003)
+      x-contract-blockers:
+      - 'OQ-003: 봉투 성공 응답과 최상위 배열 원문 간 충돌'
+      - 'OQ-006: pagination/filtering과 정정 가능한 4xx 미정; 업무 GET이므로 인프라 예외로 면제하지 않음'
+      responses:
+        '200':
+          description: 메뉴 조회 성공. 0건도 200이다. 아래 봉투는 공통 생성 지시를 따른 후보이며 최상위 배열 약속과의 충돌 OQ-003 승인 전 배포 계약이 아니다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/MenuListResponse'
+        '500':
+          description: 메뉴 조회 중 DB 오류. 성공 빈 목록이 아니다. 오류 코드·상세 메시지 정책은 미정이며 DB 접속정보를 공개하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/health:
+    get:
+      operationId: health
+      summary: 프로세스 생존 확인
+      description: 인증 없이 프로세스 생존 여부를 확인한다. DB 연결 상태는 검사하지 않는다.
+      x-related-requirements:
+      - REQ-037
+      responses:
+        '200':
+          description: 프로세스가 요청을 처리할 수 있다.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - UP
+components:
+  schemas:
+    YesNo:
+      type: string
+      enum:
+      - Y
+      - N
+      description: 원문 CHECK의 공통 Y/N 값. USE_YN·PC_ONLY_YN·LOCK_YN·READ_YN·BDGT_MANUAL_YN·CNCL_YN·RESEND_YN의 값 집합이 동일하다. 업무
+        상태나 역할 enum이 아니다.
+    ApiResponse:
+      type: object
+      required:
+      - success
+      - meta
+      properties:
+        success:
+          type: boolean
+          enum:
+          - true
+        meta:
+          type: object
+          description: 공통 응답 메타데이터. 키·추적값·페이지 필드는 원문 미정이므로 확정하지 않는다.
+          additionalProperties: true
+      description: 공통 성공 봉투. data는 연산별 allOf 분기에서 요구한다. 봉투 채택은 OQ-003 승인 대기.
+    ApiError:
+      type: object
+      required:
+      - success
+      - meta
+      properties:
+        success:
+          type: boolean
+          enum:
+          - false
+        meta:
+          type: object
+          description: 실패 메타데이터. 상세 오류 필드·코드는 미정이며 저장 컬럼을 복사하지 않는다.
+          additionalProperties: true
+      description: 공통 실패 봉투. 전체 ApiError를 ApiResponse 내부에 중첩하지 않는다. 별도 오류 항목 명명·형식은 확인 필요.
+    MenuItem:
+      type: object
+      required:
+      - menuId
+      - upperMenuId
+      - menuNm
+      - scrnId
+      - menuLvl
+      - sortOrd
+      - pcOnlyYn
+      - iconNm
+      additionalProperties: false
+      properties:
+        menuId:
+          type: string
+          maxLength: 20
+          description: TB_SY_MENU.MENU_ID 공개 값
+        upperMenuId:
+          type: string
+          maxLength: 20
+          description: TB_SY_MENU.UPPER_MENU_ID 공개 값
+          nullable: true
+        menuNm:
+          type: string
+          maxLength: 50
+          description: TB_SY_MENU.MENU_NM 공개 값
+        scrnId:
+          type: string
+          maxLength: 10
+          description: TB_SY_MENU.SCRN_ID 공개 값
+          nullable: true
+        menuLvl:
+          type: integer
+          description: TB_SY_MENU.MENU_LVL의 원문 NUMERIC 정수 값
+        sortOrd:
+          type: integer
+          description: TB_SY_MENU.SORT_ORD의 원문 NUMERIC 정수 값
+        pcOnlyYn:
+          $ref: '#/components/schemas/YesNo'
+        iconNm:
+          type: string
+          maxLength: 30
+          description: TB_SY_MENU.ICON_NM 공개 값
+          nullable: true
+      description: REQ-008의 여덟 공개 필드만 허용한다. nullable인 저장 컬럼은 null 가능하다. 감사 컬럼·USE_YN·LOCK_YN은 공개하지 않는다.
+    MenuListResponse:
+      description: 공통 생성 계약의 봉투 후보. REQ-008 원문의 최상위 배열을 대체하려면 OQ-003 승인이 필요하다. data=[]가 원문 []과 동일한 wire shape이라고 주장하지 않는다.
+      allOf:
+      - $ref: '#/components/schemas/ApiResponse'
+      - type: object
+        required:
+        - data
+        properties:
+          data:
+            type: array
+            items:
+              $ref: '#/components/schemas/MenuItem'
+            description: 계층·활성 제외 및 정렬이 반영된 공개 메뉴 항목. 0건은 빈 배열이다.
+x-uncovered-requirements:
+- canonical_id: REQ-001
+  status: screen-only
+  evidence: 단일 공통 화면 틀은 브라우저 표시 책임이다. 공통 AppLayout·Sidebar·Header 단일성은 전역 UI 골격이며 별도 API가 아니다.
+- canonical_id: REQ-002
+  status: screen-only
+  evidence: 미구현 화면 본문은 브라우저 표시 책임이다. US2에서 UI-01·UI-16 미구현 본문 '준비 중'을 확인한다.
+- canonical_id: REQ-003
+  status: screen-only
+  evidence: 상단 확장 자리와 가짜 값 금지은 브라우저 표시 책임이다. Header 확장 자리와 가짜 사용자·건수 금지는 공통 상단 렌더링 조건이다.
+- canonical_id: REQ-004
+  status: screen-only
+  evidence: 화면 폭에 따른 메뉴 배치은 브라우저 표시 책임이다. PC 펼침·휴대폰 접기·펼치기는 Sidebar의 로컬 배치·조작이다.
+- canonical_id: REQ-010
+  status: screen-only
+  evidence: 메뉴 아이콘·화면 연결은 브라우저 표시 책임이다. US1은 ICON_NM='grid' 아이콘과 SCRN_ID='UI-16' 연결을 확인한다.
+- canonical_id: REQ-011
+  status: screen-only
+  evidence: 휴대폰 메뉴의 PC 전용 화면 숨김은 브라우저 표시 책임이다. US1에서 휴대폰 메뉴의 PC 전용 UI-10 등을 제외한다.
+- canonical_id: REQ-012
+  status: screen-only
+  evidence: LOCK_YN 비적용은 브라우저 표시 책임이다. 공통 메뉴 표시가 LOCK_YN만으로 시스템 그룹을 숨기지 않는다.
+- canonical_id: REQ-013
+  status: screen-only
+  evidence: 그룹 메뉴 열기·닫기은 브라우저 표시 책임이다. US1에서 그룹 두 번 클릭의 하위 열림·닫힘을 검증한다.
+- canonical_id: REQ-014
+  status: screen-only
+  evidence: 화면 메뉴 이동은 브라우저 표시 책임이다. US2의 M004 선택 결과는 UI-01 본문 진입이며 route는 OQ-004다.
+- canonical_id: REQ-015
+  status: screen-only
+  evidence: 새로고침·직접 주소 진입은 브라우저 표시 책임이다. US3의 주소 재진입·새로고침에도 공통 틀이 유지된다.
+- canonical_id: REQ-017
+  status: screen-only
+  evidence: 빈 메뉴 표시은 브라우저 표시 책임이다. US6의 정상 0건 Sidebar 문구는 '등록된 메뉴 없음'이다.
+- canonical_id: REQ-019
+  status: screen-only
+  evidence: 후속 기능의 비활성 자리은 브라우저 표시 책임이다. 후속 여섯 기능 자리는 비활성 '준비 중'이며 실제 실행을 추가하지 않는다.
+- canonical_id: REQ-020
+  status: screen-only
+  evidence: 초기 화면 선택은 브라우저 표시 책임이다. US4는 미지정 접속 때 DB 순서상 첫 화면을 선택한다.
+- canonical_id: REQ-023
+  status: screen-only
+  evidence: 빈 그룹 숨김은 브라우저 표시 책임이다. US1은 최종 숨김 적용 후 보여 줄 하위 화면 없는 그룹을 제거한다.
+- canonical_id: REQ-024
+  status: screen-only
+  evidence: 화면·하위 메뉴 혼합 노드의 그룹 처리은 브라우저 표시 책임이다. US1의 혼합 노드 클릭은 본문 이동 없이 그룹 토글만 수행한다.
+- canonical_id: REQ-026
+  status: screen-only
+  evidence: 사용 중지 화면 직접 진입 차단 표시은 브라우저 표시 책임이다. US7의 비활성 직접 주소 안내는 OQ-005 식별 결정이 필요한 본문 규칙이다.
+- canonical_id: REQ-027
+  status: screen-only
+  evidence: PC 전용 본문 제한·폭 복원은 브라우저 표시 책임이다. US8은 UI-10의 휴대폰 안내와 PC 폭 복원을 각각 검증한다.
+- canonical_id: REQ-028
+  status: screen-only
+  evidence: 없는 화면 안내·첫 화면 복귀은 브라우저 표시 책임이다. US9는 없는 주소 안내·첫 화면 버튼을 제공하고 복귀를 확인한다.
+- canonical_id: REQ-029
+  status: data-constraint
+  evidence: 기존 DB 구조·데이터 보존은 데이터 준비·보존 책임이다. 기존 표 구조·데이터 보존과 필수 메뉴 컬럼 보유 시 진행을 데이터 요구에 고정했다.
+- canonical_id: REQ-030
+  status: data-constraint
+  evidence: 스키마 차이 보고·확인 대기은 데이터 준비·보존 책임이다. 표·컬럼·형식 차이 보고·확인 대기는 실행 준비 절차이며 제품 화면이 아니다.
+- canonical_id: REQ-031
+  status: data-constraint
+  evidence: 빈 TB_SY_MENU의 일회 초기값은 data-model.md Seed Data Contract와 T007·T008의 실행 준비 절차이며 HTTP 쓰기 API가 아니다.
+- canonical_id: REQ-032
+  status: data-constraint
+  evidence: 초기값 외 저장 금지은 데이터 준비·보존 책임이다. 화면 펼침 등 상태를 DB·영속 클라이언트 저장소에 기록하지 않는다.
+- canonical_id: REQ-033
+  status: non-functional
+  evidence: localhost 실행 경계은 실행·빌드 책임이다. Technology Stack Contract와 실행 범위는 localhost 전용·내부망 공개 금지를 유지한다.
+- canonical_id: REQ-034
+  status: non-functional
+  evidence: 신규생성 고정 기술 계약은 실행·빌드 책임이다. 고정 technology_stack 원문 값을 보존하고 Java 충돌은 OQ-001에 남겼다.
+- canonical_id: REQ-035
+  status: non-functional
+  evidence: Version BOM 고정은 실행·빌드 책임이다. 다섯 Version BOM 값을 보존하고 Boot 충돌은 OQ-002에 남겼다.
+- canonical_id: REQ-036
+  status: non-functional
+  evidence: 필수 구현 디렉터리·Compose 파일은 실행·빌드 책임이다. required_outputs의 backend·frontend·infra/docker-compose.yml 경로를 유지한다.
+
+- canonical_id: REQ-038
+  status: non-functional
+  evidence: 실행·영속성 결정은 plan.md의 기존 exact marker JSON을 정본으로 참조한다. imperative·mybatis·blocking을 유지하고 selection_source 불일치는 OQ-015에
+    남긴다.
+- canonical_id: REQ-039
+  status: non-functional
+  evidence: 원문 기술 구성과 Java 21 명확화은 실행·빌드 책임이다. DEC-001과 Java 21 명확화를 보존하고 Gradle 요구를 누락하지 않았다.
+- canonical_id: REQ-040
+  status: screen-only
+  evidence: 레퍼런스 UI/UX 적용은 브라우저 표시 책임이다. cost는 공통 틀 UI/UX 방향성이며 실제 시각 수치 확인은 후속 디자인 책임이다.
+- canonical_id: REQ-041
+  status: non-functional
+  evidence: 기존 화면 명명 준수은 실행·빌드 책임이다. UI-xx·공통 부품명은 그대로 두고 새 URL 규칙은 OQ-004로 유보한다.
+- canonical_id: REQ-042
+  status: data-constraint
+  evidence: 기존 표 재생성 금지은 데이터 준비·보존 책임이다. 기존 표에는 원문 CREATE TABLE을 재실행하거나 DROP/CREATE하지 않는다.
+- canonical_id: REQ-043
+  status: data-constraint
+  evidence: 알림 시퀀스 생성 선행 제약은 데이터 준비·보존 책임이다. 향후 알림 표 생성 때 시퀀스 선행만 보존하고 이번 생성 작업은 지시하지 않는다.
+- canonical_id: REQ-044
+  status: data-constraint
+  evidence: 물리 FK 생성 금지은 데이터 준비·보존 책임이다. -- FK:는 관계 설명이며 이번 물리 FK DDL은 만들지 않는다.
+- canonical_id: REQ-045
+  status: data-constraint
+  evidence: TB_SY_MENU 원문 구조은 데이터 준비·보존 책임이다. TB_SY_MENU 14개 컬럼·기본값·PK·Y/N CHECK 표를 구조 비교 기준으로 제공했다.
+- canonical_id: REQ-046
+  status: data-constraint
+  evidence: TB_SY_USER_SCOPE 참조 정의은 데이터 준비·보존 책임이다. TB_SY_USER_SCOPE 원문 범위는 참조로 남기고 담당범위 접근을 추가하지 않는다.
+- canonical_id: REQ-047
+  status: data-constraint
+  evidence: TB_SY_USER_PREF 참조 정의은 데이터 준비·보존 책임이다. TB_SY_USER_PREF 참조 정의를 화면 상태 영속화에 사용하지 않는다.
+- canonical_id: REQ-048
+  status: data-constraint
+  evidence: TB_SY_NOTI 참조 정의은 데이터 준비·보존 책임이다. TB_SY_NOTI·SQ_TB_SY_NOTI 의존성은 보존하지만 알림 데이터는 생성하지 않는다.
+- canonical_id: REQ-049
+  status: data-constraint
+  evidence: TB_BS_PART_STD 참조 정의은 데이터 준비·보존 책임이다. TB_BS_PART_STD는 후속 참조이며 영업파트 기준이력·계산을 구현하지 않는다.
+- canonical_id: REQ-050
+  status: data-constraint
+  evidence: TB_PJ_PROJ 참조 정의은 데이터 준비·보존 책임이다. TB_PJ_PROJ 정의만으로 프로젝트 CRUD·상태 전이·금액 계산을 만들지 않는다.
+- canonical_id: REQ-051
+  status: data-constraint
+  evidence: TB_BL_BILL 참조 정의은 데이터 준비·보존 책임이다. TB_BL_BILL은 청구·취소·금액 업무를 요구하는 것이 아닌 참조 구조다.
+- canonical_id: REQ-052
+  status: data-constraint
+  evidence: TB_BL_DUN_HIST 참조 정의은 데이터 준비·보존 책임이다. TB_BL_DUN_HIST는 미수알림·전송·재전송을 이번 기능으로 승인하지 않는다.
+- canonical_id: REQ-053
+  status: data-constraint
+  evidence: TB_CL_CLOSE 참조 정의은 데이터 준비·보존 책임이다. TB_CL_CLOSE 원문 정의는 UI-14 월마감 구현으로 확대하지 않는다.
+- canonical_id: REQ-054
+  status: out-of-scope
+  evidence: 로그인·역할별 메뉴 필터·서버 인가는 마지막 UI-22 작업으로 미룬다.
+- canonical_id: REQ-055
+  status: out-of-scope
+  evidence: 대시보드를 포함한 실제 업무 화면과 계산은 이번 '준비 중' 범위 밖이다.
+- canonical_id: REQ-056
+  status: out-of-scope
+  evidence: 즐겨찾기·최근 화면·탭·단축키·알림의 동작 대신 비활성 자리만 둔다.
+- canonical_id: REQ-057
+  status: out-of-scope
+  evidence: 업무 조회·저장·다운로드·업로드·편집은 명시된 메뉴 조회와 별개로 제외한다.
+- canonical_id: REQ-058
+  status: out-of-scope
+  evidence: 메일·AI·외부 API·로그인 연동은 mock이나 준비 모듈도 만들지 않는다.
+- canonical_id: REQ-059
+  status: out-of-scope
+  evidence: 운영 정책은 향후 결정이며 없음·영구 비활성이라는 추측을 넣지 않았다.
+- canonical_id: REQ-060
+  status: non-functional
+  evidence: 로컬 메뉴 DB 접근 경계은 실행·빌드 책임이다. 데이터 접근은 로컬 TB_SY_MENU SELECT와 허용된 최초 seed로만 제한한다.
+- canonical_id: REQ-061
+  status: non-functional
+  evidence: 실제 백엔드 구현 필수은 실행·빌드 책임이다. 후속 완료 조건에 실제 backend/ DB 조회·오류 구현이 필요함을 명시했다.
+- canonical_id: REQ-062
+  status: screen-only
+  evidence: 프론트엔드 디자인 계약 반영은 브라우저 표시 책임이다. frontend/ 결과는 후속 ui-design.md 레퍼런스 규칙과 대조해야 한다.
+- canonical_id: REQ-063
+  status: data-constraint
+  evidence: 스키마·migration 기준 필수은 데이터 준비·보존 책임이다. 비파괴 스키마·migration 기준을 요구하며 구조 차이 자동 수정을 금지한다.
+- canonical_id: REQ-064
+  status: non-functional
+  evidence: 백엔드·프론트엔드 통합 검증은 실행·빌드 책임이다. Executable Acceptance Contract는 실제 API·UI 연결 검증을 후속 실행으로 요구한다.
+- canonical_id: REQ-065
+  status: non-functional
+  evidence: Compose build context 제외 규칙은 실행·빌드 책임이다. 실제 Compose build context별 .dockerignore의 위치와 여섯 제외 항목을 검사한다.
+x-accounting-note: x-related-requirements 연결은 동작 소유 관계이며 미해결 OQ의 승인을 의미하지 않는다. 모든 원장 항목은 operation 연결 또는 x-uncovered-requirements
+  중 정확히 하나로 회계 처리한다.
+x-shared-contract-reference:
+  technology_stack:
+    frontend: React + TypeScript + Vite
+    backend: Java 17 + Spring Boot
+    database: PostgreSQL
+    infrastructure: Docker Compose
+  version_bom:
+    spring_boot: 3.3.x
+    node: 20.x
+    vite: 5.x
+    react: 18.x
+    postgres: 16.x
+  required_outputs:
+    backend_dir: backend
+    frontend_dir: frontend
+    compose_file: infra/docker-compose.yml
+    health_endpoint: /api/health
+  execution_persistence_ssot: 'plan.md의 exact marker JSON: imperative / mybatis / blocking, selection_source=explicit. spec·원장의
+    policy-default 차이는 OQ-015이며 승인 입력은 수정하지 않는다.'
+  unresolved_versions: 'OQ-001: Java 17/21; OQ-002: Spring Boot 3.3.x/3.5.x. Gradle은 유지한다.'

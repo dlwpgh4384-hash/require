@@ -1,0 +1,13 @@
+node_modules
+.next
+dist
+build
+coverage
+.git
+.vite
+.cache
+*.log
+*.local
+.env*
+playwright-report
+test-results

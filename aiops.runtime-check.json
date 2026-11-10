@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "backend": {
+    "service": "backend",
+    "container_port": 8080,
+    "health": {
+      "method": "GET",
+      "path": "/api/health",
+      "expect": [{ "path": "status", "op": "equals", "value": "UP" }]
+    }
+  },
+  "auth": { "required": false },
+  "first_menu": {
+    "route": "/",
+    "operation_id": "listCommonMenus",
+    "method": "GET",
+    "path": "/api/common/menus",
+    "expect": [
+      { "path": "success", "op": "equals", "value": true },
+      { "path": "data.data", "op": "type", "value": "array" }
+    ]
+  }
+}

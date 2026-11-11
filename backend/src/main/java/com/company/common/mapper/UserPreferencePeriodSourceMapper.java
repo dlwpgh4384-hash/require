@@ -1,4 +1,4 @@
-package com.company.common.userpreferences;
+package com.company.common.mapper;
 
 import java.math.BigDecimal;
 import java.util.List;

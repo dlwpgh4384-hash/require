@@ -48,15 +48,20 @@ class PostgreSqlPreparationTest {
     }
 
     @Test
-    void createsNineTablesAndOnlyFortyMenuRowsWithoutPhysicalForeignKeys() throws Exception {
+    void createsThirteenTablesAndOnlyBaseSeedRowsWithoutPhysicalForeignKeys() throws Exception {
         preparation.prepare();
-        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'")).isEqualTo(9);
+        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'")).isEqualTo(13);
         assertThat(number("SELECT count(*) FROM tb_sy_menu")).isEqualTo(40);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NULL")).isEqualTo(10);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NOT NULL")).isEqualTo(30);
+        assertThat(number("SELECT count(*) FROM tb_sy_user WHERE user_id='admin'")).isEqualTo(1);
+        assertThat(number("SELECT count(*) FROM tb_sy_code_grp")).isEqualTo(64);
+        assertThat(number("SELECT count(*) FROM tb_sy_code WHERE code_grp_id='PREF_TYPE'")).isEqualTo(8);
+        assertThat(number("SELECT count(*) FROM tb_sy_oper_std")).isEqualTo(43);
+        assertThat(text("SELECT std_val::bigint::text FROM tb_sy_oper_std WHERE std_cd='CASH_BASE_YM'")).isEqualTo("202601");
         assertThat(number("SELECT count(*) FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f'")).isZero();
         assertThat(number("SELECT nextval('sq_tb_sy_noti')")).isEqualTo(1);
-        try (var rows = database.createStatement().executeQuery("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name<>'tb_sy_menu'")) {
+        try (var rows = database.createStatement().executeQuery("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name NOT IN ('tb_sy_menu','tb_sy_user','tb_sy_code_grp','tb_sy_code','tb_sy_oper_std')")) {
             while (rows.next()) assertThat(number("SELECT count(*) FROM " + rows.getString(1))).isZero();
         }
     }

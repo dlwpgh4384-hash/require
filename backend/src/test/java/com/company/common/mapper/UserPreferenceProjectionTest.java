@@ -1,4 +1,6 @@
-package com.company.common.userpreferences;
+package com.company.common.mapper;
+
+import com.company.common.dto.UserPreferenceResponse;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;

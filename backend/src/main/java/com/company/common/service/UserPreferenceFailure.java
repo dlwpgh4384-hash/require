@@ -1,4 +1,4 @@
-package com.company.common.userpreferences;
+package com.company.common.service;
 
 public class UserPreferenceFailure extends RuntimeException {
     public static final String CONFLICT = "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.";

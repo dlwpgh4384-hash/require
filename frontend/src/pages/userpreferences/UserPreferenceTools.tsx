@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ScreenSettingsDialog } from "./ScreenSettingsDialog";
 import { UserPreferenceDialog } from "./UserPreferenceDialog";
 import type { PreferenceMenu } from "./PersonalScreenPreferences";
+import { ShellIcon } from "../../shared/layout/ShellIcon";
 
 export function MenuSearchDialog({
   menus,
@@ -141,31 +142,34 @@ export function UserPreferenceTools({
         aria-label="메뉴 찾기"
         onClick={() => setDialog("search")}
       >
-        {mobile ? "⌕" : "메뉴 찾기 (Ctrl+K)"}
+        {mobile ? <ShellIcon name="search" /> : "메뉴 찾기 (Ctrl+K)"}
       </button>
       <button
         type="button"
         data-testid="ai-unavailable"
         disabled
         title="준비 중"
+        aria-label="AI에게 묻기 준비 중"
       >
-        AI에게 묻기 · 준비 중
+        {mobile ? <ShellIcon name="spark" /> : "AI에게 묻기 · 준비 중"}
       </button>
       <button
         type="button"
         data-testid="notification-unavailable"
         disabled
         title="준비 중"
+        aria-label="알림 준비 중"
       >
-        알림 · 준비 중
+        {mobile ? <ShellIcon name="bell" /> : "알림 · 준비 중"}
       </button>
       <button
         type="button"
         data-testid="user-menu-open"
         aria-expanded={menuOpen}
+        aria-label="시스템 관리자"
         onClick={() => setMenuOpen(!menuOpen)}
       >
-        시스템 관리자
+        {mobile ? <ShellIcon name="user" /> : "시스템 관리자"}
       </button>
       {menuOpen && (
         <div data-testid="user-menu-panel" className="preference-user-menu">

@@ -16,7 +16,8 @@ public class SchemaPreparation {
     public void prepare() throws Exception {
         try (var session = sessions.openSession(false)) {
             try {
-                for (String resource : new String[]{"db/migration/V1__navigation_schema.sql", "db/migration/V2__navigation_menu_seed.sql"}) {
+                for (String resource : new String[]{"db/migration/V1__navigation_schema.sql", "db/migration/V2__navigation_menu_seed.sql",
+                        "db/migration/V3__common_function_seed.sql"}) {
                     String sql = new ClassPathResource(resource).getContentAsString(StandardCharsets.UTF_8);
                     try (var statement = session.getConnection().createStatement()) {
                         statement.execute(sql);

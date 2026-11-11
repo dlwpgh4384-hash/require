@@ -1,4 +1,4 @@
-package com.company.common.userpreferences;
+package com.company.common.mapper;
 
 import java.time.LocalDateTime;
 import org.apache.ibatis.annotations.Mapper;

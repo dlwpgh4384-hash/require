@@ -1,4 +1,6 @@
-package com.company.common.userpreferences;
+package com.company.common.controller;
+
+import com.company.common.service.UserPreferenceFailure;
 
 import java.util.List;
 import java.util.Map;

@@ -1,4 +1,8 @@
-package com.company.common.userpreferences;
+package com.company.common.controller;
+
+import com.company.common.service.CommonUserPreferenceService;
+import com.company.common.dto.UserPreferenceInput;
+import com.company.common.dto.UserPreferenceResponse;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

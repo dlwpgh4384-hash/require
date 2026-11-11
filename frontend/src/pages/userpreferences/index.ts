@@ -1,6 +1,7 @@
 export {
   UserPreferencesProvider,
   useUserPreferences,
+  useOptionalUserPreferences,
   useScreenPresentation,
 } from "./UserPreferencesProvider";
 export { ScreenSettingsDialog } from "./ScreenSettingsDialog";
@@ -34,6 +35,7 @@ export {
   recentScreenIds,
   visiblePreferenceScreens,
 } from "./userPreferences";
+export { useScreenPeriod } from "./useScreenPeriod";
 export type {
   PreferenceType,
   UserPreferenceResult,

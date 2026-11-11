@@ -1,4 +1,6 @@
-package com.company.common.userpreferences;
+package com.company.common.dto;
+
+import com.company.common.service.UserPreferenceFailure;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;

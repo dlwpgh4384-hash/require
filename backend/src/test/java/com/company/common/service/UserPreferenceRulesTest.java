@@ -1,4 +1,4 @@
-package com.company.common.userpreferences;
+package com.company.common.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.stream.IntStream;

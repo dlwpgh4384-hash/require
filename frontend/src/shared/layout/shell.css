@@ -653,3 +653,82 @@ main {
     animation: none !important;
   }
 }
+
+/* 00-1 FR-0101 로고 링크 */
+a.header-brand {
+  color: inherit;
+  text-decoration: none;
+  border-radius: 4px;
+}
+a.header-brand:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* 00-1 FR-0103 화면 탭 */
+.tab-strip {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  min-width: 0;
+}
+.screen-tab {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--divider);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--bg);
+  min-height: 34px;
+  white-space: nowrap;
+}
+.screen-tab.is-active {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: inset 0 2px 0 var(--primary);
+}
+.screen-tab-label,
+.screen-tab-close {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  min-height: 32px;
+}
+.screen-tab-label {
+  padding: 0 8px 0 12px;
+}
+.screen-tab-close {
+  padding: 0 8px;
+  color: var(--text-sub);
+}
+.screen-tab-close:hover {
+  color: var(--text);
+}
+.tab-dirty {
+  color: var(--primary);
+  margin-right: 4px;
+}
+.screen-tab-panel[hidden] {
+  display: none;
+}
+
+/* 00-1 제목줄 작업 버튼 자리·즐겨찾기 별 */
+.screen-actions {
+  display: flex;
+  gap: 8px;
+  min-height: 32px;
+}
+.title-row [data-testid="favorite-screen-toggle"] {
+  border: 0;
+  background: transparent;
+  color: #d97706;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.app-layout.is-mobile .preference-tools button {
+  min-height: 36px;
+}

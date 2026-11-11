@@ -5,6 +5,7 @@ type StateKind =
   | "loading"
   | "error"
   | "empty"
+  | "no-screen"
   | "unavailable"
   | "pc-only"
   | "missing"
@@ -28,15 +29,21 @@ const content: Record<
     description: "현재 표시할 수 있는 메뉴가 없습니다.",
     icon: "empty",
   },
+  // FR-0002: 메뉴는 있지만 열 수 있는 화면이 하나도 없을 때
+  "no-screen": {
+    title: "열 수 있는 화면이 없습니다",
+    description: "메뉴의 사용 상태나 화면 폭을 확인해 주세요.",
+    icon: "empty",
+  },
   unavailable: {
     title: "사용할 수 없는 화면입니다",
     description: "메뉴의 사용 상태 또는 연결 정보를 확인해 주세요.",
     icon: "lock",
   },
+  // FR-0107: 휴대폰에서 PC 전용 화면 주소로 들어왔을 때
   "pc-only": {
-    title: "PC 전용 화면입니다",
-    description:
-      "넓은 화면에서 이용해 주세요. 화면을 넓히면 같은 메뉴로 돌아옵니다.",
+    title: "PC에서 이용해 주세요",
+    description: "이 화면은 큰 표를 다루는 화면이라 휴대폰에서는 열리지 않습니다",
     icon: "screen",
   },
   missing: {
@@ -56,10 +63,13 @@ export function NavigationState({
   kind,
   children,
   compact = false,
+  description,
 }: {
   kind: StateKind;
   children?: ReactNode;
   compact?: boolean;
+  /** 기본 설명 대신 보여 줄 문구(예: PC 전용 화면 이름이 들어간 안내). */
+  description?: string;
 }) {
   const item = content[kind];
   return (
@@ -82,7 +92,7 @@ export function NavigationState({
         </span>
       )}
       <p className="state-title">{item.title}</p>
-      <p className="state-description">{item.description}</p>
+      <p className="state-description">{description ?? item.description}</p>
       {children && <div className="state-actions">{children}</div>}
     </div>
   );

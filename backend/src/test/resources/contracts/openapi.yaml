@@ -700,3 +700,14 @@ x-change-supersession:
   ui-tools: 공통 도구만 실제 연결하고 AI·알림·로그인 관련은 여전히 비활성이다. 실제 요구 연결은 새 연산과 x-uncovered-requirements의 단건 항목을 따른다.
   read-only: 'REQ-054·REQ-055: 메뉴 GET은 계속 읽기 전용이다. 여섯 설정 쓰기는 신규 putCommonUserPreference만 수행하므로 과거 UI 전체 상태 무저장 시험은
     이 변경 범위에서 대체한다.'
+  schema-prep: >-
+    공통 기능이 쓰는 TB_SY_USER·TB_SY_CODE_GRP·TB_SY_CODE·TB_SY_OPER_STD를 준비 명령(--prepare-schema)이
+    없을 때만 원문 DDL로 만들고(V1), 표가 비어 있을 때만 sql/DML_BaseData.sql의 admin 사용자·공통코드·운영 기준값을 넣는다(V3).
+    REQ-031의 9개 표 목록과 REQ-036의 "다른 표 신규 0행"은 이 네 표에 대해 이 변경이 우선한다. 물리 FK는 계속 만들지 않는다.
+  ui-states: >-
+    FR-0107: 휴대폰 PC 전용 화면 안내는 "PC에서 이용해 주세요 — 「화면명」은 큰 표를 다루는 화면이라 휴대폰에서는 열리지 않습니다"와
+    [대시보드로]로 바꾼다. FR-0002: 메뉴는 있지만 열 수 있는 화면이 없으면 "열 수 있는 화면이 없습니다", 메뉴가 0건이면 "등록된 메뉴 없음".
+  ui-shell: >-
+    REQ-072·REQ-080~REQ-084: 로고 이동, 화면 탭(열기·재사용, #UI 주소, 대시보드 고정, 8개 한도 확인, 미저장 ● 표시와 닫기 확인,
+    재접속 시 대시보드만, 휴대폰 탭 없음)은 frontend/src/app/ScreenTabs.test.tsx와 CommonNavigationPage.test.tsx로 검증한다.
+    REQ-091~REQ-101: PeriodSelector는 frontend/src/shared/period/PeriodSelector.test.tsx에서 설정 여러 가지로 검증한다.

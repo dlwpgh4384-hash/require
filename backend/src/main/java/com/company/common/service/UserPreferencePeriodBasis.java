@@ -1,4 +1,6 @@
-package com.company.common.userpreferences;
+package com.company.common.service;
+
+import com.company.common.mapper.UserPreferencePeriodSourceMapper;
 
 import java.math.BigDecimal;
 import java.time.YearMonth;

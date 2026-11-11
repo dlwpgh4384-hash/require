@@ -155,20 +155,28 @@ function mount(path = "/") {
 function body() {
   return within(screen.getByRole("main"));
 }
+// 지금 화면이 속한 묶음은 자동으로 펼쳐진다(FR-0101). 닫혀 있을 때만 연다.
+async function ensureOpen(name: string) {
+  const group = await screen.findByRole("button", { name });
+  if (group.getAttribute("aria-expanded") !== "true") fireEvent.click(group);
+  return group;
+}
 
 describe("common placeholder screen contract", () => {
   it("each visible initial screen can be selected without adding a business action", async () => {
     respond(fixture());
     mount();
-    fireEvent.click(
-      await screen.findByRole("button", { name: "시험 메뉴 group" }),
-    );
+    await screen.findByRole("region", { name: "UI-16 본문" });
+    await ensureOpen("시험 메뉴 group");
     for (const [index, id] of initialScreens.entries()) {
       fireEvent.click(
         screen.getByRole("link", {
           name: `시험 메뉴 leaf-${String(index).padStart(2, "0")}`,
         }),
       );
+      // 탭이 8개면 가장 오래 안 본 탭을 닫고 연다(FR-0103).
+      const limit = screen.queryByTestId("tab-limit-dialog");
+      if (limit) fireEvent.click(within(limit).getByRole("button", { name: "닫고 열기" }));
       expect(
         await screen.findByRole("region", { name: `${id} 본문` }),
       ).toHaveTextContent("준비 중");
@@ -185,7 +193,8 @@ describe("common placeholder screen contract", () => {
       ),
     );
     mount("/screens/SAME");
-    expect(await screen.findByText("PC 전용 화면입니다")).toBeVisible();
+    expect(await screen.findByText("PC에서 이용해 주세요")).toBeVisible();
+    expect(screen.getByRole("link", { name: "대시보드로" })).toBeVisible();
     expect(
       screen.queryByRole("link", { name: "시험 메뉴 first" }),
     ).not.toBeInTheDocument();
@@ -354,7 +363,8 @@ describe("common placeholder screen contract", () => {
       response([row("group", null, null, 1), row("pc", "group", "PC", 1, "Y")]),
     );
     mount();
-    expect(await screen.findAllByText("등록된 메뉴 없음")).toHaveLength(2);
+    // 메뉴는 있지만 휴대폰에서 열 수 있는 화면이 없다(FR-0002).
+    expect(await screen.findAllByText("열 수 있는 화면이 없습니다")).toHaveLength(2);
     expect(
       screen.queryByRole("button", { name: "시험 메뉴 group" }),
     ).not.toBeInTheDocument();
@@ -371,7 +381,7 @@ describe("common placeholder screen contract", () => {
       pc: "N" as const,
       expected: "사용할 수 없는 화면입니다",
     },
-    { available: true, pc: "Y" as const, expected: "PC 전용 화면입니다" },
+    { available: true, pc: "Y" as const, expected: "PC에서 이용해 주세요" },
     { available: true, pc: "N" as const, expected: "준비 중" },
   ])(
     "direct route applies classification priority: $available / $pc",
@@ -390,7 +400,7 @@ describe("common placeholder screen contract", () => {
       for (const text of [
         "없는 화면입니다",
         "사용할 수 없는 화면입니다",
-        "PC 전용 화면입니다",
+        "PC에서 이용해 주세요",
         "준비 중",
       ]) {
         if (text !== expected)
@@ -432,7 +442,9 @@ describe("common placeholder screen contract", () => {
       await waitFor(() =>
         expect(screen.getByLabelText("주소").textContent).toBe("/"),
       );
-      expect(body().getByText("등록된 메뉴 없음")).toBeVisible();
+      expect(
+        body().getByText(mobile ? "열 수 있는 화면이 없습니다" : "등록된 메뉴 없음"),
+      ).toBeVisible();
       expect(body().queryByText("없는 화면입니다")).not.toBeInTheDocument();
       expect(
         body().queryByRole("button", { name: "다시 시도" }),
@@ -457,7 +469,7 @@ describe("common placeholder screen contract", () => {
       screen.getByRole("button", { name: "시험 메뉴 group" }),
     ).toBeInTheDocument();
     width(true);
-    expect(body().getByText("PC 전용 화면입니다")).toBeVisible();
+    expect(body().getByText("PC에서 이용해 주세요")).toBeVisible();
     expect(
       screen.queryByRole("button", { name: "시험 메뉴 group" }),
     ).not.toBeInTheDocument();
@@ -474,10 +486,8 @@ describe("common placeholder screen contract", () => {
   it("all six PC-only seed screens disappear on mobile and return on desktop", async () => {
     respond(fixture());
     mount("/screens/UI-16");
-    const group = await screen.findByRole("button", {
-      name: "시험 메뉴 group",
-    });
-    fireEvent.click(group);
+    await screen.findByRole("region", { name: "UI-16 본문" });
+    await ensureOpen("시험 메뉴 group");
     for (const id of pcScreens)
       expect(
         screen.getByRole("link", {
@@ -513,15 +523,15 @@ describe("common placeholder screen contract", () => {
       ]),
     );
     mount("/screens/CHILD");
-    const group = await screen.findByRole("button", {
-      name: "시험 메뉴 mixed",
-    });
-    fireEvent.click(group);
+    await screen.findByRole("region", { name: "CHILD 본문" });
+    const group = await ensureOpen("시험 메뉴 mixed");
     expect(screen.getByRole("link", { name: "시험 메뉴 child" })).toBeVisible();
     fireEvent.click(group);
     expect(
       screen.queryByRole("link", { name: "시험 메뉴 child" }),
     ).not.toBeInTheDocument();
+    fireEvent.click(group);
+    expect(screen.getByRole("link", { name: "시험 메뉴 child" })).toBeVisible();
     expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/CHILD");
   });
 
@@ -537,21 +547,16 @@ describe("common placeholder screen contract", () => {
     expect(
       screen.queryByRole("link", { name: "시험 메뉴 mixed" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("등록된 메뉴 없음")).toBeInTheDocument();
+    expect(screen.getByText("열 수 있는 화면이 없습니다")).toBeInTheDocument();
   });
 
-  it("header and six disabled tools never create fake users, counts or actions", async () => {
+  it("without a preference store the four tool positions stay disabled and tabs replace the placeholder", async () => {
     respond(fixture());
     mount();
     await screen.findByRole("region", { name: "UI-16 본문" });
-    for (const name of [
-      "즐겨찾기",
-      "최근 본 화면",
-      "화면 탭",
-      "상단 도구줄",
-      "단축키",
-      "알림",
-    ]) {
+    expect(screen.getByTestId("screen-tab-list")).toBeInTheDocument();
+    expect(screen.getByTestId("screen-actions")).toBeEmptyDOMElement();
+    for (const name of ["즐겨찾기", "최근 본 화면", "단축키", "알림"]) {
       const control = screen.getByRole("button", { name: `${name} 준비 중` });
       expect(control).toBeDisabled();
       fireEvent.click(control);
@@ -567,9 +572,8 @@ describe("common placeholder screen contract", () => {
     const setItem = vi.spyOn(Storage.prototype, "setItem");
     const requests = respond(fixture());
     mount();
-    fireEvent.click(
-      await screen.findByRole("button", { name: "시험 메뉴 group" }),
-    );
+    await screen.findByRole("region", { name: "UI-16 본문" });
+    await ensureOpen("시험 메뉴 group");
     fireEvent.click(screen.getByRole("link", { name: "시험 메뉴 leaf-01" }));
     await waitFor(() =>
       expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-15"),

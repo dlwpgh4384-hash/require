@@ -38,6 +38,10 @@ class SchemaPreparationTest {
         ordered.verify(connection).createStatement();
         ordered.verify(statement).execute(contains("INSERT INTO TB_SY_MENU"));
         ordered.verify(statement).close();
+        ordered.verify(session).getConnection();
+        ordered.verify(connection).createStatement();
+        ordered.verify(statement).execute(contains("INSERT INTO TB_SY_OPER_STD"));
+        ordered.verify(statement).close();
         ordered.verify(session).commit(true);
         ordered.verify(session).close();
         verify(session, never()).rollback(anyBoolean());
@@ -62,20 +66,27 @@ class SchemaPreparationTest {
     }
 
     @Test
-    void migrationResourcesContainOnlyNineModelTablesAndOriginalMenuSeed() throws Exception {
+    void migrationResourcesContainOnlyModelTablesAndBaseSeeds() throws Exception {
         preparation.prepare();
         var resources = ArgumentCaptor.forClass(String.class);
-        verify(statement, times(2)).execute(resources.capture());
+        verify(statement, times(3)).execute(resources.capture());
         String schema = resources.getAllValues().get(0);
         var tables = java.util.regex.Pattern.compile("CREATE TABLE IF NOT EXISTS (TB_[A-Z_]+)").matcher(schema);
         var names = new java.util.ArrayList<String>();
         while (tables.find()) names.add(tables.group(1));
-        assertThat(names).containsExactly("TB_SY_USER_SCOPE", "TB_SY_MENU", "TB_SY_USER_PREF", "TB_SY_NOTI", "TB_BS_PART_STD", "TB_PJ_PROJ", "TB_BL_BILL", "TB_BL_DUN_HIST", "TB_CL_CLOSE");
+        assertThat(names).containsExactly("TB_SY_USER_SCOPE", "TB_SY_MENU", "TB_SY_USER_PREF", "TB_SY_NOTI", "TB_BS_PART_STD", "TB_PJ_PROJ", "TB_BL_BILL", "TB_BL_DUN_HIST", "TB_CL_CLOSE",
+            "TB_SY_USER", "TB_SY_CODE_GRP", "TB_SY_CODE", "TB_SY_OPER_STD");
         assertThat(schema).doesNotContain("FOREIGN KEY", "ALTER TABLE", "DROP TABLE", "TRUNCATE");
         assertThat(schema).contains("pg_advisory_xact_lock(734901, 1)");
         String seed = resources.getAllValues().get(1);
         assertThat(java.util.regex.Pattern.compile("\\('[GM][0-9]{3}',").matcher(seed).results().count()).isEqualTo(40);
         assertThat(seed).contains("IF NOT EXISTS (SELECT 1 FROM TB_SY_MENU)", "LOCK TABLE TB_SY_MENU IN EXCLUSIVE MODE");
+        String baseSeed = resources.getAllValues().get(2);
+        for (String table : new String[]{"TB_SY_USER", "TB_SY_CODE_GRP", "TB_SY_CODE", "TB_SY_OPER_STD"}) {
+            assertThat(baseSeed).contains("IF NOT EXISTS (SELECT 1 FROM " + table + ")", "LOCK TABLE " + table + " IN EXCLUSIVE MODE");
+        }
+        assertThat(baseSeed).contains("('CASH_BASE_YM', '202601',", "('PREF_TYPE', 'MENU_FOLD',");
+        assertThat(baseSeed).doesNotContain("TB_SY_ROLE", "TB_SY_CALC_RULE", "DELETE", "UPDATE", "TRUNCATE");
     }
 
     @Test

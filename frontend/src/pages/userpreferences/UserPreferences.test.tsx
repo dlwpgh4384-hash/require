@@ -568,7 +568,7 @@ describe("personal lists and tools", () => {
     expect(proceed).not.toHaveBeenCalled();
     expect(cancel).toHaveBeenCalledTimes(1);
     const execute = screen.getByTestId("confirmation-proceed");
-    expect(execute).toHaveClass("preference-danger");
+    expect(execute).toHaveClass("app-danger");
     fireEvent.click(execute);
     fireEvent.click(execute);
     expect(proceed).toHaveBeenCalledTimes(1);

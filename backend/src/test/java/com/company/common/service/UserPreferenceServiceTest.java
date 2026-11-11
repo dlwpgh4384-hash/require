@@ -1,4 +1,8 @@
-package com.company.common.userpreferences;
+package com.company.common.service;
+
+import com.company.common.mapper.UserPreferenceMapper;
+import com.company.common.mapper.UserPreferenceRow;
+import com.company.common.dto.UserPreferenceInput;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
@@ -20,7 +24,8 @@ class UserPreferenceServiceTest {
 
     @Test
     void existingNullTimestampIsAnUpdateNotAnInsert() {
-        var row = CommonUserPreferenceControllerTest.row("false", null);
+        var row = new UserPreferenceRow();
+        row.setPrefVal("false");
         when(mapper.selectPreference("MENU_FOLD", "GLOBAL")).thenReturn(row);
         when(mapper.updatePreference("MENU_FOLD", "GLOBAL", "true", null)).thenReturn(1);
         service.putCommonUserPreference("MENU_FOLD", "GLOBAL", new UserPreferenceInput("true", null));

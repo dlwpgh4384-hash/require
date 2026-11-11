@@ -177,7 +177,7 @@ describe("application route registration", () => {
     expectSingleShell();
   });
 
-  it.each(["/", "/screens/ADDED", "/unregistered/path"])(
+  it.each(["/", "/unregistered/path"])(
     "provides one shared preferences scope at %s without creating settings or excluded API calls",
     async (path) => {
       const request = respond();
@@ -209,6 +209,22 @@ describe("application route registration", () => {
       expect(preferenceCalls.every(([, init]) => !init?.method)).toBe(true);
     },
   );
+
+  it("direct entry to a screen records only that screen in recent screens", async () => {
+    const request = respond();
+    mount("/screens/ADDED");
+    await waitFor(() =>
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "PUT"),
+      ).toHaveLength(1),
+    );
+    const [url, init] = request.mock.calls.find(([, i]) => i?.method === "PUT")!;
+    expect(url).toBe("/api/common/user-preferences/RECENT/GLOBAL");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      prefVal: '["ADDED"]',
+      modDttm: null,
+    });
+  });
 
   it("keeps the same preferences scope across child route navigation", async () => {
     const request = respond();

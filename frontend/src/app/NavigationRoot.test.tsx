@@ -108,15 +108,17 @@ describe("shared navigation composition", () => {
     }
   });
 
-  it("recreation forgets previously open groups", async () => {
+  it("recreation forgets manually closed groups and reopens only the current screen's group", async () => {
     respond(fixture());
     const first = mount("/screens/ADDED");
-    fireEvent.click(await screen.findByRole("button", { name: "독립 그룹" }));
+    const group = await screen.findByRole("button", { name: "독립 그룹" });
+    await waitFor(() => expect(group).toHaveAttribute("aria-expanded", "true"));
+    fireEvent.click(group);
+    expect(group).toHaveAttribute("aria-expanded", "false");
     first.unmount();
     mount("/screens/ADDED");
-    expect(
-      await screen.findByRole("button", { name: "독립 그룹" }),
-    ).toHaveAttribute("aria-expanded", "false");
+    const again = await screen.findByRole("button", { name: "독립 그룹" });
+    await waitFor(() => expect(again).toHaveAttribute("aria-expanded", "true"));
   });
 
   it("failed reads expose both retry controls and retain the original address", async () => {
@@ -173,7 +175,13 @@ describe("shared navigation composition", () => {
     mount("/screens/ADDED");
     const toggle = screen.getByRole("button", { name: "메뉴 접기·펼치기" });
     fireEvent.click(toggle);
-    fireEvent.click(await screen.findByRole("button", { name: "독립 그룹" }));
+    // 지금 화면이 속한 묶음은 자동으로 펼쳐져 있다(FR-0101).
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "독립 그룹" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      ),
+    );
     fireEvent.click(screen.getByRole("link", { name: "독립 화면" }));
     await waitFor(() =>
       expect(toggle).toHaveAttribute("aria-expanded", "false"),

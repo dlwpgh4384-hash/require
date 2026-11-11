@@ -8,6 +8,7 @@
 -- FK: TB_BL_BILL.PROJ_ID -> TB_PJ_PROJ.PROJ_ID; CNCL_USER_ID -> TB_SY_USER.USER_ID
 -- FK: TB_BL_DUN_HIST.BILL_ID -> TB_BL_BILL.BILL_ID
 -- FK: TB_CL_CLOSE.CLOSE_USER_ID -> TB_SY_USER.USER_ID
+-- FK: TB_SY_CODE.CODE_GRP_ID -> TB_SY_CODE_GRP.CODE_GRP_ID (FK_TB_SY_CODE_01, 지금은 만들지 않음)
 DO $navigation$
 DECLARE
     definitions text[] := ARRAY[
@@ -161,6 +162,77 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_CL_CLOSE (
  MOD_USER_ID VARCHAR(30),
  MOD_DTTM TIMESTAMP,
  CONSTRAINT PK_TB_CL_CLOSE PRIMARY KEY (CLOSE_YM)
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_SY_USER (
+ USER_ID VARCHAR(30) NOT NULL,
+ USER_NM VARCHAR(50) NOT NULL,
+ EMAIL_ADDR VARCHAR(100) NOT NULL,
+ PWD_HASH VARCHAR(200) NOT NULL,
+ PWD_CHG_DTTM TIMESTAMP,
+ TEMP_PWD_YN CHAR(1) DEFAULT 'N' NOT NULL,
+ PWD_ERR_CNT NUMERIC(2) NOT NULL,
+ USER_STAT_CD VARCHAR(10) NOT NULL,
+ LAST_LOGIN_DTTM TIMESTAMP,
+ MFA_USE_YN CHAR(1) DEFAULT 'N' NOT NULL,
+ MFA_CODE_HASH VARCHAR(200),
+ MFA_EXPR_DTTM TIMESTAMP,
+ MFA_ERR_CNT NUMERIC(2) NOT NULL,
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMP,
+ CONSTRAINT PK_TB_SY_USER PRIMARY KEY (USER_ID),
+ CONSTRAINT CK_TB_SY_USER_01 CHECK (TEMP_PWD_YN IN ('Y', 'N')),
+ CONSTRAINT CK_TB_SY_USER_02 CHECK (MFA_USE_YN IN ('Y', 'N'))
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_SY_CODE_GRP (
+ CODE_GRP_ID VARCHAR(30) NOT NULL,
+ CODE_GRP_NM VARCHAR(50) NOT NULL,
+ SYS_CODE_YN CHAR(1) DEFAULT 'N' NOT NULL,
+ VAL_CODE_YN CHAR(1) DEFAULT 'N' NOT NULL,
+ SORT_ORD NUMERIC(5) NOT NULL,
+ USE_YN CHAR(1) DEFAULT 'Y' NOT NULL,
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMP,
+ CONSTRAINT PK_TB_SY_CODE_GRP PRIMARY KEY (CODE_GRP_ID),
+ CONSTRAINT CK_TB_SY_CODE_GRP_01 CHECK (SYS_CODE_YN IN ('Y', 'N')),
+ CONSTRAINT CK_TB_SY_CODE_GRP_02 CHECK (VAL_CODE_YN IN ('Y', 'N')),
+ CONSTRAINT CK_TB_SY_CODE_GRP_03 CHECK (USE_YN IN ('Y', 'N'))
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_SY_CODE (
+ CODE_GRP_ID VARCHAR(30) NOT NULL,
+ CODE VARCHAR(20) NOT NULL,
+ CODE_NM VARCHAR(100) NOT NULL,
+ SORT_ORD NUMERIC(5) NOT NULL,
+ USE_YN CHAR(1) DEFAULT 'Y' NOT NULL,
+ DEL_YN CHAR(1) DEFAULT 'N' NOT NULL,
+ CODE_VAL NUMERIC(15,4),
+ UNIT_NM VARCHAR(10),
+ ADD_VAL1 VARCHAR(100),
+ ADD_VAL2 VARCHAR(100),
+ ADD_VAL3 VARCHAR(100),
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMP,
+ CONSTRAINT PK_TB_SY_CODE PRIMARY KEY (CODE_GRP_ID, CODE),
+ CONSTRAINT CK_TB_SY_CODE_01 CHECK (USE_YN IN ('Y', 'N')),
+ CONSTRAINT CK_TB_SY_CODE_02 CHECK (DEL_YN IN ('Y', 'N'))
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_SY_OPER_STD (
+ STD_CD VARCHAR(30) NOT NULL,
+ APLY_BGN_YM CHAR(6) NOT NULL,
+ STD_NM VARCHAR(100) NOT NULL,
+ STD_VAL NUMERIC(15,4) NOT NULL,
+ UNIT_NM VARCHAR(10) NOT NULL,
+ STD_DESC VARCHAR(300),
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMP,
+ CONSTRAINT PK_TB_SY_OPER_STD PRIMARY KEY (STD_CD, APLY_BGN_YM)
 )$ddl$
 ];
     ddl text;
@@ -198,7 +270,7 @@ BEGIN
         expected_columns := ARRAY[]::text[];
         expected_constraints := ARRAY[]::text[];
         FOREACH line IN ARRAY string_to_array(ddl, E'\n') LOOP
-            parts := regexp_match(trim(line), '^([A-Z_]+) ((?:VARCHAR|CHAR|NUMERIC)\([0-9,]+\)|TIMESTAMP|DATE)(.*)$');
+            parts := regexp_match(trim(line), '^([A-Z_][A-Z0-9_]*) ((?:VARCHAR|CHAR|NUMERIC)\([0-9,]+\)|TIMESTAMP|DATE)(.*)$');
             IF parts IS NOT NULL THEN
                 expected_columns := array_append(expected_columns, lower(parts[1]));
                 expected_type := lower(parts[2]);
@@ -281,9 +353,13 @@ BEGIN
             END LOOP;
             EXECUTE format('COMMENT ON TABLE %I IS %L', table_name,
                 CASE WHEN table_name='tb_sy_menu' THEN '공통 화면의 메뉴 계층과 화면 연결을 제공한다.'
+                     WHEN table_name='tb_sy_user' THEN '사용자. 공통 기능은 admin 사용자 설정 저장에 쓴다.'
+                     WHEN table_name='tb_sy_code_grp' THEN '공통코드 그룹.'
+                     WHEN table_name='tb_sy_code' THEN '공통코드. 공통 기능은 PREF_TYPE(화면 설정 유형)을 쓴다.'
+                     WHEN table_name='tb_sy_oper_std' THEN '운영 기준값. 공통 기능은 CASH_BASE_YM(가장 최근 달 기준)을 쓴다.'
                      ELSE '현재 미사용 — 추후 업무 연동 예정. 원문 구조만 준비한다.' END);
             FOREACH line IN ARRAY string_to_array(ddl, E'\n') LOOP
-                parts := regexp_match(trim(line), '^([A-Z_]+) (?:VARCHAR|CHAR|NUMERIC|TIMESTAMP|DATE)');
+                parts := regexp_match(trim(line), '^([A-Z_][A-Z0-9_]*) (?:VARCHAR|CHAR|NUMERIC|TIMESTAMP|DATE)');
                 IF parts IS NOT NULL AND lower(parts[1]) ~ '(_id|_by)$' THEN
                     EXECUTE format('COMMENT ON COLUMN %I.%I IS %L', table_name, lower(parts[1]),
                         CASE lower(parts[1])
@@ -297,6 +373,10 @@ BEGIN
                           WHEN 'scrn_id' THEN '화면 연결 식별자 (FK 미선언)'
                           WHEN 'link_scrn_id' THEN '연결 화면 식별자 (FK 미선언)'
                           WHEN 'noti_id' THEN '알림의 자체 식별자 (외부 FK 참조 없음)'
+                          WHEN 'code_grp_id' THEN CASE WHEN table_name='tb_sy_code_grp' THEN '공통코드 그룹의 자체 식별자'
+                                                       ELSE 'TB_SY_CODE_GRP.CODE_GRP_ID 참조 의도 (FK 미선언)' END
+                          WHEN 'user_id' THEN CASE WHEN table_name='tb_sy_user' THEN '사용자의 자체 식별자'
+                                                   ELSE 'TB_SY_USER.USER_ID 참조 의도 (FK 미선언)' END
                           ELSE 'TB_SY_USER.USER_ID 참조 의도 (FK 미선언)' END);
                 END IF;
             END LOOP;

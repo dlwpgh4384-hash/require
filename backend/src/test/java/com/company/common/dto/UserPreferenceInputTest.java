@@ -1,4 +1,6 @@
-package com.company.common.userpreferences;
+package com.company.common.dto;
+
+import com.company.common.mapper.UserPreferenceRow;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;

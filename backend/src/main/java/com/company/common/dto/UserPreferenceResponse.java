@@ -1,4 +1,6 @@
-package com.company.common.userpreferences;
+package com.company.common.dto;
+
+import com.company.common.mapper.UserPreferenceRow;
 
 import java.time.ZoneOffset;
 import java.util.Map;

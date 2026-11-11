@@ -135,6 +135,10 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     </Context.Provider>
   );
 }
+/** 설정 저장소가 없는 곳(부품 단독 시험 등)에서는 null. */
+export function useOptionalUserPreferences() {
+  return useContext(Context);
+}
 export function useUserPreferences() {
   const context = useContext(Context);
   if (!context) throw new Error("UserPreferencesProvider가 필요합니다.");

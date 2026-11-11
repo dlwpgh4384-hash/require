@@ -239,7 +239,7 @@ function SettingsForm({
             20 / 50 / 100 중에서 입력해 주세요.
           </small>
           {errors.pageSize && (
-            <p id="settings-page-error" className="preference-field-error">
+            <p id="settings-page-error" className="field-error">
               {errors.pageSize}
             </p>
           )}
@@ -264,7 +264,7 @@ function SettingsForm({
             <option value="좁게">좁게</option>
           </select>
           {errors.dense && (
-            <p id="settings-dense-error" className="preference-field-error">
+            <p id="settings-dense-error" className="field-error">
               {errors.dense}
             </p>
           )}
@@ -294,7 +294,7 @@ function SettingsForm({
               onDismiss={() => setToast(false)}
             />
           )}
-          <div className="preference-actions">
+          <div className="app-actions">
             <button
               type="button"
               data-testid="settings-defaults"

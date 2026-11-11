@@ -6,6 +6,8 @@ export interface SidebarProps {
   expanded: boolean;
   onToggle: () => void;
   onNavigate: () => void;
+  /** 즐겨찾기·최근 본 화면 목록. 없으면 '준비 중' 자리만 둔다. 접힌 상태에서는 숨긴다. */
+  quickAccess?: ReactNode;
   children?: ReactNode;
 }
 
@@ -13,6 +15,7 @@ export function Sidebar({
   expanded,
   onToggle,
   onNavigate,
+  quickAccess,
   children,
 }: SidebarProps) {
   return (
@@ -22,9 +25,16 @@ export function Sidebar({
       className={`sidebar${expanded ? " is-expanded" : " is-collapsed"}`}
       aria-label="왼쪽 메뉴"
     >
-      <div className="quick-access">
-        <DisabledTools names={["즐겨찾기", "최근 본 화면"]} />
-      </div>
+      {(quickAccess === undefined || expanded) && (
+        <div
+          className="quick-access"
+          onClick={(event) => {
+            if ((event.target as HTMLElement).closest("button")) onNavigate();
+          }}
+        >
+          {quickAccess ?? <DisabledTools names={["즐겨찾기", "최근 본 화면"]} />}
+        </div>
+      )}
       <nav
         aria-label="업무 화면"
         onClick={(event) => {
@@ -42,7 +52,7 @@ export function Sidebar({
         aria-controls="app-sidebar"
       >
         <ShellIcon name="collapse" />
-        <span className="menu-label">메뉴 접기</span>
+        <span className="menu-label">{expanded ? "메뉴 접기" : "메뉴 펼치기"}</span>
       </button>
     </aside>
   );

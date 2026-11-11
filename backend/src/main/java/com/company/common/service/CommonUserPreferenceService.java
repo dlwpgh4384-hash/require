@@ -1,4 +1,9 @@
-package com.company.common.userpreferences;
+package com.company.common.service;
+
+import com.company.common.mapper.UserPreferenceMapper;
+import com.company.common.mapper.UserPreferenceRow;
+import com.company.common.dto.UserPreferenceInput;
+import com.company.common.dto.UserPreferenceResponse;
 
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;

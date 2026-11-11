@@ -1,4 +1,10 @@
-package com.company.common.userpreferences;
+package com.company.common.service;
+
+import com.company.common.controller.CommonUserPreferenceController;
+import com.company.common.controller.UserPreferenceExceptionHandler;
+import com.company.common.mapper.UserPreferenceMapper;
+import com.company.common.mapper.UserPreferencePeriodSourceMapper;
+import com.company.common.dto.UserPreferenceInput;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;

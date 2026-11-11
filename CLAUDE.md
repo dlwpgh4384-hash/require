@@ -9,7 +9,7 @@
 
 ## 기술 구성
 - Java 17, Spring Boot 3.3, Maven, MyBatis, PostgreSQL 16, Node 20 / React 18 + TypeScript / Vite 5 / npm.
-- 표는 sql/DDL_PostgreSQL.sql, 처음 값·공통코드·식은 sql/DML_BaseData.sql 기준. 없는 표만 만들고, 처음 값은 빈 표에만 넣는다. 앱은 표를 만들거나 바꾸지 않는다(준비 명령 --prepare-schema로만). Flyway는 쓰지 않는다.
+- 표는 sql/DDL_PostgreSQL.sql, 처음 값·공통코드·식은 sql/DML_BaseData.sql 기준. 없는 표만 만들고, 처음 값은 빈 표에만 넣는다. 앱은 표를 만들거나 바꾸지 않는다(준비 명령 --prepare-schema로만).
 - 식 내용은 TB_SY_CALC_RULE에서 CALC_ID로 읽는다.
 
 ## 일하는 방식

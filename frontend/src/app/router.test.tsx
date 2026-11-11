@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -53,11 +54,29 @@ function response(): ShellMenuResponse {
   };
 }
 function respond(body = response()) {
-  const request = vi
-    .fn()
-    .mockResolvedValue({ ok: true, json: async () => body });
+  const request = vi.fn(async (url: string, _init?: RequestInit) => ({
+    ok: true,
+    json: async () =>
+      url === "/api/common/menus" ? body : preferenceResponse(url),
+  }));
   vi.stubGlobal("fetch", request);
   return request;
+}
+function preferenceResponse(url: string) {
+  return {
+    success: true,
+    meta: {},
+    data: {
+      prefTypeCd: url.split("/").at(-2),
+      prefKey: "GLOBAL",
+      found: false,
+      prefVal: null,
+      modDttm: null,
+    },
+  };
+}
+function menuCalls(request: ReturnType<typeof vi.fn>) {
+  return request.mock.calls.filter(([url]) => url === "/api/common/menus");
 }
 function mount(path: string) {
   window.history.replaceState(null, "", path);
@@ -84,7 +103,7 @@ describe("application route registration", () => {
     expect(request).toHaveBeenCalledWith("/api/common/menus", {
       signal: expect.any(AbortSignal),
     });
-    expect(request).toHaveBeenCalledTimes(1);
+    expect(menuCalls(request)).toHaveLength(1);
   });
 
   it("dynamic direct entry and recreation render the registered placeholder, not a second shell", async () => {
@@ -121,10 +140,15 @@ describe("application route registration", () => {
   );
 
   it("direct entry errors retry the existing client without redirecting or exposing stale content", async () => {
-    const request = vi
+    const menuRequest = vi
       .fn()
       .mockResolvedValueOnce({ ok: false, status: 500 })
       .mockResolvedValueOnce({ ok: true, json: async () => response() });
+    const request = vi.fn(async (url: string) =>
+      url === "/api/common/menus"
+        ? menuRequest()
+        : { ok: true, json: async () => preferenceResponse(url) },
+    );
     vi.stubGlobal("fetch", request);
     mount("/screens/ADDED");
     const retries = await screen.findAllByRole("button", { name: "다시 시도" });
@@ -139,7 +163,7 @@ describe("application route registration", () => {
     ).toHaveTextContent("준비 중");
     expect(router?.state.location.pathname).toBe("/screens/ADDED");
     expectSingleShell();
-    expect(request).toHaveBeenCalledTimes(2);
+    expect(menuCalls(request)).toHaveLength(2);
   });
 
   it("root preserves a successful empty menu without a redirect or retry error", async () => {
@@ -150,6 +174,85 @@ describe("application route registration", () => {
       screen.queryByRole("button", { name: "다시 시도" }),
     ).not.toBeInTheDocument();
     expect(router?.state.location.pathname).toBe("/");
+    expectSingleShell();
+  });
+
+  it.each(["/", "/screens/ADDED", "/unregistered/path"])(
+    "provides one shared preferences scope at %s without creating settings or excluded API calls",
+    async (path) => {
+      const request = respond();
+      mount(path);
+      await waitFor(() =>
+        expect(
+          request.mock.calls.filter(([url]) => url !== "/api/common/menus"),
+        ).toHaveLength(5),
+      );
+      await act(async () => {});
+      expect(screen.getByTestId("user-preferences")).not.toHaveAttribute(
+        "data-page-size",
+      );
+      expect(screen.getByTestId("user-preferences")).not.toHaveAttribute(
+        "data-density",
+      );
+      expect(screen.getAllByTestId("user-preferences")).toHaveLength(1);
+      expectSingleShell();
+      const preferenceCalls = request.mock.calls.filter(
+        ([url]) => url !== "/api/common/menus",
+      );
+      expect(preferenceCalls.map(([url]) => url).sort()).toEqual([
+        "/api/common/user-preferences/DENSE/GLOBAL",
+        "/api/common/user-preferences/FAV/GLOBAL",
+        "/api/common/user-preferences/MENU_FOLD/GLOBAL",
+        "/api/common/user-preferences/PAGE_SIZE/GLOBAL",
+        "/api/common/user-preferences/RECENT/GLOBAL",
+      ]);
+      expect(preferenceCalls.every(([, init]) => !init?.method)).toBe(true);
+    },
+  );
+
+  it("keeps the same preferences scope across child route navigation", async () => {
+    const request = respond();
+    mount("/screens/ADDED");
+    await waitFor(() =>
+      expect(
+        request.mock.calls.filter(([url]) => url !== "/api/common/menus"),
+      ).toHaveLength(5),
+    );
+    await act(async () => {});
+    const provider = screen.getByTestId("user-preferences");
+    const reads = request.mock.calls.filter(
+      ([url]) => url !== "/api/common/menus",
+    ).length;
+    await act(async () => {
+      await router!.navigate("/unregistered/path");
+    });
+    expect(await screen.findByText("없는 화면입니다")).toBeVisible();
+    expect(screen.getByTestId("user-preferences")).toBe(provider);
+    expect(
+      request.mock.calls.filter(([url]) => url !== "/api/common/menus"),
+    ).toHaveLength(reads);
+    expectSingleShell();
+  });
+
+  it("keeps the shell available without claiming default settings when preference reads fail", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url !== "/api/common/menus")
+          throw new Error("private connection error");
+        return { ok: true, json: async () => response() };
+      }),
+    );
+    mount("/screens/ADDED");
+    expect(
+      await screen.findByRole("region", { name: "ADDED 본문" }),
+    ).toHaveTextContent("준비 중");
+    expect(screen.getByTestId("user-preferences")).not.toHaveAttribute(
+      "data-page-size",
+    );
+    expect(
+      screen.queryByText("private connection error"),
+    ).not.toBeInTheDocument();
     expectSingleShell();
   });
 });

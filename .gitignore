@@ -1,2 +1,30 @@
+# 검증용 문서 - git에 올리지 않음 (폴더 유지용 .gitkeep만 추적)
 docs/*
 !docs/.gitkeep
+
+node_modules/
+.next/
+dist/
+build/
+coverage/
+.vite/
+.cache/
+*.log
+*.local
+backend/target/
+__pycache__/
+.aiops-runtime/
+.env
+.env.*
+
+# Playwright verifier artifacts
+test-results/
+**/test-results/
+playwright-report/
+**/playwright-report/
+
+# Eclipse
+.project
+.classpath
+.settings/
+backend/bin/

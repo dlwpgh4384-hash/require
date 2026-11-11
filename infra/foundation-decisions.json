@@ -1,0 +1,47 @@
+{
+  "execution_status": "not_run",
+  "static_inspection": {
+    "ddl_tables_matching_original_baseline": 9,
+    "ddl_columns": 117,
+    "seed_rows_matching_original_request": 40,
+    "json_and_pom_xml": "parsed",
+    "trailing_whitespace": "none in authored application directories",
+    "meaning": "File inspection only; no SQL, application, tests, containers or builds executed."
+  },
+  "stack_decision": "D1: Java 17, Spring Boot 3.3.13, Maven executable jar, blocking MyBatis 3.0.4, PostgreSQL 16, Node 20, React 18, Vite 5, npm",
+  "provenance": "Checkpoint authorization permits implementation; it is not historical approval or a passing build. UP-001 policy-default citation remains unresolved; execution selection_source remains explicit. Frozen staged documents are unchanged.",
+  "api_decisions": {
+    "envelope": "Approved OpenAPI success/meta envelope; menus add data array, not the source-request top-level array.",
+    "direct_routes": "D3: meta.screenAccess from the same complete candidate snapshot; no new endpoint or query input.",
+    "health": "D4: anonymous HTTP 200 application/json with success=true and empty meta; no DB readiness assertion.",
+    "caller_errors": "Neither scoped GET defines caller inputs, login, role validation or business write errors. No invented 400/401/403 cases. Unknown paths use ordinary 404."
+  },
+  "preparation": {
+    "entry": "com.company.common.NavigationApplication --prepare-schema",
+    "connection": "Existing application SqlSessionFactory; one forced commit or rollback.",
+    "resources": ["db/migration/V1__navigation_schema.sql", "db/migration/V2__navigation_menu_seed.sql"],
+    "locking": "D5 transaction advisory lock shared by preparers; target relation locks prevent concurrent mutation during preflight; menu lock encloses empty check and all seed inserts.",
+    "flyway": "Versioned resources are Flyway-compatible; automatic Flyway is disabled to honor D5 explicit preparation without mutation of an installation before preflight. Container executes preparation before serving; do not concurrently enable automatic Flyway.",
+    "mismatch": "stderr catalog differences and nonzero command exit. No confirmation bypass or schema repair.",
+    "status_code_comments": "PROJ_STAT_CD and CLOSE_STAT_CD allowed values are unspecified. No invented status enums/comments or business behavior were added."
+  },
+  "ui_contract": {
+    "routes": ["/", "/screens/:scrnId", "*"],
+    "shell": "Single AppLayout/Header/Sidebar; title/actions/children insertion slots; six disabled tools in their reference regions; no fake user or counts.",
+    "behavior": "Memory-only expanded/groups; real relative menu GET, loading/error/empty, retry preserving address, D3 direct-route metadata, width filtering and first eligible leaf.",
+    "style": "56px header, 240/64px sidebar, 280px mobile drawer at <=767px; exact light/dark semantic colors, compact density, internal scrolling, reduced-motion behavior.",
+    "integration": "Menu controller/service/mapper, graph tests, dynamic placeholder screen wrapper and seed icon registry are present and connected. NavigationRoot.renderScreen remains the body integration seam."
+  },
+  "verification": {
+    "backend_unit_and_mockmvc": "authored_not_run",
+    "frontend_component": "authored_not_run",
+    "postgresql16": "authored_not_run; optional NAVIGATION_TEST_DB_URL enables independent owned-schema integration tests",
+    "localhost": "not_run",
+    "remote_nonloopback": "not_run",
+    "build": "not_run",
+    "browser": "not_run"
+  },
+  "materialization_required": [],
+  "lockfile": "frontend/package-lock.json is present; its root dependencies, devDependencies and engines match package.json by static inspection. npm ci and builds remain unexecuted in this integration pass.",
+  "workspace": "Final integration pass inspected the combined Git worktree; pre-existing modified and untracked files were preserved."
+}

@@ -43,6 +43,29 @@ class CommonMenuControllerTest {
     }
 
     @Test
+    void businessDisabledParentAndActiveChildAreHiddenWithoutChangingSourceRows() throws Exception {
+        var parent = row("parent", null, null, 1);
+        parent.setUseYn("N");
+        var child = row("child", "parent", "CHILD", 2);
+        var root = row("root", null, "ROOT", 3);
+        var candidates = List.of(parent, child, root);
+        when(mapper.selectCandidates()).thenReturn(candidates);
+
+        mvc.perform(get("/api/common/menus"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.length()").value(1))
+            .andExpect(jsonPath("$.data[0].menuId").value("root"));
+
+        assertThat(candidates).containsExactly(parent, child, root);
+        assertThat(parent.getUseYn()).isEqualTo("N");
+        assertThat(child.getUseYn()).isEqualTo("Y");
+        assertThat(child.getUpperMenuId()).isEqualTo("parent");
+        verify(mapper).selectCandidates();
+        verifyNoMoreInteractions(mapper);
+    }
+
+    @Test
     void emptyIsSuccessfulAndHasAnEmptyAccessList() throws Exception {
         when(mapper.selectCandidates()).thenReturn(List.of());
         mvc.perform(get("/api/common/menus")).andExpect(status().isOk())

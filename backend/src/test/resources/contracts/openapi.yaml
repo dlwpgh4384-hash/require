@@ -158,24 +158,135 @@ paths:
                 allOf:
                   - $ref: '#/components/schemas/ApiResponse'
                   - type: object
-                    required: [data, meta]
+                    required: [data]
                     properties:
-                      meta:
-                        type: object
-                        description: D3 implementation contract; staged specification remains unchanged.
-                        required: [screenAccess]
-                        properties:
-                          screenAccess:
-                            type: array
-                            description: One entry per distinct nonempty database SCRN_ID, using its first SORT_ORD/MENU_ID candidate, including unavailable screens.
-                            items:
-                              $ref: '#/components/schemas/ScreenAccess'
                       data:
                         type: array
                         items:
                           $ref: '#/components/schemas/MenuItem'
         '500':
           description: 메뉴 DB 읽기 실패. 상세 오류 필드는 원문 미제공이며 공통 실패 봉투만 제안한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/user-preferences/{prefTypeCd}/{prefKey}:
+    get:
+      operationId: getCommonUserPreference
+      summary: 사용자 공통 설정 조회
+      security: []
+      x-related-requirements:
+      - REQ-054
+      - REQ-055
+      - REQ-074
+      - REQ-075
+      - REQ-078
+      - REQ-087
+      - REQ-097
+      parameters: &id001
+      - name: prefTypeCd
+        in: path
+        required: true
+        schema:
+          type: string
+          enum:
+          - FAV
+          - RECENT
+          - MENU_FOLD
+          - PAGE_SIZE
+          - DENSE
+          - PERIOD
+      - name: prefKey
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 30
+        description: PERIOD는 대상 SCRN_ID, 나머지는 GLOBAL. 기존 DML 충돌 여부는 확인한다.
+      description: 로그인 없이 서버 고정 admin의 설정 하나를 읽는다. 행 부재는 found=false이며 임의 기본값을 생성하지 않는다.
+      x-aiops-query-role:
+        entity: TB_SY_USER_PREF
+        result_path:
+        - data
+      responses:
+        '200':
+          description: 저장 설정 또는 found=false
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferenceResponse'
+        '400':
+          description: 지원하지 않는 설정 종류·키 규약 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    put:
+      operationId: putCommonUserPreference
+      summary: 사용자 공통 설정 저장
+      security: []
+      x-related-requirements:
+      - REQ-054
+      - REQ-055
+      - REQ-074
+      - REQ-075
+      - REQ-076
+      - REQ-078
+      - REQ-087
+      - REQ-097
+      - REQ-109
+      parameters: *id001
+      description: 서버 고정 admin의 설정 단건을 저장한다. 사용자 ID·역할을 받거나 로그인 검사를 추가하지 않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferenceInput'
+      x-business-rules:
+      - FAV JSON 배열은 최대 10개, RECENT는 최대 5개다. 한도를 넘긴 요청을 저장하지 않는다.
+      - PAGE_SIZE는 20/50/100, DENSE는 넓게/좁게, MENU_FOLD는 true/false 문자열이다. PERIOD는 year 및 월형의 month를 직렬화한다.
+      - PERIOD의 허용 연도·최신 월 판정은 부품 입력과 최신 월 원천을 따르며 이 API가 업무 자료 연도를 조회하지 않는다.
+      - 기존 행은 읽은 MOD_DTTM과 DB 시각이 같은 경우에만 갱신한다. 다른 시각은 덮어쓰지 않는다.
+      x-side-effects:
+      - TB_SY_USER_PREF 신규 행은 REG_USER_ID=admin·REG_DTTM, 갱신은 MOD_USER_ID=admin·MOD_DTTM을 기록하고 다음 GET으로 읽힌다.
+      - 업무 감사·알림 행은 생성하지 않는다. 화면 설정 반영·3초 완료 알림은 성공을 소비한 UI의 책임이다.
+      x-state-transitions:
+      - from: 행 없음
+        to: 저장 행
+        condition: 유효한 설정 최초 저장
+      - from: 기존 PREF_VAL
+        to: 새 PREF_VAL
+        condition: 유효 입력·MOD_DTTM 일치
+      - from: 기존 PREF_VAL
+        to: 기존 PREF_VAL
+        condition: 입력 오류·한도 초과·MOD_DTTM 불일치
+      x-required-tests:
+      - 'happy: 기존 admin/PAGE_SIZE/GLOBAL과 읽은 modDttm으로 prefVal=50 저장 -> 200이며 후속 GET과 TB_SY_USER_PREF.PREF_VAL이 문자열
+        50이다.'
+      - 'auth: 인증 헤더 없이 admin/MENU_FOLD/GLOBAL 유효 설정 저장 -> 로그인·역할 검사 없이 200이며 GET에서 변경값이 읽힌다. 이번 요청은 로그인·권한을 제외하므로
+        근거 없는 401·403 거부 시험을 만들지 않는다.'
+      - 'validation: PAGE_SIZE/GLOBAL에 prefVal=30 저장 -> 400 ApiError.errors의 prefVal 필드 오류이며 기존 PAGE_SIZE 값은 그대로다.'
+      - 'business: 기존 행의 읽은 modDttm과 DB MOD_DTTM이 다른 채 저장 -> 409와 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.이며 PREF_VAL은 DB 최신값
+        그대로다.'
+      - 'side-effect: 기존 MENU_FOLD 행을 읽은 modDttm으로 변경 저장 -> TB_SY_USER_PREF.MOD_USER_ID=admin·MOD_DTTM 갱신이 DB에 있고
+        다음 GET.modDttm과 같다.'
+      responses:
+        '200':
+          description: 저장한 설정과 수정 시각
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferenceResponse'
+        '400':
+          description: 종류·키·직렬화·허용값·길이·목록 한도 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 읽은 시각과 다른 기존 행. 기존 값은 보존한다.
           content:
             application/json:
               schema:
@@ -221,6 +332,19 @@ components:
       type: object
       required: [success, meta]
       properties:
+        message:
+          type: string
+          description: 사용자에게 보여 줄 존댓말 오류. 내부 코드·영문 오류는 표시하지 않는다.
+        errors:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string
         success:
           type: boolean
           enum: [false]
@@ -228,20 +352,66 @@ components:
           type: object
           description: 실패 메타데이터. 오류 코드·메시지·추적 필드 정책은 확인 필요다.
           additionalProperties: true
-    ScreenAccess:
+    UserPreferenceInput:
       type: object
       additionalProperties: false
-      required: [scrnId, available, pcOnlyYn]
+      required:
+      - prefVal
+      - modDttm
       properties:
-        scrnId:
+        prefVal:
           type: string
-          maxLength: 10
-        available:
+          minLength: 1
+          maxLength: 2000
+          description: 종류별 직렬화는 데이터 계약 참조. PAGE_SIZE=20/50/100, DENSE=넓게/좁게, MENU_FOLD=true/false. FAV/RECENT는 SCRN_ID
+            배열 JSON, PERIOD는 year/month JSON.
+        modDttm:
+          type: string
+          format: date-time
+          nullable: true
+          description: 조회한 MOD_DTTM. 기존 null 시각 또는 행 부재이면 null을 그대로 전달한다.
+    UserPreferenceResult:
+      type: object
+      additionalProperties: false
+      required:
+      - prefTypeCd
+      - prefKey
+      - found
+      - prefVal
+      - modDttm
+      properties:
+        prefTypeCd:
+          type: string
+          enum:
+          - FAV
+          - RECENT
+          - MENU_FOLD
+          - PAGE_SIZE
+          - DENSE
+          - PERIOD
+        prefKey:
+          type: string
+          maxLength: 30
+        found:
           type: boolean
-          description: False for disabled, invalid-hierarchy, suppressed-ancestor or mixed-group representative menus; viewport filtering remains a client responsibility.
-        pcOnlyYn:
+          description: 저장 행 존재 여부. 행 없으면 prefVal·modDttm은 null이다.
+        prefVal:
           type: string
-          enum: ['Y', 'N']
+          nullable: true
+          maxLength: 2000
+        modDttm:
+          type: string
+          nullable: true
+          format: date-time
+    UserPreferenceResponse:
+      allOf:
+      - $ref: '#/components/schemas/ApiResponse'
+      - type: object
+        required:
+        - data
+        properties:
+          data:
+            $ref: '#/components/schemas/UserPreferenceResult'
     MenuItem:
       type: object
       additionalProperties: false
@@ -333,3 +503,211 @@ x-requirement-context:
     REQ-051: '명명 제약 — AppLayout·Sidebar·Header·TB_SY_MENU·SCRN_ID·UI-16·/api/common/menus 보존. getCommonMenus·화면 route는 설계 제안이며 원문 확정 이름으로 가장하지 않음.'
   getHealth:
     REQ-043: '필수 경로 — /api/health 유지. GET·getHealth는 기존 설계 제안. 성공 값·DB 포함·오류·4xx 부재 근거 OQ-006. 제품 검증 화면 추가 금지.'
+
+x-uncovered-requirements:
+- canonical_id: REQ-052
+  status: non-functional
+  evidence: '기존 틀 확장는 실행·범위 검수 소유다: 기능 추가 전후 AppLayout·Sidebar·Header가 각 하나이고 기존 메뉴 조회를 재사용한다.'
+- canonical_id: REQ-053
+  status: non-functional
+  evidence: '요청 디자인 우선는 실행·범위 검수 소유다: 세 폭 경계와 문구가 레퍼런스가 아닌 요청 값과 일치한다.'
+- canonical_id: REQ-056
+  status: non-functional
+  evidence: '메뉴 API 재사용는 실행·범위 검수 소유다: 메뉴 요청 경로가 /api/common/menus이며 대체 메뉴 API가 없다.'
+- canonical_id: REQ-057
+  status: non-functional
+  evidence: '기술 구성 유지는 실행·범위 검수 소유다: 구현 manifest와 빌드가 지정 버전·Maven·MyBatis를 사용한다.'
+- canonical_id: REQ-058
+  status: data-constraint
+  evidence: 'SQL 정의 준수는 SQL 대조·준비 절차가 소유한다: 준비 전후 메타데이터를 DDL과 대조하고 임의 컬럼을 추가하지 않는다.'
+- canonical_id: REQ-059
+  status: data-constraint
+  evidence: '누락 표만 준비는 SQL 대조·준비 절차가 소유한다: 기존 TB_SY_USER_PREF와 데이터가 준비 재실행 뒤 그대로 남는다.'
+- canonical_id: REQ-060
+  status: data-constraint
+  evidence: '빈 표만 초기화는 SQL 대조·준비 절차가 소유한다: 비어 있지 않은 표에서 준비 명령을 다시 실행해도 기존 행·값은 같다.'
+- canonical_id: REQ-061
+  status: non-functional
+  evidence: '명시적 구조 준비는 실행·범위 검수 소유다: 일반 기동·API 호출은 DDL 0회, 준비 명령은 누락 표만 만든다.'
+- canonical_id: REQ-062
+  status: data-constraint
+  evidence: '후속 화면 재사용 규약는 SQL 대조·준비 절차가 소유한다: 후속 인계 규약에 CALC_ID 원천을 남기고 이번 단계에 계산 기능은 생성하지 않는다.'
+- canonical_id: REQ-063
+  status: out-of-scope
+  evidence: 인증 세션 처리는 후속 UI-22 작업의 소유이며 이번 설정 GET/PUT은 security=[]로 개발 PC에서 호출한다. 인증 endpoint는 이 변경의 계약 대상이 아니다.
+- canonical_id: REQ-064
+  status: out-of-scope
+  evidence: getCommonMenus의 기존 역할 비검사 경계를 그대로 소비한다. 버튼 권한 결정을 위한 grant·revoke 또는 권한조회 연산을 이 공통 화면 변경에 추가하지 않는다.
+- canonical_id: REQ-065
+  status: out-of-scope
+  evidence: Header의 알림 자리는 준비 중 비활성 UI이다. TB_SY_NOTI 행 생성·읽음 갱신·발송 연산은 도구줄 껍데기의 성공 결과가 아니다.
+- canonical_id: REQ-066
+  status: out-of-scope
+  evidence: 사용자 메뉴에는 내 정보·비밀번호 항목을 비활성으로만 배치한다. 사용자 프로필 저장·비밀번호 재설정 wire 계약을 이번 PREF API와 혼합하지 않는다.
+- canonical_id: REQ-067
+  status: out-of-scope
+  evidence: UI-26에서 별도로 구현할 AI 분석 도우미의 질문 전송과 답변 응답은 담당 범위 밖이다. 이번 Header는 외부 AI 호출 없이 준비 중 자리만 보인다.
+- canonical_id: REQ-068
+  status: out-of-scope
+  evidence: UI-13의 청구·입금 배지와 UI-14 월마감 메뉴 배지는 후속 해당 업무가 소유한다. PeriodSelector의 기간 상태 배지와 별개이며 메뉴 배지 API는 만들지 않는다.
+- canonical_id: REQ-069
+  status: out-of-scope
+  evidence: 기존 30개 업무 본문은 준비 중을 유지한다. 프로젝트·청구·입금의 자료 조회·저장·계산 연산을 설정 단건 저장 경로로 대체하거나 추가하지 않는다.
+- canonical_id: REQ-070
+  status: screen-only
+  evidence: '후속 로그인까지 비활성는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 로그인·권한·알림 자리 클릭으로 기능이 실행되지 않는다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-071
+  status: screen-only
+  evidence: '제목줄 정보는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 선택 메뉴의 경로·제목·화면 번호와 별, 작업 버튼 자리가 보인다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-072
+  status: screen-only
+  evidence: '로고·현재 메뉴 이동는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 다른 묶음 화면에서 로고 클릭 후 UI-16이 열리고 대시보드 묶음이 펼쳐진다. 별도 업무 명령 API를
+    추가하지 않는다.'
+- canonical_id: REQ-073
+  status: screen-only
+  evidence: '접힌 메뉴 조작는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 메뉴 접기 클릭 후 아이콘과 호버 하위 메뉴가 보인다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-077
+  status: screen-only
+  evidence: '즐겨찾기 빈 안내는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: FAV 0개일 때 지정 문구가 보이고 가짜 즐겨찾기 행이 없다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-079
+  status: screen-only
+  evidence: '두 목록 가시성는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 접힌 상태에 목록이 없고 휴대폰에서 pcOnlyYn=Y 항목이 없으며 사용중지·제거 항목도 보이지 않는다.
+    별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-080
+  status: screen-only
+  evidence: '탭 열기·주소 공유는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: AC-0103: 같은 메뉴 두 번 선택 후 탭 하나만 남고 공유한 #UI-12 주소로 해당 화면에 진입한다.
+    별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-081
+  status: screen-only
+  evidence: '대시보드 탭 보호는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: UI-16 탭은 첫 위치에 남고 다른 탭 x 클릭은 해당 탭을 제거한다. 별도 업무 명령 API를 추가하지
+    않는다.'
+- canonical_id: REQ-082
+  status: screen-only
+  evidence: '탭 한도 교체 확인는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: AC-0103: 9번째 진입의 취소는 기존 8개 유지, 동의는 가장 오래 안 본 탭 교체 후 8개다. 154행의
+    단일 확인을 따른다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-083
+  status: screen-only
+  evidence: '미저장 탭 표식는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 입력 변경 후 ●가 보이고 닫기 취소 후 탭·입력값이 유지된다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-084
+  status: screen-only
+  evidence: '탭 비영속·휴대폰 제외는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 여러 탭을 연 뒤 재접속하면 UI-16 하나이며 767px 이하에는 탭이 없다. 별도 업무 명령 API를
+    추가하지 않는다.'
+- canonical_id: REQ-085
+  status: screen-only
+  evidence: '도구줄 비활성 자리는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: AC-0104: AI와 알림을 눌러도 창·API 호출이 없고 준비 중 표시가 보인다. 별도 업무 명령 API를
+    추가하지 않는다.'
+- canonical_id: REQ-086
+  status: screen-only
+  evidence: '사용자 메뉴는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 사용자 메뉴에서 두 공통 기능은 열리고 제외된 세 기능은 실행되지 않는다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-088
+  status: screen-only
+  evidence: '설정 기본값 복원는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 기본값으로 실행 결과는 DML_BaseData.sql 값과 일치해야 하며 임의 20·넓게를 기본으로 단정하지
+    않는다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-089
+  status: screen-only
+  evidence: '메뉴 찾기·창 닫기는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: Ctrl+K 후 UI-12 입력 시 해당 메뉴만 좁혀지고 Esc로 닫히며 휴대폰은 아이콘 진입이 된다.
+    별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-090
+  status: screen-only
+  evidence: '업무 단축키 연결점는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 단축키 시험에서 등록된 테스트 핸들러만 호출되고 실제 업무 조회·저장은 발생하지 않는다. 별도 업무 명령
+    API를 추가하지 않는다.'
+- canonical_id: REQ-091
+  status: screen-only
+  evidence: 'PeriodSelector 재사용는 PeriodSelector 입력·상태 callback 부품 시험으로 검증한다: 부품 시험에서 두 가지 이상 설정을 재사용하고 업무 자료 API
+    호출이 없다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-092
+  status: screen-only
+  evidence: '기간 유형·화면 매핑는 PeriodSelector 입력·상태 callback 부품 시험으로 검증한다: AC-0105: 4개 유형을 부품 시험으로 렌더링하고 UI-07은 누계, UI-04는
+    월, 나머지는 지정 유형에 대응한다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-093
+  status: screen-only
+  evidence: '기간 배치·설명는 PeriodSelector 입력·상태 callback 부품 시험으로 검증한다: 기간 줄이 Header가 아닌 본문에 있고 전달한 설명 한 줄이 표시된다. 별도
+    업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-094
+  status: screen-only
+  evidence: '기간 배지는 PeriodSelector 입력·상태 callback 부품 시험으로 검증한다: AC-0105: 지난 해 누계는 결산 완료, 내년 허용 연도는 내년 · 계획이다. 월
+    마감 코드 해석은 OQ-DATA-001 확인 후 검증한다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-095
+  status: non-functional
+  evidence: TB_CL_CLOSE 마감 코드와 TB_SY_OPER_STD 물리 키·값 정의 확보 후 최신 월 조회 연산을 결정한다(OQ-DATA-001); 범위·fallback 의미는 spec.md에
+    확정했다.
+- canonical_id: REQ-096
+  status: screen-only
+  evidence: '월 선택 상한 거부는 PeriodSelector 입력·상태 callback 부품 시험으로 검증한다: 상한 월은 선택되며 그 다음 달 선택은 거부된다. 150행에 따라 연도만 유형에는
+    월 상한을 적용하지 않는다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-098
+  status: screen-only
+  evidence: '연도·내년 범위 거부는 PeriodSelector 입력·상태 callback 부품 시험으로 검증한다: 150·152행: 내년 불허 입력은 선택 불가, 예외 화면의 내년 자료 허용
+    입력은 내년 선택·계획 배지다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-099
+  status: screen-only
+  evidence: '운영 전 연도 제한는 PeriodSelector 입력·상태 callback 부품 시험으로 검증한다: 이전 해가 자료 범위에 있을 때 UI-07은 허용, UI-18은 거부하고 선택값이
+    유지된다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-100
+  status: screen-only
+  evidence: '지난 해 읽기 전용 전달는 PeriodSelector 입력·상태 callback 부품 시험으로 검증한다: 지난 해 선택 callback은 읽기 전용이며 부품 자체가 임의 업무 버튼을
+    생성·제거하지 않는다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-101
+  status: screen-only
+  evidence: '기간 부품 접근성는 PeriodSelector 입력·상태 callback 부품 시험으로 검증한다: 767px에서 드롭다운만 보이며 키보드 선택과 연결된 접근 가능 이름·상태 안내가
+    확인된다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-102
+  status: screen-only
+  evidence: '검증 부품 실제 적용는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: AC-0106: 화면 설정에서 공통 검증기와 미저장 확인이 실제 호출된다. 별도 업무 명령 API를 추가하지
+    않는다.'
+- canonical_id: REQ-103
+  status: screen-only
+  evidence: '전체 입력 검증는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: AC-0106: 잘못된 PAGE_SIZE로 저장하면 칸 아래 오류·첫 오류 포커스가 보이고 DB 설정은 그대로다.
+    별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-104
+  status: screen-only
+  evidence: '숫자 입력 정제는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 숫자 칸에 숫자와 문자를 입력하면 숫자만 남고 저장 요청에는 문자가 없다. 별도 업무 명령 API를 추가하지
+    않는다.'
+- canonical_id: REQ-105
+  status: screen-only
+  evidence: '오류 문구 규약는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 각 검증 fixture에서 원문 문구 형식이 출력되며 SQL 오류·내부 코드가 화면에 없다. 별도 업무 명령
+    API를 추가하지 않는다.'
+- canonical_id: REQ-106
+  status: screen-only
+  evidence: '위험 작업 확인는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 확인 취소는 핸들러를 호출하지 않고 실행 동의는 핸들러 한 번만 호출한다. 실제 업무 위험 작업은 추가하지
+    않는다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-107
+  status: screen-only
+  evidence: '미저장 이탈 보호는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 154행: 취소 후 화면·입력 유지, 나가기 후 이동, 탭 교체에서는 대상 이름 포함 확인 하나, 브라우저
+    종료에서는 기본 경고를 확인한다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-108
+  status: screen-only
+  evidence: '완료 알림는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 화면 설정 저장 성공 시 초록 알림이 표시되고 3초 뒤 사라진다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-110
+  status: screen-only
+  evidence: '폭별 배치는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: AC-0107: 1280·768·767px에서 배치가 전환되고 저장 접힘은 PC·태블릿에서 우선한다. 카드 규약은
+    부품 시험으로 검증한다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-111
+  status: screen-only
+  evidence: '휴대폰 PC전용 접근 제한는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: AC-0107: 휴대폰 UI-10 직접 진입에 PC에서 이용해 주세요 안내와 대시보드로 버튼이 보이고
+    클릭 후 UI-16이다. 별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-112
+  status: screen-only
+  evidence: '휴대폰 엑셀 버튼 제외는 공통 UI의 해당 이벤트·렌더링 시험으로 검증한다: 업무 연결 시험 fixture에서 두 버튼은 휴대폰에서 보이지 않고 PC에서 해당 화면 계약에 따른다.
+    별도 업무 명령 API를 추가하지 않는다.'
+- canonical_id: REQ-113
+  status: non-functional
+  evidence: '테마·키보드 접근성는 실행·범위 검수 소유다: 기기 테마 변경 시 배색이 바뀌고 메뉴·별·창 버튼은 키보드로 조작되며 접근 가능 이름이 있다.'
+
+x-change-supersession:
+  description: 기존 operation과 기준선 시험은 원형 보존한다. 이번 공통 기능 인수에는 다음 예외가 우선하며 기존 메뉴 조회 자체를 상태 저장 API로 바꾸지 않는다.
+  ui-header: 'REQ-071·REQ-086: 제목줄 정보와 시스템 관리자 이름은 이번 원문으로 허용한다.'
+  ui-tools: 공통 도구만 실제 연결하고 AI·알림·로그인 관련은 여전히 비활성이다. 실제 요구 연결은 새 연산과 x-uncovered-requirements의 단건 항목을 따른다.
+  read-only: 'REQ-054·REQ-055: 메뉴 GET은 계속 읽기 전용이다. 여섯 설정 쓰기는 신규 putCommonUserPreference만 수행하므로 과거 UI 전체 상태 무저장 시험은
+    이 변경 범위에서 대체한다.'
+  schema-prep: >-
+    공통 기능이 쓰는 TB_SY_USER·TB_SY_CODE_GRP·TB_SY_CODE·TB_SY_OPER_STD를 준비 명령(--prepare-schema)이
+    없을 때만 원문 DDL로 만들고(V1), 표가 비어 있을 때만 sql/DML_BaseData.sql의 admin 사용자·공통코드·운영 기준값을 넣는다(V3).
+    REQ-031의 9개 표 목록과 REQ-036의 "다른 표 신규 0행"은 이 네 표에 대해 이 변경이 우선한다. 물리 FK는 계속 만들지 않는다.
+  ui-states: >-
+    FR-0107: 휴대폰 PC 전용 화면 안내는 "PC에서 이용해 주세요 — 「화면명」은 큰 표를 다루는 화면이라 휴대폰에서는 열리지 않습니다"와
+    [대시보드로]로 바꾼다. FR-0002: 메뉴는 있지만 열 수 있는 화면이 없으면 "열 수 있는 화면이 없습니다", 메뉴가 0건이면 "등록된 메뉴 없음".
+  ui-shell: >-
+    REQ-072·REQ-080~REQ-084: 로고 이동, 화면 탭(열기·재사용, #UI 주소, 대시보드 고정, 8개 한도 확인, 미저장 ● 표시와 닫기 확인,
+    재접속 시 대시보드만, 휴대폰 탭 없음)은 frontend/src/app/ScreenTabs.test.tsx와 CommonNavigationPage.test.tsx로 검증한다.
+    REQ-091~REQ-101: PeriodSelector는 frontend/src/shared/period/PeriodSelector.test.tsx에서 설정 여러 가지로 검증한다.

@@ -53,6 +53,7 @@ export function FavoriteScreenButton({ screenId }: { screenId: string }) {
       <button
         type="button"
         data-testid="favorite-screen-toggle"
+        className={`favorite-star${selected ? " is-on" : ""}`}
         aria-label={selected ? "즐겨찾기 해제" : "즐겨찾기 추가"}
         aria-pressed={selected}
         disabled={state.status !== "ready" || state.saving}
@@ -60,7 +61,7 @@ export function FavoriteScreenButton({ screenId }: { screenId: string }) {
           void toggle();
         }}
       >
-        {selected ? "★" : "☆"}
+        <ShellIcon name="star" size={18} />
       </button>
       {(message || state.error) && (
         <span role="alert">{message || state.error}</span>

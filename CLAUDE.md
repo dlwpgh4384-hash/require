@@ -5,7 +5,7 @@
 - docs/spec: v3.5 화면별 명세(만들 기준). 순서: 00(공통 화면 틀·메뉴) → 00-1(공통 기능) → 01~30(업무 화면) → 31(로그인, 맨 마지막).
 - docs/reference: 명세서 v3.1 원본(공통 기능 SFR-001~021, 비기능, 별첨 1~4), 화면 시안 v1.8, 공통규칙.md(명명·코딩 규칙), v3.4_old(옛 판, 대조용으로만).
 - docs/decisions: 12_열린질문_관리.md(날짜별 결정과 이유), 13_로그인_질문답_정리.md.
-- 기준이 다르면: docs/spec > sql > docs/reference 순서로 따른다. v3.4_old는 기준으로 쓰지 않는다.
+- 화면 모양·문구·배치는 화면 시안(v1.8)이 최종이다. 동작 규칙·표·식은 docs/spec > sql > docs/reference 순서로 따른다. v3.4_old는 기준으로 쓰지 않는다.
 
 ## 기술 구성
 - Java 17, Spring Boot 3.3, Maven, MyBatis, PostgreSQL 16, Node 20 / React 18 + TypeScript / Vite 5 / npm.

@@ -26,7 +26,7 @@ class SchemaPreparationTest {
     }
 
     @Test
-    void bothPackagedResourcesExecuteBeforeSingleCommit() throws Exception {
+    void allPackagedResourcesExecuteBeforeSingleCommit() throws Exception {
         preparation.prepare();
         var ordered = inOrder(factory, session, connection, statement);
         ordered.verify(factory).openSession(false);
@@ -41,6 +41,10 @@ class SchemaPreparationTest {
         ordered.verify(session).getConnection();
         ordered.verify(connection).createStatement();
         ordered.verify(statement).execute(contains("INSERT INTO TB_SY_OPER_STD"));
+        ordered.verify(statement).close();
+        ordered.verify(session).getConnection();
+        ordered.verify(connection).createStatement();
+        ordered.verify(statement).execute(contains("INSERT INTO TB_SY_USER_ROLE"));
         ordered.verify(statement).close();
         ordered.verify(session).commit(true);
         ordered.verify(session).close();
@@ -69,13 +73,14 @@ class SchemaPreparationTest {
     void migrationResourcesContainOnlyModelTablesAndBaseSeeds() throws Exception {
         preparation.prepare();
         var resources = ArgumentCaptor.forClass(String.class);
-        verify(statement, times(3)).execute(resources.capture());
+        verify(statement, times(4)).execute(resources.capture());
         String schema = resources.getAllValues().get(0);
         var tables = java.util.regex.Pattern.compile("CREATE TABLE IF NOT EXISTS (TB_[A-Z_]+)").matcher(schema);
         var names = new java.util.ArrayList<String>();
         while (tables.find()) names.add(tables.group(1));
         assertThat(names).containsExactly("TB_SY_USER_SCOPE", "TB_SY_MENU", "TB_SY_USER_PREF", "TB_SY_NOTI", "TB_BS_PART_STD", "TB_PJ_PROJ", "TB_BL_BILL", "TB_BL_DUN_HIST", "TB_CL_CLOSE",
-            "TB_SY_USER", "TB_SY_CODE_GRP", "TB_SY_CODE", "TB_SY_OPER_STD");
+            "TB_SY_USER", "TB_SY_CODE_GRP", "TB_SY_CODE", "TB_SY_OPER_STD",
+            "TB_SY_ROLE", "TB_SY_USER_ROLE", "TB_BS_PART", "TB_SY_ACCS_LOG", "TB_SY_CHG_HIST");
         assertThat(schema).doesNotContain("FOREIGN KEY", "ALTER TABLE", "DROP TABLE", "TRUNCATE");
         assertThat(schema).contains("pg_advisory_xact_lock(734901, 1)");
         String seed = resources.getAllValues().get(1);
@@ -87,6 +92,24 @@ class SchemaPreparationTest {
         }
         assertThat(baseSeed).contains("('CASH_BASE_YM', '202601',", "('PREF_TYPE', 'MENU_FOLD',");
         assertThat(baseSeed).doesNotContain("TB_SY_ROLE", "TB_SY_CALC_RULE", "DELETE", "UPDATE", "TRUNCATE");
+        String userSeed = resources.getAllValues().get(3);
+        for (String table : new String[]{"TB_SY_ROLE", "TB_SY_USER_ROLE", "TB_BS_PART"}) {
+            assertThat(userSeed).contains("IF NOT EXISTS (SELECT 1 FROM " + table + ")",
+                "LOCK TABLE " + table + " IN EXCLUSIVE MODE");
+        }
+        assertThat(userSeed).contains("('admin', 'ADMIN', 'SYSTEM')", "('HQ', '본사', 'Y', 'Y', 'SYSTEM')");
+        assertThat(userSeed).doesNotContain("ON CONFLICT", "UPDATE ", "DELETE ", "TB_SY_ROLE_MENU_AUTH");
+    }
+
+    @Test
+    void finalUserSeedFailureRollsBackEntirePreparation() throws Exception {
+        when(statement.execute(anyString())).thenReturn(true, true, true)
+            .thenThrow(new SQLException("injected user seed failure"));
+        assertThatThrownBy(preparation::prepare).isInstanceOf(SQLException.class);
+        verify(statement, times(4)).execute(anyString());
+        verify(session).rollback(true);
+        verify(session, never()).commit(anyBoolean());
+        verify(session).close();
     }
 
     @Test

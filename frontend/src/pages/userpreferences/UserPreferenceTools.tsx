@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import { ScreenSettingsDialog } from "./ScreenSettingsDialog";
 import { UserPreferenceDialog } from "./UserPreferenceDialog";
 import type { PreferenceMenu } from "./PersonalScreenPreferences";
@@ -231,14 +231,38 @@ export function usePreferenceBusinessShortcuts(
     onSave?: () => void;
     onPreviousPage?: () => void;
     onNextPage?: () => void;
+    dialogTarget?: RefObject<HTMLElement>;
   },
   enabled = true,
 ) {
   useEffect(() => {
     if (!enabled) return;
     const keydown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || document.querySelector('[role="dialog"]'))
+      if (event.defaultPrevented) return;
+      const dialogs = document.querySelectorAll(
+        '[role="dialog"], [role="alertdialog"]',
+      );
+      const scope = handlers.dialogTarget?.current;
+      if (scope?.closest("[hidden]")) return;
+      if (dialogs.length) {
+        const active = document.activeElement;
+        if (
+          !scope ||
+          !active ||
+          !scope.contains(active) ||
+          (active instanceof Element && active.closest('[role="alertdialog"]'))
+        )
+          return;
+        if (
+          event.ctrlKey &&
+          event.key.toLowerCase() === "s" &&
+          handlers.onSave
+        ) {
+          event.preventDefault();
+          handlers.onSave();
+        }
         return;
+      }
       const target = event.target;
       if (
         target instanceof Element &&
@@ -268,5 +292,6 @@ export function usePreferenceBusinessShortcuts(
     handlers.onSave,
     handlers.onPreviousPage,
     handlers.onNextPage,
+    handlers.dialogTarget,
   ]);
 }

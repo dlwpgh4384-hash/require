@@ -291,6 +291,731 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/users:
+    get:
+      operationId: getCommonUsers
+      summary: 사용자 목록 조회
+      security: []
+      x-related-requirements:
+      - REQ-130
+      - REQ-121
+      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+        않는다.
+      x-pagination-filtering:
+        pagination: page 1부터, pageSize 20/50/100; 공통 화면 설정을 전달한다.
+        filtering: roleCd·userStatCd·keyword(이름/아이디)
+        ordering: 이름순; 동명이인 보조 정렬은 OQ-QUERY-023
+      x-aiops-query-role:
+        entity: TB_SY_USER
+        result_path:
+        - data
+        - items
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: integer
+          enum:
+          - 20
+          - 50
+          - 100
+          default: 20
+        description: 화면은 공통 목록 설정을 전달한다. default는 HTTP 요청 생략 시 설계값이며 제품 seed가 아니다.
+      - name: roleCd
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+          description: DML 원천 코드. 미제공 코드를 하드코딩하지 않는다.
+      - name: userStatCd
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - USE
+          - LOCK
+          - STOP
+      - name: keyword
+        in: query
+        required: false
+        schema:
+          type: string
+        description: 이름 또는 아이디 검색
+      responses:
+        '200':
+          description: 조회 또는 저장한 사용자 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonUserListResult'
+        '400':
+          description: 요청 필수값·형식·필드 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    put:
+      operationId: putCommonUsers
+      summary: 사용자 등록
+      security: []
+      x-related-requirements:
+      - REQ-131
+      - REQ-132
+      - REQ-116
+      - REQ-133
+      - REQ-135
+      - REQ-136
+      - REQ-146
+      - REQ-157
+      - REQ-159
+      - REQ-161
+      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+        않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonUserCreateInput'
+      x-business-rules:
+      - 아이디 영문 소문자·숫자 4~20자·중복 불가, 이름·이메일 필수, 이메일 형식, 역할 1개 이상.
+      - 본사는 복수 책임자를 허용한다. 적격 역할만 담당 프로젝트를 지정하며 PM만 프로젝트당 1명이다. 기존 PM에서 이관하고 안내한다.
+      - 임시 비밀번호는 서버 생성·해시 저장·TEMP_PWD_YN=Y이고 실제 발송 대역만 처리한다.
+      x-side-effects:
+      - TB_SY_USER·TB_SY_USER_ROLE·TB_SY_USER_SCOPE를 저장하고 등록 접근 기록을 TB_SY_ACCS_LOG에 남긴다.
+      - REG_USER_ID=admin이며 임시 비밀번호는 해시로만 남는다. 실제 SMTP·알림 발송은 없다.
+      x-required-tests:
+      - 'happy: 유효한 신규 소문자 4자 아이디·이름·이메일·역할로 PUT -> 200이고 후속 getCommonUser와 TB_SY_USER_ROLE에 신규 계정·선택 역할이 남는다.'
+      - 'auth: 인증 헤더 없이 신규 사용자 등록 PUT -> 200이며 TB_SY_USER.REG_USER_ID=admin이다. 원문이 인증·역할 검사를 제외하므로 401/403을 발명하지 않는다.'
+      - 'validation: userId에 대문자·3자·21자 또는 roleCds=[]를 각각 PUT -> 400 ApiError.errors에 userId 또는 roleCds 오류가 있고 새 TB_SY_USER
+        행은 0개다.'
+      - 'business: 이미 존재하는 userId로 등록 PUT -> 400 중복 아이디 오류이며 기존 TB_SY_USER·TB_SY_USER_ROLE·TB_SY_USER_SCOPE가 보존된다.'
+      - 'side-effect: 등록 성공 PUT 후 DB·접근 기록 조회 -> TB_SY_ACCS_LOG에 사용자 등록·대상·일시가 있고 TEMP_PWD_YN=Y이다. 응답과 화면에 임시 평문은
+        없다.'
+      - 'pm-transfer: 다른 PM의 프로젝트를 신규 PM에 지정해 PUT -> 최종 PM은 1명이고 이전 PM의 PROJ 줄이 없으며 transferredProjects에 이관 프로젝트가
+        있다.'
+      - 'non-pm: 비PM 적격 사용자 두 명에게 같은 프로젝트를 저장 -> 각 사용자 PROJ 줄이 모두 남는다.'
+      x-state-transitions:
+      - from: 계정 없음
+        to: 등록 계정 및 TEMP_PWD_YN=Y
+        condition: 유효한 신규 사용자 저장
+      responses:
+        '200':
+          description: 조회 또는 저장한 사용자 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonUserSaveResult'
+        '400':
+          description: 요청 필수값·형식·필드 오류 또는 원문 업무 보호 위반
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/{userId}:
+    get:
+      operationId: getCommonUser
+      summary: 계정 정보 조회
+      security: []
+      x-related-requirements:
+      - REQ-137
+      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+        않는다.
+      x-aiops-query-role:
+        entity: TB_SY_USER
+        result_path:
+        - data
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z0-9]{4,20}$
+          minLength: 4
+          maxLength: 20
+        description: 대상 계정 ID. 실행자는 서버 고정 admin이다.
+      responses:
+        '200':
+          description: 조회 또는 저장한 사용자 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonUserAccount'
+        '400':
+          description: 요청 필수값·형식·필드 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    put:
+      operationId: putCommonUser
+      summary: 계정 정보·역할 변경
+      security: []
+      x-related-requirements:
+      - REQ-126
+      - REQ-134
+      - REQ-135
+      - REQ-136
+      - REQ-145
+      - REQ-146
+      - REQ-150
+      - REQ-151
+      - REQ-152
+      - REQ-155
+      - REQ-157
+      - REQ-159
+      - REQ-161
+      - REQ-163
+      - REQ-164
+      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+        않는다.
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z0-9]{4,20}$
+          minLength: 4
+          maxLength: 20
+        description: 대상 계정 ID. 실행자는 서버 고정 admin이다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonUserUpdateInput'
+      x-business-rules:
+      - MOD_DTTM이 다른 저장은 409이며 계정·역할·범위는 최신값을 유지한다.
+      - 현재 또는 예정 파트장의 영업 파트장 역할 제거는 파트명 포함 안내로 거부한다.
+      - ADMIN·USE 계정만 관리자 수에 포함하며 역할 제거 후 0명이 되는 저장은 거부한다. LOCK·STOP 관리자로 대체 계산하지 않는다.
+      - PM 역할 또는 마지막 담당 프로젝트 적격 역할 제거는 프로젝트 수·이름을 확인한 뒤 PROJ 줄을 삭제한다. 취소 시 호출하지 않으며 선인계는 강제하지 않는다.
+      - 다른 PM의 프로젝트는 이관한다. 비PM 적격 사용자끼리 동일 프로젝트 공유는 허용한다.
+      x-side-effects:
+      - 역할·담당범위 변경과 PROJ 정리를 저장하고 권한 변경은 TB_SY_ACCS_LOG, PM 해제는 TB_SY_CHG_HIST에 기록한다.
+      - MOD_USER_ID=admin·MOD_DTTM을 갱신하며 실패 계정·다른 범위 행은 변경하지 않는다.
+      x-required-tests:
+      - 'happy: 적격 역할과 읽은 modDttm으로 담당 프로젝트를 PUT -> 200이고 후속 getCommonUser.projectIds 및 TB_SY_USER_SCOPE에 선택 프로젝트가
+        남는다.'
+      - 'auth: 인증 없이 기존 사용자 역할을 PUT -> 유효 변경은200이며 TB_SY_USER.MOD_USER_ID=admin이다. 관리자 업무 보호는 호출자 인증과 별개다.'
+      - 'validation: roleCds=[]로 변경 PUT -> 400 errors.roleCds 필드 오류이고 기존 TB_SY_USER_ROLE은 그대로다.'
+      - 'business: USE·ADMIN 1명과 LOCK·ADMIN만 있는 DB에서 마지막 USE 계정의 ADMIN 제거 PUT -> 400과 마지막 시스템 관리자 안내이며 ADMIN·USE가
+        유지된다.'
+      - 'side-effect: PM 공백 영향 확인 후 PM 역할 제거 PUT -> TB_SY_USER_SCOPE의 해당 PROJ 줄이 없어지고 TB_SY_CHG_HIST에 해제 사용자·프로젝트·admin·시각이
+        있다.'
+      - 'leader: 현재 또는 예정 PART_STD 파트장의 영업 파트장 역할 제거 PUT -> 400·파트명 포함 선변경 안내이고 역할 행이 유지된다.'
+      - 'conflict: 읽은 modDttm 뒤 DB MOD_DTTM을 바꾸고 PUT -> 409이며 역할·담당범위·최신 MOD_DTTM이 변하지 않는다.'
+      - 'confirm-cancel: PM 또는 마지막 적격 역할 제거 확인에서 취소 -> PUT 호출이0회이고 DB 역할·PROJ 줄이 유지된다.'
+      - 'confirm-continue: 적격 역할 소멸 영향 프로젝트를 확인한 뒤 PUT -> 역할과 해당 PROJ 줄이 함께 없어지고 다른 범위 행은 유지된다.'
+      x-state-transitions:
+      - from: 기존 역할·담당범위
+        to: 변경 역할·담당범위
+        condition: MOD_DTTM 일치·보호 통과·필요한 영향 확인
+      responses:
+        '200':
+          description: 조회 또는 저장한 사용자 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonUserSaveResult'
+        '400':
+          description: 요청 필수값·형식·필드 오류 또는 원문 업무 보호 위반
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: MOD_DTTM 동시 수정 충돌; 최신 사용자·역할·담당범위 보존
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/{userId}/access-logs:
+    get:
+      operationId: getCommonUserAccessLogs
+      summary: 사용자 접근 기록 조회
+      security: []
+      x-related-requirements:
+      - REQ-138
+      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+        않는다.
+      x-pagination-filtering:
+        pagination: page 1부터, pageSize 20/50/100
+        filtering: path userId의 접근 기록만 조회; 추가 필터 없음
+        ordering: 원문에 미정; OQ-QUERY-023
+      x-aiops-query-role:
+        entity: TB_SY_ACCS_LOG
+        result_path:
+        - data
+        - items
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z0-9]{4,20}$
+          minLength: 4
+          maxLength: 20
+        description: 대상 계정 ID. 실행자는 서버 고정 admin이다.
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: integer
+          enum:
+          - 20
+          - 50
+          - 100
+          default: 20
+        description: 화면은 공통 목록 설정을 전달한다. default는 HTTP 요청 생략 시 설계값이며 제품 seed가 아니다.
+      responses:
+        '200':
+          description: 조회 또는 저장한 사용자 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonUserAccessLogResult'
+        '400':
+          description: 요청 필수값·형식·필드 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/{userId}/password-reset:
+    put:
+      operationId: putCommonUserPasswordReset
+      summary: 임시 비밀번호 초기화
+      security: []
+      x-related-requirements:
+      - REQ-139
+      - REQ-116
+      - REQ-147
+      - REQ-126
+      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+        않는다.
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z0-9]{4,20}$
+          minLength: 4
+          maxLength: 20
+        description: 대상 계정 ID. 실행자는 서버 고정 admin이다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonUserVersionInput'
+      x-business-rules:
+      - 임시 비밀번호를 서버에서 재생성하고 해시 저장·TEMP_PWD_YN=Y로 첫 로그인 변경 필요 표시를 유지한다. 평문은 반환하지 않는다.
+      - 읽은 MOD_DTTM과 다르면409·무변경이다. 상태별 초기화 허용 범위는 OQ-STATE-023이며 임의 확정하지 않는다.
+      x-side-effects:
+      - TB_SY_USER의 비밀번호 해시와 TEMP_PWD_YN=Y·MOD_USER_ID=admin·MOD_DTTM을 갱신한다.
+      - TB_SY_ACCS_LOG에는 초기화를 기록하지 않는다. 실제 메일 없이 발송 대역만 처리한다.
+      x-required-tests:
+      - 'happy: 읽은 modDttm으로 비밀번호 초기화 PUT -> 200이며 TB_SY_USER의 해시가 새 값·TEMP_PWD_YN=Y이고 getCommonUser가 같은 modDttm을
+        반환한다.'
+      - 'auth: 인증 없는 초기화 PUT -> 유효 요청은200이고 MOD_USER_ID=admin이다. UI-22 전 401/403 거부는 없다.'
+      - 'validation: modDttm 속성 없이 초기화 PUT -> 400 errors.modDttm이며 기존 해시가 유지된다.'
+      - 'business: stale modDttm으로 초기화 PUT -> 409이며 최신 해시·TEMP_PWD_YN·MOD_DTTM이 보존된다.'
+      - 'side-effect: 초기화 PUT 성공 후 TB_SY_ACCS_LOG와 응답·화면 대조 -> 접근 기록 증가0이고 임시 평문은 없으며 TEMP_PWD_YN=Y 저장만 확인된다.'
+      - 'future-login: TEMP_PWD_YN=Y 계정으로 후속 UI-22 첫 로그인 -> 비밀번호 변경을 완료하기 전 일반 로그인 완료로 처리하지 않는다. 이번 로그인 시험은 not_run이다.'
+      x-state-transitions:
+      - from: 기존 해시·TEMP_PWD_YN
+        to: 새 해시·TEMP_PWD_YN=Y
+        condition: MOD_DTTM 일치; 상태별 허용 범위는 OQ-STATE-023
+      responses:
+        '200':
+          description: 조회 또는 저장한 사용자 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonUserPasswordResult'
+        '400':
+          description: 요청 필수값·형식·필드 오류 또는 원문 업무 보호 위반
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: MOD_DTTM 동시 수정 충돌; 최신 사용자·역할·담당범위 보존
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/{userId}/unlock:
+    put:
+      operationId: putCommonUserUnlock
+      summary: 계정 잠금 해제
+      security: []
+      x-related-requirements:
+      - REQ-140
+      - REQ-147
+      - REQ-126
+      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+        않는다.
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z0-9]{4,20}$
+          minLength: 4
+          maxLength: 20
+        description: 대상 계정 ID. 실행자는 서버 고정 admin이다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonUserVersionInput'
+      x-business-rules:
+      - 5회 실패로 LOCK인 계정을 USE로 해제하고 PWD_ERR_CNT=0으로 초기화한다.
+      - MOD_DTTM 불일치면409로 거부한다. LOCK 외 해제 정책은 OQ-STATE-023이다.
+      x-side-effects:
+      - TB_SY_USER.USER_STAT_CD=USE·PWD_ERR_CNT=0·MOD_USER_ID=admin·MOD_DTTM을 갱신한다.
+      - TB_SY_ACCS_LOG에는 잠금 해제를 기록하지 않는다.
+      x-required-tests:
+      - 'happy: LOCK·PWD_ERR_CNT=5의 읽은 modDttm으로 해제 PUT -> 200이며 getCommonUser.userStatCd=USE, DB PWD_ERR_CNT=0이다.'
+      - 'auth: 무인증 LOCK 해제 PUT -> 유효 요청200이고 MOD_USER_ID=admin이다. 개발 단계 role403을 추가하지 않는다.'
+      - 'validation: modDttm 속성 없이 해제 PUT -> 400 errors.modDttm이고 LOCK·실패 횟수가 유지된다.'
+      - 'business: LOCK 계정을 읽은 뒤 MOD_DTTM 변경하고 해제 PUT -> 409이며 DB 최신 상태·PWD_ERR_CNT가 유지된다.'
+      - 'side-effect: 잠금 해제 성공 전후 TB_SY_ACCS_LOG 조회 -> 행 수 증가0이고 TB_SY_USER.MOD_USER_ID=admin·새 MOD_DTTM이 남는다.'
+      x-state-transitions:
+      - from: LOCK·PWD_ERR_CNT=5
+        to: USE·PWD_ERR_CNT=0
+        condition: MOD_DTTM 일치
+      responses:
+        '200':
+          description: 조회 또는 저장한 사용자 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonUserUnlockResult'
+        '400':
+          description: 요청 필수값·형식·필드 오류 또는 원문 업무 보호 위반
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: MOD_DTTM 동시 수정 충돌; 최신 사용자·역할·담당범위 보존
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/stop:
+    put:
+      operationId: putCommonUserStop
+      summary: 선택 계정 사용 중지
+      security: []
+      x-related-requirements:
+      - REQ-141
+      - REQ-142
+      - REQ-143
+      - REQ-144
+      - REQ-145
+      - REQ-150
+      - REQ-151
+      - REQ-152
+      - REQ-153
+      - REQ-155
+      - REQ-126
+      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+        않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonUserStopInput'
+      x-business-rules:
+      - 체크된 계정 중 현재·예정 파트장과 마지막 USE·ADMIN은 제외하고 나머지만 STOP으로 처리한다. 미처리 수·이유를 반환한다.
+      - 실제 처리 가능한 계정의 PM 공백 프로젝트 수·이름을 합산 확인하며 확인한 PROJ 줄만 해당 계정의 중지와 함께 삭제한다.
+      - MOD_DTTM 불일치 계정은 갱신하지 않고409 충돌 근거를 반환한다. 혼합 일괄의 HTTP/개별 결과 우선순위는 OQ-BULK-023 리뷰 대상이다.
+      - 삭제·퇴사일 입력·선인계 강제는 없다. 이미 STOP인 중지 요청 허용 정책은 OQ-STATE-023이다.
+      x-side-effects:
+      - 처리 계정은 TB_SY_USER.USER_STAT_CD=STOP이고 누가 언제 중지했는지 TB_SY_CHG_HIST에 기록한다.
+      - 확인한 PM 담당 PROJ 줄 삭제와 PM 해제 이력도 같은 계정 처리에 포함한다. 거부 계정의 행·접근 기록은 삭제하지 않는다.
+      x-required-tests:
+      - 'happy: 파트장·마지막 관리자가 아닌 USE 계정들을 선택해 PUT -> 200 processedUserIds와 후속 getCommonUsers에서 해당 USER_STAT_CD=STOP이다.'
+      - 'auth: 인증 헤더 없이 일괄 중지 PUT -> 처리 가능한 대상은200·STOP이고 TB_SY_CHG_HIST의 실행자는 admin이다. 호출자 역할 거부는 구현하지 않는다.'
+      - 'validation: users=[]로 일괄 중지 PUT -> 400 errors.users이고 TB_SY_USER·TB_SY_USER_SCOPE가 불변이다.'
+      - 'business: 정상 계정·현재/예정 파트장·마지막 USE ADMIN을 함께 중지 PUT -> 정상만STOP, 보호 계정은 유지되고 unprocessedCount·각 reason이 일치한다.'
+      - 'side-effect: PM 공백 합계를 확인하고 중지 PUT -> 처리 PM의 PROJ 줄이 없어지고 TB_SY_CHG_HIST에 중지·PM 해제 대상·admin·시각이 존재한다.'
+      - 'confirm-cancel: PM 담당 프로젝트 합산 확인에서 취소 -> 중지 PUT 0회이고 모든 선택 계정·PROJ 줄이 유지된다.'
+      - 'last-admin-locked: USE ADMIN 1명·LOCK ADMIN 1명에서 USE 관리자를 일괄 중지 -> 그 관리자는 미처리이고 사용 관리자 수1이 유지된다.'
+      x-state-transitions:
+      - from: 중지 가능한 계정
+        to: STOP
+        condition: 보호 통과·버전 일치·PM 영향 확인; 보호 계정은 불변
+      responses:
+        '200':
+          description: 조회 또는 저장한 사용자 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonUserStopResult'
+        '400':
+          description: 요청 필수값·형식·필드 오류 또는 원문 업무 보호 위반
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: MOD_DTTM 동시 수정 충돌; 최신 사용자·역할·담당범위 보존
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/{userId}/resume:
+    put:
+      operationId: putCommonUserResume
+      summary: 계정 사용 재개
+      security: []
+      x-related-requirements:
+      - REQ-148
+      - REQ-149
+      - REQ-154
+      - REQ-126
+      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+        않는다.
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z0-9]{4,20}$
+          minLength: 4
+          maxLength: 20
+        description: 대상 계정 ID. 실행자는 서버 고정 admin이다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonUserVersionInput'
+      x-business-rules:
+      - STOP 계정을 USE로 되돌리고 변경 이력을 남기며 퇴사일을 확인하지 않는다.
+      - 지워진 PROJ 담당 줄은 복구하지 않는다. MOD_DTTM 불일치면409·무변경이다. STOP 외 상태의 재개는 OQ-STATE-023이다.
+      x-side-effects:
+      - TB_SY_USER.USER_STAT_CD=USE·MOD_USER_ID=admin·MOD_DTTM과 TB_SY_CHG_HIST 재개 기록을 저장한다.
+      - TB_SY_USER_SCOPE.PROJ 줄을 복구하지 않는다.
+      x-required-tests:
+      - 'happy: STOP 계정의 읽은 modDttm으로 다시 사용 PUT -> 200이며 후속 getCommonUser와 TB_SY_USER.USER_STAT_CD=USE이다.'
+      - 'auth: 인증 없이 STOP 재개 PUT -> 유효 요청200이고 MOD_USER_ID=admin이며 퇴사일 확인 요청이 없다.'
+      - 'validation: modDttm 속성 없이 재개 PUT -> 400 errors.modDttm이고 STOP이 유지된다.'
+      - 'business: stale modDttm으로 재개 PUT -> 409이며 최신 STOP 계정과 담당범위가 바뀌지 않는다.'
+      - 'side-effect: PM 중지 후 재개 PUT -> TB_SY_CHG_HIST에 재개 대상·admin·시각이 있고 TB_SY_USER_SCOPE의 삭제된 PROJ 줄은0개 그대로다.'
+      x-state-transitions:
+      - from: STOP
+        to: USE
+        condition: MOD_DTTM 일치; 담당 프로젝트 복원 없음
+      responses:
+        '200':
+          description: 조회 또는 저장한 사용자 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonUserAccount'
+        '400':
+          description: 요청 필수값·형식·필드 오류 또는 원문 업무 보호 위반
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: MOD_DTTM 동시 수정 충돌; 최신 사용자·역할·담당범위 보존
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/user-options:
+    get:
+      operationId: getCommonUserOptions
+      summary: 사용자 역할·담당 선택 목록
+      security: []
+      x-related-requirements:
+      - REQ-133
+      - REQ-159
+      - REQ-162
+      - REQ-166
+      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+        않는다.
+      x-pagination-filtering:
+        pagination: 등록 선택 목록은 전체 옵션; 페이지 분할 없음
+        filtering: 역할과 상태는 원문 DB 목록, 프로젝트는 지정 가능한 원천 목록; 타 업무 접근 권한 필터는 추가하지 않음
+      responses:
+        '200':
+          description: 조회 또는 저장한 사용자 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonUserOptionsResult'
+        '400':
+          description: 요청 필수값·형식·필드 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/change-impact:
+    get:
+      operationId: getCommonUserChangeImpact
+      summary: 역할·중지 영향 조회
+      security: []
+      x-related-requirements:
+      - REQ-150
+      - REQ-153
+      - REQ-163
+      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+        않는다.
+      x-pagination-filtering:
+        pagination: 확인 대상의 전체 영향 집합. 페이지 분할 없음
+        filtering: 선택 userIds와 STOP/ROLE_CHANGE; 실제 처리 불가 계정은 blockedUsers로 구분
+      parameters:
+      - name: userIds
+        in: query
+        required: true
+        schema:
+          type: array
+          items:
+            type: string
+            pattern: ^[a-z0-9]{4,20}$
+            minLength: 4
+            maxLength: 20
+          minItems: 1
+      - name: action
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - STOP
+          - ROLE_CHANGE
+      - name: roleCds
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            description: DML 원천 코드. 미제공 코드를 하드코딩하지 않는다.
+        description: ROLE_CHANGE 대상 역할 집합; 담당 프로젝트 적격성 소멸 판정용
+      responses:
+        '200':
+          description: 조회 또는 저장한 사용자 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonUserImpactResult'
+        '400':
+          description: 요청 필수값·형식·필드 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/health:
     get:
       operationId: getHealth
@@ -444,6 +1169,483 @@ components:
           type: string
           maxLength: 30
           nullable: true
+    CommonUserListItem:
+      type: object
+      required:
+      - userId
+      - name
+      - roleCds
+      - userStatCd
+      - modDttm
+      - roleNames
+      - assignedParts
+      - lastAccessAt
+      properties:
+        userId:
+          type: string
+          pattern: ^[a-z0-9]{4,20}$
+          minLength: 4
+          maxLength: 20
+        name:
+          type: string
+          minLength: 1
+        roleCds:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            description: DML 원천 코드. 미제공 코드를 하드코딩하지 않는다.
+          minItems: 1
+          uniqueItems: true
+        userStatCd:
+          type: string
+          enum:
+          - USE
+          - LOCK
+          - STOP
+        modDttm:
+          type: string
+          format: date-time
+          nullable: true
+          description: 직전 조회의 MOD_DTTM. null도 그대로 비교한다.
+        roleNames:
+          type: array
+          items:
+            type: string
+        assignedParts:
+          type: array
+          items:
+            type: string
+          description: 이번 달 PART_STD 파트장 파트명과 선택 본사명 합집합
+        lastAccessAt:
+          type: string
+          format: date-time
+          nullable: true
+      additionalProperties: false
+    CommonUserAccount:
+      type: object
+      required:
+      - userId
+      - name
+      - email
+      - roleCds
+      - headquarters
+      - projectIds
+      - userStatCd
+      - modDttm
+      properties:
+        userId:
+          type: string
+          pattern: ^[a-z0-9]{4,20}$
+          minLength: 4
+          maxLength: 20
+        name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        roleCds:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            description: DML 원천 코드. 미제공 코드를 하드코딩하지 않는다.
+          minItems: 1
+          uniqueItems: true
+        headquarters:
+          type: boolean
+          description: 본사(직접 영업) 선택 여부. 실제 SCOPE_TYPE_CD/코드값은 SQL 대조 후 매핑한다.
+        projectIds:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+        userStatCd:
+          type: string
+          enum:
+          - USE
+          - LOCK
+          - STOP
+        modDttm:
+          type: string
+          format: date-time
+          nullable: true
+          description: 직전 조회의 MOD_DTTM. null도 그대로 비교한다.
+      additionalProperties: false
+    CommonUserListResult:
+      type: object
+      required:
+      - items
+      - page
+      - pageSize
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonUserListItem'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+          minimum: 0
+      additionalProperties: false
+    CommonUserAccessLog:
+      type: object
+      required:
+      - occurredAt
+      - action
+      - target
+      properties:
+        occurredAt:
+          type: string
+          format: date-time
+        action:
+          type: string
+        target:
+          type: string
+      additionalProperties: false
+    CommonUserAccessLogResult:
+      type: object
+      required:
+      - items
+      - page
+      - pageSize
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonUserAccessLog'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+          minimum: 0
+      additionalProperties: false
+    CommonUserCreateInput:
+      type: object
+      required:
+      - userId
+      - name
+      - email
+      - roleCds
+      - headquarters
+      - projectIds
+      properties:
+        userId:
+          type: string
+          pattern: ^[a-z0-9]{4,20}$
+          minLength: 4
+          maxLength: 20
+        name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        roleCds:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            description: DML 원천 코드. 미제공 코드를 하드코딩하지 않는다.
+          minItems: 1
+          uniqueItems: true
+        headquarters:
+          type: boolean
+          description: 본사(직접 영업) 선택 여부. 실제 SCOPE_TYPE_CD/코드값은 SQL 대조 후 매핑한다.
+        projectIds:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+      additionalProperties: false
+    CommonUserUpdateInput:
+      type: object
+      required:
+      - roleCds
+      - headquarters
+      - projectIds
+      - modDttm
+      - confirmedProjectIds
+      properties:
+        roleCds:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            description: DML 원천 코드. 미제공 코드를 하드코딩하지 않는다.
+          minItems: 1
+          uniqueItems: true
+        headquarters:
+          type: boolean
+          description: 본사(직접 영업) 선택 여부. 실제 SCOPE_TYPE_CD/코드값은 SQL 대조 후 매핑한다.
+        projectIds:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+        modDttm:
+          type: string
+          format: date-time
+          nullable: true
+          description: 직전 조회의 MOD_DTTM. null도 그대로 비교한다.
+        confirmedProjectIds:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+          description: 영향 조회에서 확인한 PM 공백/적격성 상실 프로젝트. 취소하면 저장 호출 자체를 하지 않는다.
+      additionalProperties: false
+    CommonUserVersionInput:
+      type: object
+      required:
+      - modDttm
+      properties:
+        modDttm:
+          type: string
+          format: date-time
+          nullable: true
+          description: 직전 조회의 MOD_DTTM. null도 그대로 비교한다.
+      additionalProperties: false
+    CommonUserStopInput:
+      type: object
+      required:
+      - users
+      - confirmedProjectIds
+      properties:
+        users:
+          type: array
+          items:
+            type: object
+            required:
+            - userId
+            - modDttm
+            properties:
+              userId:
+                type: string
+                pattern: ^[a-z0-9]{4,20}$
+                minLength: 4
+                maxLength: 20
+              modDttm:
+                type: string
+                format: date-time
+                nullable: true
+                description: 직전 조회의 MOD_DTTM. null도 그대로 비교한다.
+            additionalProperties: false
+          minItems: 1
+        confirmedProjectIds:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+      additionalProperties: false
+    CommonUserPasswordResult:
+      type: object
+      required:
+      - userId
+      - tempPwdYn
+      - modDttm
+      properties:
+        userId:
+          type: string
+          pattern: ^[a-z0-9]{4,20}$
+          minLength: 4
+          maxLength: 20
+        tempPwdYn:
+          type: string
+          enum:
+          - Y
+        modDttm:
+          type: string
+          format: date-time
+          nullable: true
+          description: 직전 조회의 MOD_DTTM. null도 그대로 비교한다.
+      additionalProperties: false
+    CommonUserUnlockResult:
+      type: object
+      required:
+      - userId
+      - userStatCd
+      - pwdErrCnt
+      - modDttm
+      properties:
+        userId:
+          type: string
+          pattern: ^[a-z0-9]{4,20}$
+          minLength: 4
+          maxLength: 20
+        userStatCd:
+          type: string
+          enum:
+          - USE
+        pwdErrCnt:
+          type: integer
+          enum:
+          - 0
+        modDttm:
+          type: string
+          format: date-time
+          nullable: true
+          description: 직전 조회의 MOD_DTTM. null도 그대로 비교한다.
+      additionalProperties: false
+    CommonUserStopResult:
+      type: object
+      required:
+      - processedUserIds
+      - unprocessedCount
+      - unprocessed
+      properties:
+        processedUserIds:
+          type: array
+          items:
+            type: string
+            pattern: ^[a-z0-9]{4,20}$
+            minLength: 4
+            maxLength: 20
+        unprocessedCount:
+          type: integer
+          minimum: 0
+        unprocessed:
+          type: array
+          items:
+            type: object
+            required:
+            - userId
+            - reason
+            properties:
+              userId:
+                type: string
+                pattern: ^[a-z0-9]{4,20}$
+                minLength: 4
+                maxLength: 20
+              reason:
+                type: string
+            additionalProperties: false
+      additionalProperties: false
+    CommonUserImpactResult:
+      type: object
+      required:
+      - projects
+      - projectCount
+      - blockedUsers
+      properties:
+        projects:
+          type: array
+          items:
+            type: object
+            required:
+            - projectId
+            - projectName
+            properties:
+              projectId:
+                type: string
+              projectName:
+                type: string
+            additionalProperties: false
+        projectCount:
+          type: integer
+          minimum: 0
+        blockedUsers:
+          type: array
+          items:
+            type: object
+            required:
+            - userId
+            - reason
+            properties:
+              userId:
+                type: string
+                pattern: ^[a-z0-9]{4,20}$
+                minLength: 4
+                maxLength: 20
+              reason:
+                type: string
+            additionalProperties: false
+      additionalProperties: false
+    CommonUserOptionsResult:
+      type: object
+      required:
+      - roles
+      - projects
+      - userStates
+      properties:
+        roles:
+          type: array
+          items:
+            type: object
+            required:
+            - roleCd
+            - roleName
+            - assignedProjectScope
+            properties:
+              roleCd:
+                type: string
+                minLength: 1
+                description: DML 원천 코드. 미제공 코드를 하드코딩하지 않는다.
+              roleName:
+                type: string
+              assignedProjectScope:
+                type: boolean
+                description: 역할 데이터 범위가 담당 프로젝트인지 여부. 물리 필드는 OQ-DATA-023.
+            additionalProperties: false
+        projects:
+          type: array
+          items:
+            type: object
+            required:
+            - projectId
+            - projectName
+            properties:
+              projectId:
+                type: string
+              projectName:
+                type: string
+            additionalProperties: false
+        userStates:
+          type: array
+          items:
+            type: object
+            required:
+            - code
+            - name
+            properties:
+              code:
+                type: string
+                minLength: 1
+                description: DML 원천 코드. 미제공 코드를 하드코딩하지 않는다.
+              name:
+                type: string
+            additionalProperties: false
+      additionalProperties: false
+    CommonUserSaveResult:
+      type: object
+      required:
+      - account
+      - transferredProjects
+      properties:
+        account:
+          $ref: '#/components/schemas/CommonUserAccount'
+        transferredProjects:
+          type: array
+          items:
+            type: object
+            required:
+            - projectId
+            - projectName
+            properties:
+              projectId:
+                type: string
+              projectName:
+                type: string
+            additionalProperties: false
+      additionalProperties: false
 x-requirement-context:
   description: >-
     아래 항목은 관련 요구별 역할·관찰 증거다. 면제 목록이 아니다.
@@ -694,20 +1896,66 @@ x-uncovered-requirements:
   status: non-functional
   evidence: '테마·키보드 접근성는 실행·범위 검수 소유다: 기기 테마 변경 시 배색이 바뀌고 메뉴·별·창 버튼은 키보드로 조작되며 접근 가능 이름이 있다.'
 
+- canonical_id: REQ-114
+  status: non-functional
+  evidence: 익명 개발 접근과 고정 등록자의 소유는 plan.md 실행·범위이며 인증 헤더 없는 사용자 저장 후 REG_USER_ID 또는 MOD_USER_ID가 admin이다.
+- canonical_id: REQ-115
+  status: out-of-scope
+  evidence: 후속 로그인·연동 경계의 소유는 plan.md 실행·범위이며 이번 변경에 로그인·권한 검사·알림 발송·SMTP 호출이 없다.
+- canonical_id: REQ-117
+  status: non-functional
+  evidence: 공통 탐색 본문 재사용의 소유는 plan.md 실행·범위이며 UI-23 진입 후 공통 틀이 하나이며 휴대폰 안내는 기존 틀이 표시한다.
+- canonical_id: REQ-118
+  status: screen-only
+  evidence: 제목줄 사용자 등록의 소유는 UI-23 공통 연결이며 제목줄의 + 사용자 등록 클릭으로 사용자 등록 Dialog가 열린다.
+- canonical_id: REQ-119
+  status: screen-only
+  evidence: 미저장 창과 공통 dirty 연결의 소유는 UI-23 공통 연결이며 입력 변경 뒤 탭 ●가 보이고 닫기 취소 시 입력과 탭이 유지된다.
+- canonical_id: REQ-120
+  status: non-functional
+  evidence: 공통 피드백 부품 재사용의 소유는 plan.md 실행·범위이며 등록 오류에 공통 required·format·duplicate 문구 및 첫 오류 포커스, 저장 성공에 초록 3초 Toast가
+    나타난다.
+- canonical_id: REQ-122
+  status: screen-only
+  evidence: 업무 단축키 연결의 소유는 UI-23 공통 연결이며 Enter 조회·Ctrl+S 저장·Ctrl+←/→ 페이지 이동이 해당 핸들러를 호출한다.
+- canonical_id: REQ-123
+  status: out-of-scope
+  evidence: 기간 부품 제외의 소유는 plan.md 실행·범위이며 UI-23에 기간 선택 칸이나 기간 조회 호출이 없다.
+- canonical_id: REQ-124
+  status: non-functional
+  evidence: 기존 MyBatis 구조 유지의 소유는 plan.md 실행·범위이며 사용자 구현이 기존 패키지·XML 위치를 사용하며 새 MyBatis 설정 클래스가 없다.
+- canonical_id: REQ-125
+  status: screen-only
+  evidence: 입력 오류 봉투의 소유는 UI-23 공통 연결이며 잘못된 아이디 저장은 400이며 errors에 userId 오류가 있고 저장 행은 없다.
+- canonical_id: REQ-127
+  status: data-constraint
+  evidence: 누락 사용 표 준비의 소유는 사용자 데이터/기록 계약이며 누락 사용 표는 준비 후 존재하고 기존 표·행은 재생성되지 않는다.
+- canonical_id: REQ-128
+  status: data-constraint
+  evidence: 빈 표 초기값 준비의 소유는 사용자 데이터/기록 계약이며 초기값 있는 표에 재실행해도 기존 행·값이 유지된다.
+- canonical_id: REQ-129
+  status: non-functional
+  evidence: 명시적 SQL 준비 경계의 소유는 plan.md 실행·범위이며 준비 절차만 누락 표를 생성하고 일반 기동·API는 DDL을 실행하지 않으며 새 물리 FK가 없다.
+- canonical_id: REQ-156
+  status: out-of-scope
+  evidence: 로그인 자동 잠금 예외의 소유는 plan.md 실행·범위이며 마지막 관리자 보호가 후속 보안 자동 잠금을 금지하는 규칙으로 확장되지 않는다.
+- canonical_id: REQ-158
+  status: data-constraint
+  evidence: 본사 알림 수신자 산정의 소유는 사용자 데이터/기록 계약이며 USE 책임자 복수는 모두 대상이고 USE 책임자 0명·LOCK/STOP만 있으면 경영진 fallback 판정이다.
+- canonical_id: REQ-160
+  status: data-constraint
+  evidence: 다중 역할 범위 합집합의 소유는 사용자 데이터/기록 계약이며 범위 판정 시험에서 프로젝트 역할 범위와 더 넓은 역할 범위의 합집합이 계산된다.
+- canonical_id: REQ-165
+  status: data-constraint
+  evidence: 사용자 저장 표 경계의 소유는 사용자 데이터/기록 계약이며 등록·상태 변경·기록 저장이 지정 5개 표 안에서 이뤄지고 사용자 삭제 표를 따로 만들지 않는다.
+- canonical_id: REQ-167
+  status: screen-only
+  evidence: PC 관리자 사용자 화면의 소유는 UI-23 공통 연결이며 PC의 UI-23에 계정 관리 본문이 보이고 휴대폰은 기존 PC 전용 안내만 보인다.
+
 x-change-supersession:
   description: 기존 operation과 기준선 시험은 원형 보존한다. 이번 공통 기능 인수에는 다음 예외가 우선하며 기존 메뉴 조회 자체를 상태 저장 API로 바꾸지 않는다.
   ui-header: 'REQ-071·REQ-086: 제목줄 정보와 시스템 관리자 이름은 이번 원문으로 허용한다.'
   ui-tools: 공통 도구만 실제 연결하고 AI·알림·로그인 관련은 여전히 비활성이다. 실제 요구 연결은 새 연산과 x-uncovered-requirements의 단건 항목을 따른다.
   read-only: 'REQ-054·REQ-055: 메뉴 GET은 계속 읽기 전용이다. 여섯 설정 쓰기는 신규 putCommonUserPreference만 수행하므로 과거 UI 전체 상태 무저장 시험은
     이 변경 범위에서 대체한다.'
-  schema-prep: >-
-    공통 기능이 쓰는 TB_SY_USER·TB_SY_CODE_GRP·TB_SY_CODE·TB_SY_OPER_STD를 준비 명령(--prepare-schema)이
-    없을 때만 원문 DDL로 만들고(V1), 표가 비어 있을 때만 sql/DML_BaseData.sql의 admin 사용자·공통코드·운영 기준값을 넣는다(V3).
-    REQ-031의 9개 표 목록과 REQ-036의 "다른 표 신규 0행"은 이 네 표에 대해 이 변경이 우선한다. 물리 FK는 계속 만들지 않는다.
-  ui-states: >-
-    FR-0107: 휴대폰 PC 전용 화면 안내는 "PC에서 이용해 주세요 — 「화면명」은 큰 표를 다루는 화면이라 휴대폰에서는 열리지 않습니다"와
-    [대시보드로]로 바꾼다. FR-0002: 메뉴는 있지만 열 수 있는 화면이 없으면 "열 수 있는 화면이 없습니다", 메뉴가 0건이면 "등록된 메뉴 없음".
-  ui-shell: >-
-    REQ-072·REQ-080~REQ-084: 로고 이동, 화면 탭(열기·재사용, #UI 주소, 대시보드 고정, 8개 한도 확인, 미저장 ● 표시와 닫기 확인,
-    재접속 시 대시보드만, 휴대폰 탭 없음)은 frontend/src/app/ScreenTabs.test.tsx와 CommonNavigationPage.test.tsx로 검증한다.
-    REQ-091~REQ-101: PeriodSelector는 frontend/src/shared/period/PeriodSelector.test.tsx에서 설정 여러 가지로 검증한다.
+  user-screen: UI-23의 사용자 업무만 신규 사용자 연산으로 허용한다. 기존 메뉴 GET과 공통 설정 연산은 무변경이다.

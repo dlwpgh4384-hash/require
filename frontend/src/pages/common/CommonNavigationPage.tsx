@@ -11,8 +11,14 @@ import {
   useUserPreferences,
 } from "../userpreferences";
 import { PlaceholderScreen } from "./PlaceholderScreen";
+import { UserPage } from "../users/UserPage";
+import {
+  UserRegistrationButton,
+  UserWorkspaceProvider,
+} from "../users/UserWorkspace";
 
-const renderScreen = (scrnId: string) => <PlaceholderScreen scrnId={scrnId} />;
+const renderScreen = (scrnId: string) =>
+  scrnId === "UI-23" ? <UserPage /> : <PlaceholderScreen scrnId={scrnId} />;
 
 /** 공통 화면 틀(00) + 공통 기능(00-1): 탭, 즐겨찾기·최근, 도구줄, 메뉴 접기 저장. */
 function PreferenceNavigation() {
@@ -37,6 +43,10 @@ function PreferenceNavigation() {
       extensions={(context) => {
         const menus = context.menus as ShellMenuItem[];
         return {
+          screenActions:
+            context.screenId === "UI-23" ? (
+              <UserRegistrationButton />
+            ) : undefined,
           quickAccess: (
             <PersonalScreenLists
               menus={menus}
@@ -53,7 +63,9 @@ function PreferenceNavigation() {
               available={context.available}
               onNavigate={context.open}
               menuLoading={!context.ready && !context.failed}
-              menuError={context.failed ? "메뉴를 불러오지 못했습니다." : undefined}
+              menuError={
+                context.failed ? "메뉴를 불러오지 못했습니다." : undefined
+              }
             />
           ),
           titleAddon: context.screenId ? (
@@ -71,6 +83,22 @@ function PreferenceNavigation() {
 
 export function CommonNavigationPage() {
   const preferences = useOptionalUserPreferences();
-  if (!preferences) return <NavigationRoot tabs renderScreen={renderScreen} />;
-  return <PreferenceNavigation />;
+  return (
+    <UserWorkspaceProvider>
+      {preferences ? (
+        <PreferenceNavigation />
+      ) : (
+        <NavigationRoot
+          tabs
+          renderScreen={renderScreen}
+          extensions={(context) => ({
+            screenActions:
+              context.screenId === "UI-23" ? (
+                <UserRegistrationButton />
+              ) : undefined,
+          })}
+        />
+      )}
+    </UserWorkspaceProvider>
+  );
 }

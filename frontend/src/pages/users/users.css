@@ -1,0 +1,73 @@
+.users-page {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  min-width: 0;
+}
+.users-search {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.users-search label {
+  display: grid;
+  gap: 6px;
+}
+.users-search input,
+.users-search select {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.users-table-wrap {
+  overflow-x: auto;
+}
+.users-page table,
+[data-testid="user-logs-panel"] table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.users-page th,
+.users-page td,
+[data-testid="user-logs-panel"] th,
+[data-testid="user-logs-panel"] td {
+  padding: 12px;
+  border-bottom: 1px solid var(--divider);
+  overflow-wrap: anywhere;
+}
+.users-page th {
+  background: var(--bg);
+  color: var(--text-sub);
+}
+.users-dense td {
+  padding: 6px 12px;
+}
+.users-page > .app-danger {
+  justify-self: start;
+}
+[data-testid="user-account-panel"] > label > input {
+  display: block;
+  margin-top: 6px;
+}
+[data-testid="user-account-panel"] input[readonly] {
+  background: var(--bg);
+  color: var(--text-sub);
+}
+[data-testid="user-dialog"] {
+  width: min(680px, 100%);
+}
+[data-testid="user-dialog"] [role="tablist"] {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+[data-testid="user-dialog"] [role="tab"][aria-selected="true"] {
+  color: var(--primary-text);
+  border-color: var(--primary);
+}

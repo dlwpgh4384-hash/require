@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.mapper.UserMapper">
+  <resultMap id="account" type="com.company.common.mapper.UserRows$Account" autoMapping="false">
+    <id column="user_id" property="userId" javaType="java.lang.String"/>
+    <result column="user_nm" property="name" javaType="java.lang.String"/>
+    <result column="email_addr" property="email" javaType="java.lang.String"/>
+    <result column="user_stat_cd" property="userStatCd" javaType="java.lang.String"/>
+    <result column="mod_dttm" property="modDttm" javaType="java.time.Instant"/>
+    <result column="last_login_dttm" property="lastAccessAt" javaType="java.time.Instant"/>
+    <result column="temp_pwd_yn" property="tempPwdYn" javaType="java.lang.String"/>
+  </resultMap>
+  <resultMap id="change" type="com.company.common.mapper.UserRows$Change" autoMapping="false">
+    <result column="reg_dttm" property="changedAt" javaType="java.time.Instant"/>
+    <result column="chg_item_nm" property="item" javaType="java.lang.String"/>
+    <result column="bfr_val" property="before" javaType="java.lang.String"/>
+    <result column="aft_val" property="after" javaType="java.lang.String"/>
+    <result column="changed_by" property="changedBy" javaType="java.lang.String"/>
+  </resultMap>
+  <resultMap id="project" type="com.company.common.mapper.UserRows$Project" autoMapping="false">
+    <id column="proj_id" property="projectId" javaType="java.lang.String"/>
+    <result column="proj_nm" property="projectName" javaType="java.lang.String"/>
+  </resultMap>
+  <resultMap id="owner" type="com.company.common.mapper.UserRows$Owner" autoMapping="false">
+    <result column="user_id" property="userId" javaType="java.lang.String"/>
+    <result column="proj_id" property="projectId" javaType="java.lang.String"/>
+    <result column="proj_nm" property="projectName" javaType="java.lang.String"/>
+  </resultMap>
+  <resultMap id="log" type="com.company.common.mapper.UserRows$Log" autoMapping="false">
+    <result column="act_dttm" property="occurredAt" javaType="java.time.Instant"/>
+    <result column="action" property="action" javaType="java.lang.String"/>
+    <result column="trgt_desc" property="target" javaType="java.lang.String"/>
+  </resultMap>
+  <select id="lockManagement" resultType="java.lang.String">
+    SELECT pg_advisory_xact_lock(734901, 1)::text
+  </select>
+  <sql id="columns">u.user_id, u.user_nm, u.email_addr, u.user_stat_cd, u.mod_dttm, u.last_login_dttm, u.temp_pwd_yn</sql>
+  <sql id="filters">
+    <where>
+      <if test="roleCd != null">
+        AND EXISTS (SELECT 1 FROM TB_SY_USER_ROLE r WHERE r.user_id=u.user_id AND r.role_id=#{roleCd})
+      </if>
+      <if test="userStatCd != null">AND u.user_stat_cd=#{userStatCd}</if>
+      <if test="!includeStopped and userStatCd == null">AND u.user_stat_cd != 'STOP'</if>
+      <if test="keyword != null">
+        AND (u.user_nm LIKE #{keyword} ESCAPE '!' OR u.user_id LIKE #{keyword} ESCAPE '!')
+      </if>
+    </where>
+  </sql>
+  <select id="selectAccount" resultMap="account">
+    SELECT <include refid="columns"/> FROM TB_SY_USER u WHERE u.user_id=#{id}
+  </select>
+  <!-- SFR-010-03 정렬: sortKey·sortDir은 UserRequests.filter에서 정해진 값만 통과한다. 기본은 이름순. -->
+  <sql id="order">
+    ORDER BY
+    <choose>
+      <when test="sortKey == 'userId'">u.user_id ${sortDir}</when>
+      <when test="sortKey == 'name'">u.user_nm ${sortDir}, u.user_id</when>
+      <when test="sortKey == 'role'">(SELECT min(r.sort_ord) FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.role_id=ur.role_id
+        WHERE ur.user_id=u.user_id) ${sortDir} NULLS LAST, u.user_nm, u.user_id</when>
+      <when test="sortKey == 'state'">u.user_stat_cd ${sortDir}, u.user_nm, u.user_id</when>
+      <when test="sortKey == 'last'">u.last_login_dttm ${sortDir} NULLS LAST, u.user_nm, u.user_id</when>
+      <otherwise>u.user_nm, u.user_id</otherwise>
+    </choose>
+  </sql>
+  <select id="selectUsers" resultMap="account">
+    SELECT <include refid="columns"/> FROM TB_SY_USER u <include refid="filters"/>
+    <include refid="order"/> LIMIT #{pageSize} OFFSET #{offset}
+  </select>
+  <select id="selectAllUsers" resultMap="account">
+    SELECT <include refid="columns"/> FROM TB_SY_USER u <include refid="filters"/>
+    <include refid="order"/>
+  </select>
+  <select id="countUsers" resultType="long">
+    SELECT count(*) FROM TB_SY_USER u <include refid="filters"/>
+  </select>
+  <select id="selectRoles" resultType="string">
+    SELECT r.role_id FROM TB_SY_USER_ROLE r WHERE r.user_id=#{id} ORDER BY r.role_id
+  </select>
+  <select id="selectRoleNames" resultType="string">
+    SELECT r.role_nm FROM TB_SY_ROLE r JOIN TB_SY_USER_ROLE ur ON ur.role_id=r.role_id
+    WHERE ur.user_id=#{id} ORDER BY r.role_id
+  </select>
+  <select id="selectParts" resultType="string">
+    SELECT names.part_nm FROM (
+      SELECT p.part_nm FROM TB_BS_PART p JOIN TB_BS_PART_STD s ON s.part_id=p.part_id
+      WHERE s.part_ldr_user_id=#{id}
+        AND s.aply_bgn_ym &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')
+        AND (s.aply_end_ym IS NULL OR s.aply_end_ym &gt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM'))
+      UNION
+      SELECT p.part_nm FROM TB_BS_PART p JOIN TB_SY_USER_SCOPE s ON s.part_id=p.part_id
+      WHERE s.user_id=#{id} AND s.scope_type_cd='PART' AND p.hq_yn='Y'
+    ) names ORDER BY names.part_nm
+  </select>
+  <select id="selectLeaders" resultType="string">
+    SELECT DISTINCT p.part_nm FROM TB_BS_PART p JOIN TB_BS_PART_STD s ON s.part_id=p.part_id
+    WHERE s.part_ldr_user_id=#{id}
+      AND (s.aply_end_ym IS NULL OR s.aply_end_ym &gt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM'))
+    ORDER BY p.part_nm
+  </select>
+  <select id="selectHeadquarters" resultType="string">
+    SELECT p.part_id FROM TB_BS_PART p WHERE p.hq_yn='Y' AND p.use_yn='Y' ORDER BY p.part_id
+  </select>
+  <select id="hasHeadquarters" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_SY_USER_SCOPE s JOIN TB_BS_PART p ON p.part_id=s.part_id
+      WHERE s.user_id=#{id} AND s.scope_type_cd='PART' AND p.hq_yn='Y')
+  </select>
+  <select id="selectProjects" resultMap="project">
+    SELECT DISTINCT p.proj_id, p.proj_nm FROM TB_PJ_PROJ p
+    JOIN TB_SY_USER_SCOPE s ON s.proj_id=p.proj_id
+    WHERE s.user_id=#{id} AND s.scope_type_cd='PROJ' ORDER BY p.proj_nm, p.proj_id
+  </select>
+  <select id="selectPmOwners" resultMap="owner">
+    SELECT DISTINCT s.user_id, p.proj_id, p.proj_nm FROM TB_SY_USER_SCOPE s
+    JOIN TB_PJ_PROJ p ON p.proj_id=s.proj_id
+    JOIN TB_SY_USER_ROLE r ON r.user_id=s.user_id AND r.role_id='PM'
+    WHERE s.scope_type_cd='PROJ' AND s.user_id != #{id} AND s.proj_id IN
+    <foreach collection="projects" item="project" open="(" close=")" separator=",">#{project}</foreach>
+    ORDER BY s.user_id, p.proj_id
+  </select>
+  <select id="countActiveAdmins" resultType="long">
+    SELECT count(*) FROM TB_SY_USER u WHERE u.user_stat_cd='USE'
+      AND EXISTS (SELECT 1 FROM TB_SY_USER_ROLE r WHERE r.user_id=u.user_id AND r.role_id='ADMIN')
+  </select>
+  <select id="selectLogs" resultMap="log">
+    SELECT l.act_dttm, COALESCE(c.code_nm,l.act_type_cd) AS action, COALESCE(l.trgt_desc,'') AS trgt_desc
+    FROM TB_SY_ACCS_LOG l LEFT JOIN TB_SY_CODE c ON c.code_grp_id='ACT_TYPE' AND c.code=l.act_type_cd
+    WHERE l.user_id=#{id} ORDER BY l.act_dttm DESC, l.log_id DESC
+    LIMIT #{filter.pageSize} OFFSET #{filter.offset}
+  </select>
+  <select id="countLogs" resultType="long">SELECT count(*) FROM TB_SY_ACCS_LOG l WHERE l.user_id=#{id}</select>
+  <!-- 사용자 변경 이력: 이 계정 키(아이디, 예전 줄은 아이디:값)로 남긴 줄, 최신순. 처리자는 이름이 있으면 이름. -->
+  <select id="selectChanges" resultMap="change">
+    SELECT h.reg_dttm, h.chg_item_nm, h.bfr_val, h.aft_val, COALESCE(w.user_nm, h.reg_user_id) AS changed_by
+    FROM TB_SY_CHG_HIST h LEFT JOIN TB_SY_USER w ON w.user_id=h.reg_user_id
+    WHERE h.trgt_tbl_nm IN ('TB_SY_USER','TB_SY_USER_ROLE','TB_SY_USER_SCOPE')
+      AND (h.trgt_key=#{id} OR h.trgt_key LIKE #{id} || ':%')
+    ORDER BY h.reg_dttm DESC, h.hist_id DESC
+  </select>
+  <sql id="nextVersion">
+    mod_user_id='admin', mod_dttm=GREATEST(clock_timestamp(), mod_dttm + INTERVAL '1 microsecond')
+  </sql>
+  <insert id="insertUser">
+    INSERT INTO TB_SY_USER (user_id,user_nm,email_addr,pwd_hash,temp_pwd_yn,pwd_err_cnt,user_stat_cd,
+      mfa_use_yn,mfa_err_cnt,reg_user_id,reg_dttm,mod_user_id,mod_dttm)
+    VALUES (#{input.userId},#{input.name},#{input.email},#{hash},'Y',0,'USE','N',0,'admin',
+      clock_timestamp(),'admin',clock_timestamp())
+  </insert>
+  <update id="updateProfile">
+    UPDATE TB_SY_USER SET user_nm=#{name}, email_addr=#{email} WHERE user_id=#{id}
+  </update>
+  <update id="touch">
+    UPDATE TB_SY_USER SET <include refid="nextVersion"/> WHERE user_id=#{id}
+      AND mod_dttm IS NOT DISTINCT FROM #{token,jdbcType=TIMESTAMP}
+  </update>
+  <update id="changeState">
+    UPDATE TB_SY_USER SET user_stat_cd=#{state},
+      <if test="unlock">pwd_err_cnt=0,</if>
+      <include refid="nextVersion"/> WHERE user_id=#{id}
+      AND mod_dttm IS NOT DISTINCT FROM #{token,jdbcType=TIMESTAMP}
+  </update>
+  <update id="resetPassword">
+    UPDATE TB_SY_USER SET pwd_hash=#{hash},temp_pwd_yn='Y',<include refid="nextVersion"/>
+    WHERE user_id=#{id} AND mod_dttm IS NOT DISTINCT FROM #{token,jdbcType=TIMESTAMP}
+  </update>
+  <delete id="deleteRoles">DELETE FROM TB_SY_USER_ROLE WHERE user_id=#{id}</delete>
+  <insert id="insertRole">
+    INSERT INTO TB_SY_USER_ROLE (user_id,role_id,reg_user_id,reg_dttm)
+    VALUES (#{id},#{role},'admin',clock_timestamp())
+  </insert>
+  <delete id="deleteProject">
+    DELETE FROM TB_SY_USER_SCOPE WHERE user_id=#{id} AND scope_type_cd='PROJ' AND proj_id=#{project}
+  </delete>
+  <delete id="deleteHeadquarters">
+    DELETE FROM TB_SY_USER_SCOPE s USING TB_BS_PART p
+    WHERE s.user_id=#{id} AND s.scope_type_cd='PART' AND s.part_id=p.part_id AND p.hq_yn='Y'
+  </delete>
+  <insert id="insertScope">
+    INSERT INTO TB_SY_USER_SCOPE (user_id,scope_sn,scope_type_cd,part_id,proj_id,reg_user_id,reg_dttm)
+    SELECT #{id}, COALESCE(MAX(s.scope_sn),0)+1, #{type},
+      <choose><when test="type == 'PART'">#{value},NULL</when><otherwise>NULL,#{value}</otherwise></choose>,
+      'admin',clock_timestamp() FROM TB_SY_USER_SCOPE s WHERE s.user_id=#{id}
+  </insert>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG (user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm)
+    VALUES (#{id},#{action},'UI-23',#{target},clock_timestamp(),'admin',clock_timestamp())
+  </insert>
+  <insert id="insertHistory">
+    INSERT INTO TB_SY_CHG_HIST (trgt_tbl_nm,trgt_key,chg_type_cd,chg_item_nm,bfr_val,aft_val,reg_user_id,reg_dttm)
+    VALUES (#{table},#{key},#{type},#{item},#{before,jdbcType=VARCHAR},#{after,jdbcType=VARCHAR},
+      'admin',clock_timestamp())
+  </insert>
+</mapper>

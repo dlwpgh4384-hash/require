@@ -144,8 +144,8 @@ export function AppLayout({
                 )}
                 <div className="title-row">
                   <h1>{title ?? "메뉴 탐색"}</h1>
-                  {screenId && <span className="screen-id">{screenId}</span>}
                   {titleAddon}
+                  {screenId && <span className="screen-id">{screenId}</span>}
                 </div>
               </div>
               {screenActions ?? <DisabledTools names={["상단 도구줄"]} />}

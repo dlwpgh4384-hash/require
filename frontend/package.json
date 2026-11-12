@@ -6,7 +6,7 @@
   "engines": { "node": "20.x", "npm": "10.x" },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "test": "vitest --environment jsdom",
+    "test": "vitest --environment jsdom --minWorkers=1 --maxWorkers=2",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1"

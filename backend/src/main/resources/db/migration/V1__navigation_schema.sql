@@ -9,6 +9,8 @@
 -- FK: TB_BL_DUN_HIST.BILL_ID -> TB_BL_BILL.BILL_ID
 -- FK: TB_CL_CLOSE.CLOSE_USER_ID -> TB_SY_USER.USER_ID
 -- FK: TB_SY_CODE.CODE_GRP_ID -> TB_SY_CODE_GRP.CODE_GRP_ID (FK_TB_SY_CODE_01, 지금은 만들지 않음)
+-- FK: TB_SY_USER_ROLE.USER_ID -> TB_SY_USER.USER_ID; ROLE_ID -> TB_SY_ROLE.ROLE_ID
+-- FK: TB_SY_ACCS_LOG.USER_ID -> TB_SY_USER.USER_ID (설명만, 물리 FK 없음)
 DO $navigation$
 DECLARE
     definitions text[] := ARRAY[
@@ -19,9 +21,9 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_SY_USER_SCOPE (
  PART_ID VARCHAR(20),
  PROJ_ID VARCHAR(20),
  REG_USER_ID VARCHAR(30) NOT NULL,
- REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
  MOD_USER_ID VARCHAR(30),
- MOD_DTTM TIMESTAMP,
+ MOD_DTTM TIMESTAMPTZ,
  CONSTRAINT PK_TB_SY_USER_SCOPE PRIMARY KEY (USER_ID, SCOPE_SN)
 )$ddl$,
 $ddl$CREATE TABLE IF NOT EXISTS TB_SY_MENU (
@@ -36,9 +38,9 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_SY_MENU (
  ICON_NM VARCHAR(30),
  LOCK_YN CHAR(1) DEFAULT 'N' NOT NULL,
  REG_USER_ID VARCHAR(30) NOT NULL,
- REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
  MOD_USER_ID VARCHAR(30),
- MOD_DTTM TIMESTAMP,
+ MOD_DTTM TIMESTAMPTZ,
  CONSTRAINT PK_TB_SY_MENU PRIMARY KEY (MENU_ID),
  CONSTRAINT CK_TB_SY_MENU_01 CHECK (USE_YN IN ('Y', 'N')),
  CONSTRAINT CK_TB_SY_MENU_02 CHECK (PC_ONLY_YN IN ('Y', 'N')),
@@ -50,9 +52,9 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_SY_USER_PREF (
  PREF_KEY VARCHAR(30) NOT NULL,
  PREF_VAL VARCHAR(2000) NOT NULL,
  REG_USER_ID VARCHAR(30) NOT NULL,
- REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
  MOD_USER_ID VARCHAR(30),
- MOD_DTTM TIMESTAMP,
+ MOD_DTTM TIMESTAMPTZ,
  CONSTRAINT PK_TB_SY_USER_PREF PRIMARY KEY (USER_ID, PREF_TYPE_CD, PREF_KEY)
 )$ddl$,
 $ddl$CREATE TABLE IF NOT EXISTS TB_SY_NOTI (
@@ -64,12 +66,12 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_SY_NOTI (
  LINK_KEY VARCHAR(50),
  SEND_MTHD_CD VARCHAR(10) NOT NULL,
  READ_YN CHAR(1) DEFAULT 'N' NOT NULL,
- READ_DTTM TIMESTAMP,
- NOTI_DTTM TIMESTAMP NOT NULL,
+ READ_DTTM TIMESTAMPTZ,
+ NOTI_DTTM TIMESTAMPTZ NOT NULL,
  REG_USER_ID VARCHAR(30) NOT NULL,
- REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
  MOD_USER_ID VARCHAR(30),
- MOD_DTTM TIMESTAMP,
+ MOD_DTTM TIMESTAMPTZ,
  CONSTRAINT PK_TB_SY_NOTI PRIMARY KEY (NOTI_ID),
  CONSTRAINT CK_TB_SY_NOTI_01 CHECK (READ_YN IN ('Y', 'N'))
 )$ddl$,
@@ -81,9 +83,9 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_BS_PART_STD (
  PRFT_DSTRB_RT NUMERIC(5,2) NOT NULL,
  SALES_EXPS_AMT NUMERIC(15) NOT NULL,
  REG_USER_ID VARCHAR(30) NOT NULL,
- REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
  MOD_USER_ID VARCHAR(30),
- MOD_DTTM TIMESTAMP,
+ MOD_DTTM TIMESTAMPTZ,
  CONSTRAINT PK_TB_BS_PART_STD PRIMARY KEY (PART_ID, APLY_BGN_YM)
 )$ddl$,
 $ddl$CREATE TABLE IF NOT EXISTS TB_PJ_PROJ (
@@ -108,9 +110,9 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_PJ_PROJ (
  FEATURE_CN VARCHAR(500),
  OPP_ID VARCHAR(20),
  REG_USER_ID VARCHAR(30) NOT NULL,
- REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
  MOD_USER_ID VARCHAR(30),
- MOD_DTTM TIMESTAMP,
+ MOD_DTTM TIMESTAMPTZ,
  CONSTRAINT PK_TB_PJ_PROJ PRIMARY KEY (PROJ_ID),
  CONSTRAINT CK_TB_PJ_PROJ_01 CHECK (BDGT_MANUAL_YN IN ('Y', 'N'))
 )$ddl$,
@@ -131,11 +133,11 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_BL_BILL (
  CNCL_YN CHAR(1) DEFAULT 'N' NOT NULL,
  CNCL_RSN VARCHAR(500),
  CNCL_USER_ID VARCHAR(30),
- CNCL_DTTM TIMESTAMP,
+ CNCL_DTTM TIMESTAMPTZ,
  REG_USER_ID VARCHAR(30) NOT NULL,
- REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
  MOD_USER_ID VARCHAR(30),
- MOD_DTTM TIMESTAMP,
+ MOD_DTTM TIMESTAMPTZ,
  CONSTRAINT PK_TB_BL_BILL PRIMARY KEY (BILL_ID),
  CONSTRAINT CK_TB_BL_BILL_01 CHECK (CNCL_YN IN ('Y', 'N'))
 )$ddl$,
@@ -148,7 +150,7 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_BL_DUN_HIST (
  SEND_MTHD_CD VARCHAR(10) NOT NULL,
  RESEND_YN CHAR(1) DEFAULT 'N' NOT NULL,
  REG_USER_ID VARCHAR(30) NOT NULL,
- REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
  CONSTRAINT PK_TB_BL_DUN_HIST PRIMARY KEY (BILL_ID, DUN_SN),
  CONSTRAINT CK_TB_BL_DUN_HIST_01 CHECK (RESEND_YN IN ('Y', 'N'))
 )$ddl$,
@@ -156,11 +158,11 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_CL_CLOSE (
  CLOSE_YM CHAR(6) NOT NULL,
  CLOSE_STAT_CD VARCHAR(10) NOT NULL,
  CLOSE_USER_ID VARCHAR(30),
- CLOSE_DTTM TIMESTAMP,
+ CLOSE_DTTM TIMESTAMPTZ,
  REG_USER_ID VARCHAR(30) NOT NULL,
- REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
  MOD_USER_ID VARCHAR(30),
- MOD_DTTM TIMESTAMP,
+ MOD_DTTM TIMESTAMPTZ,
  CONSTRAINT PK_TB_CL_CLOSE PRIMARY KEY (CLOSE_YM)
 )$ddl$,
 $ddl$CREATE TABLE IF NOT EXISTS TB_SY_USER (
@@ -168,19 +170,19 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_SY_USER (
  USER_NM VARCHAR(50) NOT NULL,
  EMAIL_ADDR VARCHAR(100) NOT NULL,
  PWD_HASH VARCHAR(200) NOT NULL,
- PWD_CHG_DTTM TIMESTAMP,
+ PWD_CHG_DTTM TIMESTAMPTZ,
  TEMP_PWD_YN CHAR(1) DEFAULT 'N' NOT NULL,
  PWD_ERR_CNT NUMERIC(2) NOT NULL,
  USER_STAT_CD VARCHAR(10) NOT NULL,
- LAST_LOGIN_DTTM TIMESTAMP,
+ LAST_LOGIN_DTTM TIMESTAMPTZ,
  MFA_USE_YN CHAR(1) DEFAULT 'N' NOT NULL,
  MFA_CODE_HASH VARCHAR(200),
- MFA_EXPR_DTTM TIMESTAMP,
+ MFA_EXPR_DTTM TIMESTAMPTZ,
  MFA_ERR_CNT NUMERIC(2) NOT NULL,
  REG_USER_ID VARCHAR(30) NOT NULL,
- REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
  MOD_USER_ID VARCHAR(30),
- MOD_DTTM TIMESTAMP,
+ MOD_DTTM TIMESTAMPTZ,
  CONSTRAINT PK_TB_SY_USER PRIMARY KEY (USER_ID),
  CONSTRAINT CK_TB_SY_USER_01 CHECK (TEMP_PWD_YN IN ('Y', 'N')),
  CONSTRAINT CK_TB_SY_USER_02 CHECK (MFA_USE_YN IN ('Y', 'N'))
@@ -193,9 +195,9 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_SY_CODE_GRP (
  SORT_ORD NUMERIC(5) NOT NULL,
  USE_YN CHAR(1) DEFAULT 'Y' NOT NULL,
  REG_USER_ID VARCHAR(30) NOT NULL,
- REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
  MOD_USER_ID VARCHAR(30),
- MOD_DTTM TIMESTAMP,
+ MOD_DTTM TIMESTAMPTZ,
  CONSTRAINT PK_TB_SY_CODE_GRP PRIMARY KEY (CODE_GRP_ID),
  CONSTRAINT CK_TB_SY_CODE_GRP_01 CHECK (SYS_CODE_YN IN ('Y', 'N')),
  CONSTRAINT CK_TB_SY_CODE_GRP_02 CHECK (VAL_CODE_YN IN ('Y', 'N')),
@@ -214,9 +216,9 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_SY_CODE (
  ADD_VAL2 VARCHAR(100),
  ADD_VAL3 VARCHAR(100),
  REG_USER_ID VARCHAR(30) NOT NULL,
- REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
  MOD_USER_ID VARCHAR(30),
- MOD_DTTM TIMESTAMP,
+ MOD_DTTM TIMESTAMPTZ,
  CONSTRAINT PK_TB_SY_CODE PRIMARY KEY (CODE_GRP_ID, CODE),
  CONSTRAINT CK_TB_SY_CODE_01 CHECK (USE_YN IN ('Y', 'N')),
  CONSTRAINT CK_TB_SY_CODE_02 CHECK (DEL_YN IN ('Y', 'N'))
@@ -229,10 +231,76 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_SY_OPER_STD (
  UNIT_NM VARCHAR(10) NOT NULL,
  STD_DESC VARCHAR(300),
  REG_USER_ID VARCHAR(30) NOT NULL,
- REG_DTTM TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
  MOD_USER_ID VARCHAR(30),
- MOD_DTTM TIMESTAMP,
+ MOD_DTTM TIMESTAMPTZ,
  CONSTRAINT PK_TB_SY_OPER_STD PRIMARY KEY (STD_CD, APLY_BGN_YM)
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_SY_ROLE (
+ ROLE_ID VARCHAR(20) NOT NULL,
+ ROLE_NM VARCHAR(50) NOT NULL,
+ DATA_SCOPE_CD VARCHAR(10) NOT NULL,
+ SNSTV_VIEW_YN CHAR(1) DEFAULT 'N' NOT NULL,
+ SYS_ROLE_YN CHAR(1) DEFAULT 'N' NOT NULL,
+ SORT_ORD NUMERIC(5) NOT NULL,
+ USE_YN CHAR(1) DEFAULT 'Y' NOT NULL,
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMPTZ,
+ CONSTRAINT PK_TB_SY_ROLE PRIMARY KEY (ROLE_ID),
+ CONSTRAINT UK_TB_SY_ROLE_01 UNIQUE (ROLE_NM),
+ CONSTRAINT CK_TB_SY_ROLE_01 CHECK (SNSTV_VIEW_YN IN ('Y', 'N')),
+ CONSTRAINT CK_TB_SY_ROLE_02 CHECK (SYS_ROLE_YN IN ('Y', 'N')),
+ CONSTRAINT CK_TB_SY_ROLE_03 CHECK (USE_YN IN ('Y', 'N'))
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_SY_USER_ROLE (
+ USER_ID VARCHAR(30) NOT NULL,
+ ROLE_ID VARCHAR(20) NOT NULL,
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMPTZ,
+ CONSTRAINT PK_TB_SY_USER_ROLE PRIMARY KEY (USER_ID, ROLE_ID)
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_BS_PART (
+ PART_ID VARCHAR(20) NOT NULL,
+ PART_NM VARCHAR(30) NOT NULL,
+ HQ_YN CHAR(1) DEFAULT 'N' NOT NULL,
+ USE_YN CHAR(1) DEFAULT 'Y' NOT NULL,
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMPTZ,
+ CONSTRAINT PK_TB_BS_PART PRIMARY KEY (PART_ID),
+ CONSTRAINT UK_TB_BS_PART_01 UNIQUE (PART_NM),
+ CONSTRAINT CK_TB_BS_PART_01 CHECK (HQ_YN IN ('Y', 'N')),
+ CONSTRAINT CK_TB_BS_PART_02 CHECK (USE_YN IN ('Y', 'N'))
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_SY_ACCS_LOG (
+ LOG_ID NUMERIC(15) DEFAULT nextval('SQ_TB_SY_ACCS_LOG') NOT NULL,
+ USER_ID VARCHAR(30) NOT NULL,
+ ACT_TYPE_CD VARCHAR(20) NOT NULL,
+ SCRN_ID VARCHAR(10),
+ TRGT_DESC VARCHAR(300),
+ CLIENT_IP VARCHAR(45),
+ ACT_DTTM TIMESTAMPTZ NOT NULL,
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ CONSTRAINT PK_TB_SY_ACCS_LOG PRIMARY KEY (LOG_ID)
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_SY_CHG_HIST (
+ HIST_ID NUMERIC(12) DEFAULT nextval('SQ_TB_SY_CHG_HIST') NOT NULL,
+ TRGT_TBL_NM VARCHAR(30) NOT NULL,
+ TRGT_KEY VARCHAR(100) NOT NULL,
+ CHG_TYPE_CD VARCHAR(10) NOT NULL,
+ CHG_ITEM_NM VARCHAR(50),
+ BFR_VAL VARCHAR(500),
+ AFT_VAL VARCHAR(500),
+ CHG_RSN VARCHAR(500),
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ CONSTRAINT PK_TB_SY_CHG_HIST PRIMARY KEY (HIST_ID)
 )$ddl$
 ];
     ddl text;
@@ -254,6 +322,7 @@ $ddl$CREATE TABLE IF NOT EXISTS TB_SY_OPER_STD (
     indexed_columns text[];
     indexed_column text;
     index_number integer;
+    sequence_name text;
     differences text[] := ARRAY[]::text[];
 BEGIN
     PERFORM pg_advisory_xact_lock(734901, 1);
@@ -270,12 +339,12 @@ BEGIN
         expected_columns := ARRAY[]::text[];
         expected_constraints := ARRAY[]::text[];
         FOREACH line IN ARRAY string_to_array(ddl, E'\n') LOOP
-            parts := regexp_match(trim(line), '^([A-Z_][A-Z0-9_]*) ((?:VARCHAR|CHAR|NUMERIC)\([0-9,]+\)|TIMESTAMP|DATE)(.*)$');
+            parts := regexp_match(trim(line), '^([A-Z_][A-Z0-9_]*) ((?:VARCHAR|CHAR|NUMERIC)\([0-9,]+\)|TIMESTAMPTZ|DATE)(.*)$');
             IF parts IS NOT NULL THEN
                 expected_columns := array_append(expected_columns, lower(parts[1]));
                 expected_type := lower(parts[2]);
                 expected_type := replace(replace(expected_type, 'varchar', 'character varying'), 'char(', 'character(');
-                IF expected_type = 'timestamp' THEN expected_type := 'timestamp without time zone'; END IF;
+                IF expected_type = 'timestamptz' THEN expected_type := 'timestamp with time zone'; END IF;
                 IF expected_type ~ '^numeric\([0-9]+\)$' THEN
                     expected_type := replace(expected_type, ')', ',0)');
                 END IF;
@@ -299,7 +368,7 @@ BEGIN
             IF parts IS NOT NULL THEN
                 expected_constraints := array_append(expected_constraints, lower(parts[1]));
                 SELECT pg_get_constraintdef(oid) INTO actual_constraint FROM pg_constraint
-                 WHERE conrelid=relation AND conname=lower(parts[1]) AND contype IN ('p','c') AND convalidated;
+                 WHERE conrelid=relation AND conname=lower(parts[1]) AND contype IN ('p','c','u') AND convalidated;
                 expected_constraint := lower(rtrim(parts[2], ','));
                 actual_constraint := lower(actual_constraint);
                 actual_constraint := regexp_replace(actual_constraint, '::(bpchar|text|character varying)', '', 'g');
@@ -323,15 +392,20 @@ BEGIN
             differences := array_append(differences, format('%s.columns expected=%s actual=%s', table_name, expected_columns, actual_columns));
         END IF;
     END LOOP;
-    IF to_regclass(format('%I.sq_tb_sy_noti', current_schema())) IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM pg_sequence WHERE seqrelid=to_regclass(format('%I.sq_tb_sy_noti', current_schema()))
-                       AND seqincrement=1 AND seqstart=1 AND NOT seqcycle) THEN
-        differences := array_append(differences, 'sq_tb_sy_noti: expected non-cycling sequence START 1 INCREMENT 1; existing sequence is not reset');
-    END IF;
+    FOREACH sequence_name IN ARRAY ARRAY['sq_tb_sy_noti','sq_tb_sy_chg_hist','sq_tb_sy_accs_log'] LOOP
+        IF to_regclass(format('%I.%I', current_schema(), sequence_name)) IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM pg_sequence
+                            WHERE seqrelid=to_regclass(format('%I.%I', current_schema(), sequence_name))
+                              AND seqincrement=1 AND seqstart=1 AND NOT seqcycle) THEN
+            differences := array_append(differences, sequence_name || ': expected non-cycling sequence START 1 INCREMENT 1; existing sequence is not reset');
+        END IF;
+    END LOOP;
     IF cardinality(differences)>0 THEN
         RAISE EXCEPTION USING MESSAGE = array_to_string(differences, E'\n'), ERRCODE='P0001';
     END IF;
     CREATE SEQUENCE IF NOT EXISTS SQ_TB_SY_NOTI START WITH 1 INCREMENT BY 1;
+    CREATE SEQUENCE IF NOT EXISTS SQ_TB_SY_CHG_HIST START WITH 1 INCREMENT BY 1;
+    CREATE SEQUENCE IF NOT EXISTS SQ_TB_SY_ACCS_LOG START WITH 1 INCREMENT BY 1;
     FOREACH ddl IN ARRAY definitions LOOP
         table_name := lower(substring(ddl FROM 'EXISTS ([A-Z_]+)'));
         IF to_regclass(format('%I.%I', current_schema(), table_name)) IS NULL THEN
@@ -339,6 +413,8 @@ BEGIN
             indexed_columns := CASE table_name
                 WHEN 'tb_sy_user_scope' THEN ARRAY['part_id','proj_id']
                 WHEN 'tb_sy_menu' THEN ARRAY['upper_menu_id']
+                WHEN 'tb_sy_user_role' THEN ARRAY['role_id']
+                WHEN 'tb_sy_accs_log' THEN ARRAY['user_id','act_dttm']
                 WHEN 'tb_sy_noti' THEN ARRAY['rcvr_user_id','noti_dttm']
                 WHEN 'tb_bs_part_std' THEN ARRAY['part_ldr_user_id']
                 WHEN 'tb_pj_proj' THEN ARRAY['cust_clnt_id','ctrt_type_cd','proj_stat_cd','opp_id']
@@ -351,15 +427,32 @@ BEGIN
                 EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON %I (%I)',
                     'ix_' || table_name || '_' || lpad(index_number::text,2,'0'), table_name, indexed_column);
             END LOOP;
+            IF table_name='tb_sy_chg_hist' THEN
+                CREATE INDEX IF NOT EXISTS IX_TB_SY_CHG_HIST_01 ON TB_SY_CHG_HIST (TRGT_TBL_NM, TRGT_KEY);
+            END IF;
             EXECUTE format('COMMENT ON TABLE %I IS %L', table_name,
                 CASE WHEN table_name='tb_sy_menu' THEN '공통 화면의 메뉴 계층과 화면 연결을 제공한다.'
                      WHEN table_name='tb_sy_user' THEN '사용자. 공통 기능은 admin 사용자 설정 저장에 쓴다.'
                      WHEN table_name='tb_sy_code_grp' THEN '공통코드 그룹.'
                      WHEN table_name='tb_sy_code' THEN '공통코드. 공통 기능은 PREF_TYPE(화면 설정 유형)을 쓴다.'
                      WHEN table_name='tb_sy_oper_std' THEN '운영 기준값. 공통 기능은 CASH_BASE_YM(가장 최근 달 기준)을 쓴다.'
+                     WHEN table_name='tb_sy_role' THEN '사용자에게 부여할 역할과 역할별 데이터 조회 범위를 정의한다.'
+                     WHEN table_name='tb_sy_user_role' THEN '계정별 다중 역할 부여 관계를 저장한다.'
+                     WHEN table_name='tb_bs_part' THEN '영업 파트와 본사 직접 영업 구분을 관리한다.'
+                     WHEN table_name='tb_sy_accs_log' THEN '사용자 등록과 권한 변경 등 업무 접근 기록을 저장한다.'
+                     WHEN table_name='tb_sy_chg_hist' THEN '계정 상태와 담당 프로젝트 해제 등 업무 데이터의 변경 이력을 보존한다.'
                      ELSE '현재 미사용 — 추후 업무 연동 예정. 원문 구조만 준비한다.' END);
+            CASE table_name
+                WHEN 'tb_sy_role' THEN
+                    COMMENT ON COLUMN TB_SY_ROLE.DATA_SCOPE_CD IS 'ALL:전체|PART:담당 파트|PROJ:담당 프로젝트';
+                WHEN 'tb_sy_accs_log' THEN
+                    COMMENT ON COLUMN TB_SY_ACCS_LOG.ACT_TYPE_CD IS 'LOGIN:로그인|LOGOUT:로그아웃|LOGIN_FAIL:로그인 실패|DNLD:다운로드|CLOSE:마감|UNCLOSE:마감 해제|AUTH_CHG:권한 변경|USER_REG:사용자 등록|SNSTV_VIEW:민감 항목 보기|ACCT_VIEW:계좌번호 보기';
+                WHEN 'tb_sy_chg_hist' THEN
+                    COMMENT ON COLUMN TB_SY_CHG_HIST.CHG_TYPE_CD IS 'NEW:신규 등록|UPD:수정|STOP:사용중지|RESUME:다시 사용|DEL:삭제';
+                ELSE NULL;
+            END CASE;
             FOREACH line IN ARRAY string_to_array(ddl, E'\n') LOOP
-                parts := regexp_match(trim(line), '^([A-Z_][A-Z0-9_]*) (?:VARCHAR|CHAR|NUMERIC|TIMESTAMP|DATE)');
+                parts := regexp_match(trim(line), '^([A-Z_][A-Z0-9_]*) (?:VARCHAR|CHAR|NUMERIC|TIMESTAMPTZ|DATE)');
                 IF parts IS NOT NULL AND lower(parts[1]) ~ '(_id|_by)$' THEN
                     EXECUTE format('COMMENT ON COLUMN %I.%I IS %L', table_name, lower(parts[1]),
                         CASE lower(parts[1])
@@ -367,6 +460,10 @@ BEGIN
                           WHEN 'proj_id' THEN 'TB_PJ_PROJ.PROJ_ID 식별 또는 참조 의도 (FK 미선언)'
                           WHEN 'bill_id' THEN 'TB_BL_BILL.BILL_ID 식별 또는 참조 의도 (FK 미선언)'
                           WHEN 'part_id' THEN 'TB_BS_PART.PART_ID 참조 의도 (FK 미선언)'
+                          WHEN 'role_id' THEN CASE WHEN table_name='tb_sy_role' THEN '역할의 자체 식별자 (외부 FK 참조 없음)'
+                                                   ELSE 'TB_SY_ROLE.ROLE_ID 참조 의도 (FK 미선언)' END
+                          WHEN 'hist_id' THEN '변경 이력의 자체 식별자 (외부 FK 참조 없음)'
+                          WHEN 'log_id' THEN '접근 기록의 자체 식별자 (외부 FK 참조 없음)'
                           WHEN 'cust_clnt_id' THEN 'TB_BS_CLNT.CLNT_ID 참조 의도 (FK 미선언)'
                           WHEN 'opp_id' THEN 'TB_SL_OPP.OPP_ID 참조 의도 (FK 미선언)'
                           WHEN 'menu_id' THEN '메뉴의 자체 식별자 (외부 FK 참조 없음)'

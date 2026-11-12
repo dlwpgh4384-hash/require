@@ -48,9 +48,9 @@ class PostgreSqlPreparationTest {
     }
 
     @Test
-    void createsThirteenTablesAndOnlyBaseSeedRowsWithoutPhysicalForeignKeys() throws Exception {
+    void createsEighteenTablesAndOnlyBaseSeedRowsWithoutPhysicalForeignKeys() throws Exception {
         preparation.prepare();
-        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'")).isEqualTo(13);
+        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'")).isEqualTo(18);
         assertThat(number("SELECT count(*) FROM tb_sy_menu")).isEqualTo(40);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NULL")).isEqualTo(10);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NOT NULL")).isEqualTo(30);
@@ -61,7 +61,10 @@ class PostgreSqlPreparationTest {
         assertThat(text("SELECT std_val::bigint::text FROM tb_sy_oper_std WHERE std_cd='CASH_BASE_YM'")).isEqualTo("202601");
         assertThat(number("SELECT count(*) FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f'")).isZero();
         assertThat(number("SELECT nextval('sq_tb_sy_noti')")).isEqualTo(1);
-        try (var rows = database.createStatement().executeQuery("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name NOT IN ('tb_sy_menu','tb_sy_user','tb_sy_code_grp','tb_sy_code','tb_sy_oper_std')")) {
+        assertThat(number("SELECT count(*) FROM tb_sy_role")).isEqualTo(5);
+        assertThat(number("SELECT count(*) FROM tb_sy_user_role WHERE user_id='admin' AND role_id='ADMIN'")).isEqualTo(1);
+        assertThat(number("SELECT count(*) FROM tb_bs_part WHERE part_id='HQ' AND hq_yn='Y'")).isEqualTo(1);
+        try (var rows = database.createStatement().executeQuery("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name NOT IN ('tb_sy_menu','tb_sy_user','tb_sy_code_grp','tb_sy_code','tb_sy_oper_std','tb_sy_role','tb_sy_user_role','tb_bs_part')")) {
             while (rows.next()) assertThat(number("SELECT count(*) FROM " + rows.getString(1))).isZero();
         }
     }
@@ -154,6 +157,98 @@ class PostgreSqlPreparationTest {
             assertThat(second.get(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
             assertThat(number("SELECT count(*) FROM tb_sy_menu")).isEqualTo(40);
         } finally { pool.shutdownNow(); }
+    }
+
+    @Test
+    void userTablesRowsAndBothSequencePositionsSurviveRepeatedPreparation() throws Exception {
+        preparation.prepare();
+        execute("INSERT INTO tb_sy_user_role(user_id,role_id,reg_user_id) VALUES ('owneduser','PM','admin')");
+        assertThat(number("INSERT INTO tb_sy_accs_log(user_id,act_type_cd,act_dttm,reg_user_id) "
+            + "VALUES ('admin','USER_REG',CURRENT_TIMESTAMP,'admin') RETURNING log_id")).isEqualTo(1);
+        assertThat(number("INSERT INTO tb_sy_chg_hist(trgt_tbl_nm,trgt_key,chg_type_cd,reg_user_id) "
+            + "VALUES ('TB_SY_USER','owneduser','STOP','admin') RETURNING hist_id")).isEqualTo(1);
+        var snapshots = new java.util.LinkedHashMap<String, String>();
+        for (String table : new String[]{"tb_sy_role", "tb_sy_user_role", "tb_bs_part", "tb_sy_accs_log", "tb_sy_chg_hist"}) {
+            snapshots.put(table, text("SELECT jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text FROM " + table + " t"));
+        }
+        preparation.prepare();
+        for (var entry : snapshots.entrySet()) {
+            assertThat(text("SELECT jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text FROM " + entry.getKey() + " t"))
+                .isEqualTo(entry.getValue());
+        }
+        assertThat(number("SELECT nextval('sq_tb_sy_accs_log')")).isEqualTo(2);
+        assertThat(number("SELECT nextval('sq_tb_sy_chg_hist')")).isEqualTo(2);
+        assertThat(number("SELECT count(*) FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f'"))
+            .isZero();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"tb_sy_role", "tb_sy_user_role", "tb_bs_part", "tb_sy_code"})
+    void nonemptyUserReferenceTableIsNeverSupplemented(String table) throws Exception {
+        preparation.prepare();
+        execute("DELETE FROM " + table);
+        switch (table) {
+            case "tb_sy_role" -> execute("INSERT INTO tb_sy_role(role_id,role_nm,data_scope_cd,sort_ord,reg_user_id) "
+                + "VALUES ('OWNED','독립 역할','PROJ',9,'OWNED')");
+            case "tb_sy_user_role" -> execute("INSERT INTO tb_sy_user_role(user_id,role_id,reg_user_id) "
+                + "VALUES ('owneduser','OWNED','OWNED')");
+            case "tb_bs_part" -> execute("INSERT INTO tb_bs_part(part_id,part_nm,reg_user_id) "
+                + "VALUES ('OWNED','독립 파트','OWNED')");
+            case "tb_sy_code" -> execute("INSERT INTO tb_sy_code(code_grp_id,code,code_nm,sort_ord,reg_user_id) "
+                + "VALUES ('USER_STAT','OWNED','독립 코드',9,'OWNED')");
+            default -> throw new IllegalArgumentException(table);
+        }
+        String before = text("SELECT jsonb_agg(to_jsonb(t))::text FROM " + table + " t");
+        preparation.prepare();
+        assertThat(number("SELECT count(*) FROM " + table)).isEqualTo(1);
+        assertThat(text("SELECT jsonb_agg(to_jsonb(t))::text FROM " + table + " t")).isEqualTo(before);
+    }
+
+    @Test
+    void newTableStructureMismatchIsReportedBeforeAnyCreation() throws Exception {
+        execute("CREATE TABLE tb_sy_role(role_id text)");
+        execute("INSERT INTO tb_sy_role VALUES ('OWNED')");
+        assertThatThrownBy(preparation::prepare)
+            .hasMessageContaining("tb_sy_role.role_id").hasMessageContaining("expected");
+        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema()"))
+            .isEqualTo(1);
+        assertThat(text("SELECT role_id FROM tb_sy_role")).isEqualTo("OWNED");
+        assertThat(text("SELECT to_regclass('sq_tb_sy_accs_log')::text")).isNull();
+    }
+
+    @Test
+    void missingOriginalUniqueConstraintIsReportedNotRecreated() throws Exception {
+        preparation.prepare();
+        execute("ALTER TABLE tb_sy_role DROP CONSTRAINT uk_tb_sy_role_01");
+        assertThatThrownBy(preparation::prepare).hasMessageContaining("UK_TB_SY_ROLE_01");
+        assertThat(number("SELECT count(*) FROM tb_sy_role")).isEqualTo(5);
+        assertThat(number("SELECT count(*) FROM pg_constraint WHERE conrelid='tb_sy_role'::regclass "
+            + "AND conname='uk_tb_sy_role_01'")).isZero();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"sq_tb_sy_accs_log", "sq_tb_sy_chg_hist"})
+    void incompatibleSequenceIsReportedWithoutResetOrTableCreation(String sequence) throws Exception {
+        execute("CREATE SEQUENCE " + sequence + " START WITH 7 INCREMENT BY 2");
+        assertThatThrownBy(preparation::prepare).hasMessageContaining(sequence);
+        assertThat(number("SELECT nextval('" + sequence + "')")).isEqualTo(7);
+        assertThat(text("SELECT to_regclass('tb_sy_user_role')::text")).isNull();
+    }
+
+    @Test
+    void userSeedErrorRollsBackEarlierSeedAndMissingTableCreation() throws Exception {
+        preparation.prepare();
+        execute("DELETE FROM tb_sy_user_role");
+        execute("DELETE FROM tb_sy_role");
+        execute("DROP TABLE tb_sy_accs_log");
+        execute("CREATE FUNCTION reject_owned_role() RETURNS trigger LANGUAGE plpgsql AS $$ "
+            + "BEGIN RAISE EXCEPTION 'owned seed failure'; END; $$");
+        execute("CREATE TRIGGER reject_owned_role BEFORE INSERT ON tb_sy_user_role "
+            + "FOR EACH ROW EXECUTE FUNCTION reject_owned_role()");
+        assertThatThrownBy(preparation::prepare).hasMessageContaining("owned seed failure");
+        assertThat(number("SELECT count(*) FROM tb_sy_role")).isZero();
+        assertThat(number("SELECT count(*) FROM tb_sy_user_role")).isZero();
+        assertThat(text("SELECT to_regclass('tb_sy_accs_log')::text")).isNull();
     }
 
     private void execute(String sql) throws Exception {

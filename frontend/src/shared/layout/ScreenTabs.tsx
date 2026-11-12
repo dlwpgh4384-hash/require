@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import { ShellIcon } from "./ShellIcon";
 
 export interface ScreenTab {
   id: string;
@@ -36,7 +37,7 @@ export function ScreenTabs({
           >
             {tab.dirty && (
               <span className="tab-dirty" aria-label="저장하지 않은 내용 있음">
-                ●
+                ●{" "}
               </span>
             )}
             {tab.label}
@@ -49,7 +50,7 @@ export function ScreenTabs({
               aria-label={`${tab.label} 탭 닫기`}
               onClick={() => onClose(tab.id)}
             >
-              ×
+              <ShellIcon name="x" size={14} />
             </button>
           )}
         </div>

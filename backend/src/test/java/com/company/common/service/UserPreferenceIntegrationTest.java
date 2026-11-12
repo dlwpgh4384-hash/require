@@ -9,7 +9,7 @@ import com.company.common.dto.UserPreferenceInput;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.sql.DriverManager;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -109,14 +109,14 @@ class UserPreferenceIntegrationTest {
         }
     }
 
-    private void seed(String type, String value, LocalDateTime token) throws Exception {
+    private void seed(String type, String value, Instant token) throws Exception {
         try (var connection = source.getConnection(); var statement = connection.prepareStatement("""
             INSERT INTO TB_SY_USER_PREF(user_id,pref_type_cd,pref_key,pref_val,reg_user_id,mod_dttm)
             VALUES ('admin',?,'GLOBAL',?,'original',?)
             """)) {
             statement.setString(1, type);
             statement.setString(2, value);
-            statement.setObject(3, token);
+            statement.setObject(3, token == null ? null : token.atOffset(java.time.ZoneOffset.UTC));
             statement.executeUpdate();
         }
     }
@@ -136,7 +136,7 @@ class UserPreferenceIntegrationTest {
 
     @Test
     void happyUpdateIsCommittedAndReadByNewConnection() throws Exception {
-        seed("PAGE_SIZE", "20", LocalDateTime.of(2026, 1, 1, 0, 0, 0, 123456000));
+        seed("PAGE_SIZE", "20", java.time.Instant.parse("2026-01-01T00:00:00.123456Z"));
         mvc.perform(put("/api/common/user-preferences/PAGE_SIZE/GLOBAL")
             .contentType("application/json")
             .content(json.writeValueAsString(java.util.Map.of("prefVal", "50", "modDttm", getToken("PAGE_SIZE")))))
@@ -151,7 +151,7 @@ class UserPreferenceIntegrationTest {
 
     @Test
     void authSideEffectAnonymousFoldUpdateWritesAdminAuditAndSameMicrosecondToken() throws Exception {
-        LocalDateTime originalToken = LocalDateTime.of(2026, 1, 1, 0, 0);
+        Instant originalToken = java.time.Instant.parse("2026-01-01T00:00:00.000000Z");
         seed("MENU_FOLD", "false", originalToken);
         var saved = mvc.perform(put("/api/common/user-preferences/MENU_FOLD/GLOBAL")
             .contentType("application/json")
@@ -169,8 +169,8 @@ class UserPreferenceIntegrationTest {
             assertThat(rows.next()).isTrue();
             assertThat(rows.getString(1)).isEqualTo("true");
             assertThat(rows.getString(2)).isEqualTo("admin");
-            assertThat(rows.getObject(3, LocalDateTime.class)).isEqualTo(OffsetDateTime.parse(token).toLocalDateTime());
-            assertThat(rows.getObject(3, LocalDateTime.class)).isAfter(originalToken);
+            assertThat(rows.getObject(3, OffsetDateTime.class).toInstant()).isEqualTo(OffsetDateTime.parse(token).toInstant());
+            assertThat(rows.getObject(3, OffsetDateTime.class).toInstant()).isAfter(originalToken);
             assertThat(rows.getString(4)).isEqualTo("original");
         }
     }

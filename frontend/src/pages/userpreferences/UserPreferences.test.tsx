@@ -493,7 +493,7 @@ describe("personal lists and tools", () => {
     });
     expect(screen.getByText("일치하는 메뉴가 없습니다.")).toBeVisible();
   });
-  it("desktop Ctrl+K opens search and Escape closes only that dialog", () => {
+  it("desktop Ctrl+K opens search(헤더 버튼 없음, 시안) and Escape closes only that dialog", () => {
     wrap(
       <UserPreferenceTools
         menus={menus}
@@ -502,7 +502,8 @@ describe("personal lists and tools", () => {
         onNavigate={vi.fn()}
       />,
     );
-    const caller = screen.getByRole("button", { name: "메뉴 찾기" });
+    expect(screen.queryByRole("button", { name: "메뉴 찾기" })).not.toBeInTheDocument();
+    const caller = screen.getByTestId("user-menu-open");
     caller.focus();
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     expect(screen.getByRole("dialog", { name: "메뉴 찾기" })).toBeVisible();
@@ -510,7 +511,7 @@ describe("personal lists and tools", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(caller).toHaveFocus();
   });
-  it("mobile Ctrl+K is inactive but search icon is usable and excluded tools stay disabled", () => {
+  it("mobile Ctrl+K is inactive but search icon is usable and later tools only say 준비 중", () => {
     wrap(
       <UserPreferenceTools
         menus={menus}
@@ -532,8 +533,9 @@ describe("personal lists and tools", () => {
       "password-unavailable",
       "logout-unavailable",
     ]) {
-      expect(screen.getByTestId(id)).toBeDisabled();
+      if (!screen.queryByTestId(id)) fireEvent.click(screen.getByTestId("user-menu-open"));
       fireEvent.click(screen.getByTestId(id));
+      expect(screen.getByTestId("header-notice")).toHaveTextContent("준비 중");
     }
     expect(puts()).toHaveLength(0);
   });
@@ -593,5 +595,27 @@ describe("personal lists and tools", () => {
       vi.advanceTimersByTime(1);
     });
     expect(screen.queryByTestId("preference-success")).not.toBeInTheDocument();
+    vi.useRealTimers();
+  });
+});
+
+describe("시안 맞춤: 자동 로그아웃 시간·[연장]", () => {
+  it("사용자 메뉴 맨 아래에 남은 시간과 [연장]이 있고, 연장하면 30분으로 돌아간다", () => {
+    vi.useRealTimers();
+    wrap(
+      <UserPreferenceTools
+        menus={menus}
+        mobile={false}
+        available={available}
+        onNavigate={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("user-menu-open"));
+    expect(screen.getByTestId("session-left")).toHaveTextContent(/자동 로그아웃까지 (29:5\d|30:00)/);
+    fireEvent.click(screen.getByTestId("session-extend"));
+    expect(screen.getByTestId("session-left")).toHaveTextContent("30:00");
+    expect(screen.getByTestId("header-notice")).toHaveTextContent(
+      "자동 로그아웃 시간을 30분으로 다시 늘렸습니다.",
+    );
   });
 });

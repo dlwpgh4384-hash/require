@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+@org.springframework.core.annotation.Order(0)
 @RestControllerAdvice(assignableTypes = CommonMenuController.class)
 public class MenuExceptionHandler {
     public record MenuFailure(boolean success, Map<String, Object> meta) {}

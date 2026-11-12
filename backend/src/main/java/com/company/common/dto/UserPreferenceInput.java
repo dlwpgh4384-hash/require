@@ -8,13 +8,13 @@ import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.io.IOException;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 
 @JsonDeserialize(using = UserPreferenceInput.Reader.class)
-public record UserPreferenceInput(String prefVal, LocalDateTime modDttm) {
+public record UserPreferenceInput(String prefVal, Instant modDttm) {
     public static class Reader extends JsonDeserializer<UserPreferenceInput> {
         @Override
         public UserPreferenceInput deserialize(JsonParser parser, DeserializationContext context) throws IOException {
@@ -37,7 +37,7 @@ public record UserPreferenceInput(String prefVal, LocalDateTime modDttm) {
                 throw UserPreferenceFailure.invalid("modDttm", "조회한 수정 시각을 보내 주세요.");
             }
             JsonNode token = body.get("modDttm");
-            LocalDateTime local = null;
+            Instant local = null;
             if (!token.isNull()) {
                 try {
                     if (!token.isTextual()) throw new DateTimeParseException("type", "", 0);
@@ -45,7 +45,7 @@ public record UserPreferenceInput(String prefVal, LocalDateTime modDttm) {
                     if (!value.getOffset().equals(ZoneOffset.UTC) || value.getNano() % 1000 != 0) {
                         throw new DateTimeParseException("precision", "", 0);
                     }
-                    local = value.toLocalDateTime();
+                    local = value.toInstant();
                 } catch (DateTimeParseException failure) {
                     throw UserPreferenceFailure.invalid("modDttm", "수정 시각의 형식을 확인해 주세요.");
                 }

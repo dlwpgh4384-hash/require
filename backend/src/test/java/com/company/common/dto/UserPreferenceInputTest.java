@@ -31,7 +31,7 @@ class UserPreferenceInputTest {
     @Test
     void exactSecondStillSerializesAsDateTimeWithSeconds() {
         var row = new UserPreferenceRow();
-        row.setModDttm(java.time.LocalDateTime.of(2026, 1, 1, 0, 0));
+        row.setModDttm(java.time.Instant.parse("2026-01-01T00:00:00.000000Z"));
         assertThat(UserPreferenceResponse.from("DENSE", "GLOBAL", row).data().modDttm()).isEqualTo("2026-01-01T00:00:00Z");
     }
 }

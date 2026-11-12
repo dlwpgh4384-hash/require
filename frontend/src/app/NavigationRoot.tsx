@@ -55,6 +55,7 @@ export interface ShellExtensions {
   quickAccess?: ReactNode;
   actions?: ReactNode;
   titleAddon?: ReactNode;
+  screenActions?: ReactNode;
   menuFolded?: boolean;
   onMenuFoldChange?: (folded: boolean) => void;
 }
@@ -365,7 +366,16 @@ export function NavigationRoot({
       .sort((a, b) => (seen.current[a] ?? 0) - (seen.current[b] ?? 0))[0];
     setTabList(base);
     setPending({ kind: "limit", target: screenId, victim, previous: current });
-  }, [ready, keepMounted, tabsOn, screenId, routeOpenable, pending, current, tabList]);
+  }, [
+    ready,
+    keepMounted,
+    tabsOn,
+    screenId,
+    routeOpenable,
+    pending,
+    current,
+    tabList,
+  ]);
 
   // 휴대폰↔PC로 폭이 바뀌면 화면 상태를 다시 맞춘다(처음 그릴 때는 그대로 둔다).
   const previousTabsOn = useRef(tabsOn);
@@ -457,13 +467,19 @@ export function NavigationRoot({
   );
   const menuFor = (id: string | null) => raw.find((item) => item.scrnId === id);
   const screenBody = (id: string) =>
-    renderScreen ? renderScreen(id, menuFor(id)) : <NavigationState kind="ready" />;
+    renderScreen ? (
+      renderScreen(id, menuFor(id))
+    ) : (
+      <NavigationState kind="ready" />
+    );
 
   // 본문에 보일 화면: 탭·휴대폰 화면이 정해져 있으면 그것, 아니면 주소의 화면.
-  const shown = keepMounted && current && (pending || routeOpenable) ? current : screenId;
+  const shown =
+    keepMounted && current && (pending || routeOpenable) ? current : screenId;
   const access = accessOf(shown);
   let routeBody: ReactNode = null;
-  if (state.status === "loading") routeBody = <NavigationState kind="loading" />;
+  if (state.status === "loading")
+    routeBody = <NavigationState kind="loading" />;
   else if (state.status === "error") routeBody = failure();
   else if (location.pathname === "/" && !first)
     routeBody = <NavigationState kind={raw.length ? "no-screen" : "empty"} />;
@@ -480,7 +496,8 @@ export function NavigationRoot({
         </Link>
       </NavigationState>
     );
-  else if (!access.available) routeBody = <NavigationState kind="unavailable" />;
+  else if (!access.available)
+    routeBody = <NavigationState kind="unavailable" />;
   else if (mobile && access.pcOnlyYn === "Y")
     routeBody = (
       <NavigationState
@@ -564,7 +581,9 @@ export function NavigationRoot({
         sidebar={sidebar}
         navigationKey={location.key}
         breadcrumb={
-          shownAvailable ? menuPath(raw, shown).map((item) => item.menuNm) : undefined
+          shownAvailable
+            ? menuPath(raw, shown).map((item) => item.menuNm)
+            : undefined
         }
         screenId={shownAvailable ? access!.scrnId : undefined}
         title={shownAvailable ? menuFor(shown)?.menuNm : undefined}
@@ -580,7 +599,11 @@ export function NavigationRoot({
         }
         screenActions={
           tabsEnabled ? (
-            <div className="screen-actions" data-testid="screen-actions" />
+            <div className="screen-actions" data-testid="screen-actions">
+              {shownAvailable && !(mobile && access?.pcOnlyYn === "Y")
+                ? extra?.screenActions
+                : undefined}
+            </div>
           ) : undefined
         }
         logoHref={tabsEnabled ? `/screens/${DASHBOARD_SCREEN}` : undefined}

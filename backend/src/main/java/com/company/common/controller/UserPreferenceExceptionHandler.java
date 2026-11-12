@@ -9,6 +9,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+@org.springframework.core.annotation.Order(0)
 @RestControllerAdvice(assignableTypes = CommonUserPreferenceController.class)
 public class UserPreferenceExceptionHandler {
     public record FieldError(String field, String message) {}

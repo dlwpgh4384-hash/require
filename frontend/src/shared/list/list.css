@@ -1,0 +1,512 @@
+/* SFR-010 목록 공통 — 화면 시안 v1.8의 목록 틀(listView)과 같은 모양 */
+:root {
+  --ls-head-bg: #f3f4f6;
+  --ls-ok: #15803d;
+  --ls-ok-bg: #f0fdf4;
+  --ls-warn: #b45309;
+  --ls-warn-bg: #fffbeb;
+  --ls-bad: #b91c1c;
+  --ls-bad-bg: #fef2f2;
+  --ls-info: #0369a1;
+  --ls-info-bg: #f0f9ff;
+  --ls-lock: #4b5563;
+  --ls-lock-bg: #f3f4f6;
+  --ls-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
+  --ls-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ls-head-bg: #1e232c;
+    --ls-ok: #4ade80;
+    --ls-ok-bg: rgba(34, 197, 94, 0.14);
+    --ls-warn: #fbbf24;
+    --ls-warn-bg: rgba(245, 158, 11, 0.14);
+    --ls-bad: #f87171;
+    --ls-bad-bg: rgba(239, 68, 68, 0.14);
+    --ls-info: #7dd3fc;
+    --ls-info-bg: rgba(14, 165, 233, 0.14);
+    --ls-lock: #a3aab6;
+    --ls-lock-bg: rgba(148, 163, 184, 0.14);
+  }
+}
+
+.ls-root {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+/* 앱 전체의 「버튼 최소 36px」 규칙을 목록 틀에서는 쓰지 않는다(시안: 작은 버튼 28px). */
+.ls-root button,
+.ls-filters button,
+.ls-drawer button,
+.ls-pop button {
+  min-height: 0;
+}
+.ls-btn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: 500 14px/1 inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ls-btn:hover:not(:disabled) {
+  background: var(--hover);
+}
+.ls-btn:disabled {
+  color: var(--text-dis);
+  cursor: default;
+}
+.ls-btn-p {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.ls-btn-p:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+.ls-btn-sm {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.ls-btn-dt {
+  color: var(--ls-bad);
+}
+.ls-btn-t {
+  border: 0;
+  background: none;
+  color: var(--primary-text);
+  height: 28px;
+  padding: 0 6px;
+  font-size: 13px;
+}
+.ls-in {
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: 400 14px inherit;
+  min-width: 0;
+}
+.ls-in-sm {
+  height: 28px;
+  font-size: 13px;
+  padding: 0 6px;
+}
+.ls-cap {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+
+/* 조건 줄 */
+.ls-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.ls-filter-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: center;
+}
+.ls-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ls-filter label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-sub);
+  white-space: nowrap;
+}
+.ls-filter-acts {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+/* 도구 줄 */
+.ls-tbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: -12px;
+}
+.ls-tl,
+.ls-tr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.ls-pop-anchor {
+  position: relative;
+}
+.ls-pop {
+  position: absolute;
+  right: 0;
+  top: 34px;
+  width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  box-shadow: var(--ls-shadow-sm);
+  z-index: 45;
+}
+.ls-pop-h {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--divider);
+  font-weight: 600;
+  font-size: 13px;
+}
+.ls-pop-b {
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+.ls-pop-b label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ls-pop-b .ls-btn {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+/* 표 */
+.ls-twrap {
+  overflow: auto;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  max-height: calc(100vh - 340px);
+  min-height: 160px;
+}
+table.ls-t {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  font-size: 13px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.ls-t th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--ls-head-bg);
+  font-weight: 600;
+  text-align: left;
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--divider);
+  white-space: nowrap;
+  user-select: none;
+}
+.ls-t th.ls-sortable {
+  cursor: pointer;
+}
+.ls-t th.ls-sortable:hover {
+  color: var(--primary-text);
+}
+.ls-t td {
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--divider);
+  white-space: nowrap;
+  background: var(--surface);
+}
+.ls-t.ls-dense td,
+.ls-t.ls-dense th {
+  height: 32px;
+}
+.ls-t tbody tr[tabindex] {
+  cursor: pointer;
+}
+.ls-t tbody tr[tabindex]:hover td {
+  background: var(--hover);
+}
+.ls-t tr.ls-sel td {
+  background: var(--primary-bg);
+}
+.ls-t tr.ls-hl td {
+  background: var(--ls-warn-bg);
+}
+.ls-t .ls-chk {
+  width: 40px;
+  text-align: center;
+}
+.ls-t .ls-right {
+  text-align: right;
+}
+.ls-t .ls-center {
+  text-align: center;
+}
+.ls-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--text-sub);
+}
+
+/* 페이지 */
+.ls-pager {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  margin-top: -12px;
+}
+.ls-pages {
+  display: flex;
+  gap: 2px;
+}
+.ls-pg {
+  min-width: 32px;
+  border: 0;
+  height: 32px;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font: 500 13px inherit;
+}
+.ls-pg:hover {
+  background: var(--hover);
+}
+.ls-pg.ls-on {
+  background: var(--primary);
+  color: #fff;
+}
+.ls-pg:disabled {
+  color: var(--text-dis);
+  cursor: default;
+  background: none;
+}
+.ls-size {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-sub);
+}
+
+/* 배지 */
+.ls-b {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.ls-b + .ls-b {
+  margin-left: 4px;
+}
+.ls-b-ok {
+  color: var(--ls-ok);
+  background: var(--ls-ok-bg);
+}
+.ls-b-warn {
+  color: var(--ls-warn);
+  background: var(--ls-warn-bg);
+}
+.ls-b-bad {
+  color: var(--ls-bad);
+  background: var(--ls-bad-bg);
+}
+.ls-b-info {
+  color: var(--ls-info);
+  background: var(--ls-info-bg);
+}
+.ls-b-lock {
+  color: var(--ls-lock);
+  background: var(--ls-lock-bg);
+}
+.ls-b-neutral {
+  color: var(--text-sub);
+  border: 1px solid var(--border);
+}
+
+/* 오른쪽 상세 패널 */
+.ls-scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  z-index: 49;
+}
+.ls-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(600px, 100%);
+  background: var(--surface);
+  box-shadow: var(--ls-shadow-lg);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+.ls-dh {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 12px 24px;
+  border-bottom: 1px solid var(--divider);
+}
+.ls-dt {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.ls-da {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ls-ibtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  border: 0;
+  background: none;
+  color: var(--text-sub);
+  cursor: pointer;
+  font-size: 16px;
+}
+.ls-ibtn:hover {
+  background: var(--hover);
+}
+.ls-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--divider);
+  overflow-x: auto;
+  flex: none;
+}
+.ls-tb {
+  height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-sub);
+  font: 500 14px inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ls-tb.ls-on {
+  color: var(--primary-text);
+  border-bottom-color: var(--primary-text);
+  font-weight: 600;
+}
+.ls-db {
+  flex: 1;
+  overflow: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ls-db .ls-twrap {
+  max-height: none;
+  min-height: 0;
+}
+.ls-kv {
+  display: grid;
+  gap: 10px;
+  font-size: 14px;
+  margin: 0;
+}
+.ls-kv-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 16px;
+}
+.ls-kv dt {
+  color: var(--text-sub);
+  font-size: 13px;
+}
+.ls-kv dd {
+  margin: 0;
+}
+.ls-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.ls-banner > span {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.ls-banner-warn {
+  background: var(--ls-warn-bg);
+  color: var(--ls-warn);
+}
+.ls-banner-lock {
+  background: var(--ls-lock-bg);
+  color: var(--ls-lock);
+}
+.ls-banner-info {
+  background: var(--ls-info-bg);
+  color: var(--ls-info);
+}
+.ls-banner-bad {
+  background: var(--ls-bad-bg);
+  color: var(--ls-bad);
+}
+.ls-chip {
+  display: inline-block;
+  font-size: 12px;
+  line-height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--ls-head-bg);
+  color: var(--text-sub);
+  margin: 0 4px 4px 0;
+}
+.ls-note {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+  margin: 0;
+}

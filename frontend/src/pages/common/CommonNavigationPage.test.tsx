@@ -135,11 +135,39 @@ function fixture(): ShellMenuResponse {
   ]);
 }
 function respond(body: ShellMenuResponse) {
-  const request = vi
-    .fn()
-    .mockResolvedValue({ ok: true, json: async () => body });
+  const request = vi.fn(async (url: string, _init?: RequestInit) => ({
+    ok: true,
+    status: 200,
+    json: async () =>
+      url.startsWith("/api/common/users?")
+        ? {
+            success: true,
+            meta: {},
+            data: { items: [], page: 1, pageSize: 20, total: 0 },
+          }
+        : url === "/api/common/user-options"
+          ? {
+              success: true,
+              meta: {},
+              data: { roles: [], projects: [], userStates: [] },
+            }
+          : body,
+  }));
   vi.stubGlobal("fetch", request);
   return request;
+}
+async function expectScreenContent(id: string) {
+  if (id === "UI-23") {
+    expect(await screen.findByText("조건에 맞는 결과가 없습니다.")).toBeVisible();
+    expect(screen.getByTestId("user-page")).toBeVisible();
+    expect(screen.getByTestId("user-keyword-filter")).toBeVisible();
+    expect(screen.getByTestId("list-search")).toBeVisible();
+    expect(screen.getByTestId("user-register-open")).toBeVisible();
+  } else {
+    expect(
+      await screen.findByRole("region", { name: `${id} 본문` }),
+    ).toHaveTextContent("준비 중");
+  }
 }
 function Position() {
   return <div aria-label="주소">{useLocation().pathname}</div>;
@@ -163,7 +191,7 @@ async function ensureOpen(name: string) {
 }
 
 describe("common placeholder screen contract", () => {
-  it("each visible initial screen can be selected without adding a business action", async () => {
+  it("each visible initial screen opens its placeholder or implemented user screen", async () => {
     respond(fixture());
     mount();
     await screen.findByRole("region", { name: "UI-16 본문" });
@@ -176,10 +204,11 @@ describe("common placeholder screen contract", () => {
       );
       // 탭이 8개면 가장 오래 안 본 탭을 닫고 연다(FR-0103).
       const limit = screen.queryByTestId("tab-limit-dialog");
-      if (limit) fireEvent.click(within(limit).getByRole("button", { name: "닫고 열기" }));
-      expect(
-        await screen.findByRole("region", { name: `${id} 본문` }),
-      ).toHaveTextContent("준비 중");
+      if (limit)
+        fireEvent.click(
+          within(limit).getByRole("button", { name: "닫고 열기" }),
+        );
+      await expectScreenContent(id);
       expect(screen.getByLabelText("주소")).toHaveTextContent(`/screens/${id}`);
     }
   });
@@ -220,24 +249,24 @@ describe("common placeholder screen contract", () => {
   });
 
   it.each(initialScreens)(
-    "%s direct entry and recreation share exactly one shell and no business form",
+    "%s direct entry and recreation share exactly one shell and the registered screen",
     async (id) => {
       respond(fixture());
       const first = mount(`/screens/${id}`);
-      expect(
-        await screen.findByRole("region", { name: `${id} 본문` }),
-      ).toHaveTextContent("준비 중");
+      await expectScreenContent(id);
       expect(screen.getAllByRole("banner")).toHaveLength(1);
       expect(screen.getAllByRole("complementary")).toHaveLength(1);
       expect(screen.getAllByRole("main")).toHaveLength(1);
-      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-      for (const name of ["조회", "저장", "다운로드", "업로드", "편집"])
-        expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+      if (id !== "UI-23") {
+        expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+        for (const name of ["조회", "저장", "다운로드", "업로드", "편집"])
+          expect(
+            screen.queryByRole("button", { name }),
+          ).not.toBeInTheDocument();
+      }
       first.unmount();
       mount(`/screens/${id}`);
-      expect(
-        await screen.findByRole("region", { name: `${id} 본문` }),
-      ).toHaveTextContent("준비 중");
+      await expectScreenContent(id);
       expect(screen.getByLabelText("주소")).toHaveTextContent(`/screens/${id}`);
     },
   );
@@ -364,7 +393,9 @@ describe("common placeholder screen contract", () => {
     );
     mount();
     // 메뉴는 있지만 휴대폰에서 열 수 있는 화면이 없다(FR-0002).
-    expect(await screen.findAllByText("열 수 있는 화면이 없습니다")).toHaveLength(2);
+    expect(
+      await screen.findAllByText("열 수 있는 화면이 없습니다"),
+    ).toHaveLength(2);
     expect(
       screen.queryByRole("button", { name: "시험 메뉴 group" }),
     ).not.toBeInTheDocument();
@@ -443,7 +474,9 @@ describe("common placeholder screen contract", () => {
         expect(screen.getByLabelText("주소").textContent).toBe("/"),
       );
       expect(
-        body().getByText(mobile ? "열 수 있는 화면이 없습니다" : "등록된 메뉴 없음"),
+        body().getByText(
+          mobile ? "열 수 있는 화면이 없습니다" : "등록된 메뉴 없음",
+        ),
       ).toBeVisible();
       expect(body().queryByText("없는 화면입니다")).not.toBeInTheDocument();
       expect(

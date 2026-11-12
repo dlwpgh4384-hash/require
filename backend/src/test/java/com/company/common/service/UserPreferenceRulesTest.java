@@ -70,4 +70,12 @@ class UserPreferenceRulesTest {
         assertThatThrownBy(() -> rules.validate("PERIOD", "UI-12", "{\"year\":2026,\"month\":1}"))
             .isInstanceOf(UserPreferenceFailure.class);
     }
+    @Test
+    void columnSettingsAreStoredPerScreenAsHiddenColumnKeys() {
+        assertThatCode(() -> rules.validate("COLS", "UI-23", "[\"last\",\"part\"]")).doesNotThrowAnyException();
+        assertThatCode(() -> rules.validate("COLS", "UI-23", "[]")).doesNotThrowAnyException();
+        assertThatThrownBy(() -> rules.validate("COLS", "GLOBAL!", "[]")).isInstanceOf(UserPreferenceFailure.class);
+        assertThatThrownBy(() -> rules.validate("COLS", "UI-23", "[\"a\",\"a\"]")).isInstanceOf(UserPreferenceFailure.class);
+        assertThatThrownBy(() -> rules.validate("COLS", "UI-23", "{\"a\":1}")).isInstanceOf(UserPreferenceFailure.class);
+    }
 }

@@ -9,7 +9,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class UserPreferenceRules {
-    private static final Set<String> TYPES = Set.of("FAV", "RECENT", "MENU_FOLD", "PAGE_SIZE", "DENSE", "PERIOD");
+    /** COLS: 목록 열 설정(SFR-010-05). 키=화면 번호, 값=숨긴 열 key 목록(JSON 배열). */
+    private static final Set<String> TYPES = Set.of("FAV", "RECENT", "MENU_FOLD", "PAGE_SIZE", "DENSE", "PERIOD", "COLS");
     private static final Set<String> MONTH_SCREENS = Set.of("UI-04", "UI-10", "UI-14", "UI-16", "UI-19", "UI-20",
         "UI-07", "UI-08", "UI-09", "UI-18");
     private final ObjectMapper json;
@@ -19,7 +20,7 @@ public class UserPreferenceRules {
     public void validateKey(String type, String key) {
         if (!TYPES.contains(type)) throw UserPreferenceFailure.invalid("prefTypeCd", "설정 종류를 확인해 주세요.");
         if (key == null || key.isBlank() || key.length() > 30
-            || (type.equals("PERIOD") ? !key.matches("[A-Za-z0-9_-]{1,10}") : !key.equals("GLOBAL"))) {
+            || (type.equals("PERIOD") || type.equals("COLS") ? !key.matches("[A-Za-z0-9_-]{1,10}") : !key.equals("GLOBAL"))) {
             throw UserPreferenceFailure.invalid("prefKey", "설정 키를 확인해 주세요.");
         }
     }
@@ -33,6 +34,7 @@ public class UserPreferenceRules {
             case "MENU_FOLD" -> { if (!Set.of("true", "false").contains(value)) invalid("메뉴 접기 값을 확인해 주세요."); }
             case "FAV", "RECENT" -> validateList(value, type.equals("FAV") ? 10 : 5);
             case "PERIOD" -> validatePeriod(key, value);
+            case "COLS" -> validateColumns(value);
             default -> throw new IllegalStateException();
         }
     }
@@ -54,6 +56,16 @@ public class UserPreferenceRules {
         for (JsonNode item : array) {
             if (!item.isTextual() || !item.textValue().matches("[A-Za-z0-9_-]{1,10}")) invalid("화면 번호의 형식을 확인해 주세요.");
             if (!seen.add(item.textValue())) invalid("같은 화면을 중복해서 입력하지 말아 주세요.");
+        }
+    }
+
+    private void validateColumns(String value) {
+        JsonNode array = parse(value);
+        if (array == null || !array.isArray() || array.size() > 50) invalid("열 설정의 형식을 확인해 주세요.");
+        Set<String> seen = new HashSet<>();
+        for (JsonNode item : array) {
+            if (!item.isTextual() || !item.textValue().matches("[A-Za-z0-9_]{1,30}") || !seen.add(item.textValue()))
+                invalid("열 설정의 형식을 확인해 주세요.");
         }
     }
 

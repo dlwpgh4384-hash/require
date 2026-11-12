@@ -78,6 +78,58 @@ function preferenceResponse(url: string) {
 function menuCalls(request: ReturnType<typeof vi.fn>) {
   return request.mock.calls.filter(([url]) => url === "/api/common/menus");
 }
+function respondWithUsers(failList = false) {
+  const menus = response();
+  menus.data.push({
+    ...menus.data[0],
+    menuId: "users-menu",
+    menuNm: "사용자",
+    scrnId: "UI-23",
+    sortOrd: 2,
+    pcOnlyYn: "Y",
+  });
+  menus.meta.screenAccess.push({
+    scrnId: "UI-23",
+    available: true,
+    pcOnlyYn: "Y",
+  });
+  const list = vi.fn(async () =>
+    failList
+      ? {
+          ok: false,
+          status: 500,
+          json: async () => ({ success: false, message: "private SQL error" }),
+        }
+      : {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: true,
+            meta: {},
+            data: { items: [], page: 1, pageSize: 20, total: 0 },
+          }),
+        },
+  );
+  const request = vi.fn(async (url: string, _init?: RequestInit) => {
+    if (url.startsWith("/api/common/users?")) return list();
+    return {
+      ok: true,
+      status: 200,
+      json: async () =>
+        url === "/api/common/menus"
+          ? menus
+          : url === "/api/common/user-options"
+            ? {
+                success: true,
+                meta: {},
+                data: { roles: [], projects: [], userStates: [] },
+              }
+            : preferenceResponse(url),
+    };
+  });
+  vi.stubGlobal("fetch", request);
+  return { request, list };
+}
 function mount(path: string) {
   window.history.replaceState(null, "", path);
   router = createAppRouter();
@@ -90,6 +142,83 @@ function expectSingleShell() {
 }
 
 describe("application route registration", () => {
+  it("UI-23 direct entry uses the existing shell, feature clients and title registration action", async () => {
+    const { request } = respondWithUsers();
+    mount("/screens/UI-23");
+    expect(await screen.findByText("조건에 맞는 결과가 없습니다.")).toBeVisible();
+    expectSingleShell();
+    expect(router?.state.location.pathname).toBe("/screens/UI-23");
+    expect(screen.getAllByTestId("user-page")).toHaveLength(1);
+    expect(request).toHaveBeenCalledWith("/api/common/user-options", {
+      signal: expect.any(AbortSignal),
+    });
+    expect(request).toHaveBeenCalledWith("/api/common/users?includeStopped=false&page=1&pageSize=50", {
+      signal: expect.any(AbortSignal),
+    });
+    const register = screen.getByTestId("user-register-open");
+    expect(register.closest(".screen-actions")).not.toBeNull();
+    fireEvent.click(register);
+    expect(await screen.findByTestId("user-dialog")).toBeVisible();
+    expect(screen.getByTestId("user-userId-input")).not.toHaveAttribute("readonly");
+    expect(
+      request.mock.calls.some(([url]) => /\/api\/(auth|.*period)/i.test(url)),
+    ).toBe(false);
+    expect(
+      request.mock.calls.filter(
+        ([url, init]) =>
+          url.startsWith("/api/common/users") &&
+          ["POST", "PUT"].includes(String(init?.method)),
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("navigation to UI-23 preserves the preferences scope and leaves other screen actions empty", async () => {
+    respondWithUsers();
+    mount("/screens/ADDED");
+    await screen.findByRole("region", { name: "ADDED 본문" });
+    const preferences = screen.getByTestId("user-preferences");
+    expect(screen.queryByTestId("user-register-open")).not.toBeInTheDocument();
+    await act(async () => {
+      await router!.navigate("/screens/UI-23");
+    });
+    await screen.findByText("조건에 맞는 결과가 없습니다.");
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
+    expect(screen.getByTestId("user-register-open")).toBeVisible();
+    await act(async () => {
+      await router!.navigate("/screens/ADDED");
+    });
+    expect(
+      screen.getByRole("region", { name: "ADDED 본문" }),
+    ).toHaveTextContent("준비 중");
+    expect(screen.queryByTestId("user-register-open")).not.toBeInTheDocument();
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
+    expectSingleShell();
+  });
+
+  it("UI-23 list failures retry the feature client without redirecting or leaking server details", async () => {
+    const { list } = respondWithUsers(true);
+    mount("/screens/UI-23");
+    const retry = await screen.findByTestId("list-retry");
+    expect(screen.queryByText("private SQL error")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("조건에 맞는 결과가 없습니다."),
+    ).not.toBeInTheDocument();
+    list.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        meta: {},
+        data: { items: [], page: 1, pageSize: 20, total: 0 },
+      }),
+    });
+    fireEvent.click(retry);
+    expect(await screen.findByText("조건에 맞는 결과가 없습니다.")).toBeVisible();
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(router?.state.location.pathname).toBe("/screens/UI-23");
+    expectSingleShell();
+  });
+
   it("root selects the database screen through the existing anonymous relative API call", async () => {
     const request = respond();
     mount("/");
@@ -218,7 +347,9 @@ describe("application route registration", () => {
         request.mock.calls.filter(([, init]) => init?.method === "PUT"),
       ).toHaveLength(1),
     );
-    const [url, init] = request.mock.calls.find(([, i]) => i?.method === "PUT")!;
+    const [url, init] = request.mock.calls.find(
+      ([, i]) => i?.method === "PUT",
+    )!;
     expect(url).toBe("/api/common/user-preferences/RECENT/GLOBAL");
     expect(JSON.parse(String(init?.body))).toEqual({
       prefVal: '["ADDED"]',

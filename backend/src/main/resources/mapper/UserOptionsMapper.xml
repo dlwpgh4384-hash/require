@@ -1,34 +1,44 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.common.commonops.UserOptionsMapper">
+<mapper namespace="com.company.common.mapper.UserOptionsMapper">
   <resultMap id="userOptionRole"
-             type="com.company.common.commonops.UserOptionRows$Role"
+             type="com.company.common.mapper.UserOptionRows$Role"
              autoMapping="false">
     <result column="role_cd" property="roleCd" javaType="java.lang.String"/>
     <result column="role_name" property="roleName" javaType="java.lang.String"/>
     <result column="assigned_project_scope" property="assignedProjectScope" javaType="_boolean"/>
+    <result column="assigned_part_scope" property="assignedPartScope" javaType="_boolean"/>
   </resultMap>
   <resultMap id="userOptionProject"
-             type="com.company.common.commonops.UserOptionRows$Project"
+             type="com.company.common.mapper.UserOptionRows$Project"
              autoMapping="false">
     <result column="project_id" property="projectId" javaType="java.lang.String"/>
     <result column="project_name" property="projectName" javaType="java.lang.String"/>
+    <result column="pm_user_id" property="pmUserId" javaType="java.lang.String"/>
+    <result column="pm_name" property="pmName" javaType="java.lang.String"/>
   </resultMap>
   <resultMap id="userOptionState"
-             type="com.company.common.commonops.UserOptionRows$UserState"
+             type="com.company.common.mapper.UserOptionRows$UserState"
              autoMapping="false">
     <result column="code" property="code" javaType="java.lang.String"/>
     <result column="name" property="name" javaType="java.lang.String"/>
   </resultMap>
   <select id="selectRoles" resultMap="userOptionRole">
     SELECT r.ROLE_ID AS role_cd, r.ROLE_NM AS role_name,
-           (r.DATA_SCOPE_CD = 'PROJ') AS assigned_project_scope
+           (r.DATA_SCOPE_CD = 'PROJ') AS assigned_project_scope,
+           (r.DATA_SCOPE_CD = 'PART') AS assigned_part_scope
     FROM TB_SY_ROLE r
     ORDER BY r.SORT_ORD, r.ROLE_ID
   </select>
   <select id="selectProjects" resultMap="userOptionProject">
-    SELECT p.PROJ_ID AS project_id, p.PROJ_NM AS project_name
+    SELECT p.PROJ_ID AS project_id, p.PROJ_NM AS project_name, pm.user_id AS pm_user_id, pm.user_nm AS pm_name
     FROM TB_PJ_PROJ p
+    LEFT JOIN LATERAL (
+      SELECT u.user_id, u.user_nm FROM TB_SY_USER_SCOPE s
+      JOIN TB_SY_USER_ROLE r ON r.user_id=s.user_id AND r.role_id='PM'
+      JOIN TB_SY_USER u ON u.user_id=s.user_id
+      WHERE s.scope_type_cd='PROJ' AND s.proj_id=p.PROJ_ID ORDER BY u.user_id LIMIT 1
+    ) pm ON TRUE
     ORDER BY p.PROJ_NM, p.PROJ_ID
   </select>
   <select id="selectUserStates" resultMap="userOptionState">

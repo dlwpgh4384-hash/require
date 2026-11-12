@@ -3,7 +3,7 @@
 <mapper namespace="com.company.common.mapper.UserPreferenceMapper">
   <resultMap id="userPreferenceRow" type="com.company.common.mapper.UserPreferenceRow" autoMapping="false">
     <result column="pref_val" property="prefVal" javaType="java.lang.String"/>
-    <result column="mod_dttm" property="modDttm" javaType="java.time.LocalDateTime"/>
+    <result column="mod_dttm" property="modDttm" javaType="java.time.Instant"/>
   </resultMap>
   <select id="selectPreference" resultMap="userPreferenceRow">
     SELECT pref_val, mod_dttm
@@ -13,13 +13,13 @@
   <insert id="insertPreference">
     INSERT INTO TB_SY_USER_PREF
       (user_id, pref_type_cd, pref_key, pref_val, reg_user_id, reg_dttm, mod_user_id, mod_dttm)
-    VALUES ('admin', #{type}, #{key}, #{value}, 'admin', clock_timestamp() AT TIME ZONE 'UTC',
-      'admin', clock_timestamp() AT TIME ZONE 'UTC')
+    VALUES ('admin', #{type}, #{key}, #{value}, 'admin', clock_timestamp(),
+      'admin', clock_timestamp())
   </insert>
   <update id="updatePreference">
     UPDATE TB_SY_USER_PREF
     SET pref_val = #{value}, mod_user_id = 'admin',
-        mod_dttm = GREATEST(clock_timestamp() AT TIME ZONE 'UTC', mod_dttm + INTERVAL '1 microsecond')
+        mod_dttm = GREATEST(clock_timestamp(), mod_dttm + INTERVAL '1 microsecond')
     WHERE user_id = 'admin' AND pref_type_cd = #{type} AND pref_key = #{key}
       AND mod_dttm IS NOT DISTINCT FROM #{token,jdbcType=TIMESTAMP}
   </update>

@@ -145,28 +145,29 @@ describe("application route registration", () => {
   it("UI-23 direct entry uses the existing shell, feature clients and title registration action", async () => {
     const { request } = respondWithUsers();
     mount("/screens/UI-23");
-    expect(await screen.findByText("조회된 사용자가 없습니다.")).toBeVisible();
+    expect(await screen.findByText("조건에 맞는 결과가 없습니다.")).toBeVisible();
     expectSingleShell();
     expect(router?.state.location.pathname).toBe("/screens/UI-23");
     expect(screen.getAllByTestId("user-page")).toHaveLength(1);
     expect(request).toHaveBeenCalledWith("/api/common/user-options", {
       signal: expect.any(AbortSignal),
     });
-    expect(request).toHaveBeenCalledWith("/api/common/users?page=1", {
+    expect(request).toHaveBeenCalledWith("/api/common/users?includeStopped=false&page=1&pageSize=50", {
       signal: expect.any(AbortSignal),
     });
     const register = screen.getByTestId("user-register-open");
     expect(register.closest(".screen-actions")).not.toBeNull();
     fireEvent.click(register);
     expect(await screen.findByTestId("user-dialog")).toBeVisible();
-    expect(screen.getByTestId("user-id-input")).not.toHaveAttribute("readonly");
+    expect(screen.getByTestId("user-userId-input")).not.toHaveAttribute("readonly");
     expect(
       request.mock.calls.some(([url]) => /\/api\/(auth|.*period)/i.test(url)),
     ).toBe(false);
     expect(
       request.mock.calls.filter(
         ([url, init]) =>
-          url.startsWith("/api/common/users") && init?.method === "PUT",
+          url.startsWith("/api/common/users") &&
+          ["POST", "PUT"].includes(String(init?.method)),
       ),
     ).toHaveLength(0);
   });
@@ -180,7 +181,7 @@ describe("application route registration", () => {
     await act(async () => {
       await router!.navigate("/screens/UI-23");
     });
-    await screen.findByText("조회된 사용자가 없습니다.");
+    await screen.findByText("조건에 맞는 결과가 없습니다.");
     expect(screen.getByTestId("user-preferences")).toBe(preferences);
     expect(screen.getByTestId("user-register-open")).toBeVisible();
     await act(async () => {
@@ -197,10 +198,10 @@ describe("application route registration", () => {
   it("UI-23 list failures retry the feature client without redirecting or leaking server details", async () => {
     const { list } = respondWithUsers(true);
     mount("/screens/UI-23");
-    const retry = await screen.findByTestId("user-list-retry");
+    const retry = await screen.findByTestId("list-retry");
     expect(screen.queryByText("private SQL error")).not.toBeInTheDocument();
     expect(
-      screen.queryByText("조회된 사용자가 없습니다."),
+      screen.queryByText("조건에 맞는 결과가 없습니다."),
     ).not.toBeInTheDocument();
     list.mockResolvedValueOnce({
       ok: true,
@@ -212,7 +213,7 @@ describe("application route registration", () => {
       }),
     });
     fireEvent.click(retry);
-    expect(await screen.findByText("조회된 사용자가 없습니다.")).toBeVisible();
+    expect(await screen.findByText("조건에 맞는 결과가 없습니다.")).toBeVisible();
     expect(list).toHaveBeenCalledTimes(2);
     expect(router?.state.location.pathname).toBe("/screens/UI-23");
     expectSingleShell();

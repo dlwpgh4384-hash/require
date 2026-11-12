@@ -7,6 +7,28 @@ export interface UserAccount {
   projectIds: string[];
   userStatCd: string;
   modDttm: string | null;
+  roleNames: string[];
+  assignedParts: string[];
+  projects: UserProject[];
+  /** 지금이거나 예정된 파트장인 영업 파트. */
+  leaderParts: string[];
+  temporaryPassword: boolean;
+  lastAccessAt: string | null;
+}
+export interface UserChange {
+  changedAt: string;
+  item: string;
+  before: string | null;
+  after: string | null;
+  changedBy: string;
+}
+export interface UserListQuery {
+  roleCd?: string;
+  userStatCd?: string;
+  keyword?: string;
+  includeStopped?: boolean;
+  sort?: string;
+  dir?: "asc" | "desc";
 }
 export interface UserListItem {
   userId: string;
@@ -47,6 +69,8 @@ export interface UserCreate {
   projectIds: string[];
 }
 export interface UserUpdate {
+  name: string;
+  email: string;
   roleCds: string[];
   headquarters: boolean;
   projectIds: string[];
@@ -83,24 +107,30 @@ const jsonBody = (body: unknown) => ({
   body: JSON.stringify(body),
 });
 
-export function getCommonUsers(
-  filters: {
-    page: number;
-    pageSize?: number;
-    roleCd?: string;
-    userStatCd?: string;
-    keyword?: string;
-  },
-  signal?: AbortSignal,
-) {
+function listQuery(filters: Record<string, unknown>) {
   const query = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== "") query.set(key, String(value));
+    if (value !== undefined && value !== "" && value !== null)
+      query.set(key, String(value));
   });
-  return fetch(`/api/common/users?${query}`, { signal }).then(
-    readResponse<UserPageResult<UserListItem>>,
-  );
+  return query;
 }
+export function getCommonUsers(
+  filters: UserListQuery & { page: number; pageSize?: number },
+  signal?: AbortSignal,
+) {
+  return fetch(`/api/common/users?${listQuery({ ...filters })}`, {
+    signal,
+  }).then(readResponse<UserPageResult<UserListItem>>);
+}
+/** SFR-011 엑셀 다운로드 주소: 지금 조건 전체, 보이는 열 순서. */
+export function commonUsersExcelUrl(filters: UserListQuery, columns: string[]) {
+  return `/api/common/users/excel?${listQuery({ ...filters, columns: columns.join(",") })}`;
+}
+export const getCommonUserChangeHistory = (id: string, signal?: AbortSignal) =>
+  fetch(`/api/common/users/${encodeURIComponent(id)}/change-history`, {
+    signal,
+  }).then(readResponse<UserChange[]>);
 export const getCommonUser = (id: string, signal?: AbortSignal) =>
   fetch(`/api/common/users/${encodeURIComponent(id)}`, { signal }).then(
     readResponse<UserAccount>,
@@ -131,7 +161,7 @@ export function getCommonUserChangeImpact(
   );
 }
 export const putCommonUsers = (body: UserCreate) =>
-  fetch("/api/common/users", { method: "PUT", ...jsonBody(body) }).then(
+  fetch("/api/common/users", { method: "POST", ...jsonBody(body) }).then(
     readResponse<UserSaveResult>,
   );
 export const putCommonUser = (id: string, body: UserUpdate) =>
@@ -144,7 +174,7 @@ export const putCommonUserStop = (
   confirmedProjectIds: string[],
 ) =>
   fetch("/api/common/users/stop", {
-    method: "PUT",
+    method: "POST",
     ...jsonBody({ users, confirmedProjectIds }),
   }).then(
     readResponse<{
@@ -158,14 +188,14 @@ export const putCommonUserPasswordReset = (
   modDttm: string | null,
 ) =>
   fetch(`/api/common/users/${encodeURIComponent(id)}/password-reset`, {
-    method: "PUT",
+    method: "POST",
     ...jsonBody({ modDttm }),
   }).then(
     readResponse<{ userId: string; tempPwdYn: string; modDttm: string | null }>,
   );
 export const putCommonUserUnlock = (id: string, modDttm: string | null) =>
   fetch(`/api/common/users/${encodeURIComponent(id)}/unlock`, {
-    method: "PUT",
+    method: "POST",
     ...jsonBody({ modDttm }),
   }).then(
     readResponse<{
@@ -177,6 +207,16 @@ export const putCommonUserUnlock = (id: string, modDttm: string | null) =>
   );
 export const putCommonUserResume = (id: string, modDttm: string | null) =>
   fetch(`/api/common/users/${encodeURIComponent(id)}/resume`, {
-    method: "PUT",
+    method: "POST",
     ...jsonBody({ modDttm }),
   }).then(readResponse<UserAccount>);
+
+/** 사용자 상태 이름(공통코드 USER_STAT). */
+export const STATE_NAMES: Record<string, string> = {
+  USE: "사용",
+  LOCK: "잠김",
+  STOP: "중지",
+};
+
+/** 시각 표시는 공통 함수(shared/time)를 쓴다. */
+export { formatDateTime } from "../../shared/time";

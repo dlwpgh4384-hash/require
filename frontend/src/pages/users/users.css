@@ -1,73 +1,64 @@
+/* UI-23 사용자 — 목록 모양은 shared/list(SFR-010)를 쓰고, 여기에는 이 화면만의 것만 둔다. */
 .users-page {
   display: grid;
-  gap: 16px;
-  padding: 20px;
+  gap: 24px;
   min-width: 0;
 }
-.users-search {
-  display: flex;
-  align-items: end;
-  gap: 12px;
-  flex-wrap: wrap;
+.users-include-stopped {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin-right: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
 }
-.users-search label {
-  display: grid;
+.users-register {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
 }
-.users-search input,
-.users-search select {
-  min-height: 36px;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
+.users-page .ls-in {
+  min-width: 140px;
 }
-.users-table-wrap {
-  overflow-x: auto;
+.users-page .users-keyword {
+  width: 200px;
 }
-.users-page table,
-[data-testid="user-logs-panel"] table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-.users-page th,
-.users-page td,
-[data-testid="user-logs-panel"] th,
-[data-testid="user-logs-panel"] td {
-  padding: 12px;
-  border-bottom: 1px solid var(--divider);
-  overflow-wrap: anywhere;
-}
-.users-page th {
-  background: var(--bg);
-  color: var(--text-sub);
-}
-.users-dense td {
-  padding: 6px 12px;
-}
-.users-page > .app-danger {
-  justify-self: start;
-}
-[data-testid="user-account-panel"] > label > input {
-  display: block;
-  margin-top: 6px;
-}
-[data-testid="user-account-panel"] input[readonly] {
-  background: var(--bg);
-  color: var(--text-sub);
-}
+
+/* 등록·수정 창(시안 「사용자 등록」 「사용자 수정」) */
 [data-testid="user-dialog"] {
-  width: min(680px, 100%);
+  width: min(520px, 100%);
 }
-[data-testid="user-dialog"] [role="tablist"] {
+.user-form {
+  display: grid;
+  gap: 16px;
+}
+.user-form .uf-field {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  flex-direction: column;
+  gap: 6px;
 }
-[data-testid="user-dialog"] [role="tab"][aria-selected="true"] {
-  color: var(--primary-text);
-  border-color: var(--primary);
+.user-form .uf-field > label {
+  margin: 0;
+}
+.user-form .uf-req::after {
+  content: " *";
+  color: #dc2626;
+}
+.user-form .uf-help {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.user-form input[readonly] {
+  background: var(--bg);
+  color: var(--text-sub);
+}
+.user-form .field-error {
+  margin: 0;
+}
+
+/* 상세 패널 */
+.user-detail .ls-twrap {
+  border-radius: 6px;
 }

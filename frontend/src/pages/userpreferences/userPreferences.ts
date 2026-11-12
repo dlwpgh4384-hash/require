@@ -4,7 +4,8 @@ export type PreferenceType =
   | "MENU_FOLD"
   | "PAGE_SIZE"
   | "DENSE"
-  | "PERIOD";
+  | "PERIOD"
+  | "COLS";
 export interface UserPreferenceResult {
   prefTypeCd: PreferenceType;
   prefKey: string;

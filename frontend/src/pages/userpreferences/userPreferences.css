@@ -8,16 +8,93 @@
   gap: 4px;
   align-items: center;
 }
+/* 헤더 오른쪽(시안 v1.8): [✦ AI에게 묻기] · 알림 종 · 사용자 메뉴 */
+.preference-tools .hd-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  min-height: 0;
+  padding: 0 14px;
+  border: 1px solid var(--primary-bg);
+  border-radius: 4px;
+  background: var(--primary-bg);
+  color: var(--primary-text);
+  font-weight: 500;
+  font-size: 14px;
+}
+.preference-tools .hd-ibtn {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-sub);
+}
+.preference-tools .hd-ibtn:hover,
+.preference-tools .hd-umenu:hover {
+  background: var(--hover);
+}
+.preference-tools .hd-anchor {
+  position: relative;
+}
+.preference-tools .hd-umenu {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  min-height: 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font-weight: 500;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.preference-tools .hd-sub {
+  color: var(--text-sub);
+  font-weight: 400;
+}
 .preference-user-menu {
   position: absolute;
-  top: 100%;
+  top: 44px;
   right: 0;
-  display: grid;
-  gap: 4px;
-  padding: 8px;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
   z-index: 50;
+}
+.preference-user-menu .hd-pop-h {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--divider);
+  font-weight: 600;
+}
+.preference-user-menu .hd-pop-i {
+  width: 100%;
+  min-height: 0;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--divider);
+  border-radius: 0;
+  background: none;
+  text-align: left;
+}
+.preference-user-menu .hd-pop-i:last-child {
+  border-bottom: 0;
+}
+.preference-user-menu .hd-pop-i:hover {
+  background: var(--hover);
 }
 .preference-personal-lists h2 {
   font-size: 12px;
@@ -62,4 +139,31 @@
     min-width: 36px;
     padding: 0 6px;
   }
+}
+
+/* 사용자 메뉴 맨 아래: 자동 로그아웃까지 mm:ss [연장] */
+.preference-user-menu .hd-sess {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.preference-user-menu .hd-sess b {
+  color: var(--text);
+}
+.preference-user-menu .hd-sess-ext {
+  margin-left: auto;
+  height: 28px;
+  min-height: 0;
+  padding: 0 10px;
+  font-size: 13px;
+}
+/* 왼쪽 즐겨찾기·최근 본 화면 제목 아이콘(시안) */
+.preference-personal-lists h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }

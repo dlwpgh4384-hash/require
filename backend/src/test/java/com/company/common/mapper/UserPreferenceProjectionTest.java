@@ -2,7 +2,7 @@ package com.company.common.mapper;
 
 import com.company.common.dto.UserPreferenceResponse;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
@@ -26,7 +26,7 @@ class UserPreferenceProjectionTest {
         assertThat(map.getAutoMapping()).isFalse();
         Map<String, Object> labels = new LinkedHashMap<>();
         labels.put("pref_val", "50");
-        labels.put("mod_dttm", LocalDateTime.of(2026, 2, 3, 4, 5, 6, 123456000));
+        labels.put("mod_dttm", java.time.Instant.parse("2026-02-03T04:05:06.123456Z"));
         String sql = statement.getBoundSql(Map.of("type", "PAGE_SIZE", "key", "GLOBAL"))
             .getSql().replaceAll("\\s+", " ").trim();
         assertThat(sql.substring(7, sql.indexOf(" FROM ")).split(",\\s*"))

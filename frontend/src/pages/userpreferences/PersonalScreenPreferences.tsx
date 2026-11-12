@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ShellIcon } from "../../shared/layout/ShellIcon";
 import { useUserPreferences } from "./UserPreferencesProvider";
 import { UserPreferenceToast } from "./UserPreferenceDialog";
 import {
@@ -120,7 +121,10 @@ export function PersonalScreenLists({
             key={type}
             aria-label={type === "FAV" ? "즐겨찾기" : "최근 본 화면"}
           >
-            <h2>{type === "FAV" ? "즐겨찾기" : "최근 본 화면"}</h2>
+            <h2>
+              <ShellIcon name={type === "FAV" ? "star" : "clock"} size={14} />
+              {type === "FAV" ? "즐겨찾기" : "최근 본 화면"}
+            </h2>
             {state.status === "loading" ? (
               <p role="status">설정을 불러오는 중입니다.</p>
             ) : state.status === "error" || invalid ? (

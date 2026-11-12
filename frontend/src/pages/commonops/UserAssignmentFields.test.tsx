@@ -28,17 +28,34 @@ function options(): CommonUserOptionsResult {
         roleCd: "ADMIN",
         roleName: "시스템 관리자",
         assignedProjectScope: false,
+        assignedPartScope: false,
       },
       {
         roleCd: "CUSTOM_ROLE",
         roleName: "담당 프로젝트 사용자",
         assignedProjectScope: true,
+        assignedPartScope: false,
       },
-      { roleCd: "OTHER", roleName: "다른 역할", assignedProjectScope: false },
+      {
+        roleCd: "OTHER",
+        roleName: "다른 역할",
+        assignedProjectScope: false,
+        assignedPartScope: true,
+      },
     ],
     projects: [
-      { projectId: "closed-project", projectName: "완료 프로젝트" },
-      { projectId: "active-project", projectName: "진행 프로젝트" },
+      {
+        projectId: "closed-project",
+        projectName: "완료 프로젝트",
+        pmUserId: null,
+        pmName: null,
+      },
+      {
+        projectId: "active-project",
+        projectName: "진행 프로젝트",
+        pmUserId: "pm01",
+        pmName: "김명희",
+      },
     ],
     userStates: [{ code: "LOCK", name: "잠김" }],
   };
@@ -90,175 +107,80 @@ afterEach(() => {
 });
 
 describe("사용자 역할·담당 선택", () => {
-  it("DB 역할을 표시하고 담당 프로젝트 역할을 선택해야 프로젝트를 표시한다", () => {
+  it("시안처럼 역할·담당 파트·담당 프로젝트를 항상 보이고 안내 문구를 붙인다", () => {
     render(<Harness />);
+    expect(screen.getByText("시스템 관리자")).toBeInTheDocument();
     expect(
-      screen.getByRole("checkbox", { name: "시스템 관리자" }),
-    ).not.toBeChecked();
+      screen.getByText("여러 개 고를 수 있고, 겹치면 넓은 쪽 권한을 따릅니다."),
+    ).toBeInTheDocument();
+    const part = screen.getByTestId("user-headquarters-select");
+    expect(within(part).getAllByRole("option").map((item) => item.textContent)).toEqual([
+      "–",
+      "본사(직접 영업)",
+    ]);
     expect(
-      screen.queryByRole("group", { name: "담당 프로젝트" }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("checkbox", { name: "시스템 관리자" }));
-    expect(
-      screen.queryByRole("group", { name: "담당 프로젝트" }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("checkbox", { name: "담당 프로젝트 사용자" }),
-    );
-    const projects = screen.getByRole("group", { name: "담당 프로젝트" });
-    expect(
-      within(projects).getByRole("checkbox", { name: "완료 프로젝트" }),
-    ).toBeVisible();
-    fireEvent.click(
-      within(projects).getByRole("checkbox", { name: "진행 프로젝트" }),
-    );
-    fireEvent.click(
-      within(projects).getByRole("checkbox", { name: "완료 프로젝트" }),
-    );
-    expect(
-      JSON.parse(screen.getByTestId("assignment-value").textContent!),
-    ).toEqual({
-      roleCds: ["ADMIN", "CUSTOM_ROLE"],
-      headquarters: false,
-      projectIds: ["active-project", "closed-project"],
+      screen.getByText(/영업1·영업2 같은 영업 파트의 파트장은 기준정보/),
+    ).toBeInTheDocument();
+    const projects = screen.getByTestId("user-project-list");
+    expect(within(projects).getByText("완료 프로젝트")).toBeInTheDocument();
+    expect(within(projects).getByText("(지금 PM: 김명희)")).toBeInTheDocument();
+    expect(screen.getByText(/한 프로젝트의 PM은 1명이라/)).toBeInTheDocument();
+  });
+  it("고른 값은 부모로 그대로 넘기고, 자기 자신은 「지금 PM」에 쓰지 않는다", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByTestId("user-role-input-1"));
+    fireEvent.change(screen.getByTestId("user-headquarters-select"), {
+      target: { value: "true" },
     });
-    fireEvent.click(
-      within(projects).getByRole("checkbox", { name: "진행 프로젝트" }),
-    );
-    expect(
-      JSON.parse(screen.getByTestId("assignment-value").textContent!)
-        .projectIds,
-    ).toEqual(["closed-project"]);
-  });
-
-  it("여러 역할의 합집합으로 적격성을 판정하고 역할 이름으로 추측하지 않는다", () => {
-    const data = options();
-    data.roles[0].roleName = "프로젝트 PM";
-    const { rerender } = render(
-      <UserAssignmentFields
-        options={data}
-        value={{ ...emptyValue, roleCds: ["ADMIN"] }}
-        onChange={vi.fn()}
-      />,
-    );
-    expect(
-      screen.queryByRole("group", { name: "담당 프로젝트" }),
-    ).not.toBeInTheDocument();
-    rerender(
-      <UserAssignmentFields
-        options={data}
-        value={{ ...emptyValue, roleCds: ["ADMIN", "CUSTOM_ROLE", "OTHER"] }}
-        onChange={vi.fn()}
-      />,
-    );
-    expect(screen.getByRole("group", { name: "담당 프로젝트" })).toBeVisible();
-  });
-
-  it("적격 역할을 제거해도 부모의 영향 확인 전 프로젝트 값을 임의로 삭제하지 않는다", () => {
-    render(
-      <Harness
-        initial={{
-          roleCds: ["CUSTOM_ROLE"],
-          headquarters: false,
-          projectIds: ["active-project"],
-        }}
-      />,
-    );
-    fireEvent.click(
-      screen.getByRole("checkbox", { name: "담당 프로젝트 사용자" }),
-    );
-    expect(
-      screen.queryByRole("group", { name: "담당 프로젝트" }),
-    ).not.toBeInTheDocument();
-    expect(
-      JSON.parse(screen.getByTestId("assignment-value").textContent!),
-    ).toEqual({
-      roleCds: [],
-      headquarters: false,
+    fireEvent.click(screen.getByTestId("user-project-input-1"));
+    expect(JSON.parse(screen.getByTestId("assignment-value").textContent!)).toEqual({
+      roleCds: ["CUSTOM_ROLE"],
+      headquarters: true,
       projectIds: ["active-project"],
     });
-    fireEvent.click(
-      screen.getByRole("checkbox", { name: "담당 프로젝트 사용자" }),
-    );
-    expect(
-      screen.getByRole("checkbox", { name: "진행 프로젝트" }),
-    ).toBeChecked();
-  });
-
-  it("담당 파트는 본사와 미선택만 제공하고 업무 원천 안내를 표시한다", () => {
-    render(<Harness />);
-    const part = screen.getByRole("combobox", { name: "담당 파트" });
-    expect(
-      within(part)
-        .getAllByRole("option")
-        .map((item) => item.textContent),
-    ).toEqual(["–", "본사(직접 영업)"]);
-    expect(part).toHaveAccessibleDescription(
-      "영업1·영업2 같은 영업 파트의 파트장은 기준정보 › 거래처·영업 파트에서 정합니다.",
-    );
-    fireEvent.change(part, { target: { value: "true" } });
-    expect(
-      JSON.parse(screen.getByTestId("assignment-value").textContent!)
-        .headquarters,
-    ).toBe(true);
-    fireEvent.change(part, { target: { value: "false" } });
-    expect(
-      JSON.parse(screen.getByTestId("assignment-value").textContent!)
-        .headquarters,
-    ).toBe(false);
-    expect(request).not.toHaveBeenCalled();
-  });
-
-  it("사용 불가 상태는 입력을 잠그고 API 칸 오류는 해당 영역에 연결한다", () => {
+    cleanup();
     render(
       <UserAssignmentFields
         options={options()}
-        disabled
-        value={{ ...emptyValue, roleCds: ["CUSTOM_ROLE"] }}
+        value={emptyValue}
         onChange={vi.fn()}
+        userId="pm01"
+        leaderParts={["영업1파트"]}
+      />,
+    );
+    expect(screen.queryByText("(지금 PM: 김명희)")).not.toBeInTheDocument();
+    expect(screen.getByText(/지금 파트장인 파트: 영업1파트/)).toBeInTheDocument();
+  });
+  it("사용 불가 상태는 입력을 잠그고 서버 칸 오류는 해당 칸에 연결한다", () => {
+    render(
+      <UserAssignmentFields
+        options={options()}
+        value={emptyValue}
+        onChange={vi.fn()}
+        disabled
         errors={{
-          roleCds: "역할을 선택해 주세요.",
-          headquarters: "본사 구성을 확인해 주세요.",
-          projectIds: "프로젝트를 확인해 주세요.",
+          headquarters: "본사(직접 영업)는 담당 파트 역할(영업 파트장 등)이 있어야 고를 수 있습니다.",
         }}
       />,
     );
-    for (const input of screen.getAllByRole("checkbox"))
-      expect(input).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "담당 파트" })).toBeDisabled();
-    expect(screen.getByRole("group", { name: /역할/ })).toHaveAttribute(
+    expect(screen.getByTestId("user-role-input-0")).toBeDisabled();
+    expect(screen.getByTestId("user-headquarters-select")).toBeDisabled();
+    expect(screen.getByTestId("user-headquarters-select")).toHaveAttribute(
       "aria-invalid",
       "true",
     );
-    expect(
-      screen.getByRole("group", { name: /역할/ }),
-    ).toHaveAccessibleDescription("역할을 선택해 주세요.");
-    expect(
-      screen.getByRole("combobox", { name: "담당 파트" }),
-    ).toHaveAccessibleDescription(/본사 구성을 확인해 주세요/);
-    expect(
-      screen.getByRole("group", { name: "담당 프로젝트" }),
-    ).toHaveAccessibleDescription("프로젝트를 확인해 주세요.");
+    expect(screen.getByText("본사(직접 영업)는 담당 파트 역할(영업 파트장 등)이 있어야 고를 수 있습니다.")).toBeInTheDocument();
   });
-
   it("빈 옵션은 합성 역할이나 프로젝트 없이 빈 상태로 안내한다", () => {
-    const { rerender } = render(
+    render(
       <UserAssignmentFields
         options={{ roles: [], projects: [], userStates: [] }}
         value={emptyValue}
         onChange={vi.fn()}
       />,
     );
-    expect(screen.getByText("선택할 역할이 없습니다.")).toBeVisible();
-    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
-    rerender(
-      <UserAssignmentFields
-        options={{ ...options(), projects: [] }}
-        value={{ ...emptyValue, roleCds: ["CUSTOM_ROLE"] }}
-        onChange={vi.fn()}
-      />,
-    );
-    expect(screen.getByText("선택할 프로젝트가 없습니다.")).toBeVisible();
+    expect(screen.getByText("선택할 역할이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("선택할 프로젝트가 없습니다.")).toBeInTheDocument();
   });
 });
 

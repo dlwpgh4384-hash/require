@@ -5,7 +5,7 @@ import com.company.common.mapper.UserPreferenceRow;
 import com.company.common.dto.UserPreferenceInput;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -36,7 +36,7 @@ class UserPreferenceServiceTest {
     @Test
     void deletedTargetWithNonNullTokenDoesNotBecomeAnInsert() {
         assertThatThrownBy(() -> service.putCommonUserPreference("DENSE", "GLOBAL",
-            new UserPreferenceInput("넓게", LocalDateTime.of(2026, 1, 1, 0, 0))))
+            new UserPreferenceInput("넓게", java.time.Instant.parse("2026-01-01T00:00:00.000000Z"))))
             .hasMessage(UserPreferenceFailure.CONFLICT);
         verify(mapper, never()).insertPreference(anyString(), anyString(), anyString());
     }

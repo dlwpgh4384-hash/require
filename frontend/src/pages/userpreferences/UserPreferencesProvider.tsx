@@ -16,7 +16,7 @@ import {
   type UserPreferenceResult,
 } from "./userPreferences";
 
-export type GlobalPreferenceType = Exclude<PreferenceType, "PERIOD">;
+export type GlobalPreferenceType = Exclude<PreferenceType, "PERIOD" | "COLS">;
 const globalTypes: GlobalPreferenceType[] = [
   "MENU_FOLD",
   "FAV",

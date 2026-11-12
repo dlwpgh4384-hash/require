@@ -11,16 +11,38 @@ import "@testing-library/jest-dom/vitest";
 import { UserPage } from "./UserPage";
 import { UserDialog } from "./UserDialog";
 import { UserRegistrationButton, UserWorkspaceProvider } from "./UserWorkspace";
-import { ScreenDirtyContext } from "../../shared/layout/ScreenTabs";
 import type { CommonUserOptionsResult } from "../commonops/userOptions";
-import type { UserAccount } from "./users";
+import { formatDateTime, type UserAccount } from "./users";
 
 const options: CommonUserOptionsResult = {
   roles: [
-    { roleCd: "PM", roleName: "프로젝트 관리자", assignedProjectScope: true },
-    { roleCd: "EXEC", roleName: "경영진", assignedProjectScope: false },
+    {
+      roleCd: "PM",
+      roleName: "일반 사용자(PM)",
+      assignedProjectScope: true,
+      assignedPartScope: false,
+    },
+    {
+      roleCd: "SALES_LDR",
+      roleName: "영업 파트장",
+      assignedProjectScope: false,
+      assignedPartScope: true,
+    },
+    {
+      roleCd: "EXEC",
+      roleName: "경영진",
+      assignedProjectScope: false,
+      assignedPartScope: false,
+    },
   ],
-  projects: [{ projectId: "project-a", projectName: "합성 프로젝트" }],
+  projects: [
+    {
+      projectId: "project-a",
+      projectName: "합성 프로젝트",
+      pmUserId: "oldpm",
+      pmName: "김명희",
+    },
+  ],
   userStates: [
     { code: "USE", name: "사용" },
     { code: "LOCK", name: "잠김" },
@@ -33,12 +55,28 @@ let request: ReturnType<typeof vi.fn>;
 const response = (data: unknown) => ({
   ok: true,
   status: 200,
+  headers: new Headers(),
   json: async () => ({ success: true, data }),
 });
 const writes = () =>
   request.mock.calls.filter(
-    (call: unknown[]) => (call[1] as RequestInit | undefined)?.method === "PUT",
+    (call: unknown[]) =>
+      ["POST", "PUT"].includes(String((call[1] as RequestInit | undefined)?.method)),
   );
+const gets = (part: string) =>
+  request.mock.calls
+    .map((call: unknown[]) => String(call[0]))
+    .filter((url: string) => url.includes(part));
+const listItem = (value: UserAccount) => ({
+  userId: value.userId,
+  name: value.name,
+  roleCds: value.roleCds,
+  roleNames: value.roleNames,
+  assignedParts: value.assignedParts,
+  userStatCd: value.userStatCd,
+  lastAccessAt: value.lastAccessAt,
+  modDttm: value.modDttm,
+});
 beforeEach(() => {
   account = {
     userId: "test",
@@ -47,40 +85,60 @@ beforeEach(() => {
     roleCds: ["PM"],
     headquarters: false,
     projectIds: ["project-a"],
-    userStatCd: "USE",
+    userStatCd: "LOCK",
     modDttm: token,
+    roleNames: ["일반 사용자(PM)"],
+    assignedParts: [],
+    projects: [{ projectId: "project-a", projectName: "합성 프로젝트" }],
+    leaderParts: [],
+    temporaryPassword: true,
+    lastAccessAt: "2026-10-12T00:02:00Z",
   };
   request = vi.fn(async (url: string, init?: RequestInit) => {
-    if (init?.method === "PUT") {
+    if (init?.method === "PUT" || init?.method === "POST") {
       if (url.endsWith("/stop"))
         return response({
           processedUserIds: ["test"],
-          unprocessedCount: 1,
-          unprocessed: [{ userId: "admin", reason: "마지막 관리자" }],
+          unprocessedCount: 0,
+          unprocessed: [],
+        });
+      if (url.endsWith("/unlock"))
+        return response({
+          userId: "test",
+          userStatCd: "USE",
+          pwdErrCnt: 0,
+          modDttm: token,
         });
       return response({ account, transferredProjects: [] });
     }
     if (url.includes("user-options")) return response(options);
-    if (url.includes("change-impact"))
+    if (url.includes("user-preferences"))
       return response({
-        projectCount: 1,
-        projects: options.projects,
-        blockedUsers: [],
+        prefTypeCd: "COLS",
+        prefKey: "UI-23",
+        found: false,
+        prefVal: null,
+        modDttm: null,
       });
+    if (url.includes("change-impact"))
+      return response({ projectCount: 0, projects: [], blockedUsers: [] });
     if (url.includes("access-logs"))
       return response({ items: [], page: 1, pageSize: 20, total: 0 });
+    if (url.includes("change-history"))
+      return response([
+        {
+          changedAt: token,
+          item: "이름",
+          before: "옛 이름",
+          after: "시험 사용자",
+          changedBy: "admin",
+        },
+      ]);
     if (url.includes("users?"))
       return response({
-        items: [
-          {
-            ...account,
-            roleNames: ["프로젝트 관리자"],
-            assignedParts: [],
-            lastAccessAt: null,
-          },
-        ],
+        items: [listItem(account)],
         page: 1,
-        pageSize: 20,
+        pageSize: 50,
         total: 1,
       });
     return response(account);
@@ -100,198 +158,213 @@ function page() {
     </UserWorkspaceProvider>,
   );
 }
-function detail(onClose = vi.fn()) {
-  return render(
-    <UserDialog
-      userId="test"
-      options={options}
-      onClose={onClose}
-      onSaved={vi.fn()}
-    />,
-  );
-}
-it("제목줄 등록 버튼이 등록 창을 열고 소문자 아이디를 그대로 저장한다", async () => {
+
+it("시안처럼 제목줄에 [사용 중지 포함]과 [등록]을 두고, 목록은 공통 목록 틀로 그린다", async () => {
   page();
-  await screen.findByTestId("user-row-test");
+  expect(screen.getByTestId("user-include-stopped")).not.toBeChecked();
+  expect(screen.getByTestId("user-register-open")).toHaveTextContent("등록");
+  const row = await screen.findByTestId("list-row-test");
+  expect(within(row).getByText("일반 사용자(PM)")).toBeInTheDocument();
+  expect(within(row).getByText("잠김")).toBeInTheDocument();
+  expect(within(row).getByText("2026-10-12 09:02")).toBeInTheDocument();
+  expect(screen.getByTestId("list-count")).toHaveTextContent("총 1건");
+  expect(screen.getByTestId("list-columns")).toBeInTheDocument();
+  expect(screen.getByTestId("list-density")).toHaveTextContent("좁게 보기");
+  expect(screen.getByTestId("list-download")).toBeInTheDocument();
+  expect(screen.getByTestId("list-range")).toHaveTextContent("1-1 / 1건");
+  expect(screen.getByPlaceholderText("이름 또는 아이디")).toBeInTheDocument();
+  expect(gets("users?")[0]).toContain("includeStopped=false");
+});
+
+it("사용 중지 포함·정렬·조건 초기화는 서버 조회 조건으로 보낸다", async () => {
+  page();
+  await screen.findByTestId("list-row-test");
+  fireEvent.click(screen.getByTestId("user-include-stopped"));
+  await waitFor(() =>
+    expect(gets("users?").at(-1)).toContain("includeStopped=true"),
+  );
+  fireEvent.click(screen.getByTestId("list-head-name"));
+  await waitFor(() => expect(gets("users?").at(-1)).toContain("sort=name"));
+  expect(gets("users?").at(-1)).toContain("dir=asc");
+  fireEvent.click(screen.getByTestId("list-head-name"));
+  await waitFor(() => expect(gets("users?").at(-1)).toContain("dir=desc"));
+  fireEvent.change(screen.getByTestId("user-keyword-filter"), {
+    target: { value: " 시험 " },
+  });
+  fireEvent.click(screen.getByTestId("list-search"));
+  await waitFor(() =>
+    expect(gets("users?").at(-1)).toContain(
+      `keyword=${encodeURIComponent("시험")}`,
+    ),
+  );
+  fireEvent.click(screen.getByTestId("list-reset"));
+  await waitFor(() => expect(gets("users?").at(-1)).not.toContain("keyword"));
+  expect(screen.getByTestId("user-keyword-filter")).toHaveValue("");
+});
+
+it("행을 누르면 오른쪽 상세 패널에 계정 정보·접근 기록·변경 이력(n) 탭을 보인다", async () => {
+  page();
+  fireEvent.click(await screen.findByTestId("list-row-test"));
+  const panel = await screen.findByTestId("user-detail");
+  expect(await within(panel).findByText("test@example.invalid")).toBeInTheDocument();
+  expect(within(panel).getByText("임시 비밀번호")).toBeInTheDocument();
+  expect(within(panel).getByText("비밀번호를 5번 틀려 잠겼습니다.")).toBeInTheDocument();
+  expect(within(panel).getByText("이 프로젝트들의 PM으로 표시됩니다.")).toBeInTheDocument();
+  expect(within(panel).getByTestId("user-detail-tab-history")).toHaveTextContent(
+    "변경 이력 (1)",
+  );
+  fireEvent.click(within(panel).getByTestId("user-detail-tab-history"));
+  expect(within(panel).getByText("옛 이름")).toBeInTheDocument();
+  fireEvent.click(within(panel).getByTestId("user-detail-tab-logs"));
+  expect(
+    await within(panel).findByText("아직 접근 기록이 없습니다."),
+  ).toBeInTheDocument();
+  fireEvent.click(within(panel).getByTestId("user-detail-tab-account"));
+  fireEvent.click(within(panel).getByTestId("user-unlock"));
+  await waitFor(() =>
+    expect(writes().map((call) => String(call[0]))).toContain(
+      "/api/common/users/test/unlock",
+    ),
+  );
+  expect(await screen.findByTestId("user-toast")).toHaveTextContent(
+    "잠금을 풀었습니다. 틀린 횟수를 0으로 되돌렸습니다.",
+  );
+});
+
+it("[등록]은 시안 「사용자 등록」 창을 열고, 빈 칸·형식 오류는 칸마다 보여 준다", async () => {
+  page();
   fireEvent.click(screen.getByTestId("user-register-open"));
   const dialog = await screen.findByTestId("user-dialog");
-  fireEvent.change(within(dialog).getByTestId("user-id-input"), {
-    target: { value: "test" },
+  expect(within(dialog).getByText("사용자 등록")).toBeInTheDocument();
+  expect(
+    within(dialog).getByText(
+      "저장하면 이 주소로 임시 비밀번호를 보냅니다. 첫 로그인 때 바꿔야 합니다.",
+    ),
+  ).toBeInTheDocument();
+  expect(within(dialog).getByTestId("user-headquarters-select")).toBeInTheDocument();
+  expect(within(dialog).getByTestId("user-project-list")).toBeInTheDocument();
+  expect(within(dialog).getByText("(지금 PM: 김명희)")).toBeInTheDocument();
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  expect(await within(dialog).findByText("아이디를 입력해 주세요.")).toBeInTheDocument();
+  expect(within(dialog).getByText("이름을 입력해 주세요.")).toBeInTheDocument();
+  expect(within(dialog).getByText("역할을 1개 이상 골라 주세요.")).toBeInTheDocument();
+  expect(within(dialog).getByTestId("user-userId-input")).toHaveFocus();
+  fireEvent.change(within(dialog).getByTestId("user-userId-input"), {
+    target: { value: "AB" },
+  });
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  expect(
+    await within(dialog).findByText("아이디는 영문 소문자·숫자 4~20자로 입력해 주세요."),
+  ).toBeInTheDocument();
+  expect(writes()).toHaveLength(0);
+});
+
+it("등록이 끝나면 시안 문구로 알리고 새 줄을 강조한다", async () => {
+  account = { ...account, userId: "newone", name: "새 사람", email: "new@example.invalid" };
+  page();
+  fireEvent.click(screen.getByTestId("user-register-open"));
+  const dialog = await screen.findByTestId("user-dialog");
+  fireEvent.change(within(dialog).getByTestId("user-userId-input"), {
+    target: { value: "newone" },
   });
   fireEvent.change(within(dialog).getByTestId("user-name-input"), {
-    target: { value: "시험 사용자" },
+    target: { value: "새 사람" },
   });
   fireEvent.change(within(dialog).getByTestId("user-email-input"), {
-    target: { value: "test@example.invalid" },
+    target: { value: "new@example.invalid" },
   });
-  fireEvent.click(
-    within(dialog).getByRole("checkbox", { name: "프로젝트 관리자" }),
+  fireEvent.click(within(dialog).getByTestId("user-role-input-2"));
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  expect(await screen.findByTestId("user-toast")).toHaveTextContent(
+    "새 사람님을 등록했습니다. new@example.invalid로 임시 비밀번호를 보냈습니다.",
   );
-  fireEvent.click(
-    within(dialog).getByRole("checkbox", { name: "합성 프로젝트" }),
-  );
-  fireEvent.click(within(dialog).getByTestId("user-form-save"));
-  await waitFor(() => expect(writes()).toHaveLength(1));
-  expect(JSON.parse(writes()[0][1].body)).toEqual({
-    userId: "test",
-    name: "시험 사용자",
-    email: "test@example.invalid",
-    roleCds: ["PM"],
-    headquarters: false,
-    projectIds: ["project-a"],
-  });
+  const body = JSON.parse(String((writes()[0][1] as RequestInit).body));
+  expect(body).toMatchObject({ userId: "newone", roleCds: ["EXEC"], headquarters: false });
 });
-it("등록 오류는 첫 필드로 이동하고 잘못된 입력은 전송하지 않는다", async () => {
+
+it("[수정]은 「사용자 수정」 창에서 아이디를 잠그고 이름·이메일도 함께 보낸다", async () => {
+  page();
+  fireEvent.click(await screen.findByTestId("list-row-test"));
+  const panel = await screen.findByTestId("user-detail");
+  fireEvent.click(await within(panel).findByTestId("user-edit"));
+  const dialog = await screen.findByTestId("user-dialog");
+  expect(within(dialog).getByText("사용자 수정")).toBeInTheDocument();
+  expect(within(dialog).getByTestId("user-userId-input")).toHaveAttribute("readonly");
+  expect(within(dialog).getByText("아이디는 바꿀 수 없습니다.")).toBeInTheDocument();
+  expect(within(dialog).queryByText("(지금 PM: 김명희)")).toBeInTheDocument();
+  fireEvent.change(within(dialog).getByTestId("user-name-input"), {
+    target: { value: "바꾼 이름" },
+  });
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  await waitFor(() => expect(writes()).toHaveLength(1));
+  const [url, init] = writes()[0];
+  expect(url).toBe("/api/common/users/test");
+  expect(JSON.parse(String((init as RequestInit).body))).toMatchObject({
+    name: "바꾼 이름",
+    email: "test@example.invalid",
+    modDttm: token,
+  });
+  expect(await screen.findByTestId("user-toast")).toHaveTextContent(
+    "사용자 정보를 저장했습니다. 변경 이력에 남겼습니다.",
+  );
+});
+
+it("체크하면 「N건 선택」과 일괄 [사용 중지]가 나오고, 확인 창은 시안 문구를 쓴다", async () => {
+  page();
+  await screen.findByTestId("list-row-test");
+  fireEvent.click(screen.getByTestId("list-select-test"));
+  expect(screen.getByTestId("list-count")).toHaveTextContent("1건 선택");
+  fireEvent.click(screen.getByTestId("list-bulk-stop"));
+  const confirm = await screen.findByTestId("user-stop-confirm");
+  expect(confirm).toHaveTextContent("시험 사용자님의 사용을 중지할까요?");
+  expect(confirm).toHaveTextContent("삭제가 아니며 기록은 그대로 남습니다.");
+  fireEvent.click(within(confirm).getByTestId("confirmation-proceed"));
+  expect(await screen.findByTestId("user-toast")).toHaveTextContent(
+    "1건의 사용을 중지했습니다.",
+  );
+});
+
+it("서버가 막은 계정만 고르면 확인 창 없이 이유를 알린다", async () => {
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    url.includes("change-impact")
+      ? response({
+          projectCount: 0,
+          projects: [],
+          blockedUsers: [
+            { userId: "test", reason: "영업1 파트장입니다. 영업 파트 탭에서 먼저 파트장을 바꾸세요." },
+          ],
+        })
+      : base(url, init),
+  );
+  page();
+  await screen.findByTestId("list-row-test");
+  fireEvent.click(screen.getByTestId("list-select-test"));
+  fireEvent.click(screen.getByTestId("list-bulk-stop"));
+  expect(await screen.findByTestId("user-toast")).toHaveTextContent(
+    "영업1 파트장입니다.",
+  );
+  expect(screen.queryByTestId("user-stop-confirm")).not.toBeInTheDocument();
+});
+
+it("시각은 한국 시간으로 보여 준다", () => {
+  expect(formatDateTime("2026-10-12T00:02:00Z")).toBe("2026-10-12 09:02");
+  expect(formatDateTime(null)).toBe("–");
+});
+
+it("수정 창의 미저장 입력은 닫기 전에 확인한다", async () => {
   render(
     <UserDialog
-      userId={null}
+      account={account}
       options={options}
       onClose={vi.fn()}
       onSaved={vi.fn()}
     />,
   );
-  fireEvent.click(screen.getByTestId("user-form-save"));
-  expect(screen.getByTestId("user-id-input")).toHaveAttribute(
-    "aria-invalid",
-    "true",
-  );
-  expect(screen.getByTestId("user-id-input")).toHaveFocus();
-  expect(writes()).toHaveLength(0);
-});
-it("상세 신원은 읽기 전용이고 LOCK에서만 해제를 표시한다", async () => {
-  account.userStatCd = "LOCK";
-  detail();
-  await screen.findByTestId("user-unlock");
-  expect(screen.getByTestId("user-id-input")).toHaveAttribute("readonly");
-  expect(screen.getByTestId("user-name-input")).toHaveAttribute("readonly");
-  expect(screen.getByTestId("user-email-input")).toHaveAttribute("readonly");
-  expect(
-    screen.getByText("비밀번호 5회 실패로 잠긴 계정입니다."),
-  ).toBeVisible();
-  expect(screen.queryByTestId("user-resume")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByTestId("user-unlock"));
-  await waitFor(() => expect(writes()).toHaveLength(1));
-  expect(JSON.parse(writes()[0][1].body)).toEqual({ modDttm: token });
-});
-it("STOP 재개와 초기화는 원본 마이크로초 버전을 보내며 평문은 표시하지 않는다", async () => {
-  account.userStatCd = "STOP";
-  detail();
-  fireEvent.click(await screen.findByTestId("user-resume"));
-  await waitFor(() => expect(writes()).toHaveLength(1));
-  await waitFor(() =>
-    expect(screen.getByTestId("user-password-reset")).not.toBeDisabled(),
-  );
-  fireEvent.click(screen.getByTestId("user-password-reset"));
-  await waitFor(() => expect(writes()).toHaveLength(2));
-  expect(writes().map((call) => JSON.parse(call[1].body))).toEqual([
-    { modDttm: token },
-    { modDttm: token },
-  ]);
-  expect(screen.queryByTestId("user-unlock")).not.toBeInTheDocument();
-  expect(document.querySelector('input[type="password"]')).toBeNull();
-});
-it("역할 제거 영향 확인 취소는 PUT 없이 역할·프로젝트 baseline을 복원한다", async () => {
-  detail();
-  fireEvent.click(await screen.findByRole("checkbox", { name: "경영진" }));
-  fireEvent.click(screen.getByRole("checkbox", { name: "프로젝트 관리자" }));
-  fireEvent.click(screen.getByTestId("user-form-save"));
-  await screen.findByText("담당 프로젝트를 해제할까요?");
-  fireEvent.click(screen.getByRole("button", { name: "취소" }));
-  expect(
-    screen.getByRole("checkbox", { name: "프로젝트 관리자" }),
-  ).toBeChecked();
-  expect(screen.getByRole("checkbox", { name: "합성 프로젝트" })).toBeChecked();
-  expect(screen.getByRole("checkbox", { name: "경영진" })).not.toBeChecked();
-  expect(writes()).toHaveLength(0);
-});
-it("영향 확인 계속은 확인 프로젝트와 수정 가능 필드만 전송한다", async () => {
-  detail();
-  fireEvent.click(await screen.findByRole("checkbox", { name: "경영진" }));
-  fireEvent.click(screen.getByRole("checkbox", { name: "프로젝트 관리자" }));
-  fireEvent.click(screen.getByTestId("user-form-save"));
-  fireEvent.click(await screen.findByRole("button", { name: "계속" }));
-  await waitFor(() => expect(writes()).toHaveLength(1));
-  expect(JSON.parse(writes()[0][1].body)).toEqual({
-    roleCds: ["EXEC"],
-    headquarters: false,
-    projectIds: [],
-    modDttm: token,
-    confirmedProjectIds: ["project-a"],
+  const dialog = screen.getByTestId("user-dialog");
+  fireEvent.change(within(dialog).getByTestId("user-name-input"), {
+    target: { value: "다른 이름" },
   });
-});
-it("접근 기록 탭을 왕복해도 편집 입력과 dirty 표시는 유지된다", async () => {
-  const dirty = vi.fn();
-  render(
-    <ScreenDirtyContext.Provider value={dirty}>
-      <UserDialog
-        userId="test"
-        options={options}
-        onClose={vi.fn()}
-        onSaved={vi.fn()}
-      />
-    </ScreenDirtyContext.Provider>,
-  );
-  fireEvent.click(await screen.findByRole("checkbox", { name: "경영진" }));
-  fireEvent.click(screen.getByTestId("user-logs-tab"));
-  await screen.findByText("접근 기록이 없습니다.");
-  fireEvent.click(screen.getByTestId("user-account-tab"));
-  expect(screen.getByRole("checkbox", { name: "경영진" })).toBeChecked();
-  expect(dirty).toHaveBeenCalledWith("UI-23", true);
-});
-it("다이얼로그 Ctrl+S는 저장만 수행하고 배경 조회를 실행하지 않는다", async () => {
-  detail();
-  const input = await screen.findByTestId("user-id-input");
-  input.focus();
-  fireEvent.keyDown(input, { key: "s", ctrlKey: true });
-  await screen.findByText("담당 프로젝트를 해제할까요?");
-  expect(
-    request.mock.calls.filter((call) => call[0].includes("users?")),
-  ).toHaveLength(0);
-  expect(writes()).toHaveLength(0);
-});
-it("일괄 중지 취소는 PUT 없이 유지하고 계속은 부분 실패 이유를 표시한다", async () => {
-  page();
-  fireEvent.click(await screen.findByTestId("user-select-test"));
-  fireEvent.click(screen.getByTestId("user-stop-open"));
-  const dialog = await screen.findByTestId("user-stop-confirm");
-  expect(dialog).toHaveTextContent("담당 프로젝트 1건");
-  fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));
-  expect(writes()).toHaveLength(0);
-  expect(screen.getByTestId("user-select-test")).toBeChecked();
-  fireEvent.click(screen.getByTestId("user-stop-open"));
-  fireEvent.click(
-    within(await screen.findByTestId("user-stop-confirm")).getByRole("button", {
-      name: "계속",
-    }),
-  );
-  await screen.findByText("admin: 마지막 관리자");
-  expect(JSON.parse(writes()[0][1].body)).toEqual({
-    users: [{ userId: "test", modDttm: token }],
-    confirmedProjectIds: ["project-a"],
-  });
-});
-it("빈 목록과 실패 목록은 구분하며 재시도를 제공한다", async () => {
-  request.mockImplementation(async (url: string) =>
-    url.includes("user-options")
-      ? response(options)
-      : response({ items: [], page: 1, pageSize: 20, total: 0 }),
-  );
-  const view = page();
-  await screen.findByText("조회된 사용자가 없습니다.");
-  view.unmount();
-  request.mockImplementation(async (url: string) => {
-    if (url.includes("user-options")) return response(options);
-    throw new Error("목록 실패");
-  });
-  page();
-  await screen.findByText("목록 실패");
-  expect(screen.getByTestId("user-list-retry")).toBeVisible();
-});
-it("서버 필드 오류는 해당 입력에 표시하고 계정 조회 실패는 재시도한다", async () => {
-  request.mockImplementation(async () => {
-    throw new Error("상세 실패");
-  });
-  detail();
-  await screen.findByText("상세 실패");
-  expect(screen.getByTestId("user-detail-retry")).toBeVisible();
+  fireEvent.click(within(dialog).getByTestId("user-cancel"));
+  expect(within(dialog).getByText("나가시겠습니까?")).toBeInTheDocument();
 });

@@ -1,4 +1,5 @@
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import { Toast } from "../../shared/feedback/Dialog";
 import { ScreenSettingsDialog } from "./ScreenSettingsDialog";
 import { UserPreferenceDialog } from "./UserPreferenceDialog";
 import type { PreferenceMenu } from "./PersonalScreenPreferences";
@@ -102,6 +103,49 @@ export function ShortcutHelpDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+/**
+ * 시안 「자동 로그아웃까지 mm:ss [연장]」. 운영 기준 SESSION_MIN(30분, 공통-07).
+ * 지금은 보이는 것만 만든다: 화면을 누르면 30분으로 돌아가고 0이 되어도 로그아웃하지 않는다.
+ * 실제 로그아웃과 운영 기준 표(TB_SY_OPER_STD)에서 분을 읽는 일은 마지막 로그인(UI-22) 작업에서 붙인다.
+ */
+const SESSION_MINUTES = 30;
+let sessionEnd = Date.now() + SESSION_MINUTES * 60_000;
+if (typeof document !== "undefined")
+  document.addEventListener("click", () => {
+    sessionEnd = Date.now() + SESSION_MINUTES * 60_000;
+  });
+export function sessionLeft(now = Date.now()) {
+  const seconds = Math.max(0, Math.round((sessionEnd - now) / 1000));
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+function SessionTimer({ onExtend }: { onExtend: () => void }) {
+  const [left, setLeft] = useState(() => sessionLeft());
+  useEffect(() => {
+    const timer = window.setInterval(() => setLeft(sessionLeft()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <div className="hd-sess" data-testid="session-left">
+      자동 로그아웃까지 <b>{left}</b>
+      <button
+        type="button"
+        className="hd-sess-ext"
+        data-testid="session-extend"
+        onClick={() => {
+          sessionEnd = Date.now() + SESSION_MINUTES * 60_000;
+          setLeft(sessionLeft());
+          onExtend();
+        }}
+      >
+        연장
+      </button>
+    </div>
+  );
+}
+
+/** 로그인(UI-22) 전까지 서버 사용자는 admin으로 고정한다. 헤더 이름 자리에 그대로 보인다. */
+const CURRENT_USER = { name: "시스템 관리자", role: "관리자" };
+
 export function UserPreferenceTools({
   menus,
   mobile,
@@ -120,6 +164,23 @@ export function UserPreferenceTools({
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notice, setNotice] = useState("");
+  const menuAnchor = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!menuAnchor.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [menuOpen]);
   const [dialog, setDialog] = useState<
     "settings" | "search" | "shortcuts" | null
   >(null);
@@ -136,67 +197,98 @@ export function UserPreferenceTools({
   }, [mobile, dialog]);
   return (
     <div data-testid="user-preference-tools" className="preference-tools">
+      {mobile && (
+        <button
+          type="button"
+          className="hd-ibtn"
+          data-testid="menu-search-open"
+          aria-label="메뉴 찾기"
+          onClick={() => setDialog("search")}
+        >
+          <ShellIcon name="search" />
+        </button>
+      )}
       <button
         type="button"
-        data-testid="menu-search-open"
-        aria-label="메뉴 찾기"
-        onClick={() => setDialog("search")}
-      >
-        {mobile ? <ShellIcon name="search" /> : "메뉴 찾기 (Ctrl+K)"}
-      </button>
-      <button
-        type="button"
+        className="hd-ai"
         data-testid="ai-unavailable"
-        disabled
-        title="준비 중"
-        aria-label="AI에게 묻기 준비 중"
+        aria-label="AI에게 묻기 (준비 중)"
+        title="AI에게 묻기는 AI 분석 도우미 작업에서 붙입니다."
+        onClick={() => setNotice("AI에게 묻기는 준비 중입니다.")}
       >
-        {mobile ? <ShellIcon name="spark" /> : "AI에게 묻기 · 준비 중"}
+        <ShellIcon name="spark" />
+        {!mobile && <span>AI에게 묻기</span>}
       </button>
       <button
         type="button"
+        className="hd-ibtn"
         data-testid="notification-unavailable"
-        disabled
-        title="준비 중"
-        aria-label="알림 준비 중"
+        aria-label="알림 (준비 중)"
+        title="알림은 마지막 로그인 작업에서 붙입니다."
+        onClick={() => setNotice("알림은 준비 중입니다.")}
       >
-        {mobile ? <ShellIcon name="bell" /> : "알림 · 준비 중"}
+        <ShellIcon name="bell" />
       </button>
-      <button
-        type="button"
-        data-testid="user-menu-open"
-        aria-expanded={menuOpen}
-        aria-label="시스템 관리자"
-        onClick={() => setMenuOpen(!menuOpen)}
-      >
-        {mobile ? <ShellIcon name="user" /> : "시스템 관리자"}
-      </button>
-      {menuOpen && (
-        <div data-testid="user-menu-panel" className="preference-user-menu">
-          <button
-            type="button"
-            data-testid="screen-settings-open"
-            onClick={() => setDialog("settings")}
+      <div className="hd-anchor" ref={menuAnchor}>
+        <button
+          type="button"
+          className="hd-umenu"
+          data-testid="user-menu-open"
+          aria-expanded={menuOpen}
+          aria-label="사용자 메뉴"
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          <ShellIcon name="user" />
+          {!mobile && (
+            <span>
+              {CURRENT_USER.name} <span className="hd-sub">({CURRENT_USER.role})</span>
+            </span>
+          )}
+          <ShellIcon name="chevronDown" />
+        </button>
+        {menuOpen && (
+          <div
+            data-testid="user-menu-panel"
+            className="preference-user-menu"
+            role="menu"
           >
-            화면 설정
-          </button>
-          <button
-            type="button"
-            data-testid="shortcut-help-open"
-            onClick={() => setDialog("shortcuts")}
-          >
-            단축키 보기
-          </button>
-          <button type="button" data-testid="profile-unavailable" disabled>
-            내 정보 · 준비 중
-          </button>
-          <button type="button" data-testid="password-unavailable" disabled>
-            비밀번호 변경 · 준비 중
-          </button>
-          <button type="button" data-testid="logout-unavailable" disabled>
-            로그아웃 · 준비 중
-          </button>
-        </div>
+            <div className="hd-pop-h">
+              {CURRENT_USER.name} <span className="hd-sub">{CURRENT_USER.role}</span>
+            </div>
+            {(
+              [
+                ["profile-unavailable", "내 정보", null],
+                ["password-unavailable", "비밀번호 변경", null],
+                ["screen-settings-open", "화면 설정", "settings"],
+                ["shortcut-help-open", "단축키 보기", "shortcuts"],
+                ["logout-unavailable", "로그아웃", null],
+              ] as const
+            ).map(([testId, label, target]) => (
+              <button
+                key={testId}
+                type="button"
+                role="menuitem"
+                className="hd-pop-i"
+                data-testid={testId}
+                onClick={() => {
+                  setMenuOpen(false);
+                  if (target) setDialog(target);
+                  else setNotice(`${label}은(는) 준비 중입니다. 마지막 로그인 작업에서 붙입니다.`);
+                }}
+              >
+                {label}
+              </button>
+            ))}
+            <SessionTimer onExtend={() => setNotice("자동 로그아웃 시간을 30분으로 다시 늘렸습니다.")} />
+          </div>
+        )}
+      </div>
+      {notice && (
+        <Toast
+          message={notice}
+          onDismiss={() => setNotice("")}
+          testId="header-notice"
+        />
       )}
       {dialog === "settings" && (
         <ScreenSettingsDialog

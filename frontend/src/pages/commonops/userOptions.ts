@@ -1,8 +1,19 @@
 import { useEffect, useState } from "react";
 
 export interface CommonUserOptionsResult {
-  roles: { roleCd: string; roleName: string; assignedProjectScope: boolean }[];
-  projects: { projectId: string; projectName: string }[];
+  roles: {
+    roleCd: string;
+    roleName: string;
+    assignedProjectScope: boolean;
+    assignedPartScope: boolean;
+  }[];
+  /** pmUserId·pmName: 지금 이 프로젝트의 PM(없으면 null). */
+  projects: {
+    projectId: string;
+    projectName: string;
+    pmUserId: string | null;
+    pmName: string | null;
+  }[];
   userStates: { code: string; name: string }[];
 }
 
@@ -23,14 +34,17 @@ function options(value: unknown): value is CommonUserOptionsResult {
         typeof role.roleCd === "string" &&
         role.roleCd.length > 0 &&
         typeof role.roleName === "string" &&
-        typeof role.assignedProjectScope === "boolean",
+        typeof role.assignedProjectScope === "boolean" &&
+        typeof role.assignedPartScope === "boolean",
     ) &&
     Array.isArray(value.projects) &&
     value.projects.every(
       (project: unknown) =>
         object(project) &&
         typeof project.projectId === "string" &&
-        typeof project.projectName === "string",
+        typeof project.projectName === "string" &&
+        (project.pmUserId === null || typeof project.pmUserId === "string") &&
+        (project.pmName === null || typeof project.pmName === "string"),
     ) &&
     Array.isArray(value.userStates) &&
     value.userStates.every(

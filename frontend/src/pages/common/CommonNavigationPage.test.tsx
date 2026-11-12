@@ -158,10 +158,10 @@ function respond(body: ShellMenuResponse) {
 }
 async function expectScreenContent(id: string) {
   if (id === "UI-23") {
-    expect(await screen.findByText("조회된 사용자가 없습니다.")).toBeVisible();
+    expect(await screen.findByText("조건에 맞는 결과가 없습니다.")).toBeVisible();
     expect(screen.getByTestId("user-page")).toBeVisible();
     expect(screen.getByTestId("user-keyword-filter")).toBeVisible();
-    expect(screen.getByTestId("user-search")).toBeVisible();
+    expect(screen.getByTestId("list-search")).toBeVisible();
     expect(screen.getByTestId("user-register-open")).toBeVisible();
   } else {
     expect(

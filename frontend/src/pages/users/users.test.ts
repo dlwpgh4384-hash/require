@@ -33,10 +33,11 @@ function reply(data: unknown) {
     }),
   );
 }
-function expectWrite(path: string, body: unknown) {
+/** 2026-11-12 결정: 등록·처리 동작은 POST, 수정만 PUT. */
+function expectWrite(path: string, body: unknown, method = "POST") {
   expect(request).toHaveBeenCalledTimes(1);
   expect(request).toHaveBeenCalledWith(path, {
-    method: "PUT",
+    method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -113,6 +114,8 @@ it("PUT registration sends JSON and returns saved account", async () => {
 });
 it("PUT detail preserves concurrency token and explicit confirmation", async () => {
   const body = {
+    name: "시험 사용자",
+    email: "test@example.invalid",
     roleCds: ["EXEC"],
     headquarters: false,
     projectIds: [],
@@ -125,7 +128,7 @@ it("PUT detail preserves concurrency token and explicit confirmation", async () 
   };
   reply(saved);
   await expect(putCommonUser("test", body)).resolves.toEqual(saved);
-  expectWrite("/api/common/users/test", body);
+  expectWrite("/api/common/users/test", body, "PUT");
 });
 it("PUT stop returns partial failure reasons without discarding success", async () => {
   const users = [{ userId: "test", ...version }];

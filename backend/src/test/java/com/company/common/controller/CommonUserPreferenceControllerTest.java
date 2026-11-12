@@ -9,7 +9,7 @@ import com.company.common.mapper.UserPreferenceRow;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +36,7 @@ class CommonUserPreferenceControllerTest {
     @Autowired ObjectMapper json;
     @MockBean UserPreferenceMapper mapper;
     @MockBean UserPreferencePeriodBasis periodBasis;
-    private static final LocalDateTime TOKEN = LocalDateTime.of(2026, 1, 2, 3, 4, 5, 123456000);
+    private static final Instant TOKEN = java.time.Instant.parse("2026-01-02T03:04:05.123456Z");
 
     @BeforeEach
     void readDurableOpenApiContract() throws Exception {
@@ -46,7 +46,7 @@ class CommonUserPreferenceControllerTest {
             "operationId: getCommonUserPreference", "operationId: putCommonUserPreference");
     }
 
-    static UserPreferenceRow row(String value, LocalDateTime token) {
+    static UserPreferenceRow row(String value, Instant token) {
         var row = new UserPreferenceRow();
         row.setPrefVal(value);
         row.setModDttm(token);

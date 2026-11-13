@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.codegroups.mapper.CodeGroupMapper">
+  <resultMap id="group" type="com.company.common.codegroups.mapper.CodeRows$Group" autoMapping="false">
+    <id column="code_grp_id" property="groupId" javaType="java.lang.String"/>
+    <result column="code_grp_nm" property="groupName" javaType="java.lang.String"/>
+    <result column="sys_code_yn" property="sysCodeYn" javaType="java.lang.String"/>
+    <result column="val_code_yn" property="valCodeYn" javaType="java.lang.String"/>
+    <result column="code_count" property="codeCount" javaType="_int"/>
+    <result column="sort_ord" property="sortOrd" javaType="_int"/>
+  </resultMap>
+  <resultMap id="code" type="com.company.common.codegroups.mapper.CodeRows$Code" autoMapping="false">
+    <id column="code_grp_id" property="groupId" javaType="java.lang.String"/>
+    <id column="code" property="code" javaType="java.lang.String"/>
+    <result column="code_nm" property="codeName" javaType="java.lang.String"/>
+    <result column="sort_ord" property="sortOrd" javaType="_int"/>
+    <result column="use_yn" property="useYn" javaType="java.lang.String"/>
+    <result column="del_yn" property="delYn" javaType="java.lang.String"/>
+    <result column="code_val" property="codeVal" javaType="java.math.BigDecimal"/>
+    <result column="unit_nm" property="unitNm" javaType="java.lang.String"/>
+    <result column="add_val1" property="addVal1" javaType="java.lang.String"/>
+    <result column="add_val2" property="addVal2" javaType="java.lang.String"/>
+    <result column="add_val3" property="addVal3" javaType="java.lang.String"/>
+    <result column="changed_at" property="changedAt" javaType="java.time.Instant"/>
+  </resultMap>
+  <select id="selectGroups" resultMap="group">
+    SELECT g.code_grp_id, g.code_grp_nm, g.sys_code_yn, g.val_code_yn, g.sort_ord,
+      (SELECT count(*) FROM TB_SY_CODE c WHERE c.code_grp_id=g.code_grp_id AND c.del_yn='N') AS code_count
+    FROM TB_SY_CODE_GRP g ORDER BY g.sort_ord, g.code_grp_id
+  </select>
+  <sql id="columns">code_grp_id, code, code_nm, sort_ord, use_yn, del_yn, code_val, unit_nm, add_val1, add_val2, add_val3,
+    COALESCE(mod_dttm, reg_dttm) AS changed_at</sql>
+  <select id="selectCodes" resultMap="code">
+    SELECT <include refid="columns"/> FROM TB_SY_CODE
+    WHERE code_grp_id=#{groupId} AND del_yn='N' ORDER BY sort_ord, code
+  </select>
+  <select id="selectCode" resultMap="code">
+    SELECT <include refid="columns"/> FROM TB_SY_CODE WHERE code_grp_id=#{groupId} AND code=#{code}
+  </select>
+  <select id="nextGroupOrder" resultType="int">
+    SELECT COALESCE(max(sort_ord),0)+1 FROM TB_SY_CODE_GRP
+  </select>
+  <select id="nextCodeOrder" resultType="int">
+    SELECT COALESCE(max(sort_ord),0)+1 FROM TB_SY_CODE WHERE code_grp_id=#{groupId}
+  </select>
+  <insert id="insertGroup">
+    INSERT INTO TB_SY_CODE_GRP (code_grp_id,code_grp_nm,sys_code_yn,val_code_yn,sort_ord,use_yn,reg_user_id,reg_dttm)
+    VALUES (#{groupId},#{groupName},'N','N',#{sortOrd},'Y','admin',clock_timestamp())
+  </insert>
+  <insert id="insertCode">
+    INSERT INTO TB_SY_CODE (code_grp_id,code,code_nm,sort_ord,use_yn,del_yn,code_val,unit_nm,
+      add_val1,add_val2,add_val3,reg_user_id,reg_dttm)
+    VALUES (#{groupId},#{code},#{codeName},#{sortOrd},#{useYn},'N',#{codeVal,jdbcType=NUMERIC},
+      #{unitNm,jdbcType=VARCHAR},#{addVal1,jdbcType=VARCHAR},#{addVal2,jdbcType=VARCHAR},
+      #{addVal3,jdbcType=VARCHAR},'admin',clock_timestamp())
+  </insert>
+  <update id="updateCode">
+    UPDATE TB_SY_CODE SET code_nm=#{codeName},sort_ord=#{sortOrd},use_yn=#{useYn},
+      code_val=#{codeVal,jdbcType=NUMERIC},unit_nm=#{unitNm,jdbcType=VARCHAR},
+      add_val1=#{addVal1,jdbcType=VARCHAR},add_val2=#{addVal2,jdbcType=VARCHAR},
+      add_val3=#{addVal3,jdbcType=VARCHAR},mod_user_id='admin',
+      mod_dttm=GREATEST(clock_timestamp(), COALESCE(mod_dttm, reg_dttm) + INTERVAL '1 microsecond')
+    WHERE code_grp_id=#{groupId} AND code=#{code} AND del_yn='N'
+  </update>
+  <update id="deleteCode">
+    UPDATE TB_SY_CODE SET del_yn='Y',mod_user_id='admin',mod_dttm=clock_timestamp()
+    WHERE code_grp_id=#{groupId} AND code=#{code} AND del_yn='N'
+  </update>
+  <select id="relationExists" resultType="boolean">
+    SELECT to_regclass(#{table}) IS NOT NULL
+  </select>
+  <update id="lockRelation">LOCK TABLE ${table} IN SHARE ROW EXCLUSIVE MODE</update>
+  <sql id="skillNames">
+    #{row.code}, #{row.codeName},
+    (SELECT h.bfr_val FROM TB_SY_CHG_HIST h WHERE h.trgt_tbl_nm='TB_SY_CODE'
+      AND h.trgt_key=#{row.groupId} || ':' || #{row.code} AND h.chg_item_nm='CODE_NM'
+      ORDER BY h.hist_id LIMIT 1)
+  </sql>
+  <select id="referenceExists" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM ${ref.table} r WHERE
+    <choose>
+      <when test="ref.column == 'BFR_VAL'">
+        r.asgn_chg_type_cd =
+        <choose><when test="row.groupId == 'INPUT_TYPE'">'KIND'</when><otherwise>'EXTP'</otherwise></choose>
+        AND (r.bfr_val=#{row.code} OR r.aft_val=#{row.code})
+      </when>
+      <when test="ref.column == 'SKILL_NM'">
+        r.${ref.column} IN (#{row.code},#{row.codeName}) OR r.${ref.column} IN (
+          SELECT h.bfr_val FROM TB_SY_CHG_HIST h WHERE h.trgt_tbl_nm='TB_SY_CODE'
+            AND h.trgt_key=#{row.groupId} || ':' || #{row.code} AND h.chg_item_nm='CODE_NM'
+          UNION SELECT h.aft_val FROM TB_SY_CHG_HIST h WHERE h.trgt_tbl_nm='TB_SY_CODE'
+            AND h.trgt_key=#{row.groupId} || ':' || #{row.code} AND h.chg_item_nm='CODE_NM')
+      </when>
+      <otherwise>r.${ref.column}=#{row.code}</otherwise>
+    </choose>)
+  </select>
+  <select id="historicalReferenceExists" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_SY_CHG_HIST h
+      WHERE upper(h.trgt_tbl_nm)=#{ref.table}
+        AND (upper(h.chg_item_nm)=#{ref.column} OR h.chg_item_nm=#{row.groupId})
+        AND (h.bfr_val=#{row.code} OR h.aft_val=#{row.code}
+          <if test="ref.column == 'SKILL_NM'">
+            OR h.bfr_val=#{row.codeName} OR h.aft_val=#{row.codeName}
+            OR h.bfr_val IN (SELECT n.bfr_val FROM TB_SY_CHG_HIST n WHERE n.trgt_tbl_nm='TB_SY_CODE'
+              AND n.trgt_key=#{row.groupId} || ':' || #{row.code} AND n.chg_item_nm='CODE_NM')
+            OR h.aft_val IN (SELECT n.bfr_val FROM TB_SY_CHG_HIST n WHERE n.trgt_tbl_nm='TB_SY_CODE'
+              AND n.trgt_key=#{row.groupId} || ':' || #{row.code} AND n.chg_item_nm='CODE_NM')
+          </if>))
+    <if test="row.groupId == 'EXT_PSBL' or row.groupId == 'INPUT_TYPE'">
+      OR EXISTS (SELECT 1 FROM TB_SY_CHG_HIST h WHERE h.trgt_tbl_nm='TB_PJ_ASGN_HIST'
+        AND h.chg_item_nm=#{row.groupId} AND (h.bfr_val=#{row.code} OR h.aft_val=#{row.code}))
+    </if>
+  </select>
+  <select id="mappedReferenceExists" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_SY_CODE_MAP WHERE code_grp_id=#{groupId} AND code=#{code})
+  </select>
+  <select id="additionalReferenceExists" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_SY_CODE c WHERE
+      NOT (c.code_grp_id=#{groupId} AND c.code=#{code}) AND (
+        <choose>
+          <when test="groupId == 'JOB'">
+            (c.code_grp_id IN ('JOB','SKILL','RSM_JOB_KW')
+              AND #{code}=ANY(regexp_split_to_array(c.add_val1,'\s*,\s*')))
+          </when>
+          <when test="groupId == 'CTRT_TYPE'">
+            (c.code_grp_id='PROJ_STEP' AND #{code}=ANY(regexp_split_to_array(c.add_val2,'\s*,\s*')))
+          </when>
+          <otherwise>FALSE</otherwise>
+        </choose>))
+      OR EXISTS (SELECT 1 FROM TB_SY_CHG_HIST h WHERE h.trgt_tbl_nm NOT IN ('TB_SY_CODE','TB_SY_CODE_GRP')
+        AND h.chg_item_nm=#{groupId} AND (h.bfr_val=#{code} OR h.aft_val=#{code}))
+      OR EXISTS (SELECT 1 FROM TB_SY_CHG_HIST h WHERE h.trgt_tbl_nm='TB_SY_CODE'
+        AND h.trgt_key != #{groupId} || ':' || #{code} AND (
+          <choose>
+            <when test="groupId == 'JOB'">
+              (h.trgt_key ~ '^(JOB|SKILL|RSM_JOB_KW):' AND h.chg_item_nm='ADD_VAL1'
+                AND (#{code}=ANY(regexp_split_to_array(h.bfr_val,'\s*,\s*'))
+                  OR #{code}=ANY(regexp_split_to_array(h.aft_val,'\s*,\s*'))))
+            </when>
+            <when test="groupId == 'CTRT_TYPE'">
+              (h.trgt_key LIKE 'PROJ_STEP:%' AND h.chg_item_nm='ADD_VAL2'
+                AND (#{code}=ANY(regexp_split_to_array(h.bfr_val,'\s*,\s*'))
+                  OR #{code}=ANY(regexp_split_to_array(h.aft_val,'\s*,\s*'))))
+            </when>
+            <otherwise>FALSE</otherwise>
+          </choose>))
+  </select>
+</mapper>

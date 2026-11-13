@@ -151,7 +151,14 @@ function respond(body: ShellMenuResponse) {
               meta: {},
               data: { roles: [], projects: [], userStates: [] },
             }
-          : url === "/api/common/roles" || url === "/api/common/menu-settings"
+          : [
+                "/api/common/roles",
+                "/api/common/menu-settings",
+                "/api/common/code-groups",
+                "/api/common/code-maps",
+                "/api/common/operating-standards",
+                "/api/common/code-change-history",
+              ].includes(url)
             ? { success: true, meta: {}, data: { items: [] } }
             : body,
   }));
@@ -174,6 +181,19 @@ async function expectScreenContent(id: string) {
     expect(await screen.findByText("등록된 메뉴가 없습니다.")).toBeVisible();
     expect(screen.getByTestId("menu-settings-page")).toBeVisible();
     expect(screen.getByTestId("menu-registration-open")).toBeEnabled();
+  } else if (id === "UI-27") {
+    expect(
+      await screen.findByText("등록된 코드 그룹이 없습니다."),
+    ).toBeVisible();
+    expect(screen.getByTestId("code-page")).toBeVisible();
+    expect(
+      screen.getAllByRole("tab", {
+        name: /^(코드|엑셀 표기 대응|운영 기준값|변경 이력)$/,
+      }),
+    ).toHaveLength(4);
+    await waitFor(() =>
+      expect(screen.getByTestId("code-group-title-add")).toBeEnabled(),
+    );
   } else {
     expect(
       await screen.findByRole("region", { name: `${id} 본문` }),
@@ -202,6 +222,41 @@ async function ensureOpen(name: string) {
 }
 
 describe("common placeholder screen contract", () => {
+  it("UI-27 without preferences composes all four API panels through the same screen dispatch", async () => {
+    const request = respond(fixture());
+    mount("/screens/UI-27");
+    await expectScreenContent("UI-27");
+    fireEvent.click(screen.getByTestId("code-group-title-add"));
+    expect(await screen.findByTestId("code-group-dialog")).toBeVisible();
+    fireEvent.click(screen.getByTestId("code-dialog-cancel"));
+    fireEvent.click(screen.getByTestId("code-tab-maps"));
+    expect(await screen.findByText("등록된 표기가 없습니다.")).toBeVisible();
+    expect(screen.getByTestId("code-maps-panel")).toBeVisible();
+    fireEvent.click(screen.getByTestId("code-tab-standards"));
+    expect(
+      await screen.findByText("등록된 운영 기준값이 없습니다."),
+    ).toBeVisible();
+    expect(screen.getByTestId("operating-standards-panel")).toBeVisible();
+    fireEvent.click(screen.getByTestId("code-tab-history"));
+    expect(await screen.findByTestId("code-history-empty")).toBeVisible();
+    expect(screen.getByTestId("code-history-panel")).toBeVisible();
+    expect(screen.queryByTestId("code-group-title-add")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-27");
+    for (const path of [
+      "/api/common/code-maps",
+      "/api/common/operating-standards",
+      "/api/common/code-change-history",
+    ])
+      expect(request).toHaveBeenCalledWith(path, {
+        signal: expect.any(AbortSignal),
+      });
+    expect(request.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(
+      screen.queryByText(/화면이 연결되지 않았습니다/),
+    ).not.toBeInTheDocument();
+  });
+
   it("each visible initial screen opens its placeholder or implemented user screen", async () => {
     respond(fixture());
     mount();

@@ -8,21 +8,24 @@ export function Dialog({
   onClose,
   testId = "app-dialog",
   role = "dialog",
+  closable = false,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   testId?: string;
   role?: "dialog" | "alertdialog";
+  /** 시안 모달 머리의 [×] 닫기 단추를 보인다. */
+  closable?: boolean;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
     const caller = document.activeElement as HTMLElement | null;
-    const first = panel.current?.querySelector<HTMLElement>(
-      "input,select,button,[tabindex='0']",
-    );
+    const first =
+      panel.current?.querySelector<HTMLElement>("input,select") ??
+      panel.current?.querySelector<HTMLElement>("button,[tabindex='0']");
     (first ?? panel.current)?.focus();
     const keydown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -69,7 +72,33 @@ export function Dialog({
         data-testid={testId}
         className="app-dialog"
       >
-        <h2>{title}</h2>
+        {closable ? (
+          <div className="app-dialog-head">
+            <h2>{title}</h2>
+            <button
+              type="button"
+              className="app-dialog-close"
+              aria-label="닫기"
+              data-testid={`${testId}-close`}
+              onClick={() => close.current()}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <h2>{title}</h2>
+        )}
         {children}
       </div>
     </div>

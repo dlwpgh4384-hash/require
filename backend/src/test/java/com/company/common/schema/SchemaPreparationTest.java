@@ -54,6 +54,18 @@ class SchemaPreparationTest {
         ordered.verify(connection).createStatement();
         ordered.verify(statement).execute(contains("CREATE INDEX IF NOT EXISTS IX_TB_SY_ROLE_MENU_AUTH_01"));
         ordered.verify(statement).close();
+        ordered.verify(session).getConnection();
+        ordered.verify(connection).createStatement();
+        ordered.verify(statement).execute(contains("CREATE TABLE IF NOT EXISTS TB_SY_CODE_MAP"));
+        ordered.verify(statement).close();
+        ordered.verify(session).getConnection();
+        ordered.verify(connection).createStatement();
+        ordered.verify(statement).execute(contains("INSERT INTO TB_SY_CALC_RULE"));
+        ordered.verify(statement).close();
+        ordered.verify(session).getConnection();
+        ordered.verify(connection).createStatement();
+        ordered.verify(statement).execute(contains("DO $common_entity_contract$"));
+        ordered.verify(statement).close();
         ordered.verify(session).commit(true);
         ordered.verify(session).close();
         verify(session, never()).rollback(anyBoolean());
@@ -81,7 +93,7 @@ class SchemaPreparationTest {
     void migrationResourcesContainOnlyModelTablesAndBaseSeeds() throws Exception {
         preparation.prepare();
         var resources = ArgumentCaptor.forClass(String.class);
-        verify(statement, times(6)).execute(resources.capture());
+        verify(statement, times(9)).execute(resources.capture());
         String schema = resources.getAllValues().get(0);
         var tables = java.util.regex.Pattern.compile("CREATE TABLE IF NOT EXISTS (TB_[A-Z_]+)").matcher(schema);
         var names = new java.util.ArrayList<String>();
@@ -110,6 +122,37 @@ class SchemaPreparationTest {
         String permissions = resources.getAllValues().get(4);
         assertThat(permissions).contains("IF NOT EXISTS (SELECT 1 FROM TB_SY_ROLE_MENU_AUTH)",
             "LOCK TABLE TB_SY_ROLE_MENU_AUTH IN EXCLUSIVE MODE");
+    }
+
+    @Test
+    void everyPreparedTableIsPhysicalAndScreenSectionNamesCannotBecomeTables() throws Exception {
+        preparation.prepare();
+        var resources = ArgumentCaptor.forClass(String.class);
+        verify(statement, times(9)).execute(resources.capture());
+        var tablePattern = java.util.regex.Pattern.compile(
+            "(?i)CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?([a-z_][a-z0-9_]*)");
+        var tables = resources.getAllValues().stream()
+            .flatMap(sql -> tablePattern.matcher(sql).results().map(match -> match.group(1).toUpperCase(java.util.Locale.ROOT)))
+            .toList();
+        assertThat(tables).hasSize(21).doesNotHaveDuplicates();
+        assertThat(tables).allMatch(name -> name.startsWith("TB_"));
+        assertThat(tables).contains("TB_SY_CALC_RULE", "TB_SY_CHG_HIST", "TB_SY_CODE", "TB_SY_CODE_GRP",
+            "TB_SY_CODE_MAP", "TB_SY_MENU", "TB_SY_OPER_STD", "TB_SY_ROLE_MENU_AUTH");
+        assertThat(tables).doesNotContain("UI_24_SLICE_006", "U_I_24_S_L_I_C_E_006");
+        String contract = resources.getAllValues().get(8);
+        assertThat(contract).contains("required physical table missing", "c.convalidated",
+            "uk_tb_sy_code_map_01", "uk_tb_sy_role_01", "ERRCODE='P0001'");
+        assertThat(contract).doesNotContain("CREATE TABLE", "ALTER TABLE", "FOREIGN KEY", "INSERT INTO");
+    }
+
+    @Test
+    void finalEntityContractFailureRollsBackSchemaAndSeeds() throws Exception {
+        when(statement.execute(anyString())).thenReturn(true, true, true, true, true, true, true, true)
+            .thenThrow(new SQLException("tb_sy_code_map.uk_tb_sy_code_map_01 expected columns", "P0001"));
+        assertThatThrownBy(preparation::prepare).isInstanceOf(SQLException.class);
+        verify(statement, times(9)).execute(anyString());
+        verify(session).rollback(true);
+        verify(session, never()).commit(anyBoolean());
     }
 
     @Test

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.mapper.CommonCodeHistoryMapper">
+  <resultMap id="change" type="com.company.common.mapper.CodeHistoryRow" autoMapping="false">
+    <result column="reg_dttm" property="changedAt" javaType="java.time.Instant"/>
+    <result column="kind" property="kind" javaType="java.lang.String"/>
+    <result column="item" property="item" javaType="java.lang.String"/>
+    <result column="before_value" property="before" javaType="java.lang.String"/>
+    <result column="after_value" property="after" javaType="java.lang.String"/>
+    <result column="reg_user_id" property="processor" javaType="java.lang.String"/>
+  </resultMap>
+  <select id="selectChanges" resultMap="change">
+    SELECT h.reg_dttm,
+      CASE h.trgt_tbl_nm
+        WHEN 'TB_SY_CODE_GRP' THEN '그룹'
+        WHEN 'TB_SY_CODE' THEN '코드'
+        WHEN 'TB_SY_OPER_STD' THEN '운영 기준값'
+        WHEN 'TB_SY_CODE_MAP' THEN '표기 대응'
+      END AS kind,
+      COALESCE(h.chg_item_nm, h.trgt_key) AS item,
+      COALESCE(h.bfr_val, '') AS before_value,
+      COALESCE(h.aft_val, '') AS after_value,
+      h.reg_user_id
+    FROM TB_SY_CHG_HIST h
+    WHERE h.trgt_tbl_nm IN ('TB_SY_CODE_GRP', 'TB_SY_CODE', 'TB_SY_OPER_STD', 'TB_SY_CODE_MAP')
+    ORDER BY h.reg_dttm DESC, h.hist_id DESC
+  </select>
+</mapper>

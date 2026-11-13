@@ -1,0 +1,92 @@
+.code-maps-panel {
+  gap: 16px;
+}
+.code-maps-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.code-maps-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.code-maps-table th {
+  background: var(--hover);
+  font-weight: 600;
+  text-align: left;
+}
+.code-maps-table th,
+.code-maps-table td {
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.code-maps-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.code-maps-fields label {
+  display: grid;
+  gap: 6px;
+}
+.code-maps-fields select,
+.code-maps-fields input {
+  width: 100%;
+}
+.code-maps-panel .app-dialog h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* 시안 UI-27 엑셀 표기 대응 (2026-11-14) */
+.code-maps-panel .code-maps-intro,
+.code-maps-panel .code-maps-note {
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.code-maps-panel .code-maps-intro {
+  margin: 0 0 12px;
+}
+.code-maps-panel .code-maps-note {
+  margin: 12px 0 0;
+}
+.code-maps-panel .code-maps-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.code-maps-panel .code-maps-toolbar h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 auto 0 0;
+}
+.code-maps-panel .code-maps-count {
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 400;
+}
+.code-maps-panel .code-maps-check {
+  width: 40px;
+}
+.code-maps-panel .code-maps-empty {
+  color: var(--text-sub);
+  text-align: center;
+}
+.code-maps-panel .code-maps-help {
+  color: var(--text-sub);
+  font-size: 12px;
+}
+.code-maps-panel .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

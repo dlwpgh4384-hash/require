@@ -1,0 +1,40 @@
+.code-history-panel {
+  gap: 16px;
+}
+.code-history-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.code-history-filters button[aria-pressed="true"] {
+  color: var(--primary-text);
+  border-color: var(--primary);
+  background: var(--hover);
+}
+.code-history-table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.code-history-panel .ls-t {
+  width: 100%;
+}
+.code-history-panel .ls-t th {
+  background: var(--hover);
+}
+.code-history-panel .ls-t td {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.code-history-panel time {
+  white-space: nowrap;
+}
+
+/* 시안 UI-27 변경 이력 아래 안내 (2026-11-14) */
+.code-history-note {
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 12px 0 0;
+}

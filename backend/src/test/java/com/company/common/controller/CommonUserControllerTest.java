@@ -60,7 +60,7 @@ class CommonUserControllerTest {
     }
     private String version() { return "{\"modDttm\":\"2026-01-02T03:04:05.123456Z\"}"; }
     @ParameterizedTest
-    @ValueSource(strings = {"/api/common/users", "/api/common/users/stop", "/api/common/users/test/password-reset",
+    @ValueSource(strings = {"/api/common/users", "/api/common/users/test", "/api/common/users/stop", "/api/common/users/test/password-reset",
         "/api/common/users/test/resume", "/api/common/users/test/unlock"})
     void obsoletePostMethodIsRejectedWithoutMutation(String path) throws Exception {
         mvc.perform(post(path).contentType("application/json").content("{}"))

@@ -1,0 +1,280 @@
+.operating-standards-panel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  color: var(--text);
+}
+.operating-standards-group {
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.operating-standards-group h3 {
+  padding: 10px 12px;
+  margin: 0;
+  background: var(--hover);
+  font-size: 13px;
+  font-weight: 600;
+}
+.operating-standards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  padding: 12px;
+}
+.operating-standard-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+}
+.operating-standard-card label {
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+.operating-standard-value,
+.operating-standard-history-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.operating-standard-value input {
+  width: 100%;
+  min-width: 0;
+}
+.operating-standard-value span {
+  white-space: nowrap;
+}
+.operating-standard-history-link {
+  justify-content: space-between;
+  color: var(--text-sub);
+  font-size: 12px;
+}
+.operating-standard-history-link button {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+.operating-standard-card p,
+.operating-standards-help {
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 12px;
+}
+.operating-standard-card .field-error {
+  color: var(--ls-bad);
+}
+.operating-standards-warning {
+  padding: 10px 16px;
+  border-radius: 8px;
+  color: var(--ls-warn);
+  background: var(--ls-warn-bg);
+}
+.operating-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.operating-history-table th,
+.operating-history-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--divider);
+  text-align: left;
+}
+.operating-history-table th {
+  background: var(--hover);
+}
+.operating-history-table td:last-child {
+  display: flex;
+  gap: 8px;
+}
+.operating-history-table input {
+  width: 120px;
+}
+
+/* 시안 UI-27 [운영 기준값] 표(2026-11-14): 기준값·값·단위·적용 시작월·쓰는 곳·이력. */
+.operating-standards-help {
+  margin: 0 0 12px;
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.operating-standards-table-wrap {
+  margin-top: 12px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  overflow: auto;
+  background: var(--surface);
+}
+.operating-standards-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.operating-standards-table th,
+.operating-standards-table td {
+  min-height: 40px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--divider);
+  text-align: left;
+  vertical-align: middle;
+}
+.operating-standards-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 40px;
+  background: var(--hover);
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.operating-standards-table tbody th {
+  min-width: 180px;
+  font-weight: 400;
+  white-space: normal;
+}
+.operating-code,
+.operating-sub,
+.operating-part-label {
+  color: var(--text-sub);
+  font-size: 12px;
+}
+.operating-lock-note {
+  color: var(--text-sub);
+  cursor: help;
+}
+.operating-value-cell {
+  text-align: center;
+}
+.operating-value-cell > .ls-in {
+  width: 220px;
+  text-align: right;
+}
+.operating-value-cell > input[type="month"] {
+  text-align: left;
+}
+.operating-parts {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: 6px 8px;
+  justify-content: end;
+  justify-items: end;
+}
+.operating-parts label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.operating-parts .ls-in {
+  width: 56px;
+  text-align: right;
+}
+.operating-history-link {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.operating-standards-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  justify-content: flex-end;
+  margin: 16px -24px 0;
+  padding: 12px 24px;
+  border-top: 1px solid var(--divider);
+  background: var(--surface);
+}
+.operating-change-list {
+  margin: 0 0 8px 18px;
+  padding: 0;
+}
+.operating-month-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.operating-field-label {
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+}
+.operating-help {
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 16px;
+}
+.operating-standards-table .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* 이력 창: 한 달에 한 줄(시안), 여러 칸은 56px 칸을 한 줄에 */
+.operating-history-values {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.operating-history-values .ls-in {
+  width: 90px;
+  text-align: right;
+}
+.operating-history-values .ls-in.operating-history-part {
+  width: 56px;
+}
+.operating-history-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+.code-page .app-dialog .operating-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.code-page .app-dialog .operating-history-table th,
+.code-page .app-dialog .operating-history-table td {
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--divider);
+  text-align: left;
+}
+.code-page .app-dialog .operating-history-table th {
+  background: var(--hover);
+  font-weight: 600;
+}
+/* 고칠 수 있는 달이 있으면 칸이 들어가도록 창을 넓힌다(읽기 전용이면 시안 폭 400). */
+.code-page .app-dialog[data-testid="operating-history-dialog"]:has(input) {
+  width: min(760px, 100%);
+}
+.code-page .app-dialog .operating-history-table th,
+.code-page .app-dialog .operating-history-table td {
+  white-space: nowrap;
+}
+.code-page .app-dialog .operating-history-values {
+  flex-wrap: nowrap;
+}
+/* 여러 칸은 본 표처럼 한 줄에 4칸씩 */
+.code-page .app-dialog .operating-history-values:has(.operating-history-part) {
+  display: inline-grid;
+  grid-template-columns: repeat(4, 56px);
+  gap: 4px;
+  padding: 6px 0;
+}
+.code-page .app-dialog .operating-history-values .ls-in {
+  min-height: 28px;
+  height: 28px;
+  padding: 0 6px;
+}

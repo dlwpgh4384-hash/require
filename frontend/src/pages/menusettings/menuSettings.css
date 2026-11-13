@@ -1,11 +1,21 @@
+/* 시스템 › 메뉴 UI-25 — 시안 v1.8 치수(표 머리 40px·#f3f4f6, 묶음 줄 회색·이름 220px 굵게, 메뉴 줄 들여쓰기 28px·이름 200px, 표 최대 576px 스크롤, 아래 고정 단추 줄). */
 .menu-settings-page {
   display: grid;
-  gap: 16px;
+  gap: 24px;
   min-width: 0;
 }
 .menu-settings-toolbar {
   display: flex;
   justify-content: flex-end;
+}
+.menu-settings-host:empty,
+.menu-settings-host > [data-testid="menu-registration"]:empty {
+  display: none;
+}
+.menu-registration-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .menu-settings-fields {
   border: 0;
@@ -14,6 +24,7 @@
   min-width: 0;
 }
 .menu-settings-table-wrap {
+  max-height: 576px;
   overflow: auto;
   border: 1px solid var(--divider);
   border-radius: 8px;
@@ -27,39 +38,54 @@
 .menu-settings-table th,
 .menu-settings-table td {
   height: 40px;
-  padding: 4px 12px;
+  padding: 0 12px;
   border-bottom: 1px solid var(--divider);
-  text-align: center;
-}
-.menu-settings-table thead th {
-  background: var(--bg);
-  color: var(--text-sub);
-  font-weight: 600;
+  text-align: left;
   white-space: nowrap;
 }
-.menu-settings-table td:nth-child(2) {
-  text-align: left;
-}
-.menu-settings-table .ls-in {
-  width: min(100%, 300px);
-  min-width: 180px;
-  height: 28px;
-  font-size: 13px;
-}
-.menu-settings-group {
+.menu-settings-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   background: var(--bg);
   font-weight: 600;
 }
-.menu-settings-group input {
+/* 손잡이·순서·사용·PC 전용 칸은 가운데. */
+.menu-settings-table th:nth-child(1),
+.menu-settings-table td:nth-child(1),
+.menu-settings-table th:nth-child(n + 4),
+.menu-settings-table td:nth-child(n + 4) {
+  text-align: center;
+}
+.menu-settings-table th:nth-child(1) {
+  width: 40px;
+}
+.menu-settings-group td {
+  background: var(--bg);
+}
+.menu-settings-group .ls-in {
+  width: 220px;
   font-weight: 600;
 }
 .menu-settings-child td:nth-child(2) {
-  padding-left: 32px;
+  padding-left: 28px;
+}
+.menu-settings-child .ls-in {
+  width: 200px;
+}
+.menu-settings-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.menu-settings-lock {
+  display: inline-flex;
+  color: var(--text-sub);
 }
 .menu-settings-handle {
   padding: 0 4px;
-  min-width: 28px;
-  min-height: 28px;
+  min-width: 24px;
+  min-height: 0;
   border: 0;
   background: transparent;
   cursor: grab;
@@ -69,11 +95,31 @@
   cursor: grabbing;
 }
 .menu-settings-help {
+  margin: 12px 0 0;
   color: var(--text-sub);
-  font-size: 13px;
-  margin: 16px 0;
+  font-size: 12px;
+  line-height: 16px;
 }
 .menu-settings-table input[type="checkbox"] {
   width: 16px;
   height: 16px;
+}
+.menu-settings-table .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+/* 시안 .fbar: 화면 아래에 붙는 [취소][저장]. */
+.menu-settings-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  justify-content: flex-end;
+  margin: 16px -24px 0;
+  padding: 12px 24px;
+  border-top: 1px solid var(--divider);
+  background: var(--surface);
 }

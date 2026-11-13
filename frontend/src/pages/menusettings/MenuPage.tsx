@@ -6,9 +6,36 @@ import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { MenuRegistration } from "../commonops/MenuRegistration";
 import { MenuRegistrationRequestError } from "../commonops/menuRegistration";
 import { usePreferenceBusinessShortcuts } from "../userpreferences/UserPreferenceTools";
+import { useMenuWorkspace } from "./MenuWorkspace";
 import * as api from "./menuSettings";
 import "../../shared/list/list.css";
 import "./menuSettings.css";
+
+/** 시안: 시스템 메뉴(LOCK_YN=Y) 이름 옆 자물쇠. */
+function LockIcon() {
+  return (
+    <span
+      className="menu-settings-lock"
+      title="시스템 메뉴: 끌 수 없고 묶음 밖으로 옮길 수 없습니다. 이름만 바꿀 수 있습니다(LOCK_YN=Y)"
+      aria-label="시스템 메뉴"
+      role="img"
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4" />
+      </svg>
+    </span>
+  );
+}
 
 const message = (error: unknown) =>
   error instanceof Error ? error.message : "메뉴를 처리하지 못했습니다.";
@@ -29,6 +56,12 @@ export function MenuPage() {
   const lock = useRef(false);
   const dragged = useRef<string | null>(null);
   const setDirty = useScreenDirty();
+  const workspace = useMenuWorkspace();
+  const { setReady } = workspace;
+  useEffect(() => {
+    setReady(!!snapshot && !busy && !refreshPending);
+    return () => setReady(false);
+  }, [snapshot, busy, refreshPending, setReady]);
   const changed = snapshot
     ? draft.filter((row) => {
         const old = snapshot.find((item) => item.menuId === row.menuId);
@@ -109,7 +142,9 @@ export function MenuPage() {
       setDraft(result.items);
       setMoved([]);
       requestMenuRefresh();
-      setNotice("메뉴를 저장했습니다.");
+      setNotice(
+        "메뉴를 저장했습니다. 모든 사용자 메뉴에 바로 반영되고 변경 이력에 남겼습니다.",
+      );
       await refresh();
     } catch (error) {
       if (saved) {
@@ -162,13 +197,19 @@ export function MenuPage() {
       data-testid="menu-settings-page"
       data-screen-id="UI-25"
     >
-      <div className="menu-settings-toolbar">
+      <div
+        className={
+          workspace.inShell ? "menu-settings-host" : "menu-settings-toolbar"
+        }
+      >
         <MenuRegistration
           dirty={dirty}
           disabled={!snapshot || busy || refreshPending}
           onDiscard={discard}
           onRegistered={refresh}
           onDialogDirty={setDialogDirty}
+          hideButton={workspace.inShell}
+          openSignal={workspace.openSignal}
           registeredScreenIds={(snapshot ?? []).flatMap((row) =>
             row.scrnId ? [row.scrnId] : [],
           )}
@@ -198,7 +239,9 @@ export function MenuPage() {
               <table aria-label="메뉴 트리 표" className="menu-settings-table">
                 <thead>
                   <tr>
-                    <th scope="col">이동</th>
+                    <th scope="col">
+                      <span className="visually-hidden">이동</span>
+                    </th>
                     <th scope="col">메뉴 이름</th>
                     <th scope="col">화면 번호</th>
                     <th scope="col">순서</th>
@@ -234,6 +277,11 @@ export function MenuPage() {
                             className="menu-settings-handle"
                             data-testid={`menu-settings-handle-${key}`}
                             aria-label={`${row.menuNm} 이동`}
+                            title={
+                              row.lockYn === "Y"
+                                ? "시스템 묶음 안에서만 순서를 바꿀 수 있습니다"
+                                : undefined
+                            }
                             onDragStart={(event) => {
                               dragged.current = row.menuId;
                               event.dataTransfer.setData(
@@ -295,16 +343,24 @@ export function MenuPage() {
                           </button>
                         </td>
                         <td>
-                          <input
-                            className="ls-in"
-                            aria-label={`${row.menuId} 메뉴 이름`}
-                            aria-invalid={!!error}
-                            data-testid={`menu-settings-name-${key}`}
-                            value={row.menuNm}
-                            onChange={(event) =>
-                              change(row.menuId, { menuNm: event.target.value })
-                            }
-                          />
+                          <span className="menu-settings-name">
+                            <input
+                              className="ls-in ls-in-sm"
+                              aria-label={`${row.menuId} 메뉴 이름`}
+                              aria-invalid={!!error}
+                              data-testid={`menu-settings-name-${key}`}
+                              maxLength={50}
+                              value={row.menuNm}
+                              onChange={(event) =>
+                                change(row.menuId, {
+                                  menuNm: event.target.value,
+                                })
+                              }
+                            />
+                            {row.lockYn === "Y" && row.menuLvl === 2 && (
+                              <LockIcon />
+                            )}
+                          </span>
                           {error && (
                             <p className="field-error" role="alert">
                               {error}
@@ -351,10 +407,13 @@ export function MenuPage() {
             </div>
             {snapshot.length === 0 && <p>등록된 메뉴가 없습니다.</p>}
             <p className="menu-settings-help">
-              일반 메뉴는 다른 묶음으로 이동할 수 있습니다. 시스템 메뉴는 묶음
-              밖 이동·끄기가 불가하며 이름 수정은 가능합니다.
+              ⋮⋮를 끌어 순서를 바꿉니다. 일반 메뉴는 다른 묶음으로도 옮길 수
+              있고, 자물쇠가 있는 시스템 묶음 메뉴(사용자·권한·메뉴·공통코드)는
+              끄거나 묶음 밖으로 옮길 수 없습니다(이름은 바꿀 수 있음). PC
+              전용을 체크하면 휴대폰 메뉴·즐겨찾기·최근에서 빠집니다. 새 메뉴는
+              모든 역할에 「권한 없음」으로 추가됩니다.
             </p>
-            <div className="app-actions">
+            <div className="app-actions menu-settings-footer">
               <button
                 type="button"
                 data-testid="menu-settings-cancel"

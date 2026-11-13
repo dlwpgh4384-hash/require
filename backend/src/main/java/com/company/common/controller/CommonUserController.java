@@ -98,11 +98,11 @@ public class CommonUserController {
         @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int pageSize) {
         return Response.of(service.getCommonUserAccessLogs(userId, UserRequests.filter(page, pageSize, null, null, null)));
     }
-    @PostMapping(value = "/api/common/users", consumes = "application/json")
+    @PutMapping(value = "/api/common/users", consumes = "application/json")
     public Response<Save> putCommonUsers(@RequestBody JsonNode body) {
         return Response.of(service.putCommonUsers(UserRequests.create(body)));
     }
-    @PostMapping(value = "/api/common/users/stop", consumes = "application/json")
+    @PutMapping(value = "/api/common/users/stop", consumes = "application/json")
     public Response<StopResult> putCommonUserStop(@RequestBody JsonNode body) {
         return Response.of(service.putCommonUserStop(UserRequests.stop(body)));
     }
@@ -110,15 +110,15 @@ public class CommonUserController {
     public Response<Save> putCommonUser(@PathVariable String userId, @RequestBody JsonNode body) {
         return Response.of(service.putCommonUser(userId, UserRequests.update(body)));
     }
-    @PostMapping(value = "/api/common/users/{userId}/password-reset", consumes = "application/json")
+    @PutMapping(value = "/api/common/users/{userId}/password-reset", consumes = "application/json")
     public Response<PasswordResult> putCommonUserPasswordReset(@PathVariable String userId, @RequestBody JsonNode body) {
         return Response.of(service.putCommonUserPasswordReset(userId, UserRequests.version(body)));
     }
-    @PostMapping(value = "/api/common/users/{userId}/resume", consumes = "application/json")
+    @PutMapping(value = "/api/common/users/{userId}/resume", consumes = "application/json")
     public Response<Account> putCommonUserResume(@PathVariable String userId, @RequestBody JsonNode body) {
         return Response.of(service.putCommonUserResume(userId, UserRequests.version(body)));
     }
-    @PostMapping(value = "/api/common/users/{userId}/unlock", consumes = "application/json")
+    @PutMapping(value = "/api/common/users/{userId}/unlock", consumes = "application/json")
     public Response<UnlockResult> putCommonUserUnlock(@PathVariable String userId, @RequestBody JsonNode body) {
         return Response.of(service.putCommonUserUnlock(userId, UserRequests.version(body)));
     }

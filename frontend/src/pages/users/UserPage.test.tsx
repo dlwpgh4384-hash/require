@@ -352,7 +352,7 @@ it("체크하면 「N건 선택」과 일괄 [사용 중지]가 나오고, 확�
   );
 });
 
-it("PM 공백 합산 확인을 취소하면 중지 POST 없이 선택 계정과 담당 프로젝트를 유지한다", async () => {
+it("PM 공백 합산 확인을 취소하면 중지 PUT 없이 선택 계정과 담당 프로젝트를 유지한다", async () => {
   const base = request.getMockImplementation()!;
   request.mockImplementation(async (url: string, init?: RequestInit) =>
     url.includes("change-impact")
@@ -414,7 +414,7 @@ it("등록 창을 다시 열 때 활성 역할을 새로 조회해 중지된 역
 it("중지 요청이 실패하면 행과 선택을 임의로 제거하지 않는다", async () => {
   const base = request.getMockImplementation()!;
   request.mockImplementation(async (url: string, init?: RequestInit) =>
-    url.endsWith("/stop") && init?.method === "POST"
+    url.endsWith("/stop") && init?.method === "PUT"
       ? {
           ok: false,
           status: 409,
@@ -553,7 +553,7 @@ it("다른 계정의 상세를 읽는 동안 이전 계정의 처리 버튼을 �
   await waitFor(() => expect(writes()).toHaveLength(1));
   expect(writes()[0][0]).toBe("/api/common/users/seconduser/unlock");
   expect(writes()[0][1]).toMatchObject({
-    method: "POST",
+    method: "PUT",
     body: JSON.stringify({ modDttm: second.modDttm }),
   });
 });
@@ -568,7 +568,7 @@ it.each(["password-reset", "resume"] as const)(
     const originalVersion = account.modDttm;
     const base = request.getMockImplementation()!;
     request.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (url.endsWith(`/${operation}`) && init?.method === "POST") {
+      if (url.endsWith(`/${operation}`) && init?.method === "PUT") {
         account = {
           ...account,
           userStatCd: "USE",
@@ -614,7 +614,7 @@ it.each(["password-reset", "resume"] as const)(
     expect(writes()).toHaveLength(1);
     expect(writes()[0][0]).toBe(`/api/common/users/test/${operation}`);
     expect(writes()[0][1]).toMatchObject({
-      method: "POST",
+      method: "PUT",
       body: JSON.stringify({ modDttm: originalVersion }),
     });
     await waitFor(() =>

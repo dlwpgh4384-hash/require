@@ -143,33 +143,50 @@ export function MenuRegistrationDialog({
             void submit();
           }}
         >
-          <label htmlFor="menu-registration-level">레벨 *</label>
-          <select
-            id="menu-registration-level"
+          <fieldset
+            className="menu-registration-level"
             data-testid="menu-registration-level"
-            className="ls-in"
-            value={level}
             disabled={busy}
-            onChange={(event) => {
-              setLevel(Number(event.target.value) as 1 | 2);
-              setErrors({});
-              setFailure("");
-            }}
           >
-            <option value="1">대메뉴(묶음)</option>
-            <option value="2">서브메뉴</option>
-          </select>
+            <legend>레벨 *</legend>
+            {(
+              [
+                [1, "대메뉴(묶음)"],
+                [2, "서브메뉴"],
+              ] as const
+            ).map(([value, label]) => (
+              <label key={value}>
+                <input
+                  type="radio"
+                  name="menu-registration-level"
+                  data-testid={`menu-registration-level-${value}`}
+                  checked={level === value}
+                  onChange={() => {
+                    setLevel(value);
+                    setErrors({});
+                    setFailure("");
+                  }}
+                />{" "}
+                {label}
+              </label>
+            ))}
+          </fieldset>
           <label htmlFor="menu-registration-name">메뉴 이름 *</label>
           <input
             id="menu-registration-name"
             data-testid="menu-registration-name"
             className="ls-in"
             autoComplete="off"
+            maxLength={50}
             value={name}
             disabled={busy}
             aria-invalid={!!errors.menuNm}
+            aria-describedby="menu-registration-name-help"
             onChange={(event) => setName(event.target.value)}
           />
+          <span id="menu-registration-name-help" className="menu-registration-help">
+            50자 이내
+          </span>
           {fieldError("menuNm")}
           {level === 2 ? (
             <>
@@ -199,15 +216,27 @@ export function MenuRegistrationDialog({
                 value={screenId}
                 disabled={busy || !options || !screens.length}
                 aria-invalid={!!errors.scrnId}
+                aria-describedby="menu-registration-screen-help"
                 onChange={(event) => setScreenId(event.target.value)}
               >
-                <option value="">선택해 주세요</option>
+                <option value="">
+                  {options && !screens.length
+                    ? "메뉴에 없는 개발된 화면이 없습니다"
+                    : "선택해 주세요"}
+                </option>
                 {screens.map((row) => (
                   <option key={row.scrnId} value={row.scrnId}>
                     {row.scrnId} · {row.menuNm}
                   </option>
                 ))}
               </select>
+              <span
+                id="menu-registration-screen-help"
+                className="menu-registration-help"
+              >
+                개발이 끝난 화면만 고를 수 있습니다. 새 화면이 개발되면 여기에
+                나옵니다.
+              </span>
               {fieldError("scrnId")}
               <label className="menu-registration-check">
                 <input
@@ -222,8 +251,12 @@ export function MenuRegistrationDialog({
               </label>
               {fieldError("pcOnlyYn")}
               {options && !screens.length && (
-                <p data-testid="menu-registration-no-screens">
-                  개발된 미등록 화면이 없습니다. 대메뉴는 등록할 수 있습니다.
+                <p
+                  data-testid="menu-registration-no-screens"
+                  className="visually-hidden"
+                >
+                  메뉴에 없는 개발된 화면이 없습니다. 대메뉴는 등록할 수
+                  있습니다.
                 </p>
               )}
             </>
@@ -246,8 +279,8 @@ export function MenuRegistrationDialog({
             </div>
           )}
           <p className="menu-registration-hint">
-            순서는 그 묶음 맨 끝이며 등록 즉시 적용됩니다. 새 메뉴는 모든 역할에
-            권한 없음으로 추가됩니다.
+            순서는 그 묶음의 맨 끝이고, 저장 즉시 적용됩니다. 새 메뉴는 모든
+            역할에 「권한 없음」으로 추가됩니다.
           </p>
           {failure && (
             <p role="alert" data-testid="menu-registration-failure">

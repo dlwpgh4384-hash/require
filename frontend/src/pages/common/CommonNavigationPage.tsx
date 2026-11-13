@@ -15,6 +15,10 @@ import { UserPage } from "../users/UserPage";
 import { RolePage } from "../roles/RolePage";
 import { MenuPage } from "../menusettings/MenuPage";
 import {
+  MenuTitleActions,
+  MenuWorkspaceProvider,
+} from "../menusettings/MenuWorkspace";
+import {
   RoleTitleActions,
   RoleWorkspaceProvider,
 } from "../roles/RoleWorkspace";
@@ -71,6 +75,8 @@ function PreferenceNavigation() {
               <UserRegistrationButton />
             ) : context.screenId === "UI-24" ? (
               <RoleTitleActions />
+            ) : context.screenId === "UI-25" ? (
+              <MenuTitleActions />
             ) : undefined,
           quickAccess: (
             <PersonalScreenLists
@@ -111,6 +117,7 @@ export function CommonNavigationPage() {
   return (
     <UserWorkspaceProvider>
       <RoleWorkspaceProvider>
+      <MenuWorkspaceProvider>
         {preferences ? (
           <PreferenceNavigation />
         ) : (
@@ -123,10 +130,13 @@ export function CommonNavigationPage() {
                   <UserRegistrationButton />
                 ) : context.screenId === "UI-24" ? (
                   <RoleTitleActions />
+                ) : context.screenId === "UI-25" ? (
+                  <MenuTitleActions />
                 ) : undefined,
             })}
           />
         )}
+      </MenuWorkspaceProvider>
       </RoleWorkspaceProvider>
     </UserWorkspaceProvider>
   );

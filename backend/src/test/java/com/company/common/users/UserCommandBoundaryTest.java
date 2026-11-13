@@ -66,7 +66,7 @@ class UserCommandBoundaryTest {
 
     @Test void stopPostDoesNotFallThroughToAnAccountUpdate() throws Exception {
         data.add("member", "USE", List.of("EXEC"));
-        mvc.perform(post("/api/common/users/stop").contentType("application/json")
+        mvc.perform(put("/api/common/users/stop").contentType("application/json")
                 .content(stopBody(List.of("member"), List.of())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.processedUserIds[0]").value("member"));
@@ -83,7 +83,7 @@ class UserCommandBoundaryTest {
                 .param("userIds", "firstpm,secondpm").param("action", "STOP"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.projectCount").value(2));
-        mvc.perform(post("/api/common/users/stop").contentType("application/json")
+        mvc.perform(put("/api/common/users/stop").contentType("application/json")
                 .content(stopBody(List.of("firstpm", "secondpm"), List.of("project-a", "project-b"))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.processedUserIds.length()").value(2))
@@ -99,7 +99,7 @@ class UserCommandBoundaryTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.userStatCd").value("STOP")).andReturn();
         var token = json.readTree(stopped.getResponse().getContentAsString()).path("data").get("modDttm");
-        mvc.perform(post("/api/common/users/firstpm/resume").contentType("application/json")
+        mvc.perform(put("/api/common/users/firstpm/resume").contentType("application/json")
                 .content(json.writeValueAsString(Map.of("modDttm", token.asText()))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.userStatCd").value("USE"))
@@ -111,7 +111,7 @@ class UserCommandBoundaryTest {
 
     @Test void headquartersRegistrationAllowsMultipleResponsibleUsers() throws Exception {
         for (String id : List.of("leaderone", "leadertwo")) {
-            mvc.perform(post("/api/common/users").contentType("application/json")
+            mvc.perform(put("/api/common/users").contentType("application/json")
                     .content(json.writeValueAsString(Map.of("userId", id, "name", "담당자",
                         "email", id + "@example.invalid", "roleCds", List.of("SALES_LDR"),
                         "headquarters", true, "projectIds", List.of()))))
@@ -127,7 +127,7 @@ class UserCommandBoundaryTest {
     @ValueSource(strings = {"password-reset", "resume", "unlock"})
     void malformedVersionIsRejectedBeforeAnyPersistence(String operation) throws Exception {
         data.add("member", "LOCK", List.of("EXEC"));
-        mvc.perform(post("/api/common/users/member/" + operation).contentType("application/json")
+        mvc.perform(put("/api/common/users/member/" + operation).contentType("application/json")
                 .content("{\"modDttm\":\"not-a-date\"}"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("modDttm"));
@@ -139,7 +139,7 @@ class UserCommandBoundaryTest {
     @Test void stalePmStopKeepsScopesAndHistoryUntouched() throws Exception {
         data.add("stalepm", "USE", List.of("PM")).modDttm = TOKEN.plusNanos(1000);
         data.projects.get("stalepm").add("project-a");
-        mvc.perform(post("/api/common/users/stop").contentType("application/json")
+        mvc.perform(put("/api/common/users/stop").contentType("application/json")
                 .content(stopBody(List.of("stalepm"), List.of("project-a"))))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.success").value(false));
@@ -156,7 +156,7 @@ class UserCommandBoundaryTest {
             .when(mapper).changeState("member", TOKEN, "USE", true);
         assertThat(data.accounts.get("member").modDttm).isEqualTo(TOKEN);
         assertThat(data.accounts.get("member").userStatCd).isEqualTo("LOCK");
-        var result = mvc.perform(post("/api/common/users/member/unlock").contentType("application/json")
+        var result = mvc.perform(put("/api/common/users/member/unlock").contentType("application/json")
                 .content(version()))
             .andExpect(status().isInternalServerError())
             .andExpect(jsonPath("$.success").value(false))
@@ -178,7 +178,7 @@ class UserCommandBoundaryTest {
     @Test
     @DisplayName("happy auth side-effect: TB_SY_USER and TB_SY_ACCS_LOG registration; REG_USER_ID=admin; no SMTP transport")
     void anonymousPostRegistrationPersistsAndCanBeReadWithoutDisclosingPassword() throws Exception {
-        mvc.perform(post("/api/common/users").contentType("application/json")
+        mvc.perform(put("/api/common/users").contentType("application/json")
                 .content(create("abcd", List.of("EXEC"), List.of())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
@@ -203,7 +203,7 @@ class UserCommandBoundaryTest {
     @ParameterizedTest
     @ValueSource(strings = {"ABCd", "abc", "abcdefghijklmnopqrstu"})
     void registrationPostRejectsInvalidIdWithoutWriting(String id) throws Exception {
-        mvc.perform(post("/api/common/users").contentType("application/json")
+        mvc.perform(put("/api/common/users").contentType("application/json")
                 .content(create(id, List.of("EXEC"), List.of())))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("userId"));
@@ -212,7 +212,7 @@ class UserCommandBoundaryTest {
     }
 
     @Test void registrationPostRequiresAtLeastOneRole() throws Exception {
-        mvc.perform(post("/api/common/users").contentType("application/json")
+        mvc.perform(put("/api/common/users").contentType("application/json")
                 .content(create("abcd", List.of(), List.of())))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("roleCds"));
@@ -226,7 +226,7 @@ class UserCommandBoundaryTest {
         var body = (com.fasterxml.jackson.databind.node.ObjectNode)
             json.readTree(create("abcd", List.of("EXEC"), List.of()));
         body.put(field, "");
-        mvc.perform(post("/api/common/users").contentType("application/json").content(body.toString()))
+        mvc.perform(put("/api/common/users").contentType("application/json").content(body.toString()))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value(field));
         verify(mapper, never()).insertUser(any(), anyString());
@@ -236,7 +236,7 @@ class UserCommandBoundaryTest {
         var body = (com.fasterxml.jackson.databind.node.ObjectNode)
             json.readTree(create("abcd", List.of("EXEC"), List.of()));
         body.put("email", "not-an-email");
-        mvc.perform(post("/api/common/users").contentType("application/json").content(body.toString()))
+        mvc.perform(put("/api/common/users").contentType("application/json").content(body.toString()))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("email"));
         verify(mapper, never()).insertUser(any(), anyString());
@@ -245,7 +245,7 @@ class UserCommandBoundaryTest {
     @Test void duplicatePostRegistrationPreservesExistingRolesAndProjects() throws Exception {
         data.add("abcd", "USE", List.of("PM"));
         data.projects.get("abcd").add("project-a");
-        mvc.perform(post("/api/common/users").contentType("application/json")
+        mvc.perform(put("/api/common/users").contentType("application/json")
                 .content(create("abcd", List.of("EXEC"), List.of())))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("userId"));
@@ -260,7 +260,7 @@ class UserCommandBoundaryTest {
         data.projects.get("oldpm").add("project-a");
         data.add("reader", "USE", List.of("PROJECT_READER"));
         data.projects.get("reader").add("project-a");
-        mvc.perform(post("/api/common/users").contentType("application/json")
+        mvc.perform(put("/api/common/users").contentType("application/json")
                 .content(create("newpm", List.of("PM"), List.of("project-a"))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.transferredProjects[0].projectId").value("project-a"));
@@ -271,7 +271,7 @@ class UserCommandBoundaryTest {
 
     @Test void eligibleNonPmPostRegistrationsShareAProject() throws Exception {
         for (String id : List.of("readerone", "readertwo")) {
-            mvc.perform(post("/api/common/users").contentType("application/json")
+            mvc.perform(put("/api/common/users").contentType("application/json")
                     .content(create(id, List.of("PROJECT_READER"), List.of("project-a"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.transferredProjects").isEmpty());
@@ -281,7 +281,7 @@ class UserCommandBoundaryTest {
     }
 
     @Test void emptyStopPostDoesNotWriteAccountsOrScopes() throws Exception {
-        mvc.perform(post("/api/common/users/stop").contentType("application/json")
+        mvc.perform(put("/api/common/users/stop").contentType("application/json")
                 .content(stopBody(List.of(), List.of())))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("users"));
@@ -296,7 +296,7 @@ class UserCommandBoundaryTest {
         data.add("futurelead", "USE", List.of("SALES_LDR"));
         data.leaders.put("currentlead", List.of("현재 파트"));
         data.leaders.put("futurelead", List.of("예정 파트"));
-        mvc.perform(post("/api/common/users/stop").contentType("application/json")
+        mvc.perform(put("/api/common/users/stop").contentType("application/json")
                 .content(stopBody(List.of("normal", "currentlead", "futurelead", "admin"), List.of())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.processedUserIds[0]").value("normal"))
@@ -320,7 +320,7 @@ class UserCommandBoundaryTest {
 
     @Test void lockedAdminIsNotAReplacementForLastUseAdminOnPost() throws Exception {
         data.add("lockedadmin", "LOCK", List.of("ADMIN"));
-        mvc.perform(post("/api/common/users/stop").contentType("application/json")
+        mvc.perform(put("/api/common/users/stop").contentType("application/json")
                 .content(stopBody(List.of("admin"), List.of())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.processedUserIds").isEmpty())
@@ -334,7 +334,7 @@ class UserCommandBoundaryTest {
     void missingPostVersionLeavesAccountUnchanged(String operation) throws Exception {
         String state = operation.equals("resume") ? "STOP" : "LOCK";
         data.add("member", state, List.of("EXEC"));
-        mvc.perform(post("/api/common/users/member/" + operation)
+        mvc.perform(put("/api/common/users/member/" + operation)
                 .contentType("application/json").content("{}"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("modDttm"));
@@ -349,7 +349,7 @@ class UserCommandBoundaryTest {
         String state = operation.equals("resume") ? "STOP" : "LOCK";
         data.add("member", state, List.of("PM")).modDttm = TOKEN.plusNanos(1000);
         data.projects.get("member").add("project-a");
-        mvc.perform(post("/api/common/users/member/" + operation)
+        mvc.perform(put("/api/common/users/member/" + operation)
                 .contentType("application/json").content(version()))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.success").value(false));
@@ -369,7 +369,7 @@ class UserCommandBoundaryTest {
         data.add("member", "USE", List.of("EXEC"));
         String before = new TemporaryUserPassword().hashAndDeliver("member@example.invalid");
         data.hashes.put("member", before);
-        mvc.perform(post("/api/common/users/member/password-reset")
+        mvc.perform(put("/api/common/users/member/password-reset")
                 .contentType("application/json").content(version()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.tempPwdYn").value("Y"))
@@ -391,7 +391,7 @@ class UserCommandBoundaryTest {
     @DisplayName("happy auth side-effect: PWD_ERR_CNT 5 to 0; MOD_USER_ID=admin MOD_DTTM; no TB_SY_ACCS_LOG")
     void anonymousUnlockPostClearsFailureCountWithoutAccessLog() throws Exception {
         data.add("member", "LOCK", List.of("EXEC"));
-        mvc.perform(post("/api/common/users/member/unlock")
+        mvc.perform(put("/api/common/users/member/unlock")
                 .contentType("application/json").content(version()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.userStatCd").value("USE"))
@@ -411,7 +411,7 @@ class UserCommandBoundaryTest {
     @DisplayName("business: password-reset stale MOD_DTTM preserves hash and TEMP_PWD_YN")
     void businessPasswordResetRejectsStaleVersion() throws Exception {
         data.add("member", "USE", List.of("EXEC")).modDttm = TOKEN.plusNanos(1000);
-        mvc.perform(post("/api/common/users/member/password-reset")
+        mvc.perform(put("/api/common/users/member/password-reset")
                 .contentType("application/json").content(version()))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.success").value(false));
         verify(mapper, never()).resetPassword(anyString(), any(), anyString());
@@ -425,7 +425,7 @@ class UserCommandBoundaryTest {
     @DisplayName("business: unlock stale MOD_DTTM preserves LOCK and PWD_ERR_CNT=5")
     void businessUnlockRejectsStaleVersion() throws Exception {
         data.add("member", "LOCK", List.of("EXEC")).modDttm = TOKEN.plusNanos(1000);
-        mvc.perform(post("/api/common/users/member/unlock")
+        mvc.perform(put("/api/common/users/member/unlock")
                 .contentType("application/json").content(version()))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.success").value(false));
         assertThat(data.accounts.get("member").userStatCd).isEqualTo("LOCK");
@@ -438,7 +438,7 @@ class UserCommandBoundaryTest {
     @DisplayName("validation: resume requires modDttm and preserves STOP and TB_SY_CHG_HIST")
     void validationResumeRequiresVersion() throws Exception {
         data.add("member", "STOP", List.of("EXEC"));
-        mvc.perform(post("/api/common/users/member/resume").contentType("application/json").content("{}"))
+        mvc.perform(put("/api/common/users/member/resume").contentType("application/json").content("{}"))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("modDttm"));
         verifyNoInteractions(mapper, options);
         assertThat(data.accounts.get("member").userStatCd).isEqualTo("STOP");
@@ -449,7 +449,7 @@ class UserCommandBoundaryTest {
     @DisplayName("business: resume stale MOD_DTTM preserves STOP and removed PROJ scopes")
     void businessResumeRejectsStaleVersion() throws Exception {
         data.add("member", "STOP", List.of("PM")).modDttm = TOKEN.plusNanos(1000);
-        mvc.perform(post("/api/common/users/member/resume").contentType("application/json").content(version()))
+        mvc.perform(put("/api/common/users/member/resume").contentType("application/json").content(version()))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.success").value(false));
         assertThat(data.accounts.get("member").userStatCd).isEqualTo("STOP");
         assertThat(data.projects.get("member")).isEmpty();
@@ -462,7 +462,7 @@ class UserCommandBoundaryTest {
     @DisplayName("happy auth side-effect: TB_SY_USER resume MOD_USER_ID=admin MOD_DTTM and TB_SY_CHG_HIST; no PROJ restore")
     void authSideEffectResumeWritesStateAndHistoryWithoutRestoringScopes() throws Exception {
         data.add("member", "STOP", List.of("PM"));
-        mvc.perform(post("/api/common/users/member/resume").contentType("application/json").content(version()))
+        mvc.perform(put("/api/common/users/member/resume").contentType("application/json").content(version()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.userStatCd").value("USE"))
             .andExpect(jsonPath("$.data.projectIds").isEmpty())
             .andExpect(jsonPath("$.data.modDttm").value(TOKEN.plusNanos(1000).toString()));

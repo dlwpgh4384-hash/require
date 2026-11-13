@@ -364,11 +364,9 @@ it("등록 완료는 관리 GET과 shell refresh 경계를 재사용", async () 
     await mount();
     fireEvent.click(screen.getByTestId("menu-registration-open"));
     await waitFor(() =>
-      expect(screen.getByTestId("menu-registration-level")).toBeEnabled(),
+      expect(screen.getByTestId("menu-registration-level-1")).toBeEnabled(),
     );
-    fireEvent.change(screen.getByTestId("menu-registration-level"), {
-      target: { value: "1" },
-    });
+    fireEvent.click(screen.getByTestId("menu-registration-level-1"));
     fireEvent.change(screen.getByTestId("menu-registration-name"), {
       target: { value: "신규 묶음" },
     });

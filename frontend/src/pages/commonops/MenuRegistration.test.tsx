@@ -278,9 +278,9 @@ it("dirty 순서 버리기는 서버 snapshot 복원 후 새 메뉴만 POST하�
 it("기본 서브메뉴이며 레벨을 바꿔도 이름 유지, 대메뉴는 이름과 레벨만 전송", async () => {
   await mount();
   await open();
-  expect(screen.getByLabelText("레벨 *")).toHaveValue("2");
+  expect(screen.getByTestId("menu-registration-level-2")).toBeChecked();
   validChild();
-  fireEvent.change(screen.getByLabelText("레벨 *"), { target: { value: "1" } });
+  fireEvent.click(screen.getByTestId("menu-registration-level-1"));
   expect(screen.getByLabelText("메뉴 이름 *")).toHaveValue("새 합성 메뉴");
   expect(screen.queryByLabelText("화면 번호 *")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("PC 전용")).not.toBeInTheDocument();
@@ -317,10 +317,10 @@ it("미등록 개발 화면이 없으면 서브메뉴 저장 금지, 대메뉴�
   await mount();
   await open();
   expect(screen.getByTestId("menu-registration-no-screens")).toHaveTextContent(
-    "개발된 미등록 화면이 없습니다",
+    "메뉴에 없는 개발된 화면이 없습니다",
   );
   expect(screen.getByTestId("menu-registration-submit")).toBeDisabled();
-  fireEvent.change(screen.getByLabelText("레벨 *"), { target: { value: "1" } });
+  fireEvent.click(screen.getByTestId("menu-registration-level-1"));
   await waitFor(() =>
     expect(screen.getByTestId("menu-registration-submit")).toBeEnabled(),
   );

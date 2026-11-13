@@ -360,9 +360,7 @@ describe("application route registration", () => {
     expect(request).toHaveBeenCalledWith("/api/common/menu-options?menuLvl=2", {
       signal: expect.any(AbortSignal),
     });
-    fireEvent.change(screen.getByTestId("menu-registration-level"), {
-      target: { value: "1" },
-    });
+    fireEvent.click(screen.getByTestId("menu-registration-level-1"));
     fireEvent.change(screen.getByTestId("menu-registration-name"), {
       target: { value: "새 묶음" },
     });

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog, Toast } from "../../shared/feedback/Dialog";
 import { feedbackMessages } from "../../shared/feedback/messages";
 import { requestMenuRefresh } from "../../app/menuRefresh";
@@ -13,6 +13,8 @@ export function MenuRegistration({
   registeredScreenIds,
   disabled = false,
   onDialogDirty,
+  hideButton = false,
+  openSignal = 0,
 }: {
   dirty: boolean;
   onDiscard: () => void;
@@ -21,9 +23,23 @@ export function MenuRegistration({
   registeredScreenIds: readonly string[];
   disabled?: boolean;
   onDialogDirty?: (dirty: boolean) => void;
+  /** 화면 틀 제목줄의 [+ 메뉴 등록](시안)을 쓰면 본문 단추를 숨긴다. */
+  hideButton?: boolean;
+  /** 제목줄 단추를 누를 때마다 1씩 늘어나는 신호. */
+  openSignal?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const dirtyNow = useRef(dirty);
+  dirtyNow.current = dirty;
+  const seenSignal = useRef(openSignal);
+  useEffect(() => {
+    if (openSignal === seenSignal.current) return;
+    seenSignal.current = openSignal;
+    // 미저장 변경이 있으면 공통 확인 창을 먼저(인터뷰 결정).
+    if (dirtyNow.current) setConfirm(true);
+    else setOpen(true);
+  }, [openSignal]);
   const [notice, setNotice] = useState("");
   const [refreshFailure, setRefreshFailure] = useState("");
   const [saved, setSaved] = useState<MenuRegistrationItem | null>(null);
@@ -49,17 +65,19 @@ export function MenuRegistration({
   };
   return (
     <div data-testid="menu-registration" data-screen-id="UI-25">
-      <button
-        type="button"
-        data-testid="menu-registration-open"
-        disabled={disabled || refreshing || !!saved}
-        onClick={() => {
-          if (dirty) setConfirm(true);
-          else setOpen(true);
-        }}
-      >
-        메뉴 등록
-      </button>
+      {!hideButton && (
+        <button
+          type="button"
+          data-testid="menu-registration-open"
+          disabled={disabled || refreshing || !!saved}
+          onClick={() => {
+            if (dirty) setConfirm(true);
+            else setOpen(true);
+          }}
+        >
+          메뉴 등록
+        </button>
+      )}
       {confirm && (
         <ConfirmDialog
           title="변경 내용을 버릴까요?"

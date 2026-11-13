@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.common.roles.RoleMapper">
-  <resultMap id="role" type="com.company.common.roles.RoleRows$Role" autoMapping="false">
+<mapper namespace="com.company.common.mapper.RoleMapper">
+  <resultMap id="role" type="com.company.common.mapper.RoleRows$Role" autoMapping="false">
     <id column="role_id" property="roleId" javaType="java.lang.String"/>
     <result column="role_nm" property="roleName" javaType="java.lang.String"/>
     <result column="data_scope_cd" property="dataScopeCd" javaType="java.lang.String"/>
     <result column="snstv_view_yn" property="snstvViewYn" javaType="java.lang.String"/>
     <result column="use_yn" property="useYn" javaType="java.lang.String"/>
   </resultMap>
-  <resultMap id="menu" type="com.company.common.roles.RoleRows$Menu" autoMapping="false">
+  <resultMap id="menu" type="com.company.common.mapper.RoleRows$Menu" autoMapping="false">
     <id column="menu_id" property="menuId" javaType="java.lang.String"/>
     <result column="menu_nm" property="menuName" javaType="java.lang.String"/>
+    <result column="scrn_id" property="screenId" javaType="java.lang.String"/>
     <result column="group_name" property="groupName" javaType="java.lang.String"/>
     <result column="inq_yn" property="readYn" javaType="java.lang.String"/>
     <result column="reg_yn" property="createYn" javaType="java.lang.String"/>
@@ -20,11 +21,11 @@
     <result column="dnld_yn" property="downloadYn" javaType="java.lang.String"/>
     <result column="cnfm_yn" property="cnfmYn" javaType="java.lang.String"/>
   </resultMap>
-  <resultMap id="dataScope" type="com.company.common.roles.RoleRows$ScopeCode" autoMapping="false">
+  <resultMap id="dataScope" type="com.company.common.mapper.RoleRows$ScopeCode" autoMapping="false">
     <id column="code" property="code" javaType="java.lang.String"/>
     <result column="code_nm" property="name" javaType="java.lang.String"/>
   </resultMap>
-  <resultMap id="scope" type="com.company.common.roles.RoleRows$Scope" autoMapping="false">
+  <resultMap id="scope" type="com.company.common.mapper.RoleRows$Scope" autoMapping="false">
     <id column="user_id" property="userId" javaType="java.lang.String"/>
     <id column="scope_sn" property="scopeSn" javaType="_int"/>
     <result column="scope_type_cd" property="scopeTypeCd" javaType="java.lang.String"/>
@@ -40,7 +41,7 @@
     SELECT <include refid="roleColumns"/> FROM TB_SY_ROLE r WHERE r.role_id=#{id}
   </select>
   <select id="selectMenus" resultMap="menu">
-    SELECT a.menu_id, m.menu_nm, COALESCE(g.menu_nm,'') AS group_name,
+    SELECT a.menu_id, m.menu_nm, m.scrn_id, COALESCE(g.menu_nm,'') AS group_name,
       a.inq_yn, a.reg_yn, a.upd_yn, a.del_yn, a.upld_yn, a.dnld_yn, a.cnfm_yn
     FROM TB_SY_ROLE_MENU_AUTH a
     JOIN TB_SY_MENU m ON m.menu_id=a.menu_id
@@ -80,6 +81,31 @@
     SELECT #{id},a.menu_id,a.inq_yn,a.reg_yn,a.upd_yn,a.del_yn,a.upld_yn,a.dnld_yn,a.cnfm_yn,
       'admin',clock_timestamp() FROM TB_SY_ROLE_MENU_AUTH a WHERE a.role_id=#{sourceId}
   </insert>
+  <insert id="insertBlankMenus">
+    INSERT INTO TB_SY_ROLE_MENU_AUTH (role_id,menu_id,inq_yn,reg_yn,upd_yn,del_yn,upld_yn,
+      dnld_yn,cnfm_yn,reg_user_id,reg_dttm)
+    SELECT #{id},m.menu_id,'N','N','N','N','N','N','N','admin',clock_timestamp()
+    FROM TB_SY_MENU m
+    WHERE m.scrn_id IS NOT NULL AND m.use_yn='Y'
+      AND NOT EXISTS (SELECT 1 FROM TB_SY_MENU child WHERE child.upper_menu_id=m.menu_id)
+  </insert>
+  <resultMap id="change" type="com.company.common.mapper.RoleRows$Change" autoMapping="false">
+    <result column="reg_dttm" property="changedAt" javaType="java.time.Instant"/>
+    <result column="trgt_tbl_nm" property="table" javaType="java.lang.String"/>
+    <result column="trgt_key" property="key" javaType="java.lang.String"/>
+    <result column="chg_item_nm" property="item" javaType="java.lang.String"/>
+    <result column="bfr_val" property="before" javaType="java.lang.String"/>
+    <result column="aft_val" property="after" javaType="java.lang.String"/>
+    <result column="changed_by" property="changedBy" javaType="java.lang.String"/>
+  </resultMap>
+  <select id="selectChanges" resultMap="change">
+    SELECT h.reg_dttm, h.trgt_tbl_nm, h.trgt_key, h.chg_item_nm, h.bfr_val, h.aft_val,
+      COALESCE(w.user_nm, h.reg_user_id) AS changed_by
+    FROM TB_SY_CHG_HIST h LEFT JOIN TB_SY_USER w ON w.user_id=h.reg_user_id
+    WHERE (h.trgt_tbl_nm='TB_SY_ROLE' AND h.trgt_key=#{id})
+       OR (h.trgt_tbl_nm='TB_SY_ROLE_MENU_AUTH' AND h.trgt_key LIKE #{id} || ':%')
+    ORDER BY h.reg_dttm DESC, h.hist_id DESC
+  </select>
   <update id="updateRole">
     UPDATE TB_SY_ROLE SET data_scope_cd=#{input.dataScopeCd},snstv_view_yn=#{input.snstvViewYn},
       mod_user_id='admin',mod_dttm=clock_timestamp() WHERE role_id=#{id}

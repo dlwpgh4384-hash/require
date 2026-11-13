@@ -1,4 +1,7 @@
-package com.company.common.roles;
+package com.company.common.controller;
+
+import com.company.common.mapper.RoleMapper;
+import com.company.common.mapper.RoleRows;
 
 import com.company.common.dto.UserContracts.History;
 import com.company.common.mapper.UserMapper;
@@ -9,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import static com.company.common.roles.RoleContracts.*;
+import static com.company.common.dto.RoleContracts.*;
 
 final class RoleTestData {
     final Map<String, RoleRows.Role> roles = new LinkedHashMap<>();

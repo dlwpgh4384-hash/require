@@ -1,4 +1,6 @@
-package com.company.common.roles;
+package com.company.common.controller;
+
+import com.company.common.service.RoleFailure;
 
 import com.company.common.controller.ApiExceptionHandler;
 import java.util.List;

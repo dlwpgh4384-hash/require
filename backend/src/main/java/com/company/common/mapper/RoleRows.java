@@ -1,4 +1,7 @@
-package com.company.common.roles;
+package com.company.common.mapper;
+
+import com.company.common.service.RoleRules;
+import com.company.common.dto.RoleContracts;
 
 public final class RoleRows {
     private RoleRows() {}
@@ -16,6 +19,7 @@ public final class RoleRows {
     public static class Menu {
         public String menuId;
         public String menuName;
+        public String screenId;
         public String groupName;
         public String readYn;
         public String createYn;
@@ -25,7 +29,7 @@ public final class RoleRows {
         public String downloadYn;
         public String cnfmYn;
         public RoleContracts.MenuAuth value() {
-            return new RoleContracts.MenuAuth(menuId, menuName, groupName, readYn,
+            return new RoleContracts.MenuAuth(menuId, menuName, screenId, groupName, readYn,
                 createYn, updateYn, deleteYn, uploadYn, downloadYn, cnfmYn);
         }
     }
@@ -33,6 +37,15 @@ public final class RoleRows {
         public String code;
         public String name;
         public RoleContracts.DataScope value() { return new RoleContracts.DataScope(code, name); }
+    }
+    public static class Change {
+        public java.time.Instant changedAt;
+        public String table;
+        public String key;
+        public String item;
+        public String before;
+        public String after;
+        public String changedBy;
     }
     public static class Scope {
         public String userId;

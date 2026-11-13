@@ -11,4 +11,4 @@ WORKDIR /app
 COPY --from=build --chown=navigation:navigation /workspace/target/navigation-shell-1.0.0.jar /app/application.jar
 USER navigation
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/application.jar"]
+ENTRYPOINT ["sh", "-c", "java -jar /app/application.jar --prepare-schema && exec java -jar /app/application.jar"]

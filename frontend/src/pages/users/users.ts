@@ -161,7 +161,7 @@ export function getCommonUserChangeImpact(
   );
 }
 export const putCommonUsers = (body: UserCreate) =>
-  fetch("/api/common/users", { method: "PUT", ...jsonBody(body) }).then(
+  fetch("/api/common/users", { method: "POST", ...jsonBody(body) }).then(
     readResponse<UserSaveResult>,
   );
 export const putCommonUser = (id: string, body: UserUpdate) =>
@@ -174,7 +174,7 @@ export const putCommonUserStop = (
   confirmedProjectIds: string[],
 ) =>
   fetch("/api/common/users/stop", {
-    method: "PUT",
+    method: "POST",
     ...jsonBody({ users, confirmedProjectIds }),
   }).then(
     readResponse<{
@@ -188,14 +188,14 @@ export const putCommonUserPasswordReset = (
   modDttm: string | null,
 ) =>
   fetch(`/api/common/users/${encodeURIComponent(id)}/password-reset`, {
-    method: "PUT",
+    method: "POST",
     ...jsonBody({ modDttm }),
   }).then(
     readResponse<{ userId: string; tempPwdYn: string; modDttm: string | null }>,
   );
 export const putCommonUserUnlock = (id: string, modDttm: string | null) =>
   fetch(`/api/common/users/${encodeURIComponent(id)}/unlock`, {
-    method: "PUT",
+    method: "POST",
     ...jsonBody({ modDttm }),
   }).then(
     readResponse<{
@@ -207,7 +207,7 @@ export const putCommonUserUnlock = (id: string, modDttm: string | null) =>
   );
 export const putCommonUserResume = (id: string, modDttm: string | null) =>
   fetch(`/api/common/users/${encodeURIComponent(id)}/resume`, {
-    method: "PUT",
+    method: "POST",
     ...jsonBody({ modDttm }),
   }).then(readResponse<UserAccount>);
 

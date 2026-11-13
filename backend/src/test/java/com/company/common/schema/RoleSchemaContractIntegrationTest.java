@@ -3,7 +3,6 @@ package com.company.common.schema;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.UUID;
-import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.core.io.ClassPathResource;
@@ -14,7 +13,6 @@ import static org.assertj.core.api.Assertions.*;
 class RoleSchemaContractIntegrationTest {
     private Connection database;
     private String schema;
-    private Flyway flyway;
 
     @BeforeEach
     void migrateOwnedSchema() throws Exception {
@@ -26,9 +24,7 @@ class RoleSchemaContractIntegrationTest {
         schema = "role_contract_" + UUID.randomUUID().toString().replace("-", "");
         execute("CREATE SCHEMA " + schema);
         execute("SET search_path TO " + schema);
-        flyway = Flyway.configure().dataSource(url, user, password)
-            .schemas(schema).defaultSchema(schema).locations("classpath:db/migration").load();
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(6);
+        prepare();
     }
 
     @AfterEach
@@ -41,8 +37,8 @@ class RoleSchemaContractIntegrationTest {
     }
 
     @Test
-    void flywayPackagesRealEntitiesAndOriginalPermissionIndexWithoutInventingScreenTables() throws Exception {
-        assertThat(text("SELECT count(*)::text FROM information_schema.tables WHERE table_schema=current_schema() AND table_name!='flyway_schema_history'"))
+    void preparationCreatesRealEntitiesAndOriginalPermissionIndexWithoutInventingScreenTables() throws Exception {
+        assertThat(text("SELECT count(*)::text FROM information_schema.tables WHERE table_schema=current_schema()"))
             .isEqualTo("19");
         assertThat(text("SELECT to_regclass('u_i_24_s_l_i_c_e_006')::text")).isNull();
         assertThat(text("SELECT indexdef FROM pg_indexes WHERE schemaname=current_schema() AND indexname='ix_tb_sy_role_menu_auth_01'"))
@@ -56,7 +52,8 @@ class RoleSchemaContractIntegrationTest {
             .hasMessageContaining("uk_tb_sy_role_01");
         assertThatThrownBy(() -> execute("INSERT INTO tb_sy_role_menu_auth SELECT * FROM tb_sy_role_menu_auth LIMIT 1"))
             .hasMessageContaining("pk_tb_sy_role_menu_auth");
-        assertThat(flyway.migrate().migrationsExecuted).isZero();
+        prepare();
+        assertThat(text("SELECT count(*)::text FROM tb_sy_role_menu_auth")).isEqualTo("150");
     }
 
     @Test
@@ -90,6 +87,13 @@ class RoleSchemaContractIntegrationTest {
         assertThat(text("SELECT count(*)::text FROM tb_sy_role_menu_auth")).isEqualTo("150");
     }
 
+    /** 준비 명령(--prepare-schema)과 같은 순서로 V1~V6을 실행한다. 앱 시작 시 자동 실행(Flyway)은 쓰지 않는다. */
+    private void prepare() throws Exception {
+        for (String name : new String[]{"V1__navigation_schema.sql", "V2__navigation_menu_seed.sql",
+                "V3__common_function_seed.sql", "V4__user_management_seed.sql",
+                "V5__role_permissions.sql", "V6__role_schema_contract.sql"})
+            execute(new ClassPathResource("db/migration/" + name).getContentAsString(StandardCharsets.UTF_8));
+    }
     private String contract() throws Exception {
         return new ClassPathResource("db/migration/V6__role_schema_contract.sql").getContentAsString(StandardCharsets.UTF_8);
     }

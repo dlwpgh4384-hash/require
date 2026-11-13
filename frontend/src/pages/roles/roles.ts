@@ -18,7 +18,11 @@ export const roleActions = [
 ] as const;
 export type RoleAction = (typeof roleActions)[number][0];
 export type RoleMenuInput = { menuId: string } & Record<RoleAction, RoleFlag>;
-export type RoleMenu = RoleMenuInput & { menuName: string; groupName: string };
+export type RoleMenu = RoleMenuInput & {
+  menuName: string;
+  screenId: string;
+  groupName: string;
+};
 export interface RoleSettings {
   role: Role;
   menuAuths: RoleMenu[];
@@ -30,8 +34,9 @@ export interface RoleUpdate {
   menuAuths: RoleMenuInput[];
   confirmedAffectedUserIds: string[];
 }
+/** sourceRoleId가 있으면 역할 복사, 없으면 역할 추가(모든 메뉴 권한 없음). */
 export interface RoleCopy {
-  sourceRoleId: string;
+  sourceRoleId?: string;
   roleName: string;
   dataScopeCd: string;
 }
@@ -90,6 +95,25 @@ export const postCommonRoleCopy = (input: RoleCopy) =>
     method: "POST",
     ...roleBody(input),
   });
+export interface RoleChange {
+  changedAt: string;
+  item: string;
+  before: string | null;
+  after: string | null;
+  changedBy: string | null;
+}
+export const getCommonRoleChangeHistory = async (
+  id: string,
+  signal?: AbortSignal,
+) => {
+  const result = await roleRequest<{ items: RoleChange[] }>(
+    `${rolePath(id)}/change-history`,
+    { signal },
+  );
+  if (!Array.isArray(result.items))
+    throw new Error("변경 이력 응답을 다시 확인해 주세요.");
+  return result.items;
+};
 export const putCommonRole = (id: string, input: RoleUpdate) =>
   roleRequest<RoleSettings>(rolePath(id), {
     method: "PUT",

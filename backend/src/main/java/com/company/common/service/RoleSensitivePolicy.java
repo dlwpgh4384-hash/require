@@ -1,4 +1,6 @@
-package com.company.common.roles;
+package com.company.common.service;
+
+import com.company.common.dto.RoleContracts;
 
 import java.util.Collection;
 import java.util.List;

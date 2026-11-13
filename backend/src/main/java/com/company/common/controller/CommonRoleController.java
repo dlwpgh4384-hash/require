@@ -1,9 +1,12 @@
-package com.company.common.roles;
+package com.company.common.controller;
+
+import com.company.common.service.CommonRoleService;
+import com.company.common.service.RoleRules;
 
 import com.company.common.dto.UserContracts.Response;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.web.bind.annotation.*;
-import static com.company.common.roles.RoleContracts.*;
+import static com.company.common.dto.RoleContracts.*;
 
 @RestController
 @RequestMapping(produces = "application/json")
@@ -16,6 +19,10 @@ public class CommonRoleController {
     @GetMapping("/api/common/roles/{roleId}")
     public Response<Settings> getCommonRole(@PathVariable String roleId) {
         return Response.of(service.getCommonRole(roleId));
+    }
+    @GetMapping("/api/common/roles/{roleId}/change-history")
+    public Response<HistoryList> getCommonRoleChangeHistory(@PathVariable String roleId) {
+        return Response.of(service.getCommonRoleChangeHistory(roleId));
     }
     @GetMapping("/api/common/roles/{roleId}/change-impact")
     public Response<Impact> getCommonRoleChangeImpact(@PathVariable String roleId, @RequestParam String dataScopeCd) {

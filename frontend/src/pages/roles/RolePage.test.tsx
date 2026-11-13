@@ -8,7 +8,9 @@ import {
   within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+import type { ReactNode } from "react";
 import { RolePage } from "./RolePage";
+import { RoleTitleActions, RoleWorkspaceProvider } from "./RoleWorkspace";
 import { ScreenDirtyContext } from "../../shared/layout/ScreenTabs";
 import {
   roleActions,
@@ -16,7 +18,21 @@ import {
   type RoleSettings,
   type RoleMenu,
   type RoleImpact,
+  type RoleChange,
 } from "./roles";
+
+/** 제목줄 단추([변경 이력]·[역할 복사]·[역할 추가])와 본문을 화면 틀처럼 함께 그린다. */
+const renderPage = (wrap: (page: ReactNode) => ReactNode = (page) => page) =>
+  render(
+    <RoleWorkspaceProvider>
+      {wrap(
+        <>
+          <RoleTitleActions />
+          <RolePage />
+        </>,
+      )}
+    </RoleWorkspaceProvider>,
+  );
 
 let request: ReturnType<typeof vi.fn>;
 let roles: Role[];
@@ -31,6 +47,7 @@ let drift: boolean;
 let failedImpact: boolean;
 let slowSettings: boolean;
 let release: (() => void) | undefined;
+let histories: Map<string, RoleChange[]>;
 const success = (data: unknown) => ({
   ok: true,
   status: 200,
@@ -54,6 +71,7 @@ const writes = (method?: string) =>
 const menu = (id: string, name: string, flag: "Y" | "N"): RoleMenu => ({
   menuId: id,
   menuName: name,
+  screenId: `UI-${id.slice(1)}`,
   groupName: "합성 묶음",
   readYn: flag,
   createYn: flag,
@@ -120,6 +138,20 @@ beforeEach(() => {
   failedImpact = false;
   slowSettings = false;
   release = undefined;
+  histories = new Map([
+    [
+      "ADMIN",
+      [
+        {
+          changedAt: "2026-11-13T01:00:00Z",
+          item: "민감 항목",
+          before: "안 보기",
+          after: "보기",
+          changedBy: "시스템 관리자",
+        },
+      ],
+    ],
+  ]);
   request = vi.fn(async (path: string, init?: RequestInit) => {
     if (path === "/api/common/user-options")
       return success({
@@ -139,15 +171,23 @@ beforeEach(() => {
         if (failCopy)
           return error("roleName", "이미 쓰고 있는 역할 이름입니다.");
         const input = JSON.parse(String(init.body));
-        const source = settings.get(input.sourceRoleId)!;
+        const blank = !input.sourceRoleId;
+        const source = settings.get(input.sourceRoleId ?? "ADMIN")!;
         const role: Role = {
           ...source.role,
           roleId: "R-002",
           roleName: input.roleName,
           dataScopeCd: input.dataScopeCd,
+          snstvViewYn: blank ? "N" : source.role.snstvViewYn,
           basicRole: false,
         };
-        const value = { ...source, role };
+        const value = {
+          ...source,
+          role,
+          menuAuths: blank
+            ? source.menuAuths.map((row) => menu(row.menuId, row.menuName, "N"))
+            : source.menuAuths,
+        };
         roles.push(role);
         settings.set(role.roleId, value);
         return success(value);
@@ -156,6 +196,8 @@ beforeEach(() => {
       return success({ items: roles.filter((role) => role.useYn === "Y") });
     }
     const id = decodeURIComponent(path.split("/")[4]);
+    if (path.includes("/change-history"))
+      return success({ items: histories.get(id) ?? [] });
     if (path.includes("/change-impact")) {
       if (failedImpact) throw new Error("영향 조회 실패");
       return success(impact);
@@ -219,6 +261,7 @@ afterEach(() => {
 });
 const loaded = async () => {
   await screen.findByTestId("role-settings");
+  await waitFor(() => expect(screen.getByTestId("role-copy-open")).toBeEnabled());
 };
 const select = async (id: string) => {
   fireEvent.click(screen.getByTestId(`role-tab-${id.toLowerCase()}`));
@@ -229,16 +272,18 @@ const select = async (id: string) => {
   );
   await waitFor(() =>
     expect(
-      screen.getByRole("group", { name: settings.get(id)!.role.roleName }),
+      screen.getByRole("group", {
+        name: `${settings.get(id)!.role.roleName} 설정`,
+      }),
     ).toBeInTheDocument(),
   );
 };
 
 it("loads persisted tabs and settings with no SELF option or stop control on the five basic roles", async () => {
-  render(<RolePage />);
+  renderPage();
   await loaded();
   expect(screen.getByTestId("role-page")).toHaveClass("screen-body");
-  expect(screen.getByLabelText("데이터 범위 *")).toHaveValue("ALL");
+  expect(screen.getByLabelText("데이터 범위")).toHaveValue("ALL");
   expect(
     screen.queryByRole("option", { name: "본인" }),
   ).not.toBeInTheDocument();
@@ -253,7 +298,7 @@ it("loads persisted tabs and settings with no SELF option or stop control on the
 });
 it("keeps save absent until settings are actually loaded", async () => {
   slowSettings = true;
-  render(<RolePage />);
+  renderPage();
   await screen.findByText("권한 설정을 불러오는 중입니다.");
   expect(screen.queryByTestId("role-save")).not.toBeInTheDocument();
   expect(screen.getByTestId("role-copy-open")).toBeDisabled();
@@ -262,20 +307,20 @@ it("keeps save absent until settings are actually loaded", async () => {
 });
 it("shows active-role and matrix empty states without invented rows", async () => {
   roles = [];
-  render(<RolePage />);
+  renderPage();
   await screen.findByText("활성 역할이 없습니다.");
   expect(screen.queryByTestId("role-save")).not.toBeInTheDocument();
 });
 it("shows an empty persisted matrix while keeping real settings editable", async () => {
   settings.get("ADMIN")!.menuAuths = [];
-  render(<RolePage />);
+  renderPage();
   await loaded();
   expect(screen.getByText("조회할 권한이 없습니다.")).toBeInTheDocument();
   expect(screen.getByTestId("role-save")).toBeEnabled();
 });
 it("retries list failures without manufacturing tabs", async () => {
   failList = true;
-  render(<RolePage />);
+  renderPage();
   await screen.findByTestId("role-list-retry");
   expect(screen.queryByTestId("role-tab-admin")).not.toBeInTheDocument();
   failList = false;
@@ -284,7 +329,7 @@ it("retries list failures without manufacturing tabs", async () => {
 });
 it("retries settings failures and never saves an unread matrix", async () => {
   failSettings = true;
-  render(<RolePage />);
+  renderPage();
   await screen.findByTestId("role-settings-retry");
   expect(screen.queryByTestId("role-save")).not.toBeInTheDocument();
   failSettings = false;
@@ -292,7 +337,7 @@ it("retries settings failures and never saves an unread matrix", async () => {
   await loaded();
 });
 it("saves scope sensitive and action flags without labels or rename and re-reads the selected role", async () => {
-  render(<RolePage />);
+  renderPage();
   await loaded();
   fireEvent.click(screen.getByTestId("role-sensitive"));
   fireEvent.click(screen.getByTestId("role-m011-cnfmyn"));
@@ -318,7 +363,7 @@ it("saves scope sensitive and action flags without labels or rename and re-reads
 });
 it("keeps the draft and field errors on failed save", async () => {
   failSave = true;
-  render(<RolePage />);
+  renderPage();
   await loaded();
   fireEvent.click(screen.getByTestId("role-sensitive"));
   fireEvent.click(screen.getByTestId("role-save"));
@@ -330,7 +375,7 @@ it("keeps the draft and field errors on failed save", async () => {
   );
 });
 it("allows sensitive changes on every role and permanently locks only leader non-read close actions", async () => {
-  render(<RolePage />);
+  renderPage();
   await loaded();
   await select("SALES_LDR");
   expect(screen.getByTestId("role-sensitive")).toBeEnabled();
@@ -346,7 +391,7 @@ it("allows sensitive changes on every role and permanently locks only leader non
   expect(writes("PUT")).toHaveLength(1);
 });
 it("shows cleanup counts and cancellation makes zero PUT requests and preserves the draft", async () => {
-  render(<RolePage />);
+  renderPage();
   await loaded();
   await select("R-001");
   fireEvent.change(screen.getByTestId("role-data-scope"), {
@@ -361,7 +406,7 @@ it("shows cleanup counts and cancellation makes zero PUT requests and preserves 
 });
 it("confirmed cleanup sends exactly previewed user IDs and preserves PM guidance", async () => {
   impact = { ...impact, headquartersUserCount: 0, projectUserCount: 1 };
-  render(<RolePage />);
+  renderPage();
   await loaded();
   await select("PM");
   fireEvent.change(screen.getByTestId("role-data-scope"), {
@@ -382,7 +427,7 @@ it("confirmed cleanup sends exactly previewed user IDs and preserves PM guidance
 });
 it("drift re-fetches impact and requires a new confirmation, not an automatic retry PUT", async () => {
   drift = true;
-  render(<RolePage />);
+  renderPage();
   await loaded();
   await select("R-001");
   fireEvent.change(screen.getByTestId("role-data-scope"), {
@@ -401,7 +446,7 @@ it("drift re-fetches impact and requires a new confirmation, not an automatic re
 });
 it("a failed impact query preserves input and performs no PUT", async () => {
   failedImpact = true;
-  render(<RolePage />);
+  renderPage();
   await loaded();
   await select("R-001");
   fireEvent.change(screen.getByTestId("role-data-scope"), {
@@ -419,7 +464,7 @@ it("scope changes with no actual cleanup save without a new destructive confirma
     affectedUserIds: [],
     preservedPmUserIds: [],
   };
-  render(<RolePage />);
+  renderPage();
   await loaded();
   await select("R-001");
   fireEvent.change(screen.getByTestId("role-data-scope"), {
@@ -429,19 +474,24 @@ it("scope changes with no actual cleanup save without a new destructive confirma
   await screen.findByTestId("role-toast");
   expect(screen.queryByTestId("role-impact-dialog")).not.toBeInTheDocument();
 });
-it("copy validates required names and sends only source name selected scope then selects the new tab", async () => {
-  render(<RolePage />);
+it("copy (시안): picks the role to copy, sends its scope and selects the new tab", async () => {
+  renderPage();
   await loaded();
   fireEvent.click(screen.getByTestId("role-copy-open"));
-  expect(screen.getByTestId("role-copy-scope")).toHaveValue("ALL");
+  expect(screen.getByRole("dialog", { name: "역할 복사" })).toBeInTheDocument();
+  expect(screen.getByTestId("role-copy-source")).toHaveValue("ADMIN");
+  expect(
+    screen.getByText("권한 표·데이터 범위·민감 항목을 그대로 복사합니다."),
+  ).toBeInTheDocument();
+  expect(screen.queryByTestId("role-copy-scope")).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId("role-copy-save"));
   await screen.findByText("새 역할 이름을 1~50자로 입력해 주세요.");
   expect(writes("POST")).toHaveLength(0);
+  fireEvent.change(screen.getByTestId("role-copy-source"), {
+    target: { value: "PM" },
+  });
   fireEvent.change(screen.getByTestId("role-copy-name"), {
     target: { value: " 합성 새 역할 " },
-  });
-  fireEvent.change(screen.getByTestId("role-copy-scope"), {
-    target: { value: "PROJ" },
   });
   fireEvent.click(screen.getByTestId("role-copy-save"));
   await waitFor(() =>
@@ -451,15 +501,91 @@ it("copy validates required names and sends only source name selected scope then
     ),
   );
   expect(JSON.parse(writes("POST")[0][1].body)).toEqual({
-    sourceRoleId: "ADMIN",
+    sourceRoleId: "PM",
     roleName: " 합성 새 역할 ",
     dataScopeCd: "PROJ",
   });
   expect(screen.queryByTestId("role-copy-dialog")).not.toBeInTheDocument();
 });
+it("add (시안): name and scope only, starts with every menu 「권한 없음」", async () => {
+  renderPage();
+  await loaded();
+  fireEvent.click(screen.getByTestId("role-add-open"));
+  expect(screen.getByRole("dialog", { name: "역할 추가" })).toBeInTheDocument();
+  expect(screen.getByTestId("role-copy-scope")).toHaveValue("PROJ");
+  expect(
+    screen.getByText("새 역할은 모든 메뉴가 「권한 없음」으로 시작합니다."),
+  ).toBeInTheDocument();
+  expect(screen.queryByTestId("role-copy-source")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("role-copy-name"), {
+    target: { value: "프로젝트 지원" },
+  });
+  fireEvent.click(screen.getByTestId("role-copy-save"));
+  await waitFor(() =>
+    expect(screen.getByTestId("role-tab-r-002")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    ),
+  );
+  expect(JSON.parse(writes("POST")[0][1].body)).toEqual({
+    roleName: "프로젝트 지원",
+    dataScopeCd: "PROJ",
+  });
+  await waitFor(() =>
+    expect(screen.getByTestId("role-m028-readyn")).not.toBeChecked(),
+  );
+});
+it("title row shows 변경 이력 (n) and opens the history list (시안)", async () => {
+  renderPage();
+  await loaded();
+  await waitFor(() =>
+    expect(screen.getByTestId("role-history-open")).toHaveTextContent(
+      "변경 이력 (1)",
+    ),
+  );
+  fireEvent.click(screen.getByTestId("role-history-open"));
+  const dialog = screen.getByRole("dialog", {
+    name: "시스템 관리자 · 권한 변경 이력 (1)",
+  });
+  expect(within(dialog).getByTestId("role-history-row-0")).toHaveTextContent(
+    "민감 항목",
+  );
+  fireEvent.click(screen.getByTestId("role-history-close"));
+  await select("EXEC");
+  await waitFor(() =>
+    expect(screen.getByTestId("role-history-open")).toHaveTextContent(
+      "변경 이력 (0)",
+    ),
+  );
+  fireEvent.click(screen.getByTestId("role-history-open"));
+  expect(screen.getByText("아직 바꾼 기록이 없습니다.")).toBeInTheDocument();
+});
+it("matrix shows group rows and screen numbers, and notes under the table (시안)", async () => {
+  renderPage();
+  await loaded();
+  expect(
+    screen.getByRole("rowheader", { name: /권한 UI-028/ }),
+  ).toBeInTheDocument();
+  expect(screen.getAllByText("합성 묶음")).toHaveLength(1);
+  expect(
+    screen.getByText(/역할이 여러 개인 사용자는 넓은 쪽\(합집합\) 권한을/),
+  ).toBeInTheDocument();
+});
+it("Ctrl+S saves, and saving with no change says 바꾼 내용이 없습니다", async () => {
+  renderPage();
+  await loaded();
+  fireEvent.click(screen.getByTestId("role-save"));
+  expect(await screen.findByTestId("role-toast")).toHaveTextContent(
+    "바꾼 내용이 없습니다.",
+  );
+  expect(writes("PUT")).toHaveLength(0);
+  fireEvent.click(screen.getByTestId("role-sensitive"));
+  fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+  await waitFor(() => expect(writes("PUT")).toHaveLength(1));
+});
 it("copy duplicate errors preserve the entered name and modal", async () => {
   failCopy = true;
-  render(<RolePage />);
+  renderPage();
   await loaded();
   fireEvent.click(screen.getByTestId("role-copy-open"));
   fireEvent.change(screen.getByTestId("role-copy-name"), {
@@ -475,7 +601,7 @@ it("copy duplicate errors preserve the entered name and modal", async () => {
   expect(screen.getByTestId("role-copy-name")).toHaveValue("경영진");
 });
 it("copy cancel reuses dirty confirmation without creating a role", async () => {
-  render(<RolePage />);
+  renderPage();
   await loaded();
   fireEvent.click(screen.getByTestId("role-copy-open"));
   fireEvent.change(screen.getByTestId("role-copy-name"), {
@@ -491,7 +617,7 @@ it("copy cancel reuses dirty confirmation without creating a role", async () => 
   expect(writes()).toHaveLength(0);
 });
 it("stop runs directly, refetches active tabs and user options, without a stop confirmation", async () => {
-  render(<RolePage />);
+  renderPage();
   await loaded();
   await select("R-001");
   fireEvent.click(screen.getByTestId("role-stop"));
@@ -508,7 +634,7 @@ it("stop runs directly, refetches active tabs and user options, without a stop c
 });
 it("assigned-role stop displays exact count and user-screen guidance and keeps its active tab", async () => {
   stopAssigned = true;
-  render(<RolePage />);
+  renderPage();
   await loaded();
   await select("R-001");
   fireEvent.click(screen.getByTestId("role-stop"));
@@ -520,11 +646,11 @@ it("assigned-role stop displays exact count and user-screen guidance and keeps i
 });
 it("dirty cancel and role navigation use existing confirmation and notify the shell", async () => {
   const dirty = vi.fn();
-  render(
+  renderPage((page) => (
     <ScreenDirtyContext.Provider value={dirty}>
-      <RolePage />
-    </ScreenDirtyContext.Provider>,
-  );
+      {page}
+    </ScreenDirtyContext.Provider>
+  ));
   await loaded();
   fireEvent.click(screen.getByTestId("role-sensitive"));
   await waitFor(() => expect(dirty).toHaveBeenCalledWith("UI-24", true));

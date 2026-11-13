@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { ConfirmDialog, Toast } from "../../shared/feedback/Dialog";
 import { feedbackMessages } from "../../shared/feedback/messages";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { getCommonUserOptions } from "../commonops/userOptions";
+import { usePreferenceBusinessShortcuts } from "../userpreferences/UserPreferenceTools";
 import { RoleCopyDialog } from "./RoleCopyDialog";
+import { RoleHistoryDialog } from "./RoleHistoryDialog";
 import { RoleImpactDialog } from "./RoleImpactDialog";
+import { useRoleWorkspace } from "./RoleWorkspace";
 import * as api from "./roles";
 import "./roles.css";
 
@@ -22,13 +25,18 @@ export function RolePage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [revision, setRevision] = useState(0);
   const [listRevision, setListRevision] = useState(0);
-  const [copying, setCopying] = useState(false);
   const [copyDirty, setCopyDirty] = useState(false);
   const [impact, setImpact] = useState<api.RoleImpact | null>(null);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
+  const root = useRef<HTMLElement>(null);
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState<(() => void) | null>(null);
+  const [history, setHistory] = useState<api.RoleChange[] | null>(null);
+  const [historyFailure, setHistoryFailure] = useState("");
+  const [historyRevision, setHistoryRevision] = useState(0);
+  const workspace = useRoleWorkspace();
+  const { dialog, setDialog, setHistoryCount, setReady } = workspace;
   const setDirty = useScreenDirty();
   const dirty =
     !!settings &&
@@ -38,6 +46,19 @@ export function RolePage() {
     setDirty("UI-24", dirty || copyDirty);
     return () => setDirty("UI-24", false);
   }, [dirty, copyDirty, setDirty]);
+  useEffect(() => {
+    setReady(!!settings && !busy);
+    return () => setReady(false);
+  }, [settings, busy, setReady]);
+  useEffect(() => () => setDialog(null), [setDialog]);
+  // 제목줄의 [역할 추가]·[역할 복사]도 저장하지 않은 입력이 있으면 먼저 확인한다.
+  useEffect(() => {
+    if ((dialog === "add" || dialog === "copy") && dirty) {
+      const next = dialog;
+      setDialog(null);
+      setPending(() => () => setDialog(next));
+    }
+  }, [dialog, dirty, setDialog]);
   useEffect(() => {
     const controller = new AbortController();
     setListFailure("");
@@ -77,6 +98,24 @@ export function RolePage() {
       );
     return () => controller.abort();
   }, [selected, revision]);
+  useEffect(() => {
+    const controller = new AbortController();
+    setHistory(null);
+    setHistoryFailure("");
+    setHistoryCount(null);
+    if (selected)
+      void api.getCommonRoleChangeHistory(selected, controller.signal).then(
+        (items) => {
+          if (controller.signal.aborted) return;
+          setHistory(items);
+          setHistoryCount(items.length);
+        },
+        (error) => {
+          if (!controller.signal.aborted) setHistoryFailure(message(error));
+        },
+      );
+    return () => controller.abort();
+  }, [selected, historyRevision, setHistoryCount]);
   const guard = (action: () => void) => {
     if (lock.current) return;
     if (dirty) setPending(() => action);
@@ -106,9 +145,14 @@ export function RolePage() {
     setSettings(refreshed);
     setDraft(api.roleDraft(refreshed));
     setListRevision((value) => value + 1);
+    setHistoryRevision((value) => value + 1);
   };
   const save = async (confirmed?: string[]) => {
     if (lock.current || !settings || !draft) return;
+    if (!confirmed && !dirty) {
+      setNotice("바꾼 내용이 없습니다.");
+      return;
+    }
     lock.current = true;
     setBusy(true);
     setFailure("");
@@ -142,6 +186,14 @@ export function RolePage() {
       lock.current = false;
       setBusy(false);
     }
+  };
+  const cancel = () => {
+    if (!settings) return;
+    if (!dirty) {
+      setNotice("바꾼 내용이 없습니다.");
+      return;
+    }
+    guard(() => setDraft(api.roleDraft(settings)));
   };
   const stop = async () => {
     if (lock.current || !settings || settings.role.basicRole) return;
@@ -177,37 +229,38 @@ export function RolePage() {
         ),
       });
   };
+  // 00-1 공통 단축키: Ctrl+S = 저장(창이 열려 있거나 다른 탭이면 쓰지 않는다).
+  usePreferenceBusinessShortcuts(
+    {
+      onSave: () => {
+        if (!root.current?.closest("[hidden]")) void save();
+      },
+    },
+    !dialog && !impact && !pending,
+  );
+  const roleName = settings?.role.roleName ?? "";
   return (
     <section
+      ref={root}
       className="roles-page screen-body"
       data-testid="role-page"
       data-screen-id="UI-24"
       aria-label="권한"
     >
-      <div className="roles-toolbar">
-        <div role="tablist" aria-label="역할" className="roles-tabs">
-          {roles?.map((role) => (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={selected === role.roleId}
-              data-testid={`role-tab-${role.roleId.toLowerCase()}`}
-              key={role.roleId}
-              disabled={busy}
-              onClick={() => guard(() => setSelected(role.roleId))}
-            >
-              {role.roleName}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          data-testid="role-copy-open"
-          disabled={!settings || busy}
-          onClick={() => guard(() => setCopying(true))}
-        >
-          역할 추가·복사
-        </button>
+      <div role="tablist" aria-label="역할" className="roles-tabs">
+        {roles?.map((role) => (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={selected === role.roleId}
+            data-testid={`role-tab-${role.roleId.toLowerCase()}`}
+            key={role.roleId}
+            disabled={busy}
+            onClick={() => guard(() => setSelected(role.roleId))}
+          >
+            {role.roleName}
+          </button>
+        ))}
       </div>
       {listFailure && (
         <div role="alert">
@@ -235,58 +288,71 @@ export function RolePage() {
             void save();
           }}
         >
-          <fieldset disabled={busy} className="roles-settings">
-            <legend>{settings.role.roleName}</legend>
-            <div className="roles-scope">
-              <label htmlFor="role-data-scope">데이터 범위 *</label>
-              <select
-                id="role-data-scope"
-                data-testid="role-data-scope"
-                value={draft.dataScopeCd}
-                aria-invalid={!!errors.dataScopeCd}
-                onChange={(event) =>
-                  setDraft({ ...draft, dataScopeCd: event.target.value })
-                }
-              >
-                {settings.dataScopes.map((scope) => (
-                  <option
-                    key={scope.code}
-                    value={scope.code}
-                    data-testid={`role-data-scope-option-${scope.code.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-                  >
-                    {scope.name}
-                  </option>
-                ))}
-              </select>
+          <fieldset
+            disabled={busy}
+            className="roles-settings"
+            aria-label={`${roleName} 설정`}
+          >
+            <div className="roles-field">
+              <label htmlFor="role-data-scope">데이터 범위</label>
+              <div>
+                <select
+                  id="role-data-scope"
+                  data-testid="role-data-scope"
+                  value={draft.dataScopeCd}
+                  aria-invalid={!!errors.dataScopeCd}
+                  aria-describedby="role-data-scope-help"
+                  onChange={(event) =>
+                    setDraft({ ...draft, dataScopeCd: event.target.value })
+                  }
+                >
+                  {settings.dataScopes.map((scope) => (
+                    <option
+                      key={scope.code}
+                      value={scope.code}
+                      data-testid={`role-data-scope-option-${scope.code.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                    >
+                      {scope.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.dataScopeCd && (
+                  <p className="field-error">{errors.dataScopeCd}</p>
+                )}
+                <p id="role-data-scope-help" className="roles-hint">
+                  어디까지 볼지 정합니다. 전체 = 회사 전부, 담당 파트 = 기준정보
+                  › 거래처·영업 파트의 영업 파트 탭에서 이번 달 파트장인 파트 +
+                  시스템 › 사용자에서 고른 본사, 담당 프로젝트 = 시스템 ›
+                  사용자에서 사람마다 정한 프로젝트만. 보통 PM은 담당 프로젝트,
+                  파트장은 담당 파트, 나머지는 전체.
+                </p>
+              </div>
             </div>
-            {errors.dataScopeCd && (
-              <p className="field-error">{errors.dataScopeCd}</p>
-            )}
-            <label className="roles-sensitive">
-              <span>민감 항목</span>
-              <input
-                type="checkbox"
-                data-testid="role-sensitive"
-                checked={draft.snstvViewYn === "Y"}
-                onChange={(event) =>
-                  setDraft({
-                    ...draft,
-                    snstvViewYn: event.target.checked ? "Y" : "N",
-                  })
-                }
-              />{" "}
-              보기
-            </label>
-            <p className="roles-help">
-              급여·지급 단가·개인별 원가·거래처 지급 계좌
-            </p>
+            <div className="roles-field">
+              <span id="role-sensitive-label">민감 항목</span>
+              <label className="roles-sensitive">
+                <input
+                  type="checkbox"
+                  data-testid="role-sensitive"
+                  aria-labelledby="role-sensitive-label role-sensitive-text"
+                  checked={draft.snstvViewYn === "Y"}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      snstvViewYn: event.target.checked ? "Y" : "N",
+                    })
+                  }
+                />
+                <span id="role-sensitive-text">
+                  급여·지급 단가·개인별 원가·거래처 지급 계좌 보기
+                </span>
+              </label>
+            </div>
           </fieldset>
           <div className="roles-matrix-wrap">
-            <table className="roles-matrix">
-              <caption>메뉴 × 동작 권한 표</caption>
+            <table className="roles-matrix" aria-label="메뉴 × 동작 권한 표">
               <thead>
                 <tr>
-                  <th scope="col">묶음</th>
                   <th scope="col">메뉴</th>
                   {api.roleActions.map(([key, label]) => (
                     <th
@@ -300,49 +366,89 @@ export function RolePage() {
                 </tr>
               </thead>
               <tbody>
-                {settings.menuAuths.map((menu, index) => (
-                  <tr
-                    key={menu.menuId}
-                    data-testid={`role-menu-${menu.menuId.toLowerCase()}`}
-                  >
-                    <th scope="row">{menu.groupName}</th>
-                    <td>{menu.menuName}</td>
-                    {api.roleActions.map(([key, label]) => {
-                      const protectedFlag =
-                        (selected === "ADMIN" &&
-                          menu.menuId === "M028" &&
-                          key === "updateYn") ||
-                        (selected === "SALES_LDR" &&
-                          menu.menuId === "M024" &&
-                          key !== "readYn");
-                      return (
-                        <td
-                          key={key}
-                          data-testid={`role-action-cell-${menu.menuId.toLowerCase()}-${key.toLowerCase()}`}
-                        >
-                          <input
-                            type="checkbox"
-                            aria-label={`${menu.menuName} ${label}`}
-                            data-testid={`role-${menu.menuId.toLowerCase()}-${key.toLowerCase()}`}
-                            checked={draft.menuAuths[index][key] === "Y"}
-                            disabled={busy || protectedFlag}
-                            title={
-                              protectedFlag
-                                ? "업무 보호 규칙으로 변경할 수 없습니다."
-                                : undefined
-                            }
-                            onChange={(event) =>
-                              changeMenu(menu.menuId, key, event.target.checked)
-                            }
-                          />
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                {settings.menuAuths.map((menu, index) => {
+                  const startsGroup =
+                    !!menu.groupName &&
+                    (index === 0 ||
+                      settings.menuAuths[index - 1].groupName !==
+                        menu.groupName);
+                  return (
+                    <Fragment key={menu.menuId}>
+                      {startsGroup && (
+                        <tr className="roles-group">
+                          <th scope="rowgroup" colSpan={8}>
+                            {menu.groupName}
+                          </th>
+                        </tr>
+                      )}
+                      <tr
+                        data-testid={`role-menu-${menu.menuId.toLowerCase()}`}
+                      >
+                        <th scope="row">
+                          {menu.menuName}{" "}
+                          <span className="roles-screen-id">
+                            {menu.screenId}
+                          </span>
+                        </th>
+                        {api.roleActions.map(([key, label]) => {
+                          const protectedFlag =
+                            (selected === "ADMIN" &&
+                              menu.menuId === "M028" &&
+                              key === "updateYn") ||
+                            (selected === "SALES_LDR" &&
+                              menu.menuId === "M024" &&
+                              key !== "readYn");
+                          return (
+                            <td
+                              key={key}
+                              data-testid={`role-action-cell-${menu.menuId.toLowerCase()}-${key.toLowerCase()}`}
+                            >
+                              <input
+                                type="checkbox"
+                                aria-label={`${menu.menuName} ${label}`}
+                                data-testid={`role-${menu.menuId.toLowerCase()}-${key.toLowerCase()}`}
+                                checked={draft.menuAuths[index][key] === "Y"}
+                                disabled={busy || protectedFlag}
+                                title={
+                                  protectedFlag
+                                    ? "업무 보호 규칙으로 변경할 수 없습니다."
+                                    : undefined
+                                }
+                                onChange={(event) =>
+                                  changeMenu(
+                                    menu.menuId,
+                                    key,
+                                    event.target.checked,
+                                  )
+                                }
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
             {settings.menuAuths.length === 0 && <p>조회할 권한이 없습니다.</p>}
+          </div>
+          <div className="roles-notes">
+            <p>
+              역할이 여러 개인 사용자는 넓은 쪽(합집합) 권한을 따릅니다.
+              「확정」은 월 마감의 마감하기, 영업 파트 이익금의 정산 확정·취소,
+              영업 파이프라인의 견적 승인·반려입니다. 저장하면 이 역할 사용자의
+              다음 요청부터 적용됩니다. 관리자가 0명이 되는 변경은 저장할 수
+              없습니다.
+            </p>
+            <p>
+              처음 값: 관리자·재무 7개, 경영진 조회·다운로드(사용자·권한·메뉴·
+              공통코드는 없음), 파트장 조회·등록·수정·다운로드, PM
+              조회·등록·수정. 파트장·PM은 사용자·권한·메뉴·공통코드·월 마감,
+              재무·자금 6개, 개인 원가·수익표, 프로젝트 원가 분석이 「권한
+              없음」으로 시작하고(PM은 영업 파트 이익금도), 필요하면 이 표에서
+              켭니다.
+            </p>
           </div>
           <div className="roles-footer">
             {!settings.role.basicRole && (
@@ -365,7 +471,7 @@ export function RolePage() {
                 type="button"
                 data-testid="role-cancel"
                 disabled={busy}
-                onClick={() => guard(() => setDraft(api.roleDraft(settings)))}
+                onClick={cancel}
               >
                 취소
               </button>
@@ -403,19 +509,31 @@ export function RolePage() {
           )}
         </div>
       )}
-      {copying && settings && (
+      {(dialog === "add" || dialog === "copy") && settings && roles && (
         <RoleCopyDialog
-          source={settings}
+          mode={dialog}
+          roles={roles}
+          selectedRoleId={selected}
+          dataScopes={settings.dataScopes}
           onDirty={setCopyDirty}
-          onClose={() => setCopying(false)}
+          onClose={() => setDialog(null)}
           onSaved={(created) => {
-            setCopying(false);
+            setDialog(null);
             setDraft(null);
             setSettings(null);
             setSelected(created.role.roleId);
             setListRevision((value) => value + 1);
             setNotice("새 역할을 만들었습니다.");
           }}
+        />
+      )}
+      {dialog === "history" && (
+        <RoleHistoryDialog
+          roleName={roleName}
+          items={history}
+          failure={historyFailure}
+          onRetry={() => setHistoryRevision((value) => value + 1)}
+          onClose={() => setDialog(null)}
         />
       )}
       {impact && (

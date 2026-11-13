@@ -1,13 +1,13 @@
+/* 시스템 › 권한 UI-24 — 시안 v1.8 치수(카드 20/24px, 칸 이름 120px 오른쪽 맞춤, 표 줄 40px, 아래 고정 단추 줄). */
 .roles-page {
   display: grid;
-  gap: 20px;
+  gap: 16px;
   min-width: 0;
 }
-.roles-toolbar {
-  display: flex;
-  gap: 16px;
+.roles-add {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
 }
 .roles-tabs {
   display: flex;
@@ -21,6 +21,7 @@
   background: transparent;
   padding: 10px 16px;
   color: var(--text-sub);
+  min-height: 0;
 }
 .roles-tabs button[aria-selected="true"] {
   color: var(--primary);
@@ -28,52 +29,63 @@
   font-weight: 600;
 }
 .roles-settings {
-  margin: 0 0 24px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  margin: 0 0 16px;
   padding: 20px 24px;
   border: 1px solid var(--divider);
   border-radius: 8px;
   background: var(--surface);
+  min-width: 0;
 }
-.roles-settings legend {
-  font-weight: 600;
+.roles-field {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: start;
 }
-.roles-scope,
-.roles-sensitive {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.roles-field > label,
+.roles-field > span {
+  padding-top: 8px;
+  text-align: right;
+  font-size: 13px;
+  color: var(--text-sub);
 }
-.roles-scope > label,
-.roles-sensitive > span {
-  width: 120px;
-}
-.roles-scope select {
+.roles-field select {
   width: 200px;
   height: 36px;
 }
 .roles-sensitive {
-  margin-top: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 8px;
+  font-size: 14px;
+  cursor: pointer;
 }
-.roles-help {
+.roles-sensitive input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+.roles-hint {
+  margin: 4px 0 0;
   color: var(--text-sub);
-  font-size: 13px;
-  margin-left: 132px;
+  font-size: 12px;
+  line-height: 1.5;
 }
 .roles-matrix-wrap {
   border: 1px solid var(--divider);
   border-radius: 8px;
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 60vh;
   background: var(--surface);
 }
 .roles-matrix {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-}
-.roles-matrix caption {
-  text-align: left;
-  padding: 12px;
-  font-weight: 600;
 }
 .roles-matrix th,
 .roles-matrix td {
@@ -82,32 +94,105 @@
   border-bottom: 1px solid var(--divider);
   white-space: nowrap;
 }
-.roles-matrix thead th,
-.roles-matrix tbody th {
+.roles-matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
+  font-weight: 600;
+  text-align: center;
+}
+.roles-matrix thead th:first-child {
+  text-align: left;
+}
+.roles-matrix .roles-group th {
   background: var(--bg);
   font-weight: 600;
   text-align: left;
 }
-.roles-matrix td:not(:nth-child(2)) {
+.roles-matrix tbody tr:not(.roles-group) th {
+  padding-left: 28px;
+  font-weight: 400;
+  color: var(--text-sub);
+  text-align: left;
+}
+.roles-screen-id {
+  margin-left: 4px;
+  font-size: 12px;
+  color: var(--text-muted, var(--text-sub));
+}
+.roles-matrix td {
   text-align: center;
 }
 .roles-matrix input {
   width: 16px;
   height: 16px;
 }
+.roles-notes {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--text-sub);
+  line-height: 1.6;
+}
+.roles-notes p {
+  margin: 0 0 8px;
+}
 .roles-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 16px;
+  gap: 8px;
+  margin: 16px -24px 0;
+  padding: 12px 24px;
+  border-top: 1px solid var(--divider);
+  background: var(--surface);
 }
 .roles-footer > .app-actions {
   margin-left: auto;
 }
 .role-copy-form {
   display: grid;
-  gap: 12px;
+  gap: 8px;
+}
+.role-copy-form .uf-req::after {
+  content: " *";
+  color: var(--danger, #dc2626);
+}
+.role-copy-form input,
+.role-copy-form select {
+  height: 36px;
 }
 [data-testid="role-copy-dialog"] {
-  width: min(520px, 100%);
+  width: min(480px, 100%);
+}
+[data-testid="role-history-dialog"] {
+  width: min(760px, 100%);
+}
+.roles-history {
+  max-height: 60vh;
+  overflow: auto;
+}
+.roles-empty {
+  margin: 8px 0;
+  color: var(--text-sub);
+}
+.roles-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.roles-history-table th,
+.roles-history-table td {
+  height: 36px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--divider);
+  text-align: left;
+  white-space: nowrap;
+}
+.roles-history-table thead th {
+  background: var(--bg);
+  font-weight: 600;
 }

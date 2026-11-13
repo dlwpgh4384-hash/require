@@ -14,6 +14,10 @@ import { PlaceholderScreen } from "./PlaceholderScreen";
 import { UserPage } from "../users/UserPage";
 import { RolePage } from "../roles/RolePage";
 import {
+  RoleTitleActions,
+  RoleWorkspaceProvider,
+} from "../roles/RoleWorkspace";
+import {
   UserRegistrationButton,
   UserWorkspaceProvider,
 } from "../users/UserWorkspace";
@@ -53,6 +57,8 @@ function PreferenceNavigation() {
           screenActions:
             context.screenId === "UI-23" ? (
               <UserRegistrationButton />
+            ) : context.screenId === "UI-24" ? (
+              <RoleTitleActions />
             ) : undefined,
           quickAccess: (
             <PersonalScreenLists
@@ -92,20 +98,24 @@ export function CommonNavigationPage() {
   const preferences = useOptionalUserPreferences();
   return (
     <UserWorkspaceProvider>
-      {preferences ? (
-        <PreferenceNavigation />
-      ) : (
-        <NavigationRoot
-          tabs
-          renderScreen={renderScreen}
-          extensions={(context) => ({
-            screenActions:
-              context.screenId === "UI-23" ? (
-                <UserRegistrationButton />
-              ) : undefined,
-          })}
-        />
-      )}
+      <RoleWorkspaceProvider>
+        {preferences ? (
+          <PreferenceNavigation />
+        ) : (
+          <NavigationRoot
+            tabs
+            renderScreen={renderScreen}
+            extensions={(context) => ({
+              screenActions:
+                context.screenId === "UI-23" ? (
+                  <UserRegistrationButton />
+                ) : context.screenId === "UI-24" ? (
+                  <RoleTitleActions />
+                ) : undefined,
+            })}
+          />
+        )}
+      </RoleWorkspaceProvider>
     </UserWorkspaceProvider>
   );
 }

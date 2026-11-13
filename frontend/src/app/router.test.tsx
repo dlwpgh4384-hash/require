@@ -164,6 +164,7 @@ function respondWithRoles() {
       {
         menuId: "M028",
         menuName: "권한",
+        screenId: "UI-24",
         groupName: "시스템",
         readYn: "Y",
         createYn: "Y",

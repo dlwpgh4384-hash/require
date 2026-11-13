@@ -352,7 +352,7 @@ it("체크하면 「N건 선택」과 일괄 [사용 중지]가 나오고, 확�
   );
 });
 
-it("PM 공백 합산 확인을 취소하면 중지 PUT 없이 선택 계정과 담당 프로젝트를 유지한다", async () => {
+it("PM 공백 합산 확인을 취소하면 중지 POST 없이 선택 계정과 담당 프로젝트를 유지한다", async () => {
   const base = request.getMockImplementation()!;
   request.mockImplementation(async (url: string, init?: RequestInit) =>
     url.includes("change-impact")
@@ -414,7 +414,7 @@ it("등록 창을 다시 열 때 활성 역할을 새로 조회해 중지된 역
 it("중지 요청이 실패하면 행과 선택을 임의로 제거하지 않는다", async () => {
   const base = request.getMockImplementation()!;
   request.mockImplementation(async (url: string, init?: RequestInit) =>
-    url.endsWith("/stop") && init?.method === "PUT"
+    url.endsWith("/stop") && init?.method === "POST"
       ? {
           ok: false,
           status: 409,

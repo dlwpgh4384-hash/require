@@ -1,11 +1,11 @@
-package com.company.common.roles;
+package com.company.common.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import static com.company.common.roles.RoleContracts.*;
+import static com.company.common.dto.RoleContracts.*;
 
 public final class RoleRules {
     private RoleRules() {}
@@ -37,7 +37,9 @@ public final class RoleRules {
         keys(body, Set.of("sourceRoleId", "roleName", "dataScopeCd"));
         String name = text(body, "roleName");
         name(name);
-        return new Copy(text(body, "sourceRoleId"), name, text(body, "dataScopeCd"));
+        // sourceRoleId가 없으면 「역할 추가」(시안), 있으면 「역할 복사」.
+        String source = body.hasNonNull("sourceRoleId") ? text(body, "sourceRoleId") : null;
+        return new Copy(source, name, text(body, "dataScopeCd"));
     }
     public static Update update(JsonNode body) {
         keys(body, Set.of("dataScopeCd", "snstvViewYn", "menuAuths", "confirmedAffectedUserIds"));

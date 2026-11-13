@@ -1,4 +1,6 @@
-package com.company.common.roles;
+package com.company.common.service;
+
+import com.company.common.dto.RoleContracts;
 
 import com.company.common.service.UserScopePolicy;
 import java.math.BigDecimal;

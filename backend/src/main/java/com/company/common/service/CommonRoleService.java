@@ -1,5 +1,9 @@
-package com.company.common.roles;
+package com.company.common.service;
 
+import com.company.common.mapper.RoleMapper;
+import com.company.common.mapper.RoleRows;
+
+import com.company.common.dto.UserContracts.ChangeHistory;
 import com.company.common.dto.UserContracts.History;
 import com.company.common.mapper.UserMapper;
 import java.math.BigInteger;
@@ -9,7 +13,7 @@ import java.util.Objects;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import static com.company.common.roles.RoleContracts.*;
+import static com.company.common.dto.RoleContracts.*;
 
 @Service
 @Transactional(readOnly = true)
@@ -62,8 +66,10 @@ public class CommonRoleService {
         management.lockManagement();
         RoleRules.name(input.roleName());
         scope(input.dataScopeCd());
-        var source = require(input.sourceRoleId());
-        if (!"Y".equals(source.useYn)) throw RoleFailure.invalid("sourceRoleId", "사용 중인 원본 역할을 선택해 주세요.");
+        // 역할 추가(시안): 원본 없이 모든 메뉴 「권한 없음」, 민감 항목 끔. 역할 복사: 원본의 권한 표·민감 항목을 그대로.
+        boolean blank = input.sourceRoleId() == null;
+        var source = blank ? blankSource() : require(input.sourceRoleId());
+        if (!blank && !"Y".equals(source.useYn)) throw RoleFailure.invalid("sourceRoleId", "사용 중인 원본 역할을 선택해 주세요.");
         if (mapper.nameExists(input.roleName())) throw duplicateName();
         BigInteger next = mapper.selectIssuedNumber().add(BigInteger.ONE);
         String suffix = next.toString();
@@ -76,9 +82,49 @@ public class CommonRoleService {
         } catch (DuplicateKeyException failure) {
             throw duplicateName();
         }
-        mapper.copyMenus(id, source.roleId);
+        if (blank) mapper.insertBlankMenus(id);
+        else mapper.copyMenus(id, source.roleId);
         mapper.insertHistory(new History("TB_SY_ROLE", id, "NEW", "ROLE_NM", null, input.roleName()));
         return getCommonRole(id);
+    }
+    private static RoleRows.Role blankSource() {
+        var role = new RoleRows.Role();
+        role.snstvViewYn = "N";
+        role.useYn = "Y";
+        return role;
+    }
+    private static final java.util.Map<String, String> ACTIONS = java.util.Map.of("INQ_YN", "조회", "REG_YN", "등록",
+        "UPD_YN", "수정", "DEL_YN", "삭제", "UPLD_YN", "업로드", "DNLD_YN", "다운로드", "CNFM_YN", "확정");
+    /** 시안 「권한 변경 이력」: 바뀐 항목마다 1줄(데이터 범위·민감 항목·메뉴별 동작). */
+    public HistoryList getCommonRoleChangeHistory(String id) {
+        require(id);
+        var menus = new java.util.HashMap<String, String>();
+        mapper.selectMenus(id).forEach(menu -> menus.put(menu.menuId, menu.menuName));
+        var scopes = new java.util.HashMap<String, String>();
+        mapper.selectDataScopes().forEach(scope -> scopes.put(scope.code, scope.name));
+        return new HistoryList(mapper.selectChanges(id).stream().map(row -> {
+            String item = row.item, before = row.before, after = row.after;
+            if ("TB_SY_ROLE_MENU_AUTH".equals(row.table)) {
+                String menuId = row.key.substring(row.key.indexOf(':') + 1);
+                item = menus.getOrDefault(menuId, menuId) + " · " + ACTIONS.getOrDefault(row.item, row.item);
+                before = flag(before, "있음", "없음");
+                after = flag(after, "있음", "없음");
+            } else if ("DATA_SCOPE_CD".equals(row.item)) {
+                item = "데이터 범위";
+                before = before == null ? null : scopes.getOrDefault(before, before);
+                after = after == null ? null : scopes.getOrDefault(after, after);
+            } else if ("SNSTV_VIEW_YN".equals(row.item)) {
+                item = "민감 항목";
+                before = flag(before, "보기", "안 보기");
+                after = flag(after, "보기", "안 보기");
+            } else if ("ROLE_NM".equals(row.item)) {
+                item = "역할 이름";
+            }
+            return new ChangeHistory(CommonUserService.time(row.changedAt), item, before, after, row.changedBy);
+        }).toList());
+    }
+    private static String flag(String value, String yes, String no) {
+        return value == null ? null : "Y".equals(value) ? yes : "N".equals(value) ? no : value;
     }
     private RoleFailure duplicateName() {
         return RoleFailure.invalid("roleName", "이미 쓰고 있는 역할 이름입니다.");

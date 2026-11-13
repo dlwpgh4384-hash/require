@@ -1,11 +1,11 @@
-package com.company.common.roles;
+package com.company.common.mapper;
 
 import com.company.common.dto.UserContracts.History;
 import java.math.BigInteger;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import static com.company.common.roles.RoleContracts.*;
+import static com.company.common.dto.RoleContracts.*;
 
 @Mapper
 public interface RoleMapper {
@@ -18,6 +18,8 @@ public interface RoleMapper {
     int selectNextSortOrder();
     void insertRole(@Param("id") String id, @Param("input") Copy input,
         @Param("source") RoleRows.Role source, @Param("sort") int sort);
+    void insertBlankMenus(@Param("id") String id);
+    List<RoleRows.Change> selectChanges(@Param("id") String id);
     void copyMenus(@Param("id") String id, @Param("sourceId") String sourceId);
     void updateRole(@Param("id") String id, @Param("input") Update input);
     void updateMenu(@Param("id") String id, @Param("input") MenuInput input);

@@ -1,4 +1,4 @@
-package com.company.common.roles;
+package com.company.common.service;
 
 public class RoleFailure extends RuntimeException {
     private final int status;

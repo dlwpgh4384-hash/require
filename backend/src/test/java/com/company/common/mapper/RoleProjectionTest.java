@@ -1,4 +1,6 @@
-package com.company.common.roles;
+package com.company.common.mapper;
+
+import com.company.common.dto.RoleContracts;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -42,12 +44,13 @@ class RoleProjectionTest {
     }
     @Test void everyActionMaterializesFromItsPhysicalColumn() throws Exception {
         var config=configuration(); var row=new RoleRows.Menu(); var labels=new LinkedHashMap<String,Object>();
-        labels.put("menu_id","M011"); labels.put("menu_nm","합성 메뉴"); labels.put("group_name","합성 묶음");
+        labels.put("menu_id","M011"); labels.put("menu_nm","합성 메뉴"); labels.put("scrn_id","UI-29"); labels.put("group_name","합성 묶음");
         for(String name:new String[]{"inq_yn","reg_yn","upd_yn","del_yn","upld_yn","dnld_yn","cnfm_yn"}) labels.put(name,"Y");
         materialize(config,"menu",row,labels);
         assertThat(row.value().input().flags()).containsOnly("Y");
         assertThat(row.value().menuName()).isEqualTo("합성 메뉴");
         assertThat(row.value().groupName()).isEqualTo("합성 묶음");
+        assertThat(row.value().screenId()).isEqualTo("UI-29");
         String query=config.getMappedStatement(RoleMapper.class.getName()+".selectMenus").getBoundSql(Map.of("id","EXEC")).getSql();
         assertThat(query).contains("a.inq_yn", "a.reg_yn", "a.upd_yn", "a.del_yn", "a.upld_yn", "a.dnld_yn", "a.cnfm_yn");
     }

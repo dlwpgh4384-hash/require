@@ -371,7 +371,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-    put:
+    post:
       operationId: putCommonUsers
       summary: 사용자 등록
       security: []
@@ -636,7 +636,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
   /api/common/users/{userId}/password-reset:
-    put:
+    post:
       operationId: putCommonUserPasswordReset
       summary: 임시 비밀번호 초기화
       security: []
@@ -708,7 +708,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
   /api/common/users/{userId}/unlock:
-    put:
+    post:
       operationId: putCommonUserUnlock
       summary: 계정 잠금 해제
       security: []
@@ -777,7 +777,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
   /api/common/users/stop:
-    put:
+    post:
       operationId: putCommonUserStop
       summary: 선택 계정 사용 중지
       security: []
@@ -848,7 +848,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
   /api/common/users/{userId}/resume:
-    put:
+    post:
       operationId: putCommonUserResume
       summary: 계정 사용 재개
       security: []
@@ -1279,6 +1279,63 @@ paths:
       - 'sensitive: 단일 역할 snstvViewYn=N 저장 후 소비 경계 조회/다운로드/AI/합계 fixture 실행 -> 급여·지급 단가·개인별 원가·지급 계좌의 제목·값·합계 기여가
         없다. 없는 제품 소비 기능은 후속 연결 시험 not_run으로 유지한다.'
       - 'confirm-action: 견적 승인/반려 fixture에서 updateYn=Y·cnfmYn=N -> 확정 동작은 거부되고 수정 권한으로 승인하지 않는다. 업무 실행은 후속 연결 시험이다.'
+  /api/common/roles/{roleId}/change-history:
+    get:
+      operationId: getCommonRoleChangeHistory
+      summary: 역할 권한 변경 이력 조회(시안 「변경 이력 (n)」)
+      security: []
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 바뀐 항목마다 1줄, 최근 순
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      type: object
+                      required:
+                      - items
+                      properties:
+                        items:
+                          type: array
+                          items:
+                            type: object
+                            required:
+                            - changedAt
+                            - item
+                            properties:
+                              changedAt:
+                                type: string
+                                format: date-time
+                              item:
+                                type: string
+                              before:
+                                type: string
+                                nullable: true
+                              after:
+                                type: string
+                                nullable: true
+                              changedBy:
+                                type: string
+                                nullable: true
+        '404':
+          description: 역할이 존재하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/common/roles/{roleId}/change-impact:
     get:
       operationId: getCommonRoleChangeImpact
@@ -2003,6 +2060,7 @@ components:
       required:
       - menuId
       - menuName
+      - screenId
       - groupName
       - readYn
       - createYn
@@ -2017,6 +2075,9 @@ components:
           minLength: 1
         menuName:
           type: string
+        screenId:
+          type: string
+          description: 메뉴의 화면 번호(예 UI-16). 시안 권한 표는 「메뉴 이름 화면 번호」로 보여 준다.
         groupName:
           type: string
         readYn:
@@ -2225,8 +2286,8 @@ components:
       additionalProperties: false
     CommonRoleCopyInput:
       type: object
+      description: sourceRoleId가 있으면 「역할 복사」(권한 표·민감 항목 복사), 없으면 「역할 추가」(모든 메뉴 권한 없음·민감 항목 끔). 시안 UI-24.
       required:
-      - sourceRoleId
       - roleName
       - dataScopeCd
       properties:

@@ -1,4 +1,9 @@
-package com.company.common.roles;
+package com.company.common.service;
+
+import com.company.common.controller.CommonRoleController;
+import com.company.common.controller.RoleExceptionHandler;
+import com.company.common.mapper.RoleMapper;
+import com.company.common.dto.RoleContracts;
 
 import com.company.common.controller.ApiExceptionHandler;
 import com.company.common.controller.CommonUserOptionsController;
@@ -111,7 +116,7 @@ class RoleManagementIntegrationTest {
         var body=json.createObjectNode().put("dataScopeCd",scope).put("snstvViewYn",sensitive);
         var menus=body.putArray("menuAuths");
         for(var menu:settings.path("menuAuths")) {
-            var input=menu.deepCopy(); ((ObjectNode)input).remove(List.of("menuName","groupName")); menus.add(input);
+            var input=menu.deepCopy(); ((ObjectNode)input).remove(List.of("menuName","screenId","groupName")); menus.add(input);
         }
         body.set("confirmedAffectedUserIds",json.valueToTree(confirmed)); return body;
     }
@@ -182,6 +187,39 @@ class RoleManagementIntegrationTest {
             .andExpect(jsonPath("$.data.roles.length()").value(5))
             .andExpect(jsonPath("$.data.roles[*].roleCd", org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("R-001"))));
         assertThat(copy("합성 다음","PM","PROJ")).isEqualTo("R-002");
+    }
+    @Test
+    @DisplayName("시안 역할 추가: 원본 없이 만들면 모든 메뉴 권한 없음·민감 항목 끔, 번호는 복사와 같은 R-nnn")
+    void addWithoutSourceStartsWithEveryMenuOff() throws Exception {
+        mvc.perform(post("/api/common/roles").contentType("application/json")
+                .content(json.writeValueAsString(Map.of("roleName", "합성 빈 역할", "dataScopeCd", "PROJ"))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.role.roleId").value("R-001"))
+            .andExpect(jsonPath("$.data.role.snstvViewYn").value("N"))
+            .andExpect(jsonPath("$.data.menuAuths.length()").value(30))
+            .andExpect(jsonPath("$.data.menuAuths[0].screenId").value(org.hamcrest.Matchers.startsWith("UI-")));
+        assertThat(count("SELECT count(*) FROM TB_SY_ROLE_MENU_AUTH WHERE role_id='R-001'")).isEqualTo(30);
+        assertThat(count("SELECT count(*) FROM TB_SY_ROLE_MENU_AUTH WHERE role_id='R-001' AND 'Y' IN (inq_yn,reg_yn,upd_yn,del_yn,upld_yn,dnld_yn,cnfm_yn)")).isZero();
+        assertThat(text("SELECT data_scope_cd FROM TB_SY_ROLE WHERE role_id='R-001'")).isEqualTo("PROJ");
+        assertThat(text("SELECT reg_user_id FROM TB_SY_ROLE WHERE role_id='R-001'")).isEqualTo("admin");
+    }
+    @Test
+    @DisplayName("시안 변경 이력: 바뀐 항목마다 1줄을 사람이 읽는 이름(데이터 범위·민감 항목·메뉴 · 동작)으로 최근 순")
+    void changeHistoryListsEachChangedItemReadably() throws Exception {
+        mvc.perform(get("/api/common/roles/EXEC/change-history")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items.length()").value(0));
+        var body = update("EXEC", "PART", "N", List.of());
+        ((ObjectNode) body.withArray("menuAuths").get(0)).put("createYn", "Y");
+        mvc.perform(put("/api/common/roles/EXEC").contentType("application/json").content(body.toString()))
+            .andExpect(status().isOk());
+        var result = mvc.perform(get("/api/common/roles/EXEC/change-history")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items.length()").value(3)).andReturn();
+        var items = json.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8)).path("data").path("items");
+        var names = new java.util.ArrayList<String>();
+        items.forEach(item -> names.add(item.path("item").asText() + "|" + item.path("before").asText() + "|" + item.path("after").asText()));
+        assertThat(names).contains("데이터 범위|전체|담당 파트", "민감 항목|보기|안 보기", "대시보드 · 등록|없음|있음");
+        assertThat(items.get(0).path("changedAt").asText()).endsWith("Z");
+        mvc.perform(get("/api/common/roles/missing/change-history")).andExpect(status().isNotFound());
     }
     @Test void inactiveNamesRemainUniqueAndMissingNameInsertsNothing() throws Exception {
         String id=copy("합성 추가","ADMIN","ALL");

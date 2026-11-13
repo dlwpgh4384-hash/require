@@ -45,10 +45,11 @@ const lockIcon = (
     <path d="M8 11V7a4 4 0 0 1 8 0v4" />
   </svg>
 );
-/** 시안: 시스템 그룹(자물쇠)을 위에, 업무 그룹(코드 수)을 아래에 둔다. */
+/** 시안: 시스템 그룹(자물쇠)을 위에, 업무 그룹(코드 수)을 아래에, 수당코드(값 코드 그룹)는 맨 끝에 고정한다. */
 const systemFirst = (rows: api.CodeGroup[]) => [
   ...rows.filter((row) => row.sysCodeYn === "Y"),
-  ...rows.filter((row) => row.sysCodeYn !== "Y"),
+  ...rows.filter((row) => row.sysCodeYn !== "Y" && row.valCodeYn !== "Y"),
+  ...rows.filter((row) => row.sysCodeYn !== "Y" && row.valCodeYn === "Y"),
 ];
 const message = (error: unknown) =>
   error instanceof Error ? error.message : "공통코드를 처리하지 못했습니다.";

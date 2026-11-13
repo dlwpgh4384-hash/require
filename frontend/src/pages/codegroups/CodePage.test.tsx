@@ -453,6 +453,8 @@ it("시안대로 시스템 그룹을 위에 두고 자물쇠만, 업무 그룹�
     screen.getByTestId("code-group-list").querySelectorAll("button"),
   ).map((button) => button.dataset.testid);
   expect(names[0]).toBe("code-group-system");
+  // 시안: 수당코드는 맨 끝 고정(새 업무 그룹을 더해도 그 뒤)
+  expect(names[names.length - 1]).toBe("code-group-alwnc");
   expect(
     within(screen.getByTestId("code-group-system")).getByRole("img", {
       name: "시스템 그룹",

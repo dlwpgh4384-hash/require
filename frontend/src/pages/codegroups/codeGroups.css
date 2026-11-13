@@ -68,18 +68,18 @@
   border: 1px solid var(--border);
   border-radius: 8px;
 }
-.code-page table {
+.code-table-wrap table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
-.code-page th {
+.code-table-wrap th {
   background: var(--hover);
   font-weight: 600;
   text-align: left;
 }
-.code-page td,
-.code-page th {
+.code-table-wrap td,
+.code-table-wrap th {
   height: 40px;
   padding: 6px 12px;
   border-bottom: 1px solid var(--border);
@@ -91,14 +91,14 @@
   margin: 0;
   min-width: 0;
 }
-.code-page td label {
+.code-table-wrap td label {
   font-size: 0;
 }
-.code-page td label input,
-.code-page td label select {
+.code-table-wrap td label input,
+.code-table-wrap td label select {
   font-size: 13px;
 }
-.code-page .ls-in-sm {
+.code-table-wrap .ls-in-sm {
   height: 28px;
   max-width: 200px;
   min-width: 90px;
@@ -182,4 +182,401 @@
 .code-page .code-help {
   color: var(--text-sub);
   font-size: 12px;
+}
+
+/* ===== 시안 UI-27 모양 맞춤 (2026-11-14): 시안 .tb/.ni/.twrap/.t/.pager/.fbar/.modal 값 그대로 ===== */
+/* 제목줄 [그룹 추가]: 시안 .btn(흰 바탕·회색 테두리). [수당코드 추가]·[추가]: .btn-p */
+.code-title-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+/* 탭: 높이 40, 좌우 10, 고른 탭 파란 글자·굵게, 아래 선 #e5e7eb */
+.code-page .code-tabs {
+  border-bottom: 1px solid var(--divider);
+  margin-bottom: 0;
+}
+.code-page .code-tabs button {
+  min-height: 40px;
+  height: 40px;
+  padding: 0 10px;
+  border-radius: 0;
+  font-weight: 500;
+  color: var(--text-sub);
+}
+.code-page .code-tabs button:hover {
+  background: transparent;
+  color: var(--text);
+}
+.code-page .code-tabs button[aria-selected="true"] {
+  color: var(--primary);
+  font-weight: 600;
+  border-bottom-color: var(--primary);
+}
+.code-page > [role="tabpanel"]:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
+}
+/* 그룹 목록: 시안 .card + .ni */
+.code-page .code-columns {
+  margin-top: 0;
+}
+.code-page .code-group-list {
+  border-color: var(--divider);
+}
+.code-page .code-group-list button {
+  min-height: 36px;
+  height: 36px;
+  padding: 6px 10px;
+  align-items: center;
+  color: var(--text-sub);
+  font-weight: 400;
+}
+.code-page .code-group-list button:hover {
+  background: var(--hover);
+}
+.code-page .code-group-list button[aria-pressed="true"] {
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+/* 오른쪽: 안내 띠 · 제목 · 표 · 페이지 · 안내 문단을 16px 간격으로 */
+.code-page .code-detail,
+.code-page .code-detail > form > fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.code-page .ls-banner {
+  margin: 0;
+}
+.ls-banner-icon,
+.code-banner-icon {
+  display: inline-flex;
+  flex: none;
+  vertical-align: -3px;
+  margin-right: 10px;
+}
+/* 제목 줄: 시안 .tbar .tl — 13px, 이름 굵게, ID 회색 */
+.code-page .code-detail-head {
+  margin: 0 0 -12px;
+  min-height: 20px;
+}
+.code-page .code-tl {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+  color: var(--text);
+}
+.code-page .code-tl strong {
+  font-weight: 700;
+}
+.code-page .code-tl .code-sub {
+  color: var(--text-sub);
+}
+.code-add-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+/* 표: 시안 .twrap + .t — 테두리 #e5e7eb, 흰 바탕, 줄 높이 40, 좌우 12 */
+.code-page .code-table-wrap {
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: auto;
+}
+.code-table-wrap td,
+.code-table-wrap th {
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--divider);
+  background: var(--surface);
+}
+.code-table-wrap thead th {
+  background: var(--hover);
+}
+.code-table-wrap tbody tr:last-child td {
+  border-bottom: 0;
+}
+.code-table-wrap .ctr {
+  text-align: center;
+}
+.code-table-wrap .num {
+  text-align: right;
+}
+.code-table-wrap .ls-in-sm {
+  width: 200px;
+  min-width: 0;
+  max-width: none;
+}
+.code-table-wrap td:not(:nth-child(2)) .ls-in-sm {
+  width: 150px;
+}
+.code-table-wrap td.num .ls-in-sm {
+  width: 110px;
+  text-align: right;
+}
+.code-page input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+.code-table-wrap .ls-btn-t {
+  border: 0;
+  background: transparent;
+}
+/* 페이지 줄: 시안 .pager — 위로 4px 당김, 「한 화면 건수」 글자는 화면에서 숨김 */
+.code-page .ls-pager {
+  margin-top: -4px;
+}
+.code-page .ls-pg {
+  font-weight: 500;
+}
+.code-page .ls-size {
+  font-size: 0;
+  gap: 0;
+}
+.code-page .ls-size select {
+  font-size: 13px;
+}
+/* 아래 안내: 시안 .note 12px·줄 16px */
+.code-page .code-note,
+.code-page .code-maps-note,
+.code-page .code-history-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.code-page .code-intro {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-sub);
+}
+/* [취소][저장]: 시안 .fbar — 화면 아래에 붙는 흰 줄 */
+.code-page .code-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  justify-content: flex-end;
+  margin: 0 -24px -24px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--divider);
+  background: var(--surface);
+}
+.code-page .code-footer button {
+  font-weight: 500;
+}
+/* 엑셀 표기 대응 */
+.code-page .code-maps-panel {
+  gap: 16px;
+}
+.code-page .code-maps-toolbar {
+  align-items: center;
+}
+.code-page .code-maps-toolbar h2 {
+  margin: 0 auto 0 0;
+}
+.code-page .code-maps-toolbar .ls-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.code-page .code-maps-table {
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--surface);
+  overflow: hidden;
+}
+.code-page .code-maps-table th,
+.code-page .code-maps-table td {
+  border-bottom: 1px solid var(--divider);
+}
+.code-page .code-maps-table .code-maps-check {
+  width: 40px;
+  padding: 0;
+  text-align: center;
+}
+.code-page .code-maps-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.code-page .code-maps-panel .code-maps-empty {
+  text-align: left;
+}
+/* 운영 기준값: 시안 표 — 기준값 칸은 보통 글자, 값 칸 가운데, 칸 220px 오른쪽 정렬 */
+.code-page .operating-standards-table-wrap {
+  margin: 0;
+  max-height: 576px;
+}
+.code-page .operating-standards-table td,
+.code-page .operating-standards-table tbody th {
+  height: 40px;
+  padding: 0 12px;
+  background: var(--surface);
+}
+.code-page .operating-standards-table thead th {
+  padding: 0 12px;
+}
+.code-page .operating-standards-table thead th:nth-child(2),
+.code-page .operating-standards-table .operating-value-cell {
+  text-align: center;
+}
+.code-page .operating-standards-table tbody th {
+  color: var(--text);
+  font-weight: 400;
+  cursor: default;
+}
+.code-page .operating-value-cell > .ls-in {
+  width: 220px;
+  min-width: 0;
+  max-width: none;
+  text-align: right;
+}
+.code-page .operating-parts {
+  padding: 6px 0;
+}
+.code-page .operating-parts .ls-in {
+  width: 56px;
+  min-width: 0;
+}
+.code-page .operating-standards-footer {
+  margin: 0 -24px -24px;
+}
+/* 변경 이력: 시안 .seg — 붙은 단추, 고른 것 파란 바탕 */
+.code-page .code-history-filters {
+  gap: 0;
+}
+.code-page .code-history-filters .ls-btn {
+  border-radius: 0;
+  margin-left: -1px;
+  font-weight: 500;
+}
+.code-page .code-history-filters .ls-btn:first-child {
+  margin-left: 0;
+  border-radius: 6px 0 0 6px;
+}
+.code-page .code-history-filters .ls-btn:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.code-page .code-history-filters .ls-btn-p {
+  position: relative;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+/* 창: 시안 .modal — 폭 400, 머리 16·16·8·24, 본문 4·24·20, 칸 이름 13px·500 회색, 칸 36px·14px, 도움말 12px */
+.code-page .app-dialog {
+  width: min(400px, 100%);
+  padding: 0;
+  border: 0;
+}
+.code-page .app-dialog > h2,
+.code-page .app-dialog-head {
+  margin: 0;
+  padding: 16px 16px 8px 24px;
+}
+.app-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.app-dialog-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.app-dialog-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  width: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-sub);
+}
+.code-page .app-dialog > form,
+.code-page .app-dialog > p,
+.code-page .app-dialog > ul,
+.code-page .app-dialog > div:not(.app-dialog-head) {
+  padding: 4px 24px 20px;
+  margin: 0;
+}
+.code-page .app-dialog fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.code-page .app-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+}
+.code-page .app-dialog label input:not([type="checkbox"]):not([type="radio"]),
+.code-page .app-dialog label select {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text);
+}
+.code-page .app-dialog .field-required {
+  color: #b91c1c;
+}
+.code-page .app-dialog .code-help,
+.code-page .app-dialog .code-maps-help {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.code-page .app-dialog .app-actions {
+  margin-top: 12px;
+}
+.code-page .app-dialog .app-actions button {
+  min-height: 36px;
+  height: 36px;
+  font-weight: 500;
+}
+/* 변경 이력 표: 시안 .twrap — 테두리 #e5e7eb, 흰 바탕, 줄 높이 40, 빈 줄도 표 안에 */
+.code-page .code-history-table-scroll {
+  border-color: var(--divider);
+  background: var(--surface);
+}
+.code-page .code-history-panel .ls-t th,
+.code-page .code-history-panel .ls-t td {
+  height: 40px;
+  padding: 0 12px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--divider);
+}
+.code-page .code-history-panel .ls-t tbody tr:last-child td {
+  border-bottom: 0;
+}
+.code-page .code-history-panel .code-history-empty {
+  color: var(--text-sub);
 }

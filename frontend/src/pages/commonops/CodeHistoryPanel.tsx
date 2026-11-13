@@ -4,6 +4,7 @@ import {
   getCommonCodeChangeHistory,
   type CodeHistoryItem,
 } from "./codeHistory";
+import { Badge } from "../../shared/list";
 import "../../shared/list/list.css";
 import "./codeHistory.css";
 
@@ -54,7 +55,7 @@ export function CodeHistoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
           <button
             type="button"
             key={value}
-            className="ls-btn ls-btn-sm"
+            className={`ls-btn ls-btn-sm${kind === value ? " ls-btn-p" : ""}`}
             data-testid={`code-history-filter-${index}`}
             aria-pressed={kind === value}
             onClick={() => setKind(value)}
@@ -84,9 +85,31 @@ export function CodeHistoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
           변경 이력을 불러오는 중입니다.
         </p>
       ) : !visible?.length ? (
-        <p className="ls-empty" data-testid="code-history-empty">
-          기록이 없습니다.
-        </p>
+        <div className="code-history-table-scroll">
+          <table className="ls-t" aria-label="공통코드 변경 이력">
+            <thead>
+              <tr>
+                <th scope="col">일시</th>
+                <th scope="col">구분</th>
+                <th scope="col">항목</th>
+                <th scope="col">변경 전</th>
+                <th scope="col">변경 후</th>
+                <th scope="col">처리자</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td
+                  colSpan={6}
+                  className="code-history-empty"
+                  data-testid="code-history-empty"
+                >
+                  기록이 없습니다.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="code-history-table-scroll">
           <table className="ls-t" aria-label="공통코드 변경 이력">
@@ -111,7 +134,9 @@ export function CodeHistoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
                       {formatDateTime(row.changedAt)}
                     </time>
                   </td>
-                  <td>{row.kind}</td>
+                  <td>
+                    <Badge>{row.kind}</Badge>
+                  </td>
                   <td>{row.item}</td>
                   <td>{row.before || "–"}</td>
                   <td>{row.after || "–"}</td>

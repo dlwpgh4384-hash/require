@@ -131,7 +131,8 @@ it("shows the empty state for an empty history", async () => {
   expect(await screen.findByTestId("code-history-empty")).toHaveTextContent(
     "기록이 없습니다.",
   );
-  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  // 시안: 빈 이력도 표 머리 아래 한 줄로 보인다.
+  expect(screen.getAllByRole("row")).toHaveLength(2);
 });
 
 it("shows an empty filtered list without discarding other history", async () => {

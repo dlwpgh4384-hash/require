@@ -98,7 +98,7 @@ export function CodeTitleActions() {
   return (
     <button
       type="button"
-      className="primary-button code-title-button"
+      className="code-title-button"
       data-testid="code-group-title-add"
       disabled={!workspace.ready}
       onClick={() => workspace.requestOpen("group")}

@@ -361,7 +361,14 @@ export function CodePage({
     disabled = false,
   ) => (
     <label key={field.key}>
-      {field.label}
+      {id === "new" ? (
+        <span className="code-fl">
+          {field.label}
+          <span className="field-required"> *</span>
+        </span>
+      ) : (
+        field.label
+      )}
       {field.key === "targetField" ? (
         <select
           aria-label={`${id} ${field.label}`}
@@ -501,22 +508,31 @@ export function CodePage({
             {numeric && <p className="code-intro">{NUMERIC_INTRO}</p>}
             {group && (
               <div className="code-detail-head">
-                <h2>
-                  {group.groupName}{" "}
-                  {!numeric && <small>{group.groupId}</small>}
-                  <span className="code-count">
-                    {" "}
-                    · {snapshot ? snapshot.length : group.codeCount}개
-                  </span>
+                <h2 className="code-tl">
+                  <strong>{group.groupName}</strong>{" "}
+                  {!numeric && <span className="code-sub">{group.groupId}</span>}{" "}
+                  · {snapshot ? snapshot.length : group.codeCount}개
                 </h2>
                 {workspace.inShell && !system && !numeric && (
                   <button
                     type="button"
-                    className="ls-btn ls-btn-sm"
+                    className="ls-btn ls-btn-sm code-add-button"
                     data-testid="code-add"
                     disabled={!snapshot || busy || refreshPending}
                     onClick={() => open("code")}
                   >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
                     코드 추가
                   </button>
                 )}
@@ -532,6 +548,7 @@ export function CodePage({
             )}
             {snapshot && (
               <form
+                id="code-form"
                 onSubmit={(event) => {
                   event.preventDefault();
                   void save();
@@ -546,7 +563,12 @@ export function CodePage({
                           <th>코드</th>
                           <th>이름</th>
                           {extras.map((field) => (
-                            <th key={field.key}>{field.label}</th>
+                            <th
+                              key={field.key}
+                              className={field.numeric ? "num" : undefined}
+                            >
+                              {field.label}
+                            </th>
                           ))}
                           {numeric ? (
                             <>
@@ -555,11 +577,11 @@ export function CodePage({
                             </>
                           ) : (
                             <>
-                              <th>순서</th>
-                              <th>사용</th>
+                              <th className="ctr">순서</th>
+                              <th className="ctr">사용</th>
                             </>
                           )}
-                          {!system && !numeric && <th>삭제</th>}
+                          {!system && !numeric && <th className="ctr">삭제</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -593,7 +615,10 @@ export function CodePage({
                               {fieldError("codeName")}
                             </td>
                             {extras.map((field) => (
-                              <td key={field.key}>
+                              <td
+                                key={field.key}
+                                className={field.numeric ? "num" : undefined}
+                              >
                                 {extraControl(
                                   field,
                                   row,
@@ -642,8 +667,8 @@ export function CodePage({
                               </>
                             ) : (
                               <>
-                                <td>{row.sortOrd}</td>
-                                <td>
+                                <td className="ctr">{row.sortOrd}</td>
+                                <td className="ctr">
                                   <input
                                     type="checkbox"
                                     aria-label={`${row.code} 사용`}
@@ -669,10 +694,10 @@ export function CodePage({
                               </>
                             )}
                             {!system && !numeric && (
-                              <td>
+                              <td className="ctr">
                                 <button
                                   type="button"
-                                  className="ls-btn ls-btn-sm"
+                                  className="ls-btn ls-btn-sm ls-btn-t"
                                   data-testid={`code-delete-${row.code.toLowerCase()}`}
                                   aria-label={`${row.code} 삭제`}
                                   onClick={() => {
@@ -721,22 +746,6 @@ export function CodePage({
                   <p className="code-note">
                     {numeric ? NUMERIC_NOTE : NOTE_GENERAL}
                   </p>
-                  <div className="app-actions">
-                    <button
-                      type="button"
-                      data-testid="code-cancel"
-                      onClick={discard}
-                    >
-                      취소
-                    </button>
-                    <button
-                      type="submit"
-                      className="primary-button"
-                      data-testid="code-save"
-                    >
-                      저장
-                    </button>
-                  </div>
                 </fieldset>
               </form>
             )}
@@ -747,6 +756,27 @@ export function CodePage({
             )}
           </div>
         </div>
+        {snapshot && (
+          <div className="app-actions code-footer">
+            <button
+              type="button"
+              data-testid="code-cancel"
+              disabled={busy || refreshPending}
+              onClick={discard}
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              form="code-form"
+              className="primary-button"
+              data-testid="code-save"
+              disabled={busy || refreshPending}
+            >
+              저장
+            </button>
+          </div>
+        )}
         {(failure || groupFailure) && (
           <button
             type="button"
@@ -801,6 +831,7 @@ export function CodePage({
                 : "코드를 삭제할까요?"
           }
           testId={`code-${modal}-dialog`}
+          closable
           onClose={() => {
             if (!busy) {
               setModal(null);
@@ -819,7 +850,7 @@ export function CodePage({
               {modal === "group" ? (
                 <>
                   <label>
-                    그룹 ID *
+                    <span className="code-fl">그룹 ID<span className="field-required"> *</span></span>
                     <input
                       aria-label="그룹 ID"
                       data-testid="new-code-group-id"
@@ -839,7 +870,7 @@ export function CodePage({
                     {fieldError("groupId")}
                   </label>
                   <label>
-                    그룹 이름 *
+                    <span className="code-fl">그룹 이름<span className="field-required"> *</span></span>
                     <input
                       aria-label="그룹 이름"
                       data-testid="new-code-group-name"
@@ -862,7 +893,7 @@ export function CodePage({
               ) : modal === "code" ? (
                 <>
                   <label>
-                    코드 *
+                    <span className="code-fl">코드<span className="field-required"> *</span></span>
                     <input
                       aria-label="새 코드"
                       data-testid="new-code-id"
@@ -883,7 +914,7 @@ export function CodePage({
                     {fieldError("code")}
                   </label>
                   <label>
-                    이름 *
+                    <span className="code-fl">이름<span className="field-required"> *</span></span>
                     <input
                       aria-label="새 코드 이름"
                       data-testid="new-code-name"
@@ -901,7 +932,7 @@ export function CodePage({
                   {numeric && (
                     <>
                       <label>
-                        값
+                        <span className="code-fl">값<span className="field-required"> *</span></span>
                         <input
                           aria-label="새 수당 값"
                           data-testid="new-code-value"
@@ -918,7 +949,7 @@ export function CodePage({
                         {fieldError("codeVal")}
                       </label>
                       <label>
-                        단위
+                        <span className="code-fl">단위<span className="field-required"> *</span></span>
                         <select
                           aria-label="새 수당 단위"
                           data-testid="new-code-unit"

@@ -185,14 +185,27 @@ export function OperatingStandardsPanel({
       {snapshot && !snapshot.length && <p>등록된 운영 기준값이 없습니다.</p>}
       {snapshot && snapshot.length > 0 && (
         <>
-          <p className="operating-standards-help">
+          <Banner kind="info">
+            <svg
+              className="ls-banner-icon"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" />
+            </svg>
             계산에 쓰는 기준값을 한곳에서 관리합니다. 값을 바꾸면 적용
             시작월부터 쓰고, 그 앞 달은 예전 값 그대로 둡니다. 칸이 여러 개인
             줄은 칸마다 따로 저장됩니다. 자금수지 시작 월·기초 잔액은 처음 한 번
             넣는 값이라 적용 시작월 없이 바로 바뀌고, 시작 월을 마감하면 고칠 수
             없습니다. 신호등 기준값(일정 5·10%p, 원가 5·15%p, 업데이트 없음
             14일)은 바꾸지 않는 고정값이라 여기 없습니다.
-          </p>
+          </Banner>
           {dirty && (
             <Banner kind="warn">
               저장하지 않은 변경 {changed.length}건이 있습니다.
@@ -408,6 +421,7 @@ export function OperatingStandardsPanel({
         <Dialog
           title="운영 기준값 저장"
           testId="operating-save-dialog"
+          closable
           onClose={() => {
             if (!busy) setConfirmSave(false);
           }}
@@ -483,6 +497,7 @@ export function OperatingStandardsPanel({
         <Dialog
           title={`${historyDef?.label ?? "운영 기준값"} · 이력`}
           testId="operating-history-dialog"
+          closable
           onClose={() => {
             if (busy) return;
             setHistoryCode(null);

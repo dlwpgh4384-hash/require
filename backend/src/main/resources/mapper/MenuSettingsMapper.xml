@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.mapper.MenuSettingsMapper">
+  <resultMap id="settings" type="com.company.common.mapper.MenuSettingsRow" autoMapping="false">
+    <id column="menu_id" property="menuId" javaType="java.lang.String"/>
+    <result column="upper_menu_id" property="upperMenuId" javaType="java.lang.String"/>
+    <result column="menu_nm" property="menuNm" javaType="java.lang.String"/>
+    <result column="scrn_id" property="scrnId" javaType="java.lang.String"/>
+    <result column="menu_lvl" property="menuLvl" javaType="_int"/>
+    <result column="sort_ord" property="sortOrd" javaType="_int"/>
+    <result column="use_yn" property="useYn" javaType="java.lang.String"/>
+    <result column="pc_only_yn" property="pcOnlyYn" javaType="java.lang.String"/>
+    <result column="lock_yn" property="lockYn" javaType="java.lang.String"/>
+    <result column="icon_nm" property="iconNm" javaType="java.lang.String"/>
+  </resultMap>
+  <select id="selectSettings" resultMap="settings">
+    SELECT menu_id, upper_menu_id, menu_nm, scrn_id, menu_lvl, sort_ord,
+      use_yn, pc_only_yn, lock_yn, icon_nm
+    FROM TB_SY_MENU ORDER BY sort_ord, menu_id
+  </select>
+  <update id="updateSetting">
+    UPDATE TB_SY_MENU SET menu_nm=#{menuNm}, upper_menu_id=#{upperMenuId,jdbcType=VARCHAR},
+      sort_ord=#{sortOrd}, use_yn=#{useYn}, pc_only_yn=#{pcOnlyYn},
+      mod_user_id='admin', mod_dttm=clock_timestamp()
+    WHERE menu_id=#{menuId}
+  </update>
+</mapper>

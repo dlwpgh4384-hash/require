@@ -33,8 +33,7 @@ function reply(data: unknown) {
     }),
   );
 }
-/** 2026-11-12 결정: 등록·처리 동작은 POST, 수정만 PUT. */
-function expectWrite(path: string, body: unknown, method = "POST") {
+function expectWrite(path: string, body: unknown, method = "PUT") {
   expect(request).toHaveBeenCalledTimes(1);
   expect(request).toHaveBeenCalledWith(path, {
     method,

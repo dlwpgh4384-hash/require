@@ -1,0 +1,84 @@
+/* 시안 UI-25-M1 「메뉴 등록」 창(폭 400px): 레벨 라디오, 칸 이름 위·필수 *, 도움말 12px. */
+[data-testid="menu-registration-dialog"] {
+  width: min(400px, 100%);
+}
+.menu-registration-form {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+/* 시안 .fl: 13px·500·#4b5563, 칸 묶음 사이 12px, 이름과 칸 사이 4px. */
+.app-dialog .menu-registration-form > label,
+.app-dialog .menu-registration-level legend {
+  display: block;
+  margin: 8px 0 0;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+}
+.menu-registration-level {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.app-dialog .menu-registration-level legend {
+  width: 100%;
+  padding: 0;
+  margin-bottom: 6px;
+}
+.app-dialog .menu-registration-level label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 14px;
+  font-weight: 400;
+}
+.menu-registration-form .ls-in {
+  width: 100%;
+  min-width: 0;
+}
+.menu-registration-help {
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 16px;
+}
+.app-dialog .menu-registration-form > label.menu-registration-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 400;
+}
+.menu-registration-hint {
+  margin: 4px 0 0;
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 16px;
+}
+.menu-registration-form .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+/* 공통 입력 스타일(높이 36px·폭 100%)이 라디오·체크박스까지 늘리지 않게. */
+.menu-registration-form input[type="radio"],
+.menu-registration-form input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  flex: none;
+}

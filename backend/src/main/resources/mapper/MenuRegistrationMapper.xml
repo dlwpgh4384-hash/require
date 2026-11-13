@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.mapper.MenuRegistrationMapper">
+  <resultMap id="menu" type="com.company.common.mapper.MenuRegistrationRow" autoMapping="false">
+    <id column="menu_id" property="menuId" javaType="java.lang.String"/>
+    <result column="upper_menu_id" property="upperMenuId" javaType="java.lang.String"/>
+    <result column="menu_nm" property="menuNm" javaType="java.lang.String"/>
+    <result column="scrn_id" property="scrnId" javaType="java.lang.String"/>
+    <result column="menu_lvl" property="menuLvl" javaType="_int"/>
+    <result column="sort_ord" property="sortOrd" javaType="_int"/>
+    <result column="use_yn" property="useYn" javaType="java.lang.String"/>
+    <result column="pc_only_yn" property="pcOnlyYn" javaType="java.lang.String"/>
+    <result column="lock_yn" property="lockYn" javaType="java.lang.String"/>
+    <result column="icon_nm" property="iconNm" javaType="java.lang.String"/>
+  </resultMap>
+  <sql id="columns">menu_id, upper_menu_id, menu_nm, scrn_id, menu_lvl, sort_ord,
+    use_yn, pc_only_yn, lock_yn, icon_nm</sql>
+  <select id="selectParents" resultMap="menu">
+    SELECT <include refid="columns"/>
+    FROM TB_SY_MENU
+    WHERE menu_lvl=1
+    ORDER BY sort_ord, menu_id
+  </select>
+  <select id="selectMenu" resultMap="menu">
+    SELECT <include refid="columns"/> FROM TB_SY_MENU WHERE menu_id=#{id}
+  </select>
+  <select id="screenExists" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_SY_MENU WHERE scrn_id=#{scrnId})
+  </select>
+  <select id="selectIssuedNumber" resultType="java.math.BigInteger">
+    SELECT COALESCE(MAX(substring(issued.id FROM 2)::numeric),0)
+    FROM (
+      SELECT m.menu_id AS id FROM TB_SY_MENU m
+      UNION ALL
+      SELECT h.trgt_key AS id FROM TB_SY_CHG_HIST h
+      WHERE h.trgt_tbl_nm='TB_SY_MENU' AND h.chg_type_cd='NEW'
+    ) issued
+    WHERE issued.id ~ ('^' || #{prefix} || '[0-9]+$')
+  </select>
+  <select id="selectNextSortOrder" resultType="int">
+    SELECT COALESCE(MAX(sort_ord),0)+1 FROM TB_SY_MENU
+    <choose>
+      <when test="parentId != null">WHERE upper_menu_id=#{parentId}</when>
+      <otherwise>WHERE menu_lvl=1 AND (upper_menu_id IS NULL OR upper_menu_id='')</otherwise>
+    </choose>
+  </select>
+  <insert id="insertMenu">
+    INSERT INTO TB_SY_MENU (menu_id,upper_menu_id,menu_nm,scrn_id,menu_lvl,sort_ord,
+      use_yn,pc_only_yn,lock_yn,icon_nm,reg_user_id,reg_dttm)
+    VALUES (#{menuId},#{upperMenuId,jdbcType=VARCHAR},#{menuNm},#{scrnId,jdbcType=VARCHAR},
+      #{menuLvl},#{sortOrd},#{useYn},#{pcOnlyYn},#{lockYn},#{iconNm,jdbcType=VARCHAR},
+      'admin',clock_timestamp())
+  </insert>
+  <insert id="insertPermissions">
+    INSERT INTO TB_SY_ROLE_MENU_AUTH (role_id,menu_id,inq_yn,reg_yn,upd_yn,del_yn,
+      upld_yn,dnld_yn,cnfm_yn,reg_user_id,reg_dttm)
+    SELECT r.role_id,#{id},'N','N','N','N','N','N','N','admin',clock_timestamp()
+    FROM TB_SY_ROLE r
+  </insert>
+</mapper>

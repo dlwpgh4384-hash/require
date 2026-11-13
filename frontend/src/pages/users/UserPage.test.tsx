@@ -352,7 +352,7 @@ it("체크하면 「N건 선택」과 일괄 [사용 중지]가 나오고, 확�
   );
 });
 
-it("PM 공백 합산 확인을 취소하면 중지 POST 없이 선택 계정과 담당 프로젝트를 유지한다", async () => {
+it("PM 공백 합산 확인을 취소하면 중지 PUT 없이 선택 계정과 담당 프로젝트를 유지한다", async () => {
   const base = request.getMockImplementation()!;
   request.mockImplementation(async (url: string, init?: RequestInit) =>
     url.includes("change-impact")
@@ -414,7 +414,7 @@ it("등록 창을 다시 열 때 활성 역할을 새로 조회해 중지된 역
 it("중지 요청이 실패하면 행과 선택을 임의로 제거하지 않는다", async () => {
   const base = request.getMockImplementation()!;
   request.mockImplementation(async (url: string, init?: RequestInit) =>
-    url.endsWith("/stop") && init?.method === "POST"
+    url.endsWith("/stop") && init?.method === "PUT"
       ? {
           ok: false,
           status: 409,
@@ -507,3 +507,129 @@ it("수정 창의 미저장 입력은 닫기 전에 확인한다", async () => {
   fireEvent.click(within(dialog).getByTestId("user-cancel"));
   expect(within(dialog).getByText("나가시겠습니까?")).toBeInTheDocument();
 });
+
+it("다른 계정의 상세를 읽는 동안 이전 계정의 처리 버튼을 재사용하지 않는다", async () => {
+  const first = { ...account };
+  const second = {
+    ...account,
+    userId: "seconduser",
+    name: "다음 사용자",
+    email: "second@example.invalid",
+    modDttm: "2026-01-03T03:04:05.123456Z",
+  };
+  let resolveAccount!: (value: ReturnType<typeof response>) => void;
+  const pendingAccount = new Promise<ReturnType<typeof response>>((resolve) => {
+    resolveAccount = resolve;
+  });
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.includes("users?"))
+      return response({
+        items: [listItem(first), listItem(second)],
+        page: 1,
+        pageSize: 50,
+        total: 2,
+      });
+    if (url === "/api/common/users/seconduser" && !init?.method)
+      return pendingAccount;
+    return base(url, init);
+  });
+  page();
+  fireEvent.click(await screen.findByTestId("list-row-test"));
+  const firstPanel = await screen.findByTestId("user-detail");
+  await within(firstPanel).findByText(first.email);
+  fireEvent.click(screen.getByTestId("list-row-seconduser"));
+  const panel = screen.getByTestId("user-detail");
+  expect(within(panel).queryByText(first.email)).not.toBeInTheDocument();
+  expect(within(panel).queryByTestId("user-edit")).not.toBeInTheDocument();
+  expect(within(panel).queryByTestId("user-unlock")).not.toBeInTheDocument();
+  expect(
+    within(panel).queryByTestId("user-password-reset"),
+  ).not.toBeInTheDocument();
+  expect(writes()).toHaveLength(0);
+  resolveAccount(response(second));
+  await within(panel).findByText(second.email);
+  fireEvent.click(within(panel).getByTestId("user-unlock"));
+  await waitFor(() => expect(writes()).toHaveLength(1));
+  expect(writes()[0][0]).toBe("/api/common/users/seconduser/unlock");
+  expect(writes()[0][1]).toMatchObject({
+    method: "PUT",
+    body: JSON.stringify({ modDttm: second.modDttm }),
+  });
+});
+
+it.each(["password-reset", "resume"] as const)(
+  "%s 확인 취소는 요청하지 않고, 확인 후 선택 계정의 POST·버전으로 처리한다",
+  async (operation) => {
+    account = {
+      ...account,
+      userStatCd: operation === "resume" ? "STOP" : "USE",
+    };
+    const originalVersion = account.modDttm;
+    const base = request.getMockImplementation()!;
+    request.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith(`/${operation}`) && init?.method === "PUT") {
+        account = {
+          ...account,
+          userStatCd: "USE",
+          temporaryPassword: true,
+          projectIds: [],
+          projects: [],
+          modDttm: "2026-01-02T03:04:05.123457Z",
+        };
+        return response(
+          operation === "resume"
+            ? account
+            : {
+                userId: account.userId,
+                tempPwdYn: "Y",
+                modDttm: account.modDttm,
+              },
+        );
+      }
+      return base(url, init);
+    });
+    page();
+    fireEvent.click(await screen.findByTestId("list-row-test"));
+    const panel = await screen.findByTestId("user-detail");
+    await within(panel).findByText(account.email);
+    const actionId =
+      operation === "resume" ? "user-resume" : "user-password-reset";
+    const confirmationId =
+      operation === "resume" ? "user-resume-confirm" : "user-reset-confirm";
+    fireEvent.click(within(panel).getByTestId(actionId));
+    fireEvent.click(
+      within(await screen.findByTestId(confirmationId)).getByTestId(
+        "confirmation-cancel",
+      ),
+    );
+    expect(writes()).toHaveLength(0);
+    fireEvent.click(within(panel).getByTestId(actionId));
+    fireEvent.click(
+      within(await screen.findByTestId(confirmationId)).getByTestId(
+        "confirmation-proceed",
+      ),
+    );
+    await screen.findByTestId("user-toast");
+    expect(writes()).toHaveLength(1);
+    expect(writes()[0][0]).toBe(`/api/common/users/test/${operation}`);
+    expect(writes()[0][1]).toMatchObject({
+      method: "PUT",
+      body: JSON.stringify({ modDttm: originalVersion }),
+    });
+    await waitFor(() =>
+      expect(gets("/api/common/users/test").length).toBeGreaterThan(2),
+    );
+    if (operation === "resume")
+      await waitFor(() =>
+        expect(
+          within(panel).queryByTestId("user-resume"),
+        ).not.toBeInTheDocument(),
+      );
+    else
+      expect(
+        await within(panel).findByText("임시 비밀번호"),
+      ).toBeInTheDocument();
+    expect(within(panel).queryByText(/\$2[aby]\$/)).not.toBeInTheDocument();
+  },
+);

@@ -44,4 +44,18 @@ class UserPreferenceProjectionTest {
         assertThat(result.prefVal()).isEqualTo("50");
         assertThat(result.modDttm()).isEqualTo("2026-02-03T04:05:06.123456Z");
     }
+
+    /** 2026-11-12 시간 기준: 「이번 달」은 DB 시간대(UTC)가 아니라 Asia/Seoul로 계산한다(매달 1일 0~9시 지난달 오류 방지). */
+    @Test
+    void cashBaseMonthUsesKoreanCalendarMonth() throws Exception {
+        var config = new Configuration();
+        try (var input = new ClassPathResource("mapper/UserPreferencePeriodSourceMapper.xml").getInputStream()) {
+            new XMLMapperBuilder(input, config, "mapper/UserPreferencePeriodSourceMapper.xml",
+                config.getSqlFragments()).parse();
+        }
+        String sql = config.getMappedStatement(UserPreferencePeriodSourceMapper.class.getName() + ".selectCashBaseYm")
+            .getBoundSql(Map.of()).getSql().replaceAll("\\s+", " ");
+        assertThat(sql).contains("to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul', 'YYYYMM')")
+            .doesNotContain("CURRENT_DATE");
+    }
 }

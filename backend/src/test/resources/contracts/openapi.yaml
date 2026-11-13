@@ -170,6 +170,69 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+    post:
+      operationId: postCommonMenu
+      summary: 대메뉴·서브메뉴 등록
+      security: []
+      x-related-requirements:
+      - REQ-221
+      - REQ-229
+      - REQ-230
+      - REQ-231
+      - REQ-233
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonMenuCreateInput'
+      x-business-rules:
+      - 레벨·이름 필수·50자 이하, 서브메뉴는 유효한 상위 대메뉴·개발된 UI-nn 화면·PC 전용 여부 필수다. 대메뉴에는 화면 번호가 없다.
+      - 한 화면은 왼쪽 메뉴에 한 번만 등록한다. 중복 SCRN_ID는 이미 다른 메뉴에 등록된 화면입니다.로 거부한다. 기존 중복 데이터를 삭제하거나 전역 UNIQUE 추가로 보정하지 않는다.
+      - 사용자에게 ID·아이콘을 입력받지 않는다. 기존 G001…/M001… 계열의 다음 ID를 자동 부여하고 등록 위치는 해당 묶음 끝이다. 대메뉴 ICON_NM=folder, 서브메뉴 ICON_NM=null이다.
+      - 등록 즉시 반영한다. 미저장 표에서 진입 시 확인 취소는 POST0회·창 미개방·입력 보존, 버리기는 표 변경 폐기 후 창을 연다. 이전 표 변경을 POST로 함께 저장하지 않는다.
+      x-side-effects:
+      - TB_SY_MENU의 새 메뉴와 REG_USER_ID=admin·등록시각을 기록한다. 모든 TB_SY_ROLE의 TB_SY_ROLE_MENU_AUTH에 새 메뉴 일곱 동작을 N으로 추가한다.
+      - TB_SY_CHG_HIST에 메뉴 등록 한 줄(항목·이전/이후·admin·일시)을 기록한다. 권한 없음 초기행은 그 등록 한 줄에 포함하고 따로 기록하지 않는다.
+      - 등록 창을 닫고 관리 트리·Sidebar를 다시 읽는다. UI-24는 역할별 새 권한 N 행을 같은 기존 조회로 확인한다.
+      x-state-transitions:
+      - from: 메뉴 없음
+        to: 새 메뉴·전 역할 권한 N
+        condition: 레벨별 필수·개발 화면·중복 검사 통과 후 등록
+      - from: 기존 메뉴 집합
+        to: 기존 메뉴 집합 그대로
+        condition: 필수값 오류·미개발 화면·화면 중복 거부
+      x-required-tests:
+      - 'happy: menuLvl=2·유효 menuNm·상위 대메뉴·개발된 미등록 scrnId·pcOnlyYn=N으로 POST -> 200 새 M계열 menuId이고 관리 GET·TB_SY_MENU에
+        해당 묶음 마지막 SORT_ORD로 저장된다.'
+      - 'auth: 로그인 없이 menuLvl=1·유효 이름으로 POST -> 200 새 G계열 메뉴이고 TB_SY_MENU.REG_USER_ID=admin이다. 개발 단계 역할403을 발명하지 않는다.'
+      - 'validation: 서브메뉴 upperMenuId 또는 scrnId를 누락해 POST -> 400 errors의 해당 필드 오류이고 새 TB_SY_MENU·권한·등록 이력은0행이다.'
+      - 'business: 이미 다른 메뉴에 연결된 scrnId로 POST -> 400과 이미 다른 메뉴에 등록된 화면입니다.이며 기존 TB_SY_MENU·TB_SY_ROLE_MENU_AUTH는 불변이다.'
+      - 'side-effect: 미등록 개발 화면을 POST로 등록 후 모든 역할을 DB 및 getCommonRole로 조회 -> TB_SY_ROLE_MENU_AUTH의 새 메뉴 모든 일곱 동작=N이고
+        TB_SY_CHG_HIST 메뉴 등록1줄·권한 초기행 추가 이력0줄이다.'
+      - 'level: 대메뉴 등록 후 DB 조회 -> SCRN_ID=null·ICON_NM=folder; 서브메뉴 등록 후 ICON_NM=null이며 응답에 ID가 있으나 사용자 입력란은 없다.'
+      - 'dirty-cancel: 미저장 이름 수정 뒤 메뉴 등록 클릭·변경 내용을 버릴까요? 취소 -> 등록 창은 열리지 않고 표 값 유지·POST0회다.'
+      - 'dirty-discard: 미저장 순서 수정 뒤 메뉴 등록 클릭·버리기 후 유효 등록 -> 기존 순서는 서버값 그대로, 새 메뉴만 저장되고 재조회 표에 반영된다.'
+      responses:
+        '200':
+          description: 처리 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonMenuSettingItem'
+        '400':
+          description: 레벨별 필수·이름 길이·미개발 화면·잘못된 상위 대메뉴 또는 중복 화면. 중복 문구는 이미 다른 메뉴에 등록된 화면입니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/common/user-preferences/{prefTypeCd}/{prefKey}:
     get:
       operationId: getCommonUserPreference
@@ -351,33 +414,6 @@ paths:
         schema:
           type: string
         description: 이름 또는 아이디 검색
-      - name: includeStopped
-        in: query
-        required: false
-        schema:
-          type: boolean
-          default: false
-        description: 시안 [사용 중지 포함]. false면 사용 중지 계정을 숨긴다(상태 조건에서 중지를 고르면 함께 보임).
-      - name: sort
-        in: query
-        required: false
-        schema:
-          type: string
-          enum:
-          - userId
-          - name
-          - role
-          - state
-          - last
-        description: 정렬 열. 없으면 이름순.
-      - name: dir
-        in: query
-        required: false
-        schema:
-          type: string
-          enum:
-          - asc
-          - desc
       responses:
         '200':
           description: 조회 또는 저장한 사용자 업무 결과
@@ -398,7 +434,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-    post:
+    put:
       operationId: putCommonUsers
       summary: 사용자 등록
       security: []
@@ -596,134 +632,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /api/common/users/excel:
-    get:
-      operationId: getCommonUsersExcel
-      summary: 사용자 목록 엑셀 다운로드(SFR-011)
-      description: 지금 조건의 전체 결과를 보이는 열 그대로 xlsx로 내려준다. 1행 「사용자 · 다운로드 admin · 한국 시각」, 3행부터 머리글. 파일 이름은 「화면이름_기간_다운로드일시.xlsx」. 접근 기록(DNLD)을 남긴다.
-      security: []
-      parameters:
-      - name: includeStopped
-        in: query
-        required: false
-        schema:
-          type: boolean
-          default: false
-        description: 시안 [사용 중지 포함]. false면 사용 중지 계정을 숨긴다(상태 조건에서 중지를 고르면 함께 보임).
-      - name: sort
-        in: query
-        required: false
-        schema:
-          type: string
-          enum:
-          - userId
-          - name
-          - role
-          - state
-          - last
-        description: 정렬 열. 없으면 이름순.
-      - name: dir
-        in: query
-        required: false
-        schema:
-          type: string
-          enum:
-          - asc
-          - desc
-      - name: roleCd
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: userStatCd
-        in: query
-        required: false
-        schema:
-          type: string
-          enum:
-          - USE
-          - LOCK
-          - STOP
-      - name: keyword
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: columns
-        in: query
-        required: false
-        schema:
-          type: array
-          items:
-            type: string
-        description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
-      responses:
-        '200':
-          description: 엑셀 파일
-          content:
-            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
-              schema:
-                type: string
-                format: binary
-        '400':
-          description: 모르는 열·정렬 값
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-  /api/common/users/{userId}/change-history:
-    get:
-      operationId: getCommonUserChangeHistory
-      summary: 사용자 변경 이력 조회(상세 패널 「변경 이력」 탭)
-      description: 바뀐 항목마다 1줄(이름·이메일·역할·고른 본사·담당 프로젝트·상태·등록), 최근 순.
-      security: []
-      parameters:
-      - name: userId
-        in: path
-        required: true
-        schema:
-          type: string
-          minLength: 1
-      responses:
-        '200':
-          description: 변경 이력 목록
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/ApiResponse'
-                - type: object
-                  required:
-                  - data
-                  properties:
-                    data:
-                      type: array
-                      items:
-                        type: object
-                        required:
-                        - changedAt
-                        - item
-                        properties:
-                          changedAt:
-                            type: string
-                            format: date-time
-                          item:
-                            type: string
-                          before:
-                            type: string
-                            nullable: true
-                          after:
-                            type: string
-                            nullable: true
-                          changedBy:
-                            type: string
-                            nullable: true
-        '400':
-          description: 아이디 형식 오류
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
   /api/common/users/{userId}/access-logs:
     get:
       operationId: getCommonUserAccessLogs
@@ -791,7 +699,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
   /api/common/users/{userId}/password-reset:
-    post:
+    put:
       operationId: putCommonUserPasswordReset
       summary: 임시 비밀번호 초기화
       security: []
@@ -863,7 +771,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
   /api/common/users/{userId}/unlock:
-    post:
+    put:
       operationId: putCommonUserUnlock
       summary: 계정 잠금 해제
       security: []
@@ -932,7 +840,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
   /api/common/users/stop:
-    post:
+    put:
       operationId: putCommonUserStop
       summary: 선택 계정 사용 중지
       security: []
@@ -1003,7 +911,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
   /api/common/users/{userId}/resume:
-    post:
+    put:
       operationId: putCommonUserResume
       summary: 계정 사용 재개
       security: []
@@ -1434,63 +1342,6 @@ paths:
       - 'sensitive: 단일 역할 snstvViewYn=N 저장 후 소비 경계 조회/다운로드/AI/합계 fixture 실행 -> 급여·지급 단가·개인별 원가·지급 계좌의 제목·값·합계 기여가
         없다. 없는 제품 소비 기능은 후속 연결 시험 not_run으로 유지한다.'
       - 'confirm-action: 견적 승인/반려 fixture에서 updateYn=Y·cnfmYn=N -> 확정 동작은 거부되고 수정 권한으로 승인하지 않는다. 업무 실행은 후속 연결 시험이다.'
-  /api/common/roles/{roleId}/change-history:
-    get:
-      operationId: getCommonRoleChangeHistory
-      summary: 역할 권한 변경 이력 조회(시안 「변경 이력 (n)」)
-      security: []
-      parameters:
-      - name: roleId
-        in: path
-        required: true
-        schema:
-          type: string
-          minLength: 1
-      responses:
-        '200':
-          description: 바뀐 항목마다 1줄, 최근 순
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/ApiResponse'
-                - type: object
-                  required:
-                  - data
-                  properties:
-                    data:
-                      type: object
-                      required:
-                      - items
-                      properties:
-                        items:
-                          type: array
-                          items:
-                            type: object
-                            required:
-                            - changedAt
-                            - item
-                            properties:
-                              changedAt:
-                                type: string
-                                format: date-time
-                              item:
-                                type: string
-                              before:
-                                type: string
-                                nullable: true
-                              after:
-                                type: string
-                                nullable: true
-                              changedBy:
-                                type: string
-                                nullable: true
-        '404':
-          description: 역할이 존재하지 않는다.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
   /api/common/roles/{roleId}/change-impact:
     get:
       operationId: getCommonRoleChangeImpact
@@ -1604,6 +1455,170 @@ paths:
       - 'validation: 존재하지 않는 roleId로 POST -> 404 ApiError이고 TB_SY_ROLE 기존 행 수·USE_YN이 유지된다.'
       - 'business: 사용자1명 이상 배정 역할에 POST -> 400·정확한 사용자 수와 선제거 안내이며 USE_YN=Y가 유지된다. 기본5개 직접 요청도400이다.'
       - 'side-effect: 추가 역할 중지 POST 뒤 getCommonUserOptions·DB 조회 -> roles에서 대상이 없고 TB_SY_ROLE_MENU_AUTH·역할 번호는 보존된다.'
+  /api/common/menu-settings:
+    get:
+      operationId: getCommonMenuSettings
+      summary: 메뉴 관리 트리 조회
+      security: []
+      x-related-requirements:
+      - REQ-218
+      parameters:
+      - name: menuLvl
+        in: query
+        required: false
+        schema:
+          type: integer
+          enum:
+          - 1
+          - 2
+        description: 생략하면 전체 관리 트리, 1 또는 2이면 해당 레벨만 반환한다. UI-25는 생략하여 전체를 읽는다. 계층 전체는 페이지 분할하지 않는다.
+      x-pagination-filtering:
+        pagination: 계층 전체 조회; 페이지 분할 없음
+        filtering: menuLvl 생략 전체, 1 대메뉴, 2 서브메뉴; 사용 중지 포함
+        ordering: 형제 SORT_ORD·MENU_ID 순
+      x-aiops-query-role:
+        entity: TB_SY_MENU
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 처리 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonMenuSettingsResult'
+        '400':
+          description: menuLvl이 1·2 외의 값이거나 정수 형식이 아니다. errors의 field=menuLvl.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      description: Sidebar용 getCommonMenus는 변경하지 않는다. 관리 표에 필요한 useYn·lockYn을 포함한 공개 DTO만 반환한다. DB 등록/수정 내부 컬럼은 공개하지
+        않는다.
+    put:
+      operationId: putCommonMenuSettings
+      summary: 메뉴 트리 변경 저장
+      security: []
+      x-related-requirements:
+      - REQ-219
+      - REQ-220
+      - REQ-221
+      - REQ-222
+      - REQ-223
+      - REQ-224
+      - REQ-225
+      - REQ-226
+      - REQ-234
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonMenuSettingsInput'
+      x-business-rules:
+      - 이름은 필수·50자 이하이며 LOCK_YN=Y도 이름 수정 가능하다. menuLvl·scrnId·iconNm·LOCK_YN 변경을 받지 않는다.
+      - 일반 메뉴는 다른 대메뉴로 이동 가능하나 서버 DB LOCK_YN=Y 메뉴는 묶음 밖 이동과 USE_YN=N을 거부한다. 화면 체크를 비활성화하여 서버 보호를 대체하지 않는다.
+      - 대메뉴는 사용·PC 전용 체크 입력이 없으므로 기존 두 값을 유지한다. useYn=N도 메뉴 행을 삭제하지 않는다.
+      - 직접 드래그한 movedMenuIds만 순서 이력을 남기고 그로 인해 밀린 형제 순서는 별도 이력을 남기지 않는다. 저장 뒤 상위·형제 순서를 실제 트리로 읽는다.
+      x-side-effects:
+      - TB_SY_MENU의 허용 필드·MOD_USER_ID=admin·수정시각을 저장한다. 이름·소속·사용·PC 전용 및 직접 드래그 순서 변경별 TB_SY_CHG_HIST에 항목·이전/이후값·admin·일시를
+        한 줄씩 기록한다.
+      - 성공 후 UI는 기존 getCommonMenus·관리 GET을 다시 읽어 Sidebar·즐겨찾기·최근·직접 주소 조건을 갱신한다. 메뉴 권한 실행 검사는 UI-22까지 추가하지 않는다.
+      x-state-transitions:
+      - from: 기존 트리 설정
+        to: 수정 트리 설정
+        condition: 필수·길이·잠금 보호 통과 후 하단 저장
+      - from: USE_YN=Y
+        to: USE_YN=N
+        condition: LOCK_YN=N인 메뉴 사용 해제; 행 보존
+      - from: PC_ONLY_YN=N 또는 Y
+        to: 선택 Y 또는 N
+        condition: PC 전용 변경 저장
+      - from: 잠금 메뉴 기존 소속·사용
+        to: 기존 소속·사용 그대로
+        condition: 타 묶음 이동 또는 끄기 거부
+      x-required-tests:
+      - 'happy: LOCK_YN=Y 메뉴의 유효 이름과 일반 메뉴 직접 순서 3→1로 PUT -> 200이며 GET 관리 트리의 menuNm·sortOrd=1 및 TB_SY_MENU.MENU_NM·SORT_ORD가
+        새 값이다.'
+      - 'auth: 인증 헤더 없이 일반 메뉴 이름을 PUT -> 200이고 TB_SY_MENU.MOD_USER_ID=admin이다. 원문18행에 따라 호출자401/403 거부를 만들지 않는다.'
+      - 'validation: menuNm이 빈 값 또는 51자인 items로 PUT -> 400 ApiError.errors의 field=menuNm이고 기존 MENU_NM과 변경 이력 행 수가
+        유지된다. 50자는200이다.'
+      - 'business: DB LOCK_YN=Y인 시스템 메뉴를 useYn=N 또는 다른 upperMenuId로 PUT -> 400 ApiError 업무 오류이고 TB_SY_MENU.USE_YN=Y·UPPER_MENU_ID가
+        그대로다. 같은 메뉴 이름만 변경은200이다.'
+      - 'side-effect: 일반 메뉴를 직접 순서 3→1로 이동하고 이름·소속·사용·PC 전용을 변경해 PUT -> TB_SY_CHG_HIST에 변경 항목마다 이전/이후값·admin·일시가 있고
+        순서 이력은 직접 메뉴 1줄, 밀린 형제는0줄이다.'
+      - 'mobile: pcOnlyYn=Y로 PUT 후 휴대폰 메뉴·즐겨찾기·최근과 직접 주소 진입 -> 세 목록에 그 화면이 없고 동일 주소는 PC 전용 안내이며 PC 폭에서는 정상 본문이다.'
+      - 'disabled: 일반 메뉴 useYn=N으로 PUT 후 기존 getCommonMenus·관리 GET -> 전자에 메뉴가 없고 후자 useYn=N 및 TB_SY_MENU 행은 보존된다.'
+      responses:
+        '200':
+          description: 처리 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonMenuSettingsResult'
+        '400':
+          description: 이름 필수·50자 초과·유효하지 않은 소속 또는 시스템 메뉴 끄기/타 묶음 이동. errors는 해당 입력 필드를 가리킨다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/menu-options:
+    get:
+      operationId: getCommonMenuOptions
+      summary: 메뉴 등록 선택 목록
+      security: []
+      x-related-requirements:
+      - REQ-230
+      parameters:
+      - name: menuLvl
+        in: query
+        required: true
+        schema:
+          type: integer
+          enum:
+          - 1
+          - 2
+        description: 등록 레벨 1=대메뉴, 2=서브메뉴. 레벨에 필요한 선택지만 반환한다.
+      x-pagination-filtering:
+        pagination: 등록 선택용 전체 옵션; 페이지 분할 없음
+        filtering: menuLvl별 기존 대메뉴 및 실제 개발된 화면; 화면 코드는 실제 구현 등록부에서 읽음
+      responses:
+        '200':
+          description: 처리 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonMenuOptionResult'
+        '400':
+          description: menuLvl 누락·정수 형식 오류·1 또는 2가 아닌 레벨; errors.field=menuLvl.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      description: UI는 응답 목록을 ls-in 선택칸에 연결하며 정본의 모든 placeholder 화면을 개발 완료 목록으로 꾸미지 않는다. 제품 목록 확보는 OQ-MENU-001, 독립
+        fixture 시험은 가능하다.
 components:
   schemas:
     ApiResponse:
@@ -2215,7 +2230,6 @@ components:
       required:
       - menuId
       - menuName
-      - screenId
       - groupName
       - readYn
       - createYn
@@ -2230,9 +2244,6 @@ components:
           minLength: 1
         menuName:
           type: string
-        screenId:
-          type: string
-          description: 메뉴의 화면 번호(예 UI-16). 시안 권한 표는 「메뉴 이름 화면 번호」로 보여 준다.
         groupName:
           type: string
         readYn:
@@ -2441,8 +2452,8 @@ components:
       additionalProperties: false
     CommonRoleCopyInput:
       type: object
-      description: sourceRoleId가 있으면 「역할 복사」(권한 표·민감 항목 복사), 없으면 「역할 추가」(모든 메뉴 권한 없음·민감 항목 끔). 시안 UI-24.
       required:
+      - sourceRoleId
       - roleName
       - dataScopeCd
       properties:
@@ -2472,6 +2483,214 @@ components:
           enum:
           - N
       additionalProperties: false
+    CommonMenuSettingItem:
+      type: object
+      required:
+      - menuId
+      - upperMenuId
+      - menuNm
+      - scrnId
+      - menuLvl
+      - sortOrd
+      - useYn
+      - pcOnlyYn
+      - lockYn
+      - iconNm
+      properties:
+        menuId:
+          type: string
+          minLength: 1
+          maxLength: 20
+        upperMenuId:
+          type: string
+          maxLength: 20
+          nullable: true
+        menuNm:
+          type: string
+          minLength: 1
+          maxLength: 50
+        scrnId:
+          type: string
+          maxLength: 10
+          nullable: true
+        menuLvl:
+          type: integer
+          enum:
+          - 1
+          - 2
+        sortOrd:
+          type: integer
+        useYn:
+          type: string
+          enum:
+          - Y
+          - N
+        pcOnlyYn:
+          type: string
+          enum:
+          - Y
+          - N
+        lockYn:
+          type: string
+          enum:
+          - Y
+          - N
+        iconNm:
+          type: string
+          maxLength: 30
+          nullable: true
+      additionalProperties: false
+    CommonMenuSettingsResult:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonMenuSettingItem'
+    CommonMenuUpdateItem:
+      type: object
+      required:
+      - menuId
+      - menuNm
+      - upperMenuId
+      - sortOrd
+      properties:
+        menuId:
+          type: string
+          minLength: 1
+          maxLength: 20
+        menuNm:
+          type: string
+          minLength: 1
+          maxLength: 50
+        upperMenuId:
+          type: string
+          maxLength: 20
+          nullable: true
+        sortOrd:
+          type: integer
+        useYn:
+          type: string
+          enum:
+          - Y
+          - N
+        pcOnlyYn:
+          type: string
+          enum:
+          - Y
+          - N
+      additionalProperties: false
+      description: 기존 행의 수정 허용 필드만 전달한다. 대메뉴는 useYn·pcOnlyYn을 보내지 않으며 서버가 기존값을 유지한다. menuLvl·scrnId·iconNm·lockYn은 변경
+        입력이 아니다.
+    CommonMenuSettingsInput:
+      type: object
+      required:
+      - items
+      - movedMenuIds
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonMenuUpdateItem'
+          minItems: 1
+        movedMenuIds:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 20
+          uniqueItems: true
+          description: 이번 편집에서 사용자가 직접 드래그한 메뉴 ID. 밀린 형제 행은 포함하지 않는다. 직접 이동하지 않았다면 빈 배열이다.
+      additionalProperties: false
+    CommonMenuGroupCreateInput:
+      type: object
+      required:
+      - menuLvl
+      - menuNm
+      properties:
+        menuLvl:
+          type: integer
+          enum:
+          - 1
+        menuNm:
+          type: string
+          minLength: 1
+          maxLength: 50
+      additionalProperties: false
+    CommonMenuChildCreateInput:
+      type: object
+      required:
+      - menuLvl
+      - menuNm
+      - upperMenuId
+      - scrnId
+      - pcOnlyYn
+      properties:
+        menuLvl:
+          type: integer
+          enum:
+          - 2
+        menuNm:
+          type: string
+          minLength: 1
+          maxLength: 50
+        upperMenuId:
+          type: string
+          minLength: 1
+          maxLength: 20
+        scrnId:
+          type: string
+          pattern: ^UI-[0-9]{2}$
+          maxLength: 10
+        pcOnlyYn:
+          type: string
+          enum:
+          - Y
+          - N
+      additionalProperties: false
+    CommonMenuCreateInput:
+      oneOf:
+      - $ref: '#/components/schemas/CommonMenuGroupCreateInput'
+      - $ref: '#/components/schemas/CommonMenuChildCreateInput'
+    CommonMenuOptionResult:
+      type: object
+      required:
+      - upperMenus
+      - screens
+      properties:
+        upperMenus:
+          type: array
+          items:
+            type: object
+            required:
+            - menuId
+            - menuNm
+            properties:
+              menuId:
+                type: string
+                minLength: 1
+                maxLength: 20
+              menuNm:
+                type: string
+                maxLength: 50
+        screens:
+          type: array
+          items:
+            type: object
+            required:
+            - scrnId
+            - menuNm
+            properties:
+              scrnId:
+                type: string
+                pattern: ^UI-[0-9]{2}$
+              menuNm:
+                type: string
+                description: 실제 개발된 화면의 이름; 제품 메뉴 seed가 아니다.
+      description: menuLvl=1은 대메뉴 선택이 필요 없어 두 배열이 비어 있다. menuLvl=2는 기존 대메뉴와 실제 개발된 화면을 반환한다. 이미 등록된 화면의 저장은 서버가 다시 중복
+        검증한다. 화면 목록은 OQ-MENU-001의 실제 구현 등록부 원천이며 placeholder 전체를 개발 완료로 취급하지 않는다.
 x-requirement-context:
   description: >-
     아래 항목은 관련 요구별 역할·관찰 증거다. 면제 목록이 아니다.
@@ -2824,6 +3043,50 @@ x-uncovered-requirements:
 - canonical_id: REQ-182
   status: non-functional
   evidence: 실제 코드와 익명 계약 — 새 역할 연산 security=[]와 코드 라우팅·응답을 대조한다. 기존 bearerAuth 정의는 지우지 않는다.
+
+- canonical_id: REQ-207
+  status: non-functional
+  evidence: '개발 단계 익명 admin: 인증 없는 메뉴 조회·저장 성공, REG_USER_ID/MOD_USER_ID=admin; securitySchemes·bearerAuth 부재.'
+- canonical_id: REQ-208
+  status: out-of-scope
+  evidence: '연동 후속 경계: 메뉴 등록 후 권한 N을 저장해도 현재 admin 화면이 로그인·메뉴 권한으로 차단되지 않으며 알림·메일 호출은 없다.'
+- canonical_id: REQ-209
+  status: non-functional
+  evidence: '최종 시안과 SQL 원천: 묶음 추가 대신 메뉴 등록, 휴대폰 표시 대신 PC 전용이며 실제 SQL과 물리 매핑을 대조한다.'
+- canonical_id: REQ-210
+  status: non-functional
+  evidence: '명시적 DB 준비: 일반 기동 자동 migration 0회; 준비 실행의 V1~V6 순서와 추가 SQL 등록을 확인한다.'
+- canonical_id: REQ-211
+  status: non-functional
+  evidence: '기존 계층별 패키지: CommonRoleController·CommonRoleService·RoleMapper·RoleContracts를 재사용하고 메뉴 담당 코드도 같은 계층별
+    패키지에 있다.'
+- canonical_id: REQ-212
+  status: non-functional
+  evidence: '사용자 HTTP 메서드 보존: 기존 실제 사용자 API 회귀에서 다섯 명령은 POST, 수정은 PUT이다. 기준선 문서의 PUT 표기 충돌은 별도 명시한다.'
+- canonical_id: REQ-213
+  status: non-functional
+  evidence: '권한 화면 수동 수정 보존: 메뉴 추가 뒤 기존 UI-24 제목줄·미저장 안내·Ctrl+S가 유지되고 모든 역할에서 새 권한 행이 조회된다.'
+- canonical_id: REQ-214
+  status: non-functional
+  evidence: '공통 입력칸 재사용: UI-25 이름 입력·레벨/상위/화면 선택의 클래스가 ls-in이며 기존 글씨 오류가 재발하지 않는다.'
+- canonical_id: REQ-215
+  status: non-functional
+  evidence: '메뉴·권한 공동 회귀: 등록·변경의 성공 후 getCommonMenus 및 getCommonRole을 읽고 Sidebar와 권한 표의 새 이름·행을 대조한다.'
+- canonical_id: REQ-216
+  status: data-constraint
+  evidence: '기존 표만 사용: 변경 전후 물리 표 inventory가 같고 UI-25·SLICE 식별자가 엔터티로 투영되지 않는다.'
+- canonical_id: REQ-217
+  status: screen-only
+  evidence: UI-25 /screens/UI-25의 PC 본문/휴대폰 안내는 브라우저 폭 판정이며 별도 API 명령을 만들지 않는다.
+- canonical_id: REQ-227
+  status: data-constraint
+  evidence: 'PC 전용 초기 여섯 화면: 빈 초기 fixture에서 여섯 화면만 Y이고 기존 메뉴 DB 준비 재실행에서 사용자 변경값은 유지된다.'
+- canonical_id: REQ-228
+  status: screen-only
+  evidence: UI-25 대메뉴의 사용·PC 전용 체크칸 제외는 관리 표 렌더링으로 만족하며 서버 쓰기를 추가하지 않는다.
+- canonical_id: REQ-232
+  status: data-constraint
+  evidence: '레벨별 화면·아이콘: 대메뉴 저장 SCRN_ID=null·ICON_NM=folder, 서브메뉴 ICON_NM=null; 아이콘 선택칸은 없다.'
 
 x-change-supersession:
   description: 기존 operation과 기준선 시험은 원형 보존한다. 이번 공통 기능 인수에는 다음 예외가 우선하며 기존 메뉴 조회 자체를 상태 저장 API로 바꾸지 않는다.

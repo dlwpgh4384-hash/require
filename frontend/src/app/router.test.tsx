@@ -12,6 +12,10 @@ import { RouterProvider } from "react-router-dom";
 import type { ShellMenuResponse } from "./NavigationRoot";
 import { createAppRouter } from "./router";
 import type { RoleSettings } from "../pages/roles/roles";
+import type {
+  MenuSettingItem,
+  MenuSettingsInput,
+} from "../pages/menusettings/menuSettings";
 
 let router: ReturnType<typeof createAppRouter> | undefined;
 
@@ -211,7 +215,266 @@ function expectSingleShell() {
   expect(screen.getAllByRole("main")).toHaveLength(1);
 }
 
+function respondWithMenuSettings() {
+  let items: MenuSettingItem[] = [
+    {
+      menuId: "G010",
+      upperMenuId: null,
+      menuNm: "시스템",
+      scrnId: null,
+      menuLvl: 1,
+      sortOrd: 1,
+      useYn: "Y",
+      pcOnlyYn: "N",
+      lockYn: "Y",
+      iconNm: "gear",
+    },
+    {
+      menuId: "M029",
+      upperMenuId: "G010",
+      menuNm: "메뉴",
+      scrnId: "UI-25",
+      menuLvl: 2,
+      sortOrd: 1,
+      useYn: "Y",
+      pcOnlyYn: "Y",
+      lockYn: "Y",
+      iconNm: null,
+    },
+  ];
+  const success = (data: unknown) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      success: true,
+      meta: {},
+      data: structuredClone(data),
+    }),
+  });
+  const list = vi.fn(async () => success({ items }));
+  const request = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url === "/api/common/menu-settings") {
+      if (init?.method === "PUT") {
+        const input: MenuSettingsInput = JSON.parse(String(init.body));
+        items = items.map((row) => ({
+          ...row,
+          ...input.items.find((item) => item.menuId === row.menuId),
+        }));
+        return success({ items });
+      }
+      return list();
+    }
+    if (url.startsWith("/api/common/menu-options?"))
+      return success({
+        upperMenus: items
+          .filter((row) => row.menuLvl === 1)
+          .map(({ menuId, menuNm }) => ({ menuId, menuNm })),
+        screens: [{ scrnId: "UI-25", menuNm: "메뉴" }],
+      });
+    if (url === "/api/common/menus") {
+      if (init?.method === "POST") {
+        const input = JSON.parse(String(init.body));
+        const item: MenuSettingItem = {
+          menuId: "G011",
+          upperMenuId: null,
+          scrnId: null,
+          menuLvl: 1,
+          menuNm: input.menuNm,
+          sortOrd: 2,
+          useYn: "Y",
+          pcOnlyYn: "N",
+          lockYn: "N",
+          iconNm: "folder",
+        };
+        items = [...items, item];
+        return success(item);
+      }
+      const body = response();
+      body.data.push(
+        ...items.map(({ useYn: _useYn, lockYn: _lockYn, ...row }) => row),
+      );
+      body.meta.screenAccess.push({
+        scrnId: "UI-25",
+        available: true,
+        pcOnlyYn: "Y",
+      });
+      return { ok: true, status: 200, json: async () => body };
+    }
+    return { ok: true, status: 200, json: async () => preferenceResponse(url) };
+  });
+  vi.stubGlobal("fetch", request);
+  return { request, list };
+}
+
 describe("application route registration", () => {
+  it("UI-25 direct entry dispatches MenuPage and saves through its real client, refreshing the single shell", async () => {
+    const { request, list } = respondWithMenuSettings();
+    mount("/screens/UI-25");
+    const input = await screen.findByLabelText("M029 메뉴 이름");
+    expect(screen.getAllByTestId("menu-settings-page")).toHaveLength(1);
+    expectSingleShell();
+    expect(request).toHaveBeenCalledWith("/api/common/menu-settings", {
+      signal: expect.any(AbortSignal),
+    });
+    fireEvent.change(input, { target: { value: "메뉴 설정" } });
+    fireEvent.click(screen.getByTestId("menu-settings-save"));
+    await screen.findByTestId("menu-settings-toast");
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(menuCalls(request)).toHaveLength(2));
+    const saves = request.mock.calls.filter(
+      ([url, init]) =>
+        url === "/api/common/menu-settings" && init?.method === "PUT",
+    );
+    expect(saves).toHaveLength(1);
+    expect(JSON.parse(String(saves[0][1]?.body))).toEqual({
+      items: [
+        {
+          menuId: "M029",
+          menuNm: "메뉴 설정",
+          upperMenuId: "G010",
+          sortOrd: 1,
+          useYn: "Y",
+          pcOnlyYn: "Y",
+        },
+      ],
+      movedMenuIds: [],
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("screen-tab-ui-25")).toHaveTextContent(
+        "메뉴 설정",
+      ),
+    );
+    expect(
+      request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
+    ).toBe(false);
+    expect(router?.state.location.pathname).toBe("/screens/UI-25");
+    expectSingleShell();
+  });
+
+  it("UI-25 registration remains a dialog and uses the existing options and POST clients", async () => {
+    const { request, list } = respondWithMenuSettings();
+    mount("/screens/UI-25");
+    await screen.findByLabelText("M029 메뉴 이름");
+    fireEvent.click(screen.getByTestId("menu-registration-open"));
+    await screen.findByTestId("menu-registration-no-screens");
+    expect(request).toHaveBeenCalledWith("/api/common/menu-options?menuLvl=2", {
+      signal: expect.any(AbortSignal),
+    });
+    fireEvent.click(screen.getByTestId("menu-registration-level-1"));
+    fireEvent.change(screen.getByTestId("menu-registration-name"), {
+      target: { value: "새 묶음" },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("menu-registration-submit")).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByTestId("menu-registration-submit"));
+    await screen.findByLabelText("G011 메뉴 이름");
+    expect(
+      screen.queryByTestId("menu-registration-dialog"),
+    ).not.toBeInTheDocument();
+    expect(request).toHaveBeenCalledWith("/api/common/menus", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ menuLvl: 1, menuNm: "새 묶음" }),
+    });
+    await waitFor(() =>
+      expect(
+        request.mock.calls.filter(
+          ([url, init]) => url === "/api/common/menus" && !init?.method,
+        ),
+      ).toHaveLength(2),
+    );
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(router?.state.location.pathname).toBe("/screens/UI-25");
+    expectSingleShell();
+  });
+
+  it("UI-25 keeps its draft across child routes and uses the shared tab-close guard", async () => {
+    respondWithMenuSettings();
+    mount("/screens/UI-25");
+    fireEvent.change(await screen.findByLabelText("M029 메뉴 이름"), {
+      target: { value: "미저장 메뉴" },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("screen-tab-ui-25")).toHaveTextContent("●"),
+    );
+    const preferences = screen.getByTestId("user-preferences");
+    await act(async () => {
+      await router!.navigate("/screens/ADDED");
+    });
+    await screen.findByRole("region", { name: "ADDED 본문" });
+    await act(async () => {
+      await router!.navigate("/screens/UI-25");
+    });
+    expect(screen.getByLabelText("M029 메뉴 이름")).toHaveValue("미저장 메뉴");
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
+    fireEvent.click(screen.getByTestId("screen-tab-close-ui-25"));
+    await screen.findByTestId("unsaved-dialog");
+    fireEvent.click(screen.getByTestId("confirmation-cancel"));
+    expect(screen.getByLabelText("M029 메뉴 이름")).toHaveValue("미저장 메뉴");
+    expectSingleShell();
+  });
+
+  it("UI-25 mobile direct entry uses the existing PC-only gate without loading management data", async () => {
+    const { request, list } = respondWithMenuSettings();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query === "(max-width: 767px)",
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    mount("/screens/UI-25");
+    expect(await screen.findByText("PC에서 이용해 주세요")).toBeVisible();
+    expect(screen.queryByTestId("menu-settings-page")).not.toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
+    expect(
+      request.mock.calls.some(([url]) =>
+        url.startsWith("/api/common/menu-options"),
+      ),
+    ).toBe(false);
+    expectSingleShell();
+  });
+
+  it("UI-25 keeps an empty management result empty without replacing the shell or disabling registration", async () => {
+    const { list } = respondWithMenuSettings();
+    list.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, meta: {}, data: { items: [] } }),
+    });
+    mount("/screens/UI-25");
+    expect(await screen.findByText("등록된 메뉴가 없습니다.")).toBeVisible();
+    expect(screen.getByTestId("menu-registration-open")).toBeEnabled();
+    expect(screen.queryByTestId("menu-settings-retry")).not.toBeInTheDocument();
+    expect(router?.state.location.pathname).toBe("/screens/UI-25");
+    expectSingleShell();
+  });
+
+  it("UI-25 management failure retries inside the same route without leaking server details", async () => {
+    const { list } = respondWithMenuSettings();
+    list.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({
+        success: false,
+        meta: {},
+        message: "private SQL error",
+        data: { items: [] },
+      }),
+    });
+    mount("/screens/UI-25");
+    const retry = await screen.findByTestId("menu-settings-retry");
+    expect(screen.queryByText("private SQL error")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("menu-settings-save")).not.toBeInTheDocument();
+    fireEvent.click(retry);
+    expect(await screen.findByLabelText("M029 메뉴 이름")).toBeVisible();
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(router?.state.location.pathname).toBe("/screens/UI-25");
+    expectSingleShell();
+  });
+
   it("UI-24 direct entry renders the role client inside the existing shell and saves anonymously", async () => {
     const { request } = respondWithRoles();
     mount("/screens/UI-24");
@@ -589,6 +852,20 @@ describe("application route registration", () => {
         request.mock.calls.filter(([, init]) => init?.method === "PUT"),
       ).toHaveLength(1),
     );
+    // 저장 후 재조회와 상태 반영까지 끝나도 같은 방문을 다시 저장하지 않는다.
+    await waitFor(() =>
+      expect(
+        request.mock.calls.filter(
+          ([url, init]) =>
+            url === "/api/common/user-preferences/RECENT/GLOBAL" &&
+            !init?.method,
+        ),
+      ).toHaveLength(2),
+    );
+    await act(async () => {});
+    expect(
+      request.mock.calls.filter(([, init]) => init?.method === "PUT"),
+    ).toHaveLength(1);
     const [url, init] = request.mock.calls.find(
       ([, i]) => i?.method === "PUT",
     )!;

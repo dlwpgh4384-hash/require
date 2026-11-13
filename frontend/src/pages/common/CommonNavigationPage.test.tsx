@@ -191,7 +191,9 @@ async function expectScreenContent(id: string) {
         name: /^(코드|엑셀 표기 대응|운영 기준값|변경 이력)$/,
       }),
     ).toHaveLength(4);
-    expect(screen.getByTestId("code-group-title-add")).toBeEnabled();
+    await waitFor(() =>
+      expect(screen.getByTestId("code-group-title-add")).toBeEnabled(),
+    );
   } else {
     expect(
       await screen.findByRole("region", { name: `${id} 본문` }),
@@ -238,7 +240,7 @@ describe("common placeholder screen contract", () => {
     fireEvent.click(screen.getByTestId("code-tab-history"));
     expect(await screen.findByTestId("code-history-empty")).toBeVisible();
     expect(screen.getByTestId("code-history-panel")).toBeVisible();
-    expect(screen.getByTestId("code-group-title-add")).toBeDisabled();
+    expect(screen.queryByTestId("code-group-title-add")).not.toBeInTheDocument();
     expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-27");
     for (const path of [
       "/api/common/code-maps",

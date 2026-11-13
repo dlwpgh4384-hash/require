@@ -93,3 +93,130 @@
 .operating-history-table input {
   width: 120px;
 }
+
+/* 시안 UI-27 [운영 기준값] 표(2026-11-14): 기준값·값·단위·적용 시작월·쓰는 곳·이력. */
+.operating-standards-help {
+  margin: 0 0 12px;
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.operating-standards-table-wrap {
+  margin-top: 12px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  overflow: auto;
+  background: var(--surface);
+}
+.operating-standards-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.operating-standards-table th,
+.operating-standards-table td {
+  min-height: 40px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--divider);
+  text-align: left;
+  vertical-align: middle;
+}
+.operating-standards-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 40px;
+  background: var(--hover);
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.operating-standards-table tbody th {
+  min-width: 180px;
+  font-weight: 400;
+  white-space: normal;
+}
+.operating-code,
+.operating-sub,
+.operating-part-label {
+  color: var(--text-sub);
+  font-size: 12px;
+}
+.operating-lock-note {
+  color: var(--text-sub);
+  cursor: help;
+}
+.operating-value-cell {
+  text-align: center;
+}
+.operating-value-cell > .ls-in {
+  width: 220px;
+  text-align: right;
+}
+.operating-value-cell > input[type="month"] {
+  text-align: left;
+}
+.operating-parts {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: 6px 8px;
+  justify-content: end;
+  justify-items: end;
+}
+.operating-parts label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.operating-parts .ls-in {
+  width: 56px;
+  text-align: right;
+}
+.operating-history-link {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.operating-standards-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  justify-content: flex-end;
+  margin: 16px -24px 0;
+  padding: 12px 24px;
+  border-top: 1px solid var(--divider);
+  background: var(--surface);
+}
+.operating-change-list {
+  margin: 0 0 8px 18px;
+  padding: 0;
+}
+.operating-month-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.operating-field-label {
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+}
+.operating-help {
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 16px;
+}
+.operating-standards-table .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

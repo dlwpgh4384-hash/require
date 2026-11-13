@@ -105,13 +105,13 @@ afterEach(() => {
 async function openAdd() {
   await waitFor(() => expect(screen.getByTestId("code-map-add")).toBeEnabled());
   fireEvent.click(screen.getByTestId("code-map-add"));
-  await screen.findByRole("option", { name: "직원 구분 (EMP_TYPE)" });
+  await screen.findByRole("option", { name: "직원 구분" });
 }
 async function chooseTarget() {
   fireEvent.change(screen.getByTestId("code-map-group"), {
     target: { value: "EMP_TYPE" },
   });
-  await screen.findByRole("option", { name: "정규직 (FULL)" });
+  await screen.findByRole("option", { name: "FULL · 정규직" });
   fireEvent.change(screen.getByTestId("code-map-code"), {
     target: { value: "FULL" },
   });
@@ -173,7 +173,7 @@ it("adds from actual group options, refreshes the list and notifies history cons
   });
   await chooseTarget();
   expect(
-    screen.queryByRole("option", { name: "중지 (STOP)" }),
+    screen.queryByRole("option", { name: "STOP · 중지" }),
   ).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId("code-map-submit"));
   await screen.findByText("正직원");
@@ -208,7 +208,7 @@ it("validates required code instead of sending a blank selection", async () => {
   fireEvent.change(screen.getByTestId("code-map-group"), {
     target: { value: "EMP_TYPE" },
   });
-  await screen.findByRole("option", { name: "정규직 (FULL)" });
+  await screen.findByRole("option", { name: "FULL · 정규직" });
   fireEvent.click(screen.getByTestId("code-map-submit"));
   expect(screen.getByText("바꿀 코드를 골라 주세요.")).toBeInTheDocument();
   expect(writes()).toHaveLength(0);
@@ -234,10 +234,10 @@ it("clears old code when changing groups", async () => {
   fireEvent.change(screen.getByTestId("code-map-group"), {
     target: { value: "OTHER" },
   });
-  await screen.findByRole("option", { name: "다른 코드 (OTHER_CODE)" });
+  await screen.findByRole("option", { name: "OTHER_CODE · 다른 코드" });
   expect(screen.getByTestId("code-map-code")).toHaveValue("");
   expect(
-    screen.queryByRole("option", { name: "정규직 (FULL)" }),
+    screen.queryByRole("option", { name: "FULL · 정규직" }),
   ).not.toBeInTheDocument();
 });
 it("blocks submit on option failure and allows retry", async () => {
@@ -249,7 +249,7 @@ it("blocks submit on option failure and allows retry", async () => {
   expect(screen.getByTestId("code-map-submit")).toBeDisabled();
   failOptions = false;
   fireEvent.click(screen.getByTestId("code-map-options-retry"));
-  await screen.findByRole("option", { name: "직원 구분 (EMP_TYPE)" });
+  await screen.findByRole("option", { name: "직원 구분" });
   expect(writes()).toHaveLength(0);
 });
 it("cancels a dirty add without posting and preserves draft when discard is cancelled", async () => {

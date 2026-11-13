@@ -58,13 +58,14 @@ class CommonOperatingStandardsControllerTest {
         verify(mapper, never()).deleteStandard(any());
         assertThat(data.histories).isEmpty();
     }
-    @Test void anonymousGetReturnsExactSevenFieldsAndPreservesFixedRowsOutsideView() throws Exception {
+    @Test void anonymousGetReturnsExactEightFieldsIncludingAllMockupStandards() throws Exception {
         var response = mvc.perform(get("/api/common/operating-standards")).andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.items[0].effectiveMonth").value(org.hamcrest.Matchers.nullValue()))
             .andExpect(jsonPath("$.data.items[0].value").value("2026-01"))
-            .andExpect(jsonPath("$.data.items[0].length()").value(7)).andReturn();
-        assertThat(response.getResponse().getContentAsString()).doesNotContain("BDGT_WARN_RT");
+            .andExpect(jsonPath("$.data.items[0].length()").value(8)).andReturn();
+        // 시안(최종) 운영 기준값 표: 예산 소진 주의도 보이고 고칠 수 있다(2026-11-14).
+        assertThat(response.getResponse().getContentAsString()).contains("BDGT_WARN_RT");
         assertThat(data.rows).containsKey("BDGT_WARN_RT:202601");
         verifyNoInteractions(management);
     }
@@ -216,8 +217,8 @@ class CommonOperatingStandardsControllerTest {
         save(item("VAT_RT", "2027-01", "add", "11"), item("VAT_RT", "2027-01", "add", "12"))
             .andExpect(status().isBadRequest()); unchanged();
     }
-    @Test void fixedThresholdCannotBeEdited() throws Exception {
-        save(item("BDGT_WARN_RT", "2027-01", "add", "90")).andExpect(status().isBadRequest()); unchanged();
+    @Test void unknownStandardCannotBeEdited() throws Exception {
+        save(item("NOT_A_STD", "2027-01", "add", "90")).andExpect(status().isBadRequest()); unchanged();
     }
     @ParameterizedTest @ValueSource(strings = {"standardCode", "effectiveMonth", "action", "value"})
     void missingRequiredFieldRejected(String field) throws Exception {

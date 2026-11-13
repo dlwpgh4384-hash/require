@@ -13,13 +13,14 @@ class CalculationRulePreparationTest {
     private String resource(String name) throws Exception {
         return new ClassPathResource("db/migration/" + name).getContentAsString(StandardCharsets.UTF_8);
     }
-    @Test void approvedSourceIntervalContains91OriginalTuplesNotFabricated94() throws Exception {
+    @Test void seedContainsAll94OriginalTuplesFromTheDml() throws Exception {
         String seed = resource("V8__calculation_rule_seed.sql");
         var matcher = Pattern.compile("^\\('식-([0-9]{2})',", Pattern.MULTILINE).matcher(seed);
         var ids = new java.util.ArrayList<Integer>();
         while (matcher.find()) ids.add(Integer.parseInt(matcher.group(1)));
-        assertThat(ids).hasSize(91).doesNotHaveDuplicates();
-        assertThat(ids).containsExactlyElementsOf(IntStream.rangeClosed(0, 93)
+        // DML 원문: 식-00..식-96 중 식-03·65·78은 원래 없음 → 94줄(2026-11-14 바로잡음).
+        assertThat(ids).hasSize(94).doesNotHaveDuplicates();
+        assertThat(ids).containsExactlyElementsOf(IntStream.rangeClosed(0, 96)
             .filter(id -> !List.of(3, 65, 78).contains(id)).boxed().toList());
         assertThat(seed).contains("IF NOT EXISTS (SELECT 1 FROM TB_SY_CALC_RULE)",
             "LOCK TABLE TB_SY_CALC_RULE IN EXCLUSIVE MODE");

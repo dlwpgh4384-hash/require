@@ -9,4 +9,5 @@ public class OperatingStandardRow {
     public BigDecimal value;
     public String unit;
     public String description;
+    public String changedBy;
 }

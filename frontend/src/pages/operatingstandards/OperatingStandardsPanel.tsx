@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Dialog, Toast } from "../../shared/feedback/Dialog";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { koreanThisMonth } from "../../shared/time";
+import { Banner } from "../../shared/list";
 import * as api from "./operatingStandards";
 import "../../shared/list/list.css";
 import "./operatingStandards.css";
@@ -169,6 +170,7 @@ export function OperatingStandardsPanel({
     setFailure("");
   };
   const blocked = busy || refreshPending;
+  const historyDef = api.operatingRows.find((def) => def.key === historyCode);
   return (
     <section
       ref={root}
@@ -180,33 +182,63 @@ export function OperatingStandardsPanel({
       {!snapshot && !failure && (
         <p role="status">운영 기준값을 불러오는 중입니다.</p>
       )}
-      {dirty && (
-        <p className="operating-standards-warning">
-          저장하지 않은 변경이 있습니다. 저장 또는 취소해 주세요.
-        </p>
-      )}
       {snapshot && !snapshot.length && <p>등록된 운영 기준값이 없습니다.</p>}
       {snapshot && snapshot.length > 0 && (
         <>
           <p className="operating-standards-help">
-            미마감 시작월 이력은 수정·삭제할 수 있습니다. 마감된 값은 새
-            시작월로 추가해 주세요.
+            계산에 쓰는 기준값을 한곳에서 관리합니다. 값을 바꾸면 적용
+            시작월부터 쓰고, 그 앞 달은 예전 값 그대로 둡니다. 칸이 여러 개인
+            줄은 칸마다 따로 저장됩니다. 자금수지 시작 월·기초 잔액은 처음 한 번
+            넣는 값이라 적용 시작월 없이 바로 바뀌고, 시작 월을 마감하면 고칠 수
+            없습니다. 신호등 기준값(일정 5·10%p, 원가 5·15%p, 업데이트 없음
+            14일)은 바꾸지 않는 고정값이라 여기 없습니다.
           </p>
-          {api.operatingGroups.map((group) => {
-            const rows = group.codes.flatMap((code) =>
-              current.filter((row) => row.standardCode === code),
-            );
-            if (!rows.length) return null;
-            return (
-              <section
-                key={group.title}
-                className="operating-standards-group"
-                aria-label={group.title}
-                data-testid={`operating-group-${api.operatingTestKey(group.codes[0])}`}
-              >
-                <h3>{group.title}</h3>
-                <div className="operating-standards-grid">
-                  {rows.map((row) => {
+          {dirty && (
+            <Banner kind="warn">
+              저장하지 않은 변경 {changed.length}건이 있습니다.
+            </Banner>
+          )}
+          <div className="operating-standards-table-wrap">
+            <table
+              className="operating-standards-table"
+              aria-label="운영 기준값 표"
+            >
+              <thead>
+                <tr>
+                  <th scope="col">기준값</th>
+                  <th scope="col">값</th>
+                  <th scope="col">단위</th>
+                  <th scope="col">적용 시작월</th>
+                  <th scope="col">쓰는 곳</th>
+                  <th scope="col">
+                    <span className="visually-hidden">이력</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {api.operatingRows.map((def) => {
+                  const rows = def.codes.flatMap((code) =>
+                    current.filter((row) => row.standardCode === code),
+                  );
+                  if (!rows.length) return null;
+                  const first = rows[0];
+                  const multi = !!def.parts;
+                  // 시안: 칸이 여러 개인 줄도 「바꾼 시점(적용 시작월)」 수로 센다.
+                  const historyCount = new Set(
+                    (snapshot ?? [])
+                      .filter((row) => def.codes.includes(row.standardCode))
+                      .map((row) => row.effectiveMonth ?? "immediate"),
+                  ).size;
+                  const rowError = rows
+                    .map(
+                      (row) =>
+                        errors[row.standardCode] ??
+                        (draft[row.standardCode] !== undefined
+                          ? errors.value
+                          : undefined),
+                    )
+                    .find(Boolean);
+                  const input = (row: api.OperatingStandard, label?: string) => {
                     const key = api.operatingTestKey(row.standardCode);
                     const error =
                       errors[row.standardCode] ??
@@ -214,83 +246,118 @@ export function OperatingStandardsPanel({
                         ? errors.value
                         : undefined);
                     return (
-                      <div
-                        key={row.standardCode}
-                        className="operating-standard-card"
-                        data-testid={`operating-card-${key}`}
-                      >
-                        <label htmlFor={`operating-value-${key}`}>
-                          {row.standardName}
-                        </label>
-                        <div className="operating-standard-value">
-                          <input
-                            id={`operating-value-${key}`}
-                            className="ls-in ls-in-sm"
-                            data-testid={`operating-value-${key}`}
-                            type={
-                              row.standardCode === "CASH_BASE_YM"
-                                ? "month"
-                                : "text"
-                            }
-                            inputMode={
-                              row.standardCode === "CASH_BASE_YM"
-                                ? undefined
-                                : "decimal"
-                            }
-                            value={draft[row.standardCode] ?? row.value}
-                            disabled={blocked || (row.immediate && row.closed)}
-                            aria-invalid={!!error}
-                            onChange={(event) => {
-                              setDraft((old) => ({
-                                ...old,
-                                [row.standardCode]: event.target.value,
-                              }));
-                              setErrors({});
-                            }}
-                          />
-                          <span>{row.unit}</span>
-                        </div>
-                        {error && (
-                          <p className="field-error" role="alert">
-                            {error}
-                          </p>
-                        )}
-                        {row.immediate ? (
-                          <p>
-                            {row.closed
-                              ? "시작 월 마감 후 잠금"
-                              : "적용 시작월 없이 바로 반영"}
-                          </p>
-                        ) : (
-                          <div className="operating-standard-history-link">
-                            <span>적용 {row.effectiveMonth}</span>
-                            <button
-                              type="button"
-                              data-testid={`operating-history-${key}`}
-                              disabled={blocked}
-                              onClick={() => {
-                                if (dirty) {
-                                  setFailure("먼저 저장 또는 취소해 주세요.");
-                                  return;
-                                }
-                                setHistoryDraft({});
-                                setErrors({});
-                                setFailure("");
-                                setHistoryCode(row.standardCode);
-                              }}
-                            >
-                              이력
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                      <input
+                        id={`operating-value-${key}`}
+                        className="ls-in ls-in-sm"
+                        data-testid={`operating-value-${key}`}
+                        aria-label={row.standardName}
+                        title={label ? row.standardCode : undefined}
+                        type={
+                          row.standardCode === "CASH_BASE_YM" ? "month" : "text"
+                        }
+                        inputMode={
+                          row.standardCode === "CASH_BASE_YM"
+                            ? undefined
+                            : "decimal"
+                        }
+                        value={draft[row.standardCode] ?? row.value}
+                        disabled={blocked || (row.immediate && row.closed)}
+                        aria-invalid={!!error}
+                        onChange={(event) => {
+                          setDraft((old) => ({
+                            ...old,
+                            [row.standardCode]: event.target.value,
+                          }));
+                          setErrors({});
+                        }}
+                      />
                     );
-                  })}
-                </div>
-              </section>
-            );
-          })}
-          <div className="app-actions">
+                  };
+                  return (
+                    <tr
+                      key={def.key}
+                      data-testid={`operating-row-${api.operatingTestKey(def.key)}`}
+                      aria-label={
+                        def.parts
+                          ? def.key === "AI_SCORE"
+                            ? "AI 배점"
+                            : def.label
+                          : undefined
+                      }
+                    >
+                      <th scope="row">
+                        {def.label}{" "}
+                        <span className="operating-code">{def.key}</span>
+                        {first.immediate && first.closed && (
+                          <span
+                            className="operating-lock-note"
+                            title="시작 월을 마감해 수정할 수 없습니다"
+                          >
+                            {" "}
+                            ⓘ
+                          </span>
+                        )}
+                      </th>
+                      <td className="operating-value-cell">
+                        {multi ? (
+                          <div className="operating-parts">
+                            {rows.map((row, index) => (
+                              <label key={row.standardCode}>
+                                <span className="operating-part-label">
+                                  {def.parts![index]}
+                                </span>
+                                {input(row, def.parts![index])}
+                                <span className="operating-part-label">
+                                  {row.unit}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        ) : (
+                          input(first)
+                        )}
+                        {rowError && (
+                          <p className="field-error" role="alert">
+                            {rowError}
+                          </p>
+                        )}
+                      </td>
+                      <td>{multi ? "" : first.unit}</td>
+                      <td>
+                        {first.immediate ? (
+                          <span className="operating-sub">–</span>
+                        ) : (
+                          first.effectiveMonth
+                        )}
+                      </td>
+                      <td className="operating-sub">{def.uses}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="operating-history-link"
+                          data-testid={`operating-history-${api.operatingTestKey(first.standardCode)}`}
+                          disabled={blocked}
+                          onClick={() => {
+                            if (dirty) {
+                              setFailure("먼저 저장 또는 취소해 주세요.");
+                              return;
+                            }
+                            setHistoryDraft({});
+                            setErrors({});
+                            setFailure("");
+                            setHistoryCode(def.key);
+                          }}
+                        >
+                          이력 {historyCount}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="app-actions operating-standards-footer">
             <button
               type="button"
               data-testid="operating-cancel"
@@ -347,20 +414,25 @@ export function OperatingStandardsPanel({
         >
           {failure && <p role="alert">{failure}</p>}
           <div data-testid="operating-save-summary">
-            {changed.map((row) => (
-              <p
-                key={row.standardCode}
-                data-testid={`operating-change-${api.operatingTestKey(row.standardCode)}`}
-              >
-                {row.standardName}: {row.value} → {draft[row.standardCode]}
-              </p>
-            ))}
+            <p>{changed.length}건을 바꿉니다.</p>
+            <ul className="operating-change-list">
+              {changed.map((row) => (
+                <li
+                  key={row.standardCode}
+                  data-testid={`operating-change-${api.operatingTestKey(row.standardCode)}`}
+                >
+                  {row.standardName}: {row.value} →{" "}
+                  <strong>{draft[row.standardCode]}</strong> {row.unit}
+                </li>
+              ))}
+            </ul>
           </div>
           {changed.some((row) => !row.immediate) && (
-            <label>
-              적용 시작월
+            <label className="operating-month-field">
+              <span className="operating-field-label">적용 시작월 *</span>
               <input
                 type="month"
+                className="ls-in"
                 aria-label="적용 시작월"
                 data-testid="operating-effective-month"
                 value={month}
@@ -370,6 +442,10 @@ export function OperatingStandardsPanel({
                   setErrors({});
                 }}
               />
+              <span className="operating-help">
+                마감한 달까지는 바꿀 수 없습니다. 그 앞 달은 예전 값 그대로
+                계산합니다.
+              </span>
             </label>
           )}
           {errors.effectiveMonth && (
@@ -405,7 +481,7 @@ export function OperatingStandardsPanel({
       )}
       {historyCode && (
         <Dialog
-          title={`${snapshot?.find((row) => row.standardCode === historyCode)?.standardName ?? "운영 기준값"} 이력`}
+          title={`${historyDef?.label ?? "운영 기준값"} · 이력`}
           testId="operating-history-dialog"
           onClose={() => {
             if (busy) return;
@@ -419,15 +495,22 @@ export function OperatingStandardsPanel({
             <thead>
               <tr>
                 <th>적용 시작월</th>
+                {historyDef?.parts && <th>항목</th>}
                 <th>값</th>
+                <th>처리자</th>
                 <th>동작</th>
               </tr>
             </thead>
             <tbody>
               {(snapshot ?? [])
-                .filter((row) => row.standardCode === historyCode)
-                .sort((a, b) =>
-                  b.effectiveMonth!.localeCompare(a.effectiveMonth!),
+                .filter((row) => historyDef?.codes.includes(row.standardCode))
+                .sort(
+                  (a, b) =>
+                    (b.effectiveMonth ?? "").localeCompare(
+                      a.effectiveMonth ?? "",
+                    ) ||
+                    historyDef!.codes.indexOf(a.standardCode) -
+                      historyDef!.codes.indexOf(b.standardCode),
                 )
                 .map((row) => {
                   const key = api.operatingKey(row);
@@ -437,9 +520,18 @@ export function OperatingStandardsPanel({
                       key={key}
                       data-testid={`operating-history-row-${testKey}`}
                     >
-                      <td>{row.effectiveMonth}</td>
+                      <td>{row.effectiveMonth ?? "–"}</td>
+                      {historyDef?.parts && (
+                        <td>
+                          {
+                            historyDef.parts[
+                              historyDef.codes.indexOf(row.standardCode)
+                            ]
+                          }
+                        </td>
+                      )}
                       <td>
-                        {row.closed ? (
+                        {row.closed || row.immediate ? (
                           row.value
                         ) : (
                           <input
@@ -464,8 +556,11 @@ export function OperatingStandardsPanel({
                           />
                         )}
                       </td>
+                      <td>{row.changedBy ?? "–"}</td>
                       <td>
-                        {row.closed ? (
+                        {row.immediate ? (
+                          "표에서 바로 고침"
+                        ) : row.closed ? (
                           "마감 · 읽기 전용 (새 시작월로 추가)"
                         ) : (
                           <>

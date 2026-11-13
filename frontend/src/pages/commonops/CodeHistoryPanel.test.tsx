@@ -92,7 +92,7 @@ it("renders all six fields in API order with Korean time and the stored processo
     within(table)
       .getAllByRole("columnheader")
       .map((cell) => cell.textContent),
-  ).toEqual(["일시", "구분", "항목", "전", "후", "처리자"]);
+  ).toEqual(["일시", "구분", "항목", "변경 전", "변경 후", "처리자"]);
   expect(screen.getByTestId("code-history-row-0")).toHaveTextContent(
     "2026-11-13 09:03표기 대응엑셀 표기 대응옛 표기새 표기admin",
   );

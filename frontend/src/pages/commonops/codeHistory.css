@@ -30,3 +30,11 @@
 .code-history-panel time {
   white-space: nowrap;
 }
+
+/* 시안 UI-27 변경 이력 아래 안내 (2026-11-14) */
+.code-history-note {
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 12px 0 0;
+}

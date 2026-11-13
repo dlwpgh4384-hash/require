@@ -414,6 +414,33 @@ paths:
         schema:
           type: string
         description: 이름 또는 아이디 검색
+      - name: includeStopped
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+        description: 시안 [사용 중지 포함]. false면 사용 중지 계정을 숨긴다(상태 조건에서 중지를 고르면 함께 보임).
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - userId
+          - name
+          - role
+          - state
+          - last
+        description: 정렬 열. 없으면 이름순.
+      - name: dir
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
       responses:
         '200':
           description: 조회 또는 저장한 사용자 업무 결과
@@ -628,6 +655,134 @@ paths:
                 $ref: '#/components/schemas/ApiError'
         '409':
           description: MOD_DTTM 동시 수정 충돌; 최신 사용자·역할·담당범위 보존
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/excel:
+    get:
+      operationId: getCommonUsersExcel
+      summary: 사용자 목록 엑셀 다운로드(SFR-011)
+      description: 지금 조건의 전체 결과를 보이는 열 그대로 xlsx로 내려준다. 1행 「사용자 · 다운로드 admin · 한국 시각」, 3행부터 머리글. 파일 이름은 「화면이름_기간_다운로드일시.xlsx」. 접근 기록(DNLD)을 남긴다.
+      security: []
+      parameters:
+      - name: includeStopped
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+        description: 시안 [사용 중지 포함]. false면 사용 중지 계정을 숨긴다(상태 조건에서 중지를 고르면 함께 보임).
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - userId
+          - name
+          - role
+          - state
+          - last
+        description: 정렬 열. 없으면 이름순.
+      - name: dir
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+      - name: roleCd
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: userStatCd
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - USE
+          - LOCK
+          - STOP
+      - name: keyword
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: columns
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
+      responses:
+        '200':
+          description: 엑셀 파일
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 모르는 열·정렬 값
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/{userId}/change-history:
+    get:
+      operationId: getCommonUserChangeHistory
+      summary: 사용자 변경 이력 조회(상세 패널 「변경 이력」 탭)
+      description: 바뀐 항목마다 1줄(이름·이메일·역할·고른 본사·담당 프로젝트·상태·등록), 최근 순.
+      security: []
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 변경 이력 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        type: object
+                        required:
+                        - changedAt
+                        - item
+                        properties:
+                          changedAt:
+                            type: string
+                            format: date-time
+                          item:
+                            type: string
+                          before:
+                            type: string
+                            nullable: true
+                          after:
+                            type: string
+                            nullable: true
+                          changedBy:
+                            type: string
+                            nullable: true
+        '400':
+          description: 아이디 형식 오류
           content:
             application/json:
               schema:
@@ -1342,6 +1497,63 @@ paths:
       - 'sensitive: 단일 역할 snstvViewYn=N 저장 후 소비 경계 조회/다운로드/AI/합계 fixture 실행 -> 급여·지급 단가·개인별 원가·지급 계좌의 제목·값·합계 기여가
         없다. 없는 제품 소비 기능은 후속 연결 시험 not_run으로 유지한다.'
       - 'confirm-action: 견적 승인/반려 fixture에서 updateYn=Y·cnfmYn=N -> 확정 동작은 거부되고 수정 권한으로 승인하지 않는다. 업무 실행은 후속 연결 시험이다.'
+  /api/common/roles/{roleId}/change-history:
+    get:
+      operationId: getCommonRoleChangeHistory
+      summary: 역할 권한 변경 이력 조회(시안 「변경 이력 (n)」)
+      security: []
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 바뀐 항목마다 1줄, 최근 순
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      type: object
+                      required:
+                      - items
+                      properties:
+                        items:
+                          type: array
+                          items:
+                            type: object
+                            required:
+                            - changedAt
+                            - item
+                            properties:
+                              changedAt:
+                                type: string
+                                format: date-time
+                              item:
+                                type: string
+                              before:
+                                type: string
+                                nullable: true
+                              after:
+                                type: string
+                                nullable: true
+                              changedBy:
+                                type: string
+                                nullable: true
+        '404':
+          description: 역할이 존재하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/common/roles/{roleId}/change-impact:
     get:
       operationId: getCommonRoleChangeImpact
@@ -2390,6 +2602,7 @@ components:
       - effectiveMonth
       - closed
       - immediate
+      - changedBy
       properties:
         standardCode:
           type: string
@@ -2408,6 +2621,10 @@ components:
           type: boolean
         immediate:
           type: boolean
+        changedBy:
+          type: string
+          nullable: true
+          description: 이력 창 「처리자」. 처음 값은 「처음 설정」.
       additionalProperties: false
     CommonOperatingStandardChange:
       type: object

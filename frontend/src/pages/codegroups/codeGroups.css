@@ -132,3 +132,54 @@
     overflow: visible;
   }
 }
+
+/* 시안 UI-27 코드 탭 (2026-11-14) */
+.code-group-list .code-group-lock {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-sub);
+}
+.code-group-list .code-group-count {
+  color: var(--text-sub);
+  font-size: 12px;
+}
+.code-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.code-detail-head h2 {
+  margin: 0;
+}
+.code-detail .code-count {
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 400;
+}
+.code-page .ls-banner {
+  margin-bottom: 12px;
+}
+.code-banner-icon {
+  display: inline-flex;
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+.code-page .code-intro,
+.code-page .code-note {
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: normal;
+}
+.code-page .code-intro {
+  margin: 0 0 12px;
+}
+.code-page .code-note {
+  margin: 12px 0 0;
+}
+.code-page .code-help {
+  color: var(--text-sub);
+  font-size: 12px;
+}

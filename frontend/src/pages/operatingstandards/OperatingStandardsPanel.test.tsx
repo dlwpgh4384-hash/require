@@ -164,7 +164,7 @@ async function confirm(month = "2027-02") {
     ).not.toBeInTheDocument(),
   );
 }
-it("renders API values with four-column groups, eight actual AI labels and no fixed traffic light", async () => {
+it("renders API values in the mockup table rows with eight AI inputs in one row", async () => {
   await mount();
   for (const [code, value] of [
     ["part-dstrb-rt", "40"],
@@ -186,15 +186,26 @@ it("renders API values with four-column groups, eight actual AI labels and no fi
     ["step-prbl-4", "90"],
   ])
     expect(screen.getByTestId(`operating-value-${code}`)).toHaveValue(value);
-  const ai = screen.getByRole("region", { name: "AI 배점" });
-  expect(ai.querySelector(".operating-standards-grid")).toBeInTheDocument();
+  const ai = screen.getByTestId("operating-row-ai-score");
+  expect(ai).toHaveAccessibleName("AI 배점");
   expect(within(ai).getAllByRole("textbox")).toHaveLength(8);
   expect(
     within(ai)
       .getAllByRole("textbox")
       .map((input) => (input as HTMLInputElement).value),
   ).toEqual(["25", "20", "15", "10", "5", "5", "10", "10"]);
-  expect(screen.queryByLabelText("예산 소진 주의")).not.toBeInTheDocument();
+  // 시안(최종): 운영 기준값 표에 예산 소진 주의도 있다.
+  expect(screen.getByLabelText("예산 소진 주의")).toHaveValue("80");
+  expect(
+    within(screen.getByTestId("operating-row-vat-rt")).getByText("식-05·49"),
+  ).toBeInTheDocument();
+});
+it("shows values without trailing zeros", async () => {
+  rows.find((item) => item.standardCode === "VAT_RT")!.value = "10.0000";
+  rows.find((item) => item.standardCode === "LOW_MRGN_GAP")!.value = "0.0330";
+  await mount();
+  expect(screen.getByLabelText("부가세율")).toHaveValue("10");
+  expect(screen.getByLabelText("저마진 경고폭")).toHaveValue("0.033");
 });
 it("loading state lasts until the actual read completes", async () => {
   let resolve!: (value: ReturnType<typeof success>) => void;

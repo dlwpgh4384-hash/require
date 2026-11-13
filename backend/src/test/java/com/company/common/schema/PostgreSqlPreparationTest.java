@@ -72,7 +72,7 @@ class PostgreSqlPreparationTest {
         assertThat(number("SELECT count(*) FROM tb_sy_user_role WHERE user_id='admin' AND role_id='ADMIN'")).isEqualTo(1);
         assertThat(number("SELECT count(*) FROM tb_bs_part WHERE part_id='HQ' AND hq_yn='Y'")).isEqualTo(1);
         assertThat(number("SELECT count(*) FROM tb_sy_role_menu_auth")).isEqualTo(150);
-        assertThat(number("SELECT count(*) FROM tb_sy_calc_rule")).isEqualTo(91);
+        assertThat(number("SELECT count(*) FROM tb_sy_calc_rule")).isEqualTo(94);
         try (var rows = database.createStatement().executeQuery("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name NOT IN ('tb_sy_menu','tb_sy_user','tb_sy_code_grp','tb_sy_code','tb_sy_oper_std','tb_sy_role','tb_sy_user_role','tb_bs_part','tb_sy_role_menu_auth','tb_sy_calc_rule')")) {
             while (rows.next()) assertThat(number("SELECT count(*) FROM " + rows.getString(1))).isZero();
         }
@@ -95,7 +95,7 @@ class PostgreSqlPreparationTest {
             .hasMessageContaining("tb_sy_calc_rule: required physical table missing");
         execute("ALTER TABLE owned_calc_rule RENAME TO tb_sy_calc_rule");
         execute(contract);
-        assertThat(number("SELECT count(*) FROM tb_sy_calc_rule")).isEqualTo(91);
+        assertThat(number("SELECT count(*) FROM tb_sy_calc_rule")).isEqualTo(94);
         assertThat(number("SELECT count(*) FROM tb_sy_role_menu_auth")).isEqualTo(150);
     }
 
@@ -297,7 +297,9 @@ class PostgreSqlPreparationTest {
             assertThat(mapper.selectDefinition("식-03")).isNull();
             assertThat(mapper.selectDefinition("식-65")).isNull();
             assertThat(mapper.selectDefinition("식-78")).isNull();
-            assertThat(mapper.selectDefinition("식-94")).isNull();
+            assertThat(mapper.selectDefinition("식-94")).isNotNull();
+            assertThat(mapper.selectDefinition("식-96")).isNotNull();
+            assertThat(mapper.selectDefinition("식-97")).isNull();
         }
     }
 
@@ -309,7 +311,7 @@ class PostgreSqlPreparationTest {
         String before = text("SELECT jsonb_agg(to_jsonb(t) ORDER BY calc_id)::text FROM tb_sy_calc_rule t");
         preparation.prepare();
         assertThat(text("SELECT jsonb_agg(to_jsonb(t) ORDER BY calc_id)::text FROM tb_sy_calc_rule t")).isEqualTo(before);
-        assertThat(number("SELECT count(*) FROM tb_sy_calc_rule")).isEqualTo(90);
+        assertThat(number("SELECT count(*) FROM tb_sy_calc_rule")).isEqualTo(93);
     }
 
     @Test

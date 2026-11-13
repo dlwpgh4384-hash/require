@@ -158,20 +158,25 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-const ready = async () => {
-  render(<CodePage />);
-  await screen.findByLabelText("ONE 이름");
-};
 const selectGroup = async (id: string) => {
   fireEvent.click(screen.getByTestId(`code-group-${id.toLowerCase()}`));
   await waitFor(() =>
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(id),
+    expect(
+      screen.getByTestId(`code-group-${id.toLowerCase()}`),
+    ).toHaveAttribute("aria-pressed", "true"),
   );
   await waitFor(() =>
     expect(
       screen.queryByText("코드를 불러오는 중입니다."),
     ).not.toBeInTheDocument(),
   );
+};
+// 시안: 처음에는 맨 위 시스템 그룹이 선택된다. 업무 시험은 GENERAL을 골라서 시작한다.
+const ready = async () => {
+  render(<CodePage />);
+  await screen.findByLabelText("FIXED 이름");
+  await selectGroup("GENERAL");
+  await screen.findByLabelText("ONE 이름");
 };
 it("네 탭과 실제 그룹 수·자물쇠·일반 네 칸을 표시하고 날짜나 순서 편집을 만들지 않는다", async () => {
   await ready();
@@ -190,7 +195,9 @@ it("네 탭과 실제 그룹 수·자물쇠·일반 네 칸을 표시하고 날�
 it("시스템 이름만 편집하고 추가·삭제·사용변경을 허용하지 않는다", async () => {
   await ready();
   await selectGroup("SYSTEM");
-  expect(screen.getByText("이름만 바꿀 수 있습니다.")).toBeInTheDocument();
+  expect(screen.getByTestId("banner-lock")).toHaveTextContent(
+    "계산 규칙에 쓰는 시스템 코드입니다. 이름만 바꿀 수 있고 추가·삭제·사용 끄기는 할 수 없습니다.",
+  );
   expect(screen.getByLabelText("FIXED 사용")).toBeDisabled();
   expect(screen.queryByTestId("code-add")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("FIXED 삭제")).not.toBeInTheDocument();
@@ -317,9 +324,9 @@ it("그룹 이동 취소는 미저장 값을 유지하고 버리기는 서버 �
   expect(writes()).toHaveLength(0);
 });
 it.each([
-  ["JOB", ["관련 직무", "견적 기준 단가"]],
+  ["JOB", ["관련 직무", "견적 기준 단가(원)"]],
   ["SKILL", ["필요한 직무"]],
-  ["PROJ_STEP", ["비중 %", "적용 계약유형"]],
+  ["PROJ_STEP", ["비중(%)", "적용 계약유형"]],
   ["BANK", ["은행 코드"]],
   ["RSM_LABEL", ["넣을 칸"]],
   ["RSM_JOB_KW", ["직무"]],
@@ -420,7 +427,7 @@ it("다른 단계 패널은 네 탭 슬롯으로 렌더링하며 수당 탭을 �
       }}
     />,
   );
-  await screen.findByLabelText("ONE 이름");
+  await screen.findByLabelText("FIXED 이름");
   fireEvent.click(screen.getByRole("tab", { name: "변경 이력" }));
   expect(screen.getByText("이력 업무")).toBeVisible();
   expect(screen.getAllByRole("tab")).toHaveLength(4);
@@ -433,10 +440,62 @@ it("작업 공간 제목줄에서 등록 창을 열고 본문 단추를 중복 �
       <CodePage />
     </CodeWorkspaceProvider>,
   );
-  await screen.findByLabelText("ONE 이름");
+  await screen.findByLabelText("FIXED 이름");
   expect(screen.queryByTestId("code-group-add")).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId("code-group-title-add"));
-  expect(screen.getByRole("dialog", { name: "그룹 추가" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("dialog", { name: "코드 그룹 추가" }),
+  ).toBeInTheDocument();
+});
+it("시안대로 시스템 그룹을 위에 두고 자물쇠만, 업무 그룹은 코드 수를 보인다", async () => {
+  await ready();
+  const names = Array.from(
+    screen.getByTestId("code-group-list").querySelectorAll("button"),
+  ).map((button) => button.dataset.testid);
+  expect(names[0]).toBe("code-group-system");
+  expect(
+    within(screen.getByTestId("code-group-system")).getByRole("img", {
+      name: "시스템 그룹",
+    }),
+  ).toBeInTheDocument();
+  expect(screen.getByTestId("code-group-general")).toHaveTextContent("2");
+  expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+    "GENERAL · 2개",
+  );
+  expect(
+    screen.getByRole("columnheader", { name: "삭제" }),
+  ).toBeInTheDocument();
+  expect(screen.getByTestId("list-range")).toHaveTextContent("1-2 / 2건");
+});
+it("제목줄 단추는 탭과 그룹에 따라 그룹 추가·수당코드 추가·추가·없음으로 바뀐다", async () => {
+  render(
+    <CodeWorkspaceProvider>
+      <CodeTitleActions />
+      <CodePage panels={{ maps: <p>대응 업무</p>, standards: <p>운영</p> }} />
+    </CodeWorkspaceProvider>,
+  );
+  await screen.findByLabelText("FIXED 이름");
+  expect(screen.getByTestId("code-group-title-add")).toHaveTextContent(
+    "그룹 추가",
+  );
+  await selectGroup("ALWNC");
+  await waitFor(() =>
+    expect(screen.getByTestId("code-title-add")).toHaveTextContent(
+      "수당코드 추가",
+    ),
+  );
+  expect(
+    screen.queryByRole("columnheader", { name: "삭제" }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("tab", { name: "엑셀 표기 대응" }));
+  await waitFor(() =>
+    expect(screen.getByTestId("code-map-title-add")).toHaveTextContent("추가"),
+  );
+  fireEvent.click(screen.getByRole("tab", { name: "운영 기준값" }));
+  await waitFor(() =>
+    expect(screen.queryByTestId("code-map-title-add")).not.toBeInTheDocument(),
+  );
+  expect(screen.queryByTestId("code-group-title-add")).not.toBeInTheDocument();
 });
 it.each([false, true])(
   "UI-27 직접 주소의 휴대폰=%s 접근은 기존 PC 전용 가드를 따른다",
@@ -492,7 +551,7 @@ it.each([false, true])(
       expect(featureRequest).not.toHaveBeenCalled();
     } else {
       expect(await screen.findByTestId("code-page")).toBeVisible();
-      await screen.findByLabelText("ONE 이름");
+      await screen.findByLabelText("FIXED 이름");
       expect(screen.getByTestId("code-group-title-add")).toBeEnabled();
     }
   },

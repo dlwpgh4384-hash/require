@@ -4,6 +4,7 @@ import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { usePreferenceBusinessShortcuts } from "../userpreferences/UserPreferenceTools";
 import { useCodeWorkspace } from "./CodeWorkspace";
 import * as api from "./codeGroups";
+import { Banner, DEFAULT_PAGE_SIZE, ListPager } from "../../shared/list";
 import "../../shared/list/list.css";
 import "./codeGroups.css";
 
@@ -20,6 +21,34 @@ const tabs: { key: CodeTab; label: string }[] = [
   { key: "maps", label: "엑셀 표기 대응" },
   { key: "standards", label: "운영 기준값" },
   { key: "history", label: "변경 이력" },
+];
+/** 시안 UI-27 문구. */
+const NOTE_GENERAL =
+  "이름을 바꾸면 저장 즉시 선택 목록에 반영되고, 지난 자료에도 새 이름으로 보입니다(코드별 적용 시작일은 두지 않음). 한 번도 쓰지 않은 코드만 [삭제]할 수 있습니다(목록에서 사라지고 변경 이력에 남음). 쓴 코드는 지울 수 없고 사용만 끕니다. 그룹 자체의 이름 바꾸기·사용 끄기는 없습니다.";
+const NOTE_EXTRA_GROUPS =
+  "추가값 칸은 직무·스킬·프로젝트 단계명·은행·이력서 이름표·이력서 직무 단어 그룹에만 있습니다.";
+const NUMERIC_INTRO =
+  "그룹장·팀장 수당, 4대보험(회사) 부담률, 퇴직금 적립률, 팀비·프로젝트경비(1인당 월) 기본값을 관리합니다. 바꾸면 UI-03 개인원가수익표와 전체 원가 계산에 바로 적용됩니다.";
+const NUMERIC_NOTE =
+  "프로젝트별로 실제 팀비·경비·예산을 따로 입력했으면(UI-01) 그 값이 우선합니다. 여기 값은 새 프로젝트의 기본값입니다.";
+const lockIcon = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+  >
+    <rect x="5" y="11" width="14" height="10" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+  </svg>
+);
+/** 시안: 시스템 그룹(자물쇠)을 위에, 업무 그룹(코드 수)을 아래에 둔다. */
+const systemFirst = (rows: api.CodeGroup[]) => [
+  ...rows.filter((row) => row.sysCodeYn === "Y"),
+  ...rows.filter((row) => row.sysCodeYn !== "Y"),
 ];
 const message = (error: unknown) =>
   error instanceof Error ? error.message : "공통코드를 처리하지 못했습니다.";
@@ -53,6 +82,8 @@ export function CodePage({
   });
   const [modalFailure, setModalFailure] = useState("");
   const [pending, setPending] = useState<(() => void) | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const lock = useRef(false);
   const root = useRef<HTMLElement>(null);
   const workspace = useCodeWorkspace();
@@ -83,7 +114,17 @@ export function CodePage({
     setDirty("UI-27", dirty || dialogDirty || panelDirty);
     return () => setDirty("UI-27", false);
   }, [dirty, dialogDirty, panelDirty, setDirty]);
-  const { setReady, setCanAddCode } = workspace;
+  const { setReady, setCanAddCode, setTab: setWorkspaceTab, setNumeric } =
+    workspace;
+  useEffect(() => {
+    setWorkspaceTab(tab);
+    setNumeric(numeric);
+  }, [tab, numeric, setWorkspaceTab, setNumeric]);
+  useEffect(() => setPage(1), [groupId]);
+  const sortedGroups = groups ? systemFirst(groups) : null;
+  const pagedDraft = numeric
+    ? draft
+    : draft.slice((page - 1) * pageSize, page * pageSize);
   useEffect(() => {
     setReady(tab === "codes" && groups !== null && !busy && !refreshPending);
     setCanAddCode(tab === "codes" && !!group && !system);
@@ -108,7 +149,9 @@ export function CodePage({
       (result) => {
         if (controller.signal.aborted) return;
         setGroups(result.items);
-        setGroupId((current) => current || result.items[0]?.groupId || "");
+        setGroupId(
+          (current) => current || systemFirst(result.items)[0]?.groupId || "",
+        );
       },
       (error) => {
         if (!controller.signal.aborted) setGroupFailure(message(error));
@@ -157,7 +200,7 @@ export function CodePage({
   useEffect(() => {
     if (workspace.signal.revision > handledSignal.current) {
       handledSignal.current = workspace.signal.revision;
-      open(workspace.signal.action);
+      if (workspace.signal.action !== "map") open(workspace.signal.action);
     }
   }, [workspace.signal]);
   const discard = () => {
@@ -187,7 +230,7 @@ export function CodePage({
     else {
       const result = await api.getCommonCodeGroups();
       setGroups(result.items);
-      setGroupId(result.items[0]?.groupId ?? "");
+      setGroupId(systemFirst(result.items)[0]?.groupId ?? "");
     }
   };
   const resolvedPanels =
@@ -290,7 +333,13 @@ export function CodePage({
           "처리는 완료되었으나 다시 읽지 못했습니다. 재조회해 주세요.",
         );
       } else {
-        setModalFailure(message(error));
+        const text = message(error);
+        // 시안: 「이름」은(는) 사용된 코드라 삭제할 수 없습니다. 사용을 끄세요.
+        setModalFailure(
+          modal === "delete" && deleteTarget && text.startsWith("사용된 코드")
+            ? `「${deleteTarget.codeName}」은(는) ${text}`
+            : text,
+        );
         setErrors(errorFields(error));
       }
     } finally {
@@ -347,6 +396,7 @@ export function CodePage({
           }
         />
       )}
+      {id === "new" && <span className="code-help">{field.help}</span>}
       {fieldError(field.key)}
     </label>
   );
@@ -413,7 +463,7 @@ export function CodePage({
             aria-label="코드 그룹"
             data-testid="code-group-list"
           >
-            {groups?.map((row) => (
+            {sortedGroups?.map((row) => (
               <button
                 key={row.groupId}
                 type="button"
@@ -425,27 +475,57 @@ export function CodePage({
                     guard(() => setGroupId(row.groupId));
                 }}
               >
-                <span>
-                  {row.groupName}{" "}
-                  {row.sysCodeYn === "Y" && (
-                    <span role="img" aria-label="시스템 그룹">
-                      🔒
-                    </span>
-                  )}
-                </span>
-                <span>{row.codeCount}</span>
+                <span>{row.groupName}</span>
+                {row.sysCodeYn === "Y" ? (
+                  <span
+                    className="code-group-lock"
+                    role="img"
+                    aria-label="시스템 그룹"
+                  >
+                    {lockIcon}
+                  </span>
+                ) : (
+                  <span className="code-group-count">{row.codeCount}</span>
+                )}
               </button>
             ))}
           </nav>
           <div className="code-detail">
-            {group && (
-              <h2>
-                {group.groupName} <small>{group.groupId}</small>
-              </h2>
+            {system && (
+              <Banner kind="lock">
+                <span className="code-banner-icon">{lockIcon}</span>
+                계산 규칙에 쓰는 시스템 코드입니다. 이름만 바꿀 수 있고
+                추가·삭제·사용 끄기는 할 수 없습니다.
+              </Banner>
             )}
-            {system && <p className="code-banner">이름만 바꿀 수 있습니다.</p>}
+            {numeric && <p className="code-intro">{NUMERIC_INTRO}</p>}
+            {group && (
+              <div className="code-detail-head">
+                <h2>
+                  {group.groupName}{" "}
+                  {!numeric && <small>{group.groupId}</small>}
+                  <span className="code-count">
+                    {" "}
+                    · {snapshot ? snapshot.length : group.codeCount}개
+                  </span>
+                </h2>
+                {workspace.inShell && !system && !numeric && (
+                  <button
+                    type="button"
+                    className="ls-btn ls-btn-sm"
+                    data-testid="code-add"
+                    disabled={!snapshot || busy || refreshPending}
+                    onClick={() => open("code")}
+                  >
+                    코드 추가
+                  </button>
+                )}
+              </div>
+            )}
             {dirty && (
-              <p className="code-banner">저장하지 않은 변경이 있습니다.</p>
+              <Banner kind="warn">
+                저장하지 않은 변경 {changed.length}건이 있습니다.
+              </Banner>
             )}
             {groupId && !snapshot && !failure && (
               <p role="status">코드를 불러오는 중입니다.</p>
@@ -465,6 +545,9 @@ export function CodePage({
                         <tr>
                           <th>코드</th>
                           <th>이름</th>
+                          {extras.map((field) => (
+                            <th key={field.key}>{field.label}</th>
+                          ))}
                           {numeric ? (
                             <>
                               <th>값</th>
@@ -476,14 +559,11 @@ export function CodePage({
                               <th>사용</th>
                             </>
                           )}
-                          {extras.map((field) => (
-                            <th key={field.key}>{field.label}</th>
-                          ))}
-                          {!system && <th aria-label="삭제" />}
+                          {!system && !numeric && <th>삭제</th>}
                         </tr>
                       </thead>
                       <tbody>
-                        {draft.map((row) => (
+                        {pagedDraft.map((row) => (
                           <tr
                             key={row.code}
                             data-testid={`code-row-${row.code.toLowerCase()}`}
@@ -512,6 +592,24 @@ export function CodePage({
                               />
                               {fieldError("codeName")}
                             </td>
+                            {extras.map((field) => (
+                              <td key={field.key}>
+                                {extraControl(
+                                  field,
+                                  row,
+                                  (patch) =>
+                                    setDraft((rows) =>
+                                      rows.map((item) =>
+                                        item.code === row.code
+                                          ? { ...item, ...patch }
+                                          : item,
+                                      ),
+                                    ),
+                                  row.code,
+                                  system,
+                                )}
+                              </td>
+                            ))}
                             {numeric ? (
                               <>
                                 <td>
@@ -570,28 +668,11 @@ export function CodePage({
                                 </td>
                               </>
                             )}
-                            {extras.map((field) => (
-                              <td key={field.key}>
-                                {extraControl(
-                                  field,
-                                  row,
-                                  (patch) =>
-                                    setDraft((rows) =>
-                                      rows.map((item) =>
-                                        item.code === row.code
-                                          ? { ...item, ...patch }
-                                          : item,
-                                      ),
-                                    ),
-                                  row.code,
-                                  system,
-                                )}
-                              </td>
-                            ))}
-                            {!system && (
+                            {!system && !numeric && (
                               <td>
                                 <button
                                   type="button"
+                                  className="ls-btn ls-btn-sm"
                                   data-testid={`code-delete-${row.code.toLowerCase()}`}
                                   aria-label={`${row.code} 삭제`}
                                   onClick={() => {
@@ -617,6 +698,29 @@ export function CodePage({
                     </table>
                   </div>
                   {snapshot.length === 0 && <p>등록된 코드가 없습니다.</p>}
+                  {!numeric && snapshot.length > 0 && (
+                    <ListPager
+                      page={page}
+                      pageSize={pageSize}
+                      total={draft.length}
+                      onPage={setPage}
+                      onPageSize={(size) => {
+                        setPageSize(size);
+                        setPage(1);
+                      }}
+                    />
+                  )}
+                  {extras.length > 0 && (
+                    <p className="code-note" data-testid="code-extra-help">
+                      {extras
+                        .map((field) => `${field.label}: ${field.help}`)
+                        .join(" · ")}
+                      . {NOTE_EXTRA_GROUPS}
+                    </p>
+                  )}
+                  <p className="code-note">
+                    {numeric ? NUMERIC_NOTE : NOTE_GENERAL}
+                  </p>
                   <div className="app-actions">
                     <button
                       type="button"
@@ -689,11 +793,11 @@ export function CodePage({
         <Dialog
           title={
             modal === "group"
-              ? "그룹 추가"
+              ? "코드 그룹 추가"
               : modal === "code"
                 ? numeric
                   ? "수당코드 추가"
-                  : "코드 추가"
+                  : `코드 추가 · ${group?.groupName ?? ""}`
                 : "코드를 삭제할까요?"
           }
           testId={`code-${modal}-dialog`}
@@ -728,6 +832,10 @@ export function CodePage({
                         }))
                       }
                     />
+                    <span className="code-help">
+                      영문 대문자로 시작, 영문 대문자·숫자·_ 30자까지. 만든
+                      뒤에는 바꿀 수 없습니다.
+                    </span>
                     {fieldError("groupId")}
                   </label>
                   <label>
@@ -744,6 +852,10 @@ export function CodePage({
                         }))
                       }
                     />
+                    <span className="code-help">
+                      새 업무 코드 그룹입니다. 만든 뒤에는 이름을 바꾸거나 끌 수
+                      없습니다.
+                    </span>
                     {fieldError("groupName")}
                   </label>
                 </>
@@ -763,6 +875,11 @@ export function CodePage({
                         }))
                       }
                     />
+                    {!numeric && (
+                      <span className="code-help">
+                        영문 대문자·숫자·_ , 그룹 안에서 중복 불가
+                      </span>
+                    )}
                     {fieldError("code")}
                   </label>
                   <label>
@@ -802,10 +919,9 @@ export function CodePage({
                       </label>
                       <label>
                         단위
-                        <input
+                        <select
                           aria-label="새 수당 단위"
                           data-testid="new-code-unit"
-                          maxLength={10}
                           value={newCode.unitNm ?? ""}
                           onChange={(event) =>
                             setNewCode((current) => ({
@@ -813,7 +929,11 @@ export function CodePage({
                               unitNm: event.target.value,
                             }))
                           }
-                        />
+                        >
+                          <option value="">선택</option>
+                          <option value="원">원</option>
+                          <option value="%">%</option>
+                        </select>
                         {fieldError("unitNm")}
                       </label>
                     </>

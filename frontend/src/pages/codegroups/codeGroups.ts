@@ -82,27 +82,29 @@ export type ExtraField = {
   key: keyof CodeItem;
   label: string;
   numeric?: boolean;
+  /** 시안 UI-27 표 아래 안내·추가 창 도움말 문구. */
+  help: string;
 };
 export function codeExtraFields(groupId: string): ExtraField[] {
   switch (groupId) {
     case "JOB":
       return [
-        { key: "relatedJobs", label: "관련 직무" },
-        { key: "estimateUnitPrice", label: "견적 기준 단가", numeric: true },
+        { key: "relatedJobs", label: "관련 직무", help: "직무 코드, 쉼표로 구분 (AI 추천 식-70·다음 자리 식-80)" },
+        { key: "estimateUnitPrice", label: "견적 기준 단가(원)", numeric: true, help: "월 단가, 견적·다음 자리 추천에 씀" },
       ];
     case "SKILL":
-      return [{ key: "requiredJobs", label: "필요한 직무" }];
+      return [{ key: "requiredJobs", label: "필요한 직무", help: "직무 코드, 쉼표로 구분 (AI 추천 스킬 점수 식-70)" }];
     case "PROJ_STEP":
       return [
-        { key: "weight", label: "비중 %", numeric: true },
-        { key: "contractTypes", label: "적용 계약유형" },
+        { key: "weight", label: "비중(%)", numeric: true, help: "진척률 계산에 쓰는 단계 비중" },
+        { key: "contractTypes", label: "적용 계약유형", help: "계약유형 코드, 쉼표로 구분" },
       ];
     case "BANK":
-      return [{ key: "bankCode", label: "은행 코드" }];
+      return [{ key: "bankCode", label: "은행 코드", help: "숫자 3자리" }];
     case "RSM_LABEL":
-      return [{ key: "targetField", label: "넣을 칸" }];
+      return [{ key: "targetField", label: "넣을 칸", help: "NAME 이름·TEL 전화번호·MAIL 이메일·ADDR 거주지·SKILL 기술·WANT 희망 단가·FROM 투입 가능일·VNDR 소속 업체 중 하나 (외부 인력 후보 [이력서 등록])" }];
     case "RSM_JOB_KW":
-      return [{ key: "job", label: "직무" }];
+      return [{ key: "job", label: "직무", help: "직무 코드, 쉼표로 구분 (외부 인력 후보 [이력서 등록]의 주 직무 추정)" }];
     default:
       return [];
   }

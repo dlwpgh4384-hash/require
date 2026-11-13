@@ -6,8 +6,9 @@ import java.util.List;
 public final class OperatingStandardsContracts {
     private OperatingStandardsContracts() {}
 
+    /** changedBy: 이력 창 「처리자」(시안). 처음 값은 「처음 설정」. */
     public record Item(String standardCode, String standardName, String value, String unit,
-        String effectiveMonth, boolean closed, boolean immediate) {}
+        String effectiveMonth, boolean closed, boolean immediate, String changedBy) {}
     public record Result(List<Item> items) {}
     public record Change(String standardCode, String value, String effectiveMonth, String action) {}
     public record Input(List<Change> items) {}

@@ -39,7 +39,8 @@ public class CommonOperatingStandardsService {
     public Result getCommonOperatingStandards() {
         var rows = mapper.selectStandards();
         if (rows.isEmpty()) return new Result(rows.stream().map(row -> new Item(row.standardCode,
-            row.standardName, row.value.toPlainString(), row.unit, publicMonth(row.month), false, false)).toList());
+            row.standardName, row.value.toPlainString(), row.unit, publicMonth(row.month), false, false,
+            row.changedBy)).toList());
         var currentMonth = mapper.selectCurrentMonth();
         var state = index(rows);
         String base = baseMonth(state, currentMonth);
@@ -52,7 +53,7 @@ public class CommonOperatingStandardsService {
             items.add(new Item(row.standardCode, row.standardName,
                 "CASH_BASE_YM".equals(row.standardCode) ? publicMonth(cashMonth(row.value)) : row.value.toPlainString(),
                 row.unit, cash ? null : publicMonth(row.month),
-                isClosed(cash ? base : row.month, base, closed), cash));
+                isClosed(cash ? base : row.month, base, closed), cash, row.changedBy));
         }
         return new Result(items);
     }

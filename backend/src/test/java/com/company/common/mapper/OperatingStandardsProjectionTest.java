@@ -26,6 +26,7 @@ class OperatingStandardsProjectionTest {
         labels.put("std_cd", "PART_SALES_EXPS"); labels.put("aply_bgn_ym", "203012");
         labels.put("std_nm", "공통관리비"); labels.put("std_val", new BigDecimal("12345678901.1234"));
         labels.put("unit_nm", "원"); labels.put("std_desc", nullable ? null : "정밀도 투영");
+        labels.put("changed_by", nullable ? null : "처음 설정");
         String sql = statement.getBoundSql(null).getSql().replaceAll("\\s+", " ").trim();
         assertThat(sql.substring(7, sql.indexOf(" FROM ")).split(",\\s*"))
             .containsExactlyElementsOf(labels.keySet());
@@ -45,5 +46,6 @@ class OperatingStandardsProjectionTest {
         assertThat(row.value).isEqualTo(new BigDecimal("12345678901.1234"));
         assertThat(row.unit).isEqualTo("원");
         assertThat(row.description).isEqualTo(nullable ? null : "정밀도 투영");
+        assertThat(row.changedBy).isEqualTo(nullable ? null : "처음 설정");
     }
 }

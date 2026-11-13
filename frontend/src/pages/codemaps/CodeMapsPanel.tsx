@@ -5,6 +5,7 @@ import {
   Toast,
 } from "../../shared/feedback/Dialog";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
+import { useCodeWorkspace } from "../codegroups/CodeWorkspace";
 import * as api from "./codeMaps";
 import "../../shared/list/list.css";
 import "./codeMaps.css";
@@ -42,6 +43,8 @@ export function CodeMapsPanel({
   const lock = useRef(false);
   const setScreenDirty = useScreenDirty();
   const form = useRef<HTMLFormElement>(null);
+  const workspace = useCodeWorkspace();
+  const handledSignal = useRef(workspace.signal.revision);
   const draftDirty = dialog === "add" && Object.values(draft).some(Boolean);
   useEffect(() => {
     if (onDirtyChange) {
@@ -182,6 +185,13 @@ export function CodeMapsPanel({
     setClosing(false);
     setDialog(kind);
   };
+  // 시안: [추가]는 제목줄 오른쪽(CodeTitleActions)에 있다.
+  useEffect(() => {
+    if (workspace.signal.revision <= handledSignal.current) return;
+    handledSignal.current = workspace.signal.revision;
+    if (workspace.signal.action === "map" && rows && !busy && !refreshPending)
+      open("add");
+  }, [workspace.signal]);
   return (
     <section
       className="code-maps-panel ls-root"
@@ -189,16 +199,27 @@ export function CodeMapsPanel({
       data-testid="code-maps-panel"
       data-screen-id="UI-27"
     >
+      <p className="code-maps-intro">
+        엑셀 업로드 때 이 표로 표기를 코드로 바꿔 읽고, 바꾼 사실을 경고로
+        알립니다(예: 「정직원」을 「정규직」으로 바꿈). 표에 없는 모르는 표기는
+        오류로 알려 주고 관리자가 여기에 추가합니다.
+      </p>
       <div className="code-maps-toolbar">
-        <button
-          type="button"
-          className="ls-btn ls-btn-p ls-btn-sm"
-          data-testid="code-map-add"
-          disabled={!rows || busy || refreshPending}
-          onClick={() => open("add")}
-        >
-          추가
-        </button>
+        <h2>
+          엑셀 표기 대응
+          <span className="code-maps-count"> · {rows?.length ?? 0}개</span>
+        </h2>
+        {!workspace.inShell && (
+          <button
+            type="button"
+            className="ls-btn ls-btn-p ls-btn-sm"
+            data-testid="code-map-add"
+            disabled={!rows || busy || refreshPending}
+            onClick={() => open("add")}
+          >
+            추가
+          </button>
+        )}
         <button
           type="button"
           className="ls-btn ls-btn-dt ls-btn-sm"
@@ -214,13 +235,22 @@ export function CodeMapsPanel({
         <table className="code-maps-table" aria-label="엑셀 표기 대응 목록">
           <thead>
             <tr>
-              <th>선택</th>
+              <th className="code-maps-check">
+                <span className="visually-hidden">선택</span>
+              </th>
               <th>엑셀 표기</th>
               <th>코드 그룹</th>
               <th>바꿀 코드</th>
             </tr>
           </thead>
           <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={4} className="code-maps-empty">
+                  등록된 표기가 없습니다.
+                </td>
+              </tr>
+            )}
             {rows.map((row, index) => (
               <tr
                 key={api.codeMapKey(row)}
@@ -250,7 +280,6 @@ export function CodeMapsPanel({
           </tbody>
         </table>
       )}
-      {rows?.length === 0 && <p>등록된 표기가 없습니다.</p>}
       {failure && (
         <div role="alert">
           {failure}
@@ -264,7 +293,10 @@ export function CodeMapsPanel({
           </button>
         </div>
       )}
-      <p>다음 업로드부터 대응 코드로 변환하고 경고합니다.</p>
+      <p className="code-maps-note">
+        처음에는 비어 있습니다. 업로드에서 모르는 표기가 나오면 여기에
+        추가합니다. 바꾼 내용은 [변경 이력]에 남습니다.
+      </p>
       {dialog && (
         <Dialog
           title={dialog === "add" ? "엑셀 표기 추가" : "표기 대응 삭제 확인"}
@@ -294,6 +326,9 @@ export function CodeMapsPanel({
                         setDraft({ ...draft, excelText: event.target.value })
                       }
                     />
+                    <span className="code-maps-help">
+                      엑셀에 실제로 적혀 오는 글자 그대로
+                    </span>
                   </label>
                   {errors.excelText && (
                     <p className="field-error">{errors.excelText}</p>
@@ -318,7 +353,7 @@ export function CodeMapsPanel({
                       <option value="">선택해 주세요</option>
                       {groups?.map((row) => (
                         <option key={row.groupId} value={row.groupId}>
-                          {row.groupName} ({row.groupId})
+                          {row.groupName}
                         </option>
                       ))}
                     </select>
@@ -341,7 +376,7 @@ export function CodeMapsPanel({
                       <option value="">선택해 주세요</option>
                       {options?.map((row) => (
                         <option key={row.code} value={row.code}>
-                          {row.codeName} ({row.code})
+                          {row.code} · {row.codeName}
                         </option>
                       ))}
                     </select>

@@ -95,8 +95,8 @@ export function CodeHistoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
                 <th scope="col">일시</th>
                 <th scope="col">구분</th>
                 <th scope="col">항목</th>
-                <th scope="col">전</th>
-                <th scope="col">후</th>
+                <th scope="col">변경 전</th>
+                <th scope="col">변경 후</th>
                 <th scope="col">처리자</th>
               </tr>
             </thead>
@@ -122,6 +122,10 @@ export function CodeHistoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
           </table>
         </div>
       )}
+      <p className="code-history-note">
+        코드 그룹·코드·운영 기준값·표기 대응을 바꾸면 누가 언제 무엇을 바꿨는지
+        최신순으로 남습니다. 지울 수 없습니다.
+      </p>
     </section>
   );
 }

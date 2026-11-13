@@ -22,7 +22,11 @@ public final class OperatingStandardsRules {
         "STEP_PRBL_1", "STEP_PRBL_2", "STEP_PRBL_3", "STEP_PRBL_4", "MIN_CASH",
         "CASH_BASE_YM", "CASH_BASE_AMT", "BILL_MISS_RT", "BILL_MISS_MIN",
         "AI_SCORE_JOB", "AI_SCORE_SKILL", "AI_SCORE_CUST", "AI_SCORE_GRADE", "AI_SCORE_PERF",
-        "AI_SCORE_COST", "AI_SCORE_AVAIL", "AI_SCORE_LOC");
+        "AI_SCORE_COST", "AI_SCORE_AVAIL", "AI_SCORE_LOC",
+        // 시안(최종) 운영 기준값 표에 있는 나머지 12개(2026-11-14): DML 43개 전부를 관리한다.
+        "WTHLD_RT", "QUOTE_APRV_RT", "QUOTE_REAPRV_GAP", "BDGT_WARN_RT", "SHORT_PERSON",
+        "SURPLUS_PERSON", "HIRE_LEAD_MON", "COST_OVER_UPRC_RT", "MM_OVER", "LOCK_FAIL_CNT",
+        "SESSION_MIN", "PWD_CHG_DAY");
     private static final DateTimeFormatter PHYSICAL = DateTimeFormatter.ofPattern("uuuuMM");
     public static boolean editable(String code) { return EDITABLE.contains(code); }
     public static boolean immediate(String code) {

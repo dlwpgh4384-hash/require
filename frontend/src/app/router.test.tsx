@@ -451,7 +451,7 @@ describe("common code route composition", () => {
           name: /저장|취소|다운로드/,
         }),
       ).not.toBeInTheDocument();
-      expect(screen.getByTestId("code-group-title-add")).toBeDisabled();
+      expect(screen.queryByTestId("code-group-title-add")).not.toBeInTheDocument();
       expect(
         request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
       ).toBe(false);
@@ -476,13 +476,13 @@ describe("common code route composition", () => {
     expect(histories).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByTestId("code-tab-maps"));
     await screen.findByText("등록된 표기가 없습니다.");
-    fireEvent.click(screen.getByTestId("code-map-add"));
-    await screen.findByRole("option", { name: "업무 그룹 (GENERAL)" });
+    fireEvent.click(screen.getByTestId("code-map-title-add"));
+    await screen.findByRole("option", { name: "업무 그룹" });
     fireEvent.change(screen.getByTestId("code-map-group"), {
       target: { value: "GENERAL" },
     });
     expect(
-      await screen.findByRole("option", { name: "바뀐 이름 (ONE)" }),
+      await screen.findByRole("option", { name: "ONE · 바뀐 이름" }),
     ).toBeInTheDocument();
     expect(request).toHaveBeenCalledWith(
       "/api/common/code-groups/GENERAL/codes",
@@ -496,15 +496,15 @@ describe("common code route composition", () => {
     await screen.findByLabelText("ONE 이름");
     fireEvent.click(screen.getByTestId("code-tab-maps"));
     await screen.findByText("등록된 표기가 없습니다.");
-    fireEvent.click(screen.getByTestId("code-map-add"));
+    fireEvent.click(screen.getByTestId("code-map-title-add"));
     fireEvent.change(screen.getByTestId("code-map-text"), {
       target: { value: "엑셀 별칭" },
     });
-    await screen.findByRole("option", { name: "업무 그룹 (GENERAL)" });
+    await screen.findByRole("option", { name: "업무 그룹" });
     fireEvent.change(screen.getByTestId("code-map-group"), {
       target: { value: "GENERAL" },
     });
-    await screen.findByRole("option", { name: "처음 이름 (ONE)" });
+    await screen.findByRole("option", { name: "ONE · 처음 이름" });
     fireEvent.change(screen.getByTestId("code-map-code"), {
       target: { value: "ONE" },
     });
@@ -606,7 +606,7 @@ describe("common code route composition", () => {
     await screen.findByLabelText("ONE 이름");
     fireEvent.click(screen.getByTestId("code-tab-maps"));
     await screen.findByText("등록된 표기가 없습니다.");
-    fireEvent.click(screen.getByTestId("code-map-add"));
+    fireEvent.click(screen.getByTestId("code-map-title-add"));
     fireEvent.change(screen.getByTestId("code-map-text"), {
       target: { value: "입력 유지" },
     });

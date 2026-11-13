@@ -1,7 +1,8 @@
 /* 시스템 › 권한 UI-24 — 시안 v1.8 치수(카드 20/24px, 칸 이름 120px 오른쪽 맞춤, 표 줄 40px, 아래 고정 단추 줄). */
+/* 시안 .content 간격 24px: 탭 아래 16px(탭 -8px), 설정 카드와 표 사이 24px. */
 .roles-page {
   display: grid;
-  gap: 16px;
+  gap: 24px;
   min-width: 0;
 }
 .roles-add {
@@ -38,7 +39,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px 24px;
-  margin: 0 0 16px;
+  margin: 0 0 24px;
   padding: 20px 24px;
   border: 1px solid var(--divider);
   border-radius: 8px;
@@ -78,7 +79,7 @@
   margin: 4px 0 0;
   color: var(--text-sub);
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 16px;
 }
 .roles-matrix-wrap {
   border: 1px solid var(--divider);

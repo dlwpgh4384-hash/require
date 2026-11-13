@@ -14,6 +14,14 @@ import { PlaceholderScreen } from "./PlaceholderScreen";
 import { UserPage } from "../users/UserPage";
 import { RolePage } from "../roles/RolePage";
 import { MenuPage } from "../menusettings/MenuPage";
+import { CodePage } from "../codegroups/CodePage";
+import {
+  CodeTitleActions,
+  CodeWorkspaceProvider,
+} from "../codegroups/CodeWorkspace";
+import { CodeMapsPanel } from "../codemaps/CodeMapsPanel";
+import { OperatingStandardsPanel } from "../operatingstandards/OperatingStandardsPanel";
+import { CodeHistoryPanel } from "../commonops/CodeHistoryPanel";
 import {
   MenuTitleActions,
   MenuWorkspaceProvider,
@@ -34,6 +42,25 @@ const renderScreen = (scrnId: string) =>
     <RolePage />
   ) : scrnId === "UI-25" ? (
     <MenuPage />
+  ) : scrnId === "UI-27" ? (
+    <CodePage
+      panels={({ dirty, onDirtyChange, onChanged, historyRevision }) => ({
+        maps: (
+          <CodeMapsPanel
+            dirty={dirty}
+            onDirtyChange={onDirtyChange}
+            onChanged={onChanged}
+          />
+        ),
+        standards: (
+          <OperatingStandardsPanel
+            onDirtyChange={onDirtyChange}
+            onChanged={onChanged}
+          />
+        ),
+        history: <CodeHistoryPanel refreshKey={historyRevision} />,
+      })}
+    />
   ) : (
     <PlaceholderScreen scrnId={scrnId} />
   );
@@ -77,6 +104,8 @@ function PreferenceNavigation() {
               <RoleTitleActions />
             ) : context.screenId === "UI-25" ? (
               <MenuTitleActions />
+            ) : context.screenId === "UI-27" ? (
+              <CodeTitleActions />
             ) : undefined,
           quickAccess: (
             <PersonalScreenLists
@@ -117,26 +146,30 @@ export function CommonNavigationPage() {
   return (
     <UserWorkspaceProvider>
       <RoleWorkspaceProvider>
-      <MenuWorkspaceProvider>
-        {preferences ? (
-          <PreferenceNavigation />
-        ) : (
-          <NavigationRoot
-            tabs
-            renderScreen={renderScreen}
-            extensions={(context) => ({
-              screenActions:
-                context.screenId === "UI-23" ? (
-                  <UserRegistrationButton />
-                ) : context.screenId === "UI-24" ? (
-                  <RoleTitleActions />
-                ) : context.screenId === "UI-25" ? (
-                  <MenuTitleActions />
-                ) : undefined,
-            })}
-          />
-        )}
-      </MenuWorkspaceProvider>
+        <MenuWorkspaceProvider>
+          <CodeWorkspaceProvider>
+            {preferences ? (
+              <PreferenceNavigation />
+            ) : (
+              <NavigationRoot
+                tabs
+                renderScreen={renderScreen}
+                extensions={(context) => ({
+                  screenActions:
+                    context.screenId === "UI-23" ? (
+                      <UserRegistrationButton />
+                    ) : context.screenId === "UI-24" ? (
+                      <RoleTitleActions />
+                    ) : context.screenId === "UI-25" ? (
+                      <MenuTitleActions />
+                    ) : context.screenId === "UI-27" ? (
+                      <CodeTitleActions />
+                    ) : undefined,
+                })}
+              />
+            )}
+          </CodeWorkspaceProvider>
+        </MenuWorkspaceProvider>
       </RoleWorkspaceProvider>
     </UserWorkspaceProvider>
   );

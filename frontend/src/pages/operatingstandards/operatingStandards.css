@@ -1,0 +1,95 @@
+.operating-standards-panel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  color: var(--text);
+}
+.operating-standards-group {
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.operating-standards-group h3 {
+  padding: 10px 12px;
+  margin: 0;
+  background: var(--hover);
+  font-size: 13px;
+  font-weight: 600;
+}
+.operating-standards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  padding: 12px;
+}
+.operating-standard-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+}
+.operating-standard-card label {
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+.operating-standard-value,
+.operating-standard-history-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.operating-standard-value input {
+  width: 100%;
+  min-width: 0;
+}
+.operating-standard-value span {
+  white-space: nowrap;
+}
+.operating-standard-history-link {
+  justify-content: space-between;
+  color: var(--text-sub);
+  font-size: 12px;
+}
+.operating-standard-history-link button {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+.operating-standard-card p,
+.operating-standards-help {
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 12px;
+}
+.operating-standard-card .field-error {
+  color: var(--ls-bad);
+}
+.operating-standards-warning {
+  padding: 10px 16px;
+  border-radius: 8px;
+  color: var(--ls-warn);
+  background: var(--ls-warn-bg);
+}
+.operating-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.operating-history-table th,
+.operating-history-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--divider);
+  text-align: left;
+}
+.operating-history-table th {
+  background: var(--hover);
+}
+.operating-history-table td:last-child {
+  display: flex;
+  gap: 8px;
+}
+.operating-history-table input {
+  width: 120px;
+}

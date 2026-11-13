@@ -1,0 +1,21 @@
+package com.company.common.service;
+
+import com.company.common.dto.CodeHistoryContracts.Result;
+import com.company.common.mapper.CodeHistoryRow;
+import com.company.common.mapper.CommonCodeHistoryMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@Transactional(readOnly = true)
+public class CommonCodeHistoryService {
+    private final CommonCodeHistoryMapper mapper;
+
+    public CommonCodeHistoryService(CommonCodeHistoryMapper mapper) {
+        this.mapper = mapper;
+    }
+
+    public Result getCommonCodeChangeHistory() {
+        return new Result(mapper.selectChanges().stream().map(CodeHistoryRow::value).toList());
+    }
+}

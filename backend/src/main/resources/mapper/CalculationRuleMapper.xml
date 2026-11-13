@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.mapper.CalculationRuleMapper">
+  <resultMap id="definition" type="com.company.common.mapper.CalculationRuleRow" autoMapping="false">
+    <id column="calc_id" property="calcId" javaType="java.lang.String"/>
+    <result column="frml_cn" property="formula" javaType="java.lang.String"/>
+    <result column="dtl_cn" property="details" javaType="java.lang.String"/>
+  </resultMap>
+  <resultMap id="standard" type="com.company.common.mapper.CalculationStandardRow" autoMapping="false">
+    <id column="std_cd" property="standardCode" javaType="java.lang.String"/>
+    <id column="aply_bgn_ym" property="effectiveMonth" javaType="java.lang.String"/>
+    <result column="std_val" property="value" javaType="java.math.BigDecimal"/>
+  </resultMap>
+  <resultMap id="codeText" type="com.company.common.mapper.CodeTextRow" autoMapping="false">
+    <id column="code_grp_id" property="groupId" javaType="java.lang.String"/>
+    <id column="code" property="code" javaType="java.lang.String"/>
+    <result column="code_nm" property="codeName" javaType="java.lang.String"/>
+  </resultMap>
+  <select id="selectDefinition" resultMap="definition">
+    SELECT calc_id, frml_cn, dtl_cn FROM TB_SY_CALC_RULE WHERE calc_id = #{calcId}
+  </select>
+  <select id="selectEffectiveStandard" resultMap="standard">
+    SELECT std_cd, aply_bgn_ym, std_val FROM TB_SY_OPER_STD
+    WHERE std_cd = #{standardCode}
+    <choose>
+      <when test="standardCode == 'CASH_BASE_YM' or standardCode == 'CASH_BASE_AMT'">
+        AND aply_bgn_ym &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul', 'YYYYMM')
+      </when>
+      <otherwise>AND aply_bgn_ym &lt;= #{month}</otherwise>
+    </choose>
+    ORDER BY aply_bgn_ym DESC LIMIT 1
+  </select>
+  <sql id="validCode">
+    FROM TB_SY_CODE c JOIN TB_SY_CODE_GRP g ON g.code_grp_id = c.code_grp_id
+    WHERE c.code_grp_id = #{groupId} AND c.use_yn = 'Y' AND c.del_yn = 'N' AND g.use_yn = 'Y'
+  </sql>
+  <select id="selectNormalText" resultMap="codeText">
+    SELECT c.code_grp_id, c.code, c.code_nm
+    <include refid="validCode"/>
+    AND (c.code = #{text} OR c.code_nm = #{text})
+    ORDER BY c.code
+  </select>
+  <select id="selectMappedText" resultMap="codeText">
+    SELECT c.code_grp_id, c.code, c.code_nm
+    FROM TB_SY_CODE_MAP m
+    JOIN TB_SY_CODE c ON c.code_grp_id = m.code_grp_id AND c.code = m.code
+    JOIN TB_SY_CODE_GRP g ON g.code_grp_id = c.code_grp_id
+    WHERE m.code_grp_id = #{groupId} AND m.src_text = #{text}
+      AND c.use_yn = 'Y' AND c.del_yn = 'N' AND g.use_yn = 'Y'
+  </select>
+</mapper>

@@ -19,6 +19,7 @@ class PostgreSqlPreparationTest {
     private Connection database;
     private String schema;
     private SchemaPreparation preparation;
+    private org.apache.ibatis.session.SqlSessionFactory sessions;
 
     @BeforeEach
     void independentSchema() throws Exception {
@@ -35,7 +36,13 @@ class PostgreSqlPreparationTest {
         properties.setProperty("currentSchema", schema);
         source.setDriverProperties(properties);
         var config = new Configuration(new Environment("postgresql", new JdbcTransactionFactory(), source));
-        preparation = new SchemaPreparation(new SqlSessionFactoryBuilder().build(config));
+        for (String resource : java.util.List.of("mapper/CalculationRuleMapper.xml", "mapper/UserPreferencePeriodSourceMapper.xml")) {
+            try (var stream = new ClassPathResource(resource).getInputStream()) {
+                new org.apache.ibatis.builder.xml.XMLMapperBuilder(stream, config, resource, config.getSqlFragments()).parse();
+            }
+        }
+        sessions = new SqlSessionFactoryBuilder().build(config);
+        preparation = new SchemaPreparation(sessions);
     }
 
     @AfterEach
@@ -50,7 +57,7 @@ class PostgreSqlPreparationTest {
     @Test
     void createsPreparedTablesAndOnlyBaseSeedRowsWithoutPhysicalForeignKeys() throws Exception {
         preparation.prepare();
-        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'")).isEqualTo(19);
+        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'")).isEqualTo(21);
         assertThat(number("SELECT count(*) FROM tb_sy_menu")).isEqualTo(40);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NULL")).isEqualTo(10);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NOT NULL")).isEqualTo(30);
@@ -65,9 +72,31 @@ class PostgreSqlPreparationTest {
         assertThat(number("SELECT count(*) FROM tb_sy_user_role WHERE user_id='admin' AND role_id='ADMIN'")).isEqualTo(1);
         assertThat(number("SELECT count(*) FROM tb_bs_part WHERE part_id='HQ' AND hq_yn='Y'")).isEqualTo(1);
         assertThat(number("SELECT count(*) FROM tb_sy_role_menu_auth")).isEqualTo(150);
-        try (var rows = database.createStatement().executeQuery("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name NOT IN ('tb_sy_menu','tb_sy_user','tb_sy_code_grp','tb_sy_code','tb_sy_oper_std','tb_sy_role','tb_sy_user_role','tb_bs_part','tb_sy_role_menu_auth')")) {
+        assertThat(number("SELECT count(*) FROM tb_sy_calc_rule")).isEqualTo(91);
+        try (var rows = database.createStatement().executeQuery("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name NOT IN ('tb_sy_menu','tb_sy_user','tb_sy_code_grp','tb_sy_code','tb_sy_oper_std','tb_sy_role','tb_sy_user_role','tb_bs_part','tb_sy_role_menu_auth','tb_sy_calc_rule')")) {
             while (rows.next()) assertThat(number("SELECT count(*) FROM " + rows.getString(1))).isZero();
         }
+    }
+
+    @Test
+    void commonEntityContractIsRepeatableAndRejectsMissingPhysicalTablesAndKeys() throws Exception {
+        preparation.prepare();
+        String contract = new ClassPathResource("db/migration/V9__common_entity_contract.sql")
+            .getContentAsString(StandardCharsets.UTF_8);
+        execute(contract);
+        execute(contract);
+        assertThat(text("SELECT to_regclass('u_i_24_s_l_i_c_e_006')::text")).isNull();
+        execute("ALTER TABLE tb_sy_code_map DROP CONSTRAINT uk_tb_sy_code_map_01");
+        assertThatThrownBy(() -> execute(contract))
+            .hasMessageContaining("tb_sy_code_map.uk_tb_sy_code_map_01");
+        execute("ALTER TABLE tb_sy_code_map ADD CONSTRAINT uk_tb_sy_code_map_01 UNIQUE (src_text,code_grp_id)");
+        execute("ALTER TABLE tb_sy_calc_rule RENAME TO owned_calc_rule");
+        assertThatThrownBy(() -> execute(contract))
+            .hasMessageContaining("tb_sy_calc_rule: required physical table missing");
+        execute("ALTER TABLE owned_calc_rule RENAME TO tb_sy_calc_rule");
+        execute(contract);
+        assertThat(number("SELECT count(*) FROM tb_sy_calc_rule")).isEqualTo(91);
+        assertThat(number("SELECT count(*) FROM tb_sy_role_menu_auth")).isEqualTo(150);
     }
 
     @Test
@@ -250,6 +279,96 @@ class PostgreSqlPreparationTest {
         assertThat(number("SELECT count(*) FROM tb_sy_role")).isZero();
         assertThat(number("SELECT count(*) FROM tb_sy_user_role")).isZero();
         assertThat(text("SELECT to_regclass('tb_sy_accs_log')::text")).isNull();
+    }
+
+    @Test
+    void originalDefinitionsMaterializeThroughTheRealXmlMapper() throws Exception {
+        preparation.prepare();
+        try (var session = sessions.openSession();
+             var input = new ClassPathResource("calculation/source-definitions.json").getInputStream()) {
+            var mapper = session.getMapper(com.company.common.mapper.CalculationRuleMapper.class);
+            var periods = session.getMapper(com.company.common.mapper.UserPreferencePeriodSourceMapper.class);
+            var service = new com.company.common.service.CalculationRuleService(mapper, periods);
+            for (var fixture : new com.fasterxml.jackson.databind.ObjectMapper().readTree(input)) {
+                var value = service.definition(fixture.get("calcId").asText());
+                assertThat(value.formula()).isEqualTo(fixture.get("formula").asText());
+                assertThat(value.details()).isEqualTo(fixture.get("details").asText());
+            }
+            assertThat(mapper.selectDefinition("식-03")).isNull();
+            assertThat(mapper.selectDefinition("식-65")).isNull();
+            assertThat(mapper.selectDefinition("식-78")).isNull();
+            assertThat(mapper.selectDefinition("식-94")).isNull();
+        }
+    }
+
+    @Test
+    void preparationPreservesEveryExistingFormulaAndDoesNotFillMissingIds() throws Exception {
+        preparation.prepare();
+        execute("UPDATE tb_sy_calc_rule SET frml_cn='수정 보존', mod_user_id='admin', mod_dttm=clock_timestamp() WHERE calc_id='식-08'");
+        execute("DELETE FROM tb_sy_calc_rule WHERE calc_id='식-00'");
+        String before = text("SELECT jsonb_agg(to_jsonb(t) ORDER BY calc_id)::text FROM tb_sy_calc_rule t");
+        preparation.prepare();
+        assertThat(text("SELECT jsonb_agg(to_jsonb(t) ORDER BY calc_id)::text FROM tb_sy_calc_rule t")).isEqualTo(before);
+        assertThat(number("SELECT count(*) FROM tb_sy_calc_rule")).isEqualTo(90);
+    }
+
+    @Test
+    void incompatibleOriginalTableIsReportedAndLeftUnchanged() throws Exception {
+        execute("CREATE TABLE tb_sy_calc_rule (calc_id text PRIMARY KEY)");
+        execute("INSERT INTO tb_sy_calc_rule VALUES ('소유 데이터')");
+        assertThatThrownBy(preparation::prepare).hasMessageContaining("tb_sy_calc_rule");
+        assertThat(text("SELECT calc_id FROM tb_sy_calc_rule")).isEqualTo("소유 데이터");
+        assertThat(text("SELECT to_regclass('tb_sy_code_map')::text")).isNull();
+        assertThat(text("SELECT to_regclass('tb_sy_menu')::text")).isNull();
+    }
+
+    @Test
+    void formulaFailureRollsBackBothNewPreparationResources() throws Exception {
+        preparation.prepare();
+        execute("DELETE FROM tb_sy_calc_rule");
+        execute("DROP TABLE tb_sy_code_map");
+        execute("CREATE FUNCTION reject_owned_formula() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned formula failure'; END; $$");
+        execute("CREATE TRIGGER reject_owned_formula BEFORE INSERT ON tb_sy_calc_rule FOR EACH ROW EXECUTE FUNCTION reject_owned_formula()");
+        assertThatThrownBy(preparation::prepare).hasMessageContaining("owned formula failure");
+        assertThat(number("SELECT count(*) FROM tb_sy_calc_rule")).isZero();
+        assertThat(text("SELECT to_regclass('tb_sy_code_map')::text")).isNull();
+    }
+
+    @Test
+    void textResolverReadsOriginalTargetAndIgnoresInactiveOrDeletedCodes() throws Exception {
+        preparation.prepare();
+        execute("INSERT INTO tb_sy_code_map (src_text,code_grp_id,code,reg_user_id) VALUES ('정직원','EMP_TYPE','FT','admin')");
+        try (var session = sessions.openSession()) {
+            var resolver = new com.company.common.service.CodeTextResolver(session.getMapper(com.company.common.mapper.CalculationRuleMapper.class));
+            var result = resolver.resolve("EMP_TYPE", "정직원");
+            assertThat(result.code()).isEqualTo("FT");
+            assertThat(result.warning()).isEqualTo("‘정직원’을 ‘정규직’으로 바꿈");
+            assertThat(resolver.resolve("EMP_TYPE", "FT").warning()).isNull();
+        }
+        execute("UPDATE tb_sy_code SET del_yn='Y' WHERE code_grp_id='EMP_TYPE' AND code='FT'");
+        try (var session = sessions.openSession()) {
+            var resolver = new com.company.common.service.CodeTextResolver(session.getMapper(com.company.common.mapper.CalculationRuleMapper.class));
+            assertThatThrownBy(() -> resolver.resolve("EMP_TYPE", "정직원")).isInstanceOf(com.company.common.service.CodeFailure.class);
+        }
+        execute("UPDATE tb_sy_code SET del_yn='N', use_yn='N' WHERE code_grp_id='EMP_TYPE' AND code='FT'");
+        try (var session = sessions.openSession()) {
+            var resolver = new com.company.common.service.CodeTextResolver(session.getMapper(com.company.common.mapper.CalculationRuleMapper.class));
+            assertThatThrownBy(() -> resolver.resolve("EMP_TYPE", "FT")).isInstanceOf(com.company.common.service.CodeFailure.class);
+        }
+    }
+
+    @Test
+    void koreanMonthBoundaryAndHistoryInstantReferToTheSameMoment() throws Exception {
+        var instant = java.time.Instant.parse("2026-01-31T15:00:00Z");
+        assertThat(instant.atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate()).isEqualTo(java.time.LocalDate.of(2026, 2, 1));
+        assertThat(text("SELECT to_char(TIMESTAMPTZ '2026-01-31 15:00:00+00' AT TIME ZONE 'Asia/Seoul','YYYYMM')")).isEqualTo("202602");
+        preparation.prepare();
+        try (var session = sessions.openSession()) {
+            var mapper = session.getMapper(com.company.common.mapper.CalculationRuleMapper.class);
+            var standard = mapper.selectEffectiveStandard("CASH_BASE_YM", "190001");
+            assertThat(standard.effectiveMonth).isEqualTo("202601");
+            assertThat(standard.value).isEqualByComparingTo("202601");
+        }
     }
 
     private void execute(String sql) throws Exception {

@@ -30,7 +30,9 @@ class MenuPreparationBoundaryTest {
     private static final List<String> RESOURCES = List.of(
         "V1__navigation_schema.sql", "V2__navigation_menu_seed.sql",
         "V3__common_function_seed.sql", "V4__user_management_seed.sql",
-        "V5__role_permissions.sql", "V6__role_schema_contract.sql");
+        "V5__role_permissions.sql", "V6__role_schema_contract.sql",
+        "V7__code_definitions_schema.sql", "V8__calculation_rule_seed.sql",
+        "V9__common_entity_contract.sql");
     private final SqlSessionFactory factory = mock(SqlSessionFactory.class);
     private final SqlSession session = mock(SqlSession.class);
     private final Connection connection = mock(Connection.class);
@@ -69,11 +71,11 @@ class MenuPreparationBoundaryTest {
     }
 
     @Test
-    void explicitPreparationRunsExactlyTheSixExistingResourcesInOrder() throws Exception {
+    void explicitPreparationRunsExactlyThePackagedResourcesInOrder() throws Exception {
         preparation.prepare();
         var sql = ArgumentCaptor.forClass(String.class);
         var order = inOrder(statement, session);
-        order.verify(statement, times(6)).execute(sql.capture());
+        order.verify(statement, times(RESOURCES.size())).execute(sql.capture());
         order.verify(session).commit(true);
         order.verify(session).close();
         for (int index = 0; index < RESOURCES.size(); index++) {
@@ -87,7 +89,7 @@ class MenuPreparationBoundaryTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {5, 6})
+    @ValueSource(ints = {5, 6, 7, 8, 9})
     void permissionPreparationFailureRollsBackTheWholePreparation(int failingResource) throws Exception {
         int[] executions = {0};
         when(statement.execute(anyString())).thenAnswer(call -> {
@@ -112,7 +114,8 @@ class MenuPreparationBoundaryTest {
         assertThat(names).containsExactlyInAnyOrder("TB_SY_USER_SCOPE", "TB_SY_MENU", "TB_SY_USER_PREF",
             "TB_SY_NOTI", "TB_BS_PART_STD", "TB_PJ_PROJ", "TB_BL_BILL", "TB_BL_DUN_HIST", "TB_CL_CLOSE",
             "TB_SY_USER", "TB_SY_CODE_GRP", "TB_SY_CODE", "TB_SY_OPER_STD", "TB_SY_ROLE", "TB_SY_USER_ROLE",
-            "TB_BS_PART", "TB_SY_ACCS_LOG", "TB_SY_CHG_HIST", "TB_SY_ROLE_MENU_AUTH");
+            "TB_BS_PART", "TB_SY_ACCS_LOG", "TB_SY_CHG_HIST", "TB_SY_ROLE_MENU_AUTH",
+            "TB_SY_CODE_MAP", "TB_SY_CALC_RULE");
     }
 
     @Test

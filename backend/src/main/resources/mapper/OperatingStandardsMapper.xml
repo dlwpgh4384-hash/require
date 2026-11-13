@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.mapper.OperatingStandardsMapper">
+  <resultMap id="standard"
+             type="com.company.common.mapper.OperatingStandardRow"
+             autoMapping="false">
+    <id column="std_cd" property="standardCode" javaType="java.lang.String"/>
+    <id column="aply_bgn_ym" property="month" javaType="java.lang.String"/>
+    <result column="std_nm" property="standardName" javaType="java.lang.String"/>
+    <result column="std_val" property="value" javaType="java.math.BigDecimal"/>
+    <result column="unit_nm" property="unit" javaType="java.lang.String"/>
+    <result column="std_desc" property="description" javaType="java.lang.String"/>
+  </resultMap>
+  <select id="selectStandards" resultMap="standard">
+    SELECT std_cd, aply_bgn_ym, std_nm, std_val, unit_nm, std_desc
+    FROM TB_SY_OPER_STD
+    ORDER BY std_cd, aply_bgn_ym
+  </select>
+  <select id="selectCurrentMonth" resultType="java.lang.String">
+    SELECT to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul', 'YYYYMM')
+  </select>
+  <update id="lockStandardsAndPeriods">
+    LOCK TABLE TB_SY_OPER_STD, TB_CL_CLOSE IN SHARE ROW EXCLUSIVE MODE
+  </update>
+  <insert id="insertStandard">
+    INSERT INTO TB_SY_OPER_STD
+      (std_cd, aply_bgn_ym, std_nm, std_val, unit_nm, std_desc, reg_user_id, reg_dttm)
+    VALUES (#{standardCode}, #{month}, #{standardName}, #{value}, #{unit},
+      #{description,jdbcType=VARCHAR}, 'admin', clock_timestamp())
+  </insert>
+  <update id="updateStandard">
+    UPDATE TB_SY_OPER_STD
+    SET std_val=#{value}, mod_user_id='admin', mod_dttm=clock_timestamp()
+    WHERE std_cd=#{standardCode} AND aply_bgn_ym=#{month}
+  </update>
+  <delete id="deleteStandard">
+    DELETE FROM TB_SY_OPER_STD
+    WHERE std_cd=#{standardCode} AND aply_bgn_ym=#{month}
+  </delete>
+</mapper>

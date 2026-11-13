@@ -56,7 +56,7 @@ class MenuRegistrationProjectionTest {
     }
     @Test void registryContainsOnlyImplementedScreenContracts() {
         assertThat(new DevelopedScreenRegistry().screens()).extracting(row -> row.scrnId())
-            .containsExactly("UI-23", "UI-24", "UI-25");
-        assertThat(new DevelopedScreenRegistry().contains("UI-27")).isFalse();
+            .containsExactly("UI-23", "UI-24", "UI-25", "UI-27");
+        assertThat(new DevelopedScreenRegistry().contains("UI-27")).isTrue();
     }
 }

@@ -1619,8 +1619,956 @@ paths:
                 $ref: '#/components/schemas/ApiError'
       description: UI는 응답 목록을 ls-in 선택칸에 연결하며 정본의 모든 placeholder 화면을 개발 완료 목록으로 꾸미지 않는다. 제품 목록 확보는 OQ-MENU-001, 독립
         fixture 시험은 가능하다.
+  /api/common/code-groups:
+    get:
+      operationId: getCommonCodeGroups
+      summary: 공통코드 그룹 목록
+      security: []
+      x-related-requirements:
+      - REQ-251
+      description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
+        승인하지 않는다.
+      x-pagination-filtering:
+        pagination: 전체 조회, 서버 페이지 분할 없음; 코드 표의 표시 페이지는 공통 목록 부품에서 처리
+        filtering: 전체 그룹/대응/기준값·이력; 추가 검색 입력 없음
+        ordering: 기존 원문 SORT_ORD 순; 동순위 보조 정렬은 기존 mapper 대조
+      x-aiops-query-role:
+        entity: TB_SY_CODE_GRP
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 공통코드 그룹 목록 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCodeGroupList'
+        '400':
+          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    post:
+      operationId: postCommonCodeGroup
+      summary: 업무 코드 그룹 등록
+      security: []
+      x-related-requirements:
+      - REQ-267
+      - REQ-268
+      description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
+        승인하지 않는다.
+      x-business-rules:
+      - 그룹 ID는 대문자로 시작·30자 이내·중복 금지; 생성 후 ID 불변
+      - 새 그룹은 업무 그룹이며 이름 수정·사용 끄기 기능은 없음
+      x-side-effects:
+      - TB_SY_CODE_GRP 새 업무 그룹과 TB_SY_CHG_HIST 그룹 추가 기록; 실제 이력 컬럼은 원문 SQL 대조
+      x-state-transitions:
+      - 그룹 없음 -> 업무 그룹 존재; 기존 그룹 불변
+      x-required-tests:
+      - 'happy: 유일한 적합 그룹 ID·이름으로 등록 -> getCommonCodeGroups에 해당 업무 그룹과 codeCount=0'
+      - 'auth: 인증 헤더 없이 새 업무 그룹 등록 -> 200 및 TB_SY_CHG_HIST 처리자 admin; UI-22 전 비관리자403 정책 없음'
+      - 'validation: 숫자로 시작하거나 31자인 groupId 전송 -> 400 errors.groupId 및 TB_SY_CODE_GRP 신규0행'
+      - 'business: 기존 groupId로 재등록 -> 400 중복 오류·기존 그룹 이름 불변'
+      - 'side-effect: 유효 업무 그룹 등록 -> 공통코드 이력 조회에 그룹 추가와 admin·일시가 존재'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonCodeGroupInput'
+      responses:
+        '200':
+          description: 업무 코드 그룹 등록 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCodeGroup'
+        '400':
+          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/code-groups/{groupId}/codes:
+    get:
+      operationId: getCommonCodes
+      summary: 그룹별 공통코드 조회
+      security: []
+      x-related-requirements:
+      - REQ-254
+      - REQ-269
+      description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
+        승인하지 않는다.
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[A-Z][A-Z0-9_]{0,29}$
+      x-pagination-filtering:
+        pagination: 전체 조회, 서버 페이지 분할 없음; 코드 표의 표시 페이지는 공통 목록 부품에서 처리
+        filtering: path groupId의 DEL_YN=N 코드; 사용 N도 관리 표에는 포함
+        ordering: 기존 원문 SORT_ORD 순; 동순위 보조 정렬은 기존 mapper 대조
+      x-aiops-query-role:
+        entity: TB_SY_CODE
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 그룹별 공통코드 조회 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCodeList'
+        '400':
+          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    post:
+      operationId: postCommonCode
+      summary: 업무·수당 코드 등록
+      security: []
+      x-related-requirements:
+      - REQ-258
+      - REQ-259
+      - REQ-260
+      - REQ-270
+      description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
+        승인하지 않는다.
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[A-Z][A-Z0-9_]{0,29}$
+      x-business-rules:
+      - 시스템 그룹에는 추가 금지; 코드 대문자 정규화 후 삭제 PK 포함 중복 검사
+      - 코드/이름 및 여섯 그룹별 추가값 필수; RSM_LABEL targetField는 지정8개만
+      - 수당은 값 미입력/비움=0
+      x-side-effects:
+      - TB_SY_CODE 새 행과 등록 변경 이력; 소비 선택 목록 갱신
+      x-state-transitions:
+      - 업무 그룹 코드 없음 -> 코드 존재·선택 가능; 시스템 그룹 불변
+      x-required-tests:
+      - 'happy: 새 업무 코드의 소문자·필수 이름/추가값 등록 -> GET codes의 대문자 code와 codeName 일치'
+      - 'auth: 무인증 업무 코드 추가 -> 200 및 등록 처리자 admin, 로그인 화면으로 이동하지 않음'
+      - 'validation: code21자·이름없음·필수 추가값누락·targetField가 지정8개 밖 -> 400 해당 필드 오류·TB_SY_CODE 신규0행'
+      - 'business: SYS_CODE_YN=Y 그룹에 등록 -> 400 시스템 추가 불가·기존 그룹 코드 수 불변'
+      - 'side-effect: 업무 코드 등록 성공 -> getCommonCodeChangeHistory에 해당 그룹/코드 등록 기록; 수당 빈 값은 CODE_VAL=0'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonCodeInput'
+      responses:
+        '200':
+          description: 업무·수당 코드 등록 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCode'
+        '400':
+          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    put:
+      operationId: putCommonCodes
+      summary: 공통코드 변경 저장
+      security: []
+      x-related-requirements:
+      - REQ-255
+      - REQ-256
+      - REQ-257
+      - REQ-261
+      - REQ-260
+      - REQ-270
+      - REQ-271
+      description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
+        승인하지 않는다.
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[A-Z][A-Z0-9_]{0,29}$
+      x-business-rules:
+      - 시스템 그룹은 CODE_NM만 변경; 사용 끄기·그 외 값 변조 거부
+      - 여러 행의 체크 변경은 저장 한 번으로 반영; 코드 ID·코드별 적용 시작일 변경 없음
+      - 수당 미마감 즉시 적용·마감값 보존·프로젝트별 값 우선
+      x-side-effects:
+      - TB_SY_CODE 변경값과 TB_SY_CHG_HIST 전/후·admin·시각 기록
+      - 선택 목록 새 이름/사용 상태 반영; UI-03 미마감 계산 경계 갱신, 마감 자료 불변
+      x-state-transitions:
+      - 업무 코드 USE_YN=Y -> N 또는 N -> Y; DEL_YN 변경 없음
+      - 이전 이름/추가값/수당값 -> 저장값; 시스템 이름 외 불변
+      x-required-tests:
+      - 'happy: 두 업무 코드 USE_YN을 N/Y로 바꿔 한 번 저장 -> GET codes의 USE_YN과 CODE_NM이 요청값이고 새 선택 목록은 N 제외'
+      - 'auth: 무인증 시스템 코드 이름만 저장 -> 200 CODE_NM 새 이름·MOD_USER_ID=admin'
+      - 'validation: 이름을 비운 행을 포함해 저장 -> 400 errors.codeName·빈 이름이 DB에 기록되지 않음'
+      - 'business: 시스템 코드 USE_YN=N 전송 -> 400 시스템 보호 오류·기존 USE_YN 유지; 같은 코드 이름만 수정은200'
+      - 'side-effect: 코드 이름 변경 성공 후 이력 GET -> 이전/이후 이름·admin·시각 존재; 수당 변경은 미마감 계산만 반영·마감값 불변'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonCodesInput'
+      responses:
+        '200':
+          description: 공통코드 변경 저장 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCodeList'
+        '400':
+          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/code-groups/{groupId}/codes/{code}/delete:
+    post:
+      operationId: postCommonCodeDelete
+      summary: 미사용 업무 코드 삭제
+      security: []
+      x-related-requirements:
+      - REQ-262
+      - REQ-263
+      - REQ-264
+      description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
+        승인하지 않는다.
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[A-Z][A-Z0-9_]{0,29}$
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[A-Z0-9_]{1,20}$
+      x-business-rules:
+      - SYS_CODE_YN=Y 삭제 금지; 전체 참조 칸에서1건이라도 있으면 지정 문구로 거부
+      - 종료·취소·DEL_YN=Y·마감 자료·이력 참조도 모두 사용으로 판정
+      - 미사용 업무 코드 DEL_YN=Y·PK보존·같은 코드 재사용 금지
+      x-side-effects:
+      - TB_SY_CODE.DEL_YN=Y; TB_SY_CHG_HIST 삭제 유형; 과거 자료와 코드 PK 보존
+      x-state-transitions:
+      - 한 번도 쓰지 않은 업무 코드 DEL_YN=N -> Y; 참조 있는 코드는 불변
+      x-required-tests:
+      - 'happy: 참조0건 업무 코드 삭제 -> TB_SY_CODE.DEL_YN=Y·PK존재, GET codes/새 선택 목록에서 제외'
+      - 'auth: 고정 admin으로 무인증 삭제 확인 -> 200 삭제 이력 처리자 admin; UI-22 전 실제403 없음'
+      - 'validation: 형식 불일치 code로 직접 삭제 -> 400 errors.code·TB_SY_CODE 변경0행'
+      - 'business: 이력/취소/DEL_YN=Y/마감 자료 중 한 칸이라도1건 참조 -> 400 “사용된 코드라 삭제할 수 없습니다. 사용을 끄세요.”·기존 DEL_YN 유지'
+      - 'side-effect: 미사용 코드 삭제 뒤 이력 GET -> 삭제 유형 존재; 같은 code 등록 재시도는400·기존 PK 유지'
+      x-no-request-body-reason: 그룹과 코드 식별자는 path로 전달하고 삭제 실행은 사용 참조를 서버에서 재검증한다. 추가 업무 입력이 없는 명시적 논리 삭제다.
+      responses:
+        '200':
+          description: 미사용 업무 코드 삭제 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCodeDeleteResult'
+        '400':
+          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/operating-standards:
+    get:
+      operationId: getCommonOperatingStandards
+      summary: 운영 기준값과 이력 조회
+      security: []
+      x-related-requirements:
+      - REQ-272
+      description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
+        승인하지 않는다.
+      x-pagination-filtering:
+        pagination: 전체 조회, 서버 페이지 분할 없음; 코드 표의 표시 페이지는 공통 목록 부품에서 처리
+        filtering: 전체 그룹/대응/기준값·이력; 추가 검색 입력 없음
+        ordering: 기존 원문 SORT_ORD 순; 동순위 보조 정렬은 기존 mapper 대조
+      x-aiops-query-role:
+        entity: TB_SY_OPER_STD
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 운영 기준값과 이력 조회 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonOperatingStandardList'
+        '400':
+          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    put:
+      operationId: putCommonOperatingStandards
+      summary: 운영 기준값 월 이력 저장
+      security: []
+      x-related-requirements:
+      - REQ-273
+      - REQ-274
+      - REQ-275
+      - REQ-276
+      - REQ-277
+      - REQ-278
+      description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
+        승인하지 않는다.
+      x-business-rules:
+      - 시작월은 가장 이른 미마감월 이후·미래 허용; 마감 월은 “마감한 달에는 적용할 수 없습니다.”
+      - 미마감 시작월 이력만 수정/삭제; 마감된 시작월은 새 시작월 추가만
+      - AI합100·미수단계 오름차순·확률0~100; 칸마다 코드 한 줄
+      - 시작월≤대상월 최신값; 이전달/마감달 보존
+      - 자금수지 두 값은 적용 시작월 없이 즉시 반영·시작 월 마감 뒤 잠금
+      x-side-effects:
+      - TB_SY_OPER_STD 코드별 월 이력 추가/수정/삭제 및 TB_SY_CHG_HIST 변경 기록
+      - 시작월 이후 미마감 계산만 새값; 자금수지는 미잠금 때 즉시 반영
+      x-state-transitions:
+      - 미마감 시작월 이력 없음 -> 신규 이력; 기존 미마감 이력 -> 수정 또는 삭제
+      - 마감 시작월 이력 -> 불변; 자금수지 시작 월 마감 전 편집가능 -> 마감 뒤 잠금
+      x-required-tests:
+      - 'happy: 미래 미마감 시작월·유효 묶음 저장 -> GET operating-standards에 코드별 해당 월 이력·시작월 이전 계산은 이전값'
+      - 'auth: 무인증 미마감 운영값 저장 -> 200 TB_SY_OPER_STD 변경 처리자 admin; 사용자 인증 요구 없음'
+      - 'validation: AI합100아님 또는 미수30/7/60 또는 확률100초과 -> 400 해당 standardCode/value 오류·기존 묶음값 불변'
+      - 'business: 마감 월 적용/마감된 이력 수정·삭제/시작 월 마감 후 자금 두 값 저장 -> 400 마감 안내·TB_SY_OPER_STD 기존 행 불변'
+      - 'side-effect: 유효 기준 이력 저장 -> TB_SY_CHG_HIST 전/후·admin·일시 존재; 시작월 이후 미마감 달만 새값·마감 달 재계산0'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonOperatingStandardsInput'
+      responses:
+        '200':
+          description: 운영 기준값 월 이력 저장 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonOperatingStandardList'
+        '400':
+          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/code-maps:
+    get:
+      operationId: getCommonCodeMaps
+      summary: 엑셀 표기 대응 조회
+      security: []
+      x-related-requirements:
+      - REQ-279
+      description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
+        승인하지 않는다.
+      x-pagination-filtering:
+        pagination: 전체 조회, 서버 페이지 분할 없음; 코드 표의 표시 페이지는 공통 목록 부품에서 처리
+        filtering: 전체 그룹/대응/기준값·이력; 추가 검색 입력 없음
+        ordering: 기존 원문 SORT_ORD 순; 동순위 보조 정렬은 기존 mapper 대조
+      x-aiops-query-role:
+        entity: TB_SY_CODE_MAP
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 엑셀 표기 대응 조회 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCodeMapList'
+        '400':
+          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    post:
+      operationId: postCommonCodeMap
+      summary: 엑셀 표기 대응 추가
+      security: []
+      x-related-requirements:
+      - REQ-280
+      - REQ-281
+      description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
+        승인하지 않는다.
+      x-business-rules:
+      - excelText·groupId·code 필수
+      - UK=표기+그룹; 다른 그룹 동일 표기 허용
+      x-side-effects:
+      - TB_SY_CODE_MAP 대응 신규 행 및 공통 변경 이력; 다음 업로드에서 대응 사용
+      x-state-transitions:
+      - 해당 그룹 표기 대응 없음 -> 단일 코드 대응 존재
+      x-required-tests:
+      - 'happy: 유효 표기·그룹·코드 등록 -> GET code-maps에 동일 세 값의 TB_SY_CODE_MAP 대응'
+      - 'auth: 무인증 표기 대응 추가 -> 200 및 대응 변경 처리자 admin'
+      - 'validation: excelText 또는 groupId 또는 code 누락 -> 400 해당 필드 오류·TB_SY_CODE_MAP 신규0행'
+      - 'business: 같은 표기+그룹에 다른 코드 추가 -> 400 중복 오류·기존 대응 유지; 다른 그룹 같은 표기는200'
+      - 'side-effect: 대응 추가 후 다음 업로드가 해당 표기를 읽음 -> 대응 코드로 변환·변경 사실 경고 및 공통 변경 이력 존재'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonCodeMapInput'
+      responses:
+        '200':
+          description: 엑셀 표기 대응 추가 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCodeMap'
+        '400':
+          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/code-maps/delete:
+    post:
+      operationId: postCommonCodeMapDelete
+      summary: 엑셀 표기 대응 삭제
+      security: []
+      x-related-requirements:
+      - REQ-282
+      - REQ-283
+      description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
+        승인하지 않는다.
+      x-business-rules:
+      - 화면에서 확인 뒤 실제 삭제; 사용 여부 검사 없음
+      - 대응표 삭제는 DEL_YN 논리삭제가 아님
+      x-side-effects:
+      - TB_SY_CODE_MAP 대상 행 실제 삭제·TB_SY_CHG_HIST 삭제 유형 기록
+      x-state-transitions:
+      - 선택 표기+그룹 대응 존재 -> 행 없음; 취소 -> 존재 유지
+      x-required-tests:
+      - 'happy: 확인한 대응 삭제 -> GET code-maps에서 대상 없음·TB_SY_CODE_MAP 조회0행'
+      - 'auth: 무인증 대응 삭제 확인 -> 200·삭제 이력 admin, 역할 검사로403 반환하지 않음'
+      - 'validation: 삭제 items 비어있음 또는 표기/그룹 누락 -> 400 필드 오류·기존 대응 유지'
+      - 'business: 사용된 대응을 선택하고 삭제 확인 -> 사용 여부를 이유로 막지 않고 실제 삭제; 확인 취소는 요청0회·대응 유지'
+      - 'side-effect: 대응 삭제 후 공통 이력 조회 -> 유형 삭제와 이전 대응 존재; 다음 미등록 표기는 업로드 오류'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonCodeMapDeleteInput'
+      responses:
+        '200':
+          description: 엑셀 표기 대응 삭제 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCodeMapDeleteResult'
+        '400':
+          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/code-change-history:
+    get:
+      operationId: getCommonCodeChangeHistory
+      summary: 공통코드 변경 이력
+      security: []
+      x-related-requirements:
+      - REQ-286
+      description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
+        승인하지 않는다.
+      x-pagination-filtering:
+        pagination: 전체 조회, 서버 페이지 분할 없음; 코드 표의 표시 페이지는 공통 목록 부품에서 처리
+        filtering: 공통코드 네 대상 변경만
+        ordering: 변경 일시 최신순
+      x-aiops-query-role:
+        entity: TB_SY_CHG_HIST
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 공통코드 변경 이력 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCodeChangeHistoryList'
+        '400':
+          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
+    CommonCodeGroup:
+      type: object
+      required:
+      - groupId
+      - groupName
+      - sysCodeYn
+      - valCodeYn
+      - codeCount
+      properties:
+        groupId:
+          type: string
+          pattern: ^[A-Z][A-Z0-9_]{0,29}$
+          maxLength: 30
+        groupName:
+          type: string
+          minLength: 1
+        sysCodeYn:
+          type: string
+          enum:
+          - Y
+          - N
+        valCodeYn:
+          type: string
+          enum:
+          - Y
+          - N
+        codeCount:
+          type: integer
+          minimum: 0
+      additionalProperties: false
+    CommonCodeGroupInput:
+      type: object
+      required:
+      - groupId
+      - groupName
+      properties:
+        groupId:
+          type: string
+          pattern: ^[A-Z][A-Z0-9_]{0,29}$
+          maxLength: 30
+        groupName:
+          type: string
+          minLength: 1
+      additionalProperties: false
+    CommonCode:
+      type: object
+      required:
+      - code
+      - codeName
+      - sortOrd
+      - useYn
+      properties:
+        code:
+          type: string
+          maxLength: 20
+          pattern: ^[A-Z0-9_]{1,20}$
+        codeName:
+          type: string
+          minLength: 1
+        sortOrd:
+          type: integer
+        useYn:
+          type: string
+          enum:
+          - Y
+          - N
+        codeVal:
+          type: number
+        unitNm:
+          type: string
+        relatedJobs:
+          type: string
+          description: 직무 그룹 관련 직무
+        estimateUnitPrice:
+          type: number
+        requiredJobs:
+          type: string
+          description: 스킬 그룹 필요한 직무
+        weight:
+          type: number
+        contractTypes:
+          type: string
+        bankCode:
+          type: string
+        targetField:
+          type: string
+          enum:
+          - NAME
+          - TEL
+          - MAIL
+          - ADDR
+          - SKILL
+          - WANT
+          - FROM
+          - VNDR
+        job:
+          type: string
+          description: 이력서 직무 단어의 직무
+      additionalProperties: false
+    CommonCodeInput:
+      type: object
+      required:
+      - code
+      - codeName
+      properties:
+        code:
+          type: string
+          maxLength: 20
+          pattern: ^[A-Za-z0-9_]{1,20}$
+        codeName:
+          type: string
+          minLength: 1
+        sortOrd:
+          type: integer
+        useYn:
+          type: string
+          enum:
+          - Y
+          - N
+        codeVal:
+          type: number
+        unitNm:
+          type: string
+        relatedJobs:
+          type: string
+          description: 직무 그룹 관련 직무
+        estimateUnitPrice:
+          type: number
+        requiredJobs:
+          type: string
+          description: 스킬 그룹 필요한 직무
+        weight:
+          type: number
+        contractTypes:
+          type: string
+        bankCode:
+          type: string
+        targetField:
+          type: string
+          enum:
+          - NAME
+          - TEL
+          - MAIL
+          - ADDR
+          - SKILL
+          - WANT
+          - FROM
+          - VNDR
+        job:
+          type: string
+          description: 이력서 직무 단어의 직무
+      additionalProperties: false
+    CommonCodesInput:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCode'
+          minItems: 1
+      additionalProperties: false
+    CommonCodeDeleteResult:
+      type: object
+      required:
+      - groupId
+      - code
+      - delYn
+      properties:
+        groupId:
+          type: string
+        code:
+          type: string
+        delYn:
+          type: string
+          enum:
+          - Y
+      additionalProperties: false
+    CommonOperatingStandard:
+      type: object
+      required:
+      - standardCode
+      - standardName
+      - value
+      - unit
+      - effectiveMonth
+      - closed
+      - immediate
+      properties:
+        standardCode:
+          type: string
+        standardName:
+          type: string
+        value:
+          type: string
+          description: 숫자 및 한국 달력 연월의 원문 정밀도를 보존하는 문자열
+        unit:
+          type: string
+        effectiveMonth:
+          type: string
+          nullable: true
+          pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+        closed:
+          type: boolean
+        immediate:
+          type: boolean
+      additionalProperties: false
+    CommonOperatingStandardChange:
+      type: object
+      required:
+      - standardCode
+      - effectiveMonth
+      - action
+      properties:
+        standardCode:
+          type: string
+        value:
+          type: string
+        effectiveMonth:
+          type: string
+          nullable: true
+          pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+        action:
+          type: string
+          enum:
+          - add
+          - update
+          - delete
+      additionalProperties: false
+    CommonOperatingStandardsInput:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonOperatingStandardChange'
+          minItems: 1
+      additionalProperties: false
+    CommonCodeMap:
+      type: object
+      required:
+      - excelText
+      - groupId
+      - code
+      properties:
+        excelText:
+          type: string
+          minLength: 1
+        groupId:
+          type: string
+        code:
+          type: string
+      additionalProperties: false
+    CommonCodeMapInput:
+      type: object
+      required:
+      - excelText
+      - groupId
+      - code
+      properties:
+        excelText:
+          type: string
+          minLength: 1
+        groupId:
+          type: string
+          minLength: 1
+        code:
+          type: string
+          minLength: 1
+      additionalProperties: false
+    CommonCodeMapDeleteInput:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCodeMap'
+          minItems: 1
+      additionalProperties: false
+    CommonCodeMapDeleteResult:
+      type: object
+      required:
+      - deleted
+      properties:
+        deleted:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCodeMap'
+      additionalProperties: false
+    CommonCodeChangeHistory:
+      type: object
+      required:
+      - changedAt
+      - kind
+      - item
+      - before
+      - after
+      - processor
+      properties:
+        changedAt:
+          type: string
+          format: date-time
+        kind:
+          type: string
+        item:
+          type: string
+        before:
+          type: string
+        after:
+          type: string
+        processor:
+          type: string
+      additionalProperties: false
+    CommonCodeGroupList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCodeGroup'
+      additionalProperties: false
+    CommonCodeList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCode'
+      additionalProperties: false
+    CommonOperatingStandardList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonOperatingStandard'
+      additionalProperties: false
+    CommonCodeMapList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCodeMap'
+      additionalProperties: false
+    CommonCodeChangeHistoryList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCodeChangeHistory'
+      additionalProperties: false
     ApiResponse:
       type: object
       required: [success, meta]
@@ -3088,6 +4036,77 @@ x-uncovered-requirements:
   status: data-constraint
   evidence: '레벨별 화면·아이콘: 대메뉴 저장 SCRN_ID=null·ICON_NM=folder, 서브메뉴 ICON_NM=null; 아이콘 선택칸은 없다.'
 
+- canonical_id: REQ-235
+  status: non-functional
+  evidence: 개발 중 익명 admin — UI-22 전 화면·API는 로그인 없이 사용하고 실행자는 admin이며 모든 권한이 있는 표시를 유지한다. auth.required=false, OpenAPI
+    securitySchemes·bearerAuth 미정의다.
+- canonical_id: REQ-236
+  status: out-of-scope
+  evidence: 로그인·권한·발송 후속 연결 — 로그인·메뉴 권한 검사·알림·메일 연동은 마지막 UI-22 작업에서 연결한다.
+- canonical_id: REQ-237
+  status: non-functional
+  evidence: 최종 시안·SQL 원천 — UI-27 모양·문구·배치는 v1.8 참조 시안을 따르며 물리 정의는 sql/DDL_PostgreSQL.sql을 따른다.
+- canonical_id: REQ-238
+  status: non-functional
+  evidence: 사용자 PUT 계약 보존 — 사용자 등록·중지·비밀번호 초기화·재개·잠금 해제는 OpenAPI대로 PUT이며 코드도 계약에 맞춘다.
+- canonical_id: REQ-239
+  status: covered
+  evidence: GET /api/common/users/excel은 기존 수동 코드의 columns/정렬값·다운로드 헤더 대조 OQ-API-027 후 추가; 현재 코드는 변경하지 않음
+- canonical_id: REQ-240
+  status: covered
+  evidence: GET /api/common/users/{userId}/change-history는 기존 사용자 기록의 공개 응답 필드·쿼리 대조 OQ-API-027 대기; 공통코드 기록 DTO를
+    복사하지 않음
+- canonical_id: REQ-241
+  status: covered
+  evidence: GET /api/common/roles/{roleId}/change-history는 기존 역할 기록 응답·쿼리 대조 OQ-API-027 대기; 사용자 기록 형식을 추측하지 않음
+- canonical_id: REQ-242
+  status: non-functional
+  evidence: 작업 공간과 제목줄 부품 — 화면별 작업 공간·제목줄 단추 부품을 사용하고 RoleWorkspace·MenuWorkspace를 참고한다. 공통 창 제목 16px·600, 표 머리와
+    묶음 줄 --hover(#f3f4f6)를 유지한다.
+- canonical_id: REQ-243
+  status: covered
+  evidence: DevelopedScreenRegistry의 UI-27 등록은 기존 getCommonMenuOptions 선택지 확장이며 새 연산 없음; architecture.md UI-27 흐름·T009
+- canonical_id: REQ-244
+  status: non-functional
+  evidence: 현금 기준 한국 월 보존 — 기간 선택 현금 기준 월은 clock_timestamp() AT TIME ZONE 'Asia/Seoul' 기준을 유지한다.
+- canonical_id: REQ-245
+  status: non-functional
+  evidence: 계층별 구현·시험 위치 — 실제·시험 코드는 controller/service/mapper/dto에, DB 준비 시험은 schema에 두고 codes/ 같은 화면별 폴더를 만들지
+    않는다.
+- canonical_id: REQ-246
+  status: data-constraint
+  evidence: 신규 표 금지 — 새 표를 만들지 않고 데이터 모델의 엔터티 제목에는 실제 표 이름만 쓴다. UI-27·SLICE 식별자를 표로 투영하지 않는다.
+- canonical_id: REQ-247
+  status: data-constraint
+  evidence: 식 정의 준비 — 기존 TB_SY_CALC_RULE을 DDL 원문과 대조하고 --prepare-schema의 새 SQL 파일·SchemaPreparation 목록에 식-00~식-93
+    원문 94줄을 빈 표일 때만 넣는다.
+- canonical_id: REQ-248
+  status: covered
+  evidence: TB_SY_CALC_RULE 읽기는 내부 계산 서비스의 DB 의존이며 공개 계산 API 아님; architecture.md UI-27 흐름·T014
+- canonical_id: REQ-249
+  status: non-functional
+  evidence: 시각·한국 달력 — 서버 Instant·SQL clock_timestamp()·화면 shared/time을 사용하며 날짜·월은 한국 달력, 오늘·이번 달은 Asia/Seoul이다.
+- canonical_id: REQ-250
+  status: screen-only
+  evidence: UI-27 /screens/UI-27의 PC 전용 라우팅·네 탭은 로컬 화면 계약이며 업무 조회는 자식 연산으로 연결; ui-design.md UI-27·T016
+- canonical_id: REQ-252
+  status: out-of-scope
+  evidence: 그룹 수정 제외 — 기존 그룹 이름 수정과 사용 끄기는 제공하지 않는다.
+- canonical_id: REQ-253
+  status: screen-only
+  evidence: UI-27 그룹 목록 scrollTop 보존은 메모리 UI 동작·별도 서버 쓰기 없음; ui-design.md 그룹 목록·T019
+- canonical_id: REQ-265
+  status: screen-only
+  evidence: UI-27 dirty guard는 삭제 호출 전에 저장/취소 요구하며 서버 dirty 필드를 발명하지 않음; ui-design.md M25-24·T031
+- canonical_id: REQ-266
+  status: screen-only
+  evidence: UI-27 줄 삭제 표시는 admin 모든 권한 기준이며 후속 UI-22에서 권한 연결; ui-design.md 권한 상태·T032
+- canonical_id: REQ-284
+  status: covered
+  evidence: 엑셀 업로드 파서가 TB_SY_CODE_MAP을 소비해 변환·경고하는 내부 경계; 기존 업로드 API/코드 미제공이므로 새 업로드 연산 생성 금지; architecture.md·T050
+- canonical_id: REQ-285
+  status: covered
+  evidence: 업로드 파서의 알 수 없는 표기 오류 시험 소유; 대응표 관리 API와 다른 행동이며 업로드 계약 원문 확인 전 새 endpoint 생성 금지; architecture.md·T051
 x-change-supersession:
   description: 기존 operation과 기준선 시험은 원형 보존한다. 이번 공통 기능 인수에는 다음 예외가 우선하며 기존 메뉴 조회 자체를 상태 저장 API로 바꾸지 않는다.
   ui-header: 'REQ-071·REQ-086: 제목줄 정보와 시스템 관리자 이름은 이번 원문으로 허용한다.'
@@ -3095,3 +4114,8 @@ x-change-supersession:
   read-only: 'REQ-054·REQ-055: 메뉴 GET은 계속 읽기 전용이다. 여섯 설정 쓰기는 신규 putCommonUserPreference만 수행하므로 과거 UI 전체 상태 무저장 시험은
     이 변경 범위에서 대체한다.'
   user-screen: UI-23의 사용자 업무만 신규 사용자 연산으로 허용한다. 기존 메뉴 GET과 공통 설정 연산은 무변경이다.
+
+x-change-open-questions:
+- 'OQ-API-027: REQ-239·REQ-240·REQ-241의 기존 수동 API 3개 실제 구현 부재; 해당 기존 응답/필터/헤더를 임의 생성하지 않음. 리뷰어는 구현을 제공하고 계약만 보충한다.'
+- 'OQ-DATA-027: SQL 원문·전체 참조 칸·마감 코드 확보 후 DTO 물리 매핑 검증.'
+- UI-22 전 securitySchemes/bearerAuth 미정의가 원문 확정이며 인증 거부 시험은 추가하지 않음.

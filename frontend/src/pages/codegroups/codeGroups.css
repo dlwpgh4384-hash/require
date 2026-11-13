@@ -1,0 +1,134 @@
+.code-page {
+  min-width: 0;
+}
+.code-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.code-tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 10px 16px;
+  color: var(--text-sub);
+}
+.code-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--primary);
+  color: var(--text);
+  font-weight: 600;
+}
+.code-columns {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 24px;
+  margin-top: 16px;
+  align-items: start;
+}
+.code-group-list {
+  max-height: calc(100dvh - 280px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--surface);
+}
+.code-group-list button {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  text-align: left;
+  gap: 8px;
+  padding: 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+}
+.code-group-list button[aria-pressed="true"],
+.code-group-list button:hover {
+  background: var(--hover);
+}
+.code-detail {
+  min-width: 0;
+}
+.code-detail h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+.code-detail h2 small {
+  color: var(--text-sub);
+  font-size: 12px;
+  margin-left: 8px;
+}
+.code-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.code-page table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.code-page th {
+  background: var(--hover);
+  font-weight: 600;
+  text-align: left;
+}
+.code-page td,
+.code-page th {
+  height: 40px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.code-page fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.code-page td label {
+  font-size: 0;
+}
+.code-page td label input,
+.code-page td label select {
+  font-size: 13px;
+}
+.code-page .ls-in-sm {
+  height: 28px;
+  max-width: 200px;
+  min-width: 90px;
+}
+.code-page .app-actions {
+  margin-top: 12px;
+}
+.code-page .code-banner {
+  background: var(--hover);
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.code-page .app-dialog label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.code-page .field-error {
+  font-size: 13px;
+  white-space: normal;
+  display: block;
+}
+@media (max-width: 767px) {
+  .code-columns {
+    grid-template-columns: 1fr;
+  }
+  .code-group-list {
+    max-height: none;
+    overflow: visible;
+  }
+}

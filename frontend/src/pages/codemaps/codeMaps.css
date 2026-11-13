@@ -1,0 +1,45 @@
+.code-maps-panel {
+  gap: 16px;
+}
+.code-maps-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.code-maps-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.code-maps-table th {
+  background: var(--hover);
+  font-weight: 600;
+  text-align: left;
+}
+.code-maps-table th,
+.code-maps-table td {
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.code-maps-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.code-maps-fields label {
+  display: grid;
+  gap: 6px;
+}
+.code-maps-fields select,
+.code-maps-fields input {
+  width: 100%;
+}
+.code-maps-panel .app-dialog h2 {
+  font-size: 16px;
+  font-weight: 600;
+}

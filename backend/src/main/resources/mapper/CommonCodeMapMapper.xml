@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.mapper.CommonCodeMapMapper">
+  <resultMap id="codeMap" type="com.company.common.mapper.CodeMapRow" autoMapping="false">
+    <id column="map_id" property="mapId" javaType="java.lang.Long"/>
+    <result column="src_text" property="excelText" javaType="java.lang.String"/>
+    <result column="code_grp_id" property="groupId" javaType="java.lang.String"/>
+    <result column="code" property="code" javaType="java.lang.String"/>
+  </resultMap>
+  <select id="selectMaps" resultMap="codeMap">
+    SELECT map_id, src_text, code_grp_id, code
+    FROM TB_SY_CODE_MAP
+    ORDER BY map_id
+  </select>
+  <select id="selectIdentity" resultMap="codeMap">
+    SELECT map_id, src_text, code_grp_id, code
+    FROM TB_SY_CODE_MAP
+    WHERE src_text=#{excelText} AND code_grp_id=#{groupId}
+    FOR UPDATE
+  </select>
+  <select id="selectableCode" resultType="boolean">
+    SELECT EXISTS (
+      SELECT 1
+      FROM TB_SY_CODE c
+      JOIN TB_SY_CODE_GRP g ON g.code_grp_id=c.code_grp_id
+      WHERE c.code_grp_id=#{groupId} AND c.code=#{code}
+        AND c.del_yn='N' AND c.use_yn='Y' AND g.use_yn='Y'
+    )
+  </select>
+  <insert id="insertMap" useGeneratedKeys="true" keyProperty="mapId" keyColumn="map_id">
+    INSERT INTO TB_SY_CODE_MAP (src_text, code_grp_id, code, reg_user_id, reg_dttm)
+    VALUES (#{excelText}, #{groupId}, #{code}, 'admin', clock_timestamp())
+  </insert>
+  <delete id="deleteMap">
+    DELETE FROM TB_SY_CODE_MAP WHERE map_id=#{mapId}
+  </delete>
+</mapper>

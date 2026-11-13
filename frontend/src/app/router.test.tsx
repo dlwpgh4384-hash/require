@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { RouterProvider } from "react-router-dom";
@@ -16,6 +17,10 @@ import type {
   MenuSettingItem,
   MenuSettingsInput,
 } from "../pages/menusettings/menuSettings";
+import type { CodeItem } from "../pages/codegroups/codeGroups";
+import type { CodeMapItem } from "../pages/codemaps/codeMaps";
+import type { OperatingStandard } from "../pages/operatingstandards/operatingStandards";
+import type { CodeHistoryItem } from "../pages/commonops/codeHistory";
 
 let router: ReturnType<typeof createAppRouter> | undefined;
 
@@ -305,6 +310,368 @@ function respondWithMenuSettings() {
   vi.stubGlobal("fetch", request);
   return { request, list };
 }
+
+function respondWithCommonCodes() {
+  const menus = response();
+  menus.data.push({
+    ...menus.data[0],
+    menuId: "common-codes-menu",
+    menuNm: "공통코드",
+    scrnId: "UI-27",
+    sortOrd: 2,
+    pcOnlyYn: "Y",
+  });
+  menus.meta.screenAccess.push({
+    scrnId: "UI-27",
+    available: true,
+    pcOnlyYn: "Y",
+  });
+  let items: CodeItem[] = [
+    { code: "ONE", codeName: "처음 이름", sortOrd: 1, useYn: "Y" },
+  ];
+  const mappings: CodeMapItem[] = [];
+  let values: OperatingStandard[] = [
+    {
+      standardCode: "CASH_BASE_AMT",
+      standardName: "기초 잔액",
+      value: "1000",
+      unit: "원",
+      effectiveMonth: null,
+      closed: false,
+      immediate: true,
+    },
+  ];
+  const history: CodeHistoryItem[] = [];
+  const success = (data: unknown) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      success: true,
+      meta: {},
+      data: structuredClone(data),
+    }),
+  });
+  const groups = vi.fn(async () =>
+    success({
+      items: [
+        {
+          groupId: "GENERAL",
+          groupName: "업무 그룹",
+          sysCodeYn: "N",
+          valCodeYn: "N",
+          codeCount: items.length,
+        },
+      ],
+    }),
+  );
+  const codes = vi.fn(async () => success({ items }));
+  const maps = vi.fn(async () => success({ items: mappings }));
+  const standards = vi.fn(async () => success({ items: values }));
+  const histories = vi.fn(async () => success({ items: history }));
+  const record = (kind: string, item: string, before: string, after: string) =>
+    history.unshift({
+      changedAt: "2026-01-02T03:04:05Z",
+      kind,
+      item,
+      before,
+      after,
+      processor: "admin",
+    });
+  const request = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url === "/api/common/menus")
+      return { ok: true, status: 200, json: async () => menus };
+    if (url === "/api/common/code-groups") return groups();
+    if (url === "/api/common/code-groups/GENERAL/codes") {
+      if (init?.method === "PUT") {
+        const input: { items: CodeItem[] } = JSON.parse(String(init.body));
+        record("코드", "이름 변경", items[0].codeName, input.items[0].codeName);
+        items = items.map(
+          (row) => input.items.find((next) => next.code === row.code) ?? row,
+        );
+        return success({ items });
+      }
+      return codes();
+    }
+    if (url === "/api/common/code-maps") {
+      if (init?.method === "POST") {
+        const item: CodeMapItem = JSON.parse(String(init.body));
+        mappings.push(item);
+        record("표기 대응", "표기 추가", "", item.excelText);
+        return success(item);
+      }
+      return maps();
+    }
+    if (url === "/api/common/operating-standards") {
+      if (init?.method === "PUT") {
+        const input = JSON.parse(String(init.body));
+        record(
+          "운영 기준값",
+          "기초 잔액 변경",
+          values[0].value,
+          input.items[0].value,
+        );
+        values = values.map((row) => ({ ...row, value: input.items[0].value }));
+        return success({ items: values });
+      }
+      return standards();
+    }
+    if (url === "/api/common/code-change-history") return histories();
+    return { ok: true, status: 200, json: async () => preferenceResponse(url) };
+  });
+  vi.stubGlobal("fetch", request);
+  return { request, groups, codes, maps, standards, histories };
+}
+
+describe("common code route composition", () => {
+  it.each(["/screens/UI-27", "/#UI-27"])(
+    "%s opens four real tabs in the existing preference shell",
+    async (path) => {
+      const { request, maps, standards, histories } = respondWithCommonCodes();
+      mount(path);
+      await screen.findByLabelText("ONE 이름");
+      expectSingleShell();
+      expect(
+        within(
+          screen.getByRole("tablist", { name: "공통코드 작업" }),
+        ).getAllByRole("tab"),
+      ).toHaveLength(4);
+      expect(screen.getByTestId("code-group-title-add")).toBeEnabled();
+      expect(maps).not.toHaveBeenCalled();
+      expect(standards).not.toHaveBeenCalled();
+      expect(histories).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByTestId("code-tab-maps"));
+      expect(await screen.findByText("등록된 표기가 없습니다.")).toBeVisible();
+      expect(screen.getByTestId("code-maps-panel")).toBeVisible();
+      fireEvent.click(screen.getByTestId("code-tab-standards"));
+      expect(await screen.findByLabelText("기초 잔액")).toHaveValue("1000");
+      fireEvent.click(screen.getByTestId("code-tab-history"));
+      expect(await screen.findByTestId("code-history-empty")).toBeVisible();
+      expect(
+        within(screen.getByTestId("code-history-panel")).queryByRole("button", {
+          name: /저장|취소|다운로드/,
+        }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("code-group-title-add")).toBeDisabled();
+      expect(
+        request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
+      ).toBe(false);
+      expect(router?.state.location.pathname).toBe("/screens/UI-27");
+      expectSingleShell();
+    },
+  );
+
+  it("code save refreshes history and the real map option client reads the changed name", async () => {
+    const { request, codes, histories } = respondWithCommonCodes();
+    mount("/screens/UI-27");
+    fireEvent.change(await screen.findByLabelText("ONE 이름"), {
+      target: { value: "바뀐 이름" },
+    });
+    fireEvent.click(screen.getByTestId("code-save"));
+    await screen.findByText("공통코드를 저장했습니다.");
+    expect(codes).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByTestId("code-tab-history"));
+    expect(await screen.findByTestId("code-history-row-0")).toHaveTextContent(
+      "바뀐 이름",
+    );
+    expect(histories).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId("code-tab-maps"));
+    await screen.findByText("등록된 표기가 없습니다.");
+    fireEvent.click(screen.getByTestId("code-map-add"));
+    await screen.findByRole("option", { name: "업무 그룹 (GENERAL)" });
+    fireEvent.change(screen.getByTestId("code-map-group"), {
+      target: { value: "GENERAL" },
+    });
+    expect(
+      await screen.findByRole("option", { name: "바뀐 이름 (ONE)" }),
+    ).toBeInTheDocument();
+    expect(request).toHaveBeenCalledWith(
+      "/api/common/code-groups/GENERAL/codes",
+      { signal: expect.any(AbortSignal) },
+    );
+  });
+
+  it("map creation uses its direct client and rereads group, selected codes and history", async () => {
+    const { request, groups, codes, maps } = respondWithCommonCodes();
+    mount("/screens/UI-27");
+    await screen.findByLabelText("ONE 이름");
+    fireEvent.click(screen.getByTestId("code-tab-maps"));
+    await screen.findByText("등록된 표기가 없습니다.");
+    fireEvent.click(screen.getByTestId("code-map-add"));
+    fireEvent.change(screen.getByTestId("code-map-text"), {
+      target: { value: "엑셀 별칭" },
+    });
+    await screen.findByRole("option", { name: "업무 그룹 (GENERAL)" });
+    fireEvent.change(screen.getByTestId("code-map-group"), {
+      target: { value: "GENERAL" },
+    });
+    await screen.findByRole("option", { name: "처음 이름 (ONE)" });
+    fireEvent.change(screen.getByTestId("code-map-code"), {
+      target: { value: "ONE" },
+    });
+    fireEvent.click(screen.getByTestId("code-map-submit"));
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("code-map-add-dialog"),
+      ).not.toBeInTheDocument(),
+    );
+    await waitFor(() => expect(groups).toHaveBeenCalledTimes(3));
+    expect(codes).toHaveBeenCalledTimes(3);
+    expect(maps).toHaveBeenCalledTimes(2);
+    expect(request).toHaveBeenCalledWith("/api/common/code-maps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        excelText: "엑셀 별칭",
+        groupId: "GENERAL",
+        code: "ONE",
+      }),
+    });
+    fireEvent.click(screen.getByTestId("code-tab-history"));
+    expect(await screen.findByTestId("code-history-row-0")).toHaveTextContent(
+      "엑셀 별칭",
+    );
+    expect(router?.state.location.pathname).toBe("/screens/UI-27");
+  });
+
+  it("operating save retains the immediate null identity and refreshes code consumers and history", async () => {
+    const { request, groups, codes, standards } = respondWithCommonCodes();
+    mount("/screens/UI-27");
+    await screen.findByLabelText("ONE 이름");
+    fireEvent.click(screen.getByTestId("code-tab-standards"));
+    fireEvent.change(await screen.findByLabelText("기초 잔액"), {
+      target: { value: "2000" },
+    });
+    fireEvent.click(screen.getByTestId("operating-save"));
+    expect(
+      screen.queryByTestId("operating-effective-month"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("operating-save-confirm"));
+    await waitFor(() => expect(standards).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(groups).toHaveBeenCalledTimes(2));
+    expect(codes).toHaveBeenCalledTimes(2);
+    expect(request).toHaveBeenCalledWith("/api/common/operating-standards", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: [
+          {
+            standardCode: "CASH_BASE_AMT",
+            value: "2000",
+            effectiveMonth: null,
+            action: "update",
+          },
+        ],
+      }),
+    });
+    fireEvent.click(screen.getByTestId("code-tab-history"));
+    expect(await screen.findByTestId("code-history-row-0")).toHaveTextContent(
+      "2000",
+    );
+    expect(router?.state.location.pathname).toBe("/screens/UI-27");
+  });
+
+  it("operating dirty state guards local tabs and shell close; cancellation preserves and discard reloads", async () => {
+    const { request } = respondWithCommonCodes();
+    mount("/screens/UI-27");
+    await screen.findByLabelText("ONE 이름");
+    fireEvent.click(screen.getByTestId("code-tab-standards"));
+    fireEvent.change(await screen.findByLabelText("기초 잔액"), {
+      target: { value: "2999" },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("screen-tab-ui-27")).toHaveTextContent("●"),
+    );
+    fireEvent.click(screen.getByTestId("screen-tab-close-ui-27"));
+    await screen.findByTestId("unsaved-dialog");
+    fireEvent.click(screen.getByTestId("confirmation-cancel"));
+    fireEvent.click(screen.getByTestId("code-tab-history"));
+    fireEvent.click(screen.getByTestId("code-discard-cancel"));
+    expect(screen.getByLabelText("기초 잔액")).toHaveValue("2999");
+    fireEvent.click(screen.getByTestId("code-tab-history"));
+    fireEvent.click(screen.getByTestId("code-discard-proceed"));
+    await screen.findByTestId("code-history-empty");
+    fireEvent.click(screen.getByTestId("code-tab-standards"));
+    expect(await screen.findByLabelText("기초 잔액")).toHaveValue("1000");
+    expect(
+      request.mock.calls.filter(
+        ([url, init]) =>
+          url === "/api/common/operating-standards" && init?.method === "PUT",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("mapping dialog dirty state reaches the shell and local tab guard without losing cancelled input", async () => {
+    respondWithCommonCodes();
+    mount("/screens/UI-27");
+    await screen.findByLabelText("ONE 이름");
+    fireEvent.click(screen.getByTestId("code-tab-maps"));
+    await screen.findByText("등록된 표기가 없습니다.");
+    fireEvent.click(screen.getByTestId("code-map-add"));
+    fireEvent.change(screen.getByTestId("code-map-text"), {
+      target: { value: "입력 유지" },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("screen-tab-ui-27")).toHaveTextContent("●"),
+    );
+    fireEvent.click(screen.getByTestId("code-tab-history"));
+    fireEvent.click(screen.getByTestId("code-discard-cancel"));
+    expect(screen.getByTestId("code-map-text")).toHaveValue("입력 유지");
+    fireEvent.click(screen.getByTestId("code-tab-history"));
+    fireEvent.click(screen.getByTestId("code-discard-proceed"));
+    await screen.findByTestId("code-history-empty");
+    expect(screen.queryByTestId("code-map-add-dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId("screen-tab-ui-27")).not.toHaveTextContent("●"),
+    );
+  });
+
+  it.each([
+    ["maps", "code-map-retry", "등록된 표기가 없습니다."],
+    ["standards", "operating-retry", "기초 잔액"],
+    ["history", "code-history-retry", "기록이 없습니다."],
+  ])(
+    "%s failures stay in the routed panel and retry the real client",
+    async (tab, retry, recovered) => {
+      const fixture = respondWithCommonCodes();
+      const reader =
+        tab === "maps"
+          ? fixture.maps
+          : tab === "standards"
+            ? fixture.standards
+            : fixture.histories;
+      reader.mockRejectedValueOnce(new Error("조회 연결 실패"));
+      mount("/screens/UI-27");
+      await screen.findByLabelText("ONE 이름");
+      fireEvent.click(screen.getByTestId(`code-tab-${tab}`));
+      fireEvent.click(await screen.findByTestId(retry));
+      if (tab === "standards")
+        expect(await screen.findByLabelText(recovered)).toBeVisible();
+      else expect(await screen.findByText(recovered)).toBeVisible();
+      expect(reader).toHaveBeenCalledTimes(2);
+      expect(router?.state.location.pathname).toBe("/screens/UI-27");
+      expectSingleShell();
+    },
+  );
+
+  it("UI-27 mobile direct entry keeps the existing PC-only gate ahead of every feature client", async () => {
+    const { groups, codes, maps, standards, histories } =
+      respondWithCommonCodes();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query === "(max-width: 767px)",
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    mount("/screens/UI-27");
+    expect(await screen.findByText("PC에서 이용해 주세요")).toBeVisible();
+    for (const reader of [groups, codes, maps, standards, histories])
+      expect(reader).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("code-page")).not.toBeInTheDocument();
+    expectSingleShell();
+  });
+});
 
 describe("application route registration", () => {
   it("UI-25 direct entry dispatches MenuPage and saves through its real client, refreshing the single shell", async () => {

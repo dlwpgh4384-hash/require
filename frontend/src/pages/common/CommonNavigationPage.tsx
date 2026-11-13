@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavigationRoot, type ShellMenuItem } from "../../app/NavigationRoot";
 import { useViewport } from "../../shared/layout/useViewport";
 import {
@@ -13,6 +13,7 @@ import {
 import { PlaceholderScreen } from "./PlaceholderScreen";
 import { UserPage } from "../users/UserPage";
 import { RolePage } from "../roles/RolePage";
+import { MenuPage } from "../menusettings/MenuPage";
 import {
   RoleTitleActions,
   RoleWorkspaceProvider,
@@ -27,6 +28,8 @@ const renderScreen = (scrnId: string) =>
     <UserPage />
   ) : scrnId === "UI-24" ? (
     <RolePage />
+  ) : scrnId === "UI-25" ? (
+    <MenuPage />
   ) : (
     <PlaceholderScreen scrnId={scrnId} />
   );
@@ -40,8 +43,17 @@ function PreferenceNavigation() {
   const recent = states.RECENT;
   // 최근 본 화면은 한 번에 하나씩 순서대로 저장한다(수정 시각 확인 때문에).
   const [visits, setVisits] = useState<string[]>([]);
+  const processingVisits = useRef<string[] | null>(null);
   useEffect(() => {
-    if (!visits.length || recent.status !== "ready" || recent.saving) return;
+    if (
+      !visits.length ||
+      recent.status !== "ready" ||
+      recent.saving ||
+      processingVisits.current === visits
+    )
+      return;
+    // 저장 응답이 큐 제거보다 먼저 반영되어도 같은 항목을 다시 저장하지 않는다.
+    processingVisits.current = visits;
     const [next, ...rest] = visits;
     setVisits(rest);
     void visit(next);

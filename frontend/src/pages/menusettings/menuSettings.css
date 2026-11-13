@@ -1,0 +1,79 @@
+.menu-settings-page {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.menu-settings-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+.menu-settings-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.menu-settings-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.menu-settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.menu-settings-table th,
+.menu-settings-table td {
+  height: 40px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--divider);
+  text-align: center;
+}
+.menu-settings-table thead th {
+  background: var(--bg);
+  color: var(--text-sub);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.menu-settings-table td:nth-child(2) {
+  text-align: left;
+}
+.menu-settings-table .ls-in {
+  width: min(100%, 300px);
+  min-width: 180px;
+  height: 28px;
+  font-size: 13px;
+}
+.menu-settings-group {
+  background: var(--bg);
+  font-weight: 600;
+}
+.menu-settings-group input {
+  font-weight: 600;
+}
+.menu-settings-child td:nth-child(2) {
+  padding-left: 32px;
+}
+.menu-settings-handle {
+  padding: 0 4px;
+  min-width: 28px;
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  color: var(--text-sub);
+}
+.menu-settings-handle:active {
+  cursor: grabbing;
+}
+.menu-settings-help {
+  color: var(--text-sub);
+  font-size: 13px;
+  margin: 16px 0;
+}
+.menu-settings-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}

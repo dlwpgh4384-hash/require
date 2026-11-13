@@ -1,0 +1,24 @@
+.menu-registration-form {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.menu-registration-form > label {
+  margin-top: 8px;
+  color: var(--text-sub);
+  font-size: 13px;
+}
+.menu-registration-form .ls-in {
+  width: 100%;
+  min-width: 0;
+}
+.menu-registration-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.menu-registration-hint {
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 1.5;
+}

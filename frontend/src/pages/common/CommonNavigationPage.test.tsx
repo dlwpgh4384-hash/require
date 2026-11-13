@@ -151,7 +151,7 @@ function respond(body: ShellMenuResponse) {
               meta: {},
               data: { roles: [], projects: [], userStates: [] },
             }
-          : url === "/api/common/roles"
+          : url === "/api/common/roles" || url === "/api/common/menu-settings"
             ? { success: true, meta: {}, data: { items: [] } }
             : body,
   }));
@@ -170,6 +170,10 @@ async function expectScreenContent(id: string) {
   } else if (id === "UI-24") {
     expect(await screen.findByText("활성 역할이 없습니다.")).toBeVisible();
     expect(screen.getByTestId("role-page")).toBeVisible();
+  } else if (id === "UI-25") {
+    expect(await screen.findByText("등록된 메뉴가 없습니다.")).toBeVisible();
+    expect(screen.getByTestId("menu-settings-page")).toBeVisible();
+    expect(screen.getByTestId("menu-registration-open")).toBeEnabled();
   } else {
     expect(
       await screen.findByRole("region", { name: `${id} 본문` }),
@@ -266,10 +270,14 @@ describe("common placeholder screen contract", () => {
       expect(screen.getAllByRole("main")).toHaveLength(1);
       if (id !== "UI-23") {
         expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-        for (const name of ["조회", "저장", "다운로드", "업로드", "편집"])
-          expect(
-            screen.queryByRole("button", { name }),
-          ).not.toBeInTheDocument();
+        for (const name of ["조회", "저장", "다운로드", "업로드", "편집"]) {
+          if (id === "UI-25" && name === "저장")
+            expect(screen.getByRole("button", { name })).toBeEnabled();
+          else
+            expect(
+              screen.queryByRole("button", { name }),
+            ).not.toBeInTheDocument();
+        }
       }
       first.unmount();
       mount(`/screens/${id}`);

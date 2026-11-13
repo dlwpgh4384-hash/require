@@ -17,6 +17,7 @@ import {
 } from "../shared/layout/ScreenTabs";
 import { ConfirmDialog } from "../shared/feedback/Dialog";
 import { feedbackMessages } from "../shared/feedback/messages";
+import { MENU_REFRESH_EVENT } from "./menuRefresh";
 
 export interface ShellMenuItem {
   menuId: string;
@@ -210,6 +211,11 @@ export function NavigationRoot({
   const tick = useRef(0);
   const autoOpened = useRef(false);
   useEffect(() => {
+    const refresh = () => setAttempt((value) => value + 1);
+    window.addEventListener(MENU_REFRESH_EVENT, refresh);
+    return () => window.removeEventListener(MENU_REFRESH_EVENT, refresh);
+  }, []);
+  useEffect(() => {
     const media = window.matchMedia("(max-width: 767px)");
     const change = () => setMobile(media.matches);
     media.addEventListener("change", change);
@@ -217,7 +223,6 @@ export function NavigationRoot({
   }, []);
   useEffect(() => {
     const controller = new AbortController();
-    setState({ status: "loading" });
     fetch("/api/common/menus", { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("Menu unavailable");
@@ -516,7 +521,12 @@ export function NavigationRoot({
   else if (!keepMounted) routeBody = screenBody(access.scrnId);
 
   const panelIds = tabsOn ? tabList : current ? [current] : [];
-  const showPanels = keepMounted && !!current && shown === current;
+  const showPanels =
+    keepMounted &&
+    !!current &&
+    shown === current &&
+    !!access?.available &&
+    !(mobile && access.pcOnlyYn === "Y");
   const body = (
     <ScreenDirtyContext.Provider value={setDirty}>
       {keepMounted &&

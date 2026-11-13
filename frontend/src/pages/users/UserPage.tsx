@@ -439,6 +439,7 @@ export function UserPage() {
       )}
       {detailId && (
         <UserDetailPanel
+          key={detailId}
           userId={detailId}
           revision={revision}
           onClose={() => setDetailId(null)}

@@ -28,6 +28,7 @@ export function Sidebar({
       {(quickAccess === undefined || expanded) && (
         <div
           className="quick-access"
+          data-testid="sidebar-quick-access"
           onClick={(event) => {
             if ((event.target as HTMLElement).closest("button")) onNavigate();
           }}
@@ -37,6 +38,7 @@ export function Sidebar({
       )}
       <nav
         aria-label="업무 화면"
+        data-testid="sidebar-menu"
         onClick={(event) => {
           if ((event.target as HTMLElement).closest("a[href]")) onNavigate();
         }}
@@ -46,6 +48,7 @@ export function Sidebar({
       <button
         type="button"
         className="sidebar-collapse"
+        data-testid="sidebar-collapse"
         onClick={onToggle}
         aria-label={expanded ? "메뉴 접기" : "메뉴 펼치기"}
         aria-expanded={expanded}

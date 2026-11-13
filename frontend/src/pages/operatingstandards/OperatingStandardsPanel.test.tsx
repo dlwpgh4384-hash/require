@@ -403,102 +403,6 @@ it("cash base closed locks both inputs but ordinary closed history can get a new
   openSave();
   expect(screen.getByTestId("operating-effective-month")).toBeInTheDocument();
 });
-it("closed history has neither edit input nor update/delete controls", async () => {
-  rows.find((item) => item.standardCode === "VAT_RT")!.closed = true;
-  await mount();
-  fireEvent.click(screen.getByTestId("operating-history-vat-rt"));
-  const history = screen.getByTestId("operating-history-dialog");
-  expect(within(history).getByText(/마감 · 읽기 전용/)).toBeInTheDocument();
-  expect(within(history).queryByRole("textbox")).not.toBeInTheDocument();
-  expect(
-    within(history).queryByRole("button", { name: "삭제" }),
-  ).not.toBeInTheDocument();
-  expect(writes()).toHaveLength(0);
-});
-it("history edits are local and closing cancels without writing", async () => {
-  await mount();
-  fireEvent.click(screen.getByTestId("operating-history-vat-rt"));
-  fireEvent.change(screen.getByLabelText("2026-01 이력 값"), {
-    target: { value: "11" },
-  });
-  fireEvent.click(screen.getByTestId("operating-history-close"));
-  expect(screen.getByLabelText("부가세율")).toHaveValue("10");
-  expect(writes()).toHaveLength(0);
-});
-it("open history update uses original immutable month and refreshes", async () => {
-  await mount();
-  fireEvent.click(screen.getByTestId("operating-history-vat-rt"));
-  fireEvent.change(screen.getByLabelText("2026-01 이력 값"), {
-    target: { value: "11" },
-  });
-  fireEvent.click(screen.getByTestId("operating-history-save-vat-rt-2026-01"));
-  await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
-  expect(
-    JSON.parse(String((writes()[0][1] as RequestInit).body)).items,
-  ).toEqual([
-    {
-      standardCode: "VAT_RT",
-      value: "11",
-      effectiveMonth: "2026-01",
-      action: "update",
-    },
-  ]);
-});
-it("clean history delete uses selected identity and no value payload", async () => {
-  rows.push(row("VAT_RT", "부가세율", "11", "%", "2026-10"));
-  await mount();
-  fireEvent.click(screen.getByTestId("operating-history-vat-rt"));
-  fireEvent.click(
-    screen.getByTestId("operating-history-delete-vat-rt-2026-10"),
-  );
-  expect(writes()).toHaveLength(0);
-  fireEvent.click(screen.getByTestId("operating-delete-confirm"));
-  await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
-  expect(
-    JSON.parse(String((writes()[0][1] as RequestInit).body)).items,
-  ).toEqual([
-    { standardCode: "VAT_RT", effectiveMonth: "2026-10", action: "delete" },
-  ]);
-  expect(
-    screen.queryByTestId("operating-history-row-vat-rt-2026-10"),
-  ).not.toBeInTheDocument();
-});
-it("delete confirmation cancel preserves history and sends no write", async () => {
-  await mount();
-  fireEvent.click(screen.getByTestId("operating-history-vat-rt"));
-  fireEvent.click(
-    screen.getByTestId("operating-history-delete-vat-rt-2026-01"),
-  );
-  fireEvent.click(screen.getByTestId("operating-delete-cancel"));
-  expect(
-    screen.getByTestId("operating-history-row-vat-rt-2026-01"),
-  ).toBeInTheDocument();
-  expect(writes()).toHaveLength(0);
-});
-it("dirty history delete gives guidance with zero writes and preserves input", async () => {
-  await mount();
-  fireEvent.click(screen.getByTestId("operating-history-vat-rt"));
-  fireEvent.change(screen.getByLabelText("2026-01 이력 값"), {
-    target: { value: "11" },
-  });
-  fireEvent.click(
-    screen.getByTestId("operating-history-delete-vat-rt-2026-01"),
-  );
-  expect(screen.getByTestId("operating-failure")).toHaveTextContent(
-    "먼저 저장 또는 취소해 주세요.",
-  );
-  expect(screen.getByLabelText("2026-01 이력 값")).toHaveValue("11");
-  expect(writes()).toHaveLength(0);
-});
-it("dirty main form cannot open a deletion-capable history dialog", async () => {
-  await mount();
-  change("vat-rt", "11");
-  fireEvent.click(screen.getByTestId("operating-history-vat-rt"));
-  expect(
-    screen.queryByTestId("operating-history-dialog"),
-  ).not.toBeInTheDocument();
-  expect(writes()).toHaveLength(0);
-});
 it("successful write followed by failed GET disables duplicate saves until requery", async () => {
   failAfterSave = true;
   await mount();
@@ -539,4 +443,27 @@ it("history shows one row per month with the parts of a multi-part value", async
   expect(
     screen.getByTestId("operating-history-row-ai-score-job-2026-01"),
   ).toHaveTextContent("25 / 20 / 15 / 10 / 5 / 5 / 10 / 10 점");
+});
+it("history window is view-only like the mockup", async () => {
+  rows.push(row("VAT_RT", "부가세율", "11", "%", "2026-10"));
+  await mount();
+  change("vat-rt", "12");
+  fireEvent.click(screen.getByTestId("operating-history-vat-rt"));
+  const history = screen.getByTestId("operating-history-dialog");
+  expect(
+    within(history)
+      .getAllByRole("columnheader")
+      .map((cell) => cell.textContent),
+  ).toEqual(["적용 시작월", "값", "처리자"]);
+  expect(within(history).getAllByRole("row")).toHaveLength(3);
+  expect(
+    screen.getByTestId("operating-history-row-vat-rt-2026-10"),
+  ).toHaveTextContent("11 %");
+  expect(within(history).queryByRole("textbox")).not.toBeInTheDocument();
+  expect(
+    within(history).queryByRole("button", { name: /저장|삭제/ }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("operating-history-close"));
+  expect(screen.getByLabelText("부가세율")).toHaveValue("12");
+  expect(writes()).toHaveLength(0);
 });

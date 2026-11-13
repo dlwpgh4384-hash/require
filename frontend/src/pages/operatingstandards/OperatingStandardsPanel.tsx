@@ -36,10 +36,6 @@ export function OperatingStandardsPanel({
   const [confirmSave, setConfirmSave] = useState(false);
   const [month, setMonth] = useState(monthNow);
   const [historyCode, setHistoryCode] = useState<string | null>(null);
-  const [deleteRow, setDeleteRow] = useState<api.OperatingStandard[] | null>(
-    null,
-  );
-  const [historyDraft, setHistoryDraft] = useState<Record<string, string>>({});
   const lock = useRef(false);
   const root = useRef<HTMLElement>(null);
   const setDirty = useScreenDirty();
@@ -49,12 +45,7 @@ export function OperatingStandardsPanel({
       draft[row.standardCode] !== undefined &&
       draft[row.standardCode] !== row.value,
   );
-  const historyDirty = (snapshot ?? []).some(
-    (row) =>
-      historyDraft[api.operatingKey(row)] !== undefined &&
-      historyDraft[api.operatingKey(row)] !== row.value,
-  );
-  const dirty = changed.length > 0 || historyDirty;
+  const dirty = changed.length > 0;
   useEffect(() => {
     if (onDirtyChange) {
       onDirtyChange(dirty);
@@ -106,7 +97,6 @@ export function OperatingStandardsPanel({
     setSnapshot(result.items);
       setClosedMonth(result.closedMonth ?? null);
     setDraft({});
-    setHistoryDraft({});
     await onChanged?.();
     setRefreshPending(false);
   };
@@ -126,11 +116,9 @@ export function OperatingStandardsPanel({
     try {
       const result = await api.putCommonOperatingStandards(changes);
       saved = true;
-      setDeleteRow(null);
       setSnapshot(result.items);
       setClosedMonth(result.closedMonth ?? null);
       setDraft({});
-      setHistoryDraft({});
       setConfirmSave(false);
       // 시안: 운영 기준값 n건을 저장했습니다(2026-11부터 적용).
       const start = changes.find((row) => row.effectiveMonth)?.effectiveMonth;
@@ -175,7 +163,6 @@ export function OperatingStandardsPanel({
   };
   const discard = () => {
     setDraft({});
-    setHistoryDraft({});
     setErrors({});
     setFailure("");
   };
@@ -382,16 +369,7 @@ export function OperatingStandardsPanel({
                           className="operating-history-link"
                           data-testid={`operating-history-${api.operatingTestKey(first.standardCode)}`}
                           disabled={blocked}
-                          onClick={() => {
-                            if (dirty) {
-                              setFailure("먼저 저장 또는 취소해 주세요.");
-                              return;
-                            }
-                            setHistoryDraft({});
-                            setErrors({});
-                            setFailure("");
-                            setHistoryCode(def.key);
-                          }}
+                          onClick={() => setHistoryCode(def.key)}
                         >
                           이력 {historyCount}
                         </button>
@@ -533,119 +511,32 @@ export function OperatingStandardsPanel({
           onClose={() => {
             if (busy) return;
             setHistoryCode(null);
-            setHistoryDraft({});
             setErrors({});
           }}
         >
           {failure && <p role="alert">{failure}</p>}
-          {/* 시안: 한 달에 한 줄. 여러 칸 값은 「25 / 20 / … 점」으로 한 칸에 보인다. 마감 안 된 달은 고치고 지울 수 있다. */}
+          {/* 시안: 보기 전용. 한 달에 한 줄이고 여러 칸 값은 「25 / 20 / … 점」으로 한 칸에 보인다. 값은 본 표에서 바꾼다. */}
           <table className="operating-history-table">
             <thead>
               <tr>
                 <th>적용 시작월</th>
                 <th>값</th>
                 <th>처리자</th>
-                <th aria-label="동작" />
               </tr>
             </thead>
             <tbody>
               {historyMonths.map(({ month: rowMonth, rows }) => {
                 const first = rows[0];
-                const testKey = `${api.operatingTestKey(first.standardCode)}-${rowMonth}`;
-                const keys = rows.map((row) => api.operatingKey(row));
-                const rowDirty = keys.some((key) => historyDraft[key] !== undefined);
-                const readOnly = first.closed || first.immediate;
-                const multi = !!historyDef?.parts;
                 return (
-                  <tr key={rowMonth} data-testid={`operating-history-row-${testKey}`}>
+                  <tr
+                    key={rowMonth}
+                    data-testid={`operating-history-row-${api.operatingTestKey(first.standardCode)}-${rowMonth}`}
+                  >
                     <td>{first.effectiveMonth ?? "–"}</td>
                     <td>
-                      {readOnly ? (
-                        <>
-                          {rows.map((row) => row.value).join(" / ")} {first.unit}
-                        </>
-                      ) : (
-                        <span className="operating-history-values">
-                          {rows.map((row) => {
-                            const key = api.operatingKey(row);
-                            const part = multi
-                              ? historyDef!.parts![historyDef!.codes.indexOf(row.standardCode)]
-                              : "";
-                            return (
-                              <input
-                                key={key}
-                                className={`ls-in ls-in-sm${multi ? " operating-history-part" : ""}`}
-                                aria-label={multi ? `${rowMonth} ${part} 이력 값` : `${rowMonth} 이력 값`}
-                                title={multi ? part : undefined}
-                                data-testid={`operating-history-value-${api.operatingTestKey(row.standardCode)}-${rowMonth}`}
-                                value={historyDraft[key] ?? row.value}
-                                disabled={blocked || (historyDirty && !rowDirty)}
-                                aria-invalid={!!(errors[row.standardCode] ?? errors.value)}
-                                onChange={(event) => {
-                                  setHistoryDraft((old) => ({
-                                    ...old,
-                                    [key]: event.target.value,
-                                  }));
-                                  setErrors({});
-                                }}
-                              />
-                            );
-                          })}
-                        </span>
-                      )}
-                      {!readOnly && <> {first.unit}</>}
+                      {rows.map((row) => row.value).join(" / ")} {first.unit}
                     </td>
                     <td>{first.changedBy ?? "–"}</td>
-                    <td>
-                      {first.immediate ? (
-                        "표에서 바로 고침"
-                      ) : first.closed ? (
-                        "마감 · 읽기 전용 (새 시작월로 추가)"
-                      ) : (
-                        <span className="operating-history-actions">
-                          <button
-                            type="button"
-                            className="ls-btn ls-btn-sm"
-                            data-testid={`operating-history-save-${testKey}`}
-                            disabled={blocked || (historyDirty && !rowDirty)}
-                            onClick={() =>
-                              void submit(
-                                rows
-                                  .filter(
-                                    (row) =>
-                                      !multi ||
-                                      (historyDraft[api.operatingKey(row)] !== undefined &&
-                                        historyDraft[api.operatingKey(row)] !== row.value),
-                                  )
-                                  .map((row) => ({
-                                    standardCode: row.standardCode,
-                                    effectiveMonth: row.effectiveMonth,
-                                    value: historyDraft[api.operatingKey(row)] ?? row.value,
-                                    action: "update" as const,
-                                  })),
-                              )
-                            }
-                          >
-                            수정 저장
-                          </button>
-                          <button
-                            type="button"
-                            className="ls-btn ls-btn-sm ls-btn-dt"
-                            data-testid={`operating-history-delete-${testKey}`}
-                            disabled={blocked}
-                            onClick={() => {
-                              if (dirty) {
-                                setFailure("먼저 저장 또는 취소해 주세요.");
-                                return;
-                              }
-                              setDeleteRow(rows);
-                            }}
-                          >
-                            삭제
-                          </button>
-                        </span>
-                      )}
-                    </td>
                   </tr>
                 );
               })}
@@ -661,52 +552,10 @@ export function OperatingStandardsPanel({
               disabled={busy}
               onClick={() => {
                 setHistoryCode(null);
-                setHistoryDraft({});
                 setErrors({});
               }}
             >
               닫기
-            </button>
-          </div>
-        </Dialog>
-      )}
-      {deleteRow && (
-        <Dialog
-          title="운영 기준값 이력 삭제"
-          testId="operating-delete-dialog"
-          onClose={() => {
-            if (!busy) setDeleteRow(null);
-          }}
-        >
-          <p>
-            {historyDef?.label ?? deleteRow[0].standardName} ·{" "}
-            {deleteRow[0].effectiveMonth} 이력을 삭제하시겠습니까?
-          </p>
-          {failure && <p role="alert">{failure}</p>}
-          <div className="app-actions">
-            <button
-              type="button"
-              data-testid="operating-delete-cancel"
-              disabled={busy}
-              onClick={() => setDeleteRow(null)}
-            >
-              취소
-            </button>
-            <button
-              type="button"
-              data-testid="operating-delete-confirm"
-              disabled={blocked}
-              onClick={() =>
-                void submit(
-                  deleteRow.map((row) => ({
-                    standardCode: row.standardCode,
-                    effectiveMonth: row.effectiveMonth,
-                    action: "delete" as const,
-                  })),
-                )
-              }
-            >
-              삭제
             </button>
           </div>
         </Dialog>

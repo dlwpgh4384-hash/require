@@ -51,7 +51,11 @@ export function DetailPanel({
   const current = tabs?.find((tab) => tab.key === activeTab) ?? tabs?.[0];
   return (
     <>
-      <div className="ls-scrim" onClick={onClose} />
+      <div
+        className="ls-scrim"
+        data-testid="detail-panel-scrim"
+        onClick={onClose}
+      />
       <section
         ref={panel}
         className="ls-drawer"
@@ -107,7 +111,7 @@ export function KeyValues({ items }: { items: [string, ReactNode][] }) {
   return (
     <dl className="ls-kv">
       {items.map(([label, value]) => (
-        <div key={label} className="ls-kv-row">
+        <div key={label} className="ls-kv-row" data-testid={`kv-row-${label}`}>
           <dt>{label}</dt>
           <dd>{value}</dd>
         </div>
@@ -127,7 +131,11 @@ export function Banner({
   action?: ReactNode;
 }) {
   return (
-    <div className={`ls-banner ls-banner-${kind}`} role="status">
+    <div
+      className={`ls-banner ls-banner-${kind}`}
+      role="status"
+      data-testid={`banner-${kind}`}
+    >
       <span>{children}</span>
       {action}
     </div>

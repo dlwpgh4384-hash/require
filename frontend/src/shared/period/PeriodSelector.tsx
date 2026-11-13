@@ -80,7 +80,7 @@ export function PeriodSelector({
           onChange={(event) => setYear(Number(event.target.value))}
         >
           {range(years.min, years.max).map((year) => (
-            <option key={year} value={year}>
+            <option key={year} value={year} data-testid={`period-year-${year}`}>
               {year}년
             </option>
           ))}
@@ -125,7 +125,11 @@ export function PeriodSelector({
             }
           >
             {range(months.min, months.max).map((month) => (
-              <option key={month} value={month}>
+              <option
+                key={month}
+                value={month}
+                data-testid={`period-month-${month}`}
+              >
                 {month}월
               </option>
             ))}

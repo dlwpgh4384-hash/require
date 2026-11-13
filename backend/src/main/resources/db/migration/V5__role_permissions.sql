@@ -1,0 +1,65 @@
+-- Explicit --prepare-schema resource. Existing permissions are never overwritten.
+CREATE TABLE IF NOT EXISTS TB_SY_ROLE_MENU_AUTH (
+    ROLE_ID VARCHAR(20) NOT NULL,
+    MENU_ID VARCHAR(20) NOT NULL,
+    INQ_YN CHAR(1) DEFAULT 'N' NOT NULL,
+    REG_YN CHAR(1) DEFAULT 'N' NOT NULL,
+    UPD_YN CHAR(1) DEFAULT 'N' NOT NULL,
+    DEL_YN CHAR(1) DEFAULT 'N' NOT NULL,
+    UPLD_YN CHAR(1) DEFAULT 'N' NOT NULL,
+    DNLD_YN CHAR(1) DEFAULT 'N' NOT NULL,
+    CNFM_YN CHAR(1) DEFAULT 'N' NOT NULL,
+    REG_USER_ID VARCHAR(30) NOT NULL,
+    REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    MOD_USER_ID VARCHAR(30),
+    MOD_DTTM TIMESTAMPTZ,
+    CONSTRAINT PK_TB_SY_ROLE_MENU_AUTH PRIMARY KEY (ROLE_ID, MENU_ID),
+    CONSTRAINT CK_TB_SY_ROLE_MENU_AUTH_01 CHECK (INQ_YN IN ('Y', 'N')),
+    CONSTRAINT CK_TB_SY_ROLE_MENU_AUTH_02 CHECK (REG_YN IN ('Y', 'N')),
+    CONSTRAINT CK_TB_SY_ROLE_MENU_AUTH_03 CHECK (UPD_YN IN ('Y', 'N')),
+    CONSTRAINT CK_TB_SY_ROLE_MENU_AUTH_04 CHECK (DEL_YN IN ('Y', 'N')),
+    CONSTRAINT CK_TB_SY_ROLE_MENU_AUTH_05 CHECK (UPLD_YN IN ('Y', 'N')),
+    CONSTRAINT CK_TB_SY_ROLE_MENU_AUTH_06 CHECK (DNLD_YN IN ('Y', 'N')),
+    CONSTRAINT CK_TB_SY_ROLE_MENU_AUTH_07 CHECK (CNFM_YN IN ('Y', 'N'))
+);
+COMMENT ON TABLE TB_SY_ROLE_MENU_AUTH IS '역할별 화면 메뉴의 조회·등록·수정·삭제·업로드·다운로드·확정 권한.';
+COMMENT ON COLUMN TB_SY_ROLE_MENU_AUTH.ROLE_ID IS 'TB_SY_ROLE.ROLE_ID 참조 의도 (FK 미선언)';
+COMMENT ON COLUMN TB_SY_ROLE_MENU_AUTH.MENU_ID IS 'TB_SY_MENU.MENU_ID 참조 의도 (FK 미선언)';
+COMMENT ON COLUMN TB_SY_ROLE_MENU_AUTH.REG_USER_ID IS 'TB_SY_USER.USER_ID 참조 의도 (FK 미선언)';
+COMMENT ON COLUMN TB_SY_ROLE_MENU_AUTH.MOD_USER_ID IS 'TB_SY_USER.USER_ID 참조 의도 (FK 미선언)';
+DO $permissions$
+BEGIN
+    PERFORM pg_advisory_xact_lock(734901, 1);
+    LOCK TABLE TB_SY_ROLE_MENU_AUTH IN EXCLUSIVE MODE;
+    IF NOT EXISTS (SELECT 1 FROM TB_SY_ROLE_MENU_AUTH) THEN
+        -- Original DML permissions expressed as role defaults and its blocked-menu rows.
+        -- EXEC/M011 CNFM=N is the approved read/download-only initial-value correction.
+        INSERT INTO TB_SY_ROLE_MENU_AUTH (
+            ROLE_ID, MENU_ID, INQ_YN, REG_YN, UPD_YN, DEL_YN, UPLD_YN, DNLD_YN, CNFM_YN, REG_USER_ID
+        )
+        SELECT r.ROLE_ID, m.MENU_ID,
+            CASE WHEN b.blocked THEN 'N' ELSE 'Y' END,
+            CASE WHEN b.blocked OR r.ROLE_ID='EXEC' THEN 'N' ELSE 'Y' END,
+            CASE WHEN b.blocked OR r.ROLE_ID='EXEC' THEN 'N' ELSE 'Y' END,
+            CASE WHEN NOT b.blocked AND r.ROLE_ID IN ('ADMIN','FIN') THEN 'Y' ELSE 'N' END,
+            CASE WHEN NOT b.blocked AND r.ROLE_ID IN ('ADMIN','FIN') THEN 'Y' ELSE 'N' END,
+            CASE WHEN NOT b.blocked AND r.ROLE_ID!='PM' THEN 'Y' ELSE 'N' END,
+            CASE WHEN NOT b.blocked AND r.ROLE_ID IN ('ADMIN','FIN') THEN 'Y' ELSE 'N' END,
+            'SYSTEM'
+        FROM TB_SY_ROLE r
+        CROSS JOIN TB_SY_MENU m
+        CROSS JOIN LATERAL (SELECT (
+            (r.ROLE_ID='EXEC' AND m.MENU_ID IN ('M027','M028','M029','M030'))
+            OR (r.ROLE_ID='SALES_LDR' AND m.MENU_ID IN (
+                'M014','M015','M018','M019','M020','M021','M022','M023','M024','M027','M028','M029','M030'))
+            OR (r.ROLE_ID='PM' AND m.MENU_ID IN (
+                'M014','M015','M016','M017','M018','M019','M020','M021','M022','M023','M024','M027','M028','M029','M030'))
+        ) AS blocked) b
+        WHERE r.ROLE_ID IN ('ADMIN','EXEC','FIN','SALES_LDR','PM')
+            AND m.MENU_ID IN (
+                'M001','M002','M003','M004','M005','M006','M007','M008','M009','M010',
+                'M011','M012','M013','M014','M015','M016','M017','M018','M019','M020',
+                'M021','M022','M023','M024','M025','M026','M027','M028','M029','M030');
+    END IF;
+END;
+$permissions$;

@@ -120,6 +120,7 @@ export function PersonalScreenLists({
         return (
           <section
             key={type}
+            data-testid={`personal-screen-section-${type.toLowerCase()}`}
             aria-label={type === "FAV" ? "즐겨찾기" : "최근 본 화면"}
           >
             <h2>

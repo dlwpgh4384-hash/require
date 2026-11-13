@@ -351,6 +351,33 @@ paths:
         schema:
           type: string
         description: 이름 또는 아이디 검색
+      - name: includeStopped
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+        description: 시안 [사용 중지 포함]. false면 사용 중지 계정을 숨긴다(상태 조건에서 중지를 고르면 함께 보임).
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - userId
+          - name
+          - role
+          - state
+          - last
+        description: 정렬 열. 없으면 이름순.
+      - name: dir
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
       responses:
         '200':
           description: 조회 또는 저장한 사용자 업무 결과
@@ -565,6 +592,134 @@ paths:
                 $ref: '#/components/schemas/ApiError'
         '409':
           description: MOD_DTTM 동시 수정 충돌; 최신 사용자·역할·담당범위 보존
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/excel:
+    get:
+      operationId: getCommonUsersExcel
+      summary: 사용자 목록 엑셀 다운로드(SFR-011)
+      description: 지금 조건의 전체 결과를 보이는 열 그대로 xlsx로 내려준다. 1행 「사용자 · 다운로드 admin · 한국 시각」, 3행부터 머리글. 파일 이름은 「화면이름_기간_다운로드일시.xlsx」. 접근 기록(DNLD)을 남긴다.
+      security: []
+      parameters:
+      - name: includeStopped
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+        description: 시안 [사용 중지 포함]. false면 사용 중지 계정을 숨긴다(상태 조건에서 중지를 고르면 함께 보임).
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - userId
+          - name
+          - role
+          - state
+          - last
+        description: 정렬 열. 없으면 이름순.
+      - name: dir
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+      - name: roleCd
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: userStatCd
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - USE
+          - LOCK
+          - STOP
+      - name: keyword
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: columns
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
+      responses:
+        '200':
+          description: 엑셀 파일
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 모르는 열·정렬 값
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/{userId}/change-history:
+    get:
+      operationId: getCommonUserChangeHistory
+      summary: 사용자 변경 이력 조회(상세 패널 「변경 이력」 탭)
+      description: 바뀐 항목마다 1줄(이름·이메일·역할·고른 본사·담당 프로젝트·상태·등록), 최근 순.
+      security: []
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 변경 이력 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        type: object
+                        required:
+                        - changedAt
+                        - item
+                        properties:
+                          changedAt:
+                            type: string
+                            format: date-time
+                          item:
+                            type: string
+                          before:
+                            type: string
+                            nullable: true
+                          after:
+                            type: string
+                            nullable: true
+                          changedBy:
+                            type: string
+                            nullable: true
+        '400':
+          description: 아이디 형식 오류
           content:
             application/json:
               schema:
@@ -927,11 +1082,12 @@ paths:
       - REQ-159
       - REQ-162
       - REQ-166
-      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
-        않는다.
+      - REQ-205
+      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지 않는다.
+        UI-24에서 사용 중지한 역할은 사용자 등록 역할 목록에서 제외한다.
       x-pagination-filtering:
         pagination: 등록 선택 목록은 전체 옵션; 페이지 분할 없음
-        filtering: 역할과 상태는 원문 DB 목록, 프로젝트는 지정 가능한 원천 목록; 타 업무 접근 권한 필터는 추가하지 않음
+        filtering: 역할과 상태는 원문 DB 목록, 프로젝트는 지정 가능한 원천 목록; 타 업무 접근 권한 필터는 추가하지 않음; 역할은 TB_SY_ROLE.USE_YN=Y만 반환한다.
       responses:
         '200':
           description: 조회 또는 저장한 사용자 업무 결과
@@ -1040,6 +1196,414 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
+  /api/common/roles:
+    get:
+      operationId: getCommonRoles
+      summary: 활성 역할 탭 조회
+      security: []
+      x-related-requirements:
+      - REQ-183
+      - REQ-184
+      responses:
+        '200':
+          description: 역할 업무 처리 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonRoleList'
+        '400':
+          description: '필수·코드·업무 보호 오류: errors에 대상 필드와 안내를 반환한다.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 대상 또는 원본 역할이 존재하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-pagination-filtering:
+        pagination: 역할 탭용 활성 역할 전체; 페이지 분할 없음
+        filtering: USE_YN=Y; 기본 역할과 추가 역할; 검색 조건 없음
+      x-aiops-query-role:
+        entity: TB_SY_ROLE
+        result_path:
+        - data
+        - items
+    post:
+      operationId: postCommonRoleCopy
+      summary: 기존 역할 복사 생성
+      security: []
+      x-related-requirements:
+      - REQ-199
+      - REQ-200
+      - REQ-201
+      responses:
+        '200':
+          description: 역할 업무 처리 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonRoleSettings'
+        '400':
+          description: '필수·코드·업무 보호 오류: errors에 대상 필드와 안내를 반환한다.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 대상 또는 원본 역할이 존재하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonRoleCopyInput'
+      x-business-rules:
+      - 원본 메뉴 표·민감 보기를 복사하고 선택 dataScopeCd를 저장한다. roleName·dataScopeCd 필수, 이름 중복 불가다.
+      - 추가 ID는 서버 R-001부터 자동 순번이며 지운/중지 번호를 재사용하지 않는다. 기본5개는 바꾸지 않는다.
+      x-side-effects:
+      - TB_SY_ROLE와 TB_SY_ROLE_MENU_AUTH에 새 역할과 복사된 동작 행을 기록한다. REG_USER_ID=admin·시각 clock_timestamp()다.
+      x-state-transitions:
+      - from: 새 역할 없음
+        to: 새 R-nnn 역할·복사 권한
+        condition: 필수 입력·유일 이름·유효 원본
+      x-required-tests:
+      - 'happy: 유일 roleName·원본 역할·유효 범위로 POST -> 200이고 getCommonRoles와 getCommonRole에서 새 R-nnn·원본 메뉴 표·민감 값이 조회된다.'
+      - 'auth: 무인증 역할 복사 POST -> 200이고 TB_SY_ROLE.REG_USER_ID=admin이다. 개발 단계 401/403은 추가하지 않는다.'
+      - 'validation: roleName 누락으로 POST -> 400 errors.roleName이고 TB_SY_ROLE 신규 행이 없다.'
+      - 'business: 기존 역할과 같은 roleName으로 POST -> 400 중복 이름 오류이며 기존 역할/권한 행은 불변이다.'
+      - 'side-effect: 복사 POST 성공 후 DB 조회 -> 새 TB_SY_ROLE_MENU_AUTH 행의 각 동작이 원본과 같고 기본5역할과 이전 번호는 보존된다.'
+      - 'number: 추가 역할 중지 후 다시 새 이름으로 복사 POST -> 중지 역할 ID는 그대로 남고 새 ID는 이전 발급 번호를 재사용하지 않는다.'
+  /api/common/roles/{roleId}:
+    get:
+      operationId: getCommonRole
+      summary: 역할 범위·메뉴 권한 조회
+      security: []
+      x-related-requirements:
+      - REQ-184
+      - REQ-185
+      - REQ-190
+      - REQ-192
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          description: 기존 기본 역할 식별자 또는 서버 자동 R-nnn. 실제 물리 PK/코드 매핑은 SQL 원문 대조.
+      responses:
+        '200':
+          description: 역할 업무 처리 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonRoleSettings'
+        '400':
+          description: '필수·코드·업무 보호 오류: errors에 대상 필드와 안내를 반환한다.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 대상 또는 원본 역할이 존재하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_SY_ROLE
+        result_path:
+        - data
+        - role
+    put:
+      operationId: putCommonRole
+      summary: 역할 범위·메뉴 권한 저장
+      security: []
+      x-related-requirements:
+      - REQ-185
+      - REQ-186
+      - REQ-187
+      - REQ-188
+      - REQ-189
+      - REQ-190
+      - REQ-191
+      - REQ-192
+      - REQ-193
+      - REQ-194
+      - REQ-195
+      - REQ-196
+      - REQ-197
+      - REQ-198
+      - REQ-206
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          description: 기존 기본 역할 식별자 또는 서버 자동 R-nnn. 실제 물리 PK/코드 매핑은 SQL 원문 대조.
+      responses:
+        '200':
+          description: 역할 업무 처리 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonRoleSettings'
+        '400':
+          description: '필수·코드·업무 보호 오류: errors에 대상 필드와 안내를 반환한다.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 대상 또는 원본 역할이 존재하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonRoleUpdateInput'
+      x-business-rules:
+      - DATA_SCOPE DML 코드만 허용하고 본인은 제외한다. ADMIN·EXEC·FIN 초기 전체, SALES_LDR 초기 담당 파트, PM 초기 담당 프로젝트다.
+      - 다른 역할로 유지되는 범위 및 PM 관계는 정리하지 않는다. 영향 있는 저장은 confirmedAffectedUserIds와 최종 대상 대조 후 수행한다.
+      - ADMIN 권한 메뉴 updateYn=N은 거부한다. SALES_LDR 월 마감은 readYn 외 모두 N이어야 한다.
+      - 민감 보기는 모든 역할에서 변경 가능하다. 초기 차단 메뉴는 관리자 변경 가능하고 월 마감 예외만 영구 유지한다.
+      x-side-effects:
+      - TB_SY_ROLE.DATA_SCOPE_CD·SNSTV_VIEW_YN과 TB_SY_ROLE_MENU_AUTH를 저장하고 확인한 TB_SY_USER_SCOPE 대상만 정리한다.
+      - 항목별 TB_SY_CHG_HIST 이전/이후값과 TB_SY_ACCS_LOG 권한 변경·admin·시각을 남긴다. 다음 요청용 역할 캐시가 있으면 갱신/무효화한다.
+      x-state-transitions:
+      - from: 기존 역할 설정·담당범위
+        to: 변경 설정·확인 대상 정리
+        condition: 유효 입력·필수 보호 통과·필요 영향 확인
+      - from: 기존 역할 설정
+        to: 기존 역할 설정
+        condition: 보호 거부·확인 취소
+      x-required-tests:
+      - 'happy: 유효 DATA_SCOPE 코드와 menuAuths·snstvViewYn=Y로 PUT -> 200이며 getCommonRole과 TB_SY_ROLE.SNSTV_VIEW_YN=Y·저장한
+        권한 표가 일치한다.'
+      - 'auth: 인증 헤더 없이 고정 admin으로 역할 PUT -> 200이고 TB_SY_ROLE.MOD_USER_ID=admin이다. UI-22 전 호출자 역할 거부 401/403을 발명하지
+        않는다.'
+      - 'validation: DATA_SCOPE에 없는 dataScopeCd로 PUT -> 400 errors의 dataScopeCd 필드 오류이고 기존 DATA_SCOPE_CD가 유지된다.'
+      - 'business: ADMIN 권한 메뉴 updateYn=N으로 PUT -> 400 업무 오류이고 TB_SY_ROLE_MENU_AUTH의 기존 수정=Y 및 역할 범위가 유지된다.'
+      - 'side-effect: 범위·민감 체크를 바꿔 유효 PUT -> TB_SY_CHG_HIST에 각 항목 이전/이후값·admin이 별도 행으로 있고 TB_SY_ACCS_LOG에 권한 변경 대상
+        역할이 있다.'
+      - 'confirm-cancel: 영향 있는 범위 변경의 확인에서 취소 -> PUT 0회이고 TB_SY_USER_SCOPE와 역할 설정이 유지된다.'
+      - 'confirm-save: 단독 담당범위 사용자와 다른 역할 유지자·PM 계정으로 영향 확인 뒤 PUT -> 확인된 단독 대상만 정리되고 PM 프로젝트·다른 역할 유지자는 남는다.'
+      - 'leader-close: SALES_LDR 월 마감 readYn=Y·나머지 N으로 PUT -> 저장되며 같은 메뉴 cnfmYn=Y PUT은400이고 직전 조회 설정이 유지된다.'
+      - 'next-request: 역할 설정 PUT 성공 뒤 새로운 getCommonRole 요청 -> 저장한 범위·민감·메뉴 동작을 반환하고 재로그인을 요구하지 않는다.'
+      - 'sensitive: 단일 역할 snstvViewYn=N 저장 후 소비 경계 조회/다운로드/AI/합계 fixture 실행 -> 급여·지급 단가·개인별 원가·지급 계좌의 제목·값·합계 기여가
+        없다. 없는 제품 소비 기능은 후속 연결 시험 not_run으로 유지한다.'
+      - 'confirm-action: 견적 승인/반려 fixture에서 updateYn=Y·cnfmYn=N -> 확정 동작은 거부되고 수정 권한으로 승인하지 않는다. 업무 실행은 후속 연결 시험이다.'
+  /api/common/roles/{roleId}/change-history:
+    get:
+      operationId: getCommonRoleChangeHistory
+      summary: 역할 권한 변경 이력 조회(시안 「변경 이력 (n)」)
+      security: []
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 바뀐 항목마다 1줄, 최근 순
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      type: object
+                      required:
+                      - items
+                      properties:
+                        items:
+                          type: array
+                          items:
+                            type: object
+                            required:
+                            - changedAt
+                            - item
+                            properties:
+                              changedAt:
+                                type: string
+                                format: date-time
+                              item:
+                                type: string
+                              before:
+                                type: string
+                                nullable: true
+                              after:
+                                type: string
+                                nullable: true
+                              changedBy:
+                                type: string
+                                nullable: true
+        '404':
+          description: 역할이 존재하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/roles/{roleId}/change-impact:
+    get:
+      operationId: getCommonRoleChangeImpact
+      summary: 담당범위 정리 영향 조회
+      security: []
+      x-related-requirements:
+      - REQ-187
+      - REQ-186
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          description: 기존 기본 역할 식별자 또는 서버 자동 R-nnn. 실제 물리 PK/코드 매핑은 SQL 원문 대조.
+      - name: dataScopeCd
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 역할 업무 처리 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonRoleImpact'
+        '400':
+          description: '필수·코드·업무 보호 오류: errors에 대상 필드와 안내를 반환한다.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 대상 또는 원본 역할이 존재하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-pagination-filtering:
+        pagination: 확인 대상 사용자 전체; 페이지 분할 없음
+        filtering: roleId와 변경 dataScopeCd; 다른 역할 유지자·PM 보존 대상 분리
+  /api/common/roles/{roleId}/stop:
+    post:
+      operationId: postCommonRoleStop
+      summary: 추가 역할 사용 중지
+      security: []
+      x-related-requirements:
+      - REQ-202
+      - REQ-203
+      - REQ-204
+      - REQ-205
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          description: 기존 기본 역할 식별자 또는 서버 자동 R-nnn. 실제 물리 PK/코드 매핑은 SQL 원문 대조.
+      responses:
+        '200':
+          description: 역할 업무 처리 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonRoleStopResult'
+        '400':
+          description: '필수·코드·업무 보호 오류: errors에 대상 필드와 안내를 반환한다.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 대상 또는 원본 역할이 존재하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-no-request-body-reason: roleId 경로만으로 대상 역할을 지정하는 처리 동작이며 원문에 별도 입력은 없다. 서버가 배정·기본 역할을 다시 확인한다.
+      x-business-rules:
+      - 기본 ADMIN·EXEC·FIN·SALES_LDR·PM은 중지 불가다. 추가 역할만 사용 중지한다.
+      - 배정 사용자가 있으면 수와 시스템 › 사용자 선제거 안내로 거부한다. 시스템 관리자 목적이지만 개발 실행자는 고정 admin이며 실제 인증 연결은 UI-22다.
+      x-side-effects:
+      - TB_SY_ROLE.USE_YN=N·MOD_USER_ID=admin·수정시각을 저장하고 역할 탭·getCommonUserOptions.roles에서 제외한다.
+      - 역할·권한 기록·번호는 삭제하거나 재사용하지 않는다. 원문에 없는 중지 전용 감사 종류·보존기간은 추가하지 않는다.
+      x-state-transitions:
+      - from: 추가 역할 USE_YN=Y
+        to: USE_YN=N
+        condition: 배정0명·기본역할 아님
+      x-required-tests:
+      - 'happy: 배정0명 추가 역할에 POST -> 200 useYn=N이고 TB_SY_ROLE.USE_YN=N·getCommonRoles 대상 부재다.'
+      - 'auth: 인증 없는 고정 admin 중지 POST -> 유효 추가 역할200·MOD_USER_ID=admin이고 기본 역할 버튼은 없다. 실제 비관리자403 시험은 후속 UI-22 연결
+        범위다.'
+      - 'validation: 존재하지 않는 roleId로 POST -> 404 ApiError이고 TB_SY_ROLE 기존 행 수·USE_YN이 유지된다.'
+      - 'business: 사용자1명 이상 배정 역할에 POST -> 400·정확한 사용자 수와 선제거 안내이며 USE_YN=Y가 유지된다. 기본5개 직접 요청도400이다.'
+      - 'side-effect: 추가 역할 중지 POST 뒤 getCommonUserOptions·DB 조회 -> roles에서 대상이 없고 TB_SY_ROLE_MENU_AUTH·역할 번호는 보존된다.'
 components:
   schemas:
     ApiResponse:
@@ -1646,6 +2210,268 @@ components:
                 type: string
             additionalProperties: false
       additionalProperties: false
+    CommonRoleMenuAuth:
+      type: object
+      required:
+      - menuId
+      - menuName
+      - screenId
+      - groupName
+      - readYn
+      - createYn
+      - updateYn
+      - deleteYn
+      - uploadYn
+      - downloadYn
+      - cnfmYn
+      properties:
+        menuId:
+          type: string
+          minLength: 1
+        menuName:
+          type: string
+        screenId:
+          type: string
+          description: 메뉴의 화면 번호(예 UI-16). 시안 권한 표는 「메뉴 이름 화면 번호」로 보여 준다.
+        groupName:
+          type: string
+        readYn:
+          type: string
+          enum:
+          - Y
+          - N
+        createYn:
+          type: string
+          enum:
+          - Y
+          - N
+        updateYn:
+          type: string
+          enum:
+          - Y
+          - N
+        deleteYn:
+          type: string
+          enum:
+          - Y
+          - N
+        uploadYn:
+          type: string
+          enum:
+          - Y
+          - N
+        downloadYn:
+          type: string
+          enum:
+          - Y
+          - N
+        cnfmYn:
+          type: string
+          enum:
+          - Y
+          - N
+      additionalProperties: false
+    CommonRole:
+      type: object
+      required:
+      - roleId
+      - roleName
+      - dataScopeCd
+      - snstvViewYn
+      - useYn
+      - basicRole
+      properties:
+        roleId:
+          type: string
+          minLength: 1
+          description: 기존 기본 역할 식별자 또는 서버 자동 R-nnn. 실제 물리 PK/코드 매핑은 SQL 원문 대조.
+        roleName:
+          type: string
+          minLength: 1
+        dataScopeCd:
+          type: string
+          minLength: 1
+          description: DATA_SCOPE DML 코드. 실제 코드는 SQL 대조 전 발명하지 않는다.
+        snstvViewYn:
+          type: string
+          enum:
+          - Y
+          - N
+        useYn:
+          type: string
+          enum:
+          - Y
+          - N
+        basicRole:
+          type: boolean
+      additionalProperties: false
+    CommonRoleSettings:
+      type: object
+      required:
+      - role
+      - menuAuths
+      - dataScopes
+      properties:
+        role:
+          $ref: '#/components/schemas/CommonRole'
+        menuAuths:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonRoleMenuAuth'
+        dataScopes:
+          type: array
+          items:
+            type: object
+            required:
+            - code
+            - name
+            properties:
+              code:
+                type: string
+              name:
+                type: string
+            additionalProperties: false
+      additionalProperties: false
+    CommonRoleList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonRole'
+      additionalProperties: false
+    CommonRoleImpact:
+      type: object
+      required:
+      - headquartersUserCount
+      - projectUserCount
+      - affectedUserIds
+      - preservedPmUserIds
+      properties:
+        headquartersUserCount:
+          type: integer
+          minimum: 0
+        projectUserCount:
+          type: integer
+          minimum: 0
+        affectedUserIds:
+          type: array
+          items:
+            type: string
+        preservedPmUserIds:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+    CommonRoleUpdateInput:
+      type: object
+      required:
+      - dataScopeCd
+      - snstvViewYn
+      - menuAuths
+      - confirmedAffectedUserIds
+      properties:
+        dataScopeCd:
+          type: string
+          minLength: 1
+        snstvViewYn:
+          type: string
+          enum:
+          - Y
+          - N
+        menuAuths:
+          type: array
+          items:
+            type: object
+            required:
+            - menuId
+            - readYn
+            - createYn
+            - updateYn
+            - deleteYn
+            - uploadYn
+            - downloadYn
+            - cnfmYn
+            properties:
+              menuId:
+                type: string
+                minLength: 1
+              readYn:
+                type: string
+                enum:
+                - Y
+                - N
+              createYn:
+                type: string
+                enum:
+                - Y
+                - N
+              updateYn:
+                type: string
+                enum:
+                - Y
+                - N
+              deleteYn:
+                type: string
+                enum:
+                - Y
+                - N
+              uploadYn:
+                type: string
+                enum:
+                - Y
+                - N
+              downloadYn:
+                type: string
+                enum:
+                - Y
+                - N
+              cnfmYn:
+                type: string
+                enum:
+                - Y
+                - N
+            additionalProperties: false
+        confirmedAffectedUserIds:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+    CommonRoleCopyInput:
+      type: object
+      description: sourceRoleId가 있으면 「역할 복사」(권한 표·민감 항목 복사), 없으면 「역할 추가」(모든 메뉴 권한 없음·민감 항목 끔). 시안 UI-24.
+      required:
+      - roleName
+      - dataScopeCd
+      properties:
+        sourceRoleId:
+          type: string
+          minLength: 1
+          description: 기존 기본 역할 식별자 또는 서버 자동 R-nnn. 실제 물리 PK/코드 매핑은 SQL 원문 대조.
+        roleName:
+          type: string
+          minLength: 1
+        dataScopeCd:
+          type: string
+          minLength: 1
+      additionalProperties: false
+    CommonRoleStopResult:
+      type: object
+      required:
+      - roleId
+      - useYn
+      properties:
+        roleId:
+          type: string
+          minLength: 1
+          description: 기존 기본 역할 식별자 또는 서버 자동 R-nnn. 실제 물리 PK/코드 매핑은 SQL 원문 대조.
+        useYn:
+          type: string
+          enum:
+          - N
+      additionalProperties: false
 x-requirement-context:
   description: >-
     아래 항목은 관련 요구별 역할·관찰 증거다. 면제 목록이 아니다.
@@ -1951,6 +2777,53 @@ x-uncovered-requirements:
 - canonical_id: REQ-167
   status: screen-only
   evidence: PC 관리자 사용자 화면의 소유는 UI-23 공통 연결이며 PC의 UI-23에 계정 관리 본문이 보이고 휴대폰은 기존 PC 전용 안내만 보인다.
+
+- canonical_id: REQ-168
+  status: data-constraint
+  evidence: DATA_SCOPE 원천 — DML의 DATA_SCOPE 코드·표시명과 UI-24 선택값이 일치한다.
+- canonical_id: REQ-169
+  status: non-functional
+  evidence: 고정 개발 실행자 — 인증 헤더 없는 역할 저장이 성공하고 REG_USER_ID·MOD_USER_ID는 admin이다.
+- canonical_id: REQ-170
+  status: out-of-scope
+  evidence: 후속 연동 경계 — UI-24 구현에 인증 세션·메뉴 접근 통제·실메일 발송을 추가하지 않는다.
+- canonical_id: REQ-171
+  status: non-functional
+  evidence: 최종 시안과 SQL 원천 — UI-24 시안 대조와 SQL 원문 대조 결과를 각각 기록하고 누락 원문을 추정하지 않는다.
+- canonical_id: REQ-172
+  status: non-functional
+  evidence: 기존 백엔드 패키지 — 권한 구현은 기존 계층 패키지에 있고 users/commonops/roles 전용 패키지와 새 스캔 설정이 없다.
+- canonical_id: REQ-173
+  status: non-functional
+  evidence: 목록 공통 부품 유지 — 기존 ListView·ListFilters·DetailPanel·useListColumns·useListPresentation을 복사하지 않고 UI-23
+    회귀가 통과한다.
+- canonical_id: REQ-174
+  status: non-functional
+  evidence: 공통 엑셀 경로 보존 — UI-23 등 기존 다운로드의 화면이름_기간_다운로드일시.xlsx 및 DNLD 회귀를 확인하며 UI-24 엑셀 버튼은 신설하지 않는다.
+- canonical_id: REQ-175
+  status: non-functional
+  evidence: 공통 화면 틀 유지 — UI-24 본문은 screen-body이고 공통 헤더·탭이 중복되지 않으며 목록 작은 버튼은 28px이다.
+- canonical_id: REQ-176
+  status: non-functional
+  evidence: 시각 표현 경계 — 월 경계 fixture에서 이번 달 파트장 범위는 한국 월이며 기록 시각은 API UTC와 화면 한국 시간으로 대응한다.
+- canonical_id: REQ-177
+  status: non-functional
+  evidence: 공통 오류 처리 — 없는 역할·잘못된 메서드·입력 오류·서버 실패가 success=false, meta, message, errors 봉투로 반환된다.
+- canonical_id: REQ-178
+  status: non-functional
+  evidence: HTTP 동작 규약 — 역할 복사는 POST·수정은 PUT·사용 중지는 POST이고 역할 DELETE는 없다.
+- canonical_id: REQ-179
+  status: non-functional
+  evidence: 공통 부품 중복 금지 — 권한 폼·확인·피드백 연결의 import가 기존 공통 부품을 가리키며 유사 복제품이 없다.
+- canonical_id: REQ-180
+  status: data-constraint
+  evidence: DB 시각 계산 — 역할 기록 SQL에 UTC 재변환이 없고 등록·수정·이력의 clock_timestamp() 및 한국 월 판정을 검토한다.
+- canonical_id: REQ-181
+  status: data-constraint
+  evidence: 항목 단위 변경 이력 — 데이터 범위와 민감 보기 두 항목 변경 시 각각의 이전·이후값을 가진 이력 두 줄이 남는다.
+- canonical_id: REQ-182
+  status: non-functional
+  evidence: 실제 코드와 익명 계약 — 새 역할 연산 security=[]와 코드 라우팅·응답을 대조한다. 기존 bearerAuth 정의는 지우지 않는다.
 
 x-change-supersession:
   description: 기존 operation과 기준선 시험은 원형 보존한다. 이번 공통 기능 인수에는 다음 예외가 우선하며 기존 메뉴 조회 자체를 상태 저장 API로 바꾸지 않는다.

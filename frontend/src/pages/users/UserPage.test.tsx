@@ -59,9 +59,10 @@ const response = (data: unknown) => ({
   json: async () => ({ success: true, data }),
 });
 const writes = () =>
-  request.mock.calls.filter(
-    (call: unknown[]) =>
-      ["POST", "PUT"].includes(String((call[1] as RequestInit | undefined)?.method)),
+  request.mock.calls.filter((call: unknown[]) =>
+    ["POST", "PUT"].includes(
+      String((call[1] as RequestInit | undefined)?.method),
+    ),
   );
 const gets = (part: string) =>
   request.mock.calls
@@ -206,13 +207,19 @@ it("행을 누르면 오른쪽 상세 패널에 계정 정보·접근 기록·�
   page();
   fireEvent.click(await screen.findByTestId("list-row-test"));
   const panel = await screen.findByTestId("user-detail");
-  expect(await within(panel).findByText("test@example.invalid")).toBeInTheDocument();
+  expect(
+    await within(panel).findByText("test@example.invalid"),
+  ).toBeInTheDocument();
   expect(within(panel).getByText("임시 비밀번호")).toBeInTheDocument();
-  expect(within(panel).getByText("비밀번호를 5번 틀려 잠겼습니다.")).toBeInTheDocument();
-  expect(within(panel).getByText("이 프로젝트들의 PM으로 표시됩니다.")).toBeInTheDocument();
-  expect(within(panel).getByTestId("user-detail-tab-history")).toHaveTextContent(
-    "변경 이력 (1)",
-  );
+  expect(
+    within(panel).getByText("비밀번호를 5번 틀려 잠겼습니다."),
+  ).toBeInTheDocument();
+  expect(
+    within(panel).getByText("이 프로젝트들의 PM으로 표시됩니다."),
+  ).toBeInTheDocument();
+  expect(
+    within(panel).getByTestId("user-detail-tab-history"),
+  ).toHaveTextContent("변경 이력 (1)");
   fireEvent.click(within(panel).getByTestId("user-detail-tab-history"));
   expect(within(panel).getByText("옛 이름")).toBeInTheDocument();
   fireEvent.click(within(panel).getByTestId("user-detail-tab-logs"));
@@ -241,26 +248,39 @@ it("[등록]은 시안 「사용자 등록」 창을 열고, 빈 칸·형식 오
       "저장하면 이 주소로 임시 비밀번호를 보냅니다. 첫 로그인 때 바꿔야 합니다.",
     ),
   ).toBeInTheDocument();
-  expect(within(dialog).getByTestId("user-headquarters-select")).toBeInTheDocument();
+  expect(
+    within(dialog).getByTestId("user-headquarters-select"),
+  ).toBeInTheDocument();
   expect(within(dialog).getByTestId("user-project-list")).toBeInTheDocument();
   expect(within(dialog).getByText("(지금 PM: 김명희)")).toBeInTheDocument();
   fireEvent.click(within(dialog).getByTestId("user-save"));
-  expect(await within(dialog).findByText("아이디를 입력해 주세요.")).toBeInTheDocument();
+  expect(
+    await within(dialog).findByText("아이디를 입력해 주세요."),
+  ).toBeInTheDocument();
   expect(within(dialog).getByText("이름을 입력해 주세요.")).toBeInTheDocument();
-  expect(within(dialog).getByText("역할을 1개 이상 골라 주세요.")).toBeInTheDocument();
+  expect(
+    within(dialog).getByText("역할을 1개 이상 골라 주세요."),
+  ).toBeInTheDocument();
   expect(within(dialog).getByTestId("user-userId-input")).toHaveFocus();
   fireEvent.change(within(dialog).getByTestId("user-userId-input"), {
     target: { value: "AB" },
   });
   fireEvent.click(within(dialog).getByTestId("user-save"));
   expect(
-    await within(dialog).findByText("아이디는 영문 소문자·숫자 4~20자로 입력해 주세요."),
+    await within(dialog).findByText(
+      "아이디는 영문 소문자·숫자 4~20자로 입력해 주세요.",
+    ),
   ).toBeInTheDocument();
   expect(writes()).toHaveLength(0);
 });
 
 it("등록이 끝나면 시안 문구로 알리고 새 줄을 강조한다", async () => {
-  account = { ...account, userId: "newone", name: "새 사람", email: "new@example.invalid" };
+  account = {
+    ...account,
+    userId: "newone",
+    name: "새 사람",
+    email: "new@example.invalid",
+  };
   page();
   fireEvent.click(screen.getByTestId("user-register-open"));
   const dialog = await screen.findByTestId("user-dialog");
@@ -279,7 +299,11 @@ it("등록이 끝나면 시안 문구로 알리고 새 줄을 강조한다", asy
     "새 사람님을 등록했습니다. new@example.invalid로 임시 비밀번호를 보냈습니다.",
   );
   const body = JSON.parse(String((writes()[0][1] as RequestInit).body));
-  expect(body).toMatchObject({ userId: "newone", roleCds: ["EXEC"], headquarters: false });
+  expect(body).toMatchObject({
+    userId: "newone",
+    roleCds: ["EXEC"],
+    headquarters: false,
+  });
 });
 
 it("[수정]은 「사용자 수정」 창에서 아이디를 잠그고 이름·이메일도 함께 보낸다", async () => {
@@ -289,8 +313,12 @@ it("[수정]은 「사용자 수정」 창에서 아이디를 잠그고 이름·
   fireEvent.click(await within(panel).findByTestId("user-edit"));
   const dialog = await screen.findByTestId("user-dialog");
   expect(within(dialog).getByText("사용자 수정")).toBeInTheDocument();
-  expect(within(dialog).getByTestId("user-userId-input")).toHaveAttribute("readonly");
-  expect(within(dialog).getByText("아이디는 바꿀 수 없습니다.")).toBeInTheDocument();
+  expect(within(dialog).getByTestId("user-userId-input")).toHaveAttribute(
+    "readonly",
+  );
+  expect(
+    within(dialog).getByText("아이디는 바꿀 수 없습니다."),
+  ).toBeInTheDocument();
   expect(within(dialog).queryByText("(지금 PM: 김명희)")).toBeInTheDocument();
   fireEvent.change(within(dialog).getByTestId("user-name-input"), {
     target: { value: "바꾼 이름" },
@@ -324,6 +352,92 @@ it("체크하면 「N건 선택」과 일괄 [사용 중지]가 나오고, 확�
   );
 });
 
+it("PM 공백 합산 확인을 취소하면 중지 POST 없이 선택 계정과 담당 프로젝트를 유지한다", async () => {
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    url.includes("change-impact")
+      ? response({
+          projectCount: 1,
+          projects: account.projects,
+          blockedUsers: [],
+        })
+      : base(url, init),
+  );
+  page();
+  await screen.findByTestId("list-row-test");
+  fireEvent.click(screen.getByTestId("list-select-test"));
+  fireEvent.click(screen.getByTestId("list-bulk-stop"));
+  const confirm = await screen.findByTestId("user-stop-confirm");
+  expect(confirm).toHaveTextContent(
+    "담당 프로젝트 1건의 PM이 비게 됩니다: 합성 프로젝트",
+  );
+  fireEvent.click(within(confirm).getByTestId("confirmation-cancel"));
+  expect(screen.queryByTestId("user-stop-confirm")).not.toBeInTheDocument();
+  expect(writes()).toHaveLength(0);
+  expect(screen.getByTestId("list-select-test")).toBeChecked();
+  expect(account.userStatCd).toBe("LOCK");
+  expect(account.projectIds).toEqual(["project-a"]);
+});
+
+it("등록 창을 다시 열 때 활성 역할을 새로 조회해 중지된 역할을 제외한다", async () => {
+  const base = request.getMockImplementation()!;
+  let stopped = false;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    url.includes("user-options")
+      ? response({
+          ...options,
+          roles: stopped
+            ? options.roles
+            : [
+                ...options.roles,
+                {
+                  roleCd: "R-001",
+                  roleName: "추가 역할",
+                  assignedProjectScope: true,
+                  assignedPartScope: false,
+                },
+              ],
+        })
+      : base(url, init),
+  );
+  page();
+  await screen.findByRole("option", { name: "추가 역할" });
+  stopped = true;
+  fireEvent.click(screen.getByTestId("user-register-open"));
+  const dialog = await screen.findByTestId("user-dialog");
+  expect(within(dialog).queryByText("추가 역할")).not.toBeInTheDocument();
+  expect(within(dialog).getByText("경영진")).toBeInTheDocument();
+  expect(gets("user-options").length).toBeGreaterThan(1);
+  expect(writes()).toHaveLength(0);
+});
+
+it("중지 요청이 실패하면 행과 선택을 임의로 제거하지 않는다", async () => {
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    url.endsWith("/stop") && init?.method === "POST"
+      ? {
+          ok: false,
+          status: 409,
+          json: async () => ({
+            success: false,
+            message: "다시 불러와 주세요.",
+            errors: [],
+          }),
+        }
+      : base(url, init),
+  );
+  page();
+  await screen.findByTestId("list-row-test");
+  fireEvent.click(screen.getByTestId("list-select-test"));
+  fireEvent.click(screen.getByTestId("list-bulk-stop"));
+  const confirm = await screen.findByTestId("user-stop-confirm");
+  fireEvent.click(within(confirm).getByTestId("confirmation-proceed"));
+  expect(await screen.findByText("다시 불러와 주세요.")).toBeInTheDocument();
+  expect(screen.getByTestId("list-row-test")).toBeInTheDocument();
+  expect(screen.getByTestId("list-select-test")).toBeChecked();
+  expect(writes()).toHaveLength(1);
+});
+
 it("서버가 막은 계정만 고르면 확인 창 없이 이유를 알린다", async () => {
   const base = request.getMockImplementation()!;
   request.mockImplementation(async (url: string, init?: RequestInit) =>
@@ -332,7 +446,11 @@ it("서버가 막은 계정만 고르면 확인 창 없이 이유를 알린다",
           projectCount: 0,
           projects: [],
           blockedUsers: [
-            { userId: "test", reason: "영업1 파트장입니다. 영업 파트 탭에서 먼저 파트장을 바꾸세요." },
+            {
+              userId: "test",
+              reason:
+                "영업1 파트장입니다. 영업 파트 탭에서 먼저 파트장을 바꾸세요.",
+            },
           ],
         })
       : base(url, init),
@@ -346,6 +464,27 @@ it("서버가 막은 계정만 고르면 확인 창 없이 이유를 알린다",
   );
   expect(screen.queryByTestId("user-stop-confirm")).not.toBeInTheDocument();
 });
+
+it.each(["USE", "LOCK", "STOP"] as const)(
+  "%s 상세는 상태에 맞는 재개·중지·잠금해제만 표시한다",
+  async (state) => {
+    account = { ...account, userStatCd: state };
+    page();
+    fireEvent.click(await screen.findByTestId("list-row-test"));
+    const panel = await screen.findByTestId("user-detail");
+    await within(panel).findByText("test@example.invalid");
+    expect(within(panel).queryByTestId("user-resume") !== null).toBe(
+      state === "STOP",
+    );
+    expect(within(panel).queryByTestId("user-stop-one") !== null).toBe(
+      state !== "STOP",
+    );
+    expect(within(panel).queryByTestId("user-unlock") !== null).toBe(
+      state === "LOCK",
+    );
+    expect(within(panel).getByTestId("user-password-reset")).toBeEnabled();
+  },
+);
 
 it("시각은 한국 시간으로 보여 준다", () => {
   expect(formatDateTime("2026-10-12T00:02:00Z")).toBe("2026-10-12 09:02");

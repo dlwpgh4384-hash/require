@@ -191,7 +191,11 @@ export function UserDetailPanel({
             account.projects.length ? (
               <>
                 {account.projects.map((project) => (
-                  <span key={project.projectId} className="ls-chip">
+                  <span
+                    key={project.projectId}
+                    className="ls-chip"
+                    data-testid={`user-project-chip-${project.projectId.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                  >
                     {project.projectName}
                   </span>
                 ))}
@@ -228,7 +232,8 @@ export function UserDetailPanel({
               disabled={busy}
               onClick={() =>
                 void run(
-                  (value) => api.putCommonUserUnlock(value.userId, value.modDttm),
+                  (value) =>
+                    api.putCommonUserUnlock(value.userId, value.modDttm),
                   "잠금을 풀었습니다. 틀린 횟수를 0으로 되돌렸습니다.",
                 )
               }
@@ -267,7 +272,10 @@ export function UserDetailPanel({
               <tbody>
                 {logs.items.length ? (
                   logs.items.map((log, index) => (
-                    <tr key={`${log.occurredAt}-${index}`}>
+                    <tr
+                      key={`${log.occurredAt}-${index}`}
+                      data-testid={`user-log-row-${index}`}
+                    >
                       <td>{api.formatDateTime(log.occurredAt)}</td>
                       <td>{log.action}</td>
                       <td>{log.target || "–"}</td>
@@ -313,7 +321,10 @@ export function UserDetailPanel({
           </thead>
           <tbody>
             {changes.map((change, index) => (
-              <tr key={`${change.changedAt}-${index}`}>
+              <tr
+                key={`${change.changedAt}-${index}`}
+                data-testid={`user-change-row-${index}`}
+              >
                 <td>{api.formatDateTime(change.changedAt)}</td>
                 <td>{change.item}</td>
                 <td>{change.before ?? "–"}</td>
@@ -357,6 +368,7 @@ export function UserDetailPanel({
             <button
               type="button"
               className="ls-btn"
+              data-testid="user-detail-retry"
               onClick={() => setAttempt((value) => value + 1)}
             >
               다시 시도

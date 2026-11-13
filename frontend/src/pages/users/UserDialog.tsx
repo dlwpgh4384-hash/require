@@ -211,7 +211,7 @@ export function UserDialog({
     help: string | null,
     extra: { maxLength: number; readOnly?: boolean; inputMode?: "email" },
   ) => (
-    <div className="uf-field">
+    <div className="uf-field" data-testid={`user-field-${key.toLowerCase()}`}>
       <label htmlFor={`${id}-${key}`} className="uf-req">
         {label}
       </label>
@@ -224,7 +224,10 @@ export function UserDialog({
         inputMode={extra.inputMode}
         autoComplete="off"
         aria-invalid={!!errors[key]}
-        aria-describedby={`${help ? `${id}-${key}-help` : ""}${errors[key] ? ` ${id}-${key}-error` : ""}`.trim() || undefined}
+        aria-describedby={
+          `${help ? `${id}-${key}-help` : ""}${errors[key] ? ` ${id}-${key}-error` : ""}`.trim() ||
+          undefined
+        }
         onChange={(event) => setForm({ ...form, [key]: event.target.value })}
       />
       {help && (
@@ -275,7 +278,9 @@ export function UserDialog({
             {field(
               "userId",
               "아이디",
-              editing ? "아이디는 바꿀 수 없습니다." : "영문 소문자·숫자 4~20자, 중복 불가",
+              editing
+                ? "아이디는 바꿀 수 없습니다."
+                : "영문 소문자·숫자 4~20자, 중복 불가",
               { maxLength: 20, readOnly: editing },
             )}
             {field("name", "이름", null, { maxLength: 20 })}

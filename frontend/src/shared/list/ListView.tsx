@@ -61,7 +61,7 @@ export function ListFilter({
   children: ReactNode;
 }) {
   return (
-    <div className="ls-filter">
+    <div className="ls-filter" data-testid={`list-filter-${htmlFor}`}>
       <label htmlFor={htmlFor}>{label}</label>
       {children}
     </div>
@@ -225,7 +225,10 @@ export function ListView<T>(props: ListViewProps<T>) {
                 <div className="ls-pop-h">보일 열</div>
                 <div className="ls-pop-b">
                   {columns.map((column) => (
-                    <label key={column.key}>
+                    <label
+                      key={column.key}
+                      data-testid={`list-column-label-${column.key}`}
+                    >
                       <input
                         type="checkbox"
                         data-testid={`list-column-${column.key}`}
@@ -367,6 +370,7 @@ export function ListView<T>(props: ListViewProps<T>) {
                         <button
                           type="button"
                           className="ls-btn"
+                          data-testid="list-empty-reset"
                           onClick={props.onResetFilters}
                         >
                           조건 초기화
@@ -397,6 +401,7 @@ export function ListView<T>(props: ListViewProps<T>) {
                       {selectable && (
                         <td
                           className="ls-chk"
+                          data-testid={`list-row-check-cell-${key}`}
                           onClick={(event) => event.stopPropagation()}
                         >
                           <input
@@ -418,6 +423,7 @@ export function ListView<T>(props: ListViewProps<T>) {
                         <td
                           key={column.key}
                           className={`ls-${column.align ?? "left"}`}
+                          data-testid={`list-cell-${key}-${column.key}`}
                         >
                           {column.render
                             ? column.render(row)
@@ -493,6 +499,7 @@ export function ListPager({
             key={value}
             type="button"
             className={`ls-pg${value === page ? " ls-on" : ""}`}
+            data-testid={`list-page-${value}`}
             aria-current={value === page ? "page" : undefined}
             onClick={() => onPage(value)}
           >
@@ -511,7 +518,7 @@ export function ListPager({
           onChange={(event) => onPageSize(Number(event.target.value))}
         >
           {LIST_PAGE_SIZES.map((size) => (
-            <option key={size} value={size}>
+            <option key={size} value={size} data-testid={`list-size-${size}`}>
               {size}건씩
             </option>
           ))}

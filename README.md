@@ -31,7 +31,7 @@ java -jar /app/application.jar --prepare-schema를 먼저 실행한다.
 연결 정보는 코드에 하드코딩하지 않는다.
 
 D5에 따라 자동 Flyway는 끄고 기존 SqlSessionFactory의 한 트랜잭션에서
-db/migration/V1__navigation_schema.sql과 V2__navigation_menu_seed.sql을 실행한다.
+db/migration/V1~V6 SQL을 차례로 실행한다.
 버전 자원은 jar에 포함되며 호스트 migration 디렉터리를 마운트하지 않는다.
 준비 명령과 자동 Flyway를 동시에 켜지 않는다. 준비 중 PostgreSQL advisory lock을
 얻고 기존 9개 대상의 컬럼·형식·precision·null·default·PK/CHECK를 모두 검사한다.

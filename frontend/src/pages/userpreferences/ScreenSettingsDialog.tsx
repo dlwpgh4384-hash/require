@@ -200,6 +200,7 @@ function SettingsForm({
         />
       ) : (
         <form
+          data-testid="screen-settings-form"
           noValidate
           onSubmit={(event) => {
             event.preventDefault();

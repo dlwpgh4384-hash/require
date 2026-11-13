@@ -49,6 +49,11 @@ export function UserPage() {
   const workspace = useUserWorkspace();
   const { registering, setRegistering, includeStopped } = workspace;
   const { state: options, reload: reloadOptions } = useCommonUserOptions();
+  const optionsReload = useRef(reloadOptions);
+  optionsReload.current = reloadOptions;
+  useEffect(() => {
+    if (registering) optionsReload.current();
+  }, [registering]);
   const presentation = useListPresentation();
   const cols = useListColumns(SCREEN, columns);
   const [filters, setFilters] = useState(emptyFilters);
@@ -129,7 +134,8 @@ export function UserPage() {
     setFilters(emptyFilters);
     search(emptyFilters);
   };
-  const overlay = registering || !!detailId || !!editing || !!stopTarget || !!resumeTarget;
+  const overlay =
+    registering || !!detailId || !!editing || !!stopTarget || !!resumeTarget;
   usePreferenceBusinessShortcuts(
     {
       onSearch: () => {
@@ -215,7 +221,8 @@ export function UserPage() {
           .map(({ userId, modDttm }) => ({ userId, modDttm })),
         stopTarget.impact.projects.map((project) => project.projectId),
       );
-      const skipped = stopTarget.impact.blockedUsers.length + value.unprocessedCount;
+      const skipped =
+        stopTarget.impact.blockedUsers.length + value.unprocessedCount;
       const reasons = [
         ...stopTarget.impact.blockedUsers,
         ...value.unprocessed,
@@ -307,7 +314,11 @@ export function UserPage() {
             <option value="">전체</option>
             {ready &&
               options.data.roles.map((role) => (
-                <option key={role.roleCd} value={role.roleCd}>
+                <option
+                  key={role.roleCd}
+                  value={role.roleCd}
+                  data-testid={`user-role-filter-option-${role.roleCd.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                >
                   {role.roleName}
                 </option>
               ))}
@@ -327,7 +338,11 @@ export function UserPage() {
             <option value="">전체</option>
             {ready &&
               options.data.userStates.map((state) => (
-                <option key={state.code} value={state.code}>
+                <option
+                  key={state.code}
+                  value={state.code}
+                  data-testid={`user-state-filter-option-${state.code.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                >
                   {state.name}
                 </option>
               ))}

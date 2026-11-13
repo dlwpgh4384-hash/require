@@ -151,18 +151,25 @@ function respond(body: ShellMenuResponse) {
               meta: {},
               data: { roles: [], projects: [], userStates: [] },
             }
-          : body,
+          : url === "/api/common/roles"
+            ? { success: true, meta: {}, data: { items: [] } }
+            : body,
   }));
   vi.stubGlobal("fetch", request);
   return request;
 }
 async function expectScreenContent(id: string) {
   if (id === "UI-23") {
-    expect(await screen.findByText("조건에 맞는 결과가 없습니다.")).toBeVisible();
+    expect(
+      await screen.findByText("조건에 맞는 결과가 없습니다."),
+    ).toBeVisible();
     expect(screen.getByTestId("user-page")).toBeVisible();
     expect(screen.getByTestId("user-keyword-filter")).toBeVisible();
     expect(screen.getByTestId("list-search")).toBeVisible();
     expect(screen.getByTestId("user-register-open")).toBeVisible();
+  } else if (id === "UI-24") {
+    expect(await screen.findByText("활성 역할이 없습니다.")).toBeVisible();
+    expect(screen.getByTestId("role-page")).toBeVisible();
   } else {
     expect(
       await screen.findByRole("region", { name: `${id} 본문` }),

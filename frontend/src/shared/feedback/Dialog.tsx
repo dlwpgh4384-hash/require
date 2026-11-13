@@ -59,7 +59,7 @@ export function Dialog({
     };
   }, []);
   return (
-    <div className="app-scrim">
+    <div className="app-scrim" data-testid={`${testId}-scrim`}>
       <div
         ref={panel}
         role={role}
@@ -89,8 +89,12 @@ function ConfirmButtons({
 }) {
   const called = useRef(false);
   return (
-    <div className="app-actions">
-      <button type="button" data-testid="confirmation-cancel" onClick={onCancel}>
+    <div className="app-actions" data-testid="confirmation-actions">
+      <button
+        type="button"
+        data-testid="confirmation-cancel"
+        onClick={onCancel}
+      >
         취소
       </button>
       <button
@@ -164,7 +168,12 @@ export function InlineConfirmation({
     section.current?.querySelector<HTMLButtonElement>("button")?.focus();
   }, []);
   return (
-    <section ref={section} role="alertdialog" aria-label={title} data-testid={testId}>
+    <section
+      ref={section}
+      role="alertdialog"
+      aria-label={title}
+      data-testid={testId}
+    >
       <h3>{title}</h3>
       <p>{description}</p>
       <ConfirmButtons

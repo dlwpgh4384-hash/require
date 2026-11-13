@@ -12,13 +12,24 @@ import {
 } from "../userpreferences";
 import { PlaceholderScreen } from "./PlaceholderScreen";
 import { UserPage } from "../users/UserPage";
+import { RolePage } from "../roles/RolePage";
+import {
+  RoleTitleActions,
+  RoleWorkspaceProvider,
+} from "../roles/RoleWorkspace";
 import {
   UserRegistrationButton,
   UserWorkspaceProvider,
 } from "../users/UserWorkspace";
 
 const renderScreen = (scrnId: string) =>
-  scrnId === "UI-23" ? <UserPage /> : <PlaceholderScreen scrnId={scrnId} />;
+  scrnId === "UI-23" ? (
+    <UserPage />
+  ) : scrnId === "UI-24" ? (
+    <RolePage />
+  ) : (
+    <PlaceholderScreen scrnId={scrnId} />
+  );
 
 /** 공통 화면 틀(00) + 공통 기능(00-1): 탭, 즐겨찾기·최근, 도구줄, 메뉴 접기 저장. */
 function PreferenceNavigation() {
@@ -46,6 +57,8 @@ function PreferenceNavigation() {
           screenActions:
             context.screenId === "UI-23" ? (
               <UserRegistrationButton />
+            ) : context.screenId === "UI-24" ? (
+              <RoleTitleActions />
             ) : undefined,
           quickAccess: (
             <PersonalScreenLists
@@ -85,20 +98,24 @@ export function CommonNavigationPage() {
   const preferences = useOptionalUserPreferences();
   return (
     <UserWorkspaceProvider>
-      {preferences ? (
-        <PreferenceNavigation />
-      ) : (
-        <NavigationRoot
-          tabs
-          renderScreen={renderScreen}
-          extensions={(context) => ({
-            screenActions:
-              context.screenId === "UI-23" ? (
-                <UserRegistrationButton />
-              ) : undefined,
-          })}
-        />
-      )}
+      <RoleWorkspaceProvider>
+        {preferences ? (
+          <PreferenceNavigation />
+        ) : (
+          <NavigationRoot
+            tabs
+            renderScreen={renderScreen}
+            extensions={(context) => ({
+              screenActions:
+                context.screenId === "UI-23" ? (
+                  <UserRegistrationButton />
+                ) : context.screenId === "UI-24" ? (
+                  <RoleTitleActions />
+                ) : undefined,
+            })}
+          />
+        )}
+      </RoleWorkspaceProvider>
     </UserWorkspaceProvider>
   );
 }

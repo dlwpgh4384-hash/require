@@ -95,8 +95,14 @@
   padding: 0 10px;
   background: var(--surface);
   color: var(--text);
-  font: 400 14px inherit;
+  /* 「font: 400 14px inherit」은 틀린 CSS라 무시돼 13.3px로 보였다. 시안: 14px·400·화면 글꼴. */
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
   min-width: 0;
+}
+select.ls-in {
+  padding: 0 4px 0 10px;
 }
 .ls-in-sm {
   height: 28px;

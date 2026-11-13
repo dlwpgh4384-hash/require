@@ -97,6 +97,7 @@ export function RoleCopyDialog({
       </label>
       <input
         id="role-copy-name"
+        className="ls-in"
         data-testid="role-copy-name"
         autoComplete="off"
         placeholder="예: 프로젝트 지원"
@@ -143,6 +144,7 @@ export function RoleCopyDialog({
               </label>
               <select
                 id="role-copy-scope"
+                className="ls-in"
                 data-testid="role-copy-scope"
                 value={scope}
                 disabled={busy}
@@ -171,6 +173,7 @@ export function RoleCopyDialog({
               </label>
               <select
                 id="role-copy-source"
+                className="ls-in"
                 data-testid="role-copy-source"
                 value={sourceId}
                 disabled={busy}

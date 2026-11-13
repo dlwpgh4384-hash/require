@@ -9,6 +9,7 @@ import { RoleHistoryDialog } from "./RoleHistoryDialog";
 import { RoleImpactDialog } from "./RoleImpactDialog";
 import { useRoleWorkspace } from "./RoleWorkspace";
 import * as api from "./roles";
+import "../../shared/list/list.css";
 import "./roles.css";
 
 const message = (error: unknown) =>
@@ -298,6 +299,7 @@ export function RolePage() {
               <div>
                 <select
                   id="role-data-scope"
+                  className="ls-in"
                   data-testid="role-data-scope"
                   value={draft.dataScopeCd}
                   aria-invalid={!!errors.dataScopeCd}

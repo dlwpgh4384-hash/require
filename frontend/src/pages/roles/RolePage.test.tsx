@@ -261,7 +261,9 @@ afterEach(() => {
 });
 const loaded = async () => {
   await screen.findByTestId("role-settings");
-  await waitFor(() => expect(screen.getByTestId("role-copy-open")).toBeEnabled());
+  await waitFor(() =>
+    expect(screen.getByTestId("role-copy-open")).toBeEnabled(),
+  );
 };
 const select = async (id: string) => {
   fireEvent.click(screen.getByTestId(`role-tab-${id.toLowerCase()}`));

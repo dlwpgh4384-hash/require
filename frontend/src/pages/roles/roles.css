@@ -9,23 +9,29 @@
   align-items: center;
   gap: 6px;
 }
+/* 역할 탭: 시안 .tabs/.tb — 높이 40px, 좌우 10px, 글씨 500(선택 600), 아래 2px 줄. */
 .roles-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  margin-bottom: -8px;
   border-bottom: 1px solid var(--divider);
 }
 .roles-tabs button {
+  height: 40px;
+  min-height: 0;
+  padding: 0 10px;
   border: 0;
+  border-bottom: 2px solid transparent;
   border-radius: 0;
   background: transparent;
-  padding: 10px 16px;
   color: var(--text-sub);
-  min-height: 0;
+  font-size: 14px;
+  font-weight: 500;
 }
 .roles-tabs button[aria-selected="true"] {
   color: var(--primary);
-  box-shadow: inset 0 -2px var(--primary);
+  border-bottom-color: var(--primary);
   font-weight: 600;
 }
 .roles-settings {
@@ -54,7 +60,6 @@
 }
 .roles-field select {
   width: 200px;
-  height: 36px;
 }
 .roles-sensitive {
   display: flex;
@@ -161,9 +166,8 @@
   content: " *";
   color: var(--danger, #dc2626);
 }
-.role-copy-form input,
-.role-copy-form select {
-  height: 36px;
+.role-copy-form .ls-in {
+  width: 100%;
 }
 [data-testid="role-copy-dialog"] {
   width: min(480px, 100%);

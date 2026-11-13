@@ -72,7 +72,7 @@ public final class OperatingStandardsRules {
         var result = new ArrayList<Change>();
         var identities = new HashSet<String>();
         for (var node : items) {
-            object(node, Set.of("standardCode", "value", "effectiveMonth", "action"));
+            object(node, Set.of("standardCode", "value", "effectiveMonth", "action", "modifiedAt"));
             String code = text(node, "standardCode");
             if (!editable(code)) throw invalid("standardCode");
             String action = text(node, "action");
@@ -86,7 +86,9 @@ public final class OperatingStandardsRules {
             if (!identities.add(code + ":" + month)) throw invalid("standardCode");
             if (node.has("value") && !node.get("value").isTextual()) throw invalid("value");
             String value = "delete".equals(action) ? null : text(node, "value");
-            var change = new Change(code, value, month, action);
+            String modifiedAt = node.has("modifiedAt") && !node.get("modifiedAt").isNull()
+                ? text(node, "modifiedAt") : null;
+            var change = new Change(code, value, month, action, modifiedAt);
             if (!"delete".equals(action)) number(change);
             result.add(change);
         }

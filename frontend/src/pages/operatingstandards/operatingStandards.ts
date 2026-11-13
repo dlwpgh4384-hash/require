@@ -8,12 +8,15 @@ export interface OperatingStandard {
   immediate: boolean;
   /** 이력 창 「처리자」. 처음 값은 「처음 설정」. */
   changedBy?: string | null;
+  /** 이 기준값 코드의 마지막 변경 시각(UTC). 저장할 때 돌려보낸다(FR-0106 동시 수정). */
+  modifiedAt?: string | null;
 }
 export interface OperatingStandardChange {
   standardCode: string;
   value?: string;
   effectiveMonth: string | null;
   action: "add" | "update" | "delete";
+  modifiedAt?: string | null;
 }
 export interface OperatingStandardsResult {
   items: OperatingStandard[];
@@ -35,7 +38,8 @@ async function operatingRequest(
   const body = await response.json();
   if (!response.ok || body.success !== true)
     throw new OperatingStandardsRequestError(
-      response.status === 400 && typeof body.message === "string"
+      (response.status === 400 || response.status === 409) &&
+        typeof body.message === "string"
         ? body.message
         : "운영 기준값을 처리하지 못했습니다. 다시 시도해 주세요.",
       response.status === 400 && Array.isArray(body.errors) ? body.errors : [],

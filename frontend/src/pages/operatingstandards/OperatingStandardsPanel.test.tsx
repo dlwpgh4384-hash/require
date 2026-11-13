@@ -467,3 +467,28 @@ it("history window is view-only like the mockup", async () => {
   expect(screen.getByLabelText("부가세율")).toHaveValue("12");
   expect(writes()).toHaveLength(0);
 });
+it("Ctrl+S opens the save dialog on this tab (FR-0104)", async () => {
+  await mount();
+  change("vat-rt", "11");
+  fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+  expect(screen.getByTestId("operating-save-dialog")).toBeInTheDocument();
+});
+it("value boxes drop letters at once (FR-0106)", async () => {
+  await mount();
+  change("vat-rt", "1a2");
+  expect(screen.getByLabelText("부가세율")).toHaveValue("12");
+});
+it("save sends back the read modifiedAt so a later change is refused (FR-0106)", async () => {
+  rows = rows.map((item) =>
+    item.standardCode === "VAT_RT"
+      ? { ...item, modifiedAt: "2026-11-14T00:00:00.123456Z" }
+      : item,
+  );
+  await mount();
+  change("vat-rt", "11");
+  openSave();
+  await confirm();
+  expect(
+    JSON.parse(String((writes()[0][1] as RequestInit).body)).items[0].modifiedAt,
+  ).toBe("2026-11-14T00:00:00.123456Z");
+});

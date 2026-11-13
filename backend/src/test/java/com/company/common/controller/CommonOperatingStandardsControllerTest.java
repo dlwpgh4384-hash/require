@@ -58,12 +58,12 @@ class CommonOperatingStandardsControllerTest {
         verify(mapper, never()).deleteStandard(any());
         assertThat(data.histories).isEmpty();
     }
-    @Test void anonymousGetReturnsExactEightFieldsIncludingAllMockupStandards() throws Exception {
+    @Test void anonymousGetReturnsExactNineFieldsIncludingAllMockupStandards() throws Exception {
         var response = mvc.perform(get("/api/common/operating-standards")).andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.items[0].effectiveMonth").value(org.hamcrest.Matchers.nullValue()))
             .andExpect(jsonPath("$.data.items[0].value").value("2026-01"))
-            .andExpect(jsonPath("$.data.items[0].length()").value(8))
+            .andExpect(jsonPath("$.data.items[0].length()").value(9))
             .andExpect(jsonPath("$.data", org.hamcrest.Matchers.hasKey("closedMonth"))).andReturn();
         // 시안(최종) 운영 기준값 표: 예산 소진 주의도 보이고 고칠 수 있다(2026-11-14).
         assertThat(response.getResponse().getContentAsString()).contains("BDGT_WARN_RT");

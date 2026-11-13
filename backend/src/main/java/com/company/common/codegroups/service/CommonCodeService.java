@@ -88,6 +88,17 @@ public class CommonCodeService {
             if (!seen.add(code)) throw invalid("code");
             var old = mapper.selectCode(id, code);
             if (old == null || !"N".equals(old.delYn)) throw new CodeFailure("code", "등록된 코드를 선택해 주세요.");
+            // FR-0106 동시 수정: 읽은 시각이 지금과 다르면 덮어쓰지 않는다.
+            var read = input.get("modifiedAt");
+            if (read != null && !read.isNull()) {
+                java.time.Instant readAt;
+                try {
+                    readAt = java.time.Instant.parse(read.asText());
+                } catch (java.time.format.DateTimeParseException failure) {
+                    throw invalid("modifiedAt");
+                }
+                if (!readAt.equals(old.changedAt)) throw CodeFailure.conflict();
+            }
             var next = parse(id, input, old, old.sortOrd, "Y".equals(group.valCodeYn));
             if ("Y".equals(group.sysCodeYn)) {
                 var changed = fields(next);

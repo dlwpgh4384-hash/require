@@ -2084,6 +2084,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 읽은 뒤 다른 사람이 먼저 바꿈(modifiedAt 다름). 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」 기존 값은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/common/code-groups/{groupId}/codes/{code}/delete:
     post:
       operationId: postCommonCodeDelete
@@ -2234,6 +2240,12 @@ paths:
                       $ref: '#/components/schemas/CommonOperatingStandardList'
         '400':
           description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 읽은 뒤 다른 사람이 먼저 바꿈(modifiedAt 다름). 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」 기존 값은 보존한다.
           content:
             application/json:
               schema:
@@ -2511,6 +2523,10 @@ components:
         job:
           type: string
           description: 이력서 직무 단어의 직무
+        modifiedAt:
+          type: string
+          format: date-time
+          description: 마지막으로 바뀐 시각(UTC). 저장할 때 그대로 보내면 그 뒤 다른 사람이 바꿨을 때 409.
       additionalProperties: false
     CommonCodeInput:
       type: object
@@ -2603,6 +2619,7 @@ components:
       - closed
       - immediate
       - changedBy
+      - modifiedAt
       properties:
         standardCode:
           type: string
@@ -2625,6 +2642,11 @@ components:
           type: string
           nullable: true
           description: 이력 창 「처리자」. 처음 값은 「처음 설정」.
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 이 기준값 코드의 모든 줄 중 마지막 변경 시각(UTC). 저장할 때 Change.modifiedAt으로 돌려보낸다.
       additionalProperties: false
     CommonOperatingStandardChange:
       type: object
@@ -2647,6 +2669,11 @@ components:
           - add
           - update
           - delete
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 화면이 읽은 그 기준값의 modifiedAt. 다르면 409(공통 기능 FR-0106 동시 수정).
       additionalProperties: false
     CommonOperatingStandardsInput:
       type: object

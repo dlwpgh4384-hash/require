@@ -7,6 +7,8 @@ export interface CodeGroup {
 }
 export interface CodeItem {
   code: string;
+  /** 마지막 변경 시각(UTC). 저장할 때 그대로 보내 동시 수정을 막는다(FR-0106). */
+  modifiedAt?: string;
   codeName: string;
   sortOrd: number;
   useYn: "Y" | "N";
@@ -37,7 +39,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok || body.success !== true) {
     throw new CodeRequestError(
       response.status,
-      response.status === 400 && typeof body.message === "string"
+      (response.status === 400 || response.status === 409) &&
+        typeof body.message === "string"
         ? body.message
         : "공통코드를 처리하지 못했습니다. 다시 시도해 주세요.",
       response.status === 400 && Array.isArray(body.errors) ? body.errors : [],
@@ -82,6 +85,8 @@ export type ExtraField = {
   key: keyof CodeItem;
   label: string;
   numeric?: boolean;
+  /** 금액(원): 콤마를 넣어 보이고 숫자만 받는다(SFR-006-02). */
+  money?: boolean;
   /** 시안 UI-27 표 아래 안내·추가 창 도움말 문구. */
   help: string;
 };
@@ -90,7 +95,7 @@ export function codeExtraFields(groupId: string): ExtraField[] {
     case "JOB":
       return [
         { key: "relatedJobs", label: "관련 직무", help: "직무 코드, 쉼표로 구분 (AI 추천 식-70·다음 자리 식-80)" },
-        { key: "estimateUnitPrice", label: "견적 기준 단가(원)", numeric: true, help: "월 단가, 견적·다음 자리 추천에 씀" },
+        { key: "estimateUnitPrice", label: "견적 기준 단가(원)", numeric: true, money: true, help: "월 단가, 견적·다음 자리 추천에 씀" },
       ];
     case "SKILL":
       return [{ key: "requiredJobs", label: "필요한 직무", help: "직무 코드, 쉼표로 구분 (AI 추천 스킬 점수 식-70)" }];

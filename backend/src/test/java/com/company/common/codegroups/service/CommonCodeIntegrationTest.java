@@ -171,6 +171,20 @@ class CommonCodeIntegrationTest {
         assertThat(count("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_key='OWNED:ONE' AND chg_item_nm='CODE_NM' AND bfr_val='시험 이름' AND aft_val='변경 이름' AND reg_user_id='admin' AND reg_dttm IS NOT NULL")).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_key='OWNED:ONE' AND chg_item_nm='USE_YN' AND bfr_val='Y' AND aft_val='N'")).isEqualTo(1);
     }
+    @Test void staleModifiedAtIsRejectedWith409AndKeepsTheFirstSave() throws Exception {
+        group(); code("OWNED", "ONE");
+        String read = new com.fasterxml.jackson.databind.ObjectMapper().readTree(
+            mvc.perform(get("/api/common/code-groups/OWNED/codes")).andReturn().getResponse().getContentAsString())
+            .at("/data/items/0/modifiedAt").asText();
+        assertThat(read).isNotBlank();
+        String body = "{\"items\":[{\"code\":\"ONE\",\"codeName\":\"%s\",\"sortOrd\":1,\"useYn\":\"Y\",\"modifiedAt\":\"" + read + "\"}]}";
+        mvc.perform(put("/api/common/code-groups/OWNED/codes").contentType("application/json")
+            .content(body.formatted("먼저 저장"))).andExpect(status().isOk());
+        mvc.perform(put("/api/common/code-groups/OWNED/codes").contentType("application/json")
+            .content(body.formatted("나중 저장"))).andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요."));
+        assertThat(mapper.selectCode("OWNED", "ONE").codeName).isEqualTo("먼저 저장");
+    }
     @Test void historyInsertionFailureRollsBackDataAndEarlierAudit() throws Exception {
         group(); code("OWNED", "ONE"); code("OWNED", "TWO");
         long before = count("SELECT count(*) FROM TB_SY_CHG_HIST");

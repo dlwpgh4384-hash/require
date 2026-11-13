@@ -103,7 +103,7 @@ class OperatingStandardsPersistenceTest {
     }
     private Input input(Change... changes) { return new Input(List.of(changes)); }
     private Change change(String code, String month, String action, String value) {
-        return new Change(code, value, month, action);
+        return new Change(code, value, month, action, null);
     }
     private void execute(String sql) throws Exception {
         try (var statement = database.createStatement()) { statement.execute(sql); }
@@ -150,6 +150,18 @@ class OperatingStandardsPersistenceTest {
         assertThat(calculations.resolve(resolve("2027-01", null)).value()).isEqualByComparingTo("10");
         assertThat(text("SELECT count(*) FROM tb_sy_chg_hist WHERE trgt_key='VAT_RT:202701' AND chg_type_cd='DEL'"))
             .isEqualTo("1");
+    }
+    @Test void staleModifiedAtIsRejectedWith409AndKeepsTheFirstSave() throws Exception {
+        String read = service.getCommonOperatingStandards().items().stream()
+            .filter(row -> row.standardCode().equals("VAT_RT")).findFirst().orElseThrow().modifiedAt();
+        assertThat(read).isNotBlank();
+        service.putCommonOperatingStandards(input(new Change("VAT_RT", "11", "2027-01", "add", read)));
+        assertThatThrownBy(() -> service.putCommonOperatingStandards(
+            input(new Change("VAT_RT", "12", "2027-01", "update", read))))
+            .isInstanceOfSatisfying(com.company.common.service.CodeFailure.class,
+                failure -> assertThat(failure.getStatus()).isEqualTo(409));
+        assertThat(text("SELECT std_val::text FROM tb_sy_oper_std WHERE std_cd='VAT_RT' AND aply_bgn_ym='202701'"))
+            .startsWith("11");
     }
     @Test void auditFailureRollsBackEveryMutationAndEarlierHistory() throws Exception {
         execute("ALTER TABLE tb_sy_chg_hist ADD CONSTRAINT owned_history_check CHECK (trgt_key <> 'VAT_RT:202701')");

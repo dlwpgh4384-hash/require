@@ -585,3 +585,15 @@
   width: 120px;
   text-align: right;
 }
+
+/* 좁게 보기(화면 설정 DENSE): 표 줄 높이 32 */
+.code-page.code-dense .code-table-wrap td,
+.code-page.code-dense .code-table-wrap th,
+.code-page.code-dense .code-maps-table td,
+.code-page.code-dense .code-maps-table th,
+.code-page.code-dense .operating-standards-table td,
+.code-page.code-dense .operating-standards-table th,
+.code-page.code-dense .code-history-panel .ls-t td,
+.code-page.code-dense .code-history-panel .ls-t th {
+  height: 32px;
+}

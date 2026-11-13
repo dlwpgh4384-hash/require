@@ -40,7 +40,7 @@ public class CommonOperatingStandardsService {
         var rows = mapper.selectStandards();
         if (rows.isEmpty()) return new Result(rows.stream().map(row -> new Item(row.standardCode,
             row.standardName, row.value.toPlainString(), row.unit, publicMonth(row.month), false, false,
-            row.changedBy)).toList(), lastClosed(periods.selectClosedMonths()));
+            row.changedBy, instant(row.changedAt))).toList(), lastClosed(periods.selectClosedMonths()));
         var currentMonth = mapper.selectCurrentMonth();
         var state = index(rows);
         String base = baseMonth(state, currentMonth);
@@ -53,9 +53,21 @@ public class CommonOperatingStandardsService {
             items.add(new Item(row.standardCode, row.standardName,
                 "CASH_BASE_YM".equals(row.standardCode) ? publicMonth(cashMonth(row.value)) : row.value.toPlainString(),
                 row.unit, cash ? null : publicMonth(row.month),
-                isClosed(cash ? base : row.month, base, closed), cash, row.changedBy));
+                isClosed(cash ? base : row.month, base, closed), cash, row.changedBy,
+                latest(state.get(row.standardCode))));
         }
         return new Result(items, lastClosed(closed));
+    }
+
+    private static String instant(java.time.Instant value) {
+        return value == null ? null : value.toString();
+    }
+
+    /** 한 기준값 코드의 모든 줄 중 마지막 변경 시각. 화면은 이 값을 읽어 저장할 때 돌려보낸다. */
+    private static String latest(Map<String, OperatingStandardRow> history) {
+        if (history == null) return null;
+        return history.values().stream().map(row -> row.changedAt).filter(Objects::nonNull)
+            .max(java.time.Instant::compareTo).map(java.time.Instant::toString).orElse(null);
     }
 
     private String lastClosed(java.util.Collection<String> closed) {
@@ -81,6 +93,10 @@ public class CommonOperatingStandardsService {
         for (var change : input.items()) {
             if (change == null || change.standardCode() == null || !editable(change.standardCode()))
                 throw invalid("standardCode");
+            // FR-0106 동시 수정: 읽은 뒤 이 기준값이 바뀌었으면 덮어쓰지 않는다.
+            if (change.modifiedAt() != null
+                && !change.modifiedAt().equals(latest(state.get(change.standardCode()))))
+                throw CodeFailure.conflict();
             if (!Set.of("add", "update", "delete").contains(Objects.toString(change.action(), "")))
                 throw invalid("action");
             var history = state.get(change.standardCode());

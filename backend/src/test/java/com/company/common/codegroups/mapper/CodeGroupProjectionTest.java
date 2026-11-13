@@ -33,8 +33,10 @@ class CodeGroupProjectionTest {
         labels.put("code_val",nullable?null:new BigDecimal("12345678901.1234"));
         labels.put("unit_nm",nullable?null:"원"); labels.put("add_val1",nullable?null:"ONE,TWO");
         labels.put("add_val2",nullable?null:"1234.1250"); labels.put("add_val3",nullable?null:"보존");
+        labels.put("changed_at",nullable?null:java.time.Instant.parse("2026-11-14T00:00:00.123456Z"));
         String sql=statement.getBoundSql("JOB").getSql().replaceAll("\\s+"," ").trim();
-        assertThat(sql.substring(7,sql.indexOf(" FROM ")).split(",\\s*"))
+        // 마지막 변경 시각은 COALESCE(mod_dttm, reg_dttm) AS changed_at으로 읽는다(동시 수정 검사).
+        assertThat(sql.substring(7,sql.indexOf(" FROM ")).replace("COALESCE(mod_dttm, reg_dttm) AS changed_at","changed_at").split(",\\s*"))
             .containsExactlyElementsOf(labels.keySet());
         assertThat(mapping.getAutoMapping()).isFalse();
         assertThat(mapping.getType()).isEqualTo(CodeRows.Code.class);
@@ -52,6 +54,7 @@ class CodeGroupProjectionTest {
         assertThat(row.value().relatedJobs).isEqualTo(labels.get("add_val1"));
         assertThat(row.value().estimateUnitPrice).isEqualTo(nullable?null:new BigDecimal("1234.1250"));
         assertThat(row.value().codeVal).isNull();
+        assertThat(row.value().modifiedAt).isEqualTo(nullable?null:"2026-11-14T00:00:00.123456Z");
     }
     @Test void groupProjectionUsesExplicitCountAndFlags() throws Exception {
         var config=configuration(); var mapping=config.getMappedStatement(CodeGroupMapper.class.getName()+".selectGroups").getResultMaps().get(0);

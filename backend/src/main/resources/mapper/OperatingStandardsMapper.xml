@@ -11,13 +11,15 @@
     <result column="unit_nm" property="unit" javaType="java.lang.String"/>
     <result column="std_desc" property="description" javaType="java.lang.String"/>
     <result column="changed_by" property="changedBy" javaType="java.lang.String"/>
+    <result column="changed_at" property="changedAt" javaType="java.time.Instant"/>
   </resultMap>
   <select id="selectStandards" resultMap="standard">
-    SELECT std_cd, aply_bgn_ym, std_nm, std_val, unit_nm, std_desc, changed_by
+    SELECT std_cd, aply_bgn_ym, std_nm, std_val, unit_nm, std_desc, changed_by, changed_at
     FROM (
       SELECT s.std_cd, s.aply_bgn_ym, s.std_nm, s.std_val, s.unit_nm, s.std_desc,
         CASE WHEN s.mod_user_id IS NULL AND s.reg_user_id = 'SYSTEM' THEN '처음 설정'
-             ELSE COALESCE(u.user_nm, s.mod_user_id, s.reg_user_id) END AS changed_by
+             ELSE COALESCE(u.user_nm, s.mod_user_id, s.reg_user_id) END AS changed_by,
+        COALESCE(s.mod_dttm, s.reg_dttm) AS changed_at
       FROM TB_SY_OPER_STD s
       LEFT JOIN TB_SY_USER u ON u.user_id = COALESCE(s.mod_user_id, s.reg_user_id)
     ) v
@@ -37,7 +39,8 @@
   </insert>
   <update id="updateStandard">
     UPDATE TB_SY_OPER_STD
-    SET std_val=#{value}, mod_user_id='admin', mod_dttm=clock_timestamp()
+    SET std_val=#{value}, mod_user_id='admin',
+      mod_dttm=GREATEST(clock_timestamp(), COALESCE(mod_dttm, reg_dttm) + INTERVAL '1 microsecond')
     WHERE std_cd=#{standardCode} AND aply_bgn_ym=#{month}
   </update>
   <delete id="deleteStandard">

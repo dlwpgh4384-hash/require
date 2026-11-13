@@ -10,4 +10,5 @@ public class OperatingStandardRow {
     public String unit;
     public String description;
     public String changedBy;
+    public java.time.Instant changedAt;
 }

@@ -21,13 +21,15 @@
     <result column="add_val1" property="addVal1" javaType="java.lang.String"/>
     <result column="add_val2" property="addVal2" javaType="java.lang.String"/>
     <result column="add_val3" property="addVal3" javaType="java.lang.String"/>
+    <result column="changed_at" property="changedAt" javaType="java.time.Instant"/>
   </resultMap>
   <select id="selectGroups" resultMap="group">
     SELECT g.code_grp_id, g.code_grp_nm, g.sys_code_yn, g.val_code_yn, g.sort_ord,
       (SELECT count(*) FROM TB_SY_CODE c WHERE c.code_grp_id=g.code_grp_id AND c.del_yn='N') AS code_count
     FROM TB_SY_CODE_GRP g ORDER BY g.sort_ord, g.code_grp_id
   </select>
-  <sql id="columns">code_grp_id, code, code_nm, sort_ord, use_yn, del_yn, code_val, unit_nm, add_val1, add_val2, add_val3</sql>
+  <sql id="columns">code_grp_id, code, code_nm, sort_ord, use_yn, del_yn, code_val, unit_nm, add_val1, add_val2, add_val3,
+    COALESCE(mod_dttm, reg_dttm) AS changed_at</sql>
   <select id="selectCodes" resultMap="code">
     SELECT <include refid="columns"/> FROM TB_SY_CODE
     WHERE code_grp_id=#{groupId} AND del_yn='N' ORDER BY sort_ord, code
@@ -56,7 +58,8 @@
     UPDATE TB_SY_CODE SET code_nm=#{codeName},sort_ord=#{sortOrd},use_yn=#{useYn},
       code_val=#{codeVal,jdbcType=NUMERIC},unit_nm=#{unitNm,jdbcType=VARCHAR},
       add_val1=#{addVal1,jdbcType=VARCHAR},add_val2=#{addVal2,jdbcType=VARCHAR},
-      add_val3=#{addVal3,jdbcType=VARCHAR},mod_user_id='admin',mod_dttm=clock_timestamp()
+      add_val3=#{addVal3,jdbcType=VARCHAR},mod_user_id='admin',
+      mod_dttm=GREATEST(clock_timestamp(), COALESCE(mod_dttm, reg_dttm) + INTERVAL '1 microsecond')
     WHERE code_grp_id=#{groupId} AND code=#{code} AND del_yn='N'
   </update>
   <update id="deleteCode">

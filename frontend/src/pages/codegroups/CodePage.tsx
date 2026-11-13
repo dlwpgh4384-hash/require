@@ -4,7 +4,7 @@ import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { usePreferenceBusinessShortcuts } from "../userpreferences/UserPreferenceTools";
 import { useCodeWorkspace } from "./CodeWorkspace";
 import * as api from "./codeGroups";
-import { Banner, DEFAULT_PAGE_SIZE, ListPager } from "../../shared/list";
+import { Banner, ListPager, useListPresentation } from "../../shared/list";
 import "../../shared/list/list.css";
 import "./codeGroups.css";
 
@@ -83,7 +83,8 @@ export function CodePage({
   const [modalFailure, setModalFailure] = useState("");
   const [pending, setPending] = useState<(() => void) | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  // SFR-010-04·05: 한 화면 건수·보기 밀도는 화면 설정(계정에 한 값)을 따른다.
+  const { pageSize, setPageSize, dense } = useListPresentation();
   const lock = useRef(false);
   const root = useRef<HTMLElement>(null);
   const workspace = useCodeWorkspace();
@@ -394,22 +395,31 @@ export function CodePage({
       ) : (
         <input
           className="ls-in ls-in-sm"
-          type={field.numeric ? "number" : "text"}
+          type={field.numeric && !field.money ? "number" : "text"}
+          inputMode={field.money ? "numeric" : undefined}
           step={field.numeric ? "0.0001" : undefined}
           aria-label={`${id} ${field.label}`}
           data-testid={`code-${id.toLowerCase()}-${field.key.toLowerCase()}`}
           disabled={disabled}
           maxLength={field.numeric ? undefined : 100}
-          value={value[field.key] ?? ""}
-          onChange={(event) =>
+          value={
+            field.money && value[field.key] !== undefined && value[field.key] !== null
+              ? Number(value[field.key]).toLocaleString("ko-KR")
+              : (value[field.key] ?? "")
+          }
+          onChange={(event) => {
+            // 금액은 콤마를 빼고 숫자만 받는다(FR-0106 숫자 칸).
+            const raw = field.money
+              ? event.target.value.replace(/[^0-9]/g, "")
+              : event.target.value;
             onChange({
               [field.key]: field.numeric
-                ? event.target.value === ""
+                ? raw === ""
                   ? undefined
-                  : Number(event.target.value)
-                : event.target.value,
-            })
-          }
+                  : Number(raw)
+                : raw,
+            });
+          }}
         />
       )}
       {id === "new" && <span className="code-help">{field.help}</span>}
@@ -419,7 +429,7 @@ export function CodePage({
   return (
     <section
       ref={root}
-      className="code-page screen-body"
+      className={`code-page screen-body${dense ? " code-dense" : ""}`}
       data-testid="code-page"
       data-screen-id="UI-27"
     >

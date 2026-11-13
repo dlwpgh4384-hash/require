@@ -3,6 +3,7 @@ import { Dialog, Toast } from "../../shared/feedback/Dialog";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { koreanThisMonth } from "../../shared/time";
 import { Banner } from "../../shared/list";
+import { usePreferenceBusinessShortcuts } from "../userpreferences/UserPreferenceTools";
 import * as api from "./operatingStandards";
 import "../../shared/list/list.css";
 import "./operatingStandards.css";
@@ -82,6 +83,7 @@ export function OperatingStandardsPanel({
       standardCode: row.standardCode,
       value: draft[row.standardCode],
       effectiveMonth: row.immediate ? null : month,
+      ...(row.modifiedAt ? { modifiedAt: row.modifiedAt } : {}),
       action:
         row.immediate ||
         snapshot?.some(
@@ -161,6 +163,13 @@ export function OperatingStandardsPanel({
     setErrors(invalid);
     if (!Object.keys(invalid).length) setConfirmSave(true);
   };
+  // 공통 기능 FR-0104: Ctrl+S = 저장(이 탭이 보일 때, 창이 없을 때)
+  usePreferenceBusinessShortcuts({
+    onSave: () => {
+      if (root.current?.closest("[hidden]") || confirmSave || historyCode) return;
+      if (!busy && !refreshPending) openSave();
+    },
+  });
   const discard = () => {
     setDraft({});
     setErrors({});
@@ -298,7 +307,11 @@ export function OperatingStandardsPanel({
                         onChange={(event) => {
                           setDraft((old) => ({
                             ...old,
-                            [row.standardCode]: event.target.value,
+                            // 공통 기능 FR-0106: 숫자 칸은 숫자 아닌 글자를 바로 지운다.
+                            [row.standardCode]:
+                              row.standardCode === "CASH_BASE_YM"
+                                ? event.target.value
+                                : event.target.value.replace(/[^0-9.-]/g, ""),
                           }));
                           setErrors({});
                         }}

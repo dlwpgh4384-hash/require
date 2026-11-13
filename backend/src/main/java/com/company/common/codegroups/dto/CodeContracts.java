@@ -26,5 +26,7 @@ public final class CodeContracts {
         public String bankCode;
         public String targetField;
         public String job;
+        /** 마지막으로 바뀐 시각(ISO UTC). 저장할 때 그대로 돌려보내 동시 수정을 막는다. */
+        public String modifiedAt;
     }
 }

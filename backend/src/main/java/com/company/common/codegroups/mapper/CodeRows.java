@@ -28,9 +28,12 @@ public final class CodeRows {
         public String addVal1;
         public String addVal2;
         public String addVal3;
+        /** COALESCE(mod_dttm, reg_dttm): 동시 수정 검사에 쓴다. */
+        public java.time.Instant changedAt;
         public CodeContracts.Item value() {
             var item = new CodeContracts.Item();
             item.code = code;
+            item.modifiedAt = changedAt == null ? null : changedAt.toString();
             item.codeName = codeName;
             item.sortOrd = sortOrd;
             item.useYn = useYn;

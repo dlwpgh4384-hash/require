@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class CodeExceptionHandler {
     @ExceptionHandler(CodeFailure.class)
     public ResponseEntity<ApiExceptionHandler.Error> invalid(CodeFailure failure) {
-        return ApiExceptionHandler.of(HttpStatus.BAD_REQUEST, failure.getMessage(),
+        return ApiExceptionHandler.of(HttpStatus.valueOf(failure.getStatus()), failure.getMessage(),
             List.of(new ApiExceptionHandler.FieldError(failure.getField(), failure.getMessage())));
     }
 }

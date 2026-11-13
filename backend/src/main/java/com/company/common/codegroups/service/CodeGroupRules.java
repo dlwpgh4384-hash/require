@@ -67,6 +67,7 @@ public final class CodeGroupRules {
     public static Code parse(String group, JsonNode body, Code old, int nextOrder, boolean numeric) {
         var allowed = new HashSet<>(COMMON);
         allowed.addAll(EXTRA);
+        allowed.add("modifiedAt");
         object(body, allowed);
         boolean create = old == null;
         if (!create && (!body.has("sortOrd") || !body.has("useYn")))

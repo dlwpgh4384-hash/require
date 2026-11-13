@@ -14,7 +14,9 @@ public class NavigationApplication {
         SpringApplication application = new SpringApplication(NavigationApplication.class);
         if (Arrays.asList(args).contains("--prepare-schema")) {
             application.setWebApplicationType(WebApplicationType.NONE);
-            try (var context = application.run(args)) {
+            String[] preparationArgs = java.util.stream.Stream.concat(Arrays.stream(args),
+                java.util.stream.Stream.of("--spring.flyway.enabled=false")).toArray(String[]::new);
+            try (var context = application.run(preparationArgs)) {
                 context.getBean(SchemaPreparation.class).prepare();
             } catch (Exception exception) {
                 System.err.println("Schema preparation refused: " + SchemaPreparation.diagnostic(exception));

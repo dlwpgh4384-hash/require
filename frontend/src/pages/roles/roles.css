@@ -1,0 +1,113 @@
+.roles-page {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.roles-toolbar {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+.roles-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--divider);
+}
+.roles-tabs button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 10px 16px;
+  color: var(--text-sub);
+}
+.roles-tabs button[aria-selected="true"] {
+  color: var(--primary);
+  box-shadow: inset 0 -2px var(--primary);
+  font-weight: 600;
+}
+.roles-settings {
+  margin: 0 0 24px;
+  padding: 20px 24px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.roles-settings legend {
+  font-weight: 600;
+}
+.roles-scope,
+.roles-sensitive {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.roles-scope > label,
+.roles-sensitive > span {
+  width: 120px;
+}
+.roles-scope select {
+  width: 200px;
+  height: 36px;
+}
+.roles-sensitive {
+  margin-top: 16px;
+}
+.roles-help {
+  color: var(--text-sub);
+  font-size: 13px;
+  margin-left: 132px;
+}
+.roles-matrix-wrap {
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  overflow-x: auto;
+  background: var(--surface);
+}
+.roles-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.roles-matrix caption {
+  text-align: left;
+  padding: 12px;
+  font-weight: 600;
+}
+.roles-matrix th,
+.roles-matrix td {
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--divider);
+  white-space: nowrap;
+}
+.roles-matrix thead th,
+.roles-matrix tbody th {
+  background: var(--bg);
+  font-weight: 600;
+  text-align: left;
+}
+.roles-matrix td:not(:nth-child(2)) {
+  text-align: center;
+}
+.roles-matrix input {
+  width: 16px;
+  height: 16px;
+}
+.roles-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+.roles-footer > .app-actions {
+  margin-left: auto;
+}
+.role-copy-form {
+  display: grid;
+  gap: 12px;
+}
+[data-testid="role-copy-dialog"] {
+  width: min(520px, 100%);
+}

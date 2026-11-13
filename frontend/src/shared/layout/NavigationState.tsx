@@ -43,7 +43,8 @@ const content: Record<
   // FR-0107: 휴대폰에서 PC 전용 화면 주소로 들어왔을 때
   "pc-only": {
     title: "PC에서 이용해 주세요",
-    description: "이 화면은 큰 표를 다루는 화면이라 휴대폰에서는 열리지 않습니다",
+    description:
+      "이 화면은 큰 표를 다루는 화면이라 휴대폰에서는 열리지 않습니다",
     icon: "screen",
   },
   missing: {
@@ -74,6 +75,7 @@ export function NavigationState({
   const item = content[kind];
   return (
     <div
+      data-testid={`navigation-state-${kind}`}
       className={`navigation-state state-${kind}${compact ? " is-compact" : ""}`}
       role={
         kind === "error" ? "alert" : kind === "loading" ? "status" : undefined

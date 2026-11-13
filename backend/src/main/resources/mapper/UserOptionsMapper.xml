@@ -28,6 +28,7 @@
            (r.DATA_SCOPE_CD = 'PROJ') AS assigned_project_scope,
            (r.DATA_SCOPE_CD = 'PART') AS assigned_part_scope
     FROM TB_SY_ROLE r
+    WHERE r.USE_YN = 'Y'
     ORDER BY r.SORT_ORD, r.ROLE_ID
   </select>
   <select id="selectProjects" resultMap="userOptionProject">

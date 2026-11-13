@@ -46,6 +46,14 @@ class SchemaPreparationTest {
         ordered.verify(connection).createStatement();
         ordered.verify(statement).execute(contains("INSERT INTO TB_SY_USER_ROLE"));
         ordered.verify(statement).close();
+        ordered.verify(session).getConnection();
+        ordered.verify(connection).createStatement();
+        ordered.verify(statement).execute(contains("CREATE TABLE IF NOT EXISTS TB_SY_ROLE_MENU_AUTH"));
+        ordered.verify(statement).close();
+        ordered.verify(session).getConnection();
+        ordered.verify(connection).createStatement();
+        ordered.verify(statement).execute(contains("CREATE INDEX IF NOT EXISTS IX_TB_SY_ROLE_MENU_AUTH_01"));
+        ordered.verify(statement).close();
         ordered.verify(session).commit(true);
         ordered.verify(session).close();
         verify(session, never()).rollback(anyBoolean());
@@ -73,7 +81,7 @@ class SchemaPreparationTest {
     void migrationResourcesContainOnlyModelTablesAndBaseSeeds() throws Exception {
         preparation.prepare();
         var resources = ArgumentCaptor.forClass(String.class);
-        verify(statement, times(4)).execute(resources.capture());
+        verify(statement, times(6)).execute(resources.capture());
         String schema = resources.getAllValues().get(0);
         var tables = java.util.regex.Pattern.compile("CREATE TABLE IF NOT EXISTS (TB_[A-Z_]+)").matcher(schema);
         var names = new java.util.ArrayList<String>();
@@ -99,6 +107,9 @@ class SchemaPreparationTest {
         }
         assertThat(userSeed).contains("('admin', 'ADMIN', 'SYSTEM')", "('HQ', '본사', 'Y', 'Y', 'SYSTEM')");
         assertThat(userSeed).doesNotContain("ON CONFLICT", "UPDATE ", "DELETE ", "TB_SY_ROLE_MENU_AUTH");
+        String permissions = resources.getAllValues().get(4);
+        assertThat(permissions).contains("IF NOT EXISTS (SELECT 1 FROM TB_SY_ROLE_MENU_AUTH)",
+            "LOCK TABLE TB_SY_ROLE_MENU_AUTH IN EXCLUSIVE MODE");
     }
 
     @Test

@@ -21,7 +21,12 @@ export function ScreenTabs({
   onClose: (id: string) => void;
 }) {
   return (
-    <div className="tab-strip" role="tablist" aria-label="열린 화면" data-testid="screen-tab-list">
+    <div
+      className="tab-strip"
+      role="tablist"
+      aria-label="열린 화면"
+      data-testid="screen-tab-list"
+    >
       {tabs.map((tab) => (
         <div
           key={tab.id}
@@ -33,6 +38,7 @@ export function ScreenTabs({
             role="tab"
             aria-selected={tab.id === active}
             className="screen-tab-label"
+            data-testid={`screen-tab-select-${tab.id.toLowerCase()}`}
             onClick={() => onSelect(tab.id)}
           >
             {tab.dirty && (

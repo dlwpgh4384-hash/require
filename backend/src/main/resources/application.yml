@@ -16,7 +16,7 @@ spring:
     init:
       mode: never
   flyway:
-    enabled: false
+    enabled: true
   jackson:
     default-property-inclusion: always
 mybatis:

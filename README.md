@@ -24,19 +24,20 @@ DB_USER·DB_PASSWORD·POSTGRES_DB를 반드시 운영 설정으로 교체한다.
 
 ## DB 준비
 
-backend 이미지의 시작 명령은 HTTP 프로세스와 별도로
-java -jar /app/application.jar --prepare-schema를 먼저 실행한다.
-정상 완료한 경우에만 HTTP 애플리케이션을 실행한다. 로컬 jar 실행 시에는
-환경변수 DB_URL·DB_USER·DB_PASSWORD를 지정하고 같은 준비 명령을 먼저 실행한다.
-연결 정보는 코드에 하드코딩하지 않는다.
+backend 이미지는 일반 Spring Boot 시작 경로에서 Flyway를 실행한다.
+환경변수 DB_URL·DB_USER·DB_PASSWORD로 연결하며 연결 정보는 코드에 넣지 않는다.
+db/migration/V1~V6 SQL은 jar에 포함되고 HTTP 서버 준비 전에 순서대로 적용된다.
+호스트 migration 디렉터리나 별도 준비 컨테이너에 의존하지 않는다.
+V6은 역할·메뉴 권한 컬럼·기본값·PK·일곱 CHECK를 검증하고 원문 MENU_ID 인덱스를 준비한다.
+기존 마이그레이션은 수정하지 않는다. 구조가 다르면 자동 ALTER나 삭제 없이 시작을 거부한다.
 
-D5에 따라 자동 Flyway는 끄고 기존 SqlSessionFactory의 한 트랜잭션에서
-db/migration/V1__navigation_schema.sql과 V2__navigation_menu_seed.sql을 실행한다.
-버전 자원은 jar에 포함되며 호스트 migration 디렉터리를 마운트하지 않는다.
-준비 명령과 자동 Flyway를 동시에 켜지 않는다. 준비 중 PostgreSQL advisory lock을
-얻고 기존 9개 대상의 컬럼·형식·precision·null·default·PK/CHECK를 모두 검사한다.
-다르면 stderr에 표·컬럼·expected/actual을 출력하고 비정상 종료한다. 자동 ALTER,
-삭제, 강제 확인 옵션은 없다. 사람이 외부에서 차이를 검토한 뒤 재실행해야 한다.
+기존 수동 준비 DB에 Flyway 이력이 없다면 자동 baseline을 켜지 않는다.
+백업과 원문 구조 대조 후 운영자가 이력 도입 버전을 검토해야 하며, 비어 있지 않은 DB는
+이력 도입 전 일반 시작이 거부될 수 있다. 기존 준비 경로를 일시 유지할 때만
+--spring.flyway.enabled=false를 명시한다. --prepare-schema 명령도 이 옵션을 함께 지정하며,
+기존 SqlSessionFactory의 한 트랜잭션에서 V1~V6을 검사·실행한다.
+준비 중 PostgreSQL advisory lock을 얻고 차이가 있으면 표·컬럼·expected/actual을 보고한다.
+사람이 차이를 검토한 뒤 재실행해야 한다. 일반 운영에서는 Flyway 경로만 사용한다.
 
 없는 표와 시퀀스만 생성하고 신규 물리 FK나 참조용 부모 표는 만들지 않는다.
 기존 시퀀스 값은 재설정하지 않는다. 메뉴 초기값은 빈 TB_SY_MENU에서만

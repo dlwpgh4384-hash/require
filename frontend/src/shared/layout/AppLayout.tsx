@@ -91,7 +91,11 @@ export function AppLayout({
       data-testid="app-layout"
       className={`app-layout${mobile ? " is-mobile" : tablet ? " is-tablet" : ""}`}
     >
-      <a className="skip-link" href="#screen-content">
+      <a
+        className="skip-link"
+        href="#screen-content"
+        data-testid="app-skip-link"
+      >
         본문 바로가기
       </a>
       <Header
@@ -137,7 +141,12 @@ export function AppLayout({
                   <nav aria-label="현재 화면 경로" className="breadcrumb">
                     <ol>
                       {breadcrumb.map((label, index) => (
-                        <li key={index}>{label}</li>
+                        <li
+                          key={index}
+                          data-testid={`app-breadcrumb-item-${index}`}
+                        >
+                          {label}
+                        </li>
                       ))}
                     </ol>
                   </nav>

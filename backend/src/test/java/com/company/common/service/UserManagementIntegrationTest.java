@@ -47,6 +47,7 @@ class UserManagementIntegrationTest {
     @Autowired DataSource source;
     @Autowired OwnedSchema owned;
     @Autowired CommonUserService service;
+    @Autowired UserOptionsMapper options;
     JdbcTemplate db;
     record OwnedSchema(String name) {}
     @TestConfiguration(proxyBeanMethods = false)
@@ -105,8 +106,10 @@ class UserManagementIntegrationTest {
         return body.toString();
     }
     private long count(String sql, Object... args) { return db.queryForObject(sql, Long.class, args); }
-    @Test void registrationResetUnlockAndAccessLogsUseRealSqlAndPreserveMicroseconds() throws Exception {
-        mvc.perform(post("/api/common/users").contentType("application/json").content(create("test", "PM", List.of("owned-project"))))
+    @Test
+    @DisplayName("side-effect: 초기화와 잠금 해제는 DB MOD_DTTM을 갱신하고 TB_SY_ACCS_LOG를 늘리지 않는다")
+    void registrationResetUnlockAndAccessLogsUseRealSqlAndPreserveMicroseconds() throws Exception {
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create("test", "PM", List.of("owned-project"))))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.account.projectIds[0]").value("owned-project"));
         assertThat(count("SELECT count(*) FROM TB_SY_USER_ROLE WHERE user_id='test' AND role_id='PM'")).isEqualTo(1);
         var values = db.queryForMap("SELECT pwd_hash,temp_pwd_yn,reg_user_id FROM TB_SY_USER WHERE user_id='test'");
@@ -115,19 +118,23 @@ class UserManagementIntegrationTest {
         assertThat(count("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE user_id='test' AND act_type_cd='USER_REG' AND reg_user_id='admin' AND scrn_id='UI-23'")).isEqualTo(1);
         mvc.perform(get("/api/common/users/test/access-logs")).andExpect(status().isOk()).andExpect(jsonPath("$.data.total").value(1));
         String before = token("test");
-        mvc.perform(post("/api/common/users/test/password-reset").contentType("application/json").content(version("test")))
+        mvc.perform(put("/api/common/users/test/password-reset").contentType("application/json").content(version("test")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.tempPwdYn").value("Y"))
             .andExpect(jsonPath("$.data.password").doesNotExist());
         assertThat(db.queryForObject("SELECT pwd_hash FROM TB_SY_USER WHERE user_id='test'", String.class)).isNotEqualTo(values.get("pwd_hash"));
         assertThat(token("test")).isNotEqualTo(before);
+        assertThat(count("SELECT count(*) FROM TB_SY_USER WHERE user_id='test' AND mod_dttm=?::timestamptz",
+            token("test"))).isEqualTo(1);
         assertThat(db.queryForObject("SELECT mod_user_id FROM TB_SY_USER WHERE user_id='test'", String.class)).isEqualTo("admin");
         assertThat(count("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE user_id='test'")).isEqualTo(1);
         db.update("UPDATE TB_SY_USER SET user_stat_cd='LOCK',pwd_err_cnt=5 WHERE user_id='test'");
         String lockedVersion = token("test");
-        mvc.perform(post("/api/common/users/test/unlock").contentType("application/json").content(version("test")))
+        mvc.perform(put("/api/common/users/test/unlock").contentType("application/json").content(version("test")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.userStatCd").value("USE"))
             .andExpect(jsonPath("$.data.pwdErrCnt").value(0));
         assertThat(token("test")).isNotEqualTo(lockedVersion);
+        assertThat(count("SELECT count(*) FROM TB_SY_USER WHERE user_id='test' AND mod_dttm=?::timestamptz",
+            token("test"))).isEqualTo(1);
         assertThat(db.queryForObject("SELECT user_stat_cd FROM TB_SY_USER WHERE user_id='test'", String.class)).isEqualTo("USE");
         assertThat(count("SELECT pwd_err_cnt FROM TB_SY_USER WHERE user_id='test'")).isZero();
         assertThat(count("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE user_id='test'")).isEqualTo(1);
@@ -140,26 +147,32 @@ class UserManagementIntegrationTest {
             .andExpect(jsonPath("$.data.items[0].target").value(""));
         assertThat(count("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE user_id='admin' AND trgt_desc IS NULL")).isEqualTo(1);
     }
-    @Test void stopAndResumePreserveHistoryAndDoNotRestoreProjectScope() throws Exception {
-        mvc.perform(post("/api/common/users").contentType("application/json").content(create("test", "PM", List.of("owned-project")))).andExpect(status().isOk());
+    @Test
+    @DisplayName("side-effect: 일괄 중지·재개는 MOD_DTTM과 TB_SY_CHG_HIST를 저장하고 PROJ 줄을 복구하지 않는다")
+    void stopAndResumePreserveHistoryAndDoNotRestoreProjectScope() throws Exception {
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create("test", "PM", List.of("owned-project")))).andExpect(status().isOk());
         var body = json.createObjectNode();
         body.putArray("users").addObject().put("userId","test").put("modDttm",token("test"));
         body.putArray("confirmedProjectIds").add("owned-project");
         String activeVersion = token("test");
-        mvc.perform(post("/api/common/users/stop").contentType("application/json").content(body.toString()))
+        mvc.perform(put("/api/common/users/stop").contentType("application/json").content(body.toString()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.processedUserIds[0]").value("test"))
             .andExpect(jsonPath("$.data.unprocessedCount").value(0));
         assertThat(db.queryForObject("SELECT user_stat_cd FROM TB_SY_USER WHERE user_id='test'", String.class)).isEqualTo("STOP");
         assertThat(db.queryForObject("SELECT mod_user_id FROM TB_SY_USER WHERE user_id='test'", String.class)).isEqualTo("admin");
         String stoppedVersion = token("test");
         assertThat(stoppedVersion).isNotEqualTo(activeVersion);
+        assertThat(count("SELECT count(*) FROM TB_SY_USER WHERE user_id='test' AND mod_dttm=?::timestamptz",
+            stoppedVersion)).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM TB_SY_USER_SCOPE WHERE user_id='test' AND scope_type_cd='PROJ'")).isZero();
-        mvc.perform(post("/api/common/users/test/resume").contentType("application/json").content(version("test")))
+        mvc.perform(put("/api/common/users/test/resume").contentType("application/json").content(version("test")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.userStatCd").value("USE"))
             .andExpect(jsonPath("$.data.projectIds").isEmpty());
         assertThat(db.queryForObject("SELECT user_stat_cd FROM TB_SY_USER WHERE user_id='test'", String.class)).isEqualTo("USE");
         assertThat(db.queryForObject("SELECT mod_user_id FROM TB_SY_USER WHERE user_id='test'", String.class)).isEqualTo("admin");
         assertThat(token("test")).isNotEqualTo(stoppedVersion);
+        assertThat(count("SELECT count(*) FROM TB_SY_USER WHERE user_id='test' AND mod_dttm=?::timestamptz",
+            token("test"))).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM TB_SY_USER_SCOPE WHERE user_id='test' AND scope_type_cd='PROJ'")).isZero();
         assertThat(count("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_key='test' AND chg_type_cd IN ('STOP','RESUME') AND reg_user_id='admin' AND reg_dttm IS NOT NULL")).isEqualTo(2);
         assertThat(count("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_key='test' AND chg_item_nm='담당 프로젝트' AND aft_val='–'")).isEqualTo(1);
@@ -167,7 +180,7 @@ class UserManagementIntegrationTest {
     @Test void sideEffectRoleUpdatePersistsModUserIdModDttmAndTbSyAccsLog() throws Exception {
         String contract = new ClassPathResource("contracts/openapi.yaml").getContentAsString(StandardCharsets.UTF_8);
         assertThat(contract).contains("operationId: putCommonUser");
-        mvc.perform(post("/api/common/users").contentType("application/json").content(create("test", "PM", List.of("owned-project"))))
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create("test", "PM", List.of("owned-project"))))
             .andExpect(status().isOk());
         String before = token("test");
         var body = json.createObjectNode();
@@ -184,6 +197,8 @@ class UserManagementIntegrationTest {
         assertThat(token("test")).isNotEqualTo(before);
         assertThat(db.queryForObject("SELECT mod_user_id FROM TB_SY_USER WHERE user_id='test'", String.class)).isEqualTo("admin");
         assertThat(db.queryForList("SELECT role_id FROM TB_SY_USER_ROLE WHERE user_id='test'", String.class)).containsExactly("EXEC");
+        assertThat(count("SELECT count(*) FROM TB_SY_USER WHERE user_id='test' AND mod_dttm=?::timestamptz",
+            token("test"))).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM TB_SY_USER_SCOPE WHERE user_id='test' AND scope_type_cd='PROJ'")).isZero();
         assertThat(count("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE user_id='test' AND act_type_cd='AUTH_CHG' AND reg_user_id='admin' AND act_dttm IS NOT NULL")).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_key='test' AND chg_item_nm IN ('역할','담당 프로젝트') AND reg_user_id='admin' AND reg_dttm IS NOT NULL")).isEqualTo(2);
@@ -191,7 +206,7 @@ class UserManagementIntegrationTest {
     @Test void sqlFailureRollsBackAccountRolesScopesAndLogsTogether() throws Exception {
         db.execute("CREATE FUNCTION reject_registration() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test transaction rollback'; END $$");
         db.execute("CREATE TRIGGER reject_registration BEFORE INSERT ON TB_SY_ACCS_LOG FOR EACH ROW EXECUTE FUNCTION reject_registration()");
-        mvc.perform(post("/api/common/users").contentType("application/json").content(create("test", "PM", List.of("owned-project"))))
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create("test", "PM", List.of("owned-project"))))
             .andExpect(status().isInternalServerError());
         assertThat(count("SELECT count(*) FROM TB_SY_USER WHERE user_id='test'")).isZero();
         assertThat(count("SELECT count(*) FROM TB_SY_USER_ROLE WHERE user_id='test'")).isZero();
@@ -199,7 +214,7 @@ class UserManagementIntegrationTest {
         assertThat(count("SELECT count(*) FROM TB_SY_CHG_HIST")).isZero();
     }
     @Test void concurrentAdminRemovalSerializesAndLeavesExactlyOneUseAdmin() throws Exception {
-        mvc.perform(post("/api/common/users").contentType("application/json").content(create("secondadmin", "ADMIN", List.of()))).andExpect(status().isOk());
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create("secondadmin", "ADMIN", List.of()))).andExpect(status().isOk());
         var first = service.getCommonUser("admin"); var second = service.getCommonUser("secondadmin");
         var gate = new CountDownLatch(1); var executor = Executors.newFixedThreadPool(2);
         try {
@@ -217,6 +232,36 @@ class UserManagementIntegrationTest {
             assertThat(succeeded).isEqualTo(1);
             assertThat(count("SELECT count(*) FROM TB_SY_USER u JOIN TB_SY_USER_ROLE r ON r.user_id=u.user_id WHERE u.user_stat_cd='USE' AND r.role_id='ADMIN'")).isEqualTo(1);
         } finally { executor.shutdownNow(); }
+    }
+    @Test void registrationTransfersPmOwnershipWithoutRemovingOtherProjectRoles() throws Exception {
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create("oldpm", "PM", List.of("owned-project"))))
+            .andExpect(status().isOk());
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create("reader", "PROJECT_READER", List.of("owned-project"))))
+            .andExpect(status().isOk());
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create("newpm", "PM", List.of("owned-project"))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.transferredProjects[0].projectId").value("owned-project"));
+        assertThat(count("SELECT count(*) FROM TB_SY_USER_SCOPE WHERE user_id='oldpm' AND scope_type_cd='PROJ'")).isZero();
+        assertThat(count("SELECT count(*) FROM TB_SY_USER_SCOPE WHERE user_id='reader' AND proj_id='owned-project'")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM TB_SY_USER_SCOPE s JOIN TB_SY_USER_ROLE r ON r.user_id=s.user_id WHERE r.role_id='PM' AND s.proj_id='owned-project'")).isEqualTo(1);
+    }
+    @Test void twoNonPmRegistrationsKeepTheirIndependentProjectScopes() throws Exception {
+        for (String id : List.of("readerone", "readertwo")) {
+            mvc.perform(put("/api/common/users").contentType("application/json").content(create(id, "PROJECT_READER", List.of("owned-project"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.transferredProjects").isEmpty());
+        }
+        assertThat(count("SELECT count(*) FROM TB_SY_USER_SCOPE WHERE user_id IN ('readerone','readertwo') AND scope_type_cd='PROJ' AND proj_id='owned-project'")).isEqualTo(2);
+    }
+    @Test void inactiveRoleIsExcludedFromRegistrationOptionsWithoutDeletingItsIdentityOrHistory() throws Exception {
+        assertThat(options.selectRoles()).extracting(row -> row.getRoleCd()).contains("PROJECT_READER");
+        db.update("INSERT INTO TB_SY_CHG_HIST(trgt_tbl_nm,trgt_key,chg_type_cd,reg_user_id) VALUES ('TB_SY_ROLE','PROJECT_READER','NEW','admin')");
+        db.update("UPDATE TB_SY_ROLE SET use_yn='N',mod_user_id='admin',mod_dttm=clock_timestamp() WHERE role_id='PROJECT_READER'");
+        assertThat(options.selectRoles()).extracting(row -> row.getRoleCd()).doesNotContain("PROJECT_READER");
+        assertThat(count("SELECT count(*) FROM TB_SY_ROLE WHERE role_id='PROJECT_READER' AND use_yn='N'")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_tbl_nm='TB_SY_ROLE' AND trgt_key='PROJECT_READER'")).isEqualTo(1);
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create("test", "PROJECT_READER", List.of())))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("roleCds"));
+        assertThat(count("SELECT count(*) FROM TB_SY_USER WHERE user_id='test'")).isZero();
     }
     @Test void concurrentPmAssignmentsTransferRatherThanCreateTwoOwners() throws Exception {
         var gate = new CountDownLatch(1); var executor = Executors.newFixedThreadPool(2);

@@ -48,9 +48,9 @@ class PostgreSqlPreparationTest {
     }
 
     @Test
-    void createsEighteenTablesAndOnlyBaseSeedRowsWithoutPhysicalForeignKeys() throws Exception {
+    void createsPreparedTablesAndOnlyBaseSeedRowsWithoutPhysicalForeignKeys() throws Exception {
         preparation.prepare();
-        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'")).isEqualTo(18);
+        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'")).isEqualTo(19);
         assertThat(number("SELECT count(*) FROM tb_sy_menu")).isEqualTo(40);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NULL")).isEqualTo(10);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NOT NULL")).isEqualTo(30);
@@ -64,7 +64,8 @@ class PostgreSqlPreparationTest {
         assertThat(number("SELECT count(*) FROM tb_sy_role")).isEqualTo(5);
         assertThat(number("SELECT count(*) FROM tb_sy_user_role WHERE user_id='admin' AND role_id='ADMIN'")).isEqualTo(1);
         assertThat(number("SELECT count(*) FROM tb_bs_part WHERE part_id='HQ' AND hq_yn='Y'")).isEqualTo(1);
-        try (var rows = database.createStatement().executeQuery("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name NOT IN ('tb_sy_menu','tb_sy_user','tb_sy_code_grp','tb_sy_code','tb_sy_oper_std','tb_sy_role','tb_sy_user_role','tb_bs_part')")) {
+        assertThat(number("SELECT count(*) FROM tb_sy_role_menu_auth")).isEqualTo(150);
+        try (var rows = database.createStatement().executeQuery("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name NOT IN ('tb_sy_menu','tb_sy_user','tb_sy_code_grp','tb_sy_code','tb_sy_oper_std','tb_sy_role','tb_sy_user_role','tb_bs_part','tb_sy_role_menu_auth')")) {
             while (rows.next()) assertThat(number("SELECT count(*) FROM " + rows.getString(1))).isZero();
         }
     }

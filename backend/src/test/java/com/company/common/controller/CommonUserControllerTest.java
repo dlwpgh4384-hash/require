@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -58,8 +59,16 @@ class CommonUserControllerTest {
             "confirmedProjectIds", confirmed, "modDttm", "2026-01-02T03:04:05.123456Z"));
     }
     private String version() { return "{\"modDttm\":\"2026-01-02T03:04:05.123456Z\"}"; }
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/common/users", "/api/common/users/stop", "/api/common/users/test/password-reset",
+        "/api/common/users/test/resume", "/api/common/users/test/unlock"})
+    void obsoletePostMethodIsRejectedWithoutMutation(String path) throws Exception {
+        mvc.perform(post(path).contentType("application/json").content("{}"))
+            .andExpect(status().isMethodNotAllowed());
+        verifyNoInteractions(mapper, passwords);
+    }
     @Test void registrationAnonymousPersistsAccountRolesTemporaryHashAndTargetAccess() throws Exception {
-        mvc.perform(post("/api/common/users").contentType("application/json").content(create("test", List.of("EXEC"))))
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create("test", List.of("EXEC"))))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.account.userId").value("test"))
             .andExpect(jsonPath("$.data.account.roleCds[0]").value("EXEC"))
             .andExpect(jsonPath("$.data.account.password").doesNotExist())
@@ -71,23 +80,52 @@ class CommonUserControllerTest {
     }
     @ParameterizedTest @ValueSource(strings = {"ABCd", "abc", "abcdefghijklmnopqrstu"})
     void invalidIdIsFieldErrorWithoutInsert(String id) throws Exception {
-        mvc.perform(post("/api/common/users").contentType("application/json").content(create(id, List.of("EXEC"))))
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create(id, List.of("EXEC"))))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("userId"));
         verify(mapper, never()).insertUser(any(), anyString());
     }
     @ParameterizedTest @ValueSource(strings = {"abcd", "abcdefghijklmnopqrst"})
     void idBoundariesAccepted(String id) throws Exception {
-        mvc.perform(post("/api/common/users").contentType("application/json").content(create(id, List.of("EXEC"))))
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create(id, List.of("EXEC"))))
             .andExpect(status().isOk());
     }
     @Test void emptyRoleIs400AndNoInsert() throws Exception {
-        mvc.perform(post("/api/common/users").contentType("application/json").content(create("test", List.of())))
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create("test", List.of())))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("roleCds"));
+        verify(mapper, never()).insertUser(any(), anyString());
+    }
+    @Test void registrationTransfersOnlyThePreviousPmAndReturnsTheProject() throws Exception {
+        data.add("oldpm", "USE", List.of("PM"));
+        data.projects.get("oldpm").add("project-a");
+        data.add("reader", "USE", List.of("PROJECT_READER"));
+        data.projects.get("reader").add("project-a");
+        var body = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(create("newpm", List.of("PM")));
+        body.withArray("projectIds").add("project-a");
+        mvc.perform(put("/api/common/users").contentType("application/json").content(body.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.transferredProjects[0].projectId").value("project-a"));
+        assertThat(data.projects.get("oldpm")).isEmpty();
+        assertThat(data.projects.get("reader")).containsExactly("project-a");
+        assertThat(data.projects.get("newpm")).containsExactly("project-a");
+    }
+    @Test void registrationLetsTwoEligibleNonPmUsersShareAProject() throws Exception {
+        for (String id : List.of("firstreader", "secondreader")) {
+            var body = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(create(id, List.of("PROJECT_READER")));
+            body.withArray("projectIds").add("project-a");
+            mvc.perform(put("/api/common/users").contentType("application/json").content(body.toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.transferredProjects").isEmpty());
+            assertThat(data.projects.get(id)).containsExactly("project-a");
+        }
+        verify(mapper, never()).selectPmOwners(anyString(), anyList());
+    }
+    @Test void registrationRejectsARoleAbsentFromActiveOptionsBeforeWriting() throws Exception {
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create("test", List.of("R-001"))))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("roleCds"));
         verify(mapper, never()).insertUser(any(), anyString());
     }
     @Test void businessDuplicateCreatePreservesAssignmentsAndDoesNotInvokeSmtpDeliveryBoundary() throws Exception {
         data.add("test", "USE", List.of("PM")); data.projects.get("test").add("project-a");
-        mvc.perform(post("/api/common/users").contentType("application/json").content(create("test", List.of("EXEC"))))
+        mvc.perform(put("/api/common/users").contentType("application/json").content(create("test", List.of("EXEC"))))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("userId"));
         assertThat(data.roles.get("test")).containsExactly("PM"); assertThat(data.projects.get("test")).containsExactly("project-a");
         verify(mapper, never()).insertUser(any(), anyString());
@@ -98,16 +136,18 @@ class CommonUserControllerTest {
         var body = json.readTree(create("test", List.of("EXEC")));
         for (String value : List.of("", "a".repeat(field.equals("name") ? 51 : 101))) {
             ((com.fasterxml.jackson.databind.node.ObjectNode) body).put(field, value);
-            mvc.perform(post("/api/common/users").contentType("application/json").content(body.toString()))
+            mvc.perform(put("/api/common/users").contentType("application/json").content(body.toString()))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value(field));
         }
     }
     @Test void invalidEmailIsFieldError() throws Exception {
         String body = create("test", List.of("EXEC")).replace("test@example.invalid", "not-an-email");
-        mvc.perform(post("/api/common/users").contentType("application/json").content(body))
+        mvc.perform(put("/api/common/users").contentType("application/json").content(body))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("email"));
     }
-    @Test void sideEffectRoleScopeUpdateAnonymousPersistsModDttmAndTbSyAccsLog() throws Exception {
+    @Test
+    @DisplayName("side-effect: 사용자 변경은 MOD_DTTM 갱신과 TB_SY_ACCS_LOG 기록을 반환한다")
+    void sideEffectRoleScopeUpdateAnonymousPersistsModDttmAndTbSyAccsLog() throws Exception {
         data.add("test", "USE", List.of("PM"));
         mvc.perform(put("/api/common/users/test").contentType("application/json")
             .content(update(List.of("PM"), List.of("project-a", "project-b"), List.of())))
@@ -164,16 +204,16 @@ class CommonUserControllerTest {
     void existingMutationsRequireVersionPropertyButAllowNull(String operation) throws Exception {
         String state = operation.equals("resume") ? "STOP" : "LOCK";
         data.add("test", state, List.of("EXEC")).modDttm = null;
-        mvc.perform(post("/api/common/users/test/" + operation).contentType("application/json").content("{}"))
+        mvc.perform(put("/api/common/users/test/" + operation).contentType("application/json").content("{}"))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("modDttm"));
         assertThat(data.accounts.get("test").userStatCd).isEqualTo(state);
-        mvc.perform(post("/api/common/users/test/" + operation).contentType("application/json").content("{\"modDttm\":null}"))
+        mvc.perform(put("/api/common/users/test/" + operation).contentType("application/json").content("{\"modDttm\":null}"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.modDttm").value("2026-01-02T03:04:05.123456Z"));
     }
     @ParameterizedTest @ValueSource(strings = {"password-reset", "resume", "unlock"})
     void staleVersionWinsBeforeStateValidationAndHasNoSideEffects(String operation) throws Exception {
         data.add("test", "USE", List.of("EXEC")).modDttm = TOKEN.plusNanos(1000);
-        mvc.perform(post("/api/common/users/test/" + operation).contentType("application/json").content(version()))
+        mvc.perform(put("/api/common/users/test/" + operation).contentType("application/json").content(version()))
             .andExpect(status().isConflict());
         assertThat(data.accounts.get("test").modDttm).isEqualTo(TOKEN.plusNanos(1000));
         verify(mapper, never()).changeState(anyString(), any(), anyString(), anyBoolean());
@@ -184,7 +224,7 @@ class CommonUserControllerTest {
     void resetPreservesStateAndFailureCountAndDoesNotLogAccess(String state) throws Exception {
         data.add("test", state, List.of("EXEC")); String oldHash = new TemporaryUserPassword().hashAndDeliver("test@example.invalid");
         data.hashes.put("test", oldHash); int count = data.failures.get("test");
-        mvc.perform(post("/api/common/users/test/password-reset").contentType("application/json").content(version()))
+        mvc.perform(put("/api/common/users/test/password-reset").contentType("application/json").content(version()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.tempPwdYn").value("Y"))
             .andExpect(jsonPath("$.data.password").doesNotExist());
         assertThat(data.hashes.get("test")).isNotEqualTo(oldHash).hasSize(60);
@@ -192,52 +232,79 @@ class CommonUserControllerTest {
         assertThat(data.failures.get("test")).isEqualTo(count); assertThat(data.accesses).isEmpty();
         mvc.perform(get("/api/common/users/test")).andExpect(jsonPath("$.data.modDttm").value("2026-01-02T03:04:05.123457Z"));
     }
-    @Test void authSideEffectUnlockAnonymousResetsFailuresAndModDttmWithoutAccessLog() throws Exception {
+    @Test
+    @DisplayName("side-effect: 잠금 해제는 MOD_DTTM·실패 횟수만 갱신하고 접근 기록은 추가하지 않는다")
+    void authSideEffectUnlockAnonymousResetsFailuresAndModDttmWithoutAccessLog() throws Exception {
         data.add("test", "LOCK", List.of("EXEC"));
-        mvc.perform(post("/api/common/users/test/unlock").contentType("application/json").content(version()))
+        mvc.perform(put("/api/common/users/test/unlock").contentType("application/json").content(version()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.pwdErrCnt").value(0))
             .andExpect(jsonPath("$.data.userStatCd").value("USE"))
             .andExpect(jsonPath("$.data.modDttm").value("2026-01-02T03:04:05.123457Z"));
         assertThat(data.accounts.get("test").userStatCd).isEqualTo("USE"); assertThat(data.failures.get("test")).isZero();
+        assertThat(data.accounts.get("test").modDttm).isEqualTo(TOKEN.plusNanos(1000));
         assertThat(data.accesses).isEmpty();
         verify(mapper).changeState("test", TOKEN, "USE", true);
     }
     @ParameterizedTest @ValueSource(strings = {"resume", "unlock"})
     void wrongStateIs400Unchanged(String operation) throws Exception {
         data.add("test", "USE", List.of("EXEC"));
-        mvc.perform(post("/api/common/users/test/" + operation).contentType("application/json").content(version()))
+        mvc.perform(put("/api/common/users/test/" + operation).contentType("application/json").content(version()))
             .andExpect(status().isBadRequest());
         assertThat(data.accounts.get("test").modDttm).isEqualTo(TOKEN);
     }
-    @Test void authSideEffectResumeAnonymousRecordsUserStatCdAndModDttmButNeverRestoresProjects() throws Exception {
+    @Test
+    @DisplayName("side-effect: 재개는 MOD_DTTM·상태·이력을 갱신하고 프로젝트를 복구하지 않는다")
+    void authSideEffectResumeAnonymousRecordsUserStatCdAndModDttmButNeverRestoresProjects() throws Exception {
         data.add("test", "STOP", List.of("PM"));
-        mvc.perform(post("/api/common/users/test/resume").contentType("application/json").content(version()))
+        mvc.perform(put("/api/common/users/test/resume").contentType("application/json").content(version()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.userStatCd").value("USE"))
             .andExpect(jsonPath("$.data.projectIds").isEmpty())
             .andExpect(jsonPath("$.data.modDttm").value("2026-01-02T03:04:05.123457Z"));
         assertThat(data.history).anyMatch(item -> item.type().equals("RESUME") && item.key().equals("test"));
+        assertThat(data.accounts.get("test").modDttm).isEqualTo(TOKEN.plusNanos(1000));
+        assertThat(data.projects.get("test")).isEmpty();
         verify(mapper).changeState("test", TOKEN, "USE", false);
         verify(mapper, never()).insertScope(anyString(), anyString(), anyString());
     }
-    @Test void authBusinessSideEffectBulkStopPartialSuccessPreservesProtectedUserStatCd() throws Exception {
+    @Test
+    @DisplayName("side-effect: 일괄 중지는 처리 계정의 상태·이력만 저장하고 보호 계정은 보존한다")
+    void authBusinessSideEffectBulkStopPartialSuccessPreservesProtectedUserStatCd() throws Exception {
         data.add("good", "USE", List.of("EXEC")); data.add("lead", "USE", List.of("SALES_LDR"));
         data.leaders.put("lead", List.of("예약 파트")); data.add("stale", "USE", List.of("EXEC")).modDttm = TOKEN.plusNanos(1000);
         String body = "{\"users\":[{\"userId\":\"good\",\"modDttm\":null},{\"userId\":\"lead\",\"modDttm\":null},{\"userId\":\"admin\",\"modDttm\":null},{\"userId\":\"stale\",\"modDttm\":null}],\"confirmedProjectIds\":[]}";
         body = body.replace("\"modDttm\":null", "\"modDttm\":\"2026-01-02T03:04:05.123456Z\"");
-        mvc.perform(post("/api/common/users/stop").contentType("application/json").content(body))
+        mvc.perform(put("/api/common/users/stop").contentType("application/json").content(body))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.processedUserIds[0]").value("good"))
             .andExpect(jsonPath("$.data.unprocessedCount").value(3));
         assertThat(data.accounts.get("good").userStatCd).isEqualTo("STOP");
+        assertThat(data.accounts.get("good").modDttm).isEqualTo(TOKEN.plusNanos(1000));
         assertThat(data.accounts.get("lead").userStatCd).isEqualTo("USE");
+        assertThat(data.accounts.get("lead").modDttm).isEqualTo(TOKEN);
         assertThat(data.accounts.get("admin").userStatCd).isEqualTo("USE");
+        assertThat(data.accounts.get("admin").modDttm).isEqualTo(TOKEN);
+        assertThat(data.accounts.get("stale").userStatCd).isEqualTo("USE");
+        assertThat(data.history).hasSize(1);
         assertThat(data.history).anyMatch(item -> item.type().equals("STOP") && item.key().equals("good"));
         verify(mapper).changeState("good", TOKEN, "STOP", false);
         verify(mapper, never()).changeState(eq("lead"), any(), anyString(), anyBoolean());
         verify(mapper, never()).changeState(eq("admin"), any(), anyString(), anyBoolean());
     }
     @Test void validationEmptyStopIs400BeforeAnyWrites() throws Exception {
-        mvc.perform(post("/api/common/users/stop").contentType("application/json").content("{\"users\":[],\"confirmedProjectIds\":[]}"))
+        mvc.perform(put("/api/common/users/stop").contentType("application/json").content("{\"users\":[],\"confirmedProjectIds\":[]}"))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("users"));
+        verify(mapper, never()).changeState(anyString(), any(), anyString(), anyBoolean());
+    }
+    @Test void stopDoesNotCountALockedAdminAsAReplacementForTheLastUseAdmin() throws Exception {
+        data.add("lockedadmin", "LOCK", List.of("ADMIN"));
+        String body = json.writeValueAsString(Map.of(
+            "users", List.of(Map.of("userId", "admin", "modDttm", TOKEN.toString())),
+            "confirmedProjectIds", List.of()));
+        mvc.perform(put("/api/common/users/stop").contentType("application/json").content(body))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.processedUserIds").isEmpty())
+            .andExpect(jsonPath("$.data.unprocessedCount").value(1));
+        assertThat(data.accounts.get("admin").userStatCd).isEqualTo("USE");
+        assertThat(data.accounts.get("lockedadmin").userStatCd).isEqualTo("LOCK");
+        assertThat(mapper.countActiveAdmins()).isEqualTo(1);
         verify(mapper, never()).changeState(anyString(), any(), anyString(), anyBoolean());
     }
     @Test void unknownUpdatePropertyIs400RatherThanEditableIdentity() throws Exception {
@@ -258,15 +325,18 @@ class CommonUserControllerTest {
         mvc.perform(get("/api/common/users/test/change-history")).andExpect(status().isOk()).andExpect(jsonPath("$.data").isArray());
         mvc.perform(get("/api/common/users/none")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("userId"));
     }
-    @Test void authSideEffectPasswordResetAnonymousChangesModDttmWithoutTbSyAccsLog() throws Exception {
+    @Test
+    @DisplayName("side-effect: 비밀번호 초기화는 MOD_DTTM과 해시를 갱신하고 TB_SY_ACCS_LOG를 추가하지 않는다")
+    void authSideEffectPasswordResetAnonymousChangesModDttmWithoutTbSyAccsLog() throws Exception {
         data.add("test", "USE", List.of("EXEC"));
-        mvc.perform(post("/api/common/users/test/password-reset").contentType("application/json").content(version()))
+        mvc.perform(put("/api/common/users/test/password-reset").contentType("application/json").content(version()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.userId").value("test"))
             .andExpect(jsonPath("$.data.tempPwdYn").value("Y"))
             .andExpect(jsonPath("$.data.modDttm").value("2026-01-02T03:04:05.123457Z"))
             .andExpect(jsonPath("$.data.password").doesNotExist());
         assertThat(data.hashes.get("test")).matches("\\$2[aby]\\$10\\$.{53}");
+        assertThat(data.accounts.get("test").modDttm).isEqualTo(TOKEN.plusNanos(1000));
         verify(mapper).resetPassword(eq("test"), eq(TOKEN), anyString());
         verify(mapper, never()).insertAccess(anyString(), anyString(), anyString());
     }
@@ -274,7 +344,7 @@ class CommonUserControllerTest {
         data.add("test", "USE", List.of("EXEC"));
         String before = passwords.hashAndDeliver("test@example.invalid");
         data.hashes.put("test", before);
-        mvc.perform(post("/api/common/users/test/password-reset").contentType("application/json").content("{}"))
+        mvc.perform(put("/api/common/users/test/password-reset").contentType("application/json").content("{}"))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("modDttm"));
         assertThat(data.hashes.get("test")).isEqualTo(before);
         verify(mapper, never()).resetPassword(anyString(), any(), anyString());
@@ -284,7 +354,7 @@ class CommonUserControllerTest {
         data.add("test", "USE", List.of("EXEC")).modDttm = TOKEN.plusNanos(1000);
         String before = passwords.hashAndDeliver("test@example.invalid");
         data.hashes.put("test", before);
-        mvc.perform(post("/api/common/users/test/password-reset").contentType("application/json").content(version()))
+        mvc.perform(put("/api/common/users/test/password-reset").contentType("application/json").content(version()))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value(UserFailure.conflict().getMessage()));
         assertThat(data.hashes.get("test")).isEqualTo(before);
         assertThat(data.temporary).doesNotContain("test");
@@ -293,7 +363,7 @@ class CommonUserControllerTest {
     }
     @Test void validationUnlockRequiresModDttmAndPreservesFailures() throws Exception {
         data.add("test", "LOCK", List.of("EXEC"));
-        mvc.perform(post("/api/common/users/test/unlock").contentType("application/json").content("{}"))
+        mvc.perform(put("/api/common/users/test/unlock").contentType("application/json").content("{}"))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("modDttm"));
         assertThat(data.accounts.get("test").userStatCd).isEqualTo("LOCK");
         assertThat(data.failures.get("test")).isEqualTo(5);
@@ -301,7 +371,7 @@ class CommonUserControllerTest {
     }
     @Test void validationResumeRequiresModDttmWithoutStateOrHistoryWrites() throws Exception {
         data.add("test", "STOP", List.of("PM"));
-        mvc.perform(post("/api/common/users/test/resume").contentType("application/json").content("{}"))
+        mvc.perform(put("/api/common/users/test/resume").contentType("application/json").content("{}"))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("modDttm"));
         assertThat(data.accounts.get("test").userStatCd).isEqualTo("STOP");
         verify(mapper, never()).changeState(anyString(), any(), anyString(), anyBoolean());
@@ -309,7 +379,7 @@ class CommonUserControllerTest {
     }
     @Test void businessResumeStaleModDttmPreservesStoppedAccountAndScopes() throws Exception {
         data.add("test", "STOP", List.of("PM")).modDttm = TOKEN.plusNanos(1000);
-        mvc.perform(post("/api/common/users/test/resume").contentType("application/json").content(version()))
+        mvc.perform(put("/api/common/users/test/resume").contentType("application/json").content(version()))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.message").value(UserFailure.conflict().getMessage()));
         assertThat(data.accounts.get("test").userStatCd).isEqualTo("STOP");
@@ -320,7 +390,7 @@ class CommonUserControllerTest {
     }
     @Test void businessUnlockStaleModDttmPreservesLockAndFailureCount() throws Exception {
         data.add("test", "LOCK", List.of("EXEC")).modDttm = TOKEN.plusNanos(1000);
-        mvc.perform(post("/api/common/users/test/unlock").contentType("application/json").content(version()))
+        mvc.perform(put("/api/common/users/test/unlock").contentType("application/json").content(version()))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value(UserFailure.conflict().getMessage()));
         assertThat(data.accounts.get("test").userStatCd).isEqualTo("LOCK");
         assertThat(data.failures.get("test")).isEqualTo(5);

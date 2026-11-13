@@ -12,13 +12,20 @@ import {
 } from "../userpreferences";
 import { PlaceholderScreen } from "./PlaceholderScreen";
 import { UserPage } from "../users/UserPage";
+import { RolePage } from "../roles/RolePage";
 import {
   UserRegistrationButton,
   UserWorkspaceProvider,
 } from "../users/UserWorkspace";
 
 const renderScreen = (scrnId: string) =>
-  scrnId === "UI-23" ? <UserPage /> : <PlaceholderScreen scrnId={scrnId} />;
+  scrnId === "UI-23" ? (
+    <UserPage />
+  ) : scrnId === "UI-24" ? (
+    <RolePage />
+  ) : (
+    <PlaceholderScreen scrnId={scrnId} />
+  );
 
 /** 공통 화면 틀(00) + 공통 기능(00-1): 탭, 즐겨찾기·최근, 도구줄, 메뉴 접기 저장. */
 function PreferenceNavigation() {

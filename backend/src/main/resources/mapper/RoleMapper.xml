@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.roles.RoleMapper">
+  <resultMap id="role" type="com.company.common.roles.RoleRows$Role" autoMapping="false">
+    <id column="role_id" property="roleId" javaType="java.lang.String"/>
+    <result column="role_nm" property="roleName" javaType="java.lang.String"/>
+    <result column="data_scope_cd" property="dataScopeCd" javaType="java.lang.String"/>
+    <result column="snstv_view_yn" property="snstvViewYn" javaType="java.lang.String"/>
+    <result column="use_yn" property="useYn" javaType="java.lang.String"/>
+  </resultMap>
+  <resultMap id="menu" type="com.company.common.roles.RoleRows$Menu" autoMapping="false">
+    <id column="menu_id" property="menuId" javaType="java.lang.String"/>
+    <result column="menu_nm" property="menuName" javaType="java.lang.String"/>
+    <result column="group_name" property="groupName" javaType="java.lang.String"/>
+    <result column="inq_yn" property="readYn" javaType="java.lang.String"/>
+    <result column="reg_yn" property="createYn" javaType="java.lang.String"/>
+    <result column="upd_yn" property="updateYn" javaType="java.lang.String"/>
+    <result column="del_yn" property="deleteYn" javaType="java.lang.String"/>
+    <result column="upld_yn" property="uploadYn" javaType="java.lang.String"/>
+    <result column="dnld_yn" property="downloadYn" javaType="java.lang.String"/>
+    <result column="cnfm_yn" property="cnfmYn" javaType="java.lang.String"/>
+  </resultMap>
+  <resultMap id="dataScope" type="com.company.common.roles.RoleRows$ScopeCode" autoMapping="false">
+    <id column="code" property="code" javaType="java.lang.String"/>
+    <result column="code_nm" property="name" javaType="java.lang.String"/>
+  </resultMap>
+  <resultMap id="scope" type="com.company.common.roles.RoleRows$Scope" autoMapping="false">
+    <id column="user_id" property="userId" javaType="java.lang.String"/>
+    <id column="scope_sn" property="scopeSn" javaType="_int"/>
+    <result column="scope_type_cd" property="scopeTypeCd" javaType="java.lang.String"/>
+    <result column="part_id" property="partId" javaType="java.lang.String"/>
+    <result column="proj_id" property="projId" javaType="java.lang.String"/>
+  </resultMap>
+  <sql id="roleColumns">r.role_id, r.role_nm, r.data_scope_cd, r.snstv_view_yn, r.use_yn</sql>
+  <select id="selectRoles" resultMap="role">
+    SELECT <include refid="roleColumns"/> FROM TB_SY_ROLE r
+    WHERE r.use_yn='Y' ORDER BY r.sort_ord, r.role_id
+  </select>
+  <select id="selectRole" resultMap="role">
+    SELECT <include refid="roleColumns"/> FROM TB_SY_ROLE r WHERE r.role_id=#{id}
+  </select>
+  <select id="selectMenus" resultMap="menu">
+    SELECT a.menu_id, m.menu_nm, COALESCE(g.menu_nm,'') AS group_name,
+      a.inq_yn, a.reg_yn, a.upd_yn, a.del_yn, a.upld_yn, a.dnld_yn, a.cnfm_yn
+    FROM TB_SY_ROLE_MENU_AUTH a
+    JOIN TB_SY_MENU m ON m.menu_id=a.menu_id
+    LEFT JOIN TB_SY_MENU g ON g.menu_id=m.upper_menu_id
+    WHERE a.role_id=#{id} AND m.scrn_id IS NOT NULL AND m.use_yn='Y'
+      AND NOT EXISTS (SELECT 1 FROM TB_SY_MENU child WHERE child.upper_menu_id=m.menu_id)
+    ORDER BY g.sort_ord NULLS FIRST, g.menu_id, m.sort_ord, m.menu_id
+  </select>
+  <select id="selectDataScopes" resultMap="dataScope">
+    SELECT c.code, c.code_nm FROM TB_SY_CODE c
+    WHERE c.code_grp_id='DATA_SCOPE' AND c.use_yn='Y' AND c.del_yn='N'
+      AND c.code IN ('ALL','PART','PROJ')
+    ORDER BY c.sort_ord, c.code
+  </select>
+  <select id="nameExists" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_SY_ROLE r WHERE r.role_nm=#{name})
+  </select>
+  <select id="selectIssuedNumber" resultType="java.math.BigInteger">
+    SELECT COALESCE(MAX(substring(issued.id FROM 3)::numeric),0) FROM (
+      SELECT r.role_id AS id FROM TB_SY_ROLE r
+      UNION ALL
+      SELECT h.trgt_key AS id FROM TB_SY_CHG_HIST h WHERE h.trgt_tbl_nm='TB_SY_ROLE'
+    ) issued WHERE issued.id ~ '^R-[0-9]+$'
+  </select>
+  <select id="selectNextSortOrder" resultType="int">
+    SELECT COALESCE(MAX(r.sort_ord),0)+1 FROM TB_SY_ROLE r
+  </select>
+  <insert id="insertRole">
+    INSERT INTO TB_SY_ROLE (role_id,role_nm,data_scope_cd,snstv_view_yn,sys_role_yn,sort_ord,
+      use_yn,reg_user_id,reg_dttm)
+    VALUES (#{id},#{input.roleName},#{input.dataScopeCd},#{source.snstvViewYn},'N',#{sort},
+      'Y','admin',clock_timestamp())
+  </insert>
+  <insert id="copyMenus">
+    INSERT INTO TB_SY_ROLE_MENU_AUTH (role_id,menu_id,inq_yn,reg_yn,upd_yn,del_yn,upld_yn,
+      dnld_yn,cnfm_yn,reg_user_id,reg_dttm)
+    SELECT #{id},a.menu_id,a.inq_yn,a.reg_yn,a.upd_yn,a.del_yn,a.upld_yn,a.dnld_yn,a.cnfm_yn,
+      'admin',clock_timestamp() FROM TB_SY_ROLE_MENU_AUTH a WHERE a.role_id=#{sourceId}
+  </insert>
+  <update id="updateRole">
+    UPDATE TB_SY_ROLE SET data_scope_cd=#{input.dataScopeCd},snstv_view_yn=#{input.snstvViewYn},
+      mod_user_id='admin',mod_dttm=clock_timestamp() WHERE role_id=#{id}
+  </update>
+  <update id="updateMenu">
+    UPDATE TB_SY_ROLE_MENU_AUTH SET inq_yn=#{input.readYn},reg_yn=#{input.createYn},
+      upd_yn=#{input.updateYn},del_yn=#{input.deleteYn},upld_yn=#{input.uploadYn},
+      dnld_yn=#{input.downloadYn},cnfm_yn=#{input.cnfmYn},mod_user_id='admin',mod_dttm=clock_timestamp()
+    WHERE role_id=#{id} AND menu_id=#{input.menuId}
+  </update>
+  <select id="countAssignments" resultType="long">
+    SELECT COUNT(DISTINCT ur.user_id) FROM TB_SY_USER_ROLE ur WHERE ur.role_id=#{id}
+  </select>
+  <update id="stopRole">
+    UPDATE TB_SY_ROLE SET use_yn='N',mod_user_id='admin',mod_dttm=clock_timestamp() WHERE role_id=#{id}
+  </update>
+  <select id="selectRemovableScopes" resultMap="scope">
+    SELECT s.user_id,s.scope_sn,s.scope_type_cd,s.part_id,s.proj_id FROM TB_SY_USER_SCOPE s
+    WHERE s.scope_type_cd=#{type}
+      AND EXISTS (SELECT 1 FROM TB_SY_USER_ROLE ur WHERE ur.user_id=s.user_id AND ur.role_id=#{id})
+      AND NOT EXISTS (
+        SELECT 1 FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.role_id=ur.role_id
+        WHERE ur.user_id=s.user_id AND r.role_id!=#{id} AND r.use_yn='Y' AND r.data_scope_cd=#{type}
+      )
+      AND (
+        (#{type}='PART' AND EXISTS (SELECT 1 FROM TB_BS_PART p WHERE p.part_id=s.part_id AND p.hq_yn='Y'))
+        OR (#{type}='PROJ' AND s.proj_id IS NOT NULL AND NOT EXISTS (
+          SELECT 1 FROM TB_SY_USER_ROLE pm WHERE pm.user_id=s.user_id AND pm.role_id='PM'
+        ))
+      )
+    ORDER BY s.user_id,s.scope_sn
+  </select>
+  <select id="selectPreservedPmUsers" resultType="string">
+    SELECT DISTINCT s.user_id FROM TB_SY_USER_SCOPE s
+    WHERE s.scope_type_cd='PROJ' AND s.proj_id IS NOT NULL
+      AND EXISTS (SELECT 1 FROM TB_SY_USER_ROLE ur WHERE ur.user_id=s.user_id AND ur.role_id=#{id})
+      AND EXISTS (SELECT 1 FROM TB_SY_USER_ROLE pm WHERE pm.user_id=s.user_id AND pm.role_id='PM')
+    ORDER BY s.user_id
+  </select>
+  <delete id="deleteScope">
+    DELETE FROM TB_SY_USER_SCOPE WHERE user_id=#{userId} AND scope_sn=#{scopeSn}
+  </delete>
+  <insert id="insertHistory">
+    INSERT INTO TB_SY_CHG_HIST (trgt_tbl_nm,trgt_key,chg_type_cd,chg_item_nm,bfr_val,aft_val,reg_user_id,reg_dttm)
+    VALUES (#{table},#{key},#{type},#{item},#{before,jdbcType=VARCHAR},#{after,jdbcType=VARCHAR},
+      'admin',clock_timestamp())
+  </insert>
+  <insert id="insertRoleAccess">
+    INSERT INTO TB_SY_ACCS_LOG (user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm)
+    VALUES ('admin','AUTH_CHG','UI-24',#{id},clock_timestamp(),'admin',clock_timestamp())
+  </insert>
+</mapper>

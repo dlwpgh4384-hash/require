@@ -7,11 +7,14 @@
   gap: 6px;
   min-width: 0;
 }
-.menu-registration-form > label,
-.menu-registration-level legend {
-  margin-top: 8px;
+/* 시안 .fl: 13px·500·#4b5563, 칸 묶음 사이 12px, 이름과 칸 사이 4px. */
+.app-dialog .menu-registration-form > label,
+.app-dialog .menu-registration-level legend {
+  display: block;
+  margin: 8px 0 0;
   color: var(--text-sub);
   font-size: 13px;
+  font-weight: 500;
 }
 .menu-registration-level {
   display: flex;
@@ -22,16 +25,19 @@
   border: 0;
   min-width: 0;
 }
-.menu-registration-level legend {
+.app-dialog .menu-registration-level legend {
   width: 100%;
   padding: 0;
   margin-bottom: 6px;
 }
-.menu-registration-level label {
+.app-dialog .menu-registration-level label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-sub);
   font-size: 14px;
+  font-weight: 400;
 }
 .menu-registration-form .ls-in {
   width: 100%;
@@ -42,11 +48,15 @@
   font-size: 12px;
   line-height: 16px;
 }
-.menu-registration-check {
+.app-dialog .menu-registration-form > label.menu-registration-check {
   display: flex;
   align-items: center;
   gap: 8px;
   min-height: 36px;
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 400;
 }
 .menu-registration-hint {
   margin: 4px 0 0;

@@ -19,9 +19,11 @@
   padding: 24px;
   box-shadow: 0 12px 36px var(--scrim);
 }
+/* 시안 모달 제목: 16px·600. */
 .app-dialog h2 {
   margin: 0 0 20px;
-  font-size: 18px;
+  font-size: 16px;
+  font-weight: 600;
 }
 .app-dialog label {
   display: block;

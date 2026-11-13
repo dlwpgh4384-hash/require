@@ -8,9 +8,9 @@
   display: flex;
   justify-content: flex-end;
 }
-.menu-settings-host:empty,
-.menu-settings-host > [data-testid="menu-registration"]:empty {
-  display: none;
+/* 제목줄 단추를 쓸 때 본문의 등록 자리(창·안내만 담음)는 흐름에서 빼서 표 위 간격을 시안(본문 위 24px)과 같게. */
+.menu-settings-host {
+  position: absolute;
 }
 .menu-registration-title {
   display: inline-flex;
@@ -47,7 +47,8 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--bg);
+  background: var(--hover);
+  color: var(--text);
   font-weight: 600;
 }
 /* 손잡이·순서·사용·PC 전용 칸은 가운데. */
@@ -60,8 +61,14 @@
 .menu-settings-table th:nth-child(1) {
   width: 40px;
 }
+/* 시안: 대메뉴 줄은 칸 전체 #f3f4f6, 글씨 600(손잡이만 회색). */
 .menu-settings-group td {
-  background: var(--bg);
+  background: var(--hover);
+  font-weight: 600;
+}
+.menu-settings-group td:first-child,
+.menu-settings-child td:first-child {
+  color: var(--text-sub);
 }
 .menu-settings-group .ls-in {
   width: 220px;

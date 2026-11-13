@@ -149,3 +149,16 @@ export const roleDraft = (settings: RoleSettings): RoleUpdate => ({
   ),
   confirmedAffectedUserIds: [],
 });
+/** 저장하면 남는 변경 이력 줄 수: 데이터 범위·민감 항목·메뉴별 동작 칸마다 바뀐 것 1줄(서버 기록 규칙과 같다). */
+export const changedItemCount = (before: RoleUpdate, after: RoleUpdate) => {
+  let count =
+    Number(before.dataScopeCd !== after.dataScopeCd) +
+    Number(before.snstvViewYn !== after.snstvViewYn);
+  for (const menu of after.menuAuths) {
+    const old = before.menuAuths.find((row) => row.menuId === menu.menuId);
+    if (old)
+      for (const [key] of roleActions)
+        count += Number(old[key] !== menu[key]);
+  }
+  return count;
+};

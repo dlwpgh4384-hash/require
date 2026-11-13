@@ -42,7 +42,7 @@ export function RoleHistoryDialog({
                 <th scope="col">항목</th>
                 <th scope="col">바꾸기 전</th>
                 <th scope="col">바꾼 뒤</th>
-                <th scope="col">바꾼 사람</th>
+                <th scope="col">처리자</th>
               </tr>
             </thead>
             <tbody>

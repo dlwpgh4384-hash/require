@@ -343,8 +343,16 @@ it("saves scope sensitive and action flags without labels or rename and re-reads
   await loaded();
   fireEvent.click(screen.getByTestId("role-sensitive"));
   fireEvent.click(screen.getByTestId("role-m011-cnfmyn"));
+  expect(
+    screen.getByText("「시스템 관리자」에 저장하지 않은 변경이 있습니다."),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByTestId("role-save"));
-  await screen.findByTestId("role-toast");
+  expect(await screen.findByTestId("role-toast")).toHaveTextContent(
+    "권한을 저장했습니다. 이 역할 사용자의 다음 요청부터 적용됩니다. 변경 이력에 2줄 남겼습니다.",
+  );
+  expect(
+    screen.queryByText("「시스템 관리자」에 저장하지 않은 변경이 있습니다."),
+  ).not.toBeInTheDocument();
   const call = writes("PUT")[0];
   const input = JSON.parse(call[1].body);
   expect(input.snstvViewYn).toBe("N");

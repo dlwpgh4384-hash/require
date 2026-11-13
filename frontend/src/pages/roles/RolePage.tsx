@@ -9,6 +9,7 @@ import { RoleHistoryDialog } from "./RoleHistoryDialog";
 import { RoleImpactDialog } from "./RoleImpactDialog";
 import { useRoleWorkspace } from "./RoleWorkspace";
 import * as api from "./roles";
+import { Banner } from "../../shared/list";
 import "../../shared/list/list.css";
 import "./roles.css";
 
@@ -134,6 +135,8 @@ export function RolePage() {
   };
   const persist = async (confirmedAffectedUserIds: string[]) => {
     if (!draft || !settings) return;
+    // 서버는 바뀐 항목마다 이력 1줄(데이터 범위·민감 항목·메뉴별 동작)을 남긴다. 시안 문구에 그 줄 수를 보여 준다.
+    const lines = api.changedItemCount(api.roleDraft(settings), draft);
     const saved = await api.putCommonRole(selected, {
       ...draft,
       confirmedAffectedUserIds,
@@ -141,7 +144,9 @@ export function RolePage() {
     setImpact(null);
     setSettings(saved);
     setDraft(api.roleDraft(saved));
-    setNotice("권한을 저장했습니다. 다음 요청부터 적용됩니다.");
+    setNotice(
+      `권한을 저장했습니다. 이 역할 사용자의 다음 요청부터 적용됩니다. 변경 이력에 ${lines}줄 남겼습니다.`,
+    );
     const refreshed = await api.getCommonRole(selected);
     setSettings(refreshed);
     setDraft(api.roleDraft(refreshed));
@@ -263,6 +268,11 @@ export function RolePage() {
           </button>
         ))}
       </div>
+      {dirty && settings && (
+        <Banner kind="warn">
+          「{settings.role.roleName}」에 저장하지 않은 변경이 있습니다.
+        </Banner>
+      )}
       {listFailure && (
         <div role="alert">
           {listFailure}{" "}

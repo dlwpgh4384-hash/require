@@ -17,6 +17,8 @@ export interface OperatingStandardChange {
 }
 export interface OperatingStandardsResult {
   items: OperatingStandard[];
+  /** 마지막으로 마감한 달(YYYY-MM). 저장 창 문구에 쓴다. */
+  closedMonth?: string | null;
 }
 export class OperatingStandardsRequestError extends Error {
   constructor(

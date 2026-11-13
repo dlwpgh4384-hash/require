@@ -40,7 +40,7 @@ public class CommonOperatingStandardsService {
         var rows = mapper.selectStandards();
         if (rows.isEmpty()) return new Result(rows.stream().map(row -> new Item(row.standardCode,
             row.standardName, row.value.toPlainString(), row.unit, publicMonth(row.month), false, false,
-            row.changedBy)).toList());
+            row.changedBy)).toList(), lastClosed(periods.selectClosedMonths()));
         var currentMonth = mapper.selectCurrentMonth();
         var state = index(rows);
         String base = baseMonth(state, currentMonth);
@@ -55,7 +55,11 @@ public class CommonOperatingStandardsService {
                 row.unit, cash ? null : publicMonth(row.month),
                 isClosed(cash ? base : row.month, base, closed), cash, row.changedBy));
         }
-        return new Result(items);
+        return new Result(items, lastClosed(closed));
+    }
+
+    private String lastClosed(java.util.Collection<String> closed) {
+        return closed.stream().max(String::compareTo).map(month -> publicMonth(month)).orElse(null);
     }
 
     @Transactional

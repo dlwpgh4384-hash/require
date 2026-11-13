@@ -21,13 +21,14 @@ let failGet: boolean;
 let failPut: boolean;
 let failAfterSave: boolean;
 let onSaved: ReturnType<typeof vi.fn>;
+let closedMonth: string | null = null;
 const success = () => ({
   ok: true,
   status: 200,
   json: async () => ({
     success: true,
     meta: {},
-    data: { items: structuredClone(rows) },
+    data: { items: structuredClone(rows), closedMonth },
   }),
 });
 const writes = () =>
@@ -87,6 +88,7 @@ beforeEach(() => {
   failPut = false;
   failAfterSave = false;
   onSaved = vi.fn();
+  closedMonth = null;
   request = vi.fn(async (path: string, init?: RequestInit) => {
     if (path !== "/api/common/operating-standards")
       throw new Error(`예상하지 않은 요청 ${path}`);
@@ -515,4 +517,26 @@ it("successful write followed by failed GET disables duplicate saves until reque
     expect(screen.getByTestId("operating-save")).not.toBeDisabled(),
   );
   expect(writes()).toHaveLength(1);
+});
+
+it("save dialog names the last closed month like the mockup", async () => {
+  closedMonth = "2026-09";
+  await mount();
+  change("vat-rt", "11");
+  openSave();
+  expect(screen.getByTestId("operating-save-dialog")).toHaveTextContent(
+    "마감한 달(2026-09)까지는 바꿀 수 없습니다.",
+  );
+});
+it("history shows one row per month with the parts of a multi-part value", async () => {
+  rows = rows.map((item) =>
+    item.standardCode.startsWith("AI_SCORE_") ? { ...item, closed: true } : item,
+  );
+  await mount();
+  fireEvent.click(screen.getByTestId("operating-history-ai-score-job"));
+  const history = screen.getByTestId("operating-history-dialog");
+  expect(within(history).getAllByRole("row")).toHaveLength(2);
+  expect(
+    screen.getByTestId("operating-history-row-ai-score-job-2026-01"),
+  ).toHaveTextContent("25 / 20 / 15 / 10 / 5 / 5 / 10 / 10 점");
 });

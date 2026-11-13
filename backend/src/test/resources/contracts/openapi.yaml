@@ -2760,11 +2760,17 @@ components:
       type: object
       required:
       - items
+      - closedMonth
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/CommonOperatingStandard'
+        closedMonth:
+          type: string
+          nullable: true
+          pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+          description: 마지막으로 마감한 달. 저장 창 「마감한 달(YYYY-MM)까지는 바꿀 수 없습니다」에 쓴다.
       additionalProperties: false
     CommonCodeMapList:
       type: object

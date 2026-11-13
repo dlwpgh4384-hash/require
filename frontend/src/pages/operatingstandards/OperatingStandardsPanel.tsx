@@ -32,10 +32,11 @@ export function OperatingStandardsPanel({
   const [busy, setBusy] = useState(false);
   const [refreshPending, setRefreshPending] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [closedMonth, setClosedMonth] = useState<string | null>(null);
   const [confirmSave, setConfirmSave] = useState(false);
   const [month, setMonth] = useState(monthNow);
   const [historyCode, setHistoryCode] = useState<string | null>(null);
-  const [deleteRow, setDeleteRow] = useState<api.OperatingStandard | null>(
+  const [deleteRow, setDeleteRow] = useState<api.OperatingStandard[] | null>(
     null,
   );
   const [historyDraft, setHistoryDraft] = useState<Record<string, string>>({});
@@ -69,6 +70,7 @@ export function OperatingStandardsPanel({
       (result) => {
         if (!controller.signal.aborted) {
           setSnapshot(result.items);
+      setClosedMonth(result.closedMonth ?? null);
           setDraft({});
         }
       },
@@ -102,6 +104,7 @@ export function OperatingStandardsPanel({
   const refresh = async () => {
     const result = await api.getCommonOperatingStandards();
     setSnapshot(result.items);
+      setClosedMonth(result.closedMonth ?? null);
     setDraft({});
     setHistoryDraft({});
     await onChanged?.();
@@ -125,6 +128,7 @@ export function OperatingStandardsPanel({
       saved = true;
       setDeleteRow(null);
       setSnapshot(result.items);
+      setClosedMonth(result.closedMonth ?? null);
       setDraft({});
       setHistoryDraft({});
       setConfirmSave(false);
@@ -177,6 +181,28 @@ export function OperatingStandardsPanel({
   };
   const blocked = busy || refreshPending;
   const historyDef = api.operatingRows.find((def) => def.key === historyCode);
+  // 이력 창: 같은 적용 시작월의 칸들을 한 줄로 묶는다(최신 달 먼저, 칸 순서는 시안 순서).
+  const historyMonths = Object.values(
+    (snapshot ?? [])
+      .filter((row) => historyDef?.codes.includes(row.standardCode))
+      .reduce<Record<string, { month: string; rows: api.OperatingStandard[] }>>(
+        (groups, row) => {
+          const key = row.effectiveMonth ?? "immediate";
+          (groups[key] ??= { month: key, rows: [] }).rows.push(row);
+          return groups;
+        },
+        {},
+      ),
+  )
+    .map((group) => ({
+      ...group,
+      rows: group.rows.sort(
+        (a, b) =>
+          historyDef!.codes.indexOf(a.standardCode) -
+          historyDef!.codes.indexOf(b.standardCode),
+      ),
+    }))
+    .sort((a, b) => b.month.localeCompare(a.month));
   return (
     <section
       ref={root}
@@ -463,8 +489,8 @@ export function OperatingStandardsPanel({
                 }}
               />
               <span className="operating-help">
-                마감한 달까지는 바꿀 수 없습니다. 그 앞 달은 예전 값 그대로
-                계산합니다.
+                마감한 달{closedMonth ? `(${closedMonth})` : ""}까지는 바꿀 수
+                없습니다. 그 앞 달은 예전 값 그대로 계산합니다.
               </span>
             </label>
           )}
@@ -512,121 +538,117 @@ export function OperatingStandardsPanel({
           }}
         >
           {failure && <p role="alert">{failure}</p>}
+          {/* 시안: 한 달에 한 줄. 여러 칸 값은 「25 / 20 / … 점」으로 한 칸에 보인다. 마감 안 된 달은 고치고 지울 수 있다. */}
           <table className="operating-history-table">
             <thead>
               <tr>
                 <th>적용 시작월</th>
-                {historyDef?.parts && <th>항목</th>}
                 <th>값</th>
                 <th>처리자</th>
-                <th>동작</th>
+                <th aria-label="동작" />
               </tr>
             </thead>
             <tbody>
-              {(snapshot ?? [])
-                .filter((row) => historyDef?.codes.includes(row.standardCode))
-                .sort(
-                  (a, b) =>
-                    (b.effectiveMonth ?? "").localeCompare(
-                      a.effectiveMonth ?? "",
-                    ) ||
-                    historyDef!.codes.indexOf(a.standardCode) -
-                      historyDef!.codes.indexOf(b.standardCode),
-                )
-                .map((row) => {
-                  const key = api.operatingKey(row);
-                  const testKey = `${api.operatingTestKey(row.standardCode)}-${row.effectiveMonth}`;
-                  return (
-                    <tr
-                      key={key}
-                      data-testid={`operating-history-row-${testKey}`}
-                    >
-                      <td>{row.effectiveMonth ?? "–"}</td>
-                      {historyDef?.parts && (
-                        <td>
-                          {
-                            historyDef.parts[
-                              historyDef.codes.indexOf(row.standardCode)
-                            ]
-                          }
-                        </td>
+              {historyMonths.map(({ month: rowMonth, rows }) => {
+                const first = rows[0];
+                const testKey = `${api.operatingTestKey(first.standardCode)}-${rowMonth}`;
+                const keys = rows.map((row) => api.operatingKey(row));
+                const rowDirty = keys.some((key) => historyDraft[key] !== undefined);
+                const readOnly = first.closed || first.immediate;
+                const multi = !!historyDef?.parts;
+                return (
+                  <tr key={rowMonth} data-testid={`operating-history-row-${testKey}`}>
+                    <td>{first.effectiveMonth ?? "–"}</td>
+                    <td>
+                      {readOnly ? (
+                        <>
+                          {rows.map((row) => row.value).join(" / ")} {first.unit}
+                        </>
+                      ) : (
+                        <span className="operating-history-values">
+                          {rows.map((row) => {
+                            const key = api.operatingKey(row);
+                            const part = multi
+                              ? historyDef!.parts![historyDef!.codes.indexOf(row.standardCode)]
+                              : "";
+                            return (
+                              <input
+                                key={key}
+                                className={`ls-in ls-in-sm${multi ? " operating-history-part" : ""}`}
+                                aria-label={multi ? `${rowMonth} ${part} 이력 값` : `${rowMonth} 이력 값`}
+                                title={multi ? part : undefined}
+                                data-testid={`operating-history-value-${api.operatingTestKey(row.standardCode)}-${rowMonth}`}
+                                value={historyDraft[key] ?? row.value}
+                                disabled={blocked || (historyDirty && !rowDirty)}
+                                aria-invalid={!!(errors[row.standardCode] ?? errors.value)}
+                                onChange={(event) => {
+                                  setHistoryDraft((old) => ({
+                                    ...old,
+                                    [key]: event.target.value,
+                                  }));
+                                  setErrors({});
+                                }}
+                              />
+                            );
+                          })}
+                        </span>
                       )}
-                      <td>
-                        {row.closed || row.immediate ? (
-                          row.value
-                        ) : (
-                          <input
-                            className="ls-in ls-in-sm"
-                            aria-label={`${row.effectiveMonth} 이력 값`}
-                            data-testid={`operating-history-value-${testKey}`}
-                            value={historyDraft[key] ?? row.value}
-                            disabled={
-                              blocked ||
-                              (historyDirty && historyDraft[key] === undefined)
-                            }
-                            aria-invalid={
-                              !!(errors[row.standardCode] ?? errors.value)
-                            }
-                            onChange={(event) => {
-                              setHistoryDraft((old) => ({
-                                ...old,
-                                [key]: event.target.value,
-                              }));
-                              setErrors({});
-                            }}
-                          />
-                        )}
-                      </td>
-                      <td>{row.changedBy ?? "–"}</td>
-                      <td>
-                        {row.immediate ? (
-                          "표에서 바로 고침"
-                        ) : row.closed ? (
-                          "마감 · 읽기 전용 (새 시작월로 추가)"
-                        ) : (
-                          <>
-                            <button
-                              type="button"
-                              data-testid={`operating-history-save-${testKey}`}
-                              disabled={
-                                blocked ||
-                                (historyDirty &&
-                                  historyDraft[key] === undefined)
-                              }
-                              onClick={() =>
-                                void submit([
-                                  {
+                      {!readOnly && <> {first.unit}</>}
+                    </td>
+                    <td>{first.changedBy ?? "–"}</td>
+                    <td>
+                      {first.immediate ? (
+                        "표에서 바로 고침"
+                      ) : first.closed ? (
+                        "마감 · 읽기 전용 (새 시작월로 추가)"
+                      ) : (
+                        <span className="operating-history-actions">
+                          <button
+                            type="button"
+                            className="ls-btn ls-btn-sm"
+                            data-testid={`operating-history-save-${testKey}`}
+                            disabled={blocked || (historyDirty && !rowDirty)}
+                            onClick={() =>
+                              void submit(
+                                rows
+                                  .filter(
+                                    (row) =>
+                                      !multi ||
+                                      (historyDraft[api.operatingKey(row)] !== undefined &&
+                                        historyDraft[api.operatingKey(row)] !== row.value),
+                                  )
+                                  .map((row) => ({
                                     standardCode: row.standardCode,
                                     effectiveMonth: row.effectiveMonth,
-                                    value: historyDraft[key] ?? row.value,
-                                    action: "update",
-                                  },
-                                ])
+                                    value: historyDraft[api.operatingKey(row)] ?? row.value,
+                                    action: "update" as const,
+                                  })),
+                              )
+                            }
+                          >
+                            수정 저장
+                          </button>
+                          <button
+                            type="button"
+                            className="ls-btn ls-btn-sm ls-btn-dt"
+                            data-testid={`operating-history-delete-${testKey}`}
+                            disabled={blocked}
+                            onClick={() => {
+                              if (dirty) {
+                                setFailure("먼저 저장 또는 취소해 주세요.");
+                                return;
                               }
-                            >
-                              수정 저장
-                            </button>
-                            <button
-                              type="button"
-                              className="app-danger"
-                              data-testid={`operating-history-delete-${testKey}`}
-                              disabled={blocked}
-                              onClick={() => {
-                                if (dirty) {
-                                  setFailure("먼저 저장 또는 취소해 주세요.");
-                                  return;
-                                }
-                                setDeleteRow(row);
-                              }}
-                            >
-                              삭제
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                              setDeleteRow(rows);
+                            }}
+                          >
+                            삭제
+                          </button>
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {Object.keys(errors).length > 0 && (
@@ -657,8 +679,8 @@ export function OperatingStandardsPanel({
           }}
         >
           <p>
-            {deleteRow.standardName} · {deleteRow.effectiveMonth} 이력을
-            삭제하시겠습니까?
+            {historyDef?.label ?? deleteRow[0].standardName} ·{" "}
+            {deleteRow[0].effectiveMonth} 이력을 삭제하시겠습니까?
           </p>
           {failure && <p role="alert">{failure}</p>}
           <div className="app-actions">
@@ -675,13 +697,13 @@ export function OperatingStandardsPanel({
               data-testid="operating-delete-confirm"
               disabled={blocked}
               onClick={() =>
-                void submit([
-                  {
-                    standardCode: deleteRow.standardCode,
-                    effectiveMonth: deleteRow.effectiveMonth,
-                    action: "delete",
-                  },
-                ])
+                void submit(
+                  deleteRow.map((row) => ({
+                    standardCode: row.standardCode,
+                    effectiveMonth: row.effectiveMonth,
+                    action: "delete" as const,
+                  })),
+                )
               }
             >
               삭제

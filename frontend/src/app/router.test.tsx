@@ -467,7 +467,9 @@ describe("common code route composition", () => {
       target: { value: "바뀐 이름" },
     });
     fireEvent.click(screen.getByTestId("code-save"));
-    await screen.findByText("공통코드를 저장했습니다.");
+    await screen.findByText(
+      "공통코드 1건을 저장했습니다. 선택 목록에 바로 반영됩니다.",
+    );
     expect(codes).toHaveBeenCalledTimes(2);
     fireEvent.click(screen.getByTestId("code-tab-history"));
     expect(await screen.findByTestId("code-history-row-0")).toHaveTextContent(

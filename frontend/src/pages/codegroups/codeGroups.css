@@ -580,3 +580,8 @@
 .code-page .code-history-panel .code-history-empty {
   color: var(--text-sub);
 }
+/* 수당코드: 이름은 글자로, 값 칸 120px 오른쪽 정렬(시안) */
+.code-table-wrap td .ls-in-sm.code-value-input {
+  width: 120px;
+  text-align: right;
+}

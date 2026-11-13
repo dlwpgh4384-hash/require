@@ -128,7 +128,13 @@ export function OperatingStandardsPanel({
       setDraft({});
       setHistoryDraft({});
       setConfirmSave(false);
-      setNotice("운영 기준값을 저장했습니다.");
+      // 시안: 운영 기준값 n건을 저장했습니다(2026-11부터 적용).
+      const start = changes.find((row) => row.effectiveMonth)?.effectiveMonth;
+      setNotice(
+        changes.some((row) => row.action === "delete")
+          ? "운영 기준값 이력을 지웠습니다."
+          : `운영 기준값 ${changes.length}건을 저장했습니다${start ? `(${start}부터 적용)` : ""}.`,
+      );
       await refresh();
     } catch (error) {
       if (saved) {

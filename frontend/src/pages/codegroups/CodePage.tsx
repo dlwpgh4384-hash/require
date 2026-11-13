@@ -265,6 +265,7 @@ export function CodePage({
     setFailure("");
     let saved = false;
     try {
+      const count = changed.length;
       const result = await api.putCommonCodes(groupId, changed);
       saved = true;
       setSnapshot(result.items);
@@ -272,7 +273,7 @@ export function CodePage({
       setHistoryRevision((value) => value + 1);
       api.notifyCodeOptionsChanged(groupId);
       await refresh(groupId);
-      setNotice("공통코드를 저장했습니다.");
+      setNotice(`공통코드 ${count}건을 저장했습니다. 선택 목록에 바로 반영됩니다.`);
     } catch (error) {
       setFailure(
         saved
@@ -310,6 +311,13 @@ export function CodePage({
     setModalFailure("");
     let committed = false;
     let selected = groupId;
+    // 시안 완료 알림 문구
+    const done =
+      modal === "group"
+        ? `「${newGroup.groupName}」 그룹을 추가했습니다. [코드 추가]로 코드를 넣으세요.`
+        : modal === "code"
+          ? `「${newCode.codeName}」 코드를 추가했습니다.`
+          : `「${deleteTarget?.codeName ?? ""}」 코드를 삭제했습니다.`;
     try {
       if (modal === "group") {
         const result = await api.postCommonCodeGroup(newGroup);
@@ -323,7 +331,7 @@ export function CodePage({
       await refresh(selected);
       setGroupId(selected);
       setModal(null);
-      setNotice("처리했습니다.");
+      setNotice(done);
     } catch (error) {
       if (committed) {
         setModal(null);
@@ -334,13 +342,14 @@ export function CodePage({
         );
       } else {
         const text = message(error);
-        // 시안: 「이름」은(는) 사용된 코드라 삭제할 수 없습니다. 사용을 끄세요.
-        setModalFailure(
-          modal === "delete" && deleteTarget && text.startsWith("사용된 코드")
-            ? `「${deleteTarget.codeName}」은(는) ${text}`
-            : text,
-        );
-        setErrors(errorFields(error));
+        // 시안: 쓴 코드는 창 없이 알림으로 「이름」은(는) 사용된 코드라 삭제할 수 없습니다. 사용을 끄세요.
+        if (modal === "delete" && deleteTarget && text.startsWith("사용된 코드")) {
+          setModal(null);
+          setNotice(`「${deleteTarget.codeName}」은(는) ${text}`);
+        } else {
+          setModalFailure(text);
+          setErrors(errorFields(error));
+        }
       }
     } finally {
       lock.current = false;
@@ -540,7 +549,7 @@ export function CodePage({
             )}
             {dirty && (
               <Banner kind="warn">
-                저장하지 않은 변경 {changed.length}건이 있습니다.
+                저장하지 않은 변경이 있습니다.
               </Banner>
             )}
             {groupId && !snapshot && !failure && (
@@ -572,7 +581,7 @@ export function CodePage({
                           ))}
                           {numeric ? (
                             <>
-                              <th>값</th>
+                              <th className="ctr">값</th>
                               <th>단위</th>
                             </>
                           ) : (
@@ -591,29 +600,33 @@ export function CodePage({
                             data-testid={`code-row-${row.code.toLowerCase()}`}
                           >
                             <td>{row.code}</td>
-                            <td>
-                              <input
-                                className="ls-in ls-in-sm"
-                                aria-label={`${row.code} 이름`}
-                                data-testid={`code-name-${row.code.toLowerCase()}`}
-                                maxLength={100}
-                                value={row.codeName}
-                                aria-invalid={!!errors.codeName}
-                                onChange={(event) =>
-                                  setDraft((rows) =>
-                                    rows.map((item) =>
-                                      item.code === row.code
-                                        ? {
-                                            ...item,
-                                            codeName: event.target.value,
-                                          }
-                                        : item,
-                                    ),
-                                  )
-                                }
-                              />
-                              {fieldError("codeName")}
-                            </td>
+                            {numeric ? (
+                              <td>{row.codeName}</td>
+                            ) : (
+                              <td>
+                                <input
+                                  className="ls-in ls-in-sm"
+                                  aria-label={`${row.code} 이름`}
+                                  data-testid={`code-name-${row.code.toLowerCase()}`}
+                                  maxLength={100}
+                                  value={row.codeName}
+                                  aria-invalid={!!errors.codeName}
+                                  onChange={(event) =>
+                                    setDraft((rows) =>
+                                      rows.map((item) =>
+                                        item.code === row.code
+                                          ? {
+                                              ...item,
+                                              codeName: event.target.value,
+                                            }
+                                          : item,
+                                      ),
+                                    )
+                                  }
+                                />
+                                {fieldError("codeName")}
+                              </td>
+                            )}
                             {extras.map((field) => (
                               <td
                                 key={field.key}
@@ -637,9 +650,9 @@ export function CodePage({
                             ))}
                             {numeric ? (
                               <>
-                                <td>
+                                <td className="ctr">
                                   <input
-                                    className="ls-in ls-in-sm"
+                                    className="ls-in ls-in-sm code-value-input"
                                     type="number"
                                     step="0.0001"
                                     aria-label={`${row.code} 값`}
@@ -762,7 +775,10 @@ export function CodePage({
               type="button"
               data-testid="code-cancel"
               disabled={busy || refreshPending}
-              onClick={discard}
+              onClick={() => {
+                if (!dirty) setNotice("바꾼 내용이 없습니다.");
+                discard();
+              }}
             >
               취소
             </button>
@@ -828,7 +844,7 @@ export function CodePage({
                 ? numeric
                   ? "수당코드 추가"
                   : `코드 추가 · ${group?.groupName ?? ""}`
-                : "코드를 삭제할까요?"
+                : `「${deleteTarget?.codeName ?? ""}」 코드를 삭제할까요?`
           }
           testId={`code-${modal}-dialog`}
           closable
@@ -981,8 +997,8 @@ export function CodePage({
                 </>
               ) : (
                 <p>
-                  {deleteTarget?.codeName} ({deleteTarget?.code}) 코드를
-                  목록에서 숨깁니다. 사용된 코드는 삭제할 수 없습니다.
+                  한 번도 쓰지 않은 코드입니다. 목록과 선택 목록에서 사라지고, 변경
+                  이력에 남습니다. 같은 코드 값은 다시 쓸 수 없습니다.
                 </p>
               )}
               {modalFailure && <p role="alert">{modalFailure}</p>}

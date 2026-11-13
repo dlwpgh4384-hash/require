@@ -218,7 +218,7 @@ it("이름과 여러 사용 체크를 한 번 저장하고 다시 조회하며 �
   fireEvent.click(screen.getByLabelText("TWO 사용"));
   fireEvent.click(screen.getByTestId("code-save"));
   await waitFor(() =>
-    expect(screen.getByText("공통코드를 저장했습니다.")).toBeInTheDocument(),
+    expect(screen.getByText("공통코드 2건을 저장했습니다. 선택 목록에 바로 반영됩니다.")).toBeInTheDocument(),
   );
   expect(writes()).toHaveLength(1);
   expect(writes()[0][1].method).toBe("PUT");

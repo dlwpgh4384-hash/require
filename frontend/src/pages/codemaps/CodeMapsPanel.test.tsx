@@ -283,7 +283,7 @@ it("confirms physical deletion then refreshes and clears selection", async () =>
   render(<CodeMapsPanel onChanged={changed} />);
   const dialog = await readyToDelete();
   expect(
-    within(dialog).getByText(/다음 업로드부터 모르는 표기는 오류/),
+    within(dialog).getByText(/다음 엑셀 업로드부터 이 표기는 모르는 표기로 오류가 납니다/),
   ).toBeInTheDocument();
   fireEvent.click(within(dialog).getByText("삭제"));
   await screen.findByText("등록된 표기가 없습니다.");

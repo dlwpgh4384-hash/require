@@ -137,7 +137,7 @@ export function CodeMapsPanel({
         invalid.groupId = "코드 그룹을 골라 주세요.";
       if (!options?.some((row) => row.code === draft.code))
         invalid.code = "바꿀 코드를 골라 주세요.";
-    } else if (!selected.length) invalid.items = "삭제할 대응을 선택해 주세요.";
+    } else if (!selected.length) invalid.items = "지울 표기를 골라 주세요.";
     setErrors(invalid);
     if (Object.keys(invalid).length) return;
     lock.current = true;
@@ -150,7 +150,11 @@ export function CodeMapsPanel({
       saved = true;
       setDialog(null);
       setDraft(empty());
-      setNotice("표기 대응을 반영했습니다.");
+      setNotice(
+        dialog === "add"
+          ? `「${draft.excelText}」 표기를 추가했습니다.`
+          : `표기 ${selected.length}건을 지웠습니다.`,
+      );
       await refresh();
     } catch (error) {
       if (saved)
@@ -177,7 +181,7 @@ export function CodeMapsPanel({
       return;
     }
     if (kind === "delete" && !selected.length) {
-      setNotice("삭제할 대응을 선택해 주세요.");
+      setNotice("지울 표기를 골라 주세요.");
       return;
     }
     setDraft(empty());
@@ -324,7 +328,11 @@ export function CodeMapsPanel({
       </p>
       {dialog && (
         <Dialog
-          title={dialog === "add" ? "엑셀 표기 추가" : "표기 대응 삭제 확인"}
+          title={
+            dialog === "add"
+              ? "엑셀 표기 추가"
+              : `표기 ${selected.length}건을 지울까요?`
+          }
           testId={`code-map-${dialog}-dialog`}
           closable
           onClose={close}
@@ -439,8 +447,8 @@ export function CodeMapsPanel({
                     ))}
                   </ul>
                   <p>
-                    선택한 대응을 실제 삭제할까요? 다음 업로드부터 모르는 표기는
-                    오류가 됩니다.
+                    다음 엑셀 업로드부터 이 표기는 모르는 표기로 오류가 납니다. 변경
+                    이력에 남습니다.
                   </p>
                   {errors.items && (
                     <p className="field-error">{errors.items}</p>

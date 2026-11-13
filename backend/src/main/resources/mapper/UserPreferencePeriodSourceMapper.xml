@@ -4,7 +4,7 @@
   <select id="selectCashBaseYm" resultType="java.math.BigDecimal">
     SELECT std_val
     FROM TB_SY_OPER_STD
-    WHERE std_cd = 'CASH_BASE_YM' AND aply_bgn_ym &lt;= to_char(CURRENT_DATE, 'YYYYMM')
+    WHERE std_cd = 'CASH_BASE_YM' AND aply_bgn_ym &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul', 'YYYYMM')
     ORDER BY aply_bgn_ym DESC
     LIMIT 1
   </select>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog, Toast } from "../../shared/feedback/Dialog";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
-import { koreanThisMonth } from "../../shared/time";
+import { formatDateTime, koreanThisMonth } from "../../shared/time";
 import { Banner } from "../../shared/list";
 import { usePreferenceBusinessShortcuts } from "../userpreferences/UserPreferenceTools";
 import * as api from "./operatingStandards";
@@ -62,7 +62,7 @@ export function OperatingStandardsPanel({
       (result) => {
         if (!controller.signal.aborted) {
           setSnapshot(result.items);
-      setClosedMonth(result.closedMonth ?? null);
+          setClosedMonth(result.closedMonth ?? null);
           setDraft({});
         }
       },
@@ -97,7 +97,7 @@ export function OperatingStandardsPanel({
   const refresh = async () => {
     const result = await api.getCommonOperatingStandards();
     setSnapshot(result.items);
-      setClosedMonth(result.closedMonth ?? null);
+    setClosedMonth(result.closedMonth ?? null);
     setDraft({});
     await onChanged?.();
     setRefreshPending(false);
@@ -166,7 +166,8 @@ export function OperatingStandardsPanel({
   // 공통 기능 FR-0104: Ctrl+S = 저장(이 탭이 보일 때, 창이 없을 때)
   usePreferenceBusinessShortcuts({
     onSave: () => {
-      if (root.current?.closest("[hidden]") || confirmSave || historyCode) return;
+      if (root.current?.closest("[hidden]") || confirmSave || historyCode)
+        return;
       if (!busy && !refreshPending) openSave();
     },
   });
@@ -279,7 +280,10 @@ export function OperatingStandardsPanel({
                           : undefined),
                     )
                     .find(Boolean);
-                  const input = (row: api.OperatingStandard, label?: string) => {
+                  const input = (
+                    row: api.OperatingStandard,
+                    label?: string,
+                  ) => {
                     const key = api.operatingTestKey(row.standardCode);
                     const error =
                       errors[row.standardCode] ??
@@ -528,13 +532,14 @@ export function OperatingStandardsPanel({
           }}
         >
           {failure && <p role="alert">{failure}</p>}
-          {/* 시안: 보기 전용. 한 달에 한 줄이고 여러 칸 값은 「25 / 20 / … 점」으로 한 칸에 보인다. 값은 본 표에서 바꾼다. */}
+          {/* UI-27-M5: 보기 전용. 값 변경은 본 표에서만 한다. */}
           <table className="operating-history-table">
             <thead>
               <tr>
                 <th>적용 시작월</th>
                 <th>값</th>
                 <th>처리자</th>
+                <th>마지막 변경시각</th>
               </tr>
             </thead>
             <tbody>
@@ -549,7 +554,12 @@ export function OperatingStandardsPanel({
                     <td>
                       {rows.map((row) => row.value).join(" / ")} {first.unit}
                     </td>
-                    <td>{first.changedBy ?? "–"}</td>
+                    <td>{first.changedBy ?? "처음 설정"}</td>
+                    <td>
+                      <time dateTime={first.modifiedAt ?? undefined}>
+                        {formatDateTime(first.modifiedAt)}
+                      </time>
+                    </td>
                   </tr>
                 );
               })}

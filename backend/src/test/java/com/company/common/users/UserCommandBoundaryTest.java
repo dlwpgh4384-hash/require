@@ -1,4 +1,4 @@
-package com.company.common.users;
+package com.company.common.service;
 
 import com.company.common.controller.ApiExceptionHandler;
 import com.company.common.controller.CommonUserController;

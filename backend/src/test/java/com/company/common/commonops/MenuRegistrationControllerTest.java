@@ -1,4 +1,4 @@
-package com.company.common.commonops;
+package com.company.common.controller;
 
 import com.company.common.controller.ApiExceptionHandler;
 import com.company.common.controller.MenuRegistrationController;
@@ -109,7 +109,7 @@ class MenuRegistrationControllerTest {
         mvc.perform(get("/api/common/menu-options").param("menuLvl", "2"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.upperMenus[0].menuId").value("G007"))
             .andExpect(jsonPath("$.data.screens[*].scrnId")
-                .value(org.hamcrest.Matchers.contains("UI-23", "UI-24", "UI-25", "UI-27")));
+                .value(org.hamcrest.Matchers.contains("UI-23", "UI-24", "UI-25", "UI-27", "UI-15")));
         noWrites();
         verifyNoInteractions(management);
     }

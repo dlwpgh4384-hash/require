@@ -422,6 +422,249 @@ function respondWithCommonCodes() {
   return { request, groups, codes, maps, standards, histories };
 }
 
+function respondWithClientParts() {
+  const menus = response();
+  menus.data.push({
+    ...menus.data[0],
+    menuId: "clients-menu",
+    menuNm: "거래처·영업 파트",
+    scrnId: "UI-15",
+    sortOrd: 2,
+    pcOnlyYn: "Y",
+  });
+  menus.meta.screenAccess.push({
+    scrnId: "UI-15",
+    available: true,
+    pcOnlyYn: "Y",
+  });
+  const success = (data: unknown) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ success: true, meta: {}, data }),
+  });
+  const clients = vi.fn(async () => success({ items: [] }));
+  const parts = vi.fn(async () => success({ items: [] }));
+  const request = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url === "/api/common/menus")
+      return { ok: true, status: 200, json: async () => menus };
+    if (url.startsWith("/api/common/user-preferences/"))
+      return {
+        ok: true,
+        status: 200,
+        json: async () => preferenceResponse(url),
+      };
+    if (url.startsWith("/api/common/clients?")) return clients();
+    if (url === "/api/common/parts") return parts();
+    if (url === "/api/common/parts/options")
+      return success({
+        leaders: [],
+        distributionRate: 37,
+        salesExpense: 1200000,
+        closedMonth: null,
+        earliestMonth: "2026-01",
+      });
+    if (/^\/api\/common\/code-groups\/[^/]+\/codes$/.test(url))
+      return success({ items: [] });
+    if (
+      (url === "/api/common/uploads" && init?.method === "POST") ||
+      url === "/api/common/uploads/checked-upload"
+    )
+      return success({
+        uploadId: "checked-upload",
+        modifiedAt: null,
+        statusName: "검사완료",
+        successCount: 0,
+        warningCount: 0,
+        errorCount: 1,
+        issues: [
+          {
+            row: 4,
+            column: "상호",
+            inputValue: "",
+            reason: "상호를 입력해 주세요.",
+            severity: "오류",
+          },
+        ],
+      });
+    throw new Error(`예상하지 않은 요청: ${url}`);
+  });
+  vi.stubGlobal("fetch", request);
+  return { request, clients, parts, success };
+}
+
+describe("client and part route composition", () => {
+  it.each(["/screens/UI-15", "/#UI-15"])(
+    "%s mounts real tabs with tab-specific title actions",
+    async (path) => {
+      const { request, parts } = respondWithClientParts();
+      mount(path);
+      await screen.findByText("등록된 거래처가 없습니다.");
+      expectSingleShell();
+      expect(screen.getAllByTestId("client-part-workspace")).toHaveLength(1);
+      expect(
+        screen.getByTestId("client-create").closest(".screen-actions"),
+      ).not.toBeNull();
+      expect(
+        screen.getByTestId("upload-open").closest(".screen-actions"),
+      ).not.toBeNull();
+      expect(screen.getAllByTestId("upload-actions")).toHaveLength(1);
+      expect(parts).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByTestId("client-workspace-parts"));
+      await screen.findByText("조건에 맞는 결과가 없습니다.");
+      expect(screen.getByTestId("part-page")).toBeVisible();
+      expect(screen.queryByTestId("part-add-button")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("client-create")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("upload-open")).not.toBeInTheDocument();
+      expect(
+        screen.getByTestId("part-title-add").closest(".screen-actions"),
+      ).not.toBeNull();
+      fireEvent.click(screen.getByTestId("part-title-add"));
+      await screen.findByRole("dialog", { name: "파트 추가" });
+      await waitFor(() =>
+        expect(screen.getByTestId("part-rate-input")).toHaveValue("37"),
+      );
+      expect(screen.getByTestId("part-expense-input")).toHaveValue("1,200,000");
+      expect(request).toHaveBeenCalledWith("/api/common/parts/options", {
+        signal: expect.any(AbortSignal),
+      });
+      expect(router?.state.location.pathname).toBe("/screens/UI-15");
+      expect(
+        request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
+      ).toBe(false);
+      fireEvent.click(screen.getByTestId("part-cancel"));
+      expect(
+        screen.queryByTestId("part-create-dialog"),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("client-workspace-clients"));
+      await screen.findByText("등록된 거래처가 없습니다.");
+      expect(screen.queryByTestId("part-title-add")).not.toBeInTheDocument();
+      expect(
+        screen.getByTestId("upload-open").closest(".screen-actions"),
+      ).not.toBeNull();
+      expect(screen.getAllByTestId("client-create")).toHaveLength(1);
+    },
+  );
+
+  it("client title registration opens the existing full-screen form without another URL", async () => {
+    const { request } = respondWithClientParts();
+    mount("/screens/UI-15");
+    await screen.findByText("등록된 거래처가 없습니다.");
+    fireEvent.click(screen.getByTestId("client-create"));
+    expect(await screen.findByText(/구분을 선택하면/)).toBeVisible();
+    expect(screen.queryByTestId("client-page")).not.toBeInTheDocument();
+    expect(router?.state.location.pathname).toBe("/screens/UI-15");
+    expect(
+      request.mock.calls.filter(
+        ([url, init]) => !url.includes("user-preferences") && init?.method,
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("the title upload uses the multipart client and closing its result never applies clients", async () => {
+    const { request } = respondWithClientParts();
+    mount("/screens/UI-15");
+    await screen.findByText("등록된 거래처가 없습니다.");
+    fireEvent.click(screen.getByTestId("upload-open"));
+    await screen.findByTestId("upload-dialog");
+    fireEvent.change(screen.getByTestId("upload-file"), {
+      target: {
+        files: [new File(["workbook"], "clients.xlsx")],
+      },
+    });
+    fireEvent.click(screen.getByTestId("upload-check"));
+    await screen.findByTestId("upload-result-dialog");
+    await waitFor(() =>
+      expect(screen.queryByText("검사 결과 조회 중…")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("upload-apply")).toBeDisabled();
+    const upload = request.mock.calls.find(
+      ([url, init]) => url === "/api/common/uploads" && init?.method === "POST",
+    )!;
+    const form = upload[1]?.body as FormData;
+    expect(form.get("formTypeCode")).toBe("B7");
+    expect(form.get("file")).toBeInstanceOf(File);
+    expect(router?.state.location.pathname).toBe("/screens/UI-15");
+    fireEvent.click(screen.getByTestId("upload-result-close"));
+    expect(
+      screen.queryByTestId("upload-result-dialog"),
+    ).not.toBeInTheDocument();
+    expect(request.mock.calls.some(([url]) => url.endsWith("/apply"))).toBe(
+      false,
+    );
+  });
+
+  it("client loading disables title actions and empty completion enables them", async () => {
+    const { clients, success } = respondWithClientParts();
+    let complete!: (value: ReturnType<typeof success>) => void;
+    clients.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve;
+        }),
+    );
+    mount("/screens/UI-15");
+    await screen.findByText("거래처 조회 중…");
+    expect(screen.getByTestId("client-create")).toBeDisabled();
+    expect(screen.getByTestId("upload-open")).toBeDisabled();
+    await act(async () => {
+      complete(success({ items: [] }));
+    });
+    await screen.findByText("등록된 거래처가 없습니다.");
+    expect(screen.getByTestId("client-create")).toBeEnabled();
+  });
+
+  it("client request failure retries the same API without replacing the shell", async () => {
+    const { clients } = respondWithClientParts();
+    clients.mockRejectedValueOnce(new Error("거래처를 불러오지 못했습니다."));
+    mount("/screens/UI-15");
+    const retry = await screen.findByTestId("client-retry");
+    expect(screen.getByTestId("client-create")).toBeDisabled();
+    fireEvent.click(retry);
+    await screen.findByText("등록된 거래처가 없습니다.");
+    expect(clients).toHaveBeenCalledTimes(2);
+    expectSingleShell();
+  });
+
+  it("part failure retries its direct client in the current tab", async () => {
+    const { parts } = respondWithClientParts();
+    parts.mockRejectedValueOnce(new Error("파트를 불러오지 못했습니다."));
+    mount("/screens/UI-15");
+    await screen.findByText("등록된 거래처가 없습니다.");
+    fireEvent.click(screen.getByTestId("client-workspace-parts"));
+    await screen.findByText("파트를 불러오지 못했습니다.");
+    fireEvent.click(
+      within(screen.getByTestId("part-page")).getByRole("button", {
+        name: "다시 시도",
+      }),
+    );
+    await screen.findByText("조건에 맞는 결과가 없습니다.");
+    expect(parts).toHaveBeenCalledTimes(2);
+    expect(router?.state.location.pathname).toBe("/screens/UI-15");
+    expectSingleShell();
+  });
+
+  it("UI-15 mobile entry retains the existing PC-only guard before feature requests", async () => {
+    const { clients, parts, request } = respondWithClientParts();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query === "(max-width: 767px)",
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    mount("/screens/UI-15");
+    await screen.findByText("PC에서 이용해 주세요");
+    expect(clients).not.toHaveBeenCalled();
+    expect(parts).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("client-page")).not.toBeInTheDocument();
+    expect(
+      request.mock.calls.some(([url]) => url.startsWith("/api/common/uploads")),
+    ).toBe(false);
+    expectSingleShell();
+  });
+});
+
 describe("common code route composition", () => {
   it.each(["/screens/UI-27", "/#UI-27"])(
     "%s opens four real tabs in the existing preference shell",
@@ -451,7 +694,9 @@ describe("common code route composition", () => {
           name: /저장|취소|다운로드/,
         }),
       ).not.toBeInTheDocument();
-      expect(screen.queryByTestId("code-group-title-add")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("code-group-title-add"),
+      ).not.toBeInTheDocument();
       expect(
         request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
       ).toBe(false);

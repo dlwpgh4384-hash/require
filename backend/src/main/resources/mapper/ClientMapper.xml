@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.mapper.ClientMapper">
+  <resultMap id="client" type="com.company.common.mapper.ClientRows$Client" autoMapping="false">
+    <id column="clnt_id" property="clientId" javaType="java.lang.String"/>
+    <result column="clnt_type_cd" property="clientTypeCode" javaType="java.lang.String"/>
+    <result column="clnt_nm" property="clientName" javaType="java.lang.String"/>
+    <result column="biz_reg_no" property="businessNumber" javaType="java.lang.String"/>
+    <result column="ceo_nm" property="representativeName" javaType="java.lang.String"/>
+    <result column="induty_cd" property="industryCode" javaType="java.lang.String"/>
+    <result column="chrg_nm" property="contactName" javaType="java.lang.String"/>
+    <result column="telno" property="contactPhone" javaType="java.lang.String"/>
+    <result column="tax_email_addr" property="taxEmail" javaType="java.lang.String"/>
+    <result column="bank_cd" property="bankCode" javaType="java.lang.String"/>
+    <result column="acct_no_enc" property="encryptedAccount" javaType="java.lang.String"/>
+    <result column="dpstr_nm" property="accountHolder" javaType="java.lang.String"/>
+    <result column="bank_name" property="bankName" javaType="java.lang.String"/>
+    <result column="use_yn" property="useYn" javaType="java.lang.String"/>
+    <result column="mod_dttm" property="modifiedAt" javaType="java.time.Instant"/>
+    <result column="project_count" property="projectCount" javaType="_long"/>
+    <result column="person_count" property="personCount" javaType="_long"/>
+  </resultMap>
+  <resultMap id="assignment" type="com.company.common.mapper.ClientRows$Assignment" autoMapping="false">
+    <result column="proj_id" property="projectId" javaType="java.lang.String"/>
+    <result column="proj_nm" property="projectName" javaType="java.lang.String"/>
+    <result column="dev_nm" property="personName" javaType="java.lang.String"/>
+    <result column="company_name" property="companyName" javaType="java.lang.String"/>
+    <result column="job_name" property="jobName" javaType="java.lang.String"/>
+    <result column="input_end_dt" property="withdrawalDate" javaType="java.time.LocalDate"/>
+  </resultMap>
+  <resultMap id="change" type="com.company.common.mapper.ClientRows$Change" autoMapping="false">
+    <result column="reg_dttm" property="changedAt" javaType="java.time.Instant"/>
+    <result column="chg_item_nm" property="fieldName" javaType="java.lang.String"/>
+    <result column="bfr_val" property="beforeValue" javaType="java.lang.String"/>
+    <result column="aft_val" property="afterValue" javaType="java.lang.String"/>
+    <result column="reg_user_id" property="changedBy" javaType="java.lang.String"/>
+  </resultMap>
+  <sql id="columns">
+    c.clnt_id, c.clnt_type_cd, c.clnt_nm, c.biz_reg_no, c.ceo_nm, c.induty_cd,
+    c.chrg_nm, c.telno, c.tax_email_addr, c.bank_cd, c.acct_no_enc, c.dpstr_nm,
+    c.use_yn, c.mod_dttm,
+    COALESCE(b.code_nm, c.bank_cd, '') AS bank_name
+  </sql>
+  <sql id="todayMembership">
+    a.asgn_stat_cd = 'ACT' AND a.input_bgn_dt &lt;= #{today}
+    AND a.input_end_dt &gt;= #{today}
+    AND ((c.clnt_type_cd IN ('CUST','BOTH') AND p.cust_clnt_id = c.clnt_id)
+      OR (c.clnt_type_cd IN ('VNDR','BOTH') AND d.blng_clnt_id = c.clnt_id))
+  </sql>
+  <sql id="counts">
+    (SELECT count(DISTINCT p.proj_id) FROM TB_PJ_ASGN a
+      JOIN TB_PJ_PROJ p ON p.proj_id = a.proj_id
+      JOIN TB_HR_DEV d ON d.dev_id = a.dev_id
+      WHERE <include refid="todayMembership"/> AND p.proj_stat_cd = 'ING') AS project_count,
+    (SELECT count(DISTINCT d.dev_id) FROM TB_PJ_ASGN a
+      JOIN TB_PJ_PROJ p ON p.proj_id = a.proj_id
+      JOIN TB_HR_DEV d ON d.dev_id = a.dev_id
+      WHERE <include refid="todayMembership"/>) AS person_count
+  </sql>
+  <select id="selectClients" resultMap="client">
+    SELECT <include refid="columns"/>, <include refid="counts"/>
+    FROM TB_BS_CLNT c
+    LEFT JOIN TB_SY_CODE b ON b.code_grp_id = 'BANK' AND b.code = c.bank_cd
+    <where>
+      <if test="filter.useYn != null">AND c.use_yn = #{filter.useYn}</if>
+      <if test="filter.clientTypeCode != null">
+        <choose>
+          <when test="filter.clientTypeCode == 'CUST'">AND c.clnt_type_cd IN ('CUST','BOTH')</when>
+          <when test="filter.clientTypeCode == 'VNDR'">AND c.clnt_type_cd IN ('VNDR','BOTH')</when>
+          <otherwise>AND c.clnt_type_cd = #{filter.clientTypeCode}</otherwise>
+        </choose>
+      </if>
+      <if test="filter.keyword != null">
+        AND (strpos(lower(c.clnt_nm), lower(#{filter.keyword})) &gt; 0
+          OR strpos(c.biz_reg_no, #{filter.keyword}) &gt; 0)
+      </if>
+    </where>
+    ORDER BY c.reg_dttm DESC, c.clnt_id
+  </select>
+  <select id="selectClient" resultMap="client">
+    SELECT <include refid="columns"/>, <include refid="counts"/>
+    FROM TB_BS_CLNT c
+    LEFT JOIN TB_SY_CODE b ON b.code_grp_id = 'BANK' AND b.code = c.bank_cd
+    WHERE c.clnt_id = #{clientId}
+  </select>
+  <select id="lockClient" resultMap="client">
+    SELECT <include refid="columns"/>, 0::bigint AS project_count, 0::bigint AS person_count
+    FROM TB_BS_CLNT c
+    LEFT JOIN TB_SY_CODE b ON b.code_grp_id = 'BANK' AND b.code = c.bank_cd
+    WHERE c.clnt_id = #{clientId} FOR UPDATE OF c
+  </select>
+  <update id="lockClientRelations">
+    LOCK TABLE TB_BS_CLNT, TB_PJ_PROJ, TB_HR_DEV IN SHARE ROW EXCLUSIVE MODE
+  </update>
+  <select id="selectBusinessOwner" resultType="java.lang.String">
+    SELECT c.clnt_nm FROM TB_BS_CLNT c WHERE c.biz_reg_no = #{businessNumber}
+  </select>
+  <select id="selectSameNameNumbers" resultType="java.lang.String">
+    SELECT c.biz_reg_no FROM TB_BS_CLNT c WHERE c.clnt_nm = #{name}
+    <if test="excludedId != null">AND c.clnt_id != #{excludedId}</if>
+    ORDER BY c.biz_reg_no
+  </select>
+  <select id="codeExists" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_SY_CODE c
+      WHERE c.code_grp_id = #{groupId} AND c.code = #{code} AND c.use_yn='Y' AND c.del_yn='N')
+  </select>
+  <insert id="insertClient">
+    INSERT INTO TB_BS_CLNT
+      (clnt_id, clnt_type_cd, clnt_nm, biz_reg_no, ceo_nm, induty_cd, chrg_nm,
+       telno, tax_email_addr, bank_cd, acct_no_enc, dpstr_nm, use_yn, reg_user_id, reg_dttm)
+    VALUES (#{clientId}, #{input.clientTypeCode}, #{input.clientName}, #{input.businessNumber},
+      #{input.representativeName,jdbcType=VARCHAR}, #{input.industryCode,jdbcType=VARCHAR},
+      #{input.contactName,jdbcType=VARCHAR}, #{input.contactPhone,jdbcType=VARCHAR},
+      #{input.taxEmail,jdbcType=VARCHAR}, #{input.bankCode,jdbcType=VARCHAR},
+      #{encryptedAccount,jdbcType=VARCHAR}, #{input.accountHolder,jdbcType=VARCHAR},
+      'Y', #{actor}, clock_timestamp())
+  </insert>
+  <update id="updateClient">
+    UPDATE TB_BS_CLNT SET clnt_type_cd=#{input.clientTypeCode}, clnt_nm=#{input.clientName},
+      ceo_nm=#{input.representativeName,jdbcType=VARCHAR}, induty_cd=#{input.industryCode,jdbcType=VARCHAR},
+      chrg_nm=#{input.contactName,jdbcType=VARCHAR}, telno=#{input.contactPhone,jdbcType=VARCHAR},
+      tax_email_addr=#{input.taxEmail,jdbcType=VARCHAR}, bank_cd=#{input.bankCode,jdbcType=VARCHAR},
+      acct_no_enc=#{encryptedAccount,jdbcType=VARCHAR}, dpstr_nm=#{input.accountHolder,jdbcType=VARCHAR},
+      mod_user_id=#{actor}, mod_dttm=GREATEST(clock_timestamp(), COALESCE(mod_dttm,reg_dttm) + INTERVAL '1 microsecond')
+    WHERE clnt_id=#{clientId} AND mod_dttm IS NOT DISTINCT FROM #{modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+  </update>
+  <update id="updateUseStatus">
+    UPDATE TB_BS_CLNT SET use_yn=#{useYn}, mod_user_id=#{actor},
+      mod_dttm=GREATEST(clock_timestamp(), COALESCE(mod_dttm,reg_dttm) + INTERVAL '1 microsecond')
+    WHERE clnt_id=#{version.clientId}
+      AND mod_dttm IS NOT DISTINCT FROM #{version.modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+  </update>
+  <select id="hasOngoingProject" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_PJ_PROJ p WHERE p.cust_clnt_id=#{clientId} AND p.proj_stat_cd='ING')
+  </select>
+  <select id="hasAffiliatedPerson" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_HR_DEV d WHERE d.blng_clnt_id=#{clientId})
+  </select>
+  <select id="selectAssignments" resultMap="assignment">
+    SELECT p.proj_id, p.proj_nm, d.dev_nm, COALESCE(v.clnt_nm,'') AS company_name,
+      COALESCE(j.code_nm,a.job_cd) AS job_name, a.input_end_dt
+    FROM TB_BS_CLNT c
+    JOIN TB_PJ_ASGN a ON a.asgn_stat_cd='ACT'
+    JOIN TB_PJ_PROJ p ON p.proj_id=a.proj_id
+    JOIN TB_HR_DEV d ON d.dev_id=a.dev_id
+    LEFT JOIN TB_BS_CLNT v ON v.clnt_id=d.blng_clnt_id
+    LEFT JOIN TB_SY_CODE j ON j.code_grp_id='JOB' AND j.code=a.job_cd
+    WHERE c.clnt_id=#{clientId} AND <include refid="todayMembership"/>
+    ORDER BY p.proj_nm, d.dev_nm, a.asgn_id
+  </select>
+  <select id="selectChanges" resultMap="change">
+    SELECT h.reg_dttm, h.chg_item_nm, h.bfr_val, h.aft_val, h.reg_user_id
+    FROM TB_SY_CHG_HIST h WHERE h.trgt_tbl_nm='TB_BS_CLNT' AND h.trgt_key=#{clientId}
+    ORDER BY h.reg_dttm DESC, h.hist_id DESC
+  </select>
+  <select id="selectSelectableClientIds" resultType="java.lang.String">
+    SELECT c.clnt_id FROM TB_BS_CLNT c WHERE c.use_yn='Y' AND c.clnt_type_cd IN ('CUST','BOTH')
+    ORDER BY c.clnt_nm, c.clnt_id
+  </select>
+</mapper>

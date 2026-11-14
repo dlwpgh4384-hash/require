@@ -1,4 +1,6 @@
-package com.company.common.menusettings;
+package com.company.common.controller;
+
+import com.company.common.service.MenuSettingsTestData;
 
 import com.company.common.controller.ApiExceptionHandler;
 import com.company.common.controller.CommonMenuSettingsController;

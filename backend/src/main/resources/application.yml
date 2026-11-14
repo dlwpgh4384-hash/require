@@ -6,6 +6,10 @@ server:
 spring:
   application:
     name: navigation-shell
+  servlet:
+    multipart:
+      max-file-size: 10000000B
+      max-request-size: 11000000B
   datasource:
     url: ${DB_URL}
     username: ${DB_USER}

@@ -1,4 +1,4 @@
-package com.company.common.menusettings;
+package com.company.common.mapper;
 
 import com.company.common.dto.MenuRegistrationContracts.Item;
 import com.company.common.config.MyBatisConfig;

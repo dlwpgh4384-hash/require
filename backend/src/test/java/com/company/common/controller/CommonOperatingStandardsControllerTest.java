@@ -105,7 +105,10 @@ class CommonOperatingStandardsControllerTest {
     void closedIdentityRejectsWholeBatchAndCreatesNoSuccessfulHistory(String action) throws Exception {
         data.closed.add("202602");
         if (!"add".equals(action)) data.row("VAT_RT", "202602", "11", "%");
-        save(item("PART_DSTRB_RT", "2027-01", "add", "45"), item("VAT_RT", "2026-02", action, "12"))
+        var body = json.createObjectNode();
+        body.putArray("items").add(item("PART_DSTRB_RT", "2027-01", "add", "45"))
+            .add(item("VAT_RT", "2026-02", action, "12"));
+        mvc.perform(put("/api/common/operating-standards").contentType("application/json").content(body.toString()))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("마감한 달에는 적용할 수 없습니다."));
         unchanged();
         if (!"add".equals(action)) assertThat(data.rows.get("VAT_RT:202602").value).isEqualByComparingTo("11");
@@ -164,7 +167,9 @@ class CommonOperatingStandardsControllerTest {
         assertThat(data.rows.get("CASH_BASE_AMT:202601").value).isEqualByComparingTo("17");
         assertThat(data.rows.get("CASH_BASE_AMT:202612").value).isEqualByComparingTo("8");
     }
-    @Test void closedOldCashBaseCannotBeMovedToBypassLock() throws Exception {
+    @Test
+    @org.junit.jupiter.api.DisplayName("business: 시작월 마감 뒤 자금 두 값을 바꿔 잠금을 우회할 수 없다")
+    void closedOldCashBaseCannotBeMovedToBypassLock() throws Exception {
         data.closed.add("202601");
         mvc.perform(put("/api/common/operating-standards").contentType("application/json")
             .content("{\"items\":[{\"standardCode\":\"CASH_BASE_YM\",\"effectiveMonth\":null,\"action\":\"update\",\"value\":\"2026-02\"},{\"standardCode\":\"CASH_BASE_AMT\",\"effectiveMonth\":null,\"action\":\"update\",\"value\":\"100\"}]}"))

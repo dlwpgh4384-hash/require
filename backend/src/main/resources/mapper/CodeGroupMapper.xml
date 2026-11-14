@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.common.codegroups.mapper.CodeGroupMapper">
-  <resultMap id="group" type="com.company.common.codegroups.mapper.CodeRows$Group" autoMapping="false">
+<mapper namespace="com.company.common.mapper.CodeGroupMapper">
+  <resultMap id="group" type="com.company.common.mapper.CodeRows$Group" autoMapping="false">
     <id column="code_grp_id" property="groupId" javaType="java.lang.String"/>
     <result column="code_grp_nm" property="groupName" javaType="java.lang.String"/>
     <result column="sys_code_yn" property="sysCodeYn" javaType="java.lang.String"/>
@@ -9,7 +9,7 @@
     <result column="code_count" property="codeCount" javaType="_int"/>
     <result column="sort_ord" property="sortOrd" javaType="_int"/>
   </resultMap>
-  <resultMap id="code" type="com.company.common.codegroups.mapper.CodeRows$Code" autoMapping="false">
+  <resultMap id="code" type="com.company.common.mapper.CodeRows$Code" autoMapping="false">
     <id column="code_grp_id" property="groupId" javaType="java.lang.String"/>
     <id column="code" property="code" javaType="java.lang.String"/>
     <result column="code_nm" property="codeName" javaType="java.lang.String"/>

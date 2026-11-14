@@ -1,4 +1,4 @@
-package com.company.common.commonops;
+package com.company.common.service;
 
 import com.company.common.controller.*;
 import com.company.common.dto.MenuRegistrationContracts.Create;

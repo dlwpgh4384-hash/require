@@ -1,7 +1,7 @@
-package com.company.common.codegroups.service;
+package com.company.common.service;
 
-import com.company.common.codegroups.controller.CommonCodeController;
-import com.company.common.codegroups.mapper.CodeGroupMapper;
+import com.company.common.controller.CommonCodeController;
+import com.company.common.mapper.CodeGroupMapper;
 import com.company.common.controller.ApiExceptionHandler;
 import com.company.common.controller.CodeExceptionHandler;
 import com.company.common.mapper.UserMapper;

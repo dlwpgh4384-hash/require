@@ -1,4 +1,4 @@
-package com.company.common.menusettings;
+package com.company.common.service;
 
 import com.company.common.dto.MenuRegistrationContracts.Item;
 import com.company.common.dto.UserContracts.History;
@@ -12,11 +12,11 @@ import java.util.Map;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-final class MenuSettingsTestData {
-    final Map<String, Item> rows = new LinkedHashMap<>();
-    final List<History> histories = new ArrayList<>();
+public final class MenuSettingsTestData {
+    public final Map<String, Item> rows = new LinkedHashMap<>();
+    public final List<History> histories = new ArrayList<>();
 
-    MenuSettingsTestData(MenuSettingsMapper mapper, UserMapper management) {
+    public MenuSettingsTestData(MenuSettingsMapper mapper, UserMapper management) {
         add(new Item("G001", null, "합성 첫 묶음", null, 1, 1, "Y", "N", "N", "folder"));
         add(new Item("G002", null, "합성 시스템", null, 1, 2, "N", "Y", "Y", "gear"));
         add(new Item("M001", "G001", "첫 메뉴", "UI-01", 2, 1, "Y", "N", "N", null));

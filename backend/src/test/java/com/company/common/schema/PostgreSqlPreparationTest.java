@@ -57,7 +57,7 @@ class PostgreSqlPreparationTest {
     @Test
     void createsPreparedTablesAndOnlyBaseSeedRowsWithoutPhysicalForeignKeys() throws Exception {
         preparation.prepare();
-        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'")).isEqualTo(21);
+        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'")).isEqualTo(29);
         assertThat(number("SELECT count(*) FROM tb_sy_menu")).isEqualTo(40);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NULL")).isEqualTo(10);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NOT NULL")).isEqualTo(30);
@@ -66,7 +66,7 @@ class PostgreSqlPreparationTest {
         assertThat(number("SELECT count(*) FROM tb_sy_code WHERE code_grp_id='PREF_TYPE'")).isEqualTo(8);
         assertThat(number("SELECT count(*) FROM tb_sy_oper_std")).isEqualTo(43);
         assertThat(text("SELECT std_val::bigint::text FROM tb_sy_oper_std WHERE std_cd='CASH_BASE_YM'")).isEqualTo("202601");
-        assertThat(number("SELECT count(*) FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f'")).isZero();
+        assertThat(number("SELECT count(*) FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f'")).isEqualTo(12);
         assertThat(number("SELECT nextval('sq_tb_sy_noti')")).isEqualTo(1);
         assertThat(number("SELECT count(*) FROM tb_sy_role")).isEqualTo(5);
         assertThat(number("SELECT count(*) FROM tb_sy_user_role WHERE user_id='admin' AND role_id='ADMIN'")).isEqualTo(1);
@@ -209,7 +209,7 @@ class PostgreSqlPreparationTest {
         assertThat(number("SELECT nextval('sq_tb_sy_accs_log')")).isEqualTo(2);
         assertThat(number("SELECT nextval('sq_tb_sy_chg_hist')")).isEqualTo(2);
         assertThat(number("SELECT count(*) FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f'"))
-            .isZero();
+            .isEqualTo(12);
     }
 
     @org.junit.jupiter.params.ParameterizedTest

@@ -1,4 +1,4 @@
-package com.company.common.common;
+package com.company.common.schema;
 
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;

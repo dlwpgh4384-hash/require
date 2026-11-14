@@ -1,4 +1,4 @@
-package com.company.common.commonops;
+package com.company.common.mapper;
 
 import com.company.common.mapper.MenuRegistrationMapper;
 import com.company.common.mapper.MenuRegistrationRow;
@@ -56,7 +56,7 @@ class MenuRegistrationProjectionTest {
     }
     @Test void registryContainsOnlyImplementedScreenContracts() {
         assertThat(new DevelopedScreenRegistry().screens()).extracting(row -> row.scrnId())
-            .containsExactly("UI-23", "UI-24", "UI-25", "UI-27");
+            .containsExactly("UI-23", "UI-24", "UI-25", "UI-27", "UI-15");
         assertThat(new DevelopedScreenRegistry().contains("UI-27")).isTrue();
     }
 }

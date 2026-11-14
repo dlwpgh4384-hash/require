@@ -1,4 +1,4 @@
-package com.company.common.commonops.service;
+package com.company.common.service;
 
 import com.company.common.mapper.CodeHistoryRow;
 import com.company.common.mapper.CommonCodeHistoryMapper;

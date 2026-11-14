@@ -8,6 +8,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import org.apache.commons.compress.archivers.zip.Zip64Mode;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Row;
@@ -28,6 +29,8 @@ public class ExcelExportService {
     public byte[] write(String title, List<String> headers, List<List<String>> rows, String downloadedBy,
         Instant atUtc) {
         try (var workbook = new SXSSFWorkbook(200); var out = new ByteArrayOutputStream()) {
+            // ZIP64가 필요 없는 파일은 JDK ZipInputStream으로도 읽을 수 있게 쓴다.
+            workbook.setZip64Mode(Zip64Mode.AsNeeded);
             Sheet sheet = workbook.createSheet(title);
             Font bold = workbook.createFont();
             bold.setBold(true);

@@ -1,4 +1,4 @@
-package com.company.common.common;
+package com.company.common.schema;
 
 import com.company.common.schema.SchemaPreparation;
 import java.nio.charset.StandardCharsets;
@@ -32,7 +32,7 @@ class MenuPreparationBoundaryTest {
         "V3__common_function_seed.sql", "V4__user_management_seed.sql",
         "V5__role_permissions.sql", "V6__role_schema_contract.sql",
         "V7__code_definitions_schema.sql", "V8__calculation_rule_seed.sql",
-        "V9__common_entity_contract.sql");
+        "V9__common_entity_contract.sql", "V10__client_part_upload_schema.sql");
     private final SqlSessionFactory factory = mock(SqlSessionFactory.class);
     private final SqlSession session = mock(SqlSession.class);
     private final Connection connection = mock(Connection.class);
@@ -89,7 +89,7 @@ class MenuPreparationBoundaryTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {5, 6, 7, 8, 9})
+    @ValueSource(ints = {5, 6, 7, 8, 9, 10})
     void permissionPreparationFailureRollsBackTheWholePreparation(int failingResource) throws Exception {
         int[] executions = {0};
         when(statement.execute(anyString())).thenAnswer(call -> {
@@ -115,7 +115,8 @@ class MenuPreparationBoundaryTest {
             "TB_SY_NOTI", "TB_BS_PART_STD", "TB_PJ_PROJ", "TB_BL_BILL", "TB_BL_DUN_HIST", "TB_CL_CLOSE",
             "TB_SY_USER", "TB_SY_CODE_GRP", "TB_SY_CODE", "TB_SY_OPER_STD", "TB_SY_ROLE", "TB_SY_USER_ROLE",
             "TB_BS_PART", "TB_SY_ACCS_LOG", "TB_SY_CHG_HIST", "TB_SY_ROLE_MENU_AUTH",
-            "TB_SY_CODE_MAP", "TB_SY_CALC_RULE");
+            "TB_SY_CODE_MAP", "TB_SY_CALC_RULE", "TB_BS_CLNT", "TB_SY_UPLD", "TB_SY_UPLD_ERR",
+            "TB_SY_ADM_AREA", "TB_HR_DEV", "TB_PJ_ASGN", "TB_PJ_PROJ_PART", "TB_CO_PART_SETL");
     }
 
     @Test

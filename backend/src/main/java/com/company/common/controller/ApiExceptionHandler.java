@@ -16,6 +16,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -61,6 +62,12 @@ public class ApiExceptionHandler {
     @ExceptionHandler({HttpMessageNotReadableException.class, HttpMediaTypeNotSupportedException.class})
     public ResponseEntity<Error> unreadable(Exception failure) {
         return of(HttpStatus.BAD_REQUEST, "입력 형식을 확인해 주세요.", List.of(new FieldError("body", "입력 형식을 확인해 주세요.")));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Error> uploadTooLarge(MaxUploadSizeExceededException failure) {
+        String message = "10,000,000 bytes 이하의 엑셀 파일을 선택해 주세요.";
+        return of(HttpStatus.BAD_REQUEST, message, List.of(new FieldError("file", message)));
     }
 
     @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)

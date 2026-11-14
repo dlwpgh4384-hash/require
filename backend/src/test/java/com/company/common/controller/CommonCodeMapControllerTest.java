@@ -128,7 +128,9 @@ class CommonCodeMapControllerTest {
             .andExpect(jsonPath("$.errors[0].field").value(field));
         noWrites();
     }
-    @Test void sameTextAndGroupRejectsAnotherCodeAndKeepsOriginal() throws Exception {
+    @Test
+    @org.junit.jupiter.api.DisplayName("business: 같은 표기+그룹의 중복 대응은 기존 코드를 보존한다")
+    void sameTextAndGroupRejectsAnotherCodeAndKeepsOriginal() throws Exception {
         create(item()).andExpect(status().isOk());
         mvc.perform(post("/api/common/code-maps").contentType("application/json")
             .content(item().put("code", "OTHER").toString())).andExpect(status().isBadRequest())
@@ -146,7 +148,9 @@ class CommonCodeMapControllerTest {
         create(item()).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("code"));
         noWrites();
     }
-    @Test void anonymousDeletionPhysicallyRemovesEvenUsedMappingAndKeepsPreviousHistory() throws Exception {
+    @Test
+    @org.junit.jupiter.api.DisplayName("auth happy business side-effect: 사용된 대응도 실제 삭제하고 이전 이력은 보존한다")
+    void anonymousDeletionPhysicallyRemovesEvenUsedMappingAndKeepsPreviousHistory() throws Exception {
         create(item()).andExpect(status().isOk());
         mvc.perform(post("/api/common/code-maps/delete").contentType("application/json")
             .content(deletion(item()).toString())).andExpect(status().isOk())

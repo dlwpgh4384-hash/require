@@ -1,4 +1,4 @@
-package com.company.common.commonops.controller;
+package com.company.common.controller;
 
 import com.company.common.controller.ApiExceptionHandler;
 import com.company.common.controller.CodeExceptionHandler;

@@ -1,7 +1,7 @@
-package com.company.common.codegroups.service;
+package com.company.common.service;
 
-import com.company.common.codegroups.mapper.CodeGroupMapper;
-import com.company.common.codegroups.mapper.CodeRows;
+import com.company.common.mapper.CodeGroupMapper;
+import com.company.common.mapper.CodeRows;
 import com.company.common.mapper.UserPreferencePeriodSourceMapper;
 import com.company.common.service.CodeFailure;
 import java.math.BigDecimal;

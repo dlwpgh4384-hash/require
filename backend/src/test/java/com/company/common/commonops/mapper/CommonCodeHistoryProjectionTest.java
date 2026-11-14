@@ -1,4 +1,4 @@
-package com.company.common.commonops.mapper;
+package com.company.common.mapper;
 
 import com.company.common.dto.CodeHistoryContracts.Item;
 import com.company.common.mapper.CodeHistoryRow;

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.common.parts.PartMapper">
+<mapper namespace="com.company.common.parts.mapper.PartMapper">
   <select id="selectCurrentMonth" resultType="java.lang.String">
     SELECT to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')
   </select>
-  <resultMap id="master" type="com.company.common.parts.PartRows$Master" autoMapping="false">
+  <resultMap id="master" type="com.company.common.parts.mapper.PartRows$Master" autoMapping="false">
     <id column="part_id" property="partId" javaType="java.lang.String"/>
     <result column="part_nm" property="partName" javaType="java.lang.String"/>
     <result column="use_yn" property="useYn" javaType="java.lang.String"/>
@@ -12,7 +12,7 @@
     <result column="person_count" property="personCount" javaType="java.lang.Long"/>
     <result column="project_count" property="projectCount" javaType="java.lang.Long"/>
   </resultMap>
-  <resultMap id="period" type="com.company.common.parts.PartRows$Period" autoMapping="false">
+  <resultMap id="period" type="com.company.common.parts.mapper.PartRows$Period" autoMapping="false">
     <id column="part_id" property="partId" javaType="java.lang.String"/>
     <id column="aply_bgn_ym" property="month" javaType="java.lang.String"/>
     <result column="aply_end_ym" property="endMonth" javaType="java.lang.String"/>
@@ -21,11 +21,11 @@
     <result column="prft_dstrb_rt" property="distributionRate" javaType="java.math.BigDecimal"/>
     <result column="sales_exps_amt" property="salesExpense" javaType="java.math.BigDecimal"/>
   </resultMap>
-  <resultMap id="leader" type="com.company.common.parts.PartRows$Leader" autoMapping="false">
+  <resultMap id="leader" type="com.company.common.parts.mapper.PartRows$Leader" autoMapping="false">
     <id column="user_id" property="userId" javaType="java.lang.String"/>
     <result column="user_nm" property="userName" javaType="java.lang.String"/>
   </resultMap>
-  <resultMap id="history" type="com.company.common.mapper.UserRows$Change" autoMapping="false">
+  <resultMap id="history" type="com.company.common.users.mapper.UserRows$Change" autoMapping="false">
     <result column="reg_dttm" property="changedAt" javaType="java.time.Instant"/>
     <result column="chg_item_nm" property="item" javaType="java.lang.String"/>
     <result column="bfr_val" property="before" javaType="java.lang.String"/>

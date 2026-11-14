@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.common.mapper.CalculationRuleMapper">
-  <resultMap id="definition" type="com.company.common.mapper.CalculationRuleRow" autoMapping="false">
+<mapper namespace="com.company.common.calculation.mapper.CalculationRuleMapper">
+  <resultMap id="definition" type="com.company.common.calculation.mapper.CalculationRuleRow" autoMapping="false">
     <id column="calc_id" property="calcId" javaType="java.lang.String"/>
     <result column="frml_cn" property="formula" javaType="java.lang.String"/>
     <result column="dtl_cn" property="details" javaType="java.lang.String"/>
   </resultMap>
-  <resultMap id="standard" type="com.company.common.mapper.CalculationStandardRow" autoMapping="false">
+  <resultMap id="standard" type="com.company.common.calculation.mapper.CalculationStandardRow" autoMapping="false">
     <id column="std_cd" property="standardCode" javaType="java.lang.String"/>
     <id column="aply_bgn_ym" property="effectiveMonth" javaType="java.lang.String"/>
     <result column="std_val" property="value" javaType="java.math.BigDecimal"/>
   </resultMap>
-  <resultMap id="codeText" type="com.company.common.mapper.CodeTextRow" autoMapping="false">
+  <resultMap id="codeText" type="com.company.common.codegroups.mapper.CodeTextRow" autoMapping="false">
     <id column="code_grp_id" property="groupId" javaType="java.lang.String"/>
     <id column="code" property="code" javaType="java.lang.String"/>
     <result column="code_nm" property="codeName" javaType="java.lang.String"/>

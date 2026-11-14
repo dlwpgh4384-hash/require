@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.common.mapper.UserOptionsMapper">
+<mapper namespace="com.company.common.users.mapper.UserOptionsMapper">
   <resultMap id="userOptionRole"
-             type="com.company.common.mapper.UserOptionRows$Role"
+             type="com.company.common.users.mapper.UserOptionRows$Role"
              autoMapping="false">
     <result column="role_cd" property="roleCd" javaType="java.lang.String"/>
     <result column="role_name" property="roleName" javaType="java.lang.String"/>
@@ -10,7 +10,7 @@
     <result column="assigned_part_scope" property="assignedPartScope" javaType="_boolean"/>
   </resultMap>
   <resultMap id="userOptionProject"
-             type="com.company.common.mapper.UserOptionRows$Project"
+             type="com.company.common.users.mapper.UserOptionRows$Project"
              autoMapping="false">
     <result column="project_id" property="projectId" javaType="java.lang.String"/>
     <result column="project_name" property="projectName" javaType="java.lang.String"/>
@@ -18,7 +18,7 @@
     <result column="pm_name" property="pmName" javaType="java.lang.String"/>
   </resultMap>
   <resultMap id="userOptionState"
-             type="com.company.common.mapper.UserOptionRows$UserState"
+             type="com.company.common.users.mapper.UserOptionRows$UserState"
              autoMapping="false">
     <result column="code" property="code" javaType="java.lang.String"/>
     <result column="name" property="name" javaType="java.lang.String"/>

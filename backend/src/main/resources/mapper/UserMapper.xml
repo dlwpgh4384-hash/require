@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.common.mapper.UserMapper">
-  <resultMap id="account" type="com.company.common.mapper.UserRows$Account" autoMapping="false">
+<mapper namespace="com.company.common.users.mapper.UserMapper">
+  <resultMap id="account" type="com.company.common.users.mapper.UserRows$Account" autoMapping="false">
     <id column="user_id" property="userId" javaType="java.lang.String"/>
     <result column="user_nm" property="name" javaType="java.lang.String"/>
     <result column="email_addr" property="email" javaType="java.lang.String"/>
@@ -10,23 +10,23 @@
     <result column="last_login_dttm" property="lastAccessAt" javaType="java.time.Instant"/>
     <result column="temp_pwd_yn" property="tempPwdYn" javaType="java.lang.String"/>
   </resultMap>
-  <resultMap id="change" type="com.company.common.mapper.UserRows$Change" autoMapping="false">
+  <resultMap id="change" type="com.company.common.users.mapper.UserRows$Change" autoMapping="false">
     <result column="reg_dttm" property="changedAt" javaType="java.time.Instant"/>
     <result column="chg_item_nm" property="item" javaType="java.lang.String"/>
     <result column="bfr_val" property="before" javaType="java.lang.String"/>
     <result column="aft_val" property="after" javaType="java.lang.String"/>
     <result column="changed_by" property="changedBy" javaType="java.lang.String"/>
   </resultMap>
-  <resultMap id="project" type="com.company.common.mapper.UserRows$Project" autoMapping="false">
+  <resultMap id="project" type="com.company.common.users.mapper.UserRows$Project" autoMapping="false">
     <id column="proj_id" property="projectId" javaType="java.lang.String"/>
     <result column="proj_nm" property="projectName" javaType="java.lang.String"/>
   </resultMap>
-  <resultMap id="owner" type="com.company.common.mapper.UserRows$Owner" autoMapping="false">
+  <resultMap id="owner" type="com.company.common.users.mapper.UserRows$Owner" autoMapping="false">
     <result column="user_id" property="userId" javaType="java.lang.String"/>
     <result column="proj_id" property="projectId" javaType="java.lang.String"/>
     <result column="proj_nm" property="projectName" javaType="java.lang.String"/>
   </resultMap>
-  <resultMap id="log" type="com.company.common.mapper.UserRows$Log" autoMapping="false">
+  <resultMap id="log" type="com.company.common.users.mapper.UserRows$Log" autoMapping="false">
     <result column="act_dttm" property="occurredAt" javaType="java.time.Instant"/>
     <result column="action" property="action" javaType="java.lang.String"/>
     <result column="trgt_desc" property="target" javaType="java.lang.String"/>

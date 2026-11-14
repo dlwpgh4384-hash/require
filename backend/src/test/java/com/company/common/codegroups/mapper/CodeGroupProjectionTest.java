@@ -1,4 +1,4 @@
-package com.company.common.mapper;
+package com.company.common.codegroups.mapper;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
@@ -64,7 +64,7 @@ class CodeGroupProjectionTest {
         labels.put("val_code_yn","N"); labels.put("sort_ord",76543); labels.put("code_count",234);
         assertThat(mapping.getAutoMapping()).isFalse();
         for(var field:mapping.getResultMappings()) meta.setValue(field.getProperty(),labels.get(field.getColumn()));
-        assertThat(row.value()).isEqualTo(new com.company.common.dto.CodeContracts.Group("ALLOWANCE","수당","Y","N",234));
+        assertThat(row.value()).isEqualTo(new com.company.common.codegroups.dto.CodeContracts.Group("ALLOWANCE","수당","Y","N",234));
         assertThat(row.sortOrd).isEqualTo(76543);
     }
     @Test void allReferenceQueriesAreUnfilteredAndOnlyEnumIdentifiersAreInterpolated() throws Exception {

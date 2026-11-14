@@ -1,6 +1,6 @@
-package com.company.common.dto;
+package com.company.common.codegroups.dto;
 
-import com.company.common.mapper.CodeRows;
+import com.company.common.codegroups.mapper.CodeRows;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.common.mapper.ClientMapper">
-  <resultMap id="client" type="com.company.common.mapper.ClientRows$Client" autoMapping="false">
+<mapper namespace="com.company.common.clients.mapper.ClientMapper">
+  <resultMap id="client" type="com.company.common.clients.mapper.ClientRows$Client" autoMapping="false">
     <id column="clnt_id" property="clientId" javaType="java.lang.String"/>
     <result column="clnt_type_cd" property="clientTypeCode" javaType="java.lang.String"/>
     <result column="clnt_nm" property="clientName" javaType="java.lang.String"/>
@@ -20,7 +20,7 @@
     <result column="project_count" property="projectCount" javaType="_long"/>
     <result column="person_count" property="personCount" javaType="_long"/>
   </resultMap>
-  <resultMap id="assignment" type="com.company.common.mapper.ClientRows$Assignment" autoMapping="false">
+  <resultMap id="assignment" type="com.company.common.clients.mapper.ClientRows$Assignment" autoMapping="false">
     <result column="proj_id" property="projectId" javaType="java.lang.String"/>
     <result column="proj_nm" property="projectName" javaType="java.lang.String"/>
     <result column="dev_nm" property="personName" javaType="java.lang.String"/>
@@ -28,7 +28,7 @@
     <result column="job_name" property="jobName" javaType="java.lang.String"/>
     <result column="input_end_dt" property="withdrawalDate" javaType="java.time.LocalDate"/>
   </resultMap>
-  <resultMap id="change" type="com.company.common.mapper.ClientRows$Change" autoMapping="false">
+  <resultMap id="change" type="com.company.common.clients.mapper.ClientRows$Change" autoMapping="false">
     <result column="reg_dttm" property="changedAt" javaType="java.time.Instant"/>
     <result column="chg_item_nm" property="fieldName" javaType="java.lang.String"/>
     <result column="bfr_val" property="beforeValue" javaType="java.lang.String"/>

@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.developers.mapper.DeveloperMapper">
+  <resultMap id="developer" type="com.company.common.developers.mapper.DeveloperRows$Developer" autoMapping="false">
+    <id column="dev_id" property="developerId" javaType="java.lang.String"/>
+    <result column="mng_no" property="managementNumber" javaType="java.lang.String"/>
+    <result column="dev_nm" property="name" javaType="java.lang.String"/>
+    <result column="emp_type_cd" property="employeeTypeCode" javaType="java.lang.String"/>
+    <result column="blng_clnt_id" property="organizationId" javaType="java.lang.String"/>
+    <result column="grade_cd" property="gradeCode" javaType="java.lang.String"/>
+    <result column="job_cd" property="primaryJobCode" javaType="java.lang.String"/>
+    <result column="sub_job_cd" property="secondaryJobCode" javaType="java.lang.String"/>
+    <result column="jbps_cd" property="positionCode" javaType="java.lang.String"/>
+    <result column="drct_cls_cd" property="directClassCode" javaType="java.lang.String"/>
+    <result column="part_id" property="salesPartId" javaType="java.lang.String"/>
+    <result column="jncmp_dt" property="hireDate" javaType="java.time.LocalDate"/>
+    <result column="retire_dt" property="retirementDate" javaType="java.time.LocalDate"/>
+    <result column="home_area_cd" property="homeAreaCode" javaType="java.lang.String"/>
+    <result column="home_addr" property="homeAddress" javaType="java.lang.String"/>
+    <result column="organization_name" property="organizationName" javaType="java.lang.String"/>
+    <result column="employee_name" property="employeeTypeName" javaType="java.lang.String"/>
+    <result column="grade_name" property="gradeName" javaType="java.lang.String"/>
+    <result column="job_name" property="primaryJobName" javaType="java.lang.String"/>
+    <result column="work_stat_cd" property="workStatusCode" javaType="java.lang.String"/>
+    <result column="use_yn" property="useYn" javaType="java.lang.String"/>
+    <result column="mon_uprc" property="monthlyRate" javaType="java.math.BigDecimal"/>
+    <result column="mon_pay_amt" property="monthlyPay" javaType="java.math.BigDecimal"/>
+  </resultMap>
+  <resultMap id="assignment" type="com.company.common.developers.mapper.DeveloperRows$Assignment" autoMapping="false">
+    <id column="asgn_id" property="assignmentId" javaType="java.lang.String"/>
+    <result column="proj_id" property="projectId" javaType="java.lang.String"/>
+    <result column="proj_nm" property="projectName" javaType="java.lang.String"/>
+    <result column="job_name" property="jobName" javaType="java.lang.String"/>
+    <result column="input_bgn_dt" property="startDate" javaType="java.time.LocalDate"/>
+    <result column="input_end_dt" property="endDate" javaType="java.time.LocalDate"/>
+    <result column="ctrt_mm" property="mm" javaType="java.math.BigDecimal"/>
+  </resultMap>
+  <resultMap id="state" type="com.company.common.developers.mapper.DeveloperRows$State" autoMapping="false">
+    <id column="dev_id" property="developerId" javaType="java.lang.String"/>
+    <id column="stat_sn" property="sequence" javaType="_int" typeHandler="com.company.common.developers.mapper.DeveloperSequenceTypeHandler"/>
+    <result column="work_stat_cd" property="code" javaType="java.lang.String"/>
+    <result column="bgn_dt" property="startDate" javaType="java.time.LocalDate"/>
+    <result column="end_dt" property="endDate" javaType="java.time.LocalDate"/>
+    <result column="stat_rsn" property="reason" javaType="java.lang.String"/>
+    <result column="close_leave_sn" property="closedLeaveSequence" javaType="java.lang.Integer" typeHandler="com.company.common.developers.mapper.DeveloperSequenceTypeHandler"/>
+    <result column="orgnl_leave_end_dt" property="originalEndDate" javaType="java.time.LocalDate"/>
+    <result column="reg_user_id" property="registeredBy" javaType="java.lang.String"/>
+  </resultMap>
+  <resultMap id="area" type="com.company.common.developers.mapper.DeveloperRows$Area" autoMapping="false">
+    <id column="area_cd" property="areaCode" javaType="java.lang.String"/>
+    <result column="area_name" property="areaName" javaType="java.lang.String"/>
+  </resultMap>
+  <resultMap id="address" type="com.company.common.developers.mapper.DeveloperRows$Address" autoMapping="false">
+    <id column="area_cd" property="areaCode" javaType="java.lang.String"/>
+    <result column="upper_area_cd" property="parentAreaCode" javaType="java.lang.String"/>
+    <result column="address" property="address" javaType="java.lang.String"/>
+  </resultMap>
+  <resultMap id="code" type="com.company.common.developers.mapper.DeveloperRows$Code" autoMapping="false">
+    <id column="code" property="code" javaType="java.lang.String"/>
+    <result column="code_nm" property="name" javaType="java.lang.String"/>
+  </resultMap>
+  <resultMap id="change" type="com.company.common.developers.mapper.DeveloperRows$Change" autoMapping="false">
+    <result column="reg_dttm" property="changedAt" javaType="java.time.Instant"/>
+    <result column="chg_item_nm" property="fieldName" javaType="java.lang.String"/>
+    <result column="bfr_val" property="beforeValue" javaType="java.lang.String"/>
+    <result column="aft_val" property="afterValue" javaType="java.lang.String"/>
+    <result column="reg_user_id" property="changedBy" javaType="java.lang.String"/>
+    <result column="chg_rsn" property="reason" javaType="java.lang.String"/>
+  </resultMap>
+  <update id="lockSources">
+    LOCK TABLE TB_CL_CLOSE, TB_SY_OPER_STD, TB_PJ_ASGN, TB_HR_DEV, TB_BS_CLNT, TB_BS_PART, TB_SY_CODE IN SHARE ROW EXCLUSIVE MODE
+  </update>
+  <sql id="columns">
+    d.dev_id,d.mng_no,d.dev_nm,d.emp_type_cd,COALESCE(d.blng_clnt_id,'') AS blng_clnt_id,d.grade_cd,
+    d.job_cd,d.sub_job_cd,d.jbps_cd,d.drct_cls_cd,d.part_id,d.jncmp_dt,d.retire_dt,d.home_area_cd,d.home_addr,
+    d.work_stat_cd,d.use_yn,COALESCE(c.clnt_nm,'자사') AS organization_name,
+    COALESCE(e.code_nm,d.emp_type_cd) AS employee_name,g.code_nm AS grade_name,
+    COALESCE(j.code_nm,d.job_cd) AS job_name,r.mon_uprc,r.mon_pay_amt
+  </sql>
+  <sql id="joins">
+    LEFT JOIN TB_BS_CLNT c ON c.clnt_id=d.blng_clnt_id
+    LEFT JOIN TB_SY_CODE e ON e.code_grp_id='EMP_TYPE' AND e.code=d.emp_type_cd
+    LEFT JOIN TB_SY_CODE g ON g.code_grp_id='GRADE' AND g.code=d.grade_cd
+    LEFT JOIN TB_SY_CODE j ON j.code_grp_id='JOB' AND j.code=d.job_cd
+    LEFT JOIN TB_HR_DEV_PRC r ON r.dev_id=d.dev_id AND r.aply_bgn_ym &lt;= #{month}
+      AND (r.aply_end_ym IS NULL OR r.aply_end_ym &gt;= #{month})
+  </sql>
+  <select id="selectDevelopers" resultMap="developer">
+    SELECT <include refid="columns"/> FROM TB_HR_DEV d <include refid="joins"/>
+    <where>
+      <if test="filter.employeeTypeCode != null">AND d.emp_type_cd=#{filter.employeeTypeCode}</if>
+      <if test="filter.jobCode != null">AND (d.job_cd=#{filter.jobCode} OR d.sub_job_cd=#{filter.jobCode})</if>
+      <if test="filter.directClassCode != null">AND d.drct_cls_cd=#{filter.directClassCode}</if>
+      <if test="filter.q != null">AND (strpos(lower(d.dev_nm),lower(#{filter.q})) &gt; 0 OR strpos(lower(d.mng_no),lower(#{filter.q})) &gt; 0)</if>
+    </where>
+    ORDER BY d.dev_nm,d.dev_id
+  </select>
+  <select id="selectDeveloper" resultMap="developer">
+    SELECT <include refid="columns"/> FROM TB_HR_DEV d <include refid="joins"/> WHERE d.dev_id=#{id}
+  </select>
+  <select id="lockDeveloper" resultMap="developer">
+    SELECT <include refid="columns"/> FROM TB_HR_DEV d <include refid="joins"/> WHERE d.dev_id=#{id} FOR UPDATE OF d
+  </select>
+  <select id="selectManagementNumbers" resultType="string">SELECT mng_no FROM TB_HR_DEV</select>
+  <select id="selectCodes" resultMap="code">
+    SELECT code,code_nm FROM TB_SY_CODE WHERE code_grp_id=#{groupId} AND use_yn='Y' AND del_yn='N' ORDER BY sort_ord,code
+  </select>
+  <select id="selectableOrganization" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_BS_CLNT WHERE clnt_id=#{id} AND use_yn='Y' AND clnt_type_cd IN ('VNDR','BOTH'))
+  </select>
+  <select id="selectablePart" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_BS_PART WHERE part_id=#{id} AND use_yn='Y')
+  </select>
+  <insert id="insertDeveloper">
+    INSERT INTO TB_HR_DEV(dev_id,mng_no,dev_nm,emp_type_cd,blng_clnt_id,grade_cd,job_cd,sub_job_cd,jbps_cd,
+      drct_cls_cd,part_id,jncmp_dt,work_stat_cd,home_area_cd,home_addr,use_yn,reg_user_id)
+    VALUES(#{developerId},#{input.managementNumber},#{input.name},#{input.employeeTypeCode},NULLIF(#{input.organizationId},''),
+      #{input.gradeCode,jdbcType=VARCHAR},#{input.primaryJobCode},#{input.secondaryJobCode,jdbcType=VARCHAR},#{input.positionCode},
+      #{input.directClassCode},#{input.salesPartId},#{input.hireDate,jdbcType=DATE},'IDLE',
+      #{input.homeAreaCode,jdbcType=VARCHAR},#{input.homeAddress,jdbcType=VARCHAR},'Y',#{actor})
+  </insert>
+  <update id="updateDeveloper">
+    UPDATE TB_HR_DEV SET dev_nm=#{input.name},emp_type_cd=#{input.employeeTypeCode},blng_clnt_id=NULLIF(#{input.organizationId},''),
+      grade_cd=#{input.gradeCode,jdbcType=VARCHAR},job_cd=#{input.primaryJobCode},sub_job_cd=#{input.secondaryJobCode,jdbcType=VARCHAR},
+      jbps_cd=#{input.positionCode},drct_cls_cd=#{input.directClassCode},part_id=#{input.salesPartId},jncmp_dt=#{input.hireDate,jdbcType=DATE},
+      home_area_cd=#{input.homeAreaCode,jdbcType=VARCHAR},home_addr=#{input.homeAddress,jdbcType=VARCHAR},mod_user_id=#{actor},mod_dttm=clock_timestamp()
+    WHERE dev_id=#{developerId}
+  </update>
+  <delete id="deleteSkills">DELETE FROM TB_HR_DEV_SKILL WHERE dev_id=#{id}</delete>
+  <insert id="insertSkill">
+    INSERT INTO TB_HR_DEV_SKILL(dev_id,skill_nm,sort_ord,reg_user_id) VALUES(#{id},#{name},#{order},'admin')
+  </insert>
+  <select id="selectSkills" resultType="string">SELECT skill_nm FROM TB_HR_DEV_SKILL WHERE dev_id=#{id} ORDER BY sort_ord,skill_nm</select>
+  <update id="closePreviousPrice">
+    UPDATE TB_HR_DEV_PRC SET aply_end_ym=#{previousMonth},mod_user_id=#{actor},mod_dttm=clock_timestamp()
+    WHERE dev_id=#{developerId} AND aply_bgn_ym &lt; #{month} AND (aply_end_ym IS NULL OR aply_end_ym &gt;= #{month})
+  </update>
+  <insert id="savePrice">
+    INSERT INTO TB_HR_DEV_PRC(dev_id,aply_bgn_ym,aply_end_ym,mon_uprc,mon_pay_amt,reg_user_id)
+    VALUES(#{developerId},#{month},(SELECT to_char(to_date(min(aply_bgn_ym),'YYYYMM')-INTERVAL '1 month','YYYYMM')
+      FROM TB_HR_DEV_PRC WHERE dev_id=#{developerId} AND aply_bgn_ym &gt; #{month}),
+      #{monthlyRate,jdbcType=NUMERIC},#{monthlyPay,jdbcType=NUMERIC},#{actor})
+    ON CONFLICT(dev_id,aply_bgn_ym) DO UPDATE SET mon_uprc=EXCLUDED.mon_uprc,mon_pay_amt=EXCLUDED.mon_pay_amt,
+      mod_user_id=EXCLUDED.reg_user_id,mod_dttm=clock_timestamp()
+  </insert>
+  <select id="selectAreas" resultMap="area">
+    SELECT area_cd,COALESCE(emd_nm,sgg_nm,sido_nm) AS area_name FROM TB_SY_ADM_AREA WHERE use_yn='Y'
+    <choose><when test="parentAreaCode != null">AND upper_area_cd=#{parentAreaCode}</when><otherwise>AND upper_area_cd IS NULL</otherwise></choose>
+    ORDER BY area_cd
+  </select>
+  <select id="selectAddress" resultMap="address">
+    SELECT area_cd,upper_area_cd,concat_ws(' ',sido_nm,sgg_nm,emd_nm) AS address FROM TB_SY_ADM_AREA WHERE area_cd=#{areaCode} AND use_yn='Y'
+  </select>
+  <select id="selectAssignments" resultMap="assignment">
+    SELECT a.asgn_id,a.proj_id,p.proj_nm,COALESCE(j.code_nm,a.job_cd) AS job_name,a.input_bgn_dt,a.input_end_dt,a.ctrt_mm
+    FROM TB_PJ_ASGN a JOIN TB_PJ_PROJ p ON p.proj_id=a.proj_id
+    LEFT JOIN TB_SY_CODE j ON j.code_grp_id='JOB' AND j.code=a.job_cd
+    WHERE a.dev_id=#{id} AND a.asgn_stat_cd='ACT' ORDER BY a.input_bgn_dt,a.proj_id,a.asgn_id
+  </select>
+  <select id="hasAssignmentHistory" resultType="boolean">SELECT to_regclass('tb_pj_asgn_hist') IS NOT NULL</select>
+  <select id="selectAssignmentMm" resultType="java.math.BigDecimal">
+    SELECT COALESCE((SELECT h.new_ctrt_mm FROM TB_PJ_ASGN_HIST h WHERE h.asgn_id=a.asgn_id AND h.aply_dt &lt;= #{date}
+      AND h.asgn_chg_type_cd='RATE' AND h.new_ctrt_mm IS NOT NULL ORDER BY h.aply_dt DESC,h.hist_sn DESC LIMIT 1),
+      (SELECT h.bfr_val::numeric FROM TB_PJ_ASGN_HIST h WHERE h.asgn_id=a.asgn_id AND h.aply_dt &gt; #{date}
+        AND h.asgn_chg_type_cd='RATE' AND h.new_ctrt_mm IS NOT NULL ORDER BY h.aply_dt,h.hist_sn LIMIT 1),a.ctrt_mm)
+    FROM TB_PJ_ASGN a WHERE a.asgn_id=#{id}
+  </select>
+  <select id="selectStatuses" resultMap="state">
+    SELECT dev_id,stat_sn,work_stat_cd,bgn_dt,end_dt,stat_rsn,close_leave_sn,orgnl_leave_end_dt,reg_user_id
+    FROM TB_HR_DEV_STAT WHERE dev_id=#{id} ORDER BY bgn_dt DESC,stat_sn DESC
+  </select>
+  <insert id="insertStatus">
+    INSERT INTO TB_HR_DEV_STAT(dev_id,stat_sn,work_stat_cd,bgn_dt,end_dt,stat_rsn,close_leave_sn,orgnl_leave_end_dt,reg_user_id)
+    VALUES(#{developerId},#{sequence},#{code},#{startDate},#{endDate,jdbcType=DATE},#{reason,jdbcType=VARCHAR},
+      #{closedLeaveSequence,jdbcType=NUMERIC},#{originalEndDate,jdbcType=DATE},#{registeredBy})
+  </insert>
+  <update id="updateStatus">
+    UPDATE TB_HR_DEV_STAT SET end_dt=#{endDate,jdbcType=DATE},close_leave_sn=#{closedLeaveSequence,jdbcType=NUMERIC},
+      orgnl_leave_end_dt=#{originalEndDate,jdbcType=DATE},mod_user_id='admin',mod_dttm=clock_timestamp()
+    WHERE dev_id=#{developerId} AND stat_sn=#{sequence}
+  </update>
+  <delete id="deleteStatus">DELETE FROM TB_HR_DEV_STAT WHERE dev_id=#{id} AND stat_sn=#{sequence}</delete>
+  <select id="closedMonth" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_CL_CLOSE WHERE close_ym=#{month} AND close_stat_cd='CLOSE')
+      OR COALESCE(#{month} &lt; (SELECT std_val::bigint::text FROM TB_SY_OPER_STD WHERE std_cd='CASH_BASE_YM' ORDER BY aply_bgn_ym DESC LIMIT 1),false)
+  </select>
+  <update id="updateDerived">
+    UPDATE TB_HR_DEV SET retire_dt=#{retirement,jdbcType=DATE},work_stat_cd=#{code},
+      use_yn=CASE WHEN #{retirement,jdbcType=DATE} &lt; #{today} THEN 'N' WHEN #{resume} THEN 'Y' ELSE use_yn END,
+      mod_user_id='admin',mod_dttm=clock_timestamp() WHERE dev_id=#{id}
+      AND (retire_dt IS DISTINCT FROM #{retirement,jdbcType=DATE} OR work_stat_cd IS DISTINCT FROM #{code}
+        OR (#{retirement,jdbcType=DATE} &lt; #{today} AND use_yn!='N') OR (#{resume} AND use_yn!='Y'))
+  </update>
+  <update id="updateUse">UPDATE TB_HR_DEV SET use_yn=#{useYn},mod_user_id=#{actor},mod_dttm=clock_timestamp() WHERE dev_id=#{id}</update>
+  <insert id="insertHistory">
+    INSERT INTO TB_SY_CHG_HIST(trgt_tbl_nm,trgt_key,chg_type_cd,chg_item_nm,bfr_val,aft_val,chg_rsn,reg_user_id)
+    VALUES('TB_HR_DEV',#{developerId},#{type},#{fieldName},#{beforeValue,jdbcType=VARCHAR},#{afterValue,jdbcType=VARCHAR},#{reason,jdbcType=VARCHAR},'admin')
+  </insert>
+  <select id="selectChanges" resultMap="change">
+    SELECT reg_dttm,chg_item_nm,bfr_val,aft_val,reg_user_id,chg_rsn FROM TB_SY_CHG_HIST
+    WHERE trgt_tbl_nm='TB_HR_DEV' AND trgt_key=#{id} ORDER BY reg_dttm DESC,hist_id DESC
+  </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG(user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id)
+    VALUES(#{actor},'DNLD','UI-02',concat('개발자 목록 ',#{count},'건'),clock_timestamp(),#{actor})
+  </insert>
+</mapper>

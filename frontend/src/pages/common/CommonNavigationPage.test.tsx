@@ -9,7 +9,8 @@ import {
   within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, RouterProvider, useLocation } from "react-router-dom";
+import { createAppRouter } from "../../app/router";
 import type {
   ShellMenuItem,
   ShellMenuResponse,
@@ -139,39 +140,75 @@ function respond(body: ShellMenuResponse) {
     ok: true,
     status: 200,
     json: async () =>
-      url.startsWith("/api/common/users?")
+      url.startsWith("/api/common/user-preferences/")
         ? {
             success: true,
             meta: {},
-            data: { items: [], page: 1, pageSize: 20, total: 0 },
+            data: {
+              prefTypeCd: url.split("/").at(-2),
+              prefKey: url.split("/").at(-1),
+              found: false,
+              prefVal: null,
+              modDttm: null,
+            },
           }
-        : url === "/api/common/user-options"
+        : url.startsWith("/api/common/users?")
           ? {
               success: true,
               meta: {},
-              data: { roles: [], projects: [], userStates: [] },
+              data: { items: [], page: 1, pageSize: 20, total: 0 },
             }
-          : [
-                "/api/common/roles",
-                "/api/common/menu-settings",
-                "/api/common/code-groups",
-                "/api/common/code-maps",
-                "/api/common/operating-standards",
-                "/api/common/code-change-history",
-              ].includes(url) ||
-              url.startsWith("/api/common/clients?") ||
-              /^\/api\/common\/code-groups\/(CLNT_TYPE|INDUTY|BANK)\/codes$/.test(
-                url,
-              )
-            ? { success: true, meta: {}, data: { items: [] } }
-            : body,
+          : url === "/api/common/user-options"
+            ? {
+                success: true,
+                meta: {},
+                data: { roles: [], projects: [], userStates: [] },
+              }
+            : [
+                  "/api/common/roles",
+                  "/api/common/menu-settings",
+                  "/api/common/code-groups",
+                  "/api/common/code-maps",
+                  "/api/common/operating-standards",
+                  "/api/common/code-change-history",
+                  "/api/common/parts",
+                  "/api/common/developers/areas",
+                ].includes(url) ||
+                url.startsWith("/api/common/clients?") ||
+                url.startsWith("/api/common/developers?") ||
+                /^\/api\/common\/code-groups\/(CLNT_TYPE|INDUTY|BANK|EMP_TYPE|JOB|GRADE|JBPS|DRCT_CLS|SKILL|WORK_STAT)\/codes$/.test(
+                  url,
+                )
+              ? { success: true, meta: {}, data: { items: [] } }
+              : body,
   }));
   vi.stubGlobal("fetch", request);
   return request;
 }
 async function expectScreenContent(id: string) {
-  if (id === "UI-15") {
-    expect(await screen.findByText("조건에 맞는 결과가 없습니다.")).toBeVisible();
+  const panel = await screen.findByTestId(`screen-panel-${id.toLowerCase()}`);
+  await waitFor(() => expect(panel).toBeVisible());
+  // 비활성 탭도 마운트되어 있으므로 현재 화면 안에서만 내용을 찾는다.
+  const content = within(panel);
+  if (id === "UI-02") {
+    expect(
+      await content.findByText("조건에 맞는 결과가 없습니다."),
+    ).toBeVisible();
+    expect(screen.getByTestId("developer-workspace")).toBeVisible();
+    expect(screen.getByTestId("developer-page")).toBeVisible();
+    expect(screen.getByTestId("developer-search")).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByTestId("developer-create")).toBeEnabled(),
+    );
+    expect(
+      within(screen.getByTestId("screen-actions")).getByTestId(
+        "developer-create",
+      ),
+    ).toBeVisible();
+  } else if (id === "UI-15") {
+    expect(
+      await content.findByText("조건에 맞는 결과가 없습니다."),
+    ).toBeVisible();
     expect(screen.getByTestId("client-part-workspace")).toBeVisible();
     expect(screen.getByTestId("client-page")).toBeVisible();
     expect(screen.getByTestId("client-search")).toBeVisible();
@@ -186,17 +223,17 @@ async function expectScreenContent(id: string) {
     expect(screen.getByTestId("client-workspace-parts")).toBeVisible();
   } else if (id === "UI-23") {
     expect(
-      await screen.findByText("조건에 맞는 결과가 없습니다."),
+      await content.findByText("조건에 맞는 결과가 없습니다."),
     ).toBeVisible();
     expect(screen.getByTestId("user-page")).toBeVisible();
     expect(screen.getByTestId("user-keyword-filter")).toBeVisible();
     expect(screen.getByTestId("list-search")).toBeVisible();
     expect(screen.getByTestId("user-register-open")).toBeVisible();
   } else if (id === "UI-24") {
-    expect(await screen.findByText("활성 역할이 없습니다.")).toBeVisible();
+    expect(await content.findByText("활성 역할이 없습니다.")).toBeVisible();
     expect(screen.getByTestId("role-page")).toBeVisible();
   } else if (id === "UI-25") {
-    expect(await screen.findByText("등록된 메뉴가 없습니다.")).toBeVisible();
+    expect(await content.findByText("등록된 메뉴가 없습니다.")).toBeVisible();
     expect(screen.getByTestId("menu-settings-page")).toBeVisible();
     // 데이터를 다 읽은 뒤에 켜진다: 켜질 때까지 기다린다(느린 환경에서 깜빡 실패 방지).
     await waitFor(() =>
@@ -204,7 +241,7 @@ async function expectScreenContent(id: string) {
     );
   } else if (id === "UI-27") {
     expect(
-      await screen.findByText("등록된 코드 그룹이 없습니다."),
+      await content.findByText("등록된 코드 그룹이 없습니다."),
     ).toBeVisible();
     expect(screen.getByTestId("code-page")).toBeVisible();
     expect(
@@ -217,7 +254,7 @@ async function expectScreenContent(id: string) {
     );
   } else {
     expect(
-      await screen.findByRole("region", { name: `${id} 본문` }),
+      await content.findByRole("region", { name: `${id} 본문` }),
     ).toHaveTextContent("준비 중");
   }
 }
@@ -243,6 +280,50 @@ async function ensureOpen(name: string) {
 }
 
 describe("common placeholder screen contract", () => {
+  it("UI-02 title actions open and cancel the full form without preferences or another URL", async () => {
+    const request = respond(fixture());
+    mount("/screens/UI-02");
+    await expectScreenContent("UI-02");
+    fireEvent.click(screen.getByTestId("developer-create"));
+    expect(await screen.findByTestId("developer-form")).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "개발자 등록",
+    );
+    expect(screen.queryByTestId("developer-list")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-02");
+    fireEvent.click(screen.getByTestId("developer-form-cancel"));
+    await expectScreenContent("UI-02");
+    expect(
+      request.mock.calls.some(([url]) =>
+        url.startsWith("/api/common/developers?"),
+      ),
+    ).toBe(true);
+    expect(request.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+  });
+
+  it("the application router and preference shell register UI-02 with working title actions", async () => {
+    respond(fixture());
+    window.history.replaceState(null, "", "/screens/UI-02");
+    const router = createAppRouter();
+    const view = render(<RouterProvider router={router} />);
+    try {
+      await expectScreenContent("UI-02");
+      expect(screen.getAllByRole("main")).toHaveLength(1);
+      fireEvent.click(screen.getByTestId("developer-create"));
+      expect(await screen.findByTestId("developer-form")).toBeVisible();
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+        "개발자 등록",
+      );
+      expect(router.state.location.pathname).toBe("/screens/UI-02");
+      fireEvent.click(screen.getByTestId("developer-form-cancel"));
+      await expectScreenContent("UI-02");
+    } finally {
+      view.unmount();
+      router.dispose();
+      window.history.replaceState(null, "", "/");
+    }
+  });
+
   it("UI-27 without preferences composes all four API panels through the same screen dispatch", async () => {
     const request = respond(fixture());
     mount("/screens/UI-27");
@@ -346,7 +427,7 @@ describe("common placeholder screen contract", () => {
       expect(screen.getAllByRole("banner")).toHaveLength(1);
       expect(screen.getAllByRole("complementary")).toHaveLength(1);
       expect(screen.getAllByRole("main")).toHaveLength(1);
-      if (id !== "UI-23" && id !== "UI-15") {
+      if (id !== "UI-23" && id !== "UI-15" && id !== "UI-02") {
         expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
         for (const name of ["조회", "저장", "다운로드", "업로드", "편집"]) {
           if (id === "UI-25" && name === "저장")

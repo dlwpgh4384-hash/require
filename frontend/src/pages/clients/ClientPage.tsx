@@ -199,12 +199,17 @@ export function ClientPage({
   const shown = sorted.slice((page - 1) * presentation.pageSize, page * presentation.pageSize);
 
   const saved = (client: Client, warnings: string[]) => {
+    // 시안: 수정은 저장 뒤 그 거래처 상세로 돌아가고, 등록은 목록으로 간다.
+    setDetail(form?.client ? { id: client.clientId, tab: "basic" } : null);
     setForm(null);
-    setDetail(null);
     setHighlight(client.clientId);
     setNotice(["저장했습니다.", ...warnings].join(" "));
     setRevision((value) => value + 1);
   };
+  const blocked =
+    pending?.useYn === "N"
+      ? pending.items.filter((item) => item.projectCount > 0 || item.personCount > 0)
+      : [];
   const changeStatus = async () => {
     if (!pending || busy) return;
     setBusy(true);
@@ -272,14 +277,9 @@ export function ClientPage({
     </div>
   );
 
-  if (form)
+  if (form && !form.client)
     return (
-      <ClientForm
-        client={form.client ?? undefined}
-        codes={codes}
-        onCancel={() => setForm(null)}
-        onSaved={saved}
-      />
+      <ClientForm codes={codes} onCancel={() => setForm(null)} onSaved={saved} />
     );
 
   return (
@@ -389,6 +389,18 @@ export function ClientPage({
         </p>
       )}
       {notice && <Toast message={notice} onDismiss={() => setNotice("")} testId="client-toast" />}
+      {form?.client && (
+        <ClientForm
+          key={form.client.clientId}
+          client={form.client}
+          codes={codes}
+          onCancel={() => {
+            setDetail({ id: form.client!.clientId, tab: "basic" });
+            setForm(null);
+          }}
+          onSaved={saved}
+        />
+      )}
       {detail && (
         <ClientDetail
           key={detail.id}
@@ -403,16 +415,53 @@ export function ClientPage({
           onStatus={(client) => setPending({ items: [client], useYn: client.useYn === "Y" ? "N" : "Y" })}
         />
       )}
-      {pending && (
+      {pending && blocked.length > 0 && (
+        // 시안: 거래가 남은 거래처가 있으면 중지하지 않고 목록으로 알린다.
         <Dialog
-          title={`거래처 ${pending.items.length}건을 ${pending.useYn === "N" ? "사용 중지할까요?" : "다시 사용할까요?"}`}
+          title="사용을 중지할 수 없습니다"
+          testId="client-status-blocked"
+          closable
+          onClose={() => setPending(null)}
+        >
+          <p>아래 거래처는 거래가 남아 있어 중지할 수 없습니다.</p>
+          <ul className="client-blocked-list">
+            {blocked.map((item) => (
+              <li key={item.clientId}>
+                {item.clientName} —{" "}
+                {[
+                  item.projectCount > 0 ? `진행 프로젝트 ${item.projectCount}건` : "",
+                  item.personCount > 0 ? `투입 인력 ${item.personCount}명` : "",
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+              </li>
+            ))}
+          </ul>
+          <div className="app-actions">
+            <button type="button" className="primary-button" data-testid="client-status-blocked-ok" onClick={() => setPending(null)}>
+              확인
+            </button>
+          </div>
+        </Dialog>
+      )}
+      {pending && blocked.length === 0 && (
+        <Dialog
+          title={
+            pending.useYn === "N"
+              ? `${pending.items.length}건의 사용을 중지할까요?`
+              : `${pending.items.length}건을 다시 사용할까요?`
+          }
           testId="client-status-confirm"
           closable
           onClose={() => !busy && setPending(null)}
         >
           <p>
+            {pending.items.length === 1
+              ? pending.items[0].clientName
+              : `${pending.items[0].clientName} 외 ${pending.items.length - 1}건`}{" "}
+            —{" "}
             {pending.useYn === "N"
-              ? "중지한 거래처는 새 프로젝트에서 고를 수 없습니다. 진행 프로젝트나 소속 인력이 있는 거래처는 중지하지 않고 건수와 이유를 알려 드립니다."
+              ? "중지하면 새 프로젝트에서 고를 수 없습니다. 기록은 그대로 남습니다."
               : "다시 사용하면 새 프로젝트에서 고를 수 있습니다."}
           </p>
           <div className="app-actions">

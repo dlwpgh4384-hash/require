@@ -3,6 +3,11 @@ import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 import { DisabledTools } from "./DisabledTools";
 import { useViewport } from "./useViewport";
+import {
+  BackToListButton,
+  ScreenTitleOverrideProvider,
+  type ScreenTitleOverride,
+} from "./ScreenTitleOverride";
 import "./shell.css";
 
 export interface AppLayoutProps {
@@ -52,6 +57,8 @@ export function AppLayout({
   const { mobile, tablet } = useViewport();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [localFolded, setLocalFolded] = useState<boolean | null>(null);
+  const [override, setOverride] = useState<ScreenTitleOverride | null>(null);
+  const form = override && override.screenId === screenId ? override : null;
   useEffect(() => {
     setMobileOpen(false);
     setLocalFolded(null);
@@ -87,6 +94,7 @@ export function AppLayout({
     }
   };
   return (
+    <ScreenTitleOverrideProvider value={setOverride}>
     <div
       data-testid="app-layout"
       className={`app-layout${mobile ? " is-mobile" : tablet ? " is-tablet" : ""}`}
@@ -136,6 +144,7 @@ export function AppLayout({
           )}
           <section className="page">
             <div className="page-title">
+              {form && <BackToListButton onClick={form.onBack} />}
               <div className="title-stack">
                 {breadcrumb && breadcrumb.length > 0 && (
                   <nav aria-label="현재 화면 경로" className="breadcrumb">
@@ -152,17 +161,18 @@ export function AppLayout({
                   </nav>
                 )}
                 <div className="title-row">
-                  <h1>{title ?? "메뉴 탐색"}</h1>
+                  <h1>{form ? form.title : (title ?? "메뉴 탐색")}</h1>
                   {titleAddon}
                   {screenId && <span className="screen-id">{screenId}</span>}
                 </div>
               </div>
-              {screenActions ?? <DisabledTools names={["상단 도구줄"]} />}
+              {form ? null : (screenActions ?? <DisabledTools names={["상단 도구줄"]} />)}
             </div>
             <div className="page-content">{children}</div>
           </section>
         </main>
       </div>
     </div>
+    </ScreenTitleOverrideProvider>
   );
 }

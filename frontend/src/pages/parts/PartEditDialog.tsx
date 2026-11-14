@@ -298,7 +298,13 @@ export function PartEditDialog({
   };
   return (
     <Dialog
-      title={mode === "standards" && part ? `${part.partName} 기준 변경` : titles[mode]}
+      title={
+        blockedStop
+          ? "사용을 중지할 수 없습니다"
+          : mode === "standards" && part
+            ? `${part.partName} 기준 변경`
+            : titles[mode]
+      }
       onClose={close}
       closable
       testId={`part-${mode}-dialog`}
@@ -429,14 +435,15 @@ export function PartEditDialog({
               )}
             </>
           )}
-          {mode === "stop" && (
+          {mode === "stop" && !blockedStop && (
             <p>
               {part?.partName} 사용을 중지할까요? 기존 기준과 기록은 남습니다.
             </p>
           )}
-          {blockedStop && (
+          {blockedStop && currentPart && (
             <p role="alert">
-              소속 인력과 진행 프로젝트를 먼저 다른 파트로 이동해 주세요.
+              {currentPart.partName}에 소속 인력 {currentPart.personCount}명, 진행 프로젝트{" "}
+              {currentPart.projectCount}건이 있습니다. 먼저 다른 파트로 옮겨 주세요.
             </p>
           )}
         </fieldset>
@@ -464,6 +471,13 @@ export function PartEditDialog({
             onCancel={() => setClosing(false)}
             onProceed={onClose}
           />
+        ) : blockedStop ? (
+          // 시안: 중지할 수 없으면 안내만 하고 [확인] 하나로 닫는다.
+          <div className="app-actions">
+            <button type="button" className="primary-button" data-testid="part-blocked-ok" onClick={onClose}>
+              확인
+            </button>
+          </div>
         ) : (
           <div className="app-actions">
             <button

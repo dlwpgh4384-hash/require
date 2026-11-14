@@ -16,6 +16,7 @@ export function DetailPanel({
   activeTab,
   onTab,
   children,
+  footer,
   onClose,
   testId = "detail-panel",
 }: {
@@ -26,6 +27,8 @@ export function DetailPanel({
   activeTab?: string;
   onTab?: (key: string) => void;
   children?: ReactNode;
+  /** 아래 고정 단추 줄(시안 .df: [취소][저장]). */
+  footer?: ReactNode;
   onClose: () => void;
   testId?: string;
 }) {
@@ -79,7 +82,7 @@ export function DetailPanel({
               data-testid={`${testId}-close`}
               onClick={onClose}
             >
-              ✕
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg>
             </button>
           </div>
         </div>
@@ -101,6 +104,7 @@ export function DetailPanel({
           </div>
         )}
         <div className="ls-db">{current ? current.content : children}</div>
+        {footer && <div className="ls-df">{footer}</div>}
       </section>
     </>
   );

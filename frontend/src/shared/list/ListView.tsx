@@ -514,7 +514,7 @@ export function ListPager({
         {nav(pages, "마지막 페이지", "»", page >= pages)}
       </div>
       <label className="ls-size">
-        한 화면 건수
+        <span className="ls-sr">한 화면 건수</span>
         <select
           className="ls-in ls-in-sm"
           data-testid="list-page-size"
@@ -564,7 +564,7 @@ function ColumnsIcon() {
 function DensityIcon() {
   return (
     <svg {...svg}>
-      <path d="M4 6h16M4 12h16M4 18h16" />
+      <path d="M4 6h16M4 10h16M4 14h16M4 18h16" />
     </svg>
   );
 }

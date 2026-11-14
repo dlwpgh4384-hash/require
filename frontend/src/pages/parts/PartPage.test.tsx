@@ -314,8 +314,11 @@ it.each(["personCount", "projectCount"] as const)(
         onSaved={vi.fn()}
       />,
     );
-    expect(screen.getByText(/먼저 다른 파트로 이동/)).toBeInTheDocument();
-    expect(screen.getByTestId("part-save")).toBeDisabled();
+    // 시안: 「사용을 중지할 수 없습니다」 + 인원·건수 안내 + [확인]만
+    expect(screen.getByText("사용을 중지할 수 없습니다")).toBeInTheDocument();
+    expect(screen.getByText(/먼저 다른 파트로 옮겨 주세요/)).toBeInTheDocument();
+    expect(screen.queryByTestId("part-save")).toBeNull();
+    expect(screen.getByTestId("part-blocked-ok")).toBeEnabled();
     expect(writes()).toHaveLength(0);
   },
 );

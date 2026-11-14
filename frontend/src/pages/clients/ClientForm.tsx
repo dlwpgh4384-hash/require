@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { Dialog } from "../../shared/feedback/Dialog";
+import { DetailPanel } from "../../shared/list/DetailPanel";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
+import { useScreenTitleOverride } from "../../shared/layout/ScreenTitleOverride";
 import {
   clientPayload,
   ClientRequestError,
@@ -59,6 +61,8 @@ export function ClientForm({
   // FR-0106: 저장하지 않은 내용이 있으면 나가기 전에 묻는다(시안 확인 창).
   const [leaving, setLeaving] = useState(false);
   const leave = () => (dirty ? setLeaving(true) : onCancel());
+  // 시안: 폼이 열리면 제목줄이 [‹ 목록] + 「거래처 등록/수정」으로 바뀐다.
+  useScreenTitleOverride("UI-15", client ? null : "거래처 등록", leave);
   useEffect(() => {
     if (!client || client.clientTypeCode === "CUST") return;
     let active = true;
@@ -210,11 +214,11 @@ export function ClientForm({
     max: number,
     required = false,
     help?: string,
+    full = false,
   ) => (
-    <div className="client-fld" key={field}>
-      <label className="client-fl" htmlFor={`client-field-${field}`}>
+    <div className={`client-fld${full ? " full" : ""}`} key={field}>
+      <label className={`client-fl${required ? " req" : ""}`} htmlFor={`client-field-${field}`}>
         {label}
-        {required && <span className="field-required"> *</span>}
       </label>
       <div className="client-fv">
       <input
@@ -223,6 +227,7 @@ export function ClientForm({
         aria-invalid={invalid(field)}
         data-testid={`client-${field.replace(/[A-Z]/g, (value) => `-${value.toLowerCase()}`)}`}
         aria-label={label}
+        style={client ? { width: EDIT_WIDTH[field] } : undefined}
         value={String(draft[field] ?? "")}
         maxLength={max}
         required={required}
@@ -251,9 +256,8 @@ export function ClientForm({
     help?: string,
   ) => (
     <div className="client-fld">
-      <label className="client-fl" htmlFor={`client-field-${field}`}>
+      <label className={`client-fl${required ? " req" : ""}`} htmlFor={`client-field-${field}`}>
         {label}
-        {required && <span className="field-required"> *</span>}
       </label>
       <div className="client-fv">
       <select
@@ -262,6 +266,7 @@ export function ClientForm({
         aria-invalid={invalid(field)}
         aria-label={label}
         data-testid={`client-${group.toLowerCase().replace(/_/g, "-")}-select`}
+        style={client ? { width: EDIT_WIDTH[field] } : undefined}
         value={draft[field] || ""}
         onChange={(event) => set(field, event.target.value)}
       >
@@ -277,126 +282,75 @@ export function ClientForm({
       </div>
     </div>
   );
-  return (
-    <section
-      ref={formRef}
-      className="client-form"
-      data-testid="client-form"
-      data-screen-id="UI-15"
+  const errorBox = error && (
+    <div role="alert" className="client-error">
+      {error.message}
+      {error.status === 409 && client && (
+        <button
+          data-testid="client-version-refresh"
+          onClick={() => {
+            void getCommonClient(client.clientId)
+              .then((latest) => {
+                setDraft((value) => ({
+                  ...value,
+                  modifiedAt: latest.modifiedAt,
+                }));
+                setError(null);
+              })
+              .catch((reason) => setError(reason));
+          }}
+        >
+          최신 버전 불러오기 (입력 유지)
+        </button>
+      )}
+      {accountFailure && (
+        <button
+          data-testid="client-account-retry"
+          onClick={() => setRevision((value) => value + 1)}
+        >
+          계좌 다시 조회
+        </button>
+      )}
+    </div>
+  );
+  const cancelButton = (
+    <button
+      type="button"
+      className="ls-btn"
+      data-testid="client-form-cancel"
+      disabled={busy}
+      onClick={leave}
     >
-      <div className="client-form-head">
-        <button type="button" className="ls-lnk" data-testid="client-form-back" onClick={leave}>
-          ‹ 목록
-        </button>
-        <h2>{client ? "거래처 수정" : "거래처 등록"}</h2>
-      </div>
-      {loading && <p role="status">계좌 조회 중…</p>}
-      {!draft.clientTypeCode && (
-        <p className="client-form-banner" role="status">
-          구분을 고르면 고객사는 세금계산서 이메일, 협력사는 지급 계좌 칸이 나옵니다.
-        </p>
-      )}
-      <section className="client-card">
-        <h3>기본 정보</h3>
-        <div className="client-fgrid">
-          {select("clientTypeCode", "구분", "CLNT_TYPE", true, "고객사이면서 협력사이면 '고객·협력'을 고릅니다")}
-          {input("clientName", "상호", 50, true)}
-          {input(
-            "businessNumber",
-            "사업자번호",
-            12,
-            true,
-            client
-              ? "사업자번호는 바꿀 수 없습니다. 잘못 등록했으면 중지한 뒤 새로 등록해 주세요."
-              : "숫자만 입력하면 하이픈이 자동으로 들어갑니다",
-          )}
-          {input("representativeName", "대표자", 20)}
-          {select("industryCode", "업종", "INDUTY", false, "공통코드 「업종」에서 고릅니다. 없으면 관리자에게 추가를 요청하세요")}
-          {input("contactName", "담당자", 20)}
-          {input("contactPhone", "연락처", 20)}
-        </div>
-      </section>
-      {customer && (
-        <section className="client-card">
-          <h3>세금계산서</h3>
-          <div className="client-fgrid">{input("taxEmail", "세금계산서 이메일", 100, true)}</div>
-        </section>
-      )}
-      {vendor && (
-        <section className="client-card">
-          <h3>지급 계좌</h3>
-          <div className="client-fgrid">
-            {select("bankCode", "은행", "BANK", true)}
-            {input("accountNumber", "계좌번호", 20, true, "숫자와 하이픈(-)만 씁니다")}
-            {input("accountHolder", "예금주", 30, true)}
-          </div>
-        </section>
-      )}
-      {error && (
-        <div role="alert" className="client-error">
-          {error.message}
-          {error.status === 409 && client && (
-            <button
-              data-testid="client-version-refresh"
-              onClick={() => {
-                void getCommonClient(client.clientId)
-                  .then((latest) => {
-                    setDraft((value) => ({
-                      ...value,
-                      modifiedAt: latest.modifiedAt,
-                    }));
-                    setError(null);
-                  })
-                  .catch((reason) => setError(reason));
-              }}
-            >
-              최신 버전 불러오기 (입력 유지)
-            </button>
-          )}
-          {accountFailure && (
-            <button
-              data-testid="client-account-retry"
-              onClick={() => setRevision((value) => value + 1)}
-            >
-              계좌 다시 조회
-            </button>
-          )}
-        </div>
-      )}
-      <footer className="client-form-foot">
-        <span className="client-help">* 표시는 꼭 입력해야 하는 항목입니다.</span>
-        <button
-          type="button"
-          data-testid="client-form-cancel"
-          disabled={busy}
-          onClick={leave}
-        >
-          취소
-        </button>
-        <button
-          type="button"
-          className="primary-button"
-          data-testid="client-form-save"
-          disabled={busy || loading || accountFailure}
-          onClick={submit}
-        >
-          {busy ? "저장 중…" : "저장"}
-        </button>
-      </footer>
+      취소
+    </button>
+  );
+  const saveButton = (
+    <button
+      type="button"
+      className="ls-btn ls-btn-p"
+      data-testid="client-form-save"
+      disabled={busy || loading || accountFailure}
+      onClick={submit}
+    >
+      {busy ? "저장 중…" : "저장"}
+    </button>
+  );
+  const dialogs = (
+    <>
       {leaving && (
         <Dialog
-          title="저장하지 않은 내용이 있습니다"
+          title={client ? "고친 내용을 버릴까요?" : "저장하지 않은 내용이 있습니다"}
           testId="client-leave-confirm"
           closable
           onClose={() => setLeaving(false)}
         >
-          <p>나가면 입력한 내용이 사라집니다.</p>
+          <p>{client ? "저장하지 않은 내용이 사라집니다." : "나가면 입력한 내용이 사라집니다."}</p>
           <div className="app-actions">
             <button type="button" data-testid="client-leave-cancel" onClick={() => setLeaving(false)}>
               취소
             </button>
             <button type="button" className="primary-button" data-testid="client-leave-go" onClick={onCancel}>
-              나가기
+              {client ? "버리기" : "나가기"}
             </button>
           </div>
         </Dialog>
@@ -427,9 +381,124 @@ export function ClientForm({
           </footer>
         </Dialog>
       )}
+    </>
+  );
+
+  // 시안: [수정]은 상세 패널 안에서 고친다(제목=상호, 작은 제목 「수정 중 · 사업자번호」, 한 줄씩, 아래 [취소][저장]).
+  if (client)
+    return (
+      <DetailPanel
+        title={client.clientName}
+        sub={`수정 중 · ${client.businessNumber}`}
+        testId="client-form"
+        onClose={leave}
+        footer={
+          <>
+            {cancelButton}
+            {saveButton}
+          </>
+        }
+      >
+        <div
+          ref={formRef as RefObject<HTMLDivElement>}
+          className="client-form client-edit"
+          data-screen-id="UI-15"
+        >
+          {loading && <p role="status">계좌 조회 중…</p>}
+          <div className="client-fsec">
+            {select("clientTypeCode", "구분", "CLNT_TYPE", true, "고객사이면서 협력사이면 '고객·협력'")}
+            {input("clientName", "상호", 50, true)}
+            {input(
+              "businessNumber",
+              "사업자번호",
+              12,
+              false,
+              "프로젝트·청구·지급과 연결되어 있어 바꿀 수 없습니다. 잘못 넣었으면 사용 중지 후 새로 등록하세요.",
+            )}
+            {input("representativeName", "대표자", 20)}
+            {select("industryCode", "업종", "INDUTY", false, "공통코드 「업종」에서 고릅니다")}
+            {input("contactName", "담당자", 20)}
+            {input("contactPhone", "연락처", 20)}
+            {customer && input("taxEmail", "세금계산서 이메일", 100, true)}
+            {vendor && select("bankCode", "은행", "BANK", true)}
+            {vendor && input("accountNumber", "계좌번호", 20, true, "숫자와 하이픈(-)만 씁니다")}
+            {vendor && input("accountHolder", "예금주", 30, true)}
+          </div>
+          {errorBox}
+          {dialogs}
+        </div>
+      </DetailPanel>
+    );
+
+  return (
+    <section
+      ref={formRef}
+      className="client-form"
+      data-testid="client-form"
+      data-screen-id="UI-15"
+    >
+      {loading && <p role="status">계좌 조회 중…</p>}
+      {!draft.clientTypeCode && (
+        <p className="ls-banner ls-banner-info client-form-banner" role="status">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" /></svg>
+          구분을 고르면 고객사는 세금계산서 이메일, 협력사는 지급 계좌 칸이 나옵니다.
+        </p>
+      )}
+      <section className="client-card">
+        <h2>기본 정보</h2>
+        <div className="client-fgrid">
+          {select("clientTypeCode", "구분", "CLNT_TYPE", true, "고객사이면서 협력사이면 '고객·협력'을 고릅니다")}
+          {input("clientName", "상호", 50, true)}
+          {input("businessNumber", "사업자번호", 12, true, "숫자만 입력하면 하이픈이 자동으로 들어갑니다")}
+          {input("representativeName", "대표자", 20)}
+          {select("industryCode", "업종", "INDUTY", false, "공통코드 「업종」에서 고릅니다. 없으면 관리자에게 추가를 요청하세요")}
+          {input("contactName", "담당자", 20)}
+          {input("contactPhone", "연락처", 20)}
+        </div>
+      </section>
+      {customer && (
+        <section className="client-card">
+          <h2>세금계산서</h2>
+          <div className="client-fgrid">{input("taxEmail", "세금계산서 이메일", 100, true, undefined, true)}</div>
+        </section>
+      )}
+      {vendor && (
+        <section className="client-card">
+          <h2>지급 계좌</h2>
+          <div className="client-fgrid">
+            {select("bankCode", "은행", "BANK", true)}
+            {input("accountNumber", "계좌번호", 20, true, "숫자와 하이픈(-)만 씁니다")}
+            {input("accountHolder", "예금주", 30, true)}
+          </div>
+        </section>
+      )}
+      {errorBox}
+      <p className="client-note">
+        <span className="client-bad">*</span> 표시는 꼭 입력해야 하는 항목입니다.
+      </p>
+      <footer className="client-form-foot">
+        {cancelButton}
+        {saveButton}
+      </footer>
+      {dialogs}
     </section>
   );
 }
+
+/** 시안 상세 패널 안 수정 칸 폭. */
+const EDIT_WIDTH: Partial<Record<keyof ClientInput, string>> = {
+  clientTypeCode: "160px",
+  clientName: "100%",
+  businessNumber: "160px",
+  representativeName: "200px",
+  industryCode: "200px",
+  contactName: "200px",
+  contactPhone: "200px",
+  taxEmail: "100%",
+  bankCode: "160px",
+  accountNumber: "220px",
+  accountHolder: "220px",
+};
 
 /** 연락처: 숫자와 하이픈만(FR-0106 숫자 칸). 비어 있으면 통과. */
 function contactPhoneInvalid(value: string | null | undefined) {

@@ -234,6 +234,7 @@ it("renders request failure with retry", async () => {
   expect(await screen.findByText("거래처A")).toBeVisible();
 });
 it("status confirmation cancellation writes nothing and failures show reasons", async () => {
+  row = { ...row, projectCount: 0, personCount: 0 };
   render(<ClientPage />);
   await screen.findByText("거래처A");
   fireEvent.click(screen.getByTestId("list-select-client-a"));
@@ -462,4 +463,15 @@ it("leaving a form with unsaved input asks first (FR-0106)", () => {
   expect(screen.getByTestId("client-leave-confirm")).toHaveTextContent("나가면 입력한 내용이 사라집니다.");
   fireEvent.click(screen.getByTestId("client-leave-go"));
   expect(cancel).toHaveBeenCalledTimes(1);
+});
+
+it("거래가 남은 거래처는 중지하지 않고 시안 안내 창으로 알린다", async () => {
+  render(<ClientPage />);
+  await screen.findByText("거래처A");
+  fireEvent.click(screen.getByTestId("list-select-client-a"));
+  fireEvent.click(screen.getByTestId("list-bulk-stop"));
+  expect(screen.getByText("사용을 중지할 수 없습니다")).toBeInTheDocument();
+  expect(screen.getByText("거래처A — 진행 프로젝트 2건, 투입 인력 3명")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("client-status-blocked-ok"));
+  expect(writes()).toHaveLength(0);
 });

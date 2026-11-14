@@ -44,14 +44,14 @@ export function PartStandardsPanel({
       ) : !rows.length ? (
         <p>기준 이력이 없습니다.</p>
       ) : (
-        <div className="part-table-wrap">
-          <table>
+        <div className="ls-twrap part-standards-wrap">
+          <table className="ls-t">
             <thead>
               <tr>
                 <th>적용 기간</th>
                 <th>파트장</th>
-                <th>배분율</th>
-                <th>공통관리비</th>
+                <th className="ls-right">배분율</th>
+                <th className="ls-right">공통관리비</th>
                 <th>상태</th>
               </tr>
             </thead>
@@ -65,11 +65,11 @@ export function PartStandardsPanel({
                     {row.effectiveMonth} ~ {row.endMonth ?? "현재"}
                   </td>
                   <td>{row.leaderName}</td>
-                  <td>{row.distributionRate}%</td>
-                  <td>{api.partMoney(row.salesExpense)}</td>
+                  <td className="ls-right">{row.distributionRate}%</td>
+                  <td className="ls-right">{api.partMoney(row.salesExpense)}</td>
                   <td>
                     <span
-                      className={`part-state part-state-${row.state === "예정" ? "scheduled" : row.state === "지난" ? "past" : "current"}`}
+                      className={`ls-b ls-b-${row.state === "예정" ? "info" : row.state === "지난" ? "lock" : "ok"}`}
                     >
                       {row.state === "지난" ? "지난 기준" : row.state}
                     </span>

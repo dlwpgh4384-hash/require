@@ -160,8 +160,9 @@ it("result reload is read-only, displays counts and closing never applies", asyn
   expect(screen.getByText("검사 결과 조회 중…")).toBeVisible();
   expect(await screen.findByText("행 오류와 경고가 없습니다.")).toBeVisible();
   await waitFor(() => expect(screen.getByTestId("upload-apply")).toBeEnabled());
+  // 시안 .kpis: 성공 / 경고(반영은 됨) / 오류(고쳐야 반영됨)
   expect(screen.getByTestId("upload-counts")).toHaveTextContent(
-    "성공 1건경고 0건오류 0건",
+    /성공\s*1건.*경고\s*0건.*반영은 됨.*오류\s*0건.*고쳐야 반영됨/,
   );
   fireEvent.click(screen.getByTestId("upload-result-close"));
   expect(close).toHaveBeenCalledOnce();
@@ -262,7 +263,7 @@ it.each([400, 409])(
     );
     fireEvent.click(screen.getByTestId("upload-apply"));
     expect(await screen.findByTestId("upload-result-error")).toBeVisible();
-    expect(screen.getByTestId("upload-counts")).toHaveTextContent("성공 1건");
+    expect(screen.getByTestId("upload-counts")).toHaveTextContent(/성공\s*1건/);
     failApply = 0;
     fireEvent.click(screen.getByTestId("upload-result-retry"));
     await waitFor(() =>

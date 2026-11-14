@@ -74,13 +74,13 @@ export function ClientDetail({
       <div className="client-more">
         <button
           type="button"
-          className="ls-ibtn"
+          className="ls-ibtn ls-ibtn-sm"
           aria-label="더보기"
           aria-expanded={menu}
           data-testid="client-detail-more"
           onClick={() => setMenu((value) => !value)}
         >
-          ⋯
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h.01M12 12h.01M19 12h.01" /></svg>
         </button>
         {menu && (
           <div className="client-more-menu" role="menu">

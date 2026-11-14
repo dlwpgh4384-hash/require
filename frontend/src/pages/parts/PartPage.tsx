@@ -19,6 +19,7 @@ import { PartRenameDialog } from "./PartRenameDialog";
 import { PartStopDialog } from "./PartStopDialog";
 import { PartStandardsPanel } from "./PartStandardsPanel";
 import * as api from "./parts";
+import { koreanToday } from "../../shared/time";
 import "./parts.css";
 
 // 시안 UI-15 [영업 파트] 표: 열 이름·값 형식 그대로.
@@ -177,6 +178,7 @@ export function PartPage() {
         </div>
       )}
       <Banner kind="info">
+        <svg className="ls-banner-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" /></svg>
         이익 배분율·공통관리비를 바꾸면 적용 시작월부터 새 기준을 씁니다. 지난 달 정산은 바뀌지 않습니다.
         기준 변경은 시스템 관리자·재무 담당만 할 수 있습니다.
       </Banner>
@@ -221,7 +223,7 @@ export function PartPage() {
       {selected && (
         <DetailPanel
           title={selected.partName}
-          sub={`파트장 ${selected.leaderName}`}
+          sub={`${koreanToday().slice(0, 7)} 기준`}
           testId="part-detail-panel"
           onClose={() => setDetailId(null)}
           actions={
@@ -237,13 +239,13 @@ export function PartPage() {
               <div className="part-more">
                 <button
                   type="button"
-                  className="ls-ibtn"
+                  className="ls-ibtn ls-ibtn-sm"
                   aria-label="더보기"
                   aria-expanded={menu}
                   data-testid="part-more"
                   onClick={() => setMenu((value) => !value)}
                 >
-                  ⋯
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h.01M12 12h.01M19 12h.01" /></svg>
                 </button>
                 {menu && (
                   <div className="part-more-menu" role="menu">
@@ -282,7 +284,12 @@ export function PartPage() {
             items={[
               ["파트장", selected.leaderName],
               ["이익 배분율", `${selected.distributionRate}%`],
-              ["공통관리비", `${api.partMoney(selected.salesExpense)} 원 (자사 인력 1인·월)`],
+              [
+                "공통관리비",
+                <span className="part-num">
+                  {api.partMoney(selected.salesExpense)} 원 <span className="ls-cap">(자사 인력 1인·월)</span>
+                </span>,
+              ],
               ["적용 기간", `${selected.effectiveMonth} ~ ${selected.endMonth ?? "현재"}`],
               ["소속 인력", `${selected.personCount}명`],
               ["진행 프로젝트", `${selected.projectCount}건`],
@@ -292,7 +299,7 @@ export function PartPage() {
               ],
             ]}
           />
-          <h3 className="part-section-title">기준 이력</h3>
+          <h2 className="part-section-title">기준 이력</h2>
           <PartStandardsPanel partId={selected.partId} revision={revision} />
           {options && (
             <p className="part-note" data-testid="part-period-note">

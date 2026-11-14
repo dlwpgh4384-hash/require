@@ -101,7 +101,7 @@
 .client-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
 }
 .client-title-actions,
 .client-title-actions .upload-actions {
@@ -115,38 +115,48 @@
   gap: 6px;
 }
 .client-keyword {
-  width: 200px;
+  width: 180px;
 }
 .client-more {
   position: relative;
 }
+/* 시안 .pop.small: 폭 220, 단추 아래 16px */
 .client-more-menu {
   position: absolute;
   right: 0;
-  top: calc(100% + 4px);
-  z-index: 5;
+  top: 44px;
+  z-index: 45;
   display: flex;
   flex-direction: column;
-  min-width: 140px;
-  padding: 4px;
+  width: 220px;
+  padding: 0;
   background: var(--surface);
   border: 1px solid var(--divider);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.12);
+  box-shadow: var(--ls-shadow-sm);
 }
 .client-more-menu button {
-  min-height: 32px;
-  padding: 0 10px;
+  min-height: 0;
+  padding: 10px 14px;
   border: 0;
+  border-bottom: 1px solid var(--divider);
+  border-radius: 0;
   background: transparent;
+  color: var(--text);
   text-align: left;
-  font-size: 13px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  width: 100%;
+}
+.client-more-menu button:last-child {
+  border-bottom: 0;
 }
 .client-more-menu button:hover {
   background: var(--hover);
 }
 .client-more-menu .client-more-danger {
-  color: #b91c1c;
+  color: var(--text);
 }
 .client-account .ls-cap {
   margin-top: 4px;
@@ -301,4 +311,93 @@
   color: var(--primary);
   font-weight: 600;
   border-bottom-color: var(--primary);
+}
+
+/* 시안 UI-15 거래처 등록(폼 화면): 탭 숨김, 카드 h2, 칸 이름 오른쪽 정렬·필수 *,
+   안내 줄(.note), 아래 고정 줄(.fbar: 본문 폭 전체, 오른쪽 [취소][저장]) */
+.client-part-workspace:has(.client-form) > .client-workspace-tabs {
+  display: none;
+}
+.screen-tab-panel:has(.client-form),
+.client-part-workspace:has(.client-form),
+.client-part-workspace:has(.client-form) > div {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+.client-form {
+  flex: 1 1 auto;
+  gap: 24px;
+}
+.client-form .client-form-banner {
+  margin: 0;
+}
+.client-card h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.client-fld {
+  align-items: start;
+}
+.client-form .client-fl {
+  display: block;
+  text-align: right;
+  padding-top: 8px;
+  line-height: 20px;
+}
+.client-fl.req::after {
+  content: " *";
+  color: var(--ls-bad);
+}
+.client-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.client-bad {
+  color: var(--ls-bad);
+}
+.client-form .client-form-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: auto -24px -24px;
+  padding: 12px 24px;
+  background: var(--surface);
+  border-top: 1px solid var(--divider);
+  border-radius: 0;
+}
+.client-fld.full {
+  grid-column: 1 / -1;
+}
+.client-form .client-fld.full .client-fv .ls-in {
+  width: 100%;
+}
+/* 시안: 상세 패널 안 수정(.fsec: 한 줄씩, 간격 16) */
+.client-edit {
+  padding: 0;
+  background: transparent;
+  gap: 16px;
+}
+.client-fsec {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.client-edit .client-fv .ls-in {
+  max-width: 100%;
+}
+.client-blocked-list {
+  margin: 0;
+  padding: 0 24px 0 42px;
+}
+.client-form .client-fv select.ls-in {
+  padding: 0 4px 0 10px;
 }

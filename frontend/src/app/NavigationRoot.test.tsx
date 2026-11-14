@@ -91,13 +91,21 @@ describe("shared navigation composition", () => {
     const requests = respond(fixture());
     mount();
     const group = await screen.findByRole("button", { name: "독립 그룹" });
+    // 첫 주소(/)는 첫 화면으로 자동 이동하고 그 화면의 묶음을 자동으로 펼친다(FR-0101).
+    // 자동 이동·펼침이 끝난 뒤에 눌러야 누르기 전 상태가 매번 같다(끝나기 전에 누르면 결과가 속도에 따라 달라짐).
+    await waitFor(() =>
+      expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/ADDED"),
+    );
+    await waitFor(() => expect(group).toHaveAttribute("aria-expanded", "true"));
+    fireEvent.click(group);
+    expect(group).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(group);
     expect(group).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(screen.getByRole("link", { name: "독립 화면" }));
     await waitFor(() =>
       expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/ADDED"),
     );
-    expect(screen.getByText("준비 중", { selector: "p" })).toBeVisible();
+    expect(await screen.findByText("준비 중", { selector: "p" })).toBeVisible();
     fireEvent.click(group);
     expect(group).toHaveAttribute("aria-expanded", "false");
     expect(storage).not.toHaveBeenCalled();

@@ -171,13 +171,13 @@ function respond(body: ShellMenuResponse) {
 }
 async function expectScreenContent(id: string) {
   if (id === "UI-15") {
-    expect(await screen.findByText("등록된 거래처가 없습니다.")).toBeVisible();
+    expect(await screen.findByText("조건에 맞는 결과가 없습니다.")).toBeVisible();
     expect(screen.getByTestId("client-part-workspace")).toBeVisible();
     expect(screen.getByTestId("client-page")).toBeVisible();
     expect(screen.getByTestId("client-search")).toBeVisible();
     // 데이터를 다 읽은 뒤에 켜진다: 켜질 때까지 기다린다(느린 환경에서 깜빡 실패 방지).
     await waitFor(() =>
-      expect(screen.getByTestId("client-query")).toBeEnabled(),
+      expect(screen.getByTestId("list-search")).toBeEnabled(),
     );
     // 데이터를 다 읽은 뒤에 켜진다: 켜질 때까지 기다린다(느린 환경에서 깜빡 실패 방지).
     await waitFor(() =>

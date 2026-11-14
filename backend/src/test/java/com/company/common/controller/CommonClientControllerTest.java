@@ -26,13 +26,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(CommonClientController.class)
 @ContextConfiguration(classes = {CommonClientController.class, CommonClientService.class,
-    CodeExceptionHandler.class, ApiExceptionHandler.class, CurrentBusinessActor.class, BusinessCalendar.class})
+    CodeExceptionHandler.class, ApiExceptionHandler.class, CurrentBusinessActor.class, BusinessCalendar.class,
+    ExcelExportService.class})
 class CommonClientControllerTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @MockBean ClientMapper mapper;
     @MockBean UserMapper management;
     @MockBean PaymentAccountCipher cipher;
+    @MockBean CodeGroupMapper codeGroups;
     @MockBean PlatformTransactionManager transactions;
     Map<String, ClientRows.Client> rows;
     List<History> histories;

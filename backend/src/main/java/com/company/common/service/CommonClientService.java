@@ -57,15 +57,32 @@ public class CommonClientService {
         require(id);
         return new Items<>(mapper.selectChanges(id));
     }
+    /** 지급 계좌 전체 보기(재무 권한). 시안: [보기]를 누르면 전체가 보이고 접근 기록에 남는다(SER-006). */
+    @Transactional
     public Account getCommonClientPaymentAccount(String id) {
         if (!ClientPartPolicy.canReadPaymentAccount(actor.roles()))
             throw CodeFailure.invalid("accountNumber", "지급 계좌 전체 보기 권한이 없습니다.");
         var row = require(id);
-        return new Account(value(row.bankCode), value(cipher.decrypt(row.encryptedAccount)), value(row.accountHolder));
+        var account = new Account(value(row.bankCode), value(cipher.decrypt(row.encryptedAccount)), value(row.accountHolder));
+        mapper.insertAccess(actor.userId(), "ACCT_VIEW", "거래처 계좌번호 보기: " + row.clientName + " (" + id + ")");
+        return account;
     }
+    /** SFR-011 엑셀 다운로드: 지금 조건의 전체 결과. 다운로드는 접근 기록에 남긴다(SER-006). */
+    @Transactional
+    public List<Item> getCommonClientsForDownload(Filter filter) {
+        var items = mapper.selectClients(filter, calendar.today()).stream().map(this::item).toList();
+        mapper.insertAccess(actor.userId(), "DNLD", "거래처 목록 " + items.size() + "건");
+        return items;
+    }
+    public String currentUserId() { return actor.userId(); }
     private String summary(ClientRows.Client row) {
         if (row.encryptedAccount == null) return "";
-        return value(row.bankName) + " " + cipher.lastFour(row.encryptedAccount);
+        try {
+            return value(row.bankName) + " " + cipher.lastFour(row.encryptedAccount);
+        } catch (IllegalStateException unreadable) {
+            // 키가 바뀌었거나 값이 망가진 계좌 하나 때문에 목록 전체가 실패하지 않게 한다. 전체 보기에서는 그대로 오류를 알린다.
+            return value(row.bankName) + " 확인 필요";
+        }
     }
     private Item item(ClientRows.Client row) {
         return new Item(row.clientId, row.clientTypeCode, row.clientName, row.businessNumber,

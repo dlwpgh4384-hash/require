@@ -498,7 +498,7 @@ describe("client and part route composition", () => {
     async (path) => {
       const { request, parts } = respondWithClientParts();
       mount(path);
-      await screen.findByText("등록된 거래처가 없습니다.");
+      await screen.findByText("조건에 맞는 결과가 없습니다.");
       expectSingleShell();
       expect(screen.getAllByTestId("client-part-workspace")).toHaveLength(1);
       expect(
@@ -536,7 +536,7 @@ describe("client and part route composition", () => {
         screen.queryByTestId("part-create-dialog"),
       ).not.toBeInTheDocument();
       fireEvent.click(screen.getByTestId("client-workspace-clients"));
-      await screen.findByText("등록된 거래처가 없습니다.");
+      await screen.findByText("조건에 맞는 결과가 없습니다.");
       expect(screen.queryByTestId("part-title-add")).not.toBeInTheDocument();
       expect(
         screen.getByTestId("upload-open").closest(".screen-actions"),
@@ -548,7 +548,7 @@ describe("client and part route composition", () => {
   it("client title registration opens the existing full-screen form without another URL", async () => {
     const { request } = respondWithClientParts();
     mount("/screens/UI-15");
-    await screen.findByText("등록된 거래처가 없습니다.");
+    await screen.findByText("조건에 맞는 결과가 없습니다.");
     fireEvent.click(screen.getByTestId("client-create"));
     expect(await screen.findByText(/구분을 선택하면/)).toBeVisible();
     expect(screen.queryByTestId("client-page")).not.toBeInTheDocument();
@@ -563,7 +563,7 @@ describe("client and part route composition", () => {
   it("the title upload uses the multipart client and closing its result never applies clients", async () => {
     const { request } = respondWithClientParts();
     mount("/screens/UI-15");
-    await screen.findByText("등록된 거래처가 없습니다.");
+    await screen.findByText("조건에 맞는 결과가 없습니다.");
     fireEvent.click(screen.getByTestId("upload-open"));
     await screen.findByTestId("upload-dialog");
     fireEvent.change(screen.getByTestId("upload-file"), {
@@ -603,13 +603,13 @@ describe("client and part route composition", () => {
         }),
     );
     mount("/screens/UI-15");
-    await screen.findByText("거래처 조회 중…");
+    await screen.findByText("목록을 불러오는 중입니다.");
     expect(screen.getByTestId("client-create")).toBeDisabled();
     expect(screen.getByTestId("upload-open")).toBeDisabled();
     await act(async () => {
       complete(success({ items: [] }));
     });
-    await screen.findByText("등록된 거래처가 없습니다.");
+    await screen.findByText("조건에 맞는 결과가 없습니다.");
     // 데이터를 다 읽은 뒤에 켜진다: 켜질 때까지 기다린다(느린 환경에서 깜빡 실패 방지).
     await waitFor(() =>
       expect(screen.getByTestId("client-create")).toBeEnabled(),
@@ -620,10 +620,10 @@ describe("client and part route composition", () => {
     const { clients } = respondWithClientParts();
     clients.mockRejectedValueOnce(new Error("거래처를 불러오지 못했습니다."));
     mount("/screens/UI-15");
-    const retry = await screen.findByTestId("client-retry");
+    const retry = await screen.findByTestId("list-retry");
     expect(screen.getByTestId("client-create")).toBeDisabled();
     fireEvent.click(retry);
-    await screen.findByText("등록된 거래처가 없습니다.");
+    await screen.findByText("조건에 맞는 결과가 없습니다.");
     expect(clients).toHaveBeenCalledTimes(2);
     expectSingleShell();
   });
@@ -632,7 +632,7 @@ describe("client and part route composition", () => {
     const { parts } = respondWithClientParts();
     parts.mockRejectedValueOnce(new Error("파트를 불러오지 못했습니다."));
     mount("/screens/UI-15");
-    await screen.findByText("등록된 거래처가 없습니다.");
+    await screen.findByText("조건에 맞는 결과가 없습니다.");
     fireEvent.click(screen.getByTestId("client-workspace-parts"));
     await screen.findByText("파트를 불러오지 못했습니다.");
     fireEvent.click(

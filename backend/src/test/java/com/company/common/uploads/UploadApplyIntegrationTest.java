@@ -73,7 +73,8 @@ class UploadApplyIntegrationTest {
         @Bean SqlSessionFactory sqlSessionFactory(DataSource source) throws Exception {
             var factory=new SqlSessionFactoryBean(); factory.setDataSource(source);
             factory.setMapperLocations(new ClassPathResource("mapper/uploads/UploadMapper.xml"),new ClassPathResource("mapper/ClientMapper.xml"),
-                new ClassPathResource("mapper/UserMapper.xml"),new ClassPathResource("mapper/CalculationRuleMapper.xml"));
+                new ClassPathResource("mapper/UserMapper.xml"),new ClassPathResource("mapper/CalculationRuleMapper.xml"),
+                new ClassPathResource("mapper/CodeGroupMapper.xml"));
             var config=new org.apache.ibatis.session.Configuration(); config.setMapUnderscoreToCamelCase(false);
             config.setAutoMappingUnknownColumnBehavior(org.apache.ibatis.session.AutoMappingUnknownColumnBehavior.FAILING);
             factory.setConfiguration(config); return factory.getObject();
@@ -82,6 +83,7 @@ class UploadApplyIntegrationTest {
         @Bean UploadMapper uploadMapper(SqlSessionTemplate session) { return session.getMapper(UploadMapper.class); }
         @Bean ClientMapper clientMapper(SqlSessionTemplate session) { return session.getMapper(ClientMapper.class); }
         @Bean UserMapper userMapper(SqlSessionTemplate session) { return session.getMapper(UserMapper.class); }
+        @Bean CodeGroupMapper codeGroupMapper(SqlSessionTemplate session) { return session.getMapper(CodeGroupMapper.class); }
         @Bean CalculationRuleMapper calculationRuleMapper(SqlSessionTemplate session) { return session.getMapper(CalculationRuleMapper.class); }
         @Bean DataSourceTransactionManager transactionManager(DataSource source) { return new DataSourceTransactionManager(source); }
         @Bean BusinessCalendar businessCalendar() { return new BusinessCalendar(); }

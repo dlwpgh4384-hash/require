@@ -85,8 +85,9 @@ public final class ClientRules {
     }
     public static Filter filter(String type, String use, String keyword) {
         if (type != null && !type.isBlank() && !customer(type) && !vendor(type)) throw invalid("clientTypeCode");
-        if (!Set.of("Y", "N").contains(use)) throw invalid("useYn");
-        return new Filter(type == null || type.isBlank() ? null : type, use,
+        // 시안: 사용 여부 조건 [전체]·[사용]·[중지]. ALL이면 사용 여부로 거르지 않는다.
+        if (!Set.of("Y", "N", "ALL").contains(use)) throw invalid("useYn");
+        return new Filter(type == null || type.isBlank() ? null : type, "ALL".equals(use) ? null : use,
             keyword == null || keyword.isBlank() ? null : keyword.trim());
     }
     public static boolean customer(String type) { return "CUST".equals(type) || "BOTH".equals(type); }

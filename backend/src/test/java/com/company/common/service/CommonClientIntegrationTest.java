@@ -32,7 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnabledIfEnvironmentVariable(named = "NAVIGATION_TEST_DB_URL", matches = "jdbc:postgresql:.*")
 @WebMvcTest(CommonClientController.class)
 @ContextConfiguration(classes = {CommonClientController.class, CommonClientService.class, CurrentBusinessActor.class,
-    CodeExceptionHandler.class, ApiExceptionHandler.class, CommonClientIntegrationTest.Persistence.class})
+    CodeExceptionHandler.class, ApiExceptionHandler.class, ExcelExportService.class,
+    CommonClientIntegrationTest.Persistence.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class CommonClientIntegrationTest {
     @Autowired MockMvc mvc;
@@ -61,7 +62,8 @@ class CommonClientIntegrationTest {
         }
         @Bean SqlSessionFactory sqlSessionFactory(DataSource source) throws Exception {
             var factory=new SqlSessionFactoryBean(); factory.setDataSource(source);
-            factory.setMapperLocations(new ClassPathResource("mapper/ClientMapper.xml"),new ClassPathResource("mapper/UserMapper.xml"));
+            factory.setMapperLocations(new ClassPathResource("mapper/ClientMapper.xml"),new ClassPathResource("mapper/UserMapper.xml"),
+                new ClassPathResource("mapper/CodeGroupMapper.xml"));
             var config=new org.apache.ibatis.session.Configuration(); config.setMapUnderscoreToCamelCase(false);
             config.setAutoMappingUnknownColumnBehavior(org.apache.ibatis.session.AutoMappingUnknownColumnBehavior.FAILING);
             factory.setConfiguration(config); return factory.getObject();
@@ -69,6 +71,7 @@ class CommonClientIntegrationTest {
         @Bean SqlSessionTemplate sqlSessionTemplate(SqlSessionFactory factory) { return new SqlSessionTemplate(factory); }
         @Bean ClientMapper clientMapper(SqlSessionTemplate session) { return session.getMapper(ClientMapper.class); }
         @Bean UserMapper userMapper(SqlSessionTemplate session) { return session.getMapper(UserMapper.class); }
+        @Bean CodeGroupMapper codeGroupMapper(SqlSessionTemplate session) { return session.getMapper(CodeGroupMapper.class); }
         @Bean DataSourceTransactionManager transactionManager(DataSource source) { return new DataSourceTransactionManager(source); }
         @Bean BusinessCalendar businessCalendar() { return new BusinessCalendar(java.time.Clock.fixed(java.time.Instant.parse("2030-01-01T15:30:00Z"),java.time.ZoneOffset.UTC)); }
         @Bean PaymentAccountCipher paymentAccountCipher() { return new PaymentAccountCipher(java.util.Base64.getEncoder().encodeToString(new byte[32])); }
@@ -104,6 +107,30 @@ class CommonClientIntegrationTest {
         mvc.perform(get("/api/common/clients/"+id+"/change-history")).andExpect(jsonPath("$.data.items[0].fieldName").value("신규 등록")).andExpect(jsonPath("$.data.items[0].changedBy").value("admin"));
         mvc.perform(get("/api/common/clients/"+id+"/payment-account")).andExpect(jsonPath("$.data.accountNumber").value("12345678"));
         var reopened=new JdbcTemplate(source); assertThat(reopened.queryForObject("SELECT use_yn FROM TB_BS_CLNT WHERE clnt_id=?",String.class,id)).isEqualTo("Y");
+    }
+    @Test void excelDownloadKeepsVisibleColumnsAndLeavesAccessLogs() throws Exception {
+        String id=create("VNDR","123-45-67890");
+        var response=mvc.perform(get("/api/common/clients/excel").param("columns","name","type","account"))
+            .andExpect(status().isOk()).andReturn().getResponse();
+        assertThat(response.getHeader("Content-Disposition")).contains("attachment");
+        try (var workbook=new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(response.getContentAsByteArray()))) {
+            var sheet=workbook.getSheetAt(0);
+            assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).contains("admin");
+            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("상호");
+            assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("구분");
+            assertThat(sheet.getRow(3).getCell(1).getStringCellValue()).isEqualTo("협력사");
+            assertThat(sheet.getRow(3).getCell(2).getStringCellValue()).endsWith("5678");
+        }
+        mvc.perform(get("/api/common/clients/excel").param("columns","unknown")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/common/clients/"+id+"/payment-account")).andExpect(status().isOk());
+        assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE scrn_id='UI-15' AND act_type_cd='DNLD' AND user_id='admin'",Long.class)).isEqualTo(1);
+        assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE scrn_id='UI-15' AND act_type_cd='ACCT_VIEW'",Long.class)).isEqualTo(1);
+    }
+    @Test void anUnreadableAccountDoesNotBreakTheList() throws Exception {
+        String id=create("VNDR","123-45-67890");
+        db.update("UPDATE TB_BS_CLNT SET acct_no_enc=? WHERE clnt_id=?", java.util.Base64.getEncoder().encodeToString(new byte[40]), id);
+        mvc.perform(get("/api/common/clients")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].paymentAccountSummary").value(org.hamcrest.Matchers.endsWith("확인 필요")));
     }
     @Test void duplicateAndMalformedRequestsHaveZeroNewRows() throws Exception {
         create("BOTH","123-45-67890"); String before=snapshot();

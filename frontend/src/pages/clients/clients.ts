@@ -141,3 +141,37 @@ export function formatBusinessNumber(value: string) {
     .filter(Boolean)
     .join("-");
 }
+
+/** 목록 지급 계좌(시안): 「KB국민은행 …3973」, 없으면 「–」. 서버 요약은 「은행이름 끝4자리」. */
+export function listAccount(summary: string | null | undefined) {
+  if (!summary) return "–";
+  const parts = summary.trim().split(/\s+/);
+  if (!/^[0-9]{4}$/.test(parts[parts.length - 1] ?? "")) return summary;
+  const last = parts.pop() ?? "";
+  return `${parts.join(" ")} …${last}`.trim();
+}
+/** 상세 지급 계좌(시안): 「KB국민은행 ****3973」. */
+export function detailAccount(summary: string | null | undefined) {
+  if (!summary) return "–";
+  const parts = summary.trim().split(/\s+/);
+  if (!/^[0-9]{4}$/.test(parts[parts.length - 1] ?? "")) return summary;
+  const last = parts.pop() ?? "";
+  return `${parts.join(" ")} ****${last}`.trim();
+}
+/** SFR-011 거래처 엑셀 다운로드 주소: 지금 조건·정렬·보이는 열 그대로. */
+export function clientsExcelUrl(
+  filter: { clientTypeCode?: string; useYn?: string; keyword?: string },
+  sort: { key: string; dir: string } | null,
+  columns: string[],
+) {
+  const params = new URLSearchParams();
+  Object.entries(filter).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  if (sort) {
+    params.set("sort", sort.key);
+    params.set("dir", sort.dir);
+  }
+  columns.forEach((column) => params.append("columns", column));
+  return `/api/common/clients/excel?${params}`;
+}

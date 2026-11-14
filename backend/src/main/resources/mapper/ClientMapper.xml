@@ -157,4 +157,8 @@
     SELECT c.clnt_id FROM TB_BS_CLNT c WHERE c.use_yn='Y' AND c.clnt_type_cd IN ('CUST','BOTH')
     ORDER BY c.clnt_nm, c.clnt_id
   </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG (user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm)
+    VALUES (#{userId},#{action},'UI-15',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
 </mapper>

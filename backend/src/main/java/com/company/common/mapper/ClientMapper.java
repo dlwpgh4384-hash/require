@@ -23,4 +23,6 @@ public interface ClientMapper {
     List<ClientRows.Assignment> selectAssignments(@Param("clientId") String clientId, @Param("today") LocalDate today);
     List<ClientRows.Change> selectChanges(String clientId);
     List<String> selectSelectableClientIds();
+    /** SER-006 접근 기록(거래처 화면 UI-15): 다운로드(DNLD)·계좌번호 보기(ACCT_VIEW). */
+    void insertAccess(@Param("userId") String userId, @Param("action") String action, @Param("target") String target);
 }

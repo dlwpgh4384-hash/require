@@ -147,9 +147,14 @@ afterEach(() => {
 it("shows API-backed twelve columns, masked accounts and default active query", async () => {
   render(<ClientPage />);
   expect(await screen.findByText("거래처A")).toBeVisible();
-  expect(screen.getByText("은행 5678")).toBeVisible();
+  // 시안: 목록 지급 계좌는 「은행 …5678」, 진행 프로젝트·투입 인력은 「N건」「N명」
+  expect(screen.getByText("은행 …5678")).toBeVisible();
   expect(screen.queryByText("12345678")).not.toBeInTheDocument();
   expect(screen.getAllByRole("columnheader")).toHaveLength(13);
+  expect(screen.getByTestId("list-count")).toHaveTextContent("1");
+  expect(screen.getByTestId("list-reset")).toBeVisible();
+  expect(screen.getByTestId("list-columns")).toBeVisible();
+  expect(screen.getByTestId("list-download")).toBeVisible();
   expect(
     request.mock.calls.some((call) => String(call[0]).includes("useYn=Y")),
   ).toBe(true);
@@ -163,7 +168,7 @@ it("submits category and keyword without invented pagination parameters", async 
   fireEvent.change(screen.getByTestId("client-search"), {
     target: { value: "123-45" },
   });
-  fireEvent.click(screen.getByTestId("client-query"));
+  fireEvent.click(screen.getByTestId("list-search"));
   await waitFor(() =>
     expect(
       request.mock.calls.some(
@@ -188,11 +193,13 @@ it.each(["client-projects-client-a", "client-people-client-a"])(
 it("detail reads selected client and counts readonly history", async () => {
   render(<ClientPage />);
   fireEvent.click(await screen.findByText("거래처A"));
-  fireEvent.click(await screen.findByTestId("client-detail-history"));
+  // 시안: [⋯] 메뉴 「변경 이력 보기」로 변경 이력 탭을 연다
+  fireEvent.click(await screen.findByTestId("client-detail-more"));
+  fireEvent.click(screen.getByTestId("client-detail-history"));
   expect(await screen.findByText("admin")).toBeVisible();
-  expect(screen.getByText("변경 이력(1)")).toBeVisible();
+  expect(screen.getByText("변경 이력 (1)")).toBeVisible();
   expect(
-    within(screen.getByTestId("client-history-panel")).queryByRole("button"),
+    within(screen.getByTestId("client-changes")).queryByRole("button"),
   ).not.toBeInTheDocument();
 });
 it("loads full account only by explicit detail action", async () => {
@@ -204,15 +211,17 @@ it("loads full account only by explicit detail action", async () => {
       String(call[0]).endsWith("payment-account"),
     ),
   ).toBe(false);
+  expect(screen.getByTestId("client-account-masked")).toHaveTextContent("****5678");
   fireEvent.click(read);
-  expect(await screen.findByTestId("client-account-full")).toHaveTextContent(
-    "12345678",
+  await waitFor(() =>
+    expect(screen.getByTestId("client-account-masked")).toHaveTextContent("12345678"),
   );
+  expect(screen.getByText(/예금주 계좌주/)).toBeVisible();
 });
 it("renders empty state", async () => {
   empty = true;
   render(<ClientPage />);
-  expect(await screen.findByText("등록된 거래처가 없습니다.")).toBeVisible();
+  expect(await screen.findByTestId("list-empty")).toHaveTextContent("조건에 맞는 결과가 없습니다.");
 });
 it("renders request failure with retry", async () => {
   failRead = true;
@@ -221,19 +230,19 @@ it("renders request failure with retry", async () => {
     "상호를 확인해 주세요.",
   );
   failRead = false;
-  fireEvent.click(screen.getByTestId("client-retry"));
+  fireEvent.click(screen.getByTestId("list-retry"));
   expect(await screen.findByText("거래처A")).toBeVisible();
 });
 it("status confirmation cancellation writes nothing and failures show reasons", async () => {
   render(<ClientPage />);
   await screen.findByText("거래처A");
-  fireEvent.click(screen.getByTestId("client-select-client-a"));
-  fireEvent.click(screen.getByTestId("client-stop-selected"));
+  fireEvent.click(screen.getByTestId("list-select-client-a"));
+  fireEvent.click(screen.getByTestId("list-bulk-stop"));
   fireEvent.click(screen.getByTestId("client-status-cancel"));
   expect(writes()).toHaveLength(0);
-  fireEvent.click(screen.getByTestId("client-stop-selected"));
+  fireEvent.click(screen.getByTestId("list-bulk-stop"));
   fireEvent.click(screen.getByTestId("client-status-save"));
-  expect(await screen.findByText(/0건 변경, 1건 실패/)).toHaveTextContent(
+  expect(await screen.findByText(/0건을 사용 중지했습니다/)).toHaveTextContent(
     "소속 인력이 있어 중지할 수 없습니다.",
   );
   expect(JSON.parse(String(writes()[0][1].body))).toEqual({
@@ -405,9 +414,7 @@ it("successful registration refreshes active list, highlights saved row and show
   });
   fireEvent.click(screen.getByTestId("client-form-save"));
   expect(await screen.findByText("새 상호")).toBeVisible();
-  expect(screen.getByTestId("client-row-client-a")).toHaveClass(
-    "client-highlight",
-  );
+  expect(screen.getByTestId("list-row-client-a")).toHaveClass("ls-hl");
   expect(screen.getByText(/같은 상호의 거래처가 이미 있습니다/)).toBeVisible();
   const body = JSON.parse(String(writes()[0][1].body));
   expect(body.businessNumber).toBe("987-65-43210");

@@ -2,9 +2,9 @@ package com.company.common.codegroups.service;
 
 import com.company.common.codegroups.controller.CommonCodeController;
 import com.company.common.codegroups.mapper.CodeGroupMapper;
-import com.company.common.controller.ApiExceptionHandler;
-import com.company.common.controller.CodeExceptionHandler;
-import com.company.common.mapper.UserMapper;
+import com.company.common.support.controller.ApiExceptionHandler;
+import com.company.common.support.controller.CodeExceptionHandler;
+import com.company.common.users.mapper.UserMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.sql.DriverManager;

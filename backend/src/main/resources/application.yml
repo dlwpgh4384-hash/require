@@ -6,6 +6,10 @@ server:
 spring:
   application:
     name: navigation-shell
+  servlet:
+    multipart:
+      max-file-size: 10000000B
+      max-request-size: 11000000B
   datasource:
     url: ${DB_URL}
     username: ${DB_USER}
@@ -19,6 +23,10 @@ spring:
     enabled: false
   jackson:
     default-property-inclusion: always
+# SER-005 거래처 계좌번호 암호화 키(Base64 32바이트). 환경 변수 PAYMENT_ACCOUNT_KEY가 있으면 그것을 쓴다.
+# 아래 값은 개발용 임시 키다(2026-11-14 사용자 결정). 운영 전에 환경 변수로 옮기고 이 값은 지운다.
+payment:
+  account-key: ${PAYMENT_ACCOUNT_KEY:C3tOITc4O3LDsDQ0qr5HNdtBYKcs/edYUREesqrtI8A=}
 mybatis:
   mapper-locations: classpath*:mapper/**/*.xml
   configuration:

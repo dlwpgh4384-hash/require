@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.common.mapper.CommonCodeHistoryMapper">
-  <resultMap id="change" type="com.company.common.mapper.CodeHistoryRow" autoMapping="false">
+<mapper namespace="com.company.common.codehistory.mapper.CommonCodeHistoryMapper">
+  <resultMap id="change" type="com.company.common.codehistory.mapper.CodeHistoryRow" autoMapping="false">
     <result column="reg_dttm" property="changedAt" javaType="java.time.Instant"/>
     <result column="kind" property="kind" javaType="java.lang.String"/>
     <result column="item" property="item" javaType="java.lang.String"/>

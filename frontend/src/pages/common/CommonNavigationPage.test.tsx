@@ -158,7 +158,11 @@ function respond(body: ShellMenuResponse) {
                 "/api/common/code-maps",
                 "/api/common/operating-standards",
                 "/api/common/code-change-history",
-              ].includes(url)
+              ].includes(url) ||
+              url.startsWith("/api/common/clients?") ||
+              /^\/api\/common\/code-groups\/(CLNT_TYPE|INDUTY|BANK)\/codes$/.test(
+                url,
+              )
             ? { success: true, meta: {}, data: { items: [] } }
             : body,
   }));
@@ -166,7 +170,21 @@ function respond(body: ShellMenuResponse) {
   return request;
 }
 async function expectScreenContent(id: string) {
-  if (id === "UI-23") {
+  if (id === "UI-15") {
+    expect(await screen.findByText("조건에 맞는 결과가 없습니다.")).toBeVisible();
+    expect(screen.getByTestId("client-part-workspace")).toBeVisible();
+    expect(screen.getByTestId("client-page")).toBeVisible();
+    expect(screen.getByTestId("client-search")).toBeVisible();
+    // 데이터를 다 읽은 뒤에 켜진다: 켜질 때까지 기다린다(느린 환경에서 깜빡 실패 방지).
+    await waitFor(() =>
+      expect(screen.getByTestId("list-search")).toBeEnabled(),
+    );
+    // 데이터를 다 읽은 뒤에 켜진다: 켜질 때까지 기다린다(느린 환경에서 깜빡 실패 방지).
+    await waitFor(() =>
+      expect(screen.getByTestId("client-create")).toBeEnabled(),
+    );
+    expect(screen.getByTestId("client-workspace-parts")).toBeVisible();
+  } else if (id === "UI-23") {
     expect(
       await screen.findByText("조건에 맞는 결과가 없습니다."),
     ).toBeVisible();
@@ -180,7 +198,10 @@ async function expectScreenContent(id: string) {
   } else if (id === "UI-25") {
     expect(await screen.findByText("등록된 메뉴가 없습니다.")).toBeVisible();
     expect(screen.getByTestId("menu-settings-page")).toBeVisible();
-    expect(screen.getByTestId("menu-registration-open")).toBeEnabled();
+    // 데이터를 다 읽은 뒤에 켜진다: 켜질 때까지 기다린다(느린 환경에서 깜빡 실패 방지).
+    await waitFor(() =>
+      expect(screen.getByTestId("menu-registration-open")).toBeEnabled(),
+    );
   } else if (id === "UI-27") {
     expect(
       await screen.findByText("등록된 코드 그룹이 없습니다."),
@@ -240,7 +261,9 @@ describe("common placeholder screen contract", () => {
     fireEvent.click(screen.getByTestId("code-tab-history"));
     expect(await screen.findByTestId("code-history-empty")).toBeVisible();
     expect(screen.getByTestId("code-history-panel")).toBeVisible();
-    expect(screen.queryByTestId("code-group-title-add")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("code-group-title-add"),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-27");
     for (const path of [
       "/api/common/code-maps",
@@ -323,7 +346,7 @@ describe("common placeholder screen contract", () => {
       expect(screen.getAllByRole("banner")).toHaveLength(1);
       expect(screen.getAllByRole("complementary")).toHaveLength(1);
       expect(screen.getAllByRole("main")).toHaveLength(1);
-      if (id !== "UI-23") {
+      if (id !== "UI-23" && id !== "UI-15") {
         expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
         for (const name of ["조회", "저장", "다운로드", "업로드", "편집"]) {
           if (id === "UI-25" && name === "저장")
@@ -681,11 +704,19 @@ describe("common placeholder screen contract", () => {
     await waitFor(() =>
       expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-15"),
     );
+    await expectScreenContent("UI-15");
     expect(setItem).not.toHaveBeenCalled();
-    expect(requests).toHaveBeenCalledTimes(1);
-    expect(requests.mock.calls[0][0]).toBe("/api/common/menus");
-    expect(requests.mock.calls[0][1]).not.toHaveProperty("method");
-    expect(requests.mock.calls[0][1]).not.toHaveProperty("body");
+    expect(requests.mock.calls.map(([url]) => url)).toEqual([
+      "/api/common/menus",
+      "/api/common/clients?useYn=Y",
+      "/api/common/code-groups/CLNT_TYPE/codes",
+      "/api/common/code-groups/INDUTY/codes",
+      "/api/common/code-groups/BANK/codes",
+    ]);
+    for (const [, init] of requests.mock.calls) {
+      expect(init).not.toHaveProperty("method");
+      expect(init).not.toHaveProperty("body");
+    }
   });
 });
 

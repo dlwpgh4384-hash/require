@@ -1,11 +1,12 @@
 package com.company.common.codegroups.controller;
 
-import com.company.common.codegroups.mapper.*;
+import com.company.common.codegroups.mapper.CodeGroupMapper;
+import com.company.common.codegroups.mapper.CodeRows;
 import com.company.common.codegroups.service.CommonCodeService;
-import com.company.common.controller.ApiExceptionHandler;
-import com.company.common.controller.CodeExceptionHandler;
-import com.company.common.dto.UserContracts.History;
-import com.company.common.mapper.UserMapper;
+import com.company.common.support.controller.ApiExceptionHandler;
+import com.company.common.support.controller.CodeExceptionHandler;
+import com.company.common.users.dto.UserContracts.History;
+import com.company.common.users.mapper.UserMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
@@ -115,7 +116,9 @@ class CommonCodeControllerTest {
             .content(json.createObjectNode().put("groupId",id).put("groupName","이름").toString())).andExpect(status().isOk());
         create(id,item("a".repeat(20))).andExpect(status().isOk()).andExpect(jsonPath("$.data.code").value("A".repeat(20)));
     }
-    @Test void duplicateGroupCannotRenameIt() throws Exception {
+    @Test
+    @org.junit.jupiter.api.DisplayName("business: 그룹 ID 중복은 기존 이름과 변경 이력을 보존한다")
+    void duplicateGroupCannotRenameIt() throws Exception {
         mvc.perform(post("/api/common/code-groups").contentType("application/json")
             .content("{\"groupId\":\"CUSTOM\",\"groupName\":\"변조\"}"))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false))
@@ -173,13 +176,31 @@ class CommonCodeControllerTest {
         assertThat(codes.get("CUSTOM:ONE").delYn).isEqualTo("N");
         unchanged();
     }
-    @Test void anonymousUpdateHappySideEffectKeepsDelYnAndAuditsName() throws Exception {
+    @Test
+    @org.junit.jupiter.api.DisplayName("auth happy side-effect: 시스템 이름 변경은 DEL_YN=N을 보존한다")
+    void anonymousUpdateHappySideEffectKeepsDelYnAndAuditsName() throws Exception {
         mvc.perform(put("/api/common/code-groups/SYSTEM/codes").contentType("application/json")
             .content(body(item("FIXED")).toString()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].codeName").value("새 이름"));
         assertThat(codes.get("SYSTEM:FIXED").delYn).isEqualTo("N");
         verify(mapper).updateCode(argThat(row -> row.code.equals("FIXED") && row.delYn.equals("N")));
         verify(management).insertHistory(new History("TB_SY_CODE", "SYSTEM:FIXED", "UPD", "CODE_NM", "FIXED", "새 이름"));
+    }
+    @Test
+    @org.junit.jupiter.api.DisplayName("side-effect: USE_YN Y→N→Y 전환에도 DEL_YN=N과 코드 PK를 보존한다")
+    void usageTransitionsNeverSoftDeleteBusinessCode() throws Exception {
+        mvc.perform(put("/api/common/code-groups/CUSTOM/codes").contentType("application/json")
+            .content(body(item("ONE").put("useYn", "N")).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].useYn").value("N"))
+            .andExpect(jsonPath("$.data.items[0].delYn").doesNotExist());
+        assertThat(codes.get("CUSTOM:ONE").delYn).isEqualTo("N");
+        mvc.perform(put("/api/common/code-groups/CUSTOM/codes").contentType("application/json")
+            .content(body(item("ONE")).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].useYn").value("Y"))
+            .andExpect(jsonPath("$.data.items[0].delYn").doesNotExist());
+        assertThat(codes.get("CUSTOM:ONE").delYn).isEqualTo("N");
+        assertThat(codes).containsKeys("CUSTOM:ONE", "CUSTOM:TWO");
+        verify(mapper, never()).deleteCode(anyString(), anyString());
     }
     @Test void updateBusinessRejectsSystemUseChangeAndKeepsDelYn() throws Exception {
         mvc.perform(put("/api/common/code-groups/SYSTEM/codes").contentType("application/json")

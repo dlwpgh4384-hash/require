@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.parts.mapper.PartMapper">
+  <select id="selectCurrentMonth" resultType="java.lang.String">
+    SELECT to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')
+  </select>
+  <resultMap id="master" type="com.company.common.parts.mapper.PartRows$Master" autoMapping="false">
+    <id column="part_id" property="partId" javaType="java.lang.String"/>
+    <result column="part_nm" property="partName" javaType="java.lang.String"/>
+    <result column="use_yn" property="useYn" javaType="java.lang.String"/>
+    <result column="mod_dttm" property="modifiedAt" javaType="java.time.Instant"/>
+    <result column="person_count" property="personCount" javaType="java.lang.Long"/>
+    <result column="project_count" property="projectCount" javaType="java.lang.Long"/>
+  </resultMap>
+  <resultMap id="period" type="com.company.common.parts.mapper.PartRows$Period" autoMapping="false">
+    <id column="part_id" property="partId" javaType="java.lang.String"/>
+    <id column="aply_bgn_ym" property="month" javaType="java.lang.String"/>
+    <result column="aply_end_ym" property="endMonth" javaType="java.lang.String"/>
+    <result column="part_ldr_user_id" property="leaderUserId" javaType="java.lang.String"/>
+    <result column="leader_name" property="leaderName" javaType="java.lang.String"/>
+    <result column="prft_dstrb_rt" property="distributionRate" javaType="java.math.BigDecimal"/>
+    <result column="sales_exps_amt" property="salesExpense" javaType="java.math.BigDecimal"/>
+  </resultMap>
+  <resultMap id="leader" type="com.company.common.parts.mapper.PartRows$Leader" autoMapping="false">
+    <id column="user_id" property="userId" javaType="java.lang.String"/>
+    <result column="user_nm" property="userName" javaType="java.lang.String"/>
+  </resultMap>
+  <resultMap id="history" type="com.company.common.users.mapper.UserRows$Change" autoMapping="false">
+    <result column="reg_dttm" property="changedAt" javaType="java.time.Instant"/>
+    <result column="chg_item_nm" property="item" javaType="java.lang.String"/>
+    <result column="bfr_val" property="before" javaType="java.lang.String"/>
+    <result column="aft_val" property="after" javaType="java.lang.String"/>
+    <result column="changed_by" property="changedBy" javaType="java.lang.String"/>
+  </resultMap>
+  <update id="lockSources">
+    LOCK TABLE TB_SY_OPER_STD, TB_CL_CLOSE, TB_CO_PART_SETL,
+      TB_BS_PART, TB_BS_PART_STD, TB_SY_USER, TB_SY_USER_ROLE, TB_SY_ROLE,
+      TB_HR_DEV, TB_PJ_PROJ, TB_PJ_PROJ_PART IN SHARE ROW EXCLUSIVE MODE
+  </update>
+  <sql id="counts">
+    (SELECT count(DISTINCT d.dev_id) FROM TB_HR_DEV d WHERE d.part_id=p.part_id) AS person_count,
+    (SELECT count(DISTINCT j.proj_id)
+       FROM TB_PJ_PROJ j
+       JOIN TB_PJ_PROJ_PART pp ON pp.proj_id=j.proj_id
+      WHERE pp.part_id=p.part_id AND j.proj_stat_cd='ING'
+        AND pp.aply_bgn_ym=(SELECT max(pr.aply_bgn_ym) FROM TB_PJ_PROJ_PART pr
+          WHERE pr.proj_id=j.proj_id AND pr.aply_bgn_ym &lt;= #{month})) AS project_count
+  </sql>
+  <select id="selectParts" resultMap="master">
+    SELECT p.part_id, p.part_nm, p.use_yn, p.mod_dttm, <include refid="counts"/>
+    FROM TB_BS_PART p WHERE p.hq_yn='N' ORDER BY p.reg_dttm DESC, p.part_id
+  </select>
+  <select id="selectMaster" resultMap="master">
+    SELECT p.part_id, p.part_nm, p.use_yn, p.mod_dttm,
+      (SELECT count(DISTINCT d.dev_id) FROM TB_HR_DEV d WHERE d.part_id=p.part_id) AS person_count,
+      (SELECT count(DISTINCT j.proj_id) FROM TB_PJ_PROJ j
+        JOIN TB_PJ_PROJ_PART pp ON pp.proj_id=j.proj_id
+        WHERE pp.part_id=p.part_id AND j.proj_stat_cd='ING'
+          AND pp.aply_bgn_ym=(SELECT max(pr.aply_bgn_ym) FROM TB_PJ_PROJ_PART pr
+            WHERE pr.proj_id=j.proj_id AND pr.aply_bgn_ym &lt;=
+              to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM'))) AS project_count
+    FROM TB_BS_PART p WHERE p.part_id=#{id} AND p.hq_yn='N'
+  </select>
+  <select id="selectPeriods" resultMap="period">
+    SELECT s.part_id, s.aply_bgn_ym, s.aply_end_ym, s.part_ldr_user_id,
+      COALESCE(u.user_nm,s.part_ldr_user_id) AS leader_name, s.prft_dstrb_rt, s.sales_exps_amt
+    FROM TB_BS_PART_STD s LEFT JOIN TB_SY_USER u ON u.user_id=s.part_ldr_user_id
+    WHERE s.part_id=#{id} ORDER BY s.aply_bgn_ym
+  </select>
+  <select id="selectLeaders" resultMap="leader">
+    SELECT u.user_id, u.user_nm FROM TB_SY_USER u
+    WHERE u.user_stat_cd='USE' AND EXISTS (
+      SELECT 1 FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.role_id=ur.role_id
+      WHERE ur.user_id=u.user_id AND r.role_id='SALES_LDR' AND r.use_yn='Y')
+    ORDER BY u.user_nm, u.user_id
+  </select>
+  <select id="nameExists" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_BS_PART p WHERE p.part_nm=#{name}
+      <if test="exceptId != null">AND p.part_id != #{exceptId}</if>)
+  </select>
+  <insert id="insertPart">
+    INSERT INTO TB_BS_PART (part_id,part_nm,hq_yn,use_yn,reg_user_id,reg_dttm)
+    VALUES (#{id},#{name},'N','Y','admin',clock_timestamp())
+  </insert>
+  <insert id="insertPeriod">
+    INSERT INTO TB_BS_PART_STD
+      (part_id,aply_bgn_ym,aply_end_ym,part_ldr_user_id,prft_dstrb_rt,sales_exps_amt,reg_user_id,reg_dttm)
+    VALUES (#{partId},#{month},#{endMonth,jdbcType=CHAR},#{values.leaderUserId},
+      #{values.distributionRate},#{values.salesExpense},'admin',clock_timestamp())
+  </insert>
+  <update id="updatePeriod">
+    UPDATE TB_BS_PART_STD SET part_ldr_user_id=#{values.leaderUserId},
+      prft_dstrb_rt=#{values.distributionRate},sales_exps_amt=#{values.salesExpense},
+      mod_user_id='admin',mod_dttm=clock_timestamp()
+    WHERE part_id=#{partId} AND aply_bgn_ym=#{month}
+  </update>
+  <update id="endPeriod">
+    UPDATE TB_BS_PART_STD SET aply_end_ym=#{end},mod_user_id='admin',mod_dttm=clock_timestamp()
+    WHERE part_id=#{id} AND aply_bgn_ym=#{month}
+  </update>
+  <update id="touch">
+    UPDATE TB_BS_PART SET mod_user_id='admin',
+      mod_dttm=GREATEST(clock_timestamp(),COALESCE(mod_dttm,reg_dttm)+INTERVAL '1 microsecond')
+    WHERE part_id=#{id} AND mod_dttm IS NOT DISTINCT FROM #{token,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+  </update>
+  <update id="rename">UPDATE TB_BS_PART SET part_nm=#{name} WHERE part_id=#{id}</update>
+  <update id="stop">UPDATE TB_BS_PART SET use_yn='N' WHERE part_id=#{id}</update>
+  <select id="selectLastConfirmed" resultType="java.lang.String">
+    SELECT max(s.setl_ym) FROM TB_CO_PART_SETL s
+    WHERE s.part_id=#{id} AND s.setl_ym &gt;= #{month} AND s.setl_stat_cd='CNFM'
+      AND NOT EXISTS (SELECT 1 FROM TB_CL_CLOSE c
+        WHERE c.close_ym=s.setl_ym AND c.close_stat_cd='CLOSE')
+  </select>
+  <select id="selectHistory" resultMap="history">
+    SELECT h.reg_dttm,h.chg_item_nm,h.bfr_val,h.aft_val,
+      COALESCE(u.user_nm,h.reg_user_id) AS changed_by
+    FROM TB_SY_CHG_HIST h LEFT JOIN TB_SY_USER u ON u.user_id=h.reg_user_id
+    WHERE h.trgt_tbl_nm IN ('TB_BS_PART','TB_BS_PART_STD')
+      AND (h.trgt_key=#{id} OR h.trgt_key LIKE #{id} || ':%')
+    ORDER BY h.reg_dttm DESC,h.hist_id DESC
+  </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG (user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm)
+    VALUES (#{userId},#{action},'UI-15',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
+</mapper>

@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.common.mapper.RoleMapper">
-  <resultMap id="role" type="com.company.common.mapper.RoleRows$Role" autoMapping="false">
+<mapper namespace="com.company.common.roles.mapper.RoleMapper">
+  <resultMap id="role" type="com.company.common.roles.mapper.RoleRows$Role" autoMapping="false">
     <id column="role_id" property="roleId" javaType="java.lang.String"/>
     <result column="role_nm" property="roleName" javaType="java.lang.String"/>
     <result column="data_scope_cd" property="dataScopeCd" javaType="java.lang.String"/>
     <result column="snstv_view_yn" property="snstvViewYn" javaType="java.lang.String"/>
     <result column="use_yn" property="useYn" javaType="java.lang.String"/>
   </resultMap>
-  <resultMap id="menu" type="com.company.common.mapper.RoleRows$Menu" autoMapping="false">
+  <resultMap id="menu" type="com.company.common.roles.mapper.RoleRows$Menu" autoMapping="false">
     <id column="menu_id" property="menuId" javaType="java.lang.String"/>
     <result column="menu_nm" property="menuName" javaType="java.lang.String"/>
     <result column="scrn_id" property="screenId" javaType="java.lang.String"/>
@@ -21,11 +21,11 @@
     <result column="dnld_yn" property="downloadYn" javaType="java.lang.String"/>
     <result column="cnfm_yn" property="cnfmYn" javaType="java.lang.String"/>
   </resultMap>
-  <resultMap id="dataScope" type="com.company.common.mapper.RoleRows$ScopeCode" autoMapping="false">
+  <resultMap id="dataScope" type="com.company.common.roles.mapper.RoleRows$ScopeCode" autoMapping="false">
     <id column="code" property="code" javaType="java.lang.String"/>
     <result column="code_nm" property="name" javaType="java.lang.String"/>
   </resultMap>
-  <resultMap id="scope" type="com.company.common.mapper.RoleRows$Scope" autoMapping="false">
+  <resultMap id="scope" type="com.company.common.roles.mapper.RoleRows$Scope" autoMapping="false">
     <id column="user_id" property="userId" javaType="java.lang.String"/>
     <id column="scope_sn" property="scopeSn" javaType="_int"/>
     <result column="scope_type_cd" property="scopeTypeCd" javaType="java.lang.String"/>
@@ -89,7 +89,7 @@
     WHERE m.scrn_id IS NOT NULL AND m.use_yn='Y'
       AND NOT EXISTS (SELECT 1 FROM TB_SY_MENU child WHERE child.upper_menu_id=m.menu_id)
   </insert>
-  <resultMap id="change" type="com.company.common.mapper.RoleRows$Change" autoMapping="false">
+  <resultMap id="change" type="com.company.common.roles.mapper.RoleRows$Change" autoMapping="false">
     <result column="reg_dttm" property="changedAt" javaType="java.time.Instant"/>
     <result column="trgt_tbl_nm" property="table" javaType="java.lang.String"/>
     <result column="trgt_key" property="key" javaType="java.lang.String"/>

@@ -785,3 +785,30 @@ a.header-brand:focus-visible {
 .app-layout.is-mobile .preference-tools button {
   min-height: 36px;
 }
+
+/* 시안 폼 화면 제목줄: [‹ 목록](btn-sm) — 제목 묶음과 12px 간격 */
+.page-title .title-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  min-height: 0;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.page-title .title-back:hover {
+  background: var(--hover);
+}
+.page-title .title-back + .title-stack {
+  margin-left: -4px;
+}

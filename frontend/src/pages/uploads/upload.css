@@ -1,0 +1,249 @@
+.upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.app-dialog:has(.upload-form) {
+  width: min(400px, 100%);
+}
+.app-dialog:has(.upload-result) {
+  width: min(880px, 100%);
+}
+.upload-form label {
+  font-size: 13px;
+  color: var(--text-sub);
+  font-weight: 400;
+}
+.upload-form input {
+  min-height: 36px;
+}
+.upload-help {
+  font-size: 12px;
+  color: var(--text-sub);
+  line-height: 1.6;
+}
+.upload-counts {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  font-weight: 600;
+}
+.upload-warning {
+  color: var(--warn, #a16207);
+}
+.upload-invalid {
+  color: var(--bad, #b91c1c);
+}
+.upload-table-scroll {
+  overflow: auto;
+  max-height: 45dvh;
+}
+.upload-result table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.upload-result th {
+  background: var(--surface-sub, #f3f4f6);
+  text-align: left;
+  position: sticky;
+  top: 0;
+}
+.upload-result th,
+.upload-result td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.upload-result td:nth-child(3) {
+  max-width: 220px;
+}
+.upload-dense td {
+  padding-block: 6px;
+}
+.upload-result nav {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+@media (max-width: 767px) {
+  .upload-result th,
+  .upload-result td {
+    padding-inline: 4px;
+  }
+}
+/* 시안 제목줄 단추: 아이콘 + 글자, 흰 바탕 테두리(.btn) */
+.upload-title-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 시안 .modal.wide 업로드 결과: 폭 720, 머리·본문(4·24·16, 간격 12, 회색 글자)·단추 줄(12·24·20) */
+.app-dialog:has(.upload-result) {
+  width: min(720px, 100%);
+  padding: 0;
+  border: 0;
+}
+.app-dialog:has(.upload-result) > .app-dialog-head {
+  margin: 0;
+  padding: 16px 16px 8px 24px;
+}
+.app-dialog:has(.upload-result) .app-dialog-head h2 {
+  line-height: 24px;
+}
+.app-dialog:has(.upload-result) .app-dialog-close {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+}
+.upload-mb {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 24px 16px;
+  color: var(--text-sub);
+  font-size: 14px;
+}
+.upload-mb p {
+  margin: 0;
+}
+.upload-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 16px;
+  padding: 0;
+  font-weight: 400;
+}
+.upload-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 20px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  min-width: 0;
+}
+.upload-kpi-l {
+  font-size: 13px;
+  color: var(--text-sub);
+}
+.upload-kpi-v {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.upload-kpi-d {
+  min-height: 16px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.upload-ok {
+  color: var(--ls-ok);
+}
+.upload-cap {
+  font-size: 12px;
+  line-height: 16px;
+}
+.upload-result .ls-twrap.upload-table-scroll {
+  max-height: 45dvh;
+  min-height: 0;
+}
+.upload-result .ls-t th,
+.upload-result .ls-t td {
+  padding: 0 12px;
+  vertical-align: middle;
+  background-clip: padding-box;
+}
+.upload-result .ls-t th {
+  background: var(--ls-head-bg);
+}
+/* 시안: 결과 표 글자는 본문처럼 회색, 줄바꿈 없음 */
+.upload-result .ls-t td {
+  color: inherit;
+}
+.upload-pages {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.upload-mf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px 20px;
+}
+.upload-mf-r {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+/* 파일 고르기 창도 시안 .modal 틀(폭 400·머리·본문·단추 줄)과 파일 칸(input[type=file].in) */
+.app-dialog:has(.upload-form) {
+  padding: 0;
+  border: 0;
+}
+.app-dialog:has(.upload-form) > .app-dialog-head {
+  margin: 0;
+  padding: 16px 16px 8px 24px;
+}
+.app-dialog:has(.upload-form) .app-dialog-head h2 {
+  line-height: 24px;
+}
+.upload-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 24px 0;
+  color: var(--text-sub);
+}
+.upload-form p {
+  margin: 0;
+}
+.upload-form label {
+  margin: 0;
+  font-weight: 500;
+}
+.upload-form input[type="file"] {
+  min-height: 40px;
+  padding: 5px 8px;
+  line-height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.upload-form input[type="file"]::file-selector-button {
+  height: 28px;
+  margin-right: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.upload-form .app-actions {
+  margin: 0 -24px;
+  padding: 12px 24px 20px;
+}
+.upload-form .app-actions button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  font-weight: 500;
+}

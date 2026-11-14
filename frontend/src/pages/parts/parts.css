@@ -1,0 +1,327 @@
+.part-page {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.part-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.part-heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.part-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border, #d1d5db);
+  margin-bottom: 16px;
+}
+.part-tabs button {
+  padding: 10px 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-sub, #4b5563);
+}
+.part-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--primary, #2563eb);
+  color: var(--primary, #2563eb);
+  font-weight: 600;
+}
+.part-form {
+  display: grid;
+  gap: 16px;
+}
+.part-form fieldset {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+.part-field {
+  display: grid;
+  gap: 6px;
+  color: var(--text-sub, #4b5563);
+  font-size: 13px;
+}
+.part-field em {
+  font-style: normal;
+  color: var(--bad, #b91c1c);
+}
+.part-field input,
+.part-field select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 4px;
+  background: var(--surface, #fff);
+  color: var(--text, #111827);
+  font: inherit;
+  font-size: 14px;
+}
+.part-field [aria-invalid="true"] {
+  border-color: var(--bad, #b91c1c);
+}
+.part-field small {
+  color: var(--bad, #b91c1c);
+  font-size: 12px;
+}
+.part-help {
+  margin: -6px 0 0;
+  color: var(--text-sub, #4b5563);
+  font-size: 12px;
+}
+.part-form [role="alert"] {
+  overflow-wrap: anywhere;
+}
+.part-table-wrap {
+  overflow: auto;
+  max-width: 100%;
+}
+.part-table-wrap table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.part-table-wrap th {
+  background: var(--surface-sub, #f3f4f6);
+  text-align: left;
+  font-weight: 600;
+}
+.part-table-wrap th,
+.part-table-wrap td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border, #d1d5db);
+  overflow-wrap: anywhere;
+}
+.part-state {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+.part-state-current {
+  color: var(--ok, #15803d);
+  background: var(--ok-bg, #f0fdf4);
+}
+.part-state-scheduled {
+  color: var(--info, #0369a1);
+  background: var(--info-bg, #f0f9ff);
+}
+.part-state-past {
+  color: var(--text-sub, #4b5563);
+  border: 1px solid var(--border, #d1d5db);
+}
+@media (max-width: 600px) {
+  .part-heading {
+    flex-wrap: wrap;
+  }
+  .part-table-wrap th,
+  .part-table-wrap td {
+    padding: 8px;
+  }
+}
+
+/* 시안 UI-15 영업 파트 상세·창 맞춤 */
+.part-more {
+  position: relative;
+}
+/* 시안 .pop.small: 폭 220, 단추 아래 16px */
+.part-more-menu {
+  position: absolute;
+  right: 0;
+  top: 44px;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  width: 220px;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  box-shadow: var(--ls-shadow-sm);
+}
+.part-more-menu button {
+  min-height: 0;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--divider);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  width: 100%;
+}
+.part-more-menu button:last-child {
+  border-bottom: 0;
+}
+.part-more-menu button:hover {
+  background: var(--hover);
+}
+.part-more-menu .part-more-danger {
+  color: var(--text);
+}
+/* 시안: 상세 안 h2(16px·600), 표는 공통 목록 표(.twrap.free) */
+.part-section-title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.ls-db .part-standards-wrap {
+  max-height: none;
+  min-height: 0;
+}
+.part-num {
+  font-variant-numeric: tabular-nums;
+}
+.part-note {
+  margin: 12px 0 0;
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 16px;
+}
+.part-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.part-unit {
+  color: var(--text-sub);
+  font-size: 13px;
+}
+.part-help {
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 16px;
+}
+/* 시안 영업 파트 창(.modal .fc): 칸 이름 위 13px·500 회색, 입력 36px, 배분율 칸 64px·공통관리비 120px 오른쪽 정렬 */
+.app-dialog .part-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+}
+.app-dialog .part-field .part-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.app-dialog .part-field input[name="effectiveMonth"] {
+  width: 200px;
+}
+.app-dialog .part-field input[name="distributionRate"] {
+  width: 64px;
+  text-align: right;
+}
+.app-dialog .part-field input[name="salesExpense"] {
+  width: 120px;
+  text-align: right;
+}
+.app-dialog .part-field .part-help {
+  margin: 0;
+  font-weight: 400;
+  line-height: 16px;
+}
+.app-dialog .part-field input,
+.app-dialog .part-field select {
+  min-height: 36px;
+  font-weight: 400;
+}
+.app-dialog .part-form {
+  padding-top: 8px;
+}
+
+/* 시안 .modal(거래처·영업 파트 화면의 모든 창): 폭 400·테두리 없음, 머리 16·16·8·24(h2 16/24, 닫기 36),
+   본문 4·24·16(칸 간격 12, 칸 안 4), 단추 줄 12·24·20, 단추 36px·500, 단위 14px 회색 */
+.client-part-workspace .app-dialog {
+  width: min(400px, 100%);
+  padding: 0;
+  border: 0;
+}
+.client-part-workspace .app-dialog > h2,
+.client-part-workspace .app-dialog-head {
+  margin: 0;
+  padding: 16px 16px 8px 24px;
+}
+.client-part-workspace .app-dialog h2 {
+  line-height: 24px;
+}
+.client-part-workspace .app-dialog-close {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  border-radius: 4px;
+}
+.client-part-workspace .app-dialog > p,
+.client-part-workspace .app-dialog > form > fieldset {
+  margin: 0;
+  padding: 4px 24px 16px;
+}
+.client-part-workspace .app-dialog > form {
+  padding: 0;
+  margin: 0;
+}
+.client-part-workspace .app-dialog > p {
+  color: var(--text-sub);
+}
+.client-part-workspace .app-dialog fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 0;
+  min-width: 0;
+}
+.client-part-workspace .app-dialog .app-actions,
+.client-part-workspace .app-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 24px 20px;
+}
+.client-part-workspace .app-dialog .app-actions button,
+.client-part-workspace .app-dialog > footer button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  font-weight: 500;
+}
+.client-part-workspace .app-dialog .part-field input[name="effectiveMonth"] {
+  width: 180px;
+}
+.client-part-workspace .app-dialog .part-field input[name="distributionRate"] {
+  width: 90px;
+}
+.client-part-workspace .app-dialog .part-field input[name="salesExpense"] {
+  width: 160px;
+}
+.client-part-workspace .app-dialog .part-field .part-control {
+  gap: 8px;
+}
+.client-part-workspace .app-dialog .part-unit {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-sub);
+}
+.client-part-workspace .app-dialog .field-required {
+  color: var(--ls-bad);
+}
+.client-part-workspace .app-dialog .part-field select {
+  padding: 0 4px 0 10px;
+}

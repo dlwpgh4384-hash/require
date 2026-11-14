@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.common.mapper.UserPreferenceMapper">
-  <resultMap id="userPreferenceRow" type="com.company.common.mapper.UserPreferenceRow" autoMapping="false">
+<mapper namespace="com.company.common.preferences.mapper.UserPreferenceMapper">
+  <resultMap id="userPreferenceRow" type="com.company.common.preferences.mapper.UserPreferenceRow" autoMapping="false">
     <result column="pref_val" property="prefVal" javaType="java.lang.String"/>
     <result column="mod_dttm" property="modDttm" javaType="java.time.Instant"/>
   </resultMap>

@@ -66,6 +66,10 @@ class SchemaPreparationTest {
         ordered.verify(connection).createStatement();
         ordered.verify(statement).execute(contains("DO $common_entity_contract$"));
         ordered.verify(statement).close();
+        ordered.verify(session).getConnection();
+        ordered.verify(connection).createStatement();
+        ordered.verify(statement).execute(contains("DO $client_part_upload$"));
+        ordered.verify(statement).close();
         ordered.verify(session).commit(true);
         ordered.verify(session).close();
         verify(session, never()).rollback(anyBoolean());
@@ -93,7 +97,7 @@ class SchemaPreparationTest {
     void migrationResourcesContainOnlyModelTablesAndBaseSeeds() throws Exception {
         preparation.prepare();
         var resources = ArgumentCaptor.forClass(String.class);
-        verify(statement, times(9)).execute(resources.capture());
+        verify(statement, times(10)).execute(resources.capture());
         String schema = resources.getAllValues().get(0);
         var tables = java.util.regex.Pattern.compile("CREATE TABLE IF NOT EXISTS (TB_[A-Z_]+)").matcher(schema);
         var names = new java.util.ArrayList<String>();
@@ -128,13 +132,13 @@ class SchemaPreparationTest {
     void everyPreparedTableIsPhysicalAndScreenSectionNamesCannotBecomeTables() throws Exception {
         preparation.prepare();
         var resources = ArgumentCaptor.forClass(String.class);
-        verify(statement, times(9)).execute(resources.capture());
+        verify(statement, times(10)).execute(resources.capture());
         var tablePattern = java.util.regex.Pattern.compile(
             "(?i)CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?([a-z_][a-z0-9_]*)");
         var tables = resources.getAllValues().stream()
             .flatMap(sql -> tablePattern.matcher(sql).results().map(match -> match.group(1).toUpperCase(java.util.Locale.ROOT)))
             .toList();
-        assertThat(tables).hasSize(21).doesNotHaveDuplicates();
+        assertThat(tables).hasSize(29).doesNotHaveDuplicates();
         assertThat(tables).allMatch(name -> name.startsWith("TB_"));
         assertThat(tables).contains("TB_SY_CALC_RULE", "TB_SY_CHG_HIST", "TB_SY_CODE", "TB_SY_CODE_GRP",
             "TB_SY_CODE_MAP", "TB_SY_MENU", "TB_SY_OPER_STD", "TB_SY_ROLE_MENU_AUTH");

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.uploads.mapper.UploadMapper">
+  <resultMap id="upload" type="com.company.common.uploads.mapper.UploadRows$Upload" autoMapping="false">
+    <id column="upld_id" property="uploadId" javaType="_long"/>
+    <result column="form_type_cd" property="formTypeCode" javaType="java.lang.String"/>
+    <result column="file_nm" property="fileName" javaType="java.lang.String"/>
+    <result column="upld_stat_cd" property="statusCode" javaType="java.lang.String"/>
+    <result column="status_name" property="statusName" javaType="java.lang.String"/>
+    <result column="succ_cnt" property="successCount" javaType="_int"/>
+    <result column="warn_cnt" property="warningCount" javaType="_int"/>
+    <result column="err_cnt" property="errorCount" javaType="_int"/>
+    <result column="mod_dttm" property="modifiedAt" javaType="java.time.Instant"/>
+  </resultMap>
+  <resultMap id="issue" type="com.company.common.uploads.mapper.UploadRows$Issue" autoMapping="false">
+    <result column="row_no" property="row" javaType="_int"/>
+    <result column="col_nm" property="column" javaType="java.lang.String"/>
+    <result column="input_val" property="inputValue" javaType="java.lang.String"/>
+    <result column="rsn_cn" property="reason" javaType="java.lang.String"/>
+    <result column="severity" property="severity" javaType="java.lang.String"/>
+  </resultMap>
+  <sql id="columns">
+    u.upld_id, u.form_type_cd, u.file_nm, u.upld_stat_cd, c.code_nm AS status_name,
+    u.succ_cnt, u.warn_cnt, u.err_cnt, u.mod_dttm
+  </sql>
+  <select id="nextUploadId" resultType="long">
+    SELECT nextval('SQ_TB_SY_UPLD')
+  </select>
+  <select id="selectUpload" resultMap="upload">
+    SELECT <include refid="columns"/>
+    FROM TB_SY_UPLD u
+    JOIN TB_SY_CODE c ON c.code_grp_id='UPLD_STAT' AND c.code=u.upld_stat_cd
+    WHERE u.upld_id=#{uploadId} AND u.form_type_cd='B7'
+  </select>
+  <select id="lockUpload" resultMap="upload">
+    SELECT <include refid="columns"/>
+    FROM TB_SY_UPLD u
+    JOIN TB_SY_CODE c ON c.code_grp_id='UPLD_STAT' AND c.code=u.upld_stat_cd
+    WHERE u.upld_id=#{uploadId} AND u.form_type_cd='B7'
+    FOR UPDATE OF u
+  </select>
+  <select id="selectIssues" resultMap="issue">
+    SELECT e.row_no, e.col_nm, e.input_val, e.rsn_cn,
+      CASE e.rslt_type_cd WHEN 'ERR' THEN '오류' ELSE '경고' END AS severity
+    FROM TB_SY_UPLD_ERR e WHERE e.upld_id=#{uploadId}
+    ORDER BY e.rslt_sn
+  </select>
+  <insert id="insertUpload">
+    INSERT INTO TB_SY_UPLD
+      (upld_id, form_type_cd, scrn_id, file_nm, file_size, tot_row_cnt,
+       succ_cnt, warn_cnt, err_cnt, upld_stat_cd, reg_user_id, reg_dttm)
+    VALUES (#{uploadId}, #{formTypeCode}, 'UI-15', #{fileName}, #{fileSize},
+      #{inspection.totalCount}, #{inspection.successCount}, #{inspection.warningCount},
+      #{inspection.errorCount}, 'CHECKED', 'admin', clock_timestamp())
+  </insert>
+  <update id="completeUpload">
+    UPDATE TB_SY_UPLD SET tot_row_cnt=#{inspection.totalCount},
+      succ_cnt=#{inspection.successCount}, warn_cnt=#{inspection.warningCount}, err_cnt=#{inspection.errorCount},
+      upld_stat_cd=<choose><when test="applied">'APPLIED'</when><otherwise>'CHECKED'</otherwise></choose>,
+      aply_dttm=<choose><when test="applied">clock_timestamp()</when><otherwise>NULL</otherwise></choose>,
+      mod_user_id='admin', mod_dttm=GREATEST(clock_timestamp(), COALESCE(mod_dttm,reg_dttm) + INTERVAL '1 microsecond')
+    WHERE upld_id=#{uploadId}
+  </update>
+  <delete id="deleteIssues">DELETE FROM TB_SY_UPLD_ERR WHERE upld_id=#{uploadId}</delete>
+  <insert id="insertIssue">
+    INSERT INTO TB_SY_UPLD_ERR
+      (upld_id, rslt_sn, rslt_type_cd, row_no, col_nm, input_val, rsn_cn, reg_user_id, reg_dttm)
+    VALUES (#{uploadId}, #{sequence},
+      CASE WHEN #{issue.severity}='오류' THEN 'ERR' ELSE 'WARN' END,
+      #{issue.row}, #{issue.column}, #{issue.inputValue}, #{issue.reason}, 'admin', clock_timestamp())
+  </insert>
+</mapper>

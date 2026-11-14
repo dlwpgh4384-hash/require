@@ -434,7 +434,9 @@ it("save dialog names the last closed month like the mockup", async () => {
 });
 it("history shows one row per month with the parts of a multi-part value", async () => {
   rows = rows.map((item) =>
-    item.standardCode.startsWith("AI_SCORE_") ? { ...item, closed: true } : item,
+    item.standardCode.startsWith("AI_SCORE_")
+      ? { ...item, closed: true }
+      : item,
   );
   await mount();
   fireEvent.click(screen.getByTestId("operating-history-ai-score-job"));
@@ -454,7 +456,7 @@ it("history window is view-only like the mockup", async () => {
     within(history)
       .getAllByRole("columnheader")
       .map((cell) => cell.textContent),
-  ).toEqual(["적용 시작월", "값", "처리자"]);
+  ).toEqual(["적용 시작월", "값", "처리자", "마지막 변경시각"]);
   expect(within(history).getAllByRole("row")).toHaveLength(3);
   expect(
     screen.getByTestId("operating-history-row-vat-rt-2026-10"),
@@ -473,6 +475,55 @@ it("Ctrl+S opens the save dialog on this tab (FR-0104)", async () => {
   fireEvent.keyDown(window, { key: "s", ctrlKey: true });
   expect(screen.getByTestId("operating-save-dialog")).toBeInTheDocument();
 });
+it("UI-27-M5 keeps the initial processor and absent modification time read-only", async () => {
+  rows = rows.map((item) => ({
+    ...item,
+    changedBy: "처음 설정",
+    modifiedAt: null,
+  }));
+  await mount();
+  fireEvent.click(screen.getByTestId("operating-history-vat-rt"));
+  const history = screen.getByTestId("operating-history-dialog");
+  const cells = within(
+    screen.getByTestId("operating-history-row-vat-rt-2026-01"),
+  ).getAllByRole("cell");
+  expect(cells[2]).toHaveTextContent("처음 설정");
+  expect(cells[3]).toHaveTextContent("–");
+  expect(
+    within(history).queryByRole("button", { name: /수정|저장|삭제/ }),
+  ).not.toBeInTheDocument();
+  expect(within(history).queryByRole("textbox")).not.toBeInTheDocument();
+  fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+  expect(screen.queryByTestId("operating-save-dialog")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("operating-history-close"));
+  expect(writes()).toHaveLength(0);
+});
+it("UI-27-M5 reads the processor and UTC token while displaying shared Korean time", async () => {
+  rows = rows.map((item) =>
+    item.standardCode === "VAT_RT"
+      ? {
+          ...item,
+          changedBy: "운영 담당자",
+          modifiedAt: "2026-11-14T00:12:34.123456Z",
+        }
+      : item,
+  );
+  await mount();
+  change("vat-rt", "11");
+  fireEvent.click(screen.getByTestId("operating-history-vat-rt"));
+  const historyRow = screen.getByTestId("operating-history-row-vat-rt-2026-01");
+  expect(historyRow).toHaveTextContent("운영 담당자");
+  expect(historyRow).toHaveTextContent("2026-11-14 09:12");
+  expect(historyRow.querySelector("time")).toHaveAttribute(
+    "datetime",
+    "2026-11-14T00:12:34.123456Z",
+  );
+  fireEvent.click(screen.getByTestId("operating-history-close"));
+  expect(screen.getByLabelText("부가세율")).toHaveValue("11");
+  expect(writes()).toHaveLength(0);
+  openSave();
+  expect(screen.getByTestId("operating-save-dialog")).toBeInTheDocument();
+});
 it("value boxes drop letters at once (FR-0106)", async () => {
   await mount();
   change("vat-rt", "1a2");
@@ -489,6 +540,7 @@ it("save sends back the read modifiedAt so a later change is refused (FR-0106)",
   openSave();
   await confirm();
   expect(
-    JSON.parse(String((writes()[0][1] as RequestInit).body)).items[0].modifiedAt,
+    JSON.parse(String((writes()[0][1] as RequestInit).body)).items[0]
+      .modifiedAt,
   ).toBe("2026-11-14T00:00:00.123456Z");
 });

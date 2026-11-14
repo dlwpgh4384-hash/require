@@ -1,5 +1,7 @@
 package com.company.common.schema;
 
+import com.company.common.calculation.mapper.CalculationRuleMapper;
+import com.company.common.preferences.mapper.UserPreferencePeriodSourceMapper;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.UUID;
@@ -57,7 +59,7 @@ class PostgreSqlPreparationTest {
     @Test
     void createsPreparedTablesAndOnlyBaseSeedRowsWithoutPhysicalForeignKeys() throws Exception {
         preparation.prepare();
-        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'")).isEqualTo(21);
+        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'")).isEqualTo(29);
         assertThat(number("SELECT count(*) FROM tb_sy_menu")).isEqualTo(40);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NULL")).isEqualTo(10);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NOT NULL")).isEqualTo(30);
@@ -66,7 +68,7 @@ class PostgreSqlPreparationTest {
         assertThat(number("SELECT count(*) FROM tb_sy_code WHERE code_grp_id='PREF_TYPE'")).isEqualTo(8);
         assertThat(number("SELECT count(*) FROM tb_sy_oper_std")).isEqualTo(43);
         assertThat(text("SELECT std_val::bigint::text FROM tb_sy_oper_std WHERE std_cd='CASH_BASE_YM'")).isEqualTo("202601");
-        assertThat(number("SELECT count(*) FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f'")).isZero();
+        assertThat(number("SELECT count(*) FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f'")).isEqualTo(12);
         assertThat(number("SELECT nextval('sq_tb_sy_noti')")).isEqualTo(1);
         assertThat(number("SELECT count(*) FROM tb_sy_role")).isEqualTo(5);
         assertThat(number("SELECT count(*) FROM tb_sy_user_role WHERE user_id='admin' AND role_id='ADMIN'")).isEqualTo(1);
@@ -209,7 +211,7 @@ class PostgreSqlPreparationTest {
         assertThat(number("SELECT nextval('sq_tb_sy_accs_log')")).isEqualTo(2);
         assertThat(number("SELECT nextval('sq_tb_sy_chg_hist')")).isEqualTo(2);
         assertThat(number("SELECT count(*) FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f'"))
-            .isZero();
+            .isEqualTo(12);
     }
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -286,9 +288,9 @@ class PostgreSqlPreparationTest {
         preparation.prepare();
         try (var session = sessions.openSession();
              var input = new ClassPathResource("calculation/source-definitions.json").getInputStream()) {
-            var mapper = session.getMapper(com.company.common.mapper.CalculationRuleMapper.class);
-            var periods = session.getMapper(com.company.common.mapper.UserPreferencePeriodSourceMapper.class);
-            var service = new com.company.common.service.CalculationRuleService(mapper, periods);
+            var mapper = session.getMapper(com.company.common.calculation.mapper.CalculationRuleMapper.class);
+            var periods = session.getMapper(com.company.common.preferences.mapper.UserPreferencePeriodSourceMapper.class);
+            var service = new com.company.common.calculation.service.CalculationRuleService(mapper, periods);
             for (var fixture : new com.fasterxml.jackson.databind.ObjectMapper().readTree(input)) {
                 var value = service.definition(fixture.get("calcId").asText());
                 assertThat(value.formula()).isEqualTo(fixture.get("formula").asText());
@@ -341,7 +343,7 @@ class PostgreSqlPreparationTest {
         preparation.prepare();
         execute("INSERT INTO tb_sy_code_map (src_text,code_grp_id,code,reg_user_id) VALUES ('정직원','EMP_TYPE','FT','admin')");
         try (var session = sessions.openSession()) {
-            var resolver = new com.company.common.service.CodeTextResolver(session.getMapper(com.company.common.mapper.CalculationRuleMapper.class));
+            var resolver = new com.company.common.codegroups.service.CodeTextResolver(session.getMapper(com.company.common.calculation.mapper.CalculationRuleMapper.class));
             var result = resolver.resolve("EMP_TYPE", "정직원");
             assertThat(result.code()).isEqualTo("FT");
             assertThat(result.warning()).isEqualTo("‘정직원’을 ‘정규직’으로 바꿈");
@@ -349,13 +351,13 @@ class PostgreSqlPreparationTest {
         }
         execute("UPDATE tb_sy_code SET del_yn='Y' WHERE code_grp_id='EMP_TYPE' AND code='FT'");
         try (var session = sessions.openSession()) {
-            var resolver = new com.company.common.service.CodeTextResolver(session.getMapper(com.company.common.mapper.CalculationRuleMapper.class));
-            assertThatThrownBy(() -> resolver.resolve("EMP_TYPE", "정직원")).isInstanceOf(com.company.common.service.CodeFailure.class);
+            var resolver = new com.company.common.codegroups.service.CodeTextResolver(session.getMapper(com.company.common.calculation.mapper.CalculationRuleMapper.class));
+            assertThatThrownBy(() -> resolver.resolve("EMP_TYPE", "정직원")).isInstanceOf(com.company.common.support.service.CodeFailure.class);
         }
         execute("UPDATE tb_sy_code SET del_yn='N', use_yn='N' WHERE code_grp_id='EMP_TYPE' AND code='FT'");
         try (var session = sessions.openSession()) {
-            var resolver = new com.company.common.service.CodeTextResolver(session.getMapper(com.company.common.mapper.CalculationRuleMapper.class));
-            assertThatThrownBy(() -> resolver.resolve("EMP_TYPE", "FT")).isInstanceOf(com.company.common.service.CodeFailure.class);
+            var resolver = new com.company.common.codegroups.service.CodeTextResolver(session.getMapper(com.company.common.calculation.mapper.CalculationRuleMapper.class));
+            assertThatThrownBy(() -> resolver.resolve("EMP_TYPE", "FT")).isInstanceOf(com.company.common.support.service.CodeFailure.class);
         }
     }
 
@@ -366,7 +368,7 @@ class PostgreSqlPreparationTest {
         assertThat(text("SELECT to_char(TIMESTAMPTZ '2026-01-31 15:00:00+00' AT TIME ZONE 'Asia/Seoul','YYYYMM')")).isEqualTo("202602");
         preparation.prepare();
         try (var session = sessions.openSession()) {
-            var mapper = session.getMapper(com.company.common.mapper.CalculationRuleMapper.class);
+            var mapper = session.getMapper(com.company.common.calculation.mapper.CalculationRuleMapper.class);
             var standard = mapper.selectEffectiveStandard("CASH_BASE_YM", "190001");
             assertThat(standard.effectiveMonth).isEqualTo("202601");
             assertThat(standard.value).isEqualByComparingTo("202601");

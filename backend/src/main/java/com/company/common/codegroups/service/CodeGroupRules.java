@@ -1,7 +1,7 @@
 package com.company.common.codegroups.service;
 
 import com.company.common.codegroups.mapper.CodeRows.Code;
-import com.company.common.service.CodeFailure;
+import com.company.common.support.service.CodeFailure;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.util.HashSet;

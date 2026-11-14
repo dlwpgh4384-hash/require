@@ -74,7 +74,8 @@ class CodeGroupProjectionTest {
             var sql=config.getMappedStatement(CodeGroupMapper.class.getName()+".referenceExists").getBoundSql(parameters).getSql();
             assertThat(sql).contains(ref.getTable()).doesNotContain("del_yn", "use_yn", "close_stat_cd");
         }
-        assertThat(CodeGroupConfiguration.class.getAnnotation(org.mybatis.spring.annotation.MapperScan.class).basePackageClasses())
-            .contains(CodeGroupMapper.class);
+        assertThat(com.company.common.config.MyBatisConfig.class
+            .getAnnotation(org.mybatis.spring.annotation.MapperScan.class).basePackages())
+            .contains(CodeGroupMapper.class.getPackageName());
     }
 }

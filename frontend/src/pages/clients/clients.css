@@ -1,0 +1,403 @@
+.client-page,
+.client-form {
+  color: var(--text);
+  font-size: 14px;
+  min-width: 0;
+}
+.client-form input,
+.client-form select {
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 10px;
+  background: var(--surface);
+  max-width: 100%;
+}
+.client-form footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+.client-form {
+  color: var(--text, #111827);
+  font-size: 14px;
+  min-width: 0;
+}
+.client-workspace-tabs {
+  display: flex;
+  gap: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 20px;
+}
+.client-workspace-tabs button {
+  padding: 12px 8px;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+}
+.client-workspace-tabs button[aria-pressed="true"] {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+}
+.client-form label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.client-form input,
+.client-form select {
+  min-height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 10px;
+  background: white;
+  max-width: 100%;
+}
+.client-form footer,
+.client-form {
+  padding: 20px;
+  background: #fff;
+}
+.client-form > label {
+  max-width: 400px;
+}
+.client-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+.client-form-grid label {
+  flex-direction: column;
+  align-items: stretch;
+  color: #6b7280;
+  font-size: 13px;
+}
+.client-form small {
+  font-size: 12px;
+}
+.client-form [role="alert"] {
+  color: #b91c1c;
+}
+.client-form input[readonly] {
+  background: #f3f4f6;
+}
+.client-form button,
+.client-workspace-tabs button {
+  cursor: pointer;
+}
+.client-form button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+@media (max-width: 700px) {
+  .client-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 거래처 목록·상세(공통 목록 부품 위에 시안 맞춤) */
+.client-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.client-title-actions,
+.client-title-actions .upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.client-create-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.client-keyword {
+  width: 180px;
+}
+.client-more {
+  position: relative;
+}
+/* 시안 .pop.small: 폭 220, 단추 아래 16px */
+.client-more-menu {
+  position: absolute;
+  right: 0;
+  top: 44px;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  width: 220px;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  box-shadow: var(--ls-shadow-sm);
+}
+.client-more-menu button {
+  min-height: 0;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--divider);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  width: 100%;
+}
+.client-more-menu button:last-child {
+  border-bottom: 0;
+}
+.client-more-menu button:hover {
+  background: var(--hover);
+}
+.client-more-menu .client-more-danger {
+  color: var(--text);
+}
+.client-account .ls-cap {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-sub);
+}
+.client-page .ls-lnk,
+.ls-drawer .ls-lnk {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  cursor: pointer;
+}
+/* 거래처 등록·수정(시안 .card + .fgrid + .fld): 칸 이름 120px 왼쪽, 입력 240px, 도움말 12px */
+.client-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0;
+  background: transparent;
+}
+.client-form-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.client-form-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.client-form .ls-lnk {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  cursor: pointer;
+}
+.client-form-banner {
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--ls-info-bg, #f0f9ff);
+  color: var(--ls-info, #0369a1);
+  font-size: 13px;
+}
+.client-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.client-card h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.client-fgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+}
+.client-fld {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 4px 12px;
+}
+.client-fl {
+  padding-top: 8px;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+}
+.client-fv {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.client-form .client-fv .ls-in {
+  width: 240px;
+  max-width: 100%;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 14px;
+}
+.client-form .client-fv .ls-in[readonly] {
+  background: var(--hover);
+}
+.client-help {
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 16px;
+}
+.client-form .field-error {
+  color: #b91c1c;
+  font-size: 12px;
+}
+.client-form-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 -24px -24px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--divider);
+  background: var(--surface);
+}
+.client-form-foot .client-help {
+  margin-right: auto;
+}
+.client-form-foot button {
+  font-weight: 500;
+}
+@media (max-width: 767px) {
+  .client-fgrid {
+    grid-template-columns: 1fr;
+  }
+}
+/* 시안 .tabs/.tb: 높이 40, 좌우 10, 고른 탭 파란 글자·굵게, 아래 선 #e5e7eb */
+.client-part-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.client-part-workspace > .client-workspace-tabs {
+  gap: 4px;
+  margin: 0;
+  border-bottom: 1px solid var(--divider);
+}
+.client-part-workspace > .client-workspace-tabs button {
+  min-height: 40px;
+  height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-sub);
+  font-weight: 500;
+}
+.client-part-workspace > .client-workspace-tabs button[aria-selected="true"] {
+  color: var(--primary);
+  font-weight: 600;
+  border-bottom-color: var(--primary);
+}
+
+/* 시안 UI-15 거래처 등록(폼 화면): 탭 숨김, 카드 h2, 칸 이름 오른쪽 정렬·필수 *,
+   안내 줄(.note), 아래 고정 줄(.fbar: 본문 폭 전체, 오른쪽 [취소][저장]) */
+.client-part-workspace:has(.client-form) > .client-workspace-tabs {
+  display: none;
+}
+.screen-tab-panel:has(.client-form),
+.client-part-workspace:has(.client-form),
+.client-part-workspace:has(.client-form) > div {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+.client-form {
+  flex: 1 1 auto;
+  gap: 24px;
+}
+.client-form .client-form-banner {
+  margin: 0;
+}
+.client-card h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.client-fld {
+  align-items: start;
+}
+.client-form .client-fl {
+  display: block;
+  text-align: right;
+  padding-top: 8px;
+  line-height: 20px;
+}
+.client-fl.req::after {
+  content: " *";
+  color: var(--ls-bad);
+}
+.client-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.client-bad {
+  color: var(--ls-bad);
+}
+.client-form .client-form-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: auto -24px -24px;
+  padding: 12px 24px;
+  background: var(--surface);
+  border-top: 1px solid var(--divider);
+  border-radius: 0;
+}
+.client-fld.full {
+  grid-column: 1 / -1;
+}
+.client-form .client-fld.full .client-fv .ls-in {
+  width: 100%;
+}
+/* 시안: 상세 패널 안 수정(.fsec: 한 줄씩, 간격 16) */
+.client-edit {
+  padding: 0;
+  background: transparent;
+  gap: 16px;
+}
+.client-fsec {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.client-edit .client-fv .ls-in {
+  max-width: 100%;
+}
+.client-blocked-list {
+  margin: 0;
+  padding: 0 24px 0 42px;
+}
+.client-form .client-fv select.ls-in {
+  padding: 0 4px 0 10px;
+}

@@ -107,6 +107,8 @@ interface ListViewProps<T> {
   onDownload?: () => void;
   downloading?: boolean;
   onResetFilters?: () => void;
+  /** 열 설정 단추를 보일지(기본 보임). 시안에 열 설정이 없는 목록은 false. */
+  columnSettings?: boolean;
   error?: string;
   onRetry?: () => void;
   testId?: string;
@@ -205,6 +207,7 @@ export function ListView<T>(props: ListViewProps<T>) {
           )}
         </div>
         <div className="ls-tr">
+          {props.columnSettings !== false && (
           <div className="ls-pop-anchor" ref={columnAnchor}>
             <button
               type="button"
@@ -254,6 +257,7 @@ export function ListView<T>(props: ListViewProps<T>) {
               </div>
             )}
           </div>
+          )}
           <button
             type="button"
             className="ls-btn ls-btn-sm"
@@ -510,7 +514,7 @@ export function ListPager({
         {nav(pages, "마지막 페이지", "»", page >= pages)}
       </div>
       <label className="ls-size">
-        한 화면 건수
+        <span className="ls-sr">한 화면 건수</span>
         <select
           className="ls-in ls-in-sm"
           data-testid="list-page-size"
@@ -560,7 +564,7 @@ function ColumnsIcon() {
 function DensityIcon() {
   return (
     <svg {...svg}>
-      <path d="M4 6h16M4 12h16M4 18h16" />
+      <path d="M4 6h16M4 10h16M4 14h16M4 18h16" />
     </svg>
   );
 }

@@ -2,7 +2,7 @@ package com.company.common.codegroups.controller;
 
 import com.company.common.codegroups.dto.CodeContracts.*;
 import com.company.common.codegroups.service.CommonCodeService;
-import com.company.common.dto.UserContracts.Response;
+import com.company.common.users.dto.UserContracts.Response;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.web.bind.annotation.*;
 

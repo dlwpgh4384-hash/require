@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.common.mapper.OperatingStandardsMapper">
+<mapper namespace="com.company.common.operatingstandards.mapper.OperatingStandardsMapper">
   <resultMap id="standard"
-             type="com.company.common.mapper.OperatingStandardRow"
+             type="com.company.common.operatingstandards.mapper.OperatingStandardRow"
              autoMapping="false">
     <id column="std_cd" property="standardCode" javaType="java.lang.String"/>
     <id column="aply_bgn_ym" property="month" javaType="java.lang.String"/>

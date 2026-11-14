@@ -43,13 +43,10 @@ public class UploadWorkbookService {
                     }
                 }
             }
-            for (var sheet : workbook) {
-                for (var row : sheet) {
-                    for (var cell : row) if (cell.getCellType() == CellType.FORMULA) throw invalid();
-                }
-            }
             var sheet = workbook.getSheetAt(0);
             var formatter = new DataFormatter(Locale.KOREA);
+            // SFR-012-03: 수식 칸은 실행하지 않고 엑셀이 저장해 둔 결과값으로 읽는다.
+            formatter.setUseCachedValuesForFormulaCells(true);
             var header = sheet.getRow(2);
             if (header == null || header.getLastCellNum() != headers.size()) throw invalid();
             for (int column = 0; column < headers.size(); column++) {
@@ -124,7 +121,7 @@ public class UploadWorkbookService {
         }
     }
 
-    /** 이름으로 헤더를 찾는다. 수식은 실행하지 않고 호출자의 행 오류로 전달한다. */
+    /** 이름으로 헤더를 찾는다. 수식 칸은 실행하지 않고 엑셀이 저장해 둔 결과값으로 읽는다(SFR-012-03). */
     public List<com.company.common.dto.UploadWorkbookContracts.TabularRow> readTabular(
         String fileName, byte[] bytes, List<String> headers) {
         if (fileName == null || fileName.length() > 200 || fileName.contains("/") || fileName.contains("\\")
@@ -142,12 +139,12 @@ public class UploadWorkbookService {
                 if (relation.getTargetMode() == TargetMode.EXTERNAL) throw invalid();
             var sheet = workbook.getSheetAt(0);
             var formatter = new DataFormatter(Locale.KOREA);
+            formatter.setUseCachedValuesForFormulaCells(true);
             int headerIndex = -1;
             var columns = new java.util.LinkedHashMap<String, Integer>();
             for (var row : sheet) {
                 columns.clear();
                 for (var cell : row) {
-                    if (cell.getCellType() == CellType.FORMULA) continue;
                     String name = formatter.formatCellValue(cell).trim();
                     if (headers.contains(name) && columns.put(name, cell.getColumnIndex()) != null) throw invalid();
                 }
@@ -162,9 +159,7 @@ public class UploadWorkbookService {
                 var formulas = new ArrayList<Integer>();
                 for (int index = 0; index < headers.size(); index++) {
                     var cell = row.getCell(columns.get(headers.get(index)));
-                    boolean formula = cell != null && cell.getCellType() == CellType.FORMULA;
-                    if (formula) formulas.add(index);
-                    values.add(formula ? "=" + cell.getCellFormula() : formatter.formatCellValue(cell));
+                    values.add(formatter.formatCellValue(cell));
                 }
                 if (values.stream().allMatch(String::isBlank)) continue;
                 result.add(new com.company.common.dto.UploadWorkbookContracts.TabularRow(

@@ -16,6 +16,7 @@ export function useViewport() {
     tablet: read(TABLET_QUERY),
   }));
   useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
     const queries = [MOBILE_QUERY, TABLET_QUERY].map((query) =>
       window.matchMedia(query),
     );

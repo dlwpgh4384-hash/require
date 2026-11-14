@@ -175,8 +175,14 @@ async function expectScreenContent(id: string) {
     expect(screen.getByTestId("client-part-workspace")).toBeVisible();
     expect(screen.getByTestId("client-page")).toBeVisible();
     expect(screen.getByTestId("client-search")).toBeVisible();
-    expect(screen.getByTestId("client-query")).toBeEnabled();
-    expect(screen.getByTestId("client-create")).toBeEnabled();
+    // 데이터를 다 읽은 뒤에 켜진다: 켜질 때까지 기다린다(느린 환경에서 깜빡 실패 방지).
+    await waitFor(() =>
+      expect(screen.getByTestId("client-query")).toBeEnabled(),
+    );
+    // 데이터를 다 읽은 뒤에 켜진다: 켜질 때까지 기다린다(느린 환경에서 깜빡 실패 방지).
+    await waitFor(() =>
+      expect(screen.getByTestId("client-create")).toBeEnabled(),
+    );
     expect(screen.getByTestId("client-workspace-parts")).toBeVisible();
   } else if (id === "UI-23") {
     expect(
@@ -192,7 +198,10 @@ async function expectScreenContent(id: string) {
   } else if (id === "UI-25") {
     expect(await screen.findByText("등록된 메뉴가 없습니다.")).toBeVisible();
     expect(screen.getByTestId("menu-settings-page")).toBeVisible();
-    expect(screen.getByTestId("menu-registration-open")).toBeEnabled();
+    // 데이터를 다 읽은 뒤에 켜진다: 켜질 때까지 기다린다(느린 환경에서 깜빡 실패 방지).
+    await waitFor(() =>
+      expect(screen.getByTestId("menu-registration-open")).toBeEnabled(),
+    );
   } else if (id === "UI-27") {
     expect(
       await screen.findByText("등록된 코드 그룹이 없습니다."),

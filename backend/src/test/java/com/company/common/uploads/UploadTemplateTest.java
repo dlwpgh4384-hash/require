@@ -51,12 +51,15 @@ class UploadTemplateTest {
                 .isInstanceOf(CodeFailure.class).hasMessageContaining("5,000");
         }
     }
-    @Test void formulaIsPreservedAsUnevaluatedRowIssueMetadata() throws Exception {
+    @Test void formulaCellIsReadAsItsSavedResult() throws Exception {
+        // SFR-012-03: 수식 칸은 결과값으로 읽는다(수식을 실행하지 않고 엑셀이 저장해 둔 값).
         try(var workbook=new XSSFWorkbook(new ByteArrayInputStream(template()))) {
-            workbook.getSheetAt(0).createRow(1).createCell(1).setCellFormula("1+1");
+            var cell=workbook.getSheetAt(0).createRow(1).createCell(1);
+            cell.setCellFormula("1+1");
+            workbook.getCreationHelper().createFormulaEvaluator().evaluateFormulaCell(cell);
             var rows=workbooks.readTabular("clients.xlsx",bytes(workbook),ClientUploadRules.HEADERS);
-            assertThat(rows.get(0).formulaColumns()).containsExactly(1);
-            assertThat(rows.get(0).values().get(1)).isEqualTo("=1+1");
+            assertThat(rows.get(0).formulaColumns()).isEmpty();
+            assertThat(rows.get(0).values().get(1)).isEqualTo("2");
         }
     }
     @Test void malformedAndRenamedTypesAndPathNamesRejected() {

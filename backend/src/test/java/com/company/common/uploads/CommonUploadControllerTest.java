@@ -214,13 +214,15 @@ class CommonUploadControllerTest {
         apply("{\"modifiedAt\":null}").andExpect(status().isOk());
         assertThat(writes).hasSize(1); verify(files,times(1)).read(81);
     }
-    @Test void mixedRowsBlockAllAndFormulaIsARowErrorNotEvaluated() throws Exception {
+    @Test void formulaCellIsReadAsItsSavedResultNotAnError() throws Exception {
+        // SFR-012-03: 수식 칸은 결과값으로 읽는다.
         try(var wb=new XSSFWorkbook(new ByteArrayInputStream(workbook(List.of(customer("123-45-67890"),customer("987-65-43210")))))) {
-            wb.getSheetAt(0).getRow(2).getCell(1).setCellFormula("1+1");
+            var cell=wb.getSheetAt(0).getRow(2).getCell(1);
+            cell.setCellFormula("\"새솔\"&\"전자\"");
+            wb.getCreationHelper().createFormulaEvaluator().evaluateFormulaCell(cell);
             var output=new java.io.ByteArrayOutputStream(); wb.write(output);
-            check(output.toByteArray()).andExpect(status().isOk()).andExpect(jsonPath("$.data.errorCount").value(1))
-                .andExpect(jsonPath("$.data.issues[0].reason").value("수식은 사용할 수 없습니다."));
-            apply("{\"modifiedAt\":null}").andExpect(status().isOk()); assertThat(writes).isEmpty();
+            check(output.toByteArray()).andExpect(status().isOk()).andExpect(jsonPath("$.data.errorCount").value(0))
+                .andExpect(jsonPath("$.data.successCount").value(2));
         }
     }
     @Test void duplicateRowsAreBothErrors() throws Exception {

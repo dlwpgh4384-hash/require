@@ -315,3 +315,19 @@ it("template failures are visible rather than silently downloading an error", as
     "파일을 확인해 주세요.",
   );
 });
+it.each([
+  [false, true],
+  [true, false],
+])("FR-0107: mobile=%s shows the template and upload buttons=%s", (mobile, shown) => {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((query: string) => ({
+      matches: mobile && query === "(max-width: 767px)",
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+  render(<UploadActions onApplied={() => {}} />);
+  expect(!!screen.queryByTestId("upload-open")).toBe(shown);
+  expect(!!screen.queryByTestId("upload-template")).toBe(shown);
+});

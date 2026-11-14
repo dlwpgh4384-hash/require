@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useViewport } from "../../shared/layout/useViewport";
 import { UploadDialog } from "./UploadDialog";
 import { UploadResultDialog } from "./UploadResultDialog";
 import {
@@ -21,6 +22,8 @@ export function UploadActions({
   const [result, setResult] = useState<UploadResult | null>(null);
   const [error, setError] = useState("");
   const [downloading, setDownloading] = useState(false);
+  // FR-0107: 휴대폰에서는 엑셀 업로드·양식 받기 단추를 숨긴다.
+  const { mobile } = useViewport();
   const download = async () => {
     setDownloading(true);
     setError("");
@@ -32,6 +35,7 @@ export function UploadActions({
       setDownloading(false);
     }
   };
+  if (mobile) return null;
   return (
     <div className="upload-actions" data-testid="upload-actions">
       <button

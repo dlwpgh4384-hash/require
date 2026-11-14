@@ -47,10 +47,17 @@ class UploadWorkbookServiceTest {
         assertThatThrownBy(() -> workbooks.read("broken.xlsx", new byte[]{'P', 'K', 3, 4}, headers))
             .isInstanceOf(CodeFailure.class);
     }
-    @Test void formulaCellsAreRejectedWithoutEvaluation() throws Exception {
+    @Test void formulaCellsAreReadAsTheirSavedResult() throws Exception {
+        // SFR-012-03: 수식 칸은 실행하지 않고 엑셀이 저장해 둔 결과값으로 읽는다.
         try (var workbook = new XSSFWorkbook(new ByteArrayInputStream(template()))) {
-            workbook.getSheetAt(0).createRow(3).createCell(0).setCellFormula("1+1");
-            assertThatThrownBy(() -> workbooks.read("formula.xlsx", bytes(workbook), headers)).isInstanceOf(CodeFailure.class);
+            var row = workbook.getSheetAt(0).createRow(3);
+            var cell = row.createCell(0);
+            cell.setCellFormula("\"가\"&\"온\"");
+            workbook.getCreationHelper().createFormulaEvaluator().evaluateFormulaCell(cell);
+            row.createCell(1).setCellValue("123-45-67890");
+            var parsed = workbooks.read("formula.xlsx", bytes(workbook), headers);
+            assertThat(parsed).hasSize(1);
+            assertThat(parsed.get(0).values()).containsExactly("가온", "123-45-67890");
         }
     }
     @Test void externalRelationshipsAreRejected() throws Exception {

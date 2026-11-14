@@ -40,7 +40,7 @@ public class CommonUploadService {
         return workbooks.tabularFile(ClientUploadRules.HEADERS, java.util.Collections.emptyList(),
             "B.7 신규 이관 전용. 구분·상호·사업자등록번호 필수. 고객사/고객·협력은 이메일, "
             + "협력사/고객·협력은 은행·계좌번호·예금주 필수. 코드·코드 이름 사용 가능, 대응 표기는 경고로 표시합니다. "
-            + "최대 10,000,000 bytes, 비어 있지 않은 데이터 5,000행. 수식은 사용할 수 없습니다.");
+            + "최대 10MB·첫 시트·데이터 5,000행. 수식 칸은 계산된 결과값으로 읽습니다.");
     }
     public Result postCommonUpload(String formTypeCode, String fileName, byte[] bytes) {
         rules.form(formTypeCode);

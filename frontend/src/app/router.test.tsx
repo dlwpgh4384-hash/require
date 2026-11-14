@@ -610,7 +610,10 @@ describe("client and part route composition", () => {
       complete(success({ items: [] }));
     });
     await screen.findByText("등록된 거래처가 없습니다.");
-    expect(screen.getByTestId("client-create")).toBeEnabled();
+    // 데이터를 다 읽은 뒤에 켜진다: 켜질 때까지 기다린다(느린 환경에서 깜빡 실패 방지).
+    await waitFor(() =>
+      expect(screen.getByTestId("client-create")).toBeEnabled(),
+    );
   });
 
   it("client request failure retries the same API without replacing the shell", async () => {
@@ -678,7 +681,10 @@ describe("common code route composition", () => {
           screen.getByRole("tablist", { name: "공통코드 작업" }),
         ).getAllByRole("tab"),
       ).toHaveLength(4);
-      expect(screen.getByTestId("code-group-title-add")).toBeEnabled();
+      // 데이터를 다 읽은 뒤에 켜진다: 켜질 때까지 기다린다(느린 환경에서 깜빡 실패 방지).
+      await waitFor(() =>
+        expect(screen.getByTestId("code-group-title-add")).toBeEnabled(),
+      );
       expect(maps).not.toHaveBeenCalled();
       expect(standards).not.toHaveBeenCalled();
       expect(histories).not.toHaveBeenCalled();
@@ -1060,7 +1066,10 @@ describe("application route registration", () => {
     });
     mount("/screens/UI-25");
     expect(await screen.findByText("등록된 메뉴가 없습니다.")).toBeVisible();
-    expect(screen.getByTestId("menu-registration-open")).toBeEnabled();
+    // 데이터를 다 읽은 뒤에 켜진다: 켜질 때까지 기다린다(느린 환경에서 깜빡 실패 방지).
+    await waitFor(() =>
+      expect(screen.getByTestId("menu-registration-open")).toBeEnabled(),
+    );
     expect(screen.queryByTestId("menu-settings-retry")).not.toBeInTheDocument();
     expect(router?.state.location.pathname).toBe("/screens/UI-25");
     expectSingleShell();

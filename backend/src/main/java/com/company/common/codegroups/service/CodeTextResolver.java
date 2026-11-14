@@ -8,7 +8,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional(readOnly = true)
+// 읽기 전용이다. 모르는 표기는 CodeFailure로 알리고, 부르는 쪽(엑셀 업로드 검사)이 행 오류로 바꾼다.
+// 그 예외로 바깥 트랜잭션이 rollback-only가 되면 업로드 기록 전체가 실패하므로 rollback 표시를 하지 않는다.
+@Transactional(readOnly = true, noRollbackFor = CodeFailure.class)
 public class CodeTextResolver {
     private final CalculationRuleMapper mapper;
 

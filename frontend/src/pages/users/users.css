@@ -62,3 +62,7 @@
 .user-detail .ls-twrap {
   border-radius: 6px;
 }
+/* 시안: 페이지 아래 「한 화면 건수」 칸은 78px(작은 칸) */
+.users-page .ls-size .ls-in {
+  min-width: 0;
+}

@@ -168,6 +168,16 @@ class UploadApplyIntegrationTest {
         assertThat(db.queryForObject("SELECT mod_dttm FROM TB_SY_UPLD WHERE upld_id=?",java.sql.Timestamp.class,Long.parseLong(id))).isNotNull();
         assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_tbl_nm='TB_BS_CLNT'",Long.class)).isZero();
     }
+    @Test void unknownCodeTextIsARowErrorAndTheCheckIsStillRecorded() throws Exception {
+        // 실제 미리보기에서 「협력업체」처럼 모르는 표기가 있으면 업로드 전체가 500(rollback-only)이던 문제
+        var unknown=new ArrayList<>(row("987-65-43210")); unknown.set(0,"모르는구분");
+        String id=check(List.of(row("123-45-67890"),unknown));
+        mvc.perform(get("/api/common/uploads/"+id)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.successCount").value(1)).andExpect(jsonPath("$.data.errorCount").value(1))
+            .andExpect(jsonPath("$.data.issues[0].inputValue").value("모르는구분"));
+        assertThat(db.queryForObject("SELECT upld_stat_cd FROM TB_SY_UPLD WHERE upld_id=?",String.class,Long.parseLong(id))).isEqualTo("CHECKED");
+        assertThat(count("TB_SY_UPLD_ERR")).isEqualTo(1);
+    }
     @Test void oneInvalidRowBlocksWholeFileAndIssuesReadBackFromDatabase() throws Exception {
         var bad=new ArrayList<>(row("987-65-43210")); bad.set(7,"");
         String id=check(List.of(row("123-45-67890"),bad));

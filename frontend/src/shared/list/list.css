@@ -318,6 +318,8 @@ table.ls-t {
 }
 .ls-pg {
   min-width: 32px;
+  /* 앱 전체 「단추 최소 36px」을 쓰지 않는다(시안 32px) */
+  min-height: 0;
   border: 0;
   height: 32px;
   padding: 0 6px;

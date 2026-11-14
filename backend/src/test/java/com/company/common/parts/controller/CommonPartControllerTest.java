@@ -184,12 +184,15 @@ class CommonPartControllerTest {
         verify(mapper).rename("part-a", "새 파트명");
         verify(mapper, never()).updatePeriod(any());
     }
-    @Test void nameLength31IsFieldErrorAndOriginalRemains() throws Exception {
+    @Test
+    @org.junit.jupiter.api.DisplayName("validation: 파트명 31자는 필드 오류이며 TB_BS_PART와 기준·이력 불변")
+    void nameLength31IsFieldErrorAndOriginalRemains() throws Exception {
         mvc.perform(put("/api/common/parts/part-a").contentType("application/json")
             .content(json.createObjectNode().put("partName", "가".repeat(31)).putNull("modifiedAt").toString()))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("partName"));
-        assertThat(data.masters.get("part-a").partName).isEqualTo("기존 파트"); noWrites();
+        assertThat(data.masters.get("part-a").partName).isEqualTo("기존 파트");
+        verify(mapper, never()).rename(anyString(), anyString()); noWrites();
     }
     @Test void duplicateRenamePreservesBothNames() throws Exception {
         data.master("part-b", "다른 파트"); rename("다른 파트").andExpect(status().isBadRequest());
@@ -279,11 +282,15 @@ class CommonPartControllerTest {
         verify(mapper).stop("part-a");
         verify(mapper, never()).updatePeriod(any()); verify(mapper, never()).endPeriod(anyString(), anyString(), anyString());
     }
-    @Test void stopRequiresNullableVersionKey() throws Exception {
+    @Test
+    @org.junit.jupiter.api.DisplayName("validation: modifiedAt 누락 중지는 400이며 TB_BS_PART 사용 상태 불변")
+    void stopRequiresNullableVersionKey() throws Exception {
         mvc.perform(put("/api/common/parts/part-a/stop").contentType("application/json").content("{}"))
             .andExpect(response("PUT", "/api/common/parts/{partId}/stop"))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.errors[0].field").value("modifiedAt")); noWrites();
+            .andExpect(jsonPath("$.errors[0].field").value("modifiedAt"));
+        assertThat(data.masters.get("part-a").useYn).isEqualTo("Y");
+        verify(mapper, never()).stop(anyString()); noWrites();
     }
     @Test
     @org.junit.jupiter.api.DisplayName("business: 소속 인력이 있는 파트 중지는 useYn=Y와 기존 기준을 보존한다")

@@ -126,6 +126,41 @@ class UploadApplyIntegrationTest {
         return mvc.perform(post("/api/common/uploads/"+id+"/apply").contentType("application/json").content("{\"modifiedAt\":null}"));
     }
     private long count(String table) { return db.queryForObject("SELECT count(*) FROM "+table,Long.class); }
+    @Test
+    @DisplayName("auth happy side-effect: B.7 검사·반영은 TB_SY_UPLD·TB_SY_UPLD_ERR·TB_BS_CLNT만 저장, TB_HR_DEV·TB_HR_MON_PAY·TB_HR_DEV_SKILL 불변")
+    void checkingAClientWorkbookPreservesExistingDeveloperAndPayrollRows() throws Exception {
+        String part=db.queryForObject("SELECT part_id FROM TB_BS_PART WHERE use_yn='Y' ORDER BY hq_yn DESC,part_id LIMIT 1",String.class);
+        db.update("INSERT INTO TB_HR_DEV(dev_id,mng_no,dev_nm,emp_type_cd,job_cd,drct_cls_cd,part_id,work_stat_cd,reg_user_id) VALUES('upload-guard','K-9000','보존 대상','FT','DEV','DRCT',?,'IDLE','admin')",part);
+        db.update("INSERT INTO TB_HR_MON_PAY(pay_ym,dev_id,pay_amt,alwnc_amt,insr_cmpny_amt,retire_rsv_amt,emp_type_cd,drct_cls_cd,reg_user_id) VALUES('202610','upload-guard',100,0,0,0,'FT','DRCT','admin')");
+        db.update("INSERT INTO TB_HR_DEV_SKILL(dev_id,skill_nm,sort_ord,reg_user_id) VALUES('upload-guard','Java',1,'admin')");
+        String developer=db.queryForObject("SELECT row_to_json(d)::text FROM TB_HR_DEV d WHERE dev_id='upload-guard'",String.class);
+        String payroll=db.queryForObject("SELECT row_to_json(p)::text FROM TB_HR_MON_PAY p WHERE dev_id='upload-guard'",String.class);
+        String skill=db.queryForObject("SELECT row_to_json(s)::text FROM TB_HR_DEV_SKILL s WHERE dev_id='upload-guard'",String.class);
+        long clientCount=count("TB_BS_CLNT");
+        var mapped=new ArrayList<>(row("123-45-67890")); mapped.set(0,"검사용 고객");
+        db.update("INSERT INTO TB_SY_CODE_MAP(src_text,code_grp_id,code,reg_user_id) VALUES('검사용 고객','CLNT_TYPE','CUST','admin')");
+        byte[] bytes=workbooks.tabularFile(ClientUploadRules.HEADERS,List.of(mapped),null);
+        var result=mvc.perform(post("/api/common/uploads").with(request -> multipart(request.getRequestURI())
+                .file(new MockMultipartFile("file","clients.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",bytes))
+                .param("formTypeCode","B7").buildRequest(request.getServletContext())))
+            .andExpect(status().isOk()).andExpect(response("POST","/api/common/uploads"))
+            .andExpect(jsonPath("$.data.warningCount").value(1))
+            .andExpect(jsonPath("$.data.errorCount").value(0)).andReturn();
+        long uploadId=Long.parseLong(json.readTree(result.getResponse().getContentAsString()).at("/data/uploadId").asText());
+        assertThat(db.queryForObject("SELECT upld_stat_cd FROM TB_SY_UPLD WHERE upld_id=? AND reg_user_id='admin'",String.class,uploadId)).isEqualTo("CHECKED");
+        assertThat(db.queryForObject("SELECT rslt_type_cd FROM TB_SY_UPLD_ERR WHERE upld_id=?",String.class,uploadId)).isEqualTo("WARN");
+        assertThat(count("TB_BS_CLNT")).isEqualTo(clientCount);
+        assertThat(db.queryForObject("SELECT row_to_json(d)::text FROM TB_HR_DEV d WHERE dev_id='upload-guard'",String.class)).isEqualTo(developer);
+        assertThat(db.queryForObject("SELECT row_to_json(p)::text FROM TB_HR_MON_PAY p WHERE dev_id='upload-guard'",String.class)).isEqualTo(payroll);
+        mvc.perform(post("/api/common/uploads/{uploadId}/apply",uploadId).contentType("application/json").content("{\"modifiedAt\":null}"))
+            .andExpect(status().isOk()).andExpect(response("POST","/api/common/uploads/{uploadId}/apply"))
+            .andExpect(jsonPath("$.data.statusName").value("반영완료"))
+            .andExpect(jsonPath("$.data.errorCount").value(0));
+        assertThat(count("TB_BS_CLNT")).isEqualTo(clientCount+1);
+        assertThat(db.queryForObject("SELECT row_to_json(d)::text FROM TB_HR_DEV d WHERE dev_id='upload-guard'",String.class)).isEqualTo(developer);
+        assertThat(db.queryForObject("SELECT row_to_json(p)::text FROM TB_HR_MON_PAY p WHERE dev_id='upload-guard'",String.class)).isEqualTo(payroll);
+        assertThat(db.queryForObject("SELECT row_to_json(s)::text FROM TB_HR_DEV_SKILL s WHERE dev_id='upload-guard'",String.class)).isEqualTo(skill);
+    }
     @Test void checkedRecordIsDurableAndClosingIsNotApplyAndReopenedStoreUsesSameBytes() throws Exception {
         String id=check(List.of(row("123-45-67890")));
         assertThat(count("TB_BS_CLNT")).isZero();

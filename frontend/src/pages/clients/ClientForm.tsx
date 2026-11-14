@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "../../shared/feedback/Dialog";
+import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import {
   clientPayload,
   ClientRequestError,
@@ -47,6 +48,14 @@ export function ClientForm({
   const [confirm, setConfirm] = useState(false);
   const [accountFailure, setAccountFailure] = useState(false);
   const [revision, setRevision] = useState(0);
+  const initial = useRef(JSON.stringify(draft));
+  const setDirty = useScreenDirty();
+  const dirty = JSON.stringify(draft) !== initial.current;
+  useEffect(() => {
+    setDirty("UI-15", dirty);
+    return () => setDirty("UI-15", false);
+  }, [dirty, setDirty]);
+  const formRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!client || client.clientTypeCode === "CUST") return;
     let active = true;
@@ -56,7 +65,11 @@ export function ClientForm({
       .then((account) => {
         if (!active) return;
         setOriginal(account);
-        setDraft((value) => ({ ...value, ...account }));
+        setDraft((value) => {
+          const next = { ...value, ...account };
+          initial.current = JSON.stringify(next);
+          return next;
+        });
       })
       .catch((reason) => {
         if (active) {
@@ -115,8 +128,14 @@ export function ClientForm({
       });
     if (customer && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.taxEmail || ""))
       errors.push({ field: "taxEmail", message: "이메일을 확인해 주세요." });
+    if (contactPhoneInvalid(draft.contactPhone))
+      errors.push({ field: "contactPhone", message: "연락처는 숫자와 하이픈(-)만 써 주세요." });
     if (errors.length) {
       setError(new ClientRequestError(400, "입력 값을 확인해 주세요.", errors));
+      // FR-0106: 첫 오류 칸으로 커서를 옮긴다.
+      setTimeout(() => {
+        formRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus();
+      }, 0);
       return false;
     }
     return true;
@@ -177,20 +196,28 @@ export function ClientForm({
     error?.errors
       .filter((item) => item.field === field)
       .map((item, index) => (
-        <small role="alert" key={index}>
+        <small role="alert" className="field-error" key={index}>
           {item.message}
         </small>
       ));
+  const invalid = (field: string) => !!error?.errors.some((item) => item.field === field);
   const input = (
     field: keyof ClientInput,
     label: string,
     max: number,
     required = false,
+    help?: string,
   ) => (
-    <label key={field}>
-      {label}
-      {required && " *"}
+    <div className="client-fld" key={field}>
+      <label className="client-fl" htmlFor={`client-field-${field}`}>
+        {label}
+        {required && <span className="field-required"> *</span>}
+      </label>
+      <div className="client-fv">
       <input
+        id={`client-field-${field}`}
+        className="ls-in"
+        aria-invalid={invalid(field)}
         data-testid={`client-${field.replace(/[A-Z]/g, (value) => `-${value.toLowerCase()}`)}`}
         aria-label={label}
         value={String(draft[field] ?? "")}
@@ -202,25 +229,34 @@ export function ClientForm({
             field,
             field === "businessNumber"
               ? formatBusinessNumber(event.target.value)
-              : field === "accountNumber"
+              : field === "accountNumber" || field === "contactPhone"
                 ? event.target.value.replace(/[^0-9-]/g, "")
                 : event.target.value,
           )
         }
       />
+      {help && <span className="client-help">{help}</span>}
       {message(field)}
-    </label>
+      </div>
+    </div>
   );
   const select = (
     field: "clientTypeCode" | "industryCode" | "bankCode",
     label: string,
     group: string,
     required = false,
+    help?: string,
   ) => (
-    <label>
-      {label}
-      {required && " *"}
+    <div className="client-fld">
+      <label className="client-fl" htmlFor={`client-field-${field}`}>
+        {label}
+        {required && <span className="field-required"> *</span>}
+      </label>
+      <div className="client-fv">
       <select
+        id={`client-field-${field}`}
+        className="ls-in"
+        aria-invalid={invalid(field)}
         aria-label={label}
         data-testid={`client-${group.toLowerCase().replace(/_/g, "-")}-select`}
         value={draft[field] || ""}
@@ -233,45 +269,65 @@ export function ClientForm({
           </option>
         ))}
       </select>
+      {help && <span className="client-help">{help}</span>}
       {message(field)}
-    </label>
+      </div>
+    </div>
   );
   return (
     <section
+      ref={formRef}
       className="client-form"
       data-testid="client-form"
       data-screen-id="UI-15"
     >
-      <h2>{client ? "거래처 수정" : "거래처 등록"}</h2>
+      <div className="client-form-head">
+        <button type="button" className="ls-lnk" data-testid="client-form-back" onClick={onCancel}>
+          ‹ 목록
+        </button>
+        <h2>{client ? "거래처 수정" : "거래처 등록"}</h2>
+      </div>
       {loading && <p role="status">계좌 조회 중…</p>}
-      {select("clientTypeCode", "구분", "CLNT_TYPE", true)}
-      {!draft.clientTypeCode ? (
-        <p className="client-banner">
-          구분을 선택하면 입력할 항목이 나타납니다.
+      {!draft.clientTypeCode && (
+        <p className="client-form-banner" role="status">
+          구분을 고르면 고객사는 세금계산서 이메일, 협력사는 지급 계좌 칸이 나옵니다.
         </p>
-      ) : (
-        <div className="client-form-grid">
+      )}
+      <section className="client-card">
+        <h3>기본 정보</h3>
+        <div className="client-fgrid">
+          {select("clientTypeCode", "구분", "CLNT_TYPE", true, "고객사이면서 협력사이면 '고객·협력'을 고릅니다")}
           {input("clientName", "상호", 50, true)}
-          {input("businessNumber", "사업자번호", 12, true)}
-          {!!client && (
-            <small>
-              사업자번호는 변경할 수 없습니다. 잘못 등록한 경우 중지 후 새로
-              등록해 주세요.
-            </small>
+          {input(
+            "businessNumber",
+            "사업자번호",
+            12,
+            true,
+            client
+              ? "사업자번호는 바꿀 수 없습니다. 잘못 등록했으면 중지한 뒤 새로 등록해 주세요."
+              : "숫자만 입력하면 하이픈이 자동으로 들어갑니다",
           )}
           {input("representativeName", "대표자", 20)}
-          {select("industryCode", "업종", "INDUTY")}
+          {select("industryCode", "업종", "INDUTY", false, "공통코드 「업종」에서 고릅니다. 없으면 관리자에게 추가를 요청하세요")}
           {input("contactName", "담당자", 20)}
           {input("contactPhone", "연락처", 20)}
-          {customer && input("taxEmail", "세금계산서 이메일", 100, true)}
-          {vendor && (
-            <>
-              {select("bankCode", "은행", "BANK", true)}
-              {input("accountNumber", "계좌번호", 20, true)}
-              {input("accountHolder", "예금주", 30, true)}
-            </>
-          )}
         </div>
+      </section>
+      {customer && (
+        <section className="client-card">
+          <h3>세금계산서</h3>
+          <div className="client-fgrid">{input("taxEmail", "세금계산서 이메일", 100, true)}</div>
+        </section>
+      )}
+      {vendor && (
+        <section className="client-card">
+          <h3>지급 계좌</h3>
+          <div className="client-fgrid">
+            {select("bankCode", "은행", "BANK", true)}
+            {input("accountNumber", "계좌번호", 20, true, "숫자와 하이픈(-)만 씁니다")}
+            {input("accountHolder", "예금주", 30, true)}
+          </div>
+        </section>
       )}
       {error && (
         <div role="alert" className="client-error">
@@ -304,8 +360,10 @@ export function ClientForm({
           )}
         </div>
       )}
-      <footer>
+      <footer className="client-form-foot">
+        <span className="client-help">* 표시는 꼭 입력해야 하는 항목입니다.</span>
         <button
+          type="button"
           data-testid="client-form-cancel"
           disabled={busy}
           onClick={onCancel}
@@ -313,12 +371,13 @@ export function ClientForm({
           취소
         </button>
         <button
+          type="button"
           className="primary-button"
           data-testid="client-form-save"
-          disabled={busy || loading || accountFailure || !draft.clientTypeCode}
+          disabled={busy || loading || accountFailure}
           onClick={submit}
         >
-          {busy ? "저장 중…" : client ? "저장" : "등록 저장"}
+          {busy ? "저장 중…" : "저장"}
         </button>
       </footer>
       {confirm && (
@@ -349,4 +408,9 @@ export function ClientForm({
       )}
     </section>
   );
+}
+
+/** 연락처: 숫자와 하이픈만(FR-0106 숫자 칸). 비어 있으면 통과. */
+function contactPhoneInvalid(value: string | null | undefined) {
+  return !!value && !/^[0-9-]{2,20}$/.test(value);
 }

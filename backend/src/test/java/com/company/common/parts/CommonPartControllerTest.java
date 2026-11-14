@@ -34,7 +34,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(CommonPartController.class)
 @ContextConfiguration(classes = {CommonPartController.class, CommonPartService.class,
-    CurrentBusinessActor.class, CodeExceptionHandler.class, ApiExceptionHandler.class})
+    CurrentBusinessActor.class, CodeExceptionHandler.class, ApiExceptionHandler.class,
+    com.company.common.service.ExcelExportService.class})
 class CommonPartControllerTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;

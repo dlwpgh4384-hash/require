@@ -42,7 +42,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnabledIfEnvironmentVariable(named = "NAVIGATION_TEST_DB_URL", matches = "jdbc:postgresql:.*")
 @WebMvcTest(CommonPartController.class)
 @ContextConfiguration(classes = {CommonPartController.class, CommonPartService.class, CurrentBusinessActor.class,
-    CodeExceptionHandler.class, ApiExceptionHandler.class, PartPersistenceIntegrationTest.Persistence.class})
+    CodeExceptionHandler.class, ApiExceptionHandler.class, com.company.common.service.ExcelExportService.class,
+    PartPersistenceIntegrationTest.Persistence.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class PartPersistenceIntegrationTest {
     @Autowired MockMvc mvc;
@@ -140,6 +141,18 @@ class PartPersistenceIntegrationTest {
             first, second, leader)).isEqualTo(2);
         assertThat(count("SELECT count(*) FROM TB_SY_USER_SCOPE")).isEqualTo(scopes);
         assertThat(count("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_key=? AND reg_user_id='admin'", first)).isPositive();
+    }
+    @Test void excelDownloadKeepsVisibleColumnsAndLeavesAnAccessLog() throws Exception {
+        create("엑셀 영업 파트");
+        var response = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/common/parts/excel")
+                .param("columns", "partName", "salesExpense"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn().getResponse();
+        try (var workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(response.getContentAsByteArray()))) {
+            var sheet = workbook.getSheetAt(0);
+            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("파트명");
+            assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("공통관리비(1인·월)");
+        }
+        assertThat(count("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE scrn_id='UI-15' AND act_type_cd='DNLD'")).isEqualTo(1);
     }
     @Test void insertingBeforeScheduleKeepsNextAndSameMonthUpdatesWithMoreHistory() throws Exception {
         String id = create("기간 파트");

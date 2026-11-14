@@ -49,7 +49,7 @@ export function PartStandardsPanel({
           <table>
             <thead>
               <tr>
-                <th>기간</th>
+                <th>적용 기간</th>
                 <th>파트장</th>
                 <th>배분율</th>
                 <th>공통관리비</th>
@@ -63,16 +63,16 @@ export function PartStandardsPanel({
                   data-testid={`part-standard-${row.effectiveMonth}`}
                 >
                   <td>
-                    {row.effectiveMonth} ~ {row.endMonth ?? "계속"}
+                    {row.effectiveMonth} ~ {row.endMonth ?? "현재"}
                   </td>
                   <td>{row.leaderName}</td>
                   <td>{row.distributionRate}%</td>
-                  <td>{api.partMoney(row.salesExpense)}원</td>
+                  <td>{api.partMoney(row.salesExpense)}</td>
                   <td>
                     <span
                       className={`part-state part-state-${row.state === "예정" ? "scheduled" : row.state === "지난" ? "past" : "current"}`}
                     >
-                      {row.state}
+                      {row.state === "지난" ? "지난 기준" : row.state}
                     </span>
                   </td>
                 </tr>

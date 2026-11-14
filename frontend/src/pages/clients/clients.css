@@ -162,3 +162,143 @@
   color: var(--primary);
   cursor: pointer;
 }
+/* 거래처 등록·수정(시안 .card + .fgrid + .fld): 칸 이름 120px 왼쪽, 입력 240px, 도움말 12px */
+.client-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0;
+  background: transparent;
+}
+.client-form-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.client-form-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.client-form .ls-lnk {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  cursor: pointer;
+}
+.client-form-banner {
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--ls-info-bg, #f0f9ff);
+  color: var(--ls-info, #0369a1);
+  font-size: 13px;
+}
+.client-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.client-card h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.client-fgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+}
+.client-fld {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 4px 12px;
+}
+.client-fl {
+  padding-top: 8px;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+}
+.client-fv {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.client-form .client-fv .ls-in {
+  width: 240px;
+  max-width: 100%;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 14px;
+}
+.client-form .client-fv .ls-in[readonly] {
+  background: var(--hover);
+}
+.client-help {
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 16px;
+}
+.client-form .field-error {
+  color: #b91c1c;
+  font-size: 12px;
+}
+.client-form-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 -24px -24px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--divider);
+  background: var(--surface);
+}
+.client-form-foot .client-help {
+  margin-right: auto;
+}
+.client-form-foot button {
+  font-weight: 500;
+}
+@media (max-width: 767px) {
+  .client-fgrid {
+    grid-template-columns: 1fr;
+  }
+}
+/* 시안 .tabs/.tb: 높이 40, 좌우 10, 고른 탭 파란 글자·굵게, 아래 선 #e5e7eb */
+.client-part-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.client-part-workspace > .client-workspace-tabs {
+  gap: 4px;
+  margin: 0;
+  border-bottom: 1px solid var(--divider);
+}
+.client-part-workspace > .client-workspace-tabs button {
+  min-height: 40px;
+  height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-sub);
+  font-weight: 500;
+}
+.client-part-workspace > .client-workspace-tabs button[aria-selected="true"] {
+  color: var(--primary);
+  font-weight: 600;
+  border-bottom-color: var(--primary);
+}

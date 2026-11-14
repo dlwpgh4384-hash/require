@@ -250,10 +250,13 @@ it("status confirmation cancellation writes nothing and failures show reasons", 
     useYn: "N",
   });
 });
-it("registration starts with guidance only and changes category-dependent fields", () => {
+it("registration shows basic fields with guidance and changes category-dependent fields", () => {
   render(<ClientForm codes={codes} onCancel={vi.fn()} onSaved={vi.fn()} />);
-  expect(screen.queryByLabelText("상호")).not.toBeInTheDocument();
-  expect(screen.getByText(/구분을 선택하면/)).toBeVisible();
+  // 시안: 기본 정보 칸은 처음부터 보이고, 안내 띠가 구분별 칸을 알려 준다.
+  expect(screen.getByLabelText("상호")).toBeVisible();
+  expect(screen.getByText(/구분을 고르면 고객사는 세금계산서 이메일/)).toBeVisible();
+  expect(screen.queryByLabelText("세금계산서 이메일")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("계좌번호")).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("구분"), {
     target: { value: "CUST" },
   });
@@ -439,4 +442,10 @@ it("failed full-account load disables edit save until retry succeeds", async () 
     expect(screen.getByLabelText("계좌번호")).toHaveValue("12345678"),
   );
   expect(screen.getByTestId("client-form-save")).toBeEnabled();
+});
+
+it("contact phone keeps only digits and hyphens (FR-0106)", () => {
+  render(<ClientForm codes={codes} onCancel={vi.fn()} onSaved={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText("연락처"), { target: { value: "02-12ab34" } });
+  expect(screen.getByLabelText("연락처")).toHaveValue("02-1234");
 });

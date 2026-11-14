@@ -64,9 +64,12 @@ export function ClientPartWorkspace({ partPage }: { partPage: ReactNode }) {
   const tab = workspace.inShell ? workspace.tab : localTab;
   const setTab = workspace.inShell ? workspace.setTab : setLocalTab;
   return (
-    <section data-testid="client-part-workspace" data-screen-id="UI-15">
-      <nav aria-label="거래처·영업 파트" className="client-workspace-tabs">
+    <section className="screen-body client-part-workspace" data-testid="client-part-workspace" data-screen-id="UI-15">
+      <nav aria-label="거래처·영업 파트" className="client-workspace-tabs" role="tablist">
         <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "clients"}
           data-testid="client-workspace-clients"
           aria-pressed={tab === "clients"}
           onClick={() => setTab("clients")}
@@ -74,6 +77,9 @@ export function ClientPartWorkspace({ partPage }: { partPage: ReactNode }) {
           거래처
         </button>
         <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "parts"}
           data-testid="client-workspace-parts"
           aria-pressed={tab === "parts"}
           onClick={() => setTab("parts")}

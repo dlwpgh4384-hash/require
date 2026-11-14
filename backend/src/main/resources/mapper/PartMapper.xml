@@ -119,4 +119,8 @@
       AND (h.trgt_key=#{id} OR h.trgt_key LIKE #{id} || ':%')
     ORDER BY h.reg_dttm DESC,h.hist_id DESC
   </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG (user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm)
+    VALUES (#{userId},#{action},'UI-15',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
 </mapper>

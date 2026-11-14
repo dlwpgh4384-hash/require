@@ -39,17 +39,23 @@ export function UploadActions({
   return (
     <div className="upload-actions" data-testid="upload-actions">
       <button
+        type="button"
+        className="upload-title-button"
         data-testid="upload-template"
         disabled={disabled || downloading}
         onClick={() => void download()}
       >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
         양식 내려받기
       </button>
       <button
+        type="button"
+        className="upload-title-button"
         data-testid="upload-open"
         disabled={disabled}
         onClick={() => setOpen(true)}
       >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20V9M7 14l5-5 5 5M5 4h14" /></svg>
         엑셀 업로드
       </button>
       {error && (

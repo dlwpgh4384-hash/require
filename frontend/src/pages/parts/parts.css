@@ -130,3 +130,61 @@
     padding: 8px;
   }
 }
+
+/* 시안 UI-15 영업 파트 상세·창 맞춤 */
+.part-more {
+  position: relative;
+}
+.part-more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.12);
+}
+.part-more-menu button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 13px;
+}
+.part-more-menu button:hover {
+  background: var(--hover);
+}
+.part-more-menu .part-more-danger {
+  color: #b91c1c;
+}
+.part-section-title {
+  margin: 20px 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.part-note {
+  margin: 12px 0 0;
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 16px;
+}
+.part-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.part-unit {
+  color: var(--text-sub);
+  font-size: 13px;
+}
+.part-help {
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 16px;
+}

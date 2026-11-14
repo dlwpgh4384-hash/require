@@ -51,6 +51,14 @@ public class CommonPartService {
         String now = mapper.selectCurrentMonth();
         return new Items<>(mapper.selectParts(now).stream().map(row -> item(row, now)).toList());
     }
+    /** SFR-011 엑셀 다운로드: 전체 목록, 접근 기록 DNLD(SER-006). */
+    @Transactional
+    public List<Part> getCommonPartsForDownload() {
+        var items = getCommonParts().items();
+        mapper.insertAccess(actor.userId(), "DNLD", "영업 파트 목록 " + items.size() + "건");
+        return items;
+    }
+    public String currentUserId() { return actor.userId(); }
     @Transactional(readOnly = true)
     public Options getCommonPartOptions() {
         YearMonth now = fromDb(mapper.selectCurrentMonth());

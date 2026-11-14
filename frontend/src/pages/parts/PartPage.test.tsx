@@ -137,7 +137,7 @@ it("목록에서 현재값·예정 변경·안내와 모든 업무 열을 표시
   expect(await screen.findByText("영업 1파트")).toBeInTheDocument();
   expect(screen.getByText("38.25%")).toBeInTheDocument();
   expect(screen.getByText("2026-12월부터 45%")).toBeInTheDocument();
-  expect(screen.getByText(/지난 정산은 그대로 유지/)).toBeInTheDocument();
+  expect(screen.getByText(/지난 달 정산은 바뀌지 않습니다/)).toBeInTheDocument();
   for (const label of ["파트장", "소속 인력", "진행 프로젝트", "사용 여부"])
     expect(
       screen.getByRole("columnheader", { name: new RegExp(label) }),
@@ -171,7 +171,7 @@ it("워크스페이스는 기존 경로의 두 탭과 파트 제목줄 추가를
   expect(screen.queryByTestId("part-add-button")).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId("part-title-add"));
   expect(
-    await screen.findByRole("dialog", { name: "파트 추가" }),
+    await screen.findByRole("dialog", { name: "영업 파트 추가" }),
   ).toBeInTheDocument();
 });
 it("새 폼의 운영 기본값·허용 시작월을 DB 옵션 응답에서 읽는다", async () => {
@@ -363,7 +363,7 @@ it("기준 이력은 현재·예정·지난 상태와 기간을 읽기 전용으
   render(<PartStandardsPanel partId={part.partId} />);
   await screen.findByText("적용 중");
   expect(screen.getByText("예정")).toBeInTheDocument();
-  expect(screen.getByText("지난")).toBeInTheDocument();
+  expect(screen.getByText("지난 기준")).toBeInTheDocument();
   expect(screen.getByText("2025-01 ~ 2025-12")).toBeInTheDocument();
   expect(screen.queryByRole("button")).not.toBeInTheDocument();
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
@@ -391,6 +391,8 @@ it("중지 파트는 상세에서 중지 단추를 숨긴다", async () => {
   render(<PartPage />);
   fireEvent.click(await screen.findByText("영업 1파트"));
   await screen.findByTestId("part-detail-panel");
+  // 시안: [⋯] 메뉴에 파트명 수정·사용 중지
+  fireEvent.click(screen.getByTestId("part-more"));
   expect(screen.queryByTestId("part-stop")).not.toBeInTheDocument();
   expect(screen.getByTestId("part-rename")).toBeEnabled();
 });

@@ -3006,6 +3006,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/parts/excel:
+    get:
+      operationId: getCommonPartsExcel
+      summary: 영업 파트 목록 엑셀 다운로드(SFR-011)
+      description: 보이는 열·정렬 그대로 xlsx로 내려준다. 파일에 받은 사람·한국 시각(SER-007), 접근 기록 DNLD(SER-006).
+      security: []
+      parameters:
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [partName, leaderName, distributionRate, salesExpense, effectiveMonth, scheduledChange, personCount, projectCount, useYn]
+      - name: dir
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [asc, desc]
+      - name: columns
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
+      responses:
+        '200':
+          description: 엑셀 파일
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 모르는 열·정렬 값
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/common/parts/options:
     get:
       operationId: getCommonPartOptions

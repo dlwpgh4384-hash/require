@@ -19,8 +19,8 @@ interface Draft {
   salesExpense: string;
 }
 const titles: Record<Mode, string> = {
-  create: "파트 추가",
-  standards: "파트 기준 변경",
+  create: "영업 파트 추가",
+  standards: "기준 변경",
   rename: "파트명 수정",
   stop: "파트 사용 중지",
 };
@@ -260,12 +260,17 @@ export function PartEditDialog({
     },
     !closing,
   );
-  const field = (key: keyof Draft, label: string, control: ReactNode) => (
+  const field = (key: keyof Draft, label: string, control: ReactNode, help?: string, unit?: string) => (
     <label className="part-field" key={key}>
       <span>
-        {label} <em>*</em>
+        {label}
+        <span className="field-required"> *</span>
       </span>
-      {control}
+      <span className="part-control">
+        {control}
+        {unit && <span className="part-unit">{unit}</span>}
+      </span>
+      {help && <span className="part-help">{help}</span>}
       {fields[key] && <small role="alert">{fields[key]}</small>}
     </label>
   );
@@ -293,7 +298,7 @@ export function PartEditDialog({
   };
   return (
     <Dialog
-      title={titles[mode]}
+      title={mode === "standards" && part ? `${part.partName} 기준 변경` : titles[mode]}
       onClose={close}
       closable
       testId={`part-${mode}-dialog`}
@@ -335,6 +340,7 @@ export function PartEditDialog({
                 aria-invalid={!!fields.partName}
                 onChange={(event) => change("partName", event.target.value)}
               />,
+              mode === "rename" ? "소속 인력·프로젝트·사업계획의 파트명도 함께 바뀝니다." : undefined,
             )}
           {periodMode && (
             <>
@@ -350,11 +356,10 @@ export function PartEditDialog({
                   aria-invalid={!!fields.effectiveMonth}
                   onChange={(event) => changeMonth(event.target.value)}
                 />,
+                options?.closedMonth
+                  ? `마감된 달(${options.closedMonth}) 다음 달부터 고를 수 있습니다.`
+                  : `${options?.earliestMonth ?? ""}부터 고를 수 있습니다.`,
               )}
-              <p className="part-help">
-                {options?.earliestMonth}부터 적용할 수 있습니다. 지난 정산은
-                유지됩니다.
-              </p>
               {field(
                 "leaderUserId",
                 "파트장",
@@ -368,20 +373,21 @@ export function PartEditDialog({
                     change("leaderUserId", event.target.value)
                   }
                 >
-                  <option value="">선택해 주세요</option>
+                  <option value="">선택</option>
                   {options?.leaders.map((leader) => (
                     <option key={leader.userId} value={leader.userId}>
                       {leader.userName}
                     </option>
                   ))}
                 </select>,
+                "영업 파트장 역할인 사용자만 나옵니다. 적용 시작월부터 이 사람이 파트 데이터를 보고 미수 2단계 알림을 받습니다. 시스템 › 사용자에서는 고치지 않습니다.",
               )}
               {options && !options.leaders.length && (
                 <p>선택할 수 있는 영업 파트장이 없습니다.</p>
               )}
               {field(
                 "distributionRate",
-                "이익 배분율 (%)",
+                "이익 배분율",
                 <input
                   name="distributionRate"
                   inputMode="decimal"
@@ -395,10 +401,12 @@ export function PartEditDialog({
                     )
                   }
                 />,
+                undefined,
+                "%",
               )}
               {field(
                 "salesExpense",
-                "공통관리비 (1인·월)",
+                "공통관리비 (자사 인력 1인·월)",
                 <input
                   name="salesExpense"
                   inputMode="numeric"
@@ -415,6 +423,8 @@ export function PartEditDialog({
                     )
                   }
                 />,
+                undefined,
+                "원",
               )}
             </>
           )}

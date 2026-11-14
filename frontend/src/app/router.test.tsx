@@ -519,7 +519,7 @@ describe("client and part route composition", () => {
         screen.getByTestId("part-title-add").closest(".screen-actions"),
       ).not.toBeNull();
       fireEvent.click(screen.getByTestId("part-title-add"));
-      await screen.findByRole("dialog", { name: "파트 추가" });
+      await screen.findByRole("dialog", { name: "영업 파트 추가" });
       await waitFor(() =>
         expect(screen.getByTestId("part-rate-input")).toHaveValue("37"),
       );
@@ -550,7 +550,7 @@ describe("client and part route composition", () => {
     mount("/screens/UI-15");
     await screen.findByText("조건에 맞는 결과가 없습니다.");
     fireEvent.click(screen.getByTestId("client-create"));
-    expect(await screen.findByText(/구분을 선택하면/)).toBeVisible();
+    expect(await screen.findByText(/구분을 고르면 고객사는/)).toBeVisible();
     expect(screen.queryByTestId("client-page")).not.toBeInTheDocument();
     expect(router?.state.location.pathname).toBe("/screens/UI-15");
     expect(

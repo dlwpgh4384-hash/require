@@ -106,3 +106,14 @@ export const partErrorMessage = (value: unknown) =>
     ? value.message
     : "처리하지 못했습니다. 다시 시도해 주세요.";
 export const partMoney = (value: number) => value.toLocaleString("ko-KR");
+
+/** SFR-011 영업 파트 엑셀 다운로드 주소: 정렬·보이는 열 그대로. */
+export function partsExcelUrl(sort: { key: string; dir: string } | null, columns: string[]) {
+  const params = new URLSearchParams();
+  if (sort) {
+    params.set("sort", sort.key);
+    params.set("dir", sort.dir);
+  }
+  columns.forEach((column) => params.append("columns", column));
+  return `/api/common/parts/excel?${params}`;
+}

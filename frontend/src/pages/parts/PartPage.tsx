@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Toast } from "../../shared/feedback/Dialog";
 import {
+  Badge,
   Banner,
   DetailPanel,
+  KeyValues,
   ListView,
+  downloadFile,
   useListColumns,
   useListPresentation,
   type ListColumn,
@@ -15,40 +18,39 @@ import { PartStandardChangeDialog } from "./PartStandardChangeDialog";
 import { PartRenameDialog } from "./PartRenameDialog";
 import { PartStopDialog } from "./PartStopDialog";
 import { PartStandardsPanel } from "./PartStandardsPanel";
-import { PartChangeHistoryPanel } from "./PartChangeHistoryPanel";
 import * as api from "./parts";
 import "./parts.css";
 
+// 시안 UI-15 [영업 파트] 표: 열 이름·값 형식 그대로.
 const columns: ListColumn<api.Part>[] = [
   { key: "partName", label: "파트명", required: true },
   { key: "leaderName", label: "파트장" },
   {
     key: "distributionRate",
-    label: "배분율",
+    label: "이익 배분율",
+    align: "right",
     render: (row) => `${row.distributionRate}%`,
   },
   {
     key: "salesExpense",
-    label: "공통관리비 (1인·월)",
-    render: (row) => `${api.partMoney(row.salesExpense)}원`,
+    label: "공통관리비(1인·월)",
+    align: "right",
+    render: (row) => api.partMoney(row.salesExpense),
   },
   { key: "effectiveMonth", label: "적용 시작" },
   {
     key: "scheduledChange",
-    label: "예정 변경",
+    label: "예정된 변경",
+    sortable: false,
     render: (row) => row.scheduledChange ?? "–",
   },
-  { key: "personCount", label: "소속 인력" },
-  { key: "projectCount", label: "진행 프로젝트" },
+  { key: "personCount", label: "소속 인력", align: "right", render: (row) => `${row.personCount}명` },
+  { key: "projectCount", label: "진행 프로젝트", align: "right", render: (row) => `${row.projectCount}건` },
   {
     key: "useYn",
     label: "사용 여부",
     render: (row) => (
-      <span
-        className={`part-state part-state-${row.useYn === "Y" ? "current" : "past"}`}
-      >
-        {row.useYn === "Y" ? "사용" : "중지"}
-      </span>
+      <Badge kind={row.useYn === "Y" ? "ok" : "lock"}>{row.useYn === "Y" ? "사용" : "중지"}</Badge>
     ),
   },
 ];
@@ -70,7 +72,30 @@ export function PartPage() {
   >(null);
   const [adding, setAdding] = useState(false);
   const [notice, setNotice] = useState("");
-  const [tab, setTab] = useState("standards");
+  const [menu, setMenu] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [options, setOptions] = useState<api.PartOptions | null>(null);
+  useEffect(() => {
+    if (!detailId) return;
+    const controller = new AbortController();
+    api.getCommonPartOptions(controller.signal).then(
+      (value) => setOptions(value),
+      () => undefined,
+    );
+    return () => controller.abort();
+  }, [detailId, revision]);
+  const download = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      await downloadFile(api.partsExcelUrl(sort, cols.visible.map((column) => column.key)), "영업 파트.xlsx");
+      setNotice(`엑셀 파일을 내려받았습니다. (${data?.length ?? 0}건)`);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "엑셀 파일을 받지 못했습니다.");
+    } finally {
+      setDownloading(false);
+    }
+  };
   const pendingDetail = useRef<string | null>(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -152,8 +177,8 @@ export function PartPage() {
         </div>
       )}
       <Banner kind="info">
-        기준 변경은 적용 시작월부터 새 기준을 사용합니다. 지난 정산은 그대로
-        유지됩니다.
+        이익 배분율·공통관리비를 바꾸면 적용 시작월부터 새 기준을 씁니다. 지난 달 정산은 바뀌지 않습니다.
+        기준 변경은 시스템 관리자·재무 담당만 할 수 있습니다.
       </Banner>
       <ListView
         screenId="UI-15-parts"
@@ -183,9 +208,12 @@ export function PartPage() {
         }}
         onRowClick={(row) => {
           setDetailId(row.partId);
-          setTab("standards");
+          setMenu(false);
         }}
         highlightKey={highlight}
+        columnSettings={false}
+        onDownload={() => void download()}
+        downloading={downloading}
         error={error}
         onRetry={() => setRevision((value) => value + 1)}
         testId="part-list"
@@ -193,60 +221,88 @@ export function PartPage() {
       {selected && (
         <DetailPanel
           title={selected.partName}
+          sub={`파트장 ${selected.leaderName}`}
           testId="part-detail-panel"
           onClose={() => setDetailId(null)}
-          activeTab={tab}
-          onTab={setTab}
           actions={
             <>
               <button
                 type="button"
+                className="ls-btn ls-btn-sm ls-btn-p"
                 data-testid="part-standard-change"
                 onClick={() => setEditing("standards")}
               >
                 기준 변경
               </button>
-              <button
-                type="button"
-                data-testid="part-rename"
-                onClick={() => setEditing("rename")}
-              >
-                파트명 수정
-              </button>
-              {selected.useYn === "Y" && (
+              <div className="part-more">
                 <button
                   type="button"
-                  data-testid="part-stop"
-                  onClick={() => setEditing("stop")}
+                  className="ls-ibtn"
+                  aria-label="더보기"
+                  aria-expanded={menu}
+                  data-testid="part-more"
+                  onClick={() => setMenu((value) => !value)}
                 >
-                  중지
+                  ⋯
                 </button>
-              )}
+                {menu && (
+                  <div className="part-more-menu" role="menu">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      data-testid="part-rename"
+                      onClick={() => {
+                        setMenu(false);
+                        setEditing("rename");
+                      }}
+                    >
+                      파트명 수정
+                    </button>
+                    {selected.useYn === "Y" && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="part-more-danger"
+                        data-testid="part-stop"
+                        onClick={() => {
+                          setMenu(false);
+                          setEditing("stop");
+                        }}
+                      >
+                        사용 중지
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </>
           }
-          tabs={[
-            {
-              key: "standards",
-              label: "기준 이력",
-              content: (
-                <PartStandardsPanel
-                  partId={selected.partId}
-                  revision={revision}
-                />
-              ),
-            },
-            {
-              key: "history",
-              label: "변경 기록",
-              content: (
-                <PartChangeHistoryPanel
-                  partId={selected.partId}
-                  revision={revision}
-                />
-              ),
-            },
-          ]}
-        />
+        >
+          <KeyValues
+            items={[
+              ["파트장", selected.leaderName],
+              ["이익 배분율", `${selected.distributionRate}%`],
+              ["공통관리비", `${api.partMoney(selected.salesExpense)} 원 (자사 인력 1인·월)`],
+              ["적용 기간", `${selected.effectiveMonth} ~ ${selected.endMonth ?? "현재"}`],
+              ["소속 인력", `${selected.personCount}명`],
+              ["진행 프로젝트", `${selected.projectCount}건`],
+              [
+                "사용 여부",
+                <Badge kind={selected.useYn === "Y" ? "ok" : "lock"}>{selected.useYn === "Y" ? "사용" : "중지"}</Badge>,
+              ],
+            ]}
+          />
+          <h3 className="part-section-title">기준 이력</h3>
+          <PartStandardsPanel partId={selected.partId} revision={revision} />
+          {options && (
+            <p className="part-note" data-testid="part-period-note">
+              {options.closedMonth
+                ? `마감된 달(${options.closedMonth})까지의 정산에는 그때 기준이 그대로 쓰입니다. `
+                : ""}
+              새 기준은 {options.earliestMonth}부터 넣을 수 있습니다.
+            </p>
+          )}
+        </DetailPanel>
       )}
       {(adding || workspace.addingPart) && (
         <PartCreateDialog onClose={closeCreate} onSaved={saved} />

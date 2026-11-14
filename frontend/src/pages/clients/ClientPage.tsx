@@ -210,6 +210,7 @@ export function ClientPage({
     pending?.useYn === "N"
       ? pending.items.filter((item) => item.projectCount > 0 || item.personCount > 0)
       : [];
+  const allBlocked = !!pending && blocked.length > 0 && blocked.length === pending.items.length;
   const changeStatus = async () => {
     if (!pending || busy) return;
     setBusy(true);
@@ -415,8 +416,9 @@ export function ClientPage({
           onStatus={(client) => setPending({ items: [client], useYn: client.useYn === "Y" ? "N" : "Y" })}
         />
       )}
-      {pending && blocked.length > 0 && (
-        // 시안: 거래가 남은 거래처가 있으면 중지하지 않고 목록으로 알린다.
+      {pending && allBlocked && (
+        // 시안: 고른 거래처 모두 거래가 남아 있으면 중지하지 않고 목록으로 알린다.
+        // 일부만 남아 있으면 SFR-115-06대로 가능한 건만 중지하고 못 한 건수·이유를 알린다.
         <Dialog
           title="사용을 중지할 수 없습니다"
           testId="client-status-blocked"
@@ -444,7 +446,7 @@ export function ClientPage({
           </div>
         </Dialog>
       )}
-      {pending && blocked.length === 0 && (
+      {pending && !allBlocked && (
         <Dialog
           title={
             pending.useYn === "N"

@@ -1,16 +1,7 @@
 package com.company.common.service;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.Files;
-import java.nio.file.LinkOption;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -18,20 +9,33 @@ import java.util.Base64;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+/**
+ * SER-005 거래처 계좌번호 암호화: AES-256-GCM, 값마다 새 IV.
+ * 키는 설정 값 payment.account-key(Base64 32바이트)에서 읽는다. 환경 변수 PAYMENT_ACCOUNT_KEY가 있으면 그것을 쓴다.
+ * 지금 application.yml의 값은 개발용 임시 키다(2026-11-14 사용자 결정). 운영 전에 환경 변수로 옮기고 파일의 값은 지운다.
+ */
 @Service
 public class PaymentAccountCipher {
-    private static final Object KEY_CREATION = new Object();
     private static final SecureRandom RANDOM = new SecureRandom();
-    private final Path directory;
+    private final byte[] key;
 
-    public PaymentAccountCipher() {
-        this(Path.of(System.getProperty("java.io.tmpdir"), "company-payment-accounts"));
+    public PaymentAccountCipher(@Value("${payment.account-key:}") String base64Key) {
+        byte[] decoded;
+        try {
+            decoded = base64Key == null || base64Key.isBlank() ? new byte[0] : Base64.getDecoder().decode(base64Key.trim());
+        } catch (IllegalArgumentException exception) {
+            decoded = new byte[0];
+        }
+        this.key = decoded.length == 32 ? decoded.clone() : null;
+        Arrays.fill(decoded, (byte) 0);
     }
 
-    public PaymentAccountCipher(Path directory) {
-        this.directory = directory.toAbsolutePath().normalize();
+    private byte[] key() {
+        if (key == null) throw new IllegalStateException("계좌 암호화 키가 설정되지 않았습니다. 관리자에게 문의해 주세요.");
+        return key;
     }
 
     public String encrypt(String accountNumber) {
@@ -39,18 +43,17 @@ public class PaymentAccountCipher {
         if (!accountNumber.matches("[0-9-]{8,20}")) {
             throw new IllegalArgumentException("계좌번호 형식을 확인해 주세요.");
         }
-        byte[] key = localKey();
         try {
             byte[] iv = new byte[12];
             RANDOM.nextBytes(iv);
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(128, iv));
+            cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key(), "AES"), new GCMParameterSpec(128, iv));
             byte[] encrypted = cipher.doFinal(accountNumber.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(ByteBuffer.allocate(iv.length + encrypted.length)
                 .put(iv).put(encrypted).array());
         } catch (GeneralSecurityException exception) {
             throw new IllegalStateException("계좌 정보를 암호화할 수 없습니다.");
-        } finally { Arrays.fill(key, (byte) 0); }
+        }
     }
 
     public String decrypt(String encryptedAccount) {
@@ -60,15 +63,14 @@ public class PaymentAccountCipher {
         try { encoded = Base64.getDecoder().decode(encryptedAccount); }
         catch (IllegalArgumentException exception) { throw unreadable(); }
         if (encoded.length < 36 || encoded.length > 48) throw unreadable();
-        byte[] key = localKey();
         try {
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"),
+            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key(), "AES"),
                 new GCMParameterSpec(128, Arrays.copyOf(encoded, 12)));
             return new String(cipher.doFinal(encoded, 12, encoded.length - 12), StandardCharsets.UTF_8);
         } catch (GeneralSecurityException exception) {
             throw unreadable();
-        } finally { Arrays.fill(key, (byte) 0); }
+        }
     }
 
     public String lastFour(String encryptedAccount) {
@@ -80,60 +82,5 @@ public class PaymentAccountCipher {
 
     private static IllegalStateException unreadable() {
         return new IllegalStateException("계좌 정보를 읽을 수 없습니다.");
-    }
-
-    private byte[] localKey() {
-        synchronized (KEY_CREATION) {
-            try {
-                try {
-                    Files.createDirectory(directory, PosixFilePermissions.asFileAttribute(
-                        PosixFilePermissions.fromString("rwx------")));
-                } catch (FileAlreadyExistsException exists) {
-                    requirePrivate(directory, true);
-                }
-                Path lockPath = directory.resolve("account-key.lock");
-                try {
-                    Files.createFile(lockPath, PosixFilePermissions.asFileAttribute(
-                        PosixFilePermissions.fromString("rw-------")));
-                } catch (FileAlreadyExistsException exists) {
-                    requirePrivate(lockPath, false);
-                }
-                try (FileChannel channel = FileChannel.open(lockPath, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
-                     var lock = channel.lock()) {
-                    Path keyPath = directory.resolve("account-key.bin");
-                    if (!Files.exists(keyPath, LinkOption.NOFOLLOW_LINKS)) {
-                        byte[] generated = new byte[32];
-                        RANDOM.nextBytes(generated);
-                        Path pending = Files.createTempFile(directory, "account-key-", ".pending",
-                            PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
-                        try {
-                            try (var output = FileChannel.open(pending, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS)) {
-                                ByteBuffer bytes = ByteBuffer.wrap(generated);
-                                while (bytes.hasRemaining()) output.write(bytes);
-                                output.force(true);
-                            }
-                            Files.move(pending, keyPath, StandardCopyOption.ATOMIC_MOVE);
-                        } finally {
-                            Arrays.fill(generated, (byte) 0);
-                            Files.deleteIfExists(pending);
-                        }
-                    }
-                    requirePrivate(keyPath, false);
-                    if (Files.size(keyPath) != 32) throw new IOException("Invalid key file");
-                    return Files.readAllBytes(keyPath);
-                }
-            } catch (IOException | UnsupportedOperationException exception) {
-                throw new IllegalStateException("계좌 암호화 저장소를 사용할 수 없습니다.");
-            }
-        }
-    }
-
-    private static void requirePrivate(Path path, boolean isDirectory) throws IOException {
-        boolean correctKind = isDirectory ? Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)
-            : Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS);
-        var expected = PosixFilePermissions.fromString(isDirectory ? "rwx------" : "rw-------");
-        if (!correctKind || !Files.getPosixFilePermissions(path, LinkOption.NOFOLLOW_LINKS).equals(expected)) {
-            throw new IOException("Unsafe key storage");
-        }
     }
 }

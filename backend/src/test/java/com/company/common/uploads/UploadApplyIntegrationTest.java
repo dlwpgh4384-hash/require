@@ -88,7 +88,7 @@ class UploadApplyIntegrationTest {
         @Bean UploadFileStore uploadFileStore(OwnedSchema owned) throws Exception {
             Files.createDirectory(owned.directory()); return new UploadFileStore(owned.directory().resolve("originals"));
         }
-        @Bean PaymentAccountCipher paymentAccountCipher(OwnedSchema owned) { return new PaymentAccountCipher(owned.directory().resolve("keys")); }
+        @Bean PaymentAccountCipher paymentAccountCipher(OwnedSchema owned) { return new PaymentAccountCipher(java.util.Base64.getEncoder().encodeToString(new byte[32])); }
     }
     @BeforeEach void setup() { db=new JdbcTemplate(source); }
     @AfterEach void cleanup() throws Exception {

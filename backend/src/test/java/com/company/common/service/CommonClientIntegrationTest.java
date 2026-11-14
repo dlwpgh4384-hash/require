@@ -71,7 +71,7 @@ class CommonClientIntegrationTest {
         @Bean UserMapper userMapper(SqlSessionTemplate session) { return session.getMapper(UserMapper.class); }
         @Bean DataSourceTransactionManager transactionManager(DataSource source) { return new DataSourceTransactionManager(source); }
         @Bean BusinessCalendar businessCalendar() { return new BusinessCalendar(java.time.Clock.fixed(java.time.Instant.parse("2030-01-01T15:30:00Z"),java.time.ZoneOffset.UTC)); }
-        @Bean PaymentAccountCipher paymentAccountCipher() { return new PaymentAccountCipher(); }
+        @Bean PaymentAccountCipher paymentAccountCipher() { return new PaymentAccountCipher(java.util.Base64.getEncoder().encodeToString(new byte[32])); }
     }
     @BeforeEach void setup() { db=new JdbcTemplate(source); }
     @AfterEach void cleanup() throws Exception {

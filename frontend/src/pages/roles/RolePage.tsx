@@ -9,7 +9,7 @@ import { RoleHistoryDialog } from "./RoleHistoryDialog";
 import { RoleImpactDialog } from "./RoleImpactDialog";
 import { useRoleWorkspace } from "./RoleWorkspace";
 import * as api from "./roles";
-import { Banner } from "../../shared/list";
+import { Banner, ListPager, useListPresentation } from "../../shared/list";
 import "../../shared/list/list.css";
 import "./roles.css";
 
@@ -21,6 +21,8 @@ export function RolePage() {
   const [roles, setRoles] = useState<api.Role[] | null>(null);
   const [selected, setSelected] = useState("");
   const [settings, setSettings] = useState<api.RoleSettings | null>(null);
+  const [matrixPage, setMatrixPage] = useState(1);
+  useEffect(() => setMatrixPage(1), [selected]);
   const [draft, setDraft] = useState<api.RoleUpdate | null>(null);
   const [listFailure, setListFailure] = useState("");
   const [failure, setFailure] = useState("");
@@ -245,6 +247,13 @@ export function RolePage() {
     !dialog && !impact && !pending,
   );
   const roleName = settings?.role.roleName ?? "";
+  // 시안: 권한 표 아래 페이지 줄. 화면(메뉴) 줄을 한 화면 건수씩 나누고, 그 쪽에 있는 묶음 머리 줄을 함께 보인다.
+  const presentation = useListPresentation();
+  const menuCount = settings?.menuAuths.length ?? 0;
+  const lastPage = Math.max(1, Math.ceil(menuCount / presentation.pageSize));
+  const currentPage = Math.min(matrixPage, lastPage);
+  const pageStart = (currentPage - 1) * presentation.pageSize;
+  const pageEnd = pageStart + presentation.pageSize;
   return (
     <section
       ref={root}
@@ -379,9 +388,10 @@ export function RolePage() {
               </thead>
               <tbody>
                 {settings.menuAuths.map((menu, index) => {
+                  if (index < pageStart || index >= pageEnd) return null;
                   const startsGroup =
                     !!menu.groupName &&
-                    (index === 0 ||
+                    (index === pageStart ||
                       settings.menuAuths[index - 1].groupName !==
                         menu.groupName);
                   return (
@@ -445,6 +455,18 @@ export function RolePage() {
             </table>
             {settings.menuAuths.length === 0 && <p>조회할 권한이 없습니다.</p>}
           </div>
+          {menuCount > 0 && (
+            <ListPager
+              page={currentPage}
+              pageSize={presentation.pageSize}
+              total={menuCount}
+              onPage={setMatrixPage}
+              onPageSize={(size) => {
+                presentation.setPageSize(size);
+                setMatrixPage(1);
+              }}
+            />
+          )}
           <div className="roles-notes">
             <p>
               역할이 여러 개인 사용자는 넓은 쪽(합집합) 권한을 따릅니다.

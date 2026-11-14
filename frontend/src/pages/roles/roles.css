@@ -201,3 +201,10 @@
   background: var(--hover);
   font-weight: 600;
 }
+/* 시안: 권한 표 아래 페이지 줄 — 표와 12px, 아래 안내와 24px */
+.roles-matrix-wrap + .ls-pager {
+  margin-top: 12px;
+}
+.ls-pager + .roles-notes {
+  margin-top: 24px;
+}

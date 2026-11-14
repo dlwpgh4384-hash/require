@@ -336,6 +336,7 @@ export function PartEditDialog({
               <input
                 name="partName"
                 data-testid="part-name-input"
+                placeholder="예: 영업4파트"
                 value={draft.partName}
                 aria-invalid={!!fields.partName}
                 onChange={(event) => change("partName", event.target.value)}

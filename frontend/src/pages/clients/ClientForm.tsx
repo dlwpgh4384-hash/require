@@ -56,6 +56,9 @@ export function ClientForm({
     return () => setDirty("UI-15", false);
   }, [dirty, setDirty]);
   const formRef = useRef<HTMLElement>(null);
+  // FR-0106: 저장하지 않은 내용이 있으면 나가기 전에 묻는다(시안 확인 창).
+  const [leaving, setLeaving] = useState(false);
+  const leave = () => (dirty ? setLeaving(true) : onCancel());
   useEffect(() => {
     if (!client || client.clientTypeCode === "CUST") return;
     let active = true;
@@ -282,7 +285,7 @@ export function ClientForm({
       data-screen-id="UI-15"
     >
       <div className="client-form-head">
-        <button type="button" className="ls-lnk" data-testid="client-form-back" onClick={onCancel}>
+        <button type="button" className="ls-lnk" data-testid="client-form-back" onClick={leave}>
           ‹ 목록
         </button>
         <h2>{client ? "거래처 수정" : "거래처 등록"}</h2>
@@ -366,7 +369,7 @@ export function ClientForm({
           type="button"
           data-testid="client-form-cancel"
           disabled={busy}
-          onClick={onCancel}
+          onClick={leave}
         >
           취소
         </button>
@@ -380,6 +383,24 @@ export function ClientForm({
           {busy ? "저장 중…" : "저장"}
         </button>
       </footer>
+      {leaving && (
+        <Dialog
+          title="저장하지 않은 내용이 있습니다"
+          testId="client-leave-confirm"
+          closable
+          onClose={() => setLeaving(false)}
+        >
+          <p>나가면 입력한 내용이 사라집니다.</p>
+          <div className="app-actions">
+            <button type="button" data-testid="client-leave-cancel" onClick={() => setLeaving(false)}>
+              취소
+            </button>
+            <button type="button" className="primary-button" data-testid="client-leave-go" onClick={onCancel}>
+              나가기
+            </button>
+          </div>
+        </Dialog>
+      )}
       {confirm && (
         <Dialog
           title="지급 계좌 변경"

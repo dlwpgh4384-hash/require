@@ -188,3 +188,42 @@
   font-size: 12px;
   line-height: 16px;
 }
+/* 시안 영업 파트 창(.modal .fc): 칸 이름 위 13px·500 회색, 입력 36px, 배분율 칸 64px·공통관리비 120px 오른쪽 정렬 */
+.app-dialog .part-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+}
+.app-dialog .part-field .part-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.app-dialog .part-field input[name="effectiveMonth"] {
+  width: 200px;
+}
+.app-dialog .part-field input[name="distributionRate"] {
+  width: 64px;
+  text-align: right;
+}
+.app-dialog .part-field input[name="salesExpense"] {
+  width: 120px;
+  text-align: right;
+}
+.app-dialog .part-field .part-help {
+  margin: 0;
+  font-weight: 400;
+  line-height: 16px;
+}
+.app-dialog .part-field input,
+.app-dialog .part-field select {
+  min-height: 36px;
+  font-weight: 400;
+}
+.app-dialog .part-form {
+  padding-top: 8px;
+}

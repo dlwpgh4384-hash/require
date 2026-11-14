@@ -28,7 +28,6 @@ export function PartStandardsPanel({
   }, [partId, revision, retry]);
   return (
     <section data-testid="part-standards-panel">
-      <h3>지금 기준과 기준 이력</h3>
       {error ? (
         <div role="alert">
           {error}

@@ -449,3 +449,17 @@ it("contact phone keeps only digits and hyphens (FR-0106)", () => {
   fireEvent.change(screen.getByLabelText("연락처"), { target: { value: "02-12ab34" } });
   expect(screen.getByLabelText("연락처")).toHaveValue("02-1234");
 });
+it("leaving a form with unsaved input asks first (FR-0106)", () => {
+  const cancel = vi.fn();
+  render(<ClientForm codes={codes} onCancel={cancel} onSaved={vi.fn()} />);
+  fireEvent.click(screen.getByTestId("client-form-cancel"));
+  expect(cancel).toHaveBeenCalledTimes(1);
+  cancel.mockClear();
+  render(<ClientForm codes={codes} onCancel={cancel} onSaved={vi.fn()} />);
+  fireEvent.change(screen.getAllByLabelText("상호")[1], { target: { value: "새 상호" } });
+  fireEvent.click(screen.getAllByTestId("client-form-cancel")[1]);
+  expect(cancel).not.toHaveBeenCalled();
+  expect(screen.getByTestId("client-leave-confirm")).toHaveTextContent("나가면 입력한 내용이 사라집니다.");
+  fireEvent.click(screen.getByTestId("client-leave-go"));
+  expect(cancel).toHaveBeenCalledTimes(1);
+});

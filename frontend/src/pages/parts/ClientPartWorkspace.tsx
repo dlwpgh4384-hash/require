@@ -58,10 +58,13 @@ export function PartTitleActions() {
   return (
     <button
       type="button"
-      className="primary-button"
+      className="primary-button part-title-add"
       data-testid="part-title-add"
       onClick={() => workspace.setAddingPart(true)}
     >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
       파트 추가
     </button>
   );

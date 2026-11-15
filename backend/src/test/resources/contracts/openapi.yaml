@@ -6775,6 +6775,11 @@ components:
           format: date-time
           nullable: true
           description: '동시 수정 막기: 수정할 때 그대로 돌려보내고 다르면 409'
+        skillNames:
+          type: array
+          items:
+            type: string
+          description: 보유 스킬 이름(TB_HR_DEV_SKILL.SKILL_NM)
       required:
       - developerId
       - managementNumber

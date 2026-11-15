@@ -67,7 +67,8 @@ public class CommonDeveloperService {
     }
     private Developer detail(Developer row) {
         List<DeveloperRows.Code> codes=mapper.selectCodes("SKILL");
-        row.skillCodes=mapper.selectSkills(row.developerId).stream().map(name -> {
+        row.skillNames=mapper.selectSkills(row.developerId);
+        row.skillCodes=row.skillNames.stream().map(name -> {
             var matches=codes.stream().filter(c -> c.name.equals(name)).toList();
             return matches.size()==1 ? matches.get(0).code : name;
         }).toList();

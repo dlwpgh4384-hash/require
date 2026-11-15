@@ -247,3 +247,8 @@
   padding: 0 14px;
   font-weight: 500;
 }
+/* 시안 .mb p.sub: 표 아래 안내 13px 회색 */
+.upload-sub {
+  font-size: 13px;
+  color: var(--text-sub);
+}

@@ -16,6 +16,8 @@ public final class DeveloperRows {
             primaryJobName, workStatusName, useYn;
         public BigDecimal monthlyRate, monthlyPay;
         public List<String> skillCodes;
+        /** 보유 스킬 이름(시안 상세 칩). */
+        public List<String> skillNames;
         public boolean retirementScheduled;
         public String secondaryJobName, positionName, directClassName, salesPartName;
         /** 동시 수정 막기: 저장할 때 그대로 돌려보내고 다르면 409. */

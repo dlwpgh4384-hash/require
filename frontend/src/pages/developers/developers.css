@@ -1,175 +1,373 @@
-.developer-page,
-.developer-form {
-  color: var(--text);
-  min-width: 0;
-  font-size: 14px;
-}
+/* 시안 UI-02 개발자 풀 — 거래처 화면과 같은 목록·폼·창 틀 */
 .developer-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
+  min-width: 0;
+  color: var(--text);
 }
-.developer-actions,
-.developer-upload-actions,
-.developer-form-actions {
+/* 제목줄: [사용 중지 포함] [급여 양식] [급여 업로드] [양식] [엑셀 업로드] [+ 등록] */
+.developer-actions {
   display: flex;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
+}
+.developer-stopped {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin-right: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.developer-title-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.developer-search {
+  width: 180px;
+}
+/* 표: 이름 아래 작은 관리번호(시안 .pname) */
+.developer-pname {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 20px;
+}
+.developer-pname small {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.developer-project {
+  color: var(--primary-text);
+}
+.developer-sub-inline {
+  color: var(--text-sub);
+}
+.developer-empty {
+  margin: 0;
+  color: var(--text-sub);
+}
+/* 상세 */
+.developer-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.developer-chips .ls-chip {
+  margin: 0;
+}
+.developer-num {
+  font-variant-numeric: tabular-nums;
+}
+.ls-db .developer-free {
+  max-height: none;
+  min-height: 0;
+}
+.developer-status-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.developer-status-head .ls-cap {
+  flex: 1 1 240px;
+}
+.developer-lnk {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+.developer-blocked-list {
+  margin: 0;
+  padding: 0 24px 0 42px;
+}
+
+/* 등록·수정(폼 화면): 탭 없음, 카드 h2, 칸 이름 오른쪽 정렬·필수 *, 아래 고정 단추 줄 */
+.screen-tab-panel:has(.developer-form),
+.developer-workspace:has(.developer-form) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+.developer-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 24px;
+  min-width: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+.developer-form-banner {
+  margin: 0;
+}
+.developer-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+  min-width: 0;
+}
+.developer-card h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.developer-fgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+}
+.developer-fld {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: start;
+}
+.developer-fl {
+  padding-top: 8px;
+  text-align: right;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.developer-fl.req::after,
+.developer-req::after {
+  content: " *";
+  color: var(--ls-bad);
+}
+.developer-fv {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.developer-fv .ls-in {
+  width: 240px;
+  max-width: 100%;
+}
+.developer-fv select.ls-in {
+  padding: 0 4px 0 10px;
+}
+.developer-fv .ls-in[readonly] {
+  background: var(--ls-head-bg);
+  color: var(--text-sub);
+}
+.developer-fv .ls-in[aria-invalid="true"] {
+  border-color: var(--ls-bad);
+}
+.developer-fv .developer-date,
+.developer-fv .developer-money {
+  width: 160px;
+}
+.developer-money {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.developer-row {
+  display: flex;
   align-items: center;
   gap: 8px;
 }
-.developer-form {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 24px;
+.developer-unit {
+  color: var(--text-sub);
 }
-.developer-form-grid,
-.developer-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px 24px;
+.developer-help {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
 }
-.developer-field {
+.developer-form .field-error {
+  color: var(--ls-bad);
+  font-size: 12px;
+}
+.developer-error {
+  color: var(--ls-bad);
+}
+.developer-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.developer-bad {
+  color: var(--ls-bad);
+}
+.developer-form .developer-form-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: auto -24px -24px;
+  padding: 12px 24px;
+  background: var(--surface);
+  border-top: 1px solid var(--divider);
+}
+@media (max-width: 767px) {
+  .developer-fgrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 시안 .modal: 폭 400·테두리 없음, 머리 16·16·8·24, 본문 4·24·16(칸 간격 12), 단추 줄 12·24·20 */
+.developer-workspace .app-dialog {
+  width: min(400px, 100%);
+  padding: 0;
+  border: 0;
+}
+.developer-workspace .app-dialog:has(.developer-pay-form) {
+  width: min(720px, 100%);
+}
+.developer-workspace .app-dialog > h2,
+.developer-workspace .app-dialog-head {
+  margin: 0;
+  padding: 16px 16px 8px 24px;
+}
+.developer-workspace .app-dialog h2 {
+  line-height: 24px;
+}
+.developer-workspace .app-dialog-close {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+}
+.developer-workspace .app-dialog > p {
+  margin: 0;
+  padding: 4px 24px 16px;
+  color: var(--text-sub);
+}
+.developer-workspace .app-dialog > form,
+.developer-workspace .app-dialog > form > fieldset {
+  margin: 0;
+  border: 0;
   min-width: 0;
 }
-.developer-form input:not([type="checkbox"]),
-.developer-form select {
+.developer-workspace .app-dialog > form > fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 24px 16px;
+}
+.developer-workspace .app-dialog .developer-upload-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 24px 0;
+  color: var(--text-sub);
+}
+.developer-fc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+}
+.developer-fc input,
+.developer-fc select {
+  width: 100%;
+  height: 36px;
   min-height: 36px;
-  padding: 8px 10px;
+  padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--surface);
   color: var(--text);
-  width: 100%;
-  box-sizing: border-box;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
 }
-.developer-field input[readonly] {
-  background: var(--hover);
-  color: var(--text-sub);
-  cursor: not-allowed;
+.developer-fc input[type="file"] {
+  min-height: 40px;
+  height: auto;
+  padding: 5px 8px;
+  line-height: 28px;
 }
-.developer-field-help,
-.developer-sub {
+.developer-fc .developer-help {
+  font-weight: 400;
+}
+.developer-cap {
+  margin: 0;
   font-size: 12px;
+  line-height: 16px;
   color: var(--text-sub);
 }
-.developer-sub {
-  display: block;
-  overflow-wrap: anywhere;
-}
-.developer-field-error,
-.developer-form .field-error,
-.developer-warning,
-.developer-form [role="alert"] {
-  color: var(--danger, #b91c1c);
-}
-.developer-field [aria-invalid="true"] {
-  border-color: var(--danger, #b91c1c);
-}
-.developer-form-banner {
-  background: var(--hover);
-  padding: 12px 16px;
-  border-radius: 4px;
-  line-height: 1.6;
-}
-.developer-form fieldset {
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 16px;
-  margin: 24px 0 0;
-}
-.developer-form fieldset label {
-  display: inline-flex;
-  gap: 6px;
-  padding: 6px 12px 6px 0;
-}
-.developer-areas {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-.developer-areas label {
+.developer-workspace .app-dialog .app-actions,
+.developer-workspace .app-dialog > footer {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.developer-form-actions,
-.developer-footer {
-  display: flex;
-  gap: 8px;
   justify-content: flex-end;
-  position: sticky;
-  bottom: 0;
-  background: var(--surface);
-  margin-top: 24px;
-  padding: 16px 0 0;
-  border-top: 1px solid var(--divider);
+  gap: 8px;
+  margin: 0 -24px;
+  padding: 12px 24px 20px;
 }
-.developer-form button:disabled {
-  opacity: 0.55;
-  cursor: default;
+.developer-workspace .app-dialog > div.app-actions {
+  margin: 0;
 }
-.developer-table-scroll {
-  max-width: 100%;
-  overflow-x: auto;
+.developer-workspace .app-dialog .app-actions button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  font-weight: 500;
 }
-.developer-history,
-.developer-table-scroll > table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
+.developer-workspace .app-dialog > form > .app-actions {
+  margin: 0;
 }
-.developer-history td,
-.developer-history th,
-.developer-table-scroll td,
-.developer-table-scroll th {
-  text-align: left;
-  vertical-align: top;
-  padding: 10px 8px;
-  border-bottom: 1px solid var(--divider);
-  overflow-wrap: anywhere;
+/* 업로드 창은 제목줄에서 열리므로 화면 영역 밖에 있다: 창 안의 폼으로 찾는다 */
+.app-dialog:has(.developer-upload-form) {
+  width: min(400px, 100%);
+  padding: 0;
+  border: 0;
 }
-.developer-status-highlight,
-.developer-state-highlight {
-  background: var(--hover);
-  font-weight: 600;
+.app-dialog:has(.developer-pay-form) {
+  width: min(720px, 100%);
 }
-.developer-status-dialog form {
+.app-dialog:has(.developer-upload-form) > .app-dialog-head {
+  margin: 0;
+  padding: 16px 16px 8px 24px;
+}
+.app-dialog:has(.developer-upload-form) .app-dialog-head h2 {
+  line-height: 24px;
+}
+.app-dialog:has(.developer-upload-form) .app-dialog-close {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+}
+.app-dialog .developer-upload-form {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 4px 24px 0;
+  color: var(--text-sub);
 }
-.developer-status-dialog label {
+.app-dialog .developer-upload-form > .app-actions {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 -24px;
+  padding: 12px 24px 20px;
 }
-.developer-status-dialog input,
-.developer-status-dialog select,
-.developer-status-dialog textarea {
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font: inherit;
-}
-@media (max-width: 700px) {
-  .developer-form {
-    padding: 16px;
-  }
-  .developer-form-grid,
-  .developer-fields,
-  .developer-areas {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .developer-upload-actions {
-    display: none;
-  }
-  .developer-history td,
-  .developer-history th {
-    min-width: 80px;
-  }
+.app-dialog .developer-upload-form > .app-actions button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  font-weight: 500;
 }

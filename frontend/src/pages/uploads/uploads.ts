@@ -15,6 +15,10 @@ export interface UploadResult {
   warningCount: number;
   errorCount: number;
   issues: UploadIssue[];
+  /** B.8: 관리번호를 비운 줄에 반영 때 붙을 번호(시안 「붙을 번호」). */
+  plannedDevelopers?: { row: number; managementNumber: string }[];
+  /** B.1: 고른 연월(YYYY-MM). */
+  yearMonth?: string;
 }
 export class UploadRequestError extends Error {
   constructor(

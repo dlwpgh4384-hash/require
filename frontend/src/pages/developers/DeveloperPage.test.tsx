@@ -98,6 +98,11 @@ beforeEach(() => {
     monthlyRate: 100,
     monthlyPay: 50,
     skillCodes: ["JAVA"],
+    skillNames: ["Java"],
+    salesPartName: "영업1",
+    positionName: "팀원",
+    directClassName: "직접",
+    modifiedAt: "2026-11-15T00:00:00Z",
     homeAreaCode: "1168010100",
     homeAddress: "서울 강남구 역삼동",
     workStatusName: "휴직",
@@ -272,8 +277,8 @@ it("renders API-backed columns, representative project and exact MM without warn
     "data-screen-id",
     "UI-02",
   );
-  expect(screen.getByText(/대표 프로젝트 외 2건/)).toBeVisible();
-  expect(screen.queryByText("1.0 초과")).not.toBeInTheDocument();
+  expect(screen.getByText("대표 프로젝트").closest("td")).toHaveTextContent("대표 프로젝트 외 2건");
+  expect(screen.queryByText(/1\.0 초과/)).not.toBeInTheDocument();
   expect(screen.getByTestId("list-count")).toHaveTextContent("1");
   for (const name of ["소속", "등급", "주 직무", "철수 예정일", "월 단가"])
     expect(screen.getByRole("columnheader", { name })).toBeVisible();
@@ -286,7 +291,8 @@ it("renders API-backed columns, representative project and exact MM without warn
 it("warns only when the API indicates over 1.0", async () => {
   over = true;
   render(<DeveloperPage />);
-  expect(await screen.findByText("1.0 초과")).toHaveClass("developer-warning");
+  // 시안: 「이번 달 1.01 MM · 1.0 초과」
+  expect(await screen.findByText(/이번 달 1\.01 MM · 1\.0 초과/)).toBeVisible();
 });
 it("submits each filter, explicitly permits retirement without include stopped", async () => {
   render(<DeveloperPage />);
@@ -319,11 +325,11 @@ it("submits each filter, explicitly permits retirement without include stopped",
     ).toBe(true),
   );
 });
-it("can include stopped rows and reset filters", async () => {
+it("can include stopped rows from the title bar check box and keeps it on filter reset", async () => {
   render(<DeveloperPage />);
   await screen.findByText("김개발");
+  // 시안: 제목줄의 [사용 중지 포함]은 누르면 바로 다시 조회한다
   fireEvent.click(screen.getByTestId("developer-include-stopped"));
-  fireEvent.click(screen.getByTestId("list-search"));
   await waitFor(() =>
     expect(
       request.mock.calls.some((c) =>
@@ -332,7 +338,7 @@ it("can include stopped rows and reset filters", async () => {
     ).toBe(true),
   );
   fireEvent.click(screen.getByTestId("list-reset"));
-  expect(screen.getByTestId("developer-include-stopped")).not.toBeChecked();
+  expect(screen.getByTestId("developer-include-stopped")).toBeChecked();
 });
 it("renders empty state", async () => {
   empty = true;
@@ -375,7 +381,7 @@ it("requires confirmation and reports an all-rejected stop with name and reason"
     "사용을 중지할 수 없습니다",
   );
   expect(screen.getByTestId("developer-rejected-d")).toHaveTextContent(
-    "김개발 · 진행 투입",
+    "김개발 — 진행 투입",
   );
 });
 it("registration has team-member/direct defaults, no sales-part default and no stopped organization choice", async () => {
@@ -387,11 +393,11 @@ it("registration has team-member/direct defaults, no sales-part default and no s
   );
   expect(screen.getByTestId("developer-positionCode")).toHaveValue("MEMBER");
   expect(screen.getByTestId("developer-directClassCode")).toHaveValue("DRCT");
-  expect(screen.getByTestId("developer-sales-part")).toHaveValue("");
+  expect(screen.getByTestId("developer-salesPartId")).toHaveValue("");
   expect(
     screen.queryByRole("option", { name: "중지 협력사" }),
   ).not.toBeInTheDocument();
-  expect(screen.getByText(/간접은 관리직만 선택/)).toBeVisible();
+  expect(screen.getByText(/관리직만 간접/)).toBeVisible();
   expect(screen.queryByLabelText("연락처")).not.toBeInTheDocument();
 });
 it("restores address by code, locks management number, excludes identity/address text from update payload", async () => {
@@ -410,18 +416,16 @@ it("restores address by code, locks management number, excludes identity/address
   expect(screen.getByTestId("developer-management-number")).toHaveAttribute(
     "readonly",
   );
-  expect(screen.getByTestId("developer-management-number")).toHaveClass(
-    "developer-locked",
-  );
   fireEvent.change(screen.getByTestId("developer-name"), {
     target: { value: "새 이름" },
   });
-  fireEvent.click(screen.getByTestId("developer-form-save"));
+  fireEvent.click(screen.getByTestId("developer-save"));
   await waitFor(() => expect(saved).toHaveBeenCalled());
   const body = JSON.parse(String(writes()[0][1].body));
   expect(body).not.toHaveProperty("managementNumber");
   expect(body).not.toHaveProperty("developerId");
-  expect(body).not.toHaveProperty("modifiedAt");
+  // 공통 기능: 동시 수정 막기 — 상세의 modifiedAt을 그대로 돌려보낸다
+  expect(body.modifiedAt).toBe("2026-11-15T00:00:00Z");
   expect(body).not.toHaveProperty("homeAddress");
   expect(body.homeAreaCode).toBe("1168010100");
 });
@@ -451,9 +455,10 @@ it("protects dirty data with an explicit discard confirmation", async () => {
   fireEvent.change(screen.getByTestId("developer-name"), {
     target: { value: "수정" },
   });
-  fireEvent.click(screen.getByTestId("developer-form-cancel"));
+  fireEvent.click(screen.getByTestId("developer-cancel"));
   expect(cancel).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByTestId("developer-discard"));
+  expect(screen.getByTestId("developer-leave-confirm")).toHaveTextContent("저장하지 않은 내용이 있습니다");
+  fireEvent.click(screen.getByTestId("developer-leave-go"));
   expect(cancel).toHaveBeenCalledOnce();
 });
 it("shows ApiError field validation without navigating away", async () => {
@@ -469,11 +474,11 @@ it("shows ApiError field validation without navigating away", async () => {
   await waitFor(() =>
     expect(screen.getByTestId("developer-area-2")).toHaveValue("1168010100"),
   );
-  fireEvent.click(screen.getByTestId("developer-form-save"));
+  fireEvent.click(screen.getByTestId("developer-save"));
   expect(await screen.findByText("name 입력 오류")).toBeVisible();
   expect(screen.getByTestId("developer-form")).toBeVisible();
 });
-it("keeps unresolved skills visible for deliberate resolution", async () => {
+it("keeps unresolved skills visible and blocks saving until they match the skill codes", async () => {
   row.skillCodes = ["폐기된 스킬"];
   render(
     <DeveloperForm
@@ -483,9 +488,15 @@ it("keeps unresolved skills visible for deliberate resolution", async () => {
       onCancel={vi.fn()}
     />,
   );
-  expect(screen.getByText(/확인 필요: 폐기된 스킬/)).toBeVisible();
-  fireEvent.click(screen.getByTestId("developer-legacy-skill-폐기된 스킬"));
-  expect(screen.queryByText(/확인 필요: 폐기된 스킬/)).not.toBeInTheDocument();
+  expect(screen.getByTestId("developer-skills")).toHaveValue("폐기된 스킬");
+  await waitFor(() =>
+    expect(screen.getByTestId("developer-area-2")).toHaveValue("1168010100"),
+  );
+  fireEvent.click(screen.getByTestId("developer-save"));
+  expect(
+    await screen.findByText("공통코드 「스킬」에 없는 이름입니다: 폐기된 스킬"),
+  ).toBeVisible();
+  expect(writes()).toHaveLength(0);
 });
 it("renders four detail tabs and the readonly skills/address", async () => {
   render(
@@ -493,16 +504,20 @@ it("renders four detail tabs and the readonly skills/address", async () => {
       developerId="d"
       onClose={vi.fn()}
       onEdit={vi.fn()}
+      onStop={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
   expect(await screen.findByText("서울 강남구 역삼동")).toBeVisible();
   expect(screen.getAllByRole("tab")).toHaveLength(4);
-  expect(screen.getByText("JAVA")).toBeVisible();
+  expect(screen.getByText("Java")).toBeVisible();
+  expect(screen.getByText("영업1")).toBeVisible();
   fireEvent.click(screen.getByRole("tab", { name: "투입 이력" }));
   expect(screen.getByText("투입 이력이 없습니다.")).toBeVisible();
-  fireEvent.click(screen.getByRole("tab", { name: "변경 이력" }));
+  fireEvent.click(screen.getByRole("tab", { name: "변경 이력 (1)" }));
   expect(screen.getByText("이전 이름")).toBeVisible();
+  // 시간 기준: 변경일은 한국 날짜로(2026-11-15T01:00Z → 2026-11-15)
+  expect(screen.getByTestId("developer-change-0")).toHaveTextContent("2026-11-15");
 });
 it("highlights ongoing leave and keeps hire-date working row below it", async () => {
   render(
@@ -510,14 +525,14 @@ it("highlights ongoing leave and keeps hire-date working row below it", async ()
       developerId="d"
       onClose={vi.fn()}
       onEdit={vi.fn()}
+      onStop={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
   await screen.findByText("서울 강남구 역삼동");
   fireEvent.click(screen.getByRole("tab", { name: "근무 상태 이력" }));
-  expect(screen.getByTestId("developer-status-1")).toHaveClass(
-    "developer-state-highlight",
-  );
+  // 시안: 진행 중인 휴직은 「진행 중」 배지
+  expect(screen.getByTestId("developer-status-1")).toHaveTextContent("진행 중");
   expect(screen.getByTestId("developer-status-hire")).toHaveTextContent(
     "2026-01-01",
   );
@@ -530,6 +545,7 @@ it("does not offer end-date edit for a finished leave", async () => {
       developerId="d"
       onClose={vi.fn()}
       onEdit={vi.fn()}
+      onStop={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
@@ -544,6 +560,7 @@ it("hides status registration after retirement", async () => {
       developerId="d"
       onClose={vi.fn()}
       onEdit={vi.fn()}
+      onStop={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
@@ -559,13 +576,12 @@ it("shows scheduled retirement without a date attached to the status label", asy
       developerId="d"
       onClose={vi.fn()}
       onEdit={vi.fn()}
+      onStop={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
-  expect(await screen.findByText("휴직 · 퇴사 예정")).toBeVisible();
-  expect(
-    screen.queryByText("휴직 · 퇴사 예정 2026-12-01"),
-  ).not.toBeInTheDocument();
+  expect(await screen.findByText("퇴사 예정")).toBeVisible();
+  expect(screen.queryByText(/2026-12-01/)).not.toBeInTheDocument();
 });
 it("return cancellation sends no body", async () => {
   statuses[0] = { ...statuses[0], statusName: "재직", ongoing: false };
@@ -574,6 +590,7 @@ it("return cancellation sends no body", async () => {
       developerId="d"
       onClose={vi.fn()}
       onEdit={vi.fn()}
+      onStop={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
@@ -591,6 +608,7 @@ it("retirement cancellation requires a reason before HTTP", async () => {
       developerId="d"
       onClose={vi.fn()}
       onEdit={vi.fn()}
+      onStop={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
@@ -608,6 +626,7 @@ it("end-date error stays in its small dialog", async () => {
       developerId="d"
       onClose={vi.fn()}
       onEdit={vi.fn()}
+      onStop={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
@@ -623,19 +642,22 @@ it("end-date error stays in its small dialog", async () => {
   ).toBeVisible();
 });
 it("B1 requires the unclosed selected month while B8 has no month field", async () => {
+  // 연월 목록은 한국 달력 이번 달부터 10개월: 날짜를 고정한다
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-15T03:00:00Z"));
   render(<DeveloperPage />);
   await screen.findByText("김개발");
   fireEvent.click(screen.getByTestId("developer-pay-upload"));
   await waitFor(() =>
     expect(screen.getByTestId("developer-pay-month")).not.toBeDisabled(),
   );
-  expect(screen.getByTestId("developer-pay-month")).toHaveAttribute(
-    "min",
-    "2026-11",
-  );
+  // 시안: 연월은 목록에서 고르고, 마감한 달(2026-10까지)은 「(마감)」으로 못 고른다
+  const closed = screen.getByRole("option", { name: "2026-10 (마감)" });
+  expect(closed).toBeDisabled();
   fireEvent.click(screen.getByTestId("developer-upload-close"));
   fireEvent.click(screen.getByTestId("developer-upload"));
   expect(screen.queryByTestId("developer-pay-month")).not.toBeInTheDocument();
+  vi.useRealTimers();
 });
 it("rejects a renamed/unsupported file before upload HTTP", async () => {
   render(<DeveloperPage />);
@@ -645,7 +667,7 @@ it("rejects a renamed/unsupported file before upload HTTP", async () => {
     target: { files: [new File(["text"], "data.csv")] },
   });
   fireEvent.click(screen.getByTestId("developer-upload-check"));
-  expect(await screen.findByText(/10,000,000 bytes 이하/)).toBeVisible();
+  expect(await screen.findByText(/10MB 이하의 xlsx/)).toBeVisible();
   expect(writes()).toHaveLength(0);
 });
 it("payload never sends editable lifecycle identity on update", () => {

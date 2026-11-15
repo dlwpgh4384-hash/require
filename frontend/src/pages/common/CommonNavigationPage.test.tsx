@@ -291,7 +291,7 @@ describe("common placeholder screen contract", () => {
     );
     expect(screen.queryByTestId("developer-list")).not.toBeInTheDocument();
     expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-02");
-    fireEvent.click(screen.getByTestId("developer-form-cancel"));
+    fireEvent.click(screen.getByTestId("developer-cancel"));
     await expectScreenContent("UI-02");
     expect(
       request.mock.calls.some(([url]) =>
@@ -315,7 +315,7 @@ describe("common placeholder screen contract", () => {
         "개발자 등록",
       );
       expect(router.state.location.pathname).toBe("/screens/UI-02");
-      fireEvent.click(screen.getByTestId("developer-form-cancel"));
+      fireEvent.click(screen.getByTestId("developer-cancel"));
       await expectScreenContent("UI-02");
     } finally {
       view.unmount();

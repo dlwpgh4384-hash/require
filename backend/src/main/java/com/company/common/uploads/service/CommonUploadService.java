@@ -95,7 +95,8 @@ public class CommonUploadService {
         var row = require(mapper.selectUpload(id(uploadId)));
         Map<Integer, String> assigned = Map.of();
         // B.8 「붙을 번호」: 반영 전 검사 결과는 저장된 파일을 다시 읽어 지금 붙을 번호를 계산한다.
-        if ("CHECKED".equals(row.statusCode) && row.errorCount == 0 && "B8".equals(row.formTypeCode)) {
+        // 오류가 있는 파일도 시안처럼 오류 없는 줄의 붙을 번호를 보여 준다(반영은 막힘).
+        if ("CHECKED".equals(row.statusCode) && "B8".equals(row.formTypeCode)) {
             UploadForm form = form(row.formTypeCode);
             assigned = form.inspect(workbooks.readTabular(row.fileName, files.read(row.uploadId), form.headers()),
                 targetMonth(row)).assigned();

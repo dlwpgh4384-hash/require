@@ -20,10 +20,13 @@ export function UploadResultDialog({
   onClose,
   onApplied,
   targetName = "거래처",
+  notes = [],
 }: {
   uploadId: string;
   /** 시안 제목 「엑셀 업로드 결과 · 거래처」 */
   targetName?: string;
+  /** 표 아래 안내(시안 개발자 업로드: 붙을 번호·거주지 설명). */
+  notes?: string[];
   initialResult?: UploadResult;
   onClose: () => void;
   onApplied: () => void;
@@ -130,6 +133,10 @@ export function UploadResultDialog({
       setBusy(false);
     }
   };
+  // B.8: 관리번호를 비운 줄에 붙을 번호(행번호 → 번호)
+  const planned = result?.plannedDevelopers
+    ? new Map(result.plannedDevelopers.map((p) => [p.row, p.managementNumber]))
+    : null;
   const shown =
     result?.issues.slice(
       page * presentation.pageSize,
@@ -195,6 +202,7 @@ export function UploadResultDialog({
                         <th>열</th>
                         <th>입력값</th>
                         <th>이유</th>
+                        {planned && <th>붙을 번호</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -212,12 +220,18 @@ export function UploadResultDialog({
                           <td>{issue.column}</td>
                           <td>{issue.inputValue === "" ? "(빈칸)" : issue.inputValue}</td>
                           <td>{issue.reason}</td>
+                          {planned && <td>{(issue.severity !== "오류" && planned.get(issue.row)) || "–"}</td>}
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               )}
+              {notes.map((note) => (
+                <p className="upload-sub" key={note}>
+                  {note}
+                </p>
+              ))}
               {result.issues.length > presentation.pageSize && (
                 <nav aria-label="업로드 결과 페이지" className="upload-pages">
                   <button

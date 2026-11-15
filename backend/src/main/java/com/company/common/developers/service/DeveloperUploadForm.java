@@ -127,7 +127,7 @@ public class DeveloperUploadForm implements UploadForm {
     private String code(TabularRow row, int column, String group, boolean required, String label, List<Issue> issues) {
         String text = row.values().get(column).trim();
         if (text.isEmpty()) {
-            if (required) issue(issues, row, column, label + "을(를) 입력해 주세요.", "오류");
+            if (required) issue(issues, row, column, label + object(label) + " 입력해 주세요.", "오류");
             return null;
         }
         try {
@@ -138,6 +138,12 @@ public class DeveloperUploadForm implements UploadForm {
             issue(issues, row, column, failure.getMessage(), "오류");
             return null;
         }
+    }
+    /** 받침이 있으면 「을」, 없으면 「를」(시안: 「주 직무를 입력해 주세요.」). */
+    static String object(String word) {
+        char last = word.charAt(word.length() - 1);
+        if (last < 0xAC00 || last > 0xD7A3) return "을(를)";
+        return (last - 0xAC00) % 28 == 0 ? "를" : "을";
     }
     private String organization(TabularRow row, List<Issue> issues) {
         String text = row.values().get(3).trim();

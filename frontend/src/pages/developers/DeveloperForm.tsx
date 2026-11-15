@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { Dialog } from "../../shared/feedback/Dialog";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { useScreenTitleOverride } from "../../shared/layout/ScreenTitleOverride";
 import {
   DeveloperRequestError,
   developerFailure,
+  directLabel,
   getCommonDeveloperAreas,
   postCommonDeveloper,
   putCommonDeveloper,
@@ -15,6 +16,12 @@ import {
 } from "./developers";
 import "./developers.css";
 
+const SELF = "__self";
+const required = ["name", "employeeTypeCode", "organizationId", "primaryJobCode", "salesPartId", "directClassCode"] as const;
+const digits = (value: string) => value.replace(/[^0-9]/g, "");
+const money = (value: number | null | undefined) => (value == null ? "" : value.toLocaleString("ko-KR"));
+
+/** 시안 개발자 등록·수정(폼 화면): 제목줄 [‹ 목록], 카드 「기본 정보」·「금액」, 아래 [취소][저장]. */
 export function DeveloperForm({
   developer,
   options,
@@ -26,29 +33,26 @@ export function DeveloperForm({
   onCancel: () => void;
   onSaved: (developer: Developer) => void;
 }) {
-  const [draft, setDraft] = useState<DeveloperInput>(() => ({
+  const skillName = (code: string) => options.codes.SKILL?.find((c) => c.code === code)?.codeName || code;
+  const [draft, setDraft] = useState(() => ({
     name: developer?.name || "",
     managementNumber: developer?.managementNumber || "",
     employeeTypeCode: developer?.employeeTypeCode || "",
-    organizationId: developer?.organizationId ?? "",
+    organization: developer ? (developer.organizationId ? developer.organizationId : SELF) : "",
     gradeCode: developer?.gradeCode || "",
     primaryJobCode: developer?.primaryJobCode || "",
     secondaryJobCode: developer?.secondaryJobCode || "",
-    positionCode:
-      developer?.positionCode ||
-      options.codes.JBPS?.find((c) => c.codeName === "팀원")?.code ||
-      "",
-    directClassCode:
-      developer?.directClassCode ||
-      options.codes.DRCT_CLS?.find((c) => c.codeName === "직접")?.code ||
-      "",
+    skills: (developer?.skillCodes || []).map(skillName).join(", "),
     salesPartId: developer?.salesPartId || "",
     hireDate: developer?.hireDate || "",
-    monthlyRate: developer?.monthlyRate ?? null,
-    monthlyPay: developer?.monthlyPay ?? null,
-    skillCodes: developer?.skillCodes || [],
-    homeAreaCode: developer?.homeAreaCode || null,
+    // 시안·명세: 새 등록은 직위 「팀원」, 직접/간접 「직접」이 처음 값
+    positionCode: developer?.positionCode || options.codes.JBPS?.find((c) => c.codeName === "팀원")?.code || "",
+    directClassCode: developer?.directClassCode || options.codes.DRCT_CLS?.find((c) => c.codeName === "직접")?.code || "",
+    monthlyRate: money(developer?.monthlyRate),
+    monthlyPay: money(developer?.monthlyPay),
+    homeAreaCode: developer?.homeAreaCode || null as string | null,
   }));
+  type Draft = typeof draft;
   const original = useRef(JSON.stringify(draft));
   const dirty = original.current !== JSON.stringify(draft);
   const setDirty = useScreenDirty();
@@ -56,6 +60,8 @@ export function DeveloperForm({
   const saving = useRef(false);
   const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const formRef = useRef<HTMLElement>(null);
   const [areas, setAreas] = useState<DeveloperArea[][]>([[], [], []]);
   const [location, setLocation] = useState(["", "", ""]);
   const [areaBusy, setAreaBusy] = useState(true);
@@ -67,11 +73,8 @@ export function DeveloperForm({
     return () => setDirty("UI-02", false);
   }, [dirty, setDirty]);
   const leave = () => (dirty ? setLeaving(true) : onCancel());
-  useScreenTitleOverride(
-    "UI-02",
-    developer ? "개발자 등록 수정" : "개발자 등록",
-    leave,
-  );
+  // 시안 제목 문구 그대로: 등록 「개발자 등록」, 수정 「개발자 등록 수정」
+  useScreenTitleOverride("UI-02", developer ? "개발자 등록 수정" : "개발자 등록", leave);
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -79,22 +82,17 @@ export function DeveloperForm({
       setAreaError("");
       try {
         const root = (await getCommonDeveloperAreas()).items;
-        let lists = [root, [] as DeveloperArea[], [] as DeveloperArea[]],
-          selected = ["", "", ""];
-        const code = draft.homeAreaCode;
+        const lists = [root, [] as DeveloperArea[], [] as DeveloperArea[]];
+        const selected = ["", "", ""];
+        const code = developer?.homeAreaCode;
         if (code) {
-          selected[0] =
-            root.find((a) => a.areaCode.slice(0, 2) === code.slice(0, 2))
-              ?.areaCode || "";
+          selected[0] = root.find((a) => a.areaCode.slice(0, 2) === code.slice(0, 2))?.areaCode || "";
           if (selected[0] && selected[0] !== code) {
             lists[1] = (await getCommonDeveloperAreas(selected[0])).items;
-            selected[1] =
-              lists[1].find((a) => a.areaCode.slice(0, 5) === code.slice(0, 5))
-                ?.areaCode || "";
+            selected[1] = lists[1].find((a) => a.areaCode.slice(0, 5) === code.slice(0, 5))?.areaCode || "";
             if (selected[1] && selected[1] !== code) {
               lists[2] = (await getCommonDeveloperAreas(selected[1])).items;
-              selected[2] =
-                lists[2].find((a) => a.areaCode === code)?.areaCode || "";
+              selected[2] = lists[2].find((a) => a.areaCode === code)?.areaCode || "";
             }
           }
         }
@@ -113,17 +111,18 @@ export function DeveloperForm({
       active = false;
     };
   }, [developer?.homeAreaCode, areaRevision]);
-  function change<K extends keyof DeveloperInput>(
-    key: K,
-    value: DeveloperInput[K],
-  ) {
+  const change = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((d) => ({ ...d, [key]: value }));
-  }
+    setErrors((e) => {
+      if (!e[key as string]) return e;
+      const next = { ...e };
+      delete next[key as string];
+      return next;
+    });
+  };
   const selectArea = async (level: number, value: string) => {
     const request = ++areaRequest.current;
-    const next = location.map((v, i) =>
-      i === level ? value : i > level ? "" : v,
-    );
+    const next = location.map((v, i) => (i === level ? value : i > level ? "" : v));
     setLocation(next);
     change("homeAreaCode", next[2] || next[1] || next[0] || null);
     setAreas((old) => old.map((list, i) => (i > level ? [] : list)));
@@ -135,72 +134,118 @@ export function DeveloperForm({
     setAreaBusy(true);
     try {
       const response = await getCommonDeveloperAreas(value);
-      if (request === areaRequest.current)
-        setAreas((old) =>
-          old.map((list, i) => (i === level + 1 ? response.items : list)),
-        );
+      if (request === areaRequest.current) setAreas((old) => old.map((list, i) => (i === level + 1 ? response.items : list)));
     } catch (reason) {
-      if (request === areaRequest.current)
-        setAreaError(developerFailure(reason));
+      if (request === areaRequest.current) setAreaError(developerFailure(reason));
     } finally {
       if (request === areaRequest.current) setAreaBusy(false);
     }
   };
+  const serverErrors = error instanceof DeveloperRequestError ? error.errors : [];
   const fieldError = (key: string) =>
-    error instanceof DeveloperRequestError
-      ? error.errors.find((e) => e.field === key)?.message
-      : undefined;
-  const field = (key: string, label: string, control: ReactNode) => (
-    <div className="developer-field" key={key}>
-      <label htmlFor={`developer-${key}`}>{label}</label>
-      {control}
-      {fieldError(key) && (
-        <span role="alert" className="field-error">
-          {fieldError(key)}
-        </span>
-      )}
+    errors[key] || serverErrors.find((e) => e.field === (key === "organization" ? "organizationId" : key === "skills" ? "skillCodes" : key))?.message;
+  const fld = (key: string, label: string, isRequired: boolean, control: ReactNode, help?: ReactNode) => (
+    <div className="developer-fld" key={key}>
+      <label className={`developer-fl${isRequired ? " req" : ""}`} htmlFor={`developer-${key}`}>
+        {label}
+      </label>
+      <div className="developer-fv">
+        {control}
+        {help && <span className="developer-help">{help}</span>}
+        {fieldError(key) && (
+          <small role="alert" className="field-error">
+            {fieldError(key)}
+          </small>
+        )}
+      </div>
     </div>
   );
-  const codeSelect = (
-    key: keyof DeveloperInput,
-    label: string,
-    group: string,
-    required = false,
-  ) =>
-    field(
+  const codeSelect = (key: keyof Draft, label: string, group: string, isRequired = false, help?: string) =>
+    fld(
       key,
       label,
+      isRequired,
       <select
         id={`developer-${key}`}
         data-testid={`developer-${key}`}
+        className="ls-in"
+        aria-invalid={!!fieldError(key)}
         value={String(draft[key] || "")}
         disabled={busy}
-        onChange={(e) => change(key, e.target.value)}
-        required={required}
+        onChange={(e) => change(key, e.target.value as never)}
       >
         <option value="">선택</option>
-        {!!draft[key] &&
-          !options.codes[group]?.some((c) => c.code === draft[key]) && (
-            <option value={String(draft[key])} disabled>
-              {String(draft[key])} (기존값·새 선택 불가)
-            </option>
-          )}
+        {!!draft[key] && !options.codes[group]?.some((c) => c.code === draft[key]) && (
+          <option value={String(draft[key])} disabled>
+            {String(draft[key])} (기존값·새 선택 불가)
+          </option>
+        )}
         {options.codes[group]?.map((c) => (
           <option key={c.code} value={c.code}>
-            {c.codeName}
+            {group === "DRCT_CLS" ? directLabel(c.codeName) : c.codeName}
           </option>
         ))}
       </select>,
+      help,
     );
+  const validate = () => {
+    const found: Record<string, string> = {};
+    if (!draft.name.trim()) found.name = "이름을 입력해 주세요.";
+    if (!developer && draft.managementNumber.trim() && !/^[A-Za-z0-9-]{1,20}$/.test(draft.managementNumber.trim()))
+      found.managementNumber = "영문·숫자·하이픈 20자 이내로 입력해 주세요.";
+    for (const key of required) {
+      const value = key === "organizationId" ? draft.organization : draft[key];
+      if (!value && !found[key === "organizationId" ? "organization" : key])
+        found[key === "organizationId" ? "organization" : key] = "필수 입력입니다.";
+    }
+    const unknown = draft.skills
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .filter((name) => !options.codes.SKILL?.some((c) => c.codeName === name || c.code === name));
+    if (unknown.length) found.skills = `공통코드 「스킬」에 없는 이름입니다: ${unknown.join(", ")}`;
+    setErrors(found);
+    if (Object.keys(found).length) {
+      // 공통 기능: 첫 오류 칸으로 커서를 옮긴다
+      setTimeout(() => formRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus(), 0);
+      return false;
+    }
+    return true;
+  };
+  const payload = (): DeveloperInput => ({
+    managementNumber: developer ? undefined : draft.managementNumber.trim() || undefined,
+    name: draft.name,
+    employeeTypeCode: draft.employeeTypeCode,
+    organizationId: draft.organization === SELF ? "" : draft.organization,
+    gradeCode: draft.gradeCode || null,
+    primaryJobCode: draft.primaryJobCode,
+    secondaryJobCode: draft.secondaryJobCode || null,
+    positionCode: draft.positionCode || undefined,
+    directClassCode: draft.directClassCode,
+    salesPartId: draft.salesPartId,
+    hireDate: draft.hireDate || null,
+    monthlyRate: draft.monthlyRate ? Number(digits(draft.monthlyRate)) : null,
+    monthlyPay: draft.monthlyPay ? Number(digits(draft.monthlyPay)) : null,
+    skillCodes: [
+      ...new Set(
+        draft.skills
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .map((name) => options.codes.SKILL?.find((c) => c.codeName === name || c.code === name)?.code || name),
+      ),
+    ],
+    homeAreaCode: draft.homeAreaCode,
+  });
   const save = async () => {
-    if (saving.current || areaBusy || areaError) return;
+    if (saving.current || areaBusy || areaError || !validate()) return;
     saving.current = true;
     setBusy(true);
     setError(null);
     try {
       const saved = developer
-        ? await putCommonDeveloper(developer.developerId, draft)
-        : await postCommonDeveloper(draft);
+        ? await putCommonDeveloper(developer.developerId, payload(), developer.modifiedAt ?? null)
+        : await postCommonDeveloper(payload());
       original.current = JSON.stringify(draft);
       setDirty("UI-02", false);
       onSaved(saved);
@@ -211,75 +256,109 @@ export function DeveloperForm({
       setBusy(false);
     }
   };
-  return (
-    <section
-      className="developer-form"
-      data-testid="developer-form"
-      data-screen-id="UI-02"
-    >
-      <h2>{developer ? "개발자 등록 수정" : "개발자 등록"}</h2>
-      <p className="ls-banner ls-banner-info">
-        보유 스킬·거주지는 이 화면에서만 입력합니다(「내 정보」에서는 고치지
-        않음). 거주지는 시·도, 시·군·구, 동까지 받습니다(번지는 받지 않음).
-      </p>
-      {error != null && <p role="alert">{developerFailure(error)}</p>}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
+  const currentSave = useRef(save);
+  currentSave.current = save;
+  useEffect(() => {
+    // 공통 기능: Ctrl+S로 저장
+    const handler = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void currentSave.current();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+  const textInput = (key: "name" | "managementNumber" | "skills", max: number, extra?: Partial<InputHTMLAttributes<HTMLInputElement>>) => (
+    <input
+      id={`developer-${key}`}
+      data-testid={`developer-${key === "managementNumber" ? "management-number" : key}`}
+      className="ls-in"
+      aria-invalid={!!fieldError(key)}
+      value={draft[key]}
+      maxLength={max}
+      disabled={busy}
+      onChange={(e) => change(key, e.target.value)}
+      {...extra}
+    />
+  );
+  const moneyInput = (key: "monthlyRate" | "monthlyPay") => (
+    <span className="developer-row">
+      <input
+        id={`developer-${key}`}
+        data-testid={`developer-${key}`}
+        className="ls-in developer-money"
+        inputMode="numeric"
+        value={draft[key]}
+        disabled={busy}
+        onChange={(e) => {
+          const plain = digits(e.target.value);
+          change(key, plain ? Number(plain).toLocaleString("ko-KR") : "");
         }}
-        noValidate
+      />
+      <span className="developer-unit">원</span>
+    </span>
+  );
+  const areaSelect = (level: number, key: string, label: string, help: string) =>
+    fld(
+      key,
+      label,
+      false,
+      <select
+        id={`developer-${key}`}
+        data-testid={`developer-area-${level}`}
+        className="ls-in"
+        value={location[level]}
+        disabled={busy || (level > 0 && !location[level - 1])}
+        onChange={(e) => void selectArea(level, e.target.value)}
       >
-        <div className="developer-fields">
-          {field(
-            "name",
-            "이름 *",
-            <input
-              id="developer-name"
-              data-testid="developer-name"
-              value={draft.name}
-              maxLength={50}
-              disabled={busy}
-              onChange={(e) => change("name", e.target.value)}
-            />,
-          )}
-          {field(
+        <option value="">선택</option>
+        {areas[level].map((a) => (
+          <option key={a.areaCode} value={a.areaCode}>
+            {a.areaName}
+          </option>
+        ))}
+      </select>,
+      help,
+    );
+  return (
+    <section ref={formRef} className="developer-form" data-testid="developer-form" data-screen-id="UI-02">
+      <div className="ls-banner ls-banner-info developer-form-banner" role="status">
+        <span>
+          보유 스킬·거주지는 이 화면에서만 입력합니다(「내 정보」에서는 고치지 않음). 거주지는 시·도, 시·군·구, 동까지 받습니다(번지는 받지 않음). 연락처는 받지 않습니다.
+        </span>
+      </div>
+      <section className="developer-card">
+        <h2>기본 정보</h2>
+        <div className="developer-fgrid">
+          {fld("name", "이름", true, textInput("name", 50))}
+          {fld(
             "managementNumber",
             "관리번호",
-            <>
-              <input
-                id="developer-managementNumber"
-                data-testid="developer-management-number"
-                value={draft.managementNumber}
-                readOnly={!!developer}
-                className={developer ? "developer-locked" : ""}
-                maxLength={20}
-                disabled={busy}
-                onChange={(e) => change("managementNumber", e.target.value)}
-              />
-              <small>
-                {developer
-                  ? "관리번호는 바꿀 수 없습니다. 잘못 넣었으면 사용 중지 후 새로 등록하세요."
-                  : "비우면 K-nnnn 번호가 자동 발급됩니다."}
-              </small>
-            </>,
+            false,
+            textInput("managementNumber", 20, { readOnly: !!developer }),
+            developer
+              ? "관리번호는 바꿀 수 없습니다. 잘못 넣었으면 사용 중지 후 새로 등록하세요."
+              : "비우면 저장할 때 K-0001처럼 자동으로 붙습니다. 직접 넣으면 영문·숫자·하이픈 20자 이내이고, 등록한 뒤에는 바꿀 수 없습니다",
           )}
-          {codeSelect("employeeTypeCode", "직원구분 *", "EMP_TYPE", true)}
-          {field(
-            "organizationId",
-            "소속 *",
+          {codeSelect("employeeTypeCode", "직원구분", "EMP_TYPE", true)}
+          {fld(
+            "organization",
+            "소속",
+            true,
             <select
-              id="developer-organizationId"
+              id="developer-organization"
               data-testid="developer-organization"
-              value={draft.organizationId}
+              className="ls-in"
+              aria-invalid={!!fieldError("organization")}
+              value={draft.organization}
               disabled={busy}
-              onChange={(e) => change("organizationId", e.target.value)}
+              onChange={(e) => change("organization", e.target.value)}
             >
-              <option value="">자사</option>
+              <option value="">선택</option>
+              <option value={SELF}>자사</option>
               {options.organizations
-                .filter(
-                  (o) => o.useYn === "Y" || o.id === developer?.organizationId,
-                )
+                .filter((o) => o.useYn === "Y" || o.id === developer?.organizationId)
                 .map((o) => (
                   <option key={o.id} value={o.id} disabled={o.useYn !== "Y"}>
                     {o.name}
@@ -289,181 +368,116 @@ export function DeveloperForm({
             </select>,
           )}
           {codeSelect("gradeCode", "등급", "GRADE")}
-          {codeSelect("primaryJobCode", "주 직무 *", "JOB", true)}
-          {codeSelect("secondaryJobCode", "보조 직무", "JOB")}
-          {codeSelect("positionCode", "직위", "JBPS")}
-          {codeSelect("directClassCode", "직접/간접 *", "DRCT_CLS", true)}
-          {field(
+          {codeSelect("primaryJobCode", "주 직무", "JOB", true)}
+          {codeSelect("secondaryJobCode", "보조 직무", "JOB", false, "선택. AI 추천에서 직무 일치로 함께 봅니다.")}
+          {fld(
+            "skills",
+            "보유 스킬",
+            false,
+            textInput("skills", 100),
+            "공통코드 「스킬」(UI-27)에 있는 이름을 쉼표(,)로 구분해 여러 개 적습니다. AI 인력 추천의 스킬 점수에 씁니다.",
+          )}
+          {areaSelect(0, "homeSido", "거주지(시·도)", "추천의 근무지 점수는 시·도가 근무지와 같은지로 봅니다.")}
+          {areaSelect(1, "homeSgg", "거주지(시·군·구)", "시·도를 먼저 고르면 그 시·도의 시·군·구가 나옵니다. 선택.")}
+          {areaSelect(2, "homeDong", "거주지(동)", "시·군·구를 먼저 고르면 그 시·군·구의 읍·면·동이 나옵니다. 선택.")}
+          {fld(
             "salesPartId",
-            "영업 파트 *",
+            "영업 파트",
+            true,
             <select
               id="developer-salesPartId"
-              data-testid="developer-sales-part"
+              data-testid="developer-salesPartId"
+              className="ls-in"
+              aria-invalid={!!fieldError("salesPartId")}
               value={draft.salesPartId}
               disabled={busy}
               onChange={(e) => change("salesPartId", e.target.value)}
             >
               <option value="">선택</option>
               {options.parts
-                .filter(
-                  (o) => o.useYn === "Y" || o.id === developer?.salesPartId,
-                )
-                .map((o) => (
-                  <option key={o.id} value={o.id} disabled={o.useYn !== "Y"}>
-                    {o.name}
-                    {o.useYn !== "Y" ? " (중지)" : ""}
+                .filter((p) => p.useYn === "Y" || p.id === developer?.salesPartId)
+                .map((p) => (
+                  <option key={p.id} value={p.id} disabled={p.useYn !== "Y"}>
+                    {p.name}
                   </option>
                 ))}
             </select>,
+            "이 사람 이익금이 어느 파트 정산으로 갈지 정합니다. 본사 소속·관리직이면 「본사(직접 영업)」(파트 정산에서 빠짐). 배정할 때 프로젝트 파트와 다르면 경고가 뜹니다.",
           )}
-          {field(
+          {fld(
             "hireDate",
             "입사일",
+            false,
             <input
               id="developer-hireDate"
-              data-testid="developer-hire-date"
+              data-testid="developer-hireDate"
+              className="ls-in developer-date"
               type="date"
-              value={draft.hireDate || ""}
+              value={draft.hireDate}
               disabled={busy}
               onChange={(e) => change("hireDate", e.target.value)}
             />,
           )}
-          {(["monthlyRate", "monthlyPay"] as const).map((key) =>
-            field(
-              key,
-              key === "monthlyRate" ? "월 단가" : "월 급여·지급액",
-              <input
-                id={`developer-${key}`}
-                data-testid={`developer-${key}`}
-                type="number"
-                min="0"
-                value={draft[key] ?? ""}
-                disabled={busy}
-                onChange={(e) =>
-                  change(
-                    key,
-                    e.target.value === "" ? null : Number(e.target.value),
-                  )
-                }
-              />,
-            ),
+          {codeSelect("positionCode", "직위", "JBPS", false, "공통코드(UI-27) 「직위」. 팀장·그룹장 수당 계산에 씁니다.")}
+          {codeSelect(
+            "directClassCode",
+            "직접/간접",
+            "DRCT_CLS",
+            true,
+            "관리직만 간접. 간접 인력은 투입 배정·인력 운영 보드·가동률·개인 원가 화면에서 빠지고 인건비는 판관비로 잡힙니다.",
           )}
         </div>
-        <p>
-          간접은 관리직만 선택하세요. 월 단가·급여 적용 시작월은 저장한
-          달입니다.
-        </p>
-        <fieldset disabled={busy}>
-          <legend>보유 스킬</legend>
-          <div className="developer-skills">
-            {options.codes.SKILL?.map((c) => (
-              <label key={c.code}>
-                <input
-                  type="checkbox"
-                  data-testid={`developer-skill-${c.code}`}
-                  checked={draft.skillCodes?.includes(c.code) || false}
-                  onChange={(e) =>
-                    change(
-                      "skillCodes",
-                      e.target.checked
-                        ? [...(draft.skillCodes || []), c.code]
-                        : draft.skillCodes?.filter((v) => v !== c.code),
-                    )
-                  }
-                />
-                {c.codeName}
-              </label>
-            ))}
-          </div>
-          {draft.skillCodes
-            ?.filter(
-              (c) => !options.codes.SKILL?.some((item) => item.code === c),
-            )
-            .map((c) => (
-              <label className="field-error" key={c}>
-                <input
-                  type="checkbox"
-                  data-testid={`developer-legacy-skill-${c}`}
-                  checked
-                  onChange={() =>
-                    change(
-                      "skillCodes",
-                      draft.skillCodes?.filter((v) => v !== c),
-                    )
-                  }
-                />
-                확인 필요: {c} (해제 후 현재 스킬을 선택하세요)
-              </label>
-            ))}
-        </fieldset>
-        <div className="developer-fields">
-          {["시·도", "시·군·구", "동"].map((label, i) =>
-            field(
-              `area-${i}`,
-              label,
-              <select
-                id={`developer-area-${i}`}
-                data-testid={`developer-area-${i}`}
-                value={location[i]}
-                disabled={busy || areaBusy || (i > 0 && !location[i - 1])}
-                onChange={(e) => void selectArea(i, e.target.value)}
-              >
-                <option value="">선택</option>
-                {areas[i].map((a) => (
-                  <option key={a.areaCode} value={a.areaCode}>
-                    {a.areaName}
-                  </option>
-                ))}
-              </select>,
-            ),
+      </section>
+      <section className="developer-card">
+        <h2>금액</h2>
+        <div className="developer-fgrid">
+          {fld(
+            "monthlyRate",
+            "월 단가",
+            false,
+            moneyInput("monthlyRate"),
+            "PM에게는 보이지 않습니다(관리자·경영진·재무·파트장만). 수정하면 저장한 달부터 적용되고, 언제 바뀌었는지는 [변경 이력]에 남습니다",
+          )}
+          {fld(
+            "monthlyPay",
+            "월 급여·지급액",
+            false,
+            moneyInput("monthlyPay"),
+            "민감 항목이라 관리자·경영진·재무만 보입니다. 수정하면 저장한 달부터 적용되고, 언제 바뀌었는지는 [변경 이력]에 남습니다",
           )}
         </div>
-        {areaBusy && <p role="status">거주지 읽는 중…</p>}
-        {areaError && (
-          <p role="alert">
-            {areaError}
-            <button
-              type="button"
-              data-testid="developer-area-retry"
-              onClick={() => setAreaRevision((v) => v + 1)}
-            >
-              재시도
+      </section>
+      {(areaError || error != null) && (
+        <div role="alert" className="developer-error">
+          {areaError || (error instanceof DeveloperRequestError && error.status === 409
+            ? "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요."
+            : developerFailure(error))}
+          {areaError && (
+            <button type="button" data-testid="developer-area-retry" onClick={() => setAreaRevision((v) => v + 1)}>
+              다시 시도
             </button>
-          </p>
-        )}
-        <footer className="developer-footer">
-          <button
-            type="button"
-            data-testid="developer-form-cancel"
-            disabled={busy}
-            onClick={leave}
-          >
-            취소
-          </button>
-          <button
-            type="submit"
-            data-testid="developer-form-save"
-            disabled={busy || areaBusy || !!areaError}
-            className="primary-button"
-          >
-            {busy ? "저장 중…" : "저장"}
-          </button>
-        </footer>
-      </form>
+          )}
+        </div>
+      )}
+      <p className="developer-note">
+        <span className="developer-bad">*</span> 표시는 꼭 입력해야 하는 항목입니다.
+      </p>
+      <footer className="developer-form-foot">
+        <button type="button" className="ls-btn" data-testid="developer-cancel" disabled={busy} onClick={leave}>
+          취소
+        </button>
+        <button type="button" className="ls-btn ls-btn-p" data-testid="developer-save" disabled={busy || areaBusy} onClick={() => void save()}>
+          {busy ? "저장 중…" : "저장"}
+        </button>
+      </footer>
       {leaving && (
-        <Dialog
-          title="저장하지 않고 나갈까요?"
-          onClose={() => setLeaving(false)}
-        >
-          <p>입력한 내용이 사라집니다.</p>
+        <Dialog title="저장하지 않은 내용이 있습니다" closable testId="developer-leave-confirm" onClose={() => setLeaving(false)}>
+          <p>나가면 입력한 내용이 사라집니다.</p>
           <div className="app-actions">
-            <button
-              data-testid="developer-stay"
-              onClick={() => setLeaving(false)}
-            >
-              계속 입력
+            <button type="button" data-testid="developer-leave-cancel" onClick={() => setLeaving(false)}>
+              취소
             </button>
-            <button data-testid="developer-discard" onClick={onCancel}>
+            <button type="button" className="primary-button" data-testid="developer-leave-go" onClick={onCancel}>
               나가기
             </button>
           </div>

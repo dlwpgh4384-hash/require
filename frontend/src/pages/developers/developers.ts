@@ -31,11 +31,18 @@ export interface Developer extends DeveloperInput {
   retirementScheduled: boolean;
   retirementDate: string | null;
   useYn: string;
+  secondaryJobName?: string | null;
+  positionName?: string | null;
+  directClassName?: string | null;
+  salesPartName?: string | null;
+  skillNames?: string[];
+  /** 동시 수정 막기: 저장할 때 그대로 돌려보낸다(다르면 409). */
+  modifiedAt?: string | null;
 }
 export interface DeveloperListRow
   extends Omit<
     Developer,
-    "monthlyPay" | "homeAreaCode" | "homeAddress" | "skillCodes"
+    "monthlyPay" | "homeAreaCode" | "homeAddress" | "skillCodes" | "modifiedAt"
   > {
   currentProjectName: string | null;
   additionalProjectCount: number;
@@ -56,7 +63,7 @@ export interface DeveloperStatus {
   startDate: string;
   endDate: string | null;
   reason: string | null;
-  registeredBy: string;
+  registeredBy: string | null;
   ongoing?: boolean;
   retirementScheduled?: boolean;
 }
@@ -109,6 +116,14 @@ export async function developerRequest<T>(
   return body.data as T;
 }
 const root = "/api/common/developers";
+/** 본사(직접 영업)의 예약 파트 ID(DDL TB_BS_PART.PART_ID 주석). */
+export const HQ_PART = "HQ";
+/** 시안 표기: 직접/간접 코드 이름 「간접(관리직)」을 「간접」으로 보인다. */
+export const directLabel = (name: string | null | undefined) =>
+  (name || "").replace(/\(관리직\)$/, "") || "–";
+/** 금액: 콤마, 값 없음 「–」(공통 기능). */
+export const won = (value: number | null | undefined) =>
+  value == null ? "–" : value.toLocaleString("ko-KR");
 const target = (id: string) => `${root}/${encodeURIComponent(id)}`;
 const write = (method: string, body?: unknown): RequestInit => ({
   method,
@@ -180,10 +195,14 @@ export const postCommonDeveloper = (body: DeveloperInput) =>
     root,
     write("POST", developerPayload(body, false)),
   );
-export const putCommonDeveloper = (id: string, body: DeveloperInput) =>
+export const putCommonDeveloper = (
+  id: string,
+  body: DeveloperInput,
+  modifiedAt: string | null,
+) =>
   developerRequest<Developer>(
     target(id),
-    write("PUT", developerPayload(body, true)),
+    write("PUT", { ...developerPayload(body, true), modifiedAt }),
   );
 export const postCommonDeveloperStatus = (
   id: string,
@@ -257,11 +276,15 @@ export async function getDeveloperOptions(): Promise<DeveloperOptions> {
     organizations: clients.items
       .filter((c) => ["VNDR", "BOTH"].includes(c.clientTypeCode))
       .map((c) => ({ id: c.clientId, name: c.clientName, useYn: c.useYn })),
-    parts: parts.items.map((p) => ({
-      id: p.partId,
-      name: p.partName,
-      useYn: p.useYn,
-    })),
+    // 시안: 사용 중 파트 + 「본사(직접 영업)」(예약 ID HQ, TB_BS_PART.PART_ID 주석)
+    parts: [
+      ...parts.items.map((p) => ({
+        id: p.partId,
+        name: p.partName,
+        useYn: p.useYn,
+      })),
+      { id: HQ_PART, name: "본사(직접 영업)", useYn: "Y" },
+    ],
   };
 }
 export const developerFailure = (reason: unknown) =>

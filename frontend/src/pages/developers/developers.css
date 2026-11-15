@@ -31,14 +31,14 @@
   width: 180px;
 }
 /* 표: 이름 아래 작은 관리번호(시안 .pname) */
+/* 시안 .pname: 세로 두 줄, 줄 높이 18px(작은 글자도 같은 줄 높이) */
 .developer-pname {
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
-  line-height: 20px;
+  line-height: 18px;
 }
 .developer-pname small {
   font-size: 12px;
-  line-height: 16px;
   color: var(--text-sub);
 }
 .developer-project {
@@ -370,4 +370,16 @@
   min-height: 36px;
   padding: 0 14px;
   font-weight: 500;
+}
+
+/* 창 안 칸(시안 .fc): 공통 창의 label 여백(위 16·아래 6)·굵기를 쓰지 않는다 */
+.app-dialog .developer-fc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  font-weight: 500;
+}
+.app-dialog .developer-fc .developer-help {
+  line-height: 16px;
 }

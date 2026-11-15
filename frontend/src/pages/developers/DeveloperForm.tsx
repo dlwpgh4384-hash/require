@@ -17,6 +17,20 @@ import {
 import "./developers.css";
 
 const SELF = "__self";
+/** 시안 문구: 「직원구분을 입력해 주세요.」「주 직무를 입력해 주세요.」(받침에 따라 을/를) */
+const enter = (label: string) => {
+  const code = label.charCodeAt(label.length - 1) - 0xac00;
+  const particle = code < 0 || code > 11171 ? "을(를)" : code % 28 === 0 ? "를" : "을";
+  return `${label}${particle} 입력해 주세요.`;
+};
+const labels: Record<string, string> = {
+  name: "이름",
+  employeeTypeCode: "직원구분",
+  organization: "소속",
+  primaryJobCode: "주 직무",
+  salesPartId: "영업 파트",
+  directClassCode: "직접/간접",
+};
 const required = ["name", "employeeTypeCode", "organizationId", "primaryJobCode", "salesPartId", "directClassCode"] as const;
 const digits = (value: string) => value.replace(/[^0-9]/g, "");
 const money = (value: number | null | undefined) => (value == null ? "" : value.toLocaleString("ko-KR"));
@@ -190,13 +204,13 @@ export function DeveloperForm({
     );
   const validate = () => {
     const found: Record<string, string> = {};
-    if (!draft.name.trim()) found.name = "이름을 입력해 주세요.";
+    if (!draft.name.trim()) found.name = enter(labels.name);
     if (!developer && draft.managementNumber.trim() && !/^[A-Za-z0-9-]{1,20}$/.test(draft.managementNumber.trim()))
       found.managementNumber = "영문·숫자·하이픈 20자 이내로 입력해 주세요.";
     for (const key of required) {
       const value = key === "organizationId" ? draft.organization : draft[key];
-      if (!value && !found[key === "organizationId" ? "organization" : key])
-        found[key === "organizationId" ? "organization" : key] = "필수 입력입니다.";
+      const field = key === "organizationId" ? "organization" : key;
+      if (!value && !found[field]) found[field] = enter(labels[field]);
     }
     const unknown = draft.skills
       .split(",")

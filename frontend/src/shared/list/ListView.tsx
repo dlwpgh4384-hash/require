@@ -5,6 +5,7 @@ import {
   type ListColumn,
   type ListSort,
 } from "./listTypes";
+import { useViewport } from "../layout/useViewport";
 import "./list.css";
 
 /** SFR-010-01 조건 줄: 조건 칸들, [초기화], [조회](Enter로도 적용). */
@@ -19,9 +20,27 @@ export function ListFilters({
   onReset: () => void;
   testId?: string;
 }) {
+  const { mobile } = useViewport();
+  const [open, setOpen] = useState(false);
   return (
+    <>
+    {mobile && (
+      <button
+        type="button"
+        className="ls-btn ls-fl-toggle"
+        data-testid="list-filter-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M3 5h18l-7 8v6l-4 2v-8z" />
+        </svg>{" "}
+        조건
+      </button>
+    )}
     <form
       className="ls-filters"
+      hidden={mobile && !open}
       data-testid={testId}
       onSubmit={(event: FormEvent) => {
         event.preventDefault();
@@ -47,6 +66,7 @@ export function ListFilters({
         </button>
       </div>
     </form>
+    </>
   );
 }
 
@@ -112,6 +132,10 @@ interface ListViewProps<T> {
   error?: string;
   onRetry?: () => void;
   testId?: string;
+  /** 휴대폰 카드 한 장(시안 .mcard). 주면 휴대폰에서 표 대신 카드와 [더 보기]를 보인다. */
+  renderCard?: (row: T) => ReactNode;
+  /** 휴대폰 카드에 쓸 전체 결과(정렬된 순서). 없으면 rows. */
+  mobileRows?: T[] | null;
 }
 
 /** SFR-010 목록 공통: 도구 줄, 열 설정, 좁게 보기, 엑셀, 정렬, 선택, 페이지. */
@@ -132,6 +156,8 @@ export function ListView<T>(props: ListViewProps<T>) {
   } = props;
   const [columnsOpen, setColumnsOpen] = useState(false);
   const columnAnchor = useRef<HTMLDivElement>(null);
+  const { mobile } = useViewport();
+  const [shown, setShown] = useState(props.pageSize);
   useEffect(() => {
     if (!columnsOpen) return;
     const close = (event: MouseEvent) => {
@@ -160,6 +186,60 @@ export function ListView<T>(props: ListViewProps<T>) {
         : "asc";
     props.onSort({ key: column.key, dir });
   };
+  if (mobile && props.renderCard) {
+    // 시안 휴대폰: 도구 줄은 「총 N건」만, 표 대신 카드, 아래 [더 보기 (보인 수/전체)]
+    const all = props.mobileRows ?? rows ?? [];
+    return (
+      <div className="ls-root" data-testid={testId}>
+        <div className="ls-tbar">
+          <div className="ls-tl" data-testid="list-count">
+            <span>
+              총 <strong>{total}</strong>건
+            </span>
+          </div>
+        </div>
+        {props.error ? (
+          <div className="ls-empty" role="alert" data-testid="list-error">
+            <p>{props.error}</p>
+            {props.onRetry && (
+              <button type="button" className="ls-btn" data-testid="list-retry" onClick={props.onRetry}>
+                다시 시도
+              </button>
+            )}
+          </div>
+        ) : rows === null ? (
+          <p className="ls-empty" role="status">
+            {listMessages.loading}
+          </p>
+        ) : all.length === 0 ? (
+          <p className="ls-empty" data-testid="list-empty">
+            {listMessages.empty}
+          </p>
+        ) : (
+          <div className="ls-cards" data-testid="list-cards">
+            {all.slice(0, shown).map((row) => (
+              <button
+                type="button"
+                className="ls-mcard"
+                key={rowKey(row)}
+                data-testid={`list-card-${rowKey(row)}`}
+                onClick={() => props.onRowClick?.(row)}
+              >
+                {props.renderCard!(row)}
+              </button>
+            ))}
+          </div>
+        )}
+        {all.length > shown && (
+          <div className="ls-more">
+            <button type="button" className="ls-btn" data-testid="list-more" onClick={() => setShown((v) => v + props.pageSize)}>
+              더 보기 ({shown}/{all.length})
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="ls-root" data-testid={testId}>
       <div className="ls-tbar">

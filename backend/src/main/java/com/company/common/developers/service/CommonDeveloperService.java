@@ -56,7 +56,11 @@ public class CommonDeveloperService {
                 code=calculations.withdrawalSoon(last,today) ? "WTHDR" : "INPUT";
             }
         }
-        mapper.updateDerived(row.developerId,retire,code,resume,today);
+        // 상태가 바뀌어 저장했으면 수정 시각도 새로 읽는다(동시 수정 막기에 쓰는 modifiedAt).
+        if (mapper.updateDerived(row.developerId,retire,code,resume,today)>0) {
+            var fresh=mapper.selectDeveloper(row.developerId,month());
+            if (fresh!=null) row.modifiedAt=fresh.modifiedAt;
+        }
         row.retirementDate=retire; row.retirementScheduled=retire!=null && !retire.isBefore(today);
         row.workStatusCode=code; row.workStatusName=statusName(code);
         if ("RETIRE".equals(code)) row.useYn="N"; else if (resume) row.useYn="Y";

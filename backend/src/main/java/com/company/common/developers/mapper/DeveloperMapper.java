@@ -34,7 +34,7 @@ public interface DeveloperMapper {
     int updateStatus(DeveloperRows.State row);
     int deleteStatus(@Param("id") String id, @Param("sequence") int sequence);
     boolean closedMonth(String month);
-    void updateDerived(@Param("id") String id, @Param("retirement") LocalDate retirement,
+    int updateDerived(@Param("id") String id, @Param("retirement") LocalDate retirement,
         @Param("code") String code, @Param("resume") boolean resume, @Param("today") LocalDate today);
     int updateUse(@Param("id") String id, @Param("useYn") String useYn, @Param("actor") String actor);
     void insertHistory(Audit audit);

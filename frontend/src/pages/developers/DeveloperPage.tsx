@@ -172,6 +172,17 @@ export function DeveloperPage({
     });
     return list;
   }, [rows, sort]);
+  // 시안: 고른 것 중 바꿀 대상이 없으면 창 대신 알림(「고른 것 중 사용 중지된 개발자가 없습니다.」)
+  const askUse = (useYn: string) => {
+    const ids = (rows || [])
+      .filter((r) => selected.includes(r.developerId) && r.useYn !== useYn)
+      .map((r) => r.developerId);
+    if (!ids.length) {
+      setNotice(useYn === "Y" ? "고른 것 중 사용 중지된 개발자가 없습니다." : "고른 것 중 사용 중인 개발자가 없습니다.");
+      return;
+    }
+    setPendingUse({ ids, useYn });
+  };
   const use = async () => {
     if (pending.current || !pendingUse) return;
     pending.current = true;
@@ -199,7 +210,7 @@ export function DeveloperPage({
     setDownloading(true);
     try {
       await downloadFile(developersExcelUrl(applied), "developers.xlsx");
-      setNotice(`엑셀 파일을 내려받았습니다. (${rows?.length ?? 0}건)`);
+      setNotice(`엑셀 파일을 만들었습니다 (조회 결과 ${rows?.length ?? 0}건).`);
     } catch (e) {
       setError(developerFailure(e));
     } finally {
@@ -350,10 +361,33 @@ export function DeveloperPage({
         onSelectAllResults={() => setSelected(rows?.map((r) => r.developerId) || [])}
         allResultsSelected={!!rows?.length && selected.length === rows.length}
         bulkActions={[
-          { key: "stop", label: "사용 중지", danger: true, onClick: () => setPendingUse({ ids: selected, useYn: "N" }) },
-          { key: "resume", label: "다시 사용", onClick: () => setPendingUse({ ids: selected, useYn: "Y" }) },
+          { key: "stop", label: "사용 중지", danger: true, onClick: () => askUse("N") },
+          { key: "resume", label: "다시 사용", onClick: () => askUse("Y") },
         ]}
         onRowClick={(r) => setDetail(r.developerId)}
+        mobileRows={sorted}
+        renderCard={(r) => (
+          // 시안 휴대폰 카드: 이름·관리번호·소속 + 상태 / 직무·등급·직원구분 + 월 단가 / 현재 프로젝트 + 이번 달 MM
+          <>
+            <div className="ls-r1">
+              <span className="developer-pname">
+                {r.name}
+                <small>
+                  {r.managementNumber} · {r.organizationName}
+                </small>
+              </span>
+              <Badge kind={statusKind(r.workStatusName)}>{r.workStatusName}</Badge>
+            </div>
+            <div className="ls-r2">
+              <span>{[r.primaryJobName, r.gradeName, r.employeeTypeName].filter(Boolean).join(" · ")}</span>
+              <b>{won(r.monthlyRate)}</b>
+            </div>
+            <div className="ls-r2">
+              <span>{r.currentProjectName || "–"}</span>
+              <span>{r.currentProjectName ? `${r.currentMonthMm.toFixed(2)} MM` : ""}</span>
+            </div>
+          </>
+        )}
         onDownload={() => void download()}
         downloading={downloading}
         error={error}

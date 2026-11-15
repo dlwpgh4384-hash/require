@@ -301,6 +301,9 @@ export function DeveloperPage({
       {renderActions ? titleActions : actions}
       <ListFilters
         testId="developer-filters"
+        activeCount={
+          [applied.directClassCode, applied.employeeTypeCode, applied.jobCode, applied.workStatusName, applied.q].filter(Boolean).length
+        }
         onSearch={() => {
           setApplied({ ...filter });
           setPage(1);

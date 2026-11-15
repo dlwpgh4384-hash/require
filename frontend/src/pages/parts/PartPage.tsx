@@ -212,6 +212,22 @@ export function PartPage() {
           setDetailId(row.partId);
           setMenu(false);
         }}
+        mobileRows={sorted}
+        renderCard={(row) => (
+          // 시안 휴대폰 카드: 파트명 + 사용 / 파트장 + 이익 배분율 · 공통관리비
+          <>
+            <div className="ls-r1">
+              <strong>{row.partName}</strong>
+              <Badge kind={row.useYn === "Y" ? "ok" : "lock"}>{row.useYn === "Y" ? "사용" : "중지"}</Badge>
+            </div>
+            <div className="ls-r2">
+              <span>파트장 {row.leaderName}</span>
+              <b>
+                {row.distributionRate}% · {api.partMoney(row.salesExpense)}
+              </b>
+            </div>
+          </>
+        )}
         highlightKey={highlight}
         columnSettings={false}
         onDownload={() => void download()}

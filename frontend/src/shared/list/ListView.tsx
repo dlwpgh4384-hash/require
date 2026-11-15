@@ -14,11 +14,14 @@ export function ListFilters({
   onSearch,
   onReset,
   testId = "list-filters",
+  activeCount = 0,
 }: {
   children: ReactNode;
   onSearch: () => void;
   onReset: () => void;
   testId?: string;
+  /** 값이 든 조건 수. 휴대폰 [조건] 단추에 「조건 (n)」으로 보인다(시안). */
+  activeCount?: number;
 }) {
   const { mobile } = useViewport();
   const [open, setOpen] = useState(false);
@@ -35,7 +38,7 @@ export function ListFilters({
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M3 5h18l-7 8v6l-4 2v-8z" />
         </svg>{" "}
-        조건
+        {activeCount > 0 ? `조건 (${activeCount})` : "조건"}
       </button>
     )}
     <form

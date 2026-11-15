@@ -137,8 +137,12 @@ export function UploadResultDialog({
   const planned = result?.plannedDevelopers
     ? new Map(result.plannedDevelopers.map((p) => [p.row, p.managementNumber]))
     : null;
+  // 시안: 오류 줄을 먼저, 그다음 경고(같은 구분 안에서는 행 순서)
+  const ordered = result
+    ? [...result.issues].sort((x, y) => Number(y.severity === "오류") - Number(x.severity === "오류") || x.row - y.row)
+    : [];
   const shown =
-    result?.issues.slice(
+    ordered.slice(
       page * presentation.pageSize,
       (page + 1) * presentation.pageSize,
     ) || [];

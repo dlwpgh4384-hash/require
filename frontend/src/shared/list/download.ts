@@ -22,7 +22,9 @@ export async function downloadFile(url: string, fallbackName: string) {
   }
   const header = response.headers.get("Content-Disposition") ?? "";
   const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)?.[1];
-  const name = encoded ? decodeURIComponent(encoded) : fallbackName;
+  // filename*=UTF-8''… 가 없으면 filename="…"(서버 양식 이름)을 쓴다
+  const plain = /filename="?([^";]+)"?/i.exec(header)?.[1];
+  const name = encoded ? decodeURIComponent(encoded) : plain || fallbackName;
   const blob = await response.blob();
   const link = document.createElement("a");
   const href = URL.createObjectURL(blob);

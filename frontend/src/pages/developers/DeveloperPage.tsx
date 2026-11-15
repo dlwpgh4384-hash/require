@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Dialog, Toast } from "../../shared/feedback/Dialog";
+import { Dialog, Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
   ListFilter,
@@ -79,6 +79,7 @@ export function DeveloperPage({
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const [notice, setNotice] = useState("");
+  const [noticeKind, setNoticeKind] = useState<ToastKind>("ok");
   const [downloading, setDownloading] = useState(false);
   const presentation = useListPresentation();
   const refresh = () => setRevision((v) => v + 1);
@@ -406,7 +407,18 @@ export function DeveloperPage({
             setDetail(null);
           }}
           onStop={(d) => setPendingUse({ ids: [d.developerId], useYn: d.useYn === "Y" ? "N" : "Y" })}
-          onChanged={refresh}
+          onNotice={(message) => {
+            setNoticeKind("warn");
+            setNotice(message);
+          }}
+          onChanged={(message) => {
+            refresh();
+            if (message) {
+              // 시안: 휴직 기간에 배정이 있으면 info, 나머지는 ok
+              setNoticeKind(message.includes("투입 배정이") ? "info" : "ok");
+              setNotice(message);
+            }
+          }}
         />
       )}
       {pendingUse && (
@@ -461,7 +473,16 @@ export function DeveloperPage({
           </div>
         </Dialog>
       )}
-      {notice && <Toast message={notice} onDismiss={() => setNotice("")} />}
+      {notice && (
+        <Toast
+          message={notice}
+          kind={noticeKind}
+          onDismiss={() => {
+            setNotice("");
+            setNoticeKind("ok");
+          }}
+        />
+      )}
     </section>
   );
 }

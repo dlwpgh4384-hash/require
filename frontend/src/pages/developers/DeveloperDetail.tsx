@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Badge, DetailPanel, KeyValues } from "../../shared/list";
+import { Badge, Banner, DetailPanel, KeyValues } from "../../shared/list";
 import { Dialog } from "../../shared/feedback/Dialog";
 import { formatDateTime, koreanToday } from "../../shared/time";
 import {
@@ -18,6 +18,7 @@ import {
   type Developer,
   type DeveloperAssignment,
   type DeveloperStatus,
+  type DeveloperStatusList,
   type DeveloperChange,
 } from "./developers";
 
@@ -34,17 +35,25 @@ export function DeveloperDetail({
   onClose,
   onEdit,
   onStop,
+  onNotice,
   onChanged,
 }: {
   developerId: string;
   onClose: () => void;
   onEdit: (developer: Developer) => void;
   onStop: (developer: Developer) => void;
-  onChanged: () => void;
+  /** 저장 없이 안내만 띄운다(시안 toast warn). */
+  onNotice: (message: string) => void;
+  /** 바뀐 뒤 목록을 다시 읽고 안내(message)를 띄운다. */
+  onChanged: (message?: string) => void;
 }) {
   const [developer, setDeveloper] = useState<Developer | null>(null);
   const [assignments, setAssignments] = useState<DeveloperAssignment[]>([]);
   const [statuses, setStatuses] = useState<DeveloperStatus[]>([]);
+  const [permission, setPermission] = useState<Omit<DeveloperStatusList, "items">>({
+    canManageStatuses: false,
+    canCancelPastRetirement: false,
+  });
   const [changes, setChanges] = useState<DeveloperChange[]>([]);
   const [tab, setTab] = useState("basic");
   const [error, setError] = useState("");
@@ -66,6 +75,7 @@ export function DeveloperDetail({
           setDeveloper(d);
           setAssignments(a.items);
           setStatuses(s.items);
+          setPermission({ canManageStatuses: !!s.canManageStatuses, canCancelPastRetirement: !!s.canCancelPastRetirement });
           setChanges(c.items);
         }
       })
@@ -81,6 +91,45 @@ export function DeveloperDetail({
   }, [developerId, revision]);
   const empty = (message: string) => <p className="developer-empty">{message}</p>;
   const d = developer;
+  const today = koreanToday();
+  const gone = d?.workStatusName === "퇴사";
+  const cap = (text: string) => <span className="ls-cap">{text}</span>;
+  /** 시안 statHtml act: 줄마다 할 수 있는 일 또는 안내 */
+  const act = (s: DeveloperStatus) => {
+    if (!s.statusId || !permission.canManageStatuses) return null;
+    if (s.statusName === "퇴사") {
+      if (s.startDate < today && !permission.canCancelPastRetirement) return cap("관리자만 취소");
+      return (
+        <button
+          className="ls-lnk developer-lnk"
+          data-testid={`developer-retire-${s.statusId}`}
+          onClick={() =>
+            s.startDate < today && s.monthClosed
+              ? onNotice(`퇴사한 달(${s.startDate.slice(0, 7)})이 마감되어 취소할 수 없습니다. 다시 쓰려면 새로 등록하세요.`)
+              : setAction({ kind: "retire", row: s })
+          }
+        >
+          퇴사 취소
+        </button>
+      );
+    }
+    if (s.statusName === "휴직" && s.closedByReturn) return cap("재직으로 닫힘");
+    if (s.statusName === "휴직" && (!s.endDate || s.endDate >= today))
+      return (
+        <button className="ls-lnk developer-lnk" data-testid={`developer-end-${s.statusId}`} onClick={() => setAction({ kind: "end", row: s })}>
+          종료일 수정
+        </button>
+      );
+    if (s.statusName === "재직")
+      return s.monthClosed ? (
+        cap("마감됨")
+      ) : (
+        <button className="ls-lnk developer-lnk" data-testid={`developer-return-${s.statusId}`} onClick={() => setAction({ kind: "return", row: s })}>
+          재직 취소
+        </button>
+      );
+    return cap("끝남");
+  };
   const table = (head: string[], body: ReactNode) => (
     <div className="ls-twrap developer-free">
       <table className="ls-t">
@@ -118,7 +167,7 @@ export function DeveloperDetail({
             {d && (
               <button
                 type="button"
-                className="ls-btn ls-btn-sm ls-btn-dt"
+                className={d.useYn === "Y" ? "ls-btn ls-btn-sm ls-btn-dt" : "ls-btn ls-btn-sm"}
                 data-testid="developer-stop"
                 disabled={loading || !!error}
                 onClick={() => onStop(d)}
@@ -135,6 +184,17 @@ export function DeveloperDetail({
             key: "basic",
             label: "기본 정보",
             content: d && (
+              <>
+              {d.useYn === "N" && (
+                // 시안: 사용 중지된 개발자 안내 띠
+                <Banner kind="lock">
+                  <svg className="developer-banner-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="5" y="11" width="14" height="10" rx="2" />
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                  </svg>
+                  사용 중지된 개발자입니다. 배정 후보에서 빠지고 기록은 그대로 남습니다.
+                </Banner>
+              )}
               <KeyValues
                 items={[
                   ["관리번호", d.managementNumber],
@@ -180,6 +240,7 @@ export function DeveloperDetail({
                   ["직접/간접", directLabel(d.directClassName)],
                 ]}
               />
+              </>
             ),
           },
           {
@@ -208,16 +269,18 @@ export function DeveloperDetail({
               <>
                 <div className="developer-status-head">
                   <span className="ls-cap">
-                    근무 상태는 투입·휴직 기록으로 매일 자동으로 정합니다. 여기서는 휴직·퇴사·재직(휴직 복귀)을 등록합니다(관리자·재무).
+                    {gone
+                      ? "퇴사한 개발자입니다. 상태를 더 등록할 수 없습니다. 다시 쓰려면 개발자 풀에서 새로 등록하세요."
+                      : "근무 상태는 투입·휴직 기록으로 매일 자동으로 정합니다. 여기서는 휴직·퇴사·재직(휴직 복귀)을 등록합니다(관리자·재무)."}
                   </span>
-                  {d?.workStatusName !== "퇴사" && (
+                  {!gone && permission.canManageStatuses && (
                     <button
                       type="button"
                       className="ls-btn ls-btn-sm ls-btn-p"
                       data-testid="developer-status-add"
                       onClick={() => setAction({ kind: "register" })}
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M12 5v14M5 12h14" />
                       </svg>
                       상태 등록
@@ -232,29 +295,13 @@ export function DeveloperDetail({
                           <td>
                             <Badge kind={statusKind(s.statusName)}>{s.statusName}</Badge>
                             {s.ongoing && <Badge kind="warn">진행 중</Badge>}
-                            {s.retirementScheduled && <Badge kind="warn">퇴사 예정</Badge>}
+                            {s.retirementScheduled && <Badge kind="warn">예정</Badge>}
                           </td>
                           <td>{s.startDate}</td>
-                          <td>{s.endDate || "–"}</td>
+                          <td>{s.endDate || (s.statusName === "휴직" && s.statusId ? <span className="developer-sub">복직일 미정</span> : "–")}</td>
                           <td>{s.reason || "–"}</td>
                           <td>{s.registeredBy || "–"}</td>
-                          <td>
-                            {s.statusName === "휴직" && s.ongoing && s.statusId && (
-                              <button className="ls-lnk developer-lnk" data-testid={`developer-end-${s.statusId}`} onClick={() => setAction({ kind: "end", row: s })}>
-                                종료일 수정
-                              </button>
-                            )}
-                            {s.statusName === "재직" && s.statusId && (
-                              <button className="ls-lnk developer-lnk" data-testid={`developer-return-${s.statusId}`} onClick={() => setAction({ kind: "return", row: s })}>
-                                재직 취소
-                              </button>
-                            )}
-                            {s.statusName === "퇴사" && s.statusId && (
-                              <button className="ls-lnk developer-lnk" data-testid={`developer-retire-${s.statusId}`} onClick={() => setAction({ kind: "retire", row: s })}>
-                                퇴사 취소
-                              </button>
-                            )}
-                          </td>
+                          <td>{act(s)}</td>
                         </tr>
                       )),
                     )
@@ -303,11 +350,14 @@ export function DeveloperDetail({
         <DeveloperStatusDialog
           action={action}
           developerId={developerId}
+          developerName={d?.name || ""}
+          statuses={statuses}
+          assignments={assignments}
           onClose={() => setAction(null)}
-          onSaved={() => {
+          onSaved={(message) => {
             setAction(null);
             setRevision((v) => v + 1);
-            onChanged();
+            onChanged(message);
           }}
         />
       )}
@@ -315,21 +365,29 @@ export function DeveloperDetail({
   );
 }
 
-/** 시안 근무 상태 등록·휴직 종료일 수정 창. 재직·퇴사 취소는 확인 창. */
+/** 시안 근무 상태 등록·휴직 종료일 수정·재직 취소·퇴사 취소 창. */
 function DeveloperStatusDialog({
   action,
   developerId,
+  developerName,
+  statuses,
+  assignments,
   onClose,
   onSaved,
 }: {
   action: Action;
   developerId: string;
+  developerName: string;
+  statuses: DeveloperStatus[];
+  assignments: DeveloperAssignment[];
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (message: string) => void;
 }) {
+  const today = koreanToday();
   const [statusName, setStatusName] = useState("휴직");
-  const [date, setDate] = useState(() => koreanToday());
-  const [endDate, setEndDate] = useState(action.row?.endDate || "");
+  const [date, setDate] = useState(today);
+  // 시안: 종료일 수정 창은 지금 종료일(없으면 오늘)로 시작
+  const [endDate, setEndDate] = useState(action.kind === "end" ? action.row?.endDate || today : "");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
@@ -337,34 +395,54 @@ function DeveloperStatusDialog({
   const title = {
     register: "근무 상태 등록",
     end: "휴직 종료일 수정",
-    return: "재직을 취소할까요?",
-    retire: "퇴사를 취소할까요?",
+    return: "재직 취소",
+    retire: "퇴사 취소",
   }[action.kind];
+  const dateLabel = statusName === "퇴사" ? "퇴사일" : statusName === "재직" ? "복귀일" : "시작일";
+  const stop = (field: string, message: string) => setError(new DeveloperRequestError(400, message, [{ field, message }]));
   const execute = async () => {
     if (pending.current) return;
     setError(null);
-    if (action.kind === "retire" && !reason.trim()) {
-      setError(new DeveloperRequestError(400, "취소 사유를 입력해 주세요.", [{ field: "reason", message: "취소 사유를 입력해 주세요." }]));
-      return;
-    }
-    if (action.kind === "register" && !date) {
-      setError(new DeveloperRequestError(400, "날짜를 입력해 주세요.", [{ field: "date", message: "날짜를 입력해 주세요." }]));
-      return;
-    }
+    if (action.kind === "retire" && !reason.trim()) return stop("reason", "취소 사유를 넣어 주세요.");
+    if (action.kind === "register" && !date) return stop("date", `${dateLabel}을 넣어 주세요.`);
+    if (action.kind === "end" && (!endDate || endDate < action.row!.startDate)) return stop("endDate", "시작일 이후 날짜를 넣어 주세요.");
     pending.current = true;
     setBusy(true);
     try {
-      if (action.kind === "register")
+      let message = "";
+      if (action.kind === "register") {
         await postCommonDeveloperStatus(developerId, {
           statusName,
           date,
           ...(statusName === "휴직" ? { endDate: endDate || null } : {}),
           reason,
         });
-      if (action.kind === "end") await putCommonDeveloperStatusEndDate(developerId, action.row!.statusId!, endDate || null);
-      if (action.kind === "return") await postCommonDeveloperReturnCancel(developerId, action.row!.statusId!);
-      if (action.kind === "retire") await postCommonDeveloperRetirementCancel(developerId, action.row!.statusId!, reason);
-      onSaved();
+        // 시안 statSave 안내
+        if (statusName === "휴직") {
+          const n = assignments.filter((a) => a.startDate <= (endDate || "9999-12-31") && a.endDate >= date).length;
+          message = n ? `휴직을 등록했습니다. 그 기간에 투입 배정이 ${n}건 있으니 확인해 주세요.` : "휴직을 등록했습니다.";
+        } else if (statusName === "재직") message = "재직(휴직 복귀)을 등록했습니다.";
+        else {
+          const closedLeave = statuses.some((s) => s.statusName === "휴직" && s.statusId && s.startDate < date && (!s.endDate || s.endDate >= date));
+          message =
+            date < today
+              ? "퇴사를 등록했습니다. 퇴사일이 지나 사용 중지되었습니다."
+              : `퇴사를 등록했습니다. ${date} 다음 날 자동으로 사용 중지됩니다.` + (closedLeave ? " 진행 중이던 휴직은 퇴사일 전날로 닫았습니다." : "");
+        }
+      }
+      if (action.kind === "end") {
+        await putCommonDeveloperStatusEndDate(developerId, action.row!.statusId!, endDate);
+        message = "휴직 종료일을 바꿨습니다.";
+      }
+      if (action.kind === "return") {
+        await postCommonDeveloperReturnCancel(developerId, action.row!.statusId!);
+        message = "재직을 취소했습니다. 휴직 종료일이 원래대로 돌아갔습니다.";
+      }
+      if (action.kind === "retire") {
+        await postCommonDeveloperRetirementCancel(developerId, action.row!.statusId!, reason);
+        message = "퇴사를 취소했습니다. 변경 이력에 남았습니다.";
+      }
+      onSaved(message);
     } catch (e) {
       setError(e);
     } finally {
@@ -386,8 +464,18 @@ function DeveloperStatusDialog({
         <fieldset>
           {action.kind === "end" && action.row && (
             <p className="ls-cap">
-              {action.row.startDate} ~ {action.row.endDate || "미정"}
-              {action.row.reason ? ` · ${action.row.reason}` : ""}
+              {action.row.startDate} ~ {action.row.endDate || "복직일 미정"} · {action.row.reason || "휴직"}
+            </p>
+          )}
+          {action.kind === "return" && action.row && (
+            <p>
+              {action.row.startDate} 재직(휴직 복귀)을 취소합니다. 휴직 종료일이 원래대로({action.row.restoreEndDate || "복직일 미정"}) 돌아갑니다. 복귀일을 바꾸려면 취소한 뒤 다시 등록하세요.
+            </p>
+          )}
+          {action.kind === "retire" && action.row && (
+            <p>
+              {developerName}님의 퇴사({action.row.startDate})를 취소합니다. 실수로 등록한 경우에만 씁니다. 퇴사가 없던 일이 되고
+              {action.row.startDate < today ? " 사용 중지도 풀립니다" : ""}.
             </p>
           )}
           {action.kind === "register" && (
@@ -402,6 +490,7 @@ function DeveloperStatusDialog({
                   onChange={(e) => {
                     setStatusName(e.target.value);
                     setEndDate("");
+                    setError(null);
                   }}
                 >
                   <option>휴직</option>
@@ -411,7 +500,7 @@ function DeveloperStatusDialog({
                 <span className="developer-help">투입중·철수예정·대기는 자동으로 정해집니다. 재직은 휴직에서 돌아올 때만 등록합니다.</span>
               </label>
               <label className="developer-fc">
-                <span className="developer-req">{statusName === "퇴사" ? "퇴사일" : statusName === "재직" ? "복귀일" : "시작일"}</span>
+                <span className="developer-req">{dateLabel}</span>
                 <input
                   id="developer-status-date"
                   data-testid="developer-status-date"
@@ -447,32 +536,41 @@ function DeveloperStatusDialog({
               <input
                 id="developer-status-reason"
                 data-testid="developer-status-reason"
-                maxLength={action.kind === "retire" ? 300 : 100}
-                placeholder={action.kind === "register" ? "예: 육아휴직" : undefined}
+                maxLength={100}
+                placeholder={
+                  action.kind === "retire"
+                    ? "예: 다른 사람으로 잘못 등록"
+                    : statusName === "휴직"
+                      ? "예: 육아휴직"
+                      : statusName === "퇴사"
+                        ? "예: 개인 사정"
+                        : "예: 육아휴직 복귀"
+                }
                 disabled={busy}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               />
             </label>
           )}
-          {action.kind === "return" && <p>취소하면 연결된 휴직의 원래 종료일로 되돌립니다.</p>}
-          {error != null && (
-            <div role="alert" className="field-error">
-              <p>{developerFailure(error)}</p>
-              {fieldError.map((e) => (
-                <p key={e.field} data-testid={`developer-status-error-${e.field}`}>
-                  {e.message}
-                </p>
+          {/* 시안 .errmsg: 오류가 없어도 빈 줄 자리를 둔다 */}
+          <div role="alert" className="field-error developer-errmsg" hidden={action.kind === "return" && error == null}>
+            {error != null && (fieldError.length ? (
+                fieldError.map((e) => (
+                  <p key={e.field} data-testid={`developer-status-error-${e.field}`}>
+                    {e.message}
+                  </p>
+                ))
+              ) : (
+                <p>{developerFailure(error)}</p>
               ))}
-            </div>
-          )}
+          </div>
         </fieldset>
         <div className="app-actions">
           <button type="button" data-testid="developer-status-close" disabled={busy} onClick={onClose}>
             {action.kind === "return" || action.kind === "retire" ? "닫기" : "취소"}
           </button>
           <button type="submit" className="primary-button" data-testid="developer-status-save" disabled={busy}>
-            {busy ? "처리 중…" : action.kind === "register" ? "등록" : action.kind === "end" ? "저장" : "취소하기"}
+            {busy ? "처리 중…" : action.kind === "register" ? "등록" : action.kind === "end" ? "저장" : action.kind === "return" ? "재직 취소" : "퇴사 취소"}
           </button>
         </div>
       </form>

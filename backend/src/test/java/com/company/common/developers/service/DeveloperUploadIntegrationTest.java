@@ -145,7 +145,7 @@ class DeveloperUploadIntegrationTest {
             .andExpect(response("POST","/api/common/uploads")));
         assertThat(checked.path("errorCount").asInt()).isEqualTo(1);
         assertThat(checked.toString()).contains("이미 등록된 관리번호입니다.").contains("같은 이름·입사일의 개발자가 이미 있습니다(K-0001).")
-            .contains("‘자양동’으로 바꿔 읽었습니다.");
+            .contains("'자양동'으로 바꿔 읽었습니다.");
         // 관리번호를 비운 줄에 붙을 번호(K-0001은 이미 있어 건너뜀)
         assertThat(checked.path("plannedDevelopers").findValuesAsText("managementNumber")).containsExactly("K-0002","K-0003");
         // 오류가 하나라도 있으면 반영하지 않는다
@@ -163,6 +163,22 @@ class DeveloperUploadIntegrationTest {
         assertThat(db.queryForObject("SELECT count(*) FROM TB_HR_DEV_SKILL s JOIN TB_HR_DEV d ON d.dev_id=s.dev_id WHERE d.mng_no='K-0002'",Integer.class)).isEqualTo(1);
     }
 
+    private static List<String> lives(String name, String sido, String sgg, String dong) {
+        return List.of("",name,"정규직","자사","","백엔드 개발","","","직접","본사","","","","",sido,sgg,dong);
+    }
+    @Test void addressMatchesShortAndMergedProvinceNamesAndKeepsMissingAsWarnings() throws Exception {
+        // SFR-021-04: 「서울시」→서울, 합쳐지기 전 「광주광역시」→전남광주, 세종은 시·군·구 없이 동, 못 찾은 시·도는 오류가 아니라 경고
+        var rows=List.of(lives("서울시민","서울시","광진구","자양동"), lives("목포시민","전라남도","목포시","용당동"),
+            lives("세종시민","세종특별자치시","","반곡동"), lives("모름","없는도","",""));
+        var checked=data(upload("B8",null,DeveloperUploadForm.HEADERS,rows).andExpect(status().isOk()));
+        assertThat(checked.path("errorCount").asInt()).isZero();
+        assertThat(checked.toString()).contains("거주지를 못 찾아 비웠습니다.");
+        apply(checked).andExpect(status().isOk());
+        assertThat(db.queryForObject("SELECT home_addr FROM TB_HR_DEV WHERE dev_nm='서울시민'",String.class)).isEqualTo("서울 광진구 자양동");
+        assertThat(db.queryForObject("SELECT home_addr FROM TB_HR_DEV WHERE dev_nm='목포시민'",String.class)).isEqualTo("전남광주 목포시 용당동");
+        assertThat(db.queryForObject("SELECT home_addr FROM TB_HR_DEV WHERE dev_nm='세종시민'",String.class)).isEqualTo("세종 반곡동");
+        assertThat(db.queryForObject("SELECT home_addr FROM TB_HR_DEV WHERE dev_nm='모름'",String.class)).isNull();
+    }
     private void developerRow(String id, String number, String name, String type, String position, String retire) {
         db.update("INSERT INTO TB_HR_DEV(dev_id,mng_no,dev_nm,emp_type_cd,job_cd,jbps_cd,drct_cls_cd,part_id,retire_dt,work_stat_cd,use_yn,reg_user_id) "
             +"VALUES(?,?,?,?,'BE',?,'DRCT','HQ',?::date,'IDLE',?,'admin')",id,number,name,type,position,retire,retire==null?"Y":"N");

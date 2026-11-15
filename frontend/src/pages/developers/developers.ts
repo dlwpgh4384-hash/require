@@ -66,6 +66,19 @@ export interface DeveloperStatus {
   registeredBy: string | null;
   ongoing?: boolean;
   retirementScheduled?: boolean;
+  /** 휴직 줄이 재직(복귀)으로 닫힘(시안 「재직으로 닫힘」) */
+  closedByReturn?: boolean;
+  /** 재직·퇴사 줄의 달이 마감됨(시안 「마감됨」) */
+  monthClosed?: boolean;
+  /** 재직 줄을 취소하면 돌아갈 휴직 종료일(없으면 복직일 미정) */
+  restoreEndDate?: string | null;
+}
+export interface DeveloperStatusList {
+  items: DeveloperStatus[];
+  /** 관리자·재무: 상태 등록·수정·취소(시안 canStatMe) */
+  canManageStatuses: boolean;
+  /** 시스템 관리자: 퇴사일이 지난 퇴사 취소(시안 isAdminMe) */
+  canCancelPastRetirement: boolean;
 }
 export interface DeveloperChange {
   changedAt: string;
@@ -157,7 +170,7 @@ export const getCommonDeveloperAssignments = (id: string) =>
     `${target(id)}/assignments`,
   );
 export const getCommonDeveloperStatuses = (id: string) =>
-  developerRequest<{ items: DeveloperStatus[] }>(`${target(id)}/statuses`);
+  developerRequest<DeveloperStatusList>(`${target(id)}/statuses`);
 export const getCommonDeveloperChangeHistory = (id: string) =>
   developerRequest<{ items: DeveloperChange[] }>(
     `${target(id)}/change-history`,
@@ -213,7 +226,7 @@ export const postCommonDeveloperStatus = (
     reason?: string;
   },
 ) =>
-  developerRequest<{ items: DeveloperStatus[] }>(
+  developerRequest<DeveloperStatusList>(
     `${target(id)}/statuses`,
     write("POST", body),
   );
@@ -222,12 +235,12 @@ export const putCommonDeveloperStatusEndDate = (
   statusId: string,
   endDate: string | null,
 ) =>
-  developerRequest<{ items: DeveloperStatus[] }>(
+  developerRequest<DeveloperStatusList>(
     `${target(id)}/statuses/${encodeURIComponent(statusId)}/end-date`,
     write("PUT", { endDate }),
   );
 export const postCommonDeveloperReturnCancel = (id: string, statusId: string) =>
-  developerRequest<{ items: DeveloperStatus[] }>(
+  developerRequest<DeveloperStatusList>(
     `${target(id)}/statuses/${encodeURIComponent(statusId)}/return-cancel`,
     write("POST"),
   );
@@ -236,7 +249,7 @@ export const postCommonDeveloperRetirementCancel = (
   statusId: string,
   reason: string,
 ) =>
-  developerRequest<{ items: DeveloperStatus[] }>(
+  developerRequest<DeveloperStatusList>(
     `${target(id)}/statuses/${encodeURIComponent(statusId)}/retirement-cancel`,
     write("POST", { reason }),
   );

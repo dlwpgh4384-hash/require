@@ -263,7 +263,7 @@ class CommonDeveloperControllerTest {
     void returnClosedLeaveRequiresReturnCancellation() throws Exception {
         state("LEAVE",1,today.minusDays(5),today.minusDays(1));var w=state("WORK",2,today,null);w.closedLeaveSequence=1;
         mvc.perform(put("/api/common/developers/dev/statuses/1/end-date").contentType("application/json").content("{\"endDate\":null}"))
-            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("재직을 먼저 취소하세요."));verify(mapper,never()).updateStatus(any());
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("재직(복귀)으로 닫힌 휴직입니다. 바꾸려면 재직을 먼저 취소하세요."));verify(mapper,never()).updateStatus(any());
     }
     @Test void endedLeaveCannotBeEdited() throws Exception {state("LEAVE",1,today.minusDays(5),today.minusDays(1));mvc.perform(put("/api/common/developers/dev/statuses/1/end-date").contentType("application/json").content("{\"endDate\":null}")).andExpect(status().isBadRequest());verify(mapper,never()).updateStatus(any());}
     @Test

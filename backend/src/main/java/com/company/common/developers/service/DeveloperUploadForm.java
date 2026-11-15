@@ -132,7 +132,7 @@ public class DeveloperUploadForm implements UploadForm {
         }
         try {
             var result = resolver.resolve(group, text);
-            if (result.warning() != null) issue(issues, row, column, "‘" + result.codeName() + "’으로 바꿔 읽었습니다.", "경고");
+            if (result.warning() != null) issue(issues, row, column, CodeTextResolver.readAs(result.codeName()), "경고");
             return result.code();
         } catch (CodeFailure failure) {
             issue(issues, row, column, failure.getMessage(), "오류");
@@ -205,14 +205,29 @@ public class DeveloperUploadForm implements UploadForm {
         return List.copyOf(result);
     }
     /** SFR-021-04: 시·도 정식·줄임 이름 같이 봄, 행정동은 법정동으로 바꿈, 못 찾으면 찾은 단계까지만 저장하고 경고. */
+    /** 합쳐지기 전 이름도 같은 시·도로 본다(광주·전남 → 전남광주, 2026-11-02). */
+    private static final Set<String> MERGED = Set.of("광주광역시", "광주시", "광주", "전라남도", "전남");
+    private List<DeveloperRows.Area> sido(String text) {
+        String name = MERGED.contains(text) ? "전남광주" : text;
+        var rows = mapper.selectAreasByName("SIDO", null, name);
+        // 「줄임 이름+시」(서울시 → 서울)
+        if (rows.isEmpty() && name.endsWith("시") && name.length() > 1)
+            rows = mapper.selectAreasByName("SIDO", null, name.substring(0, name.length() - 1));
+        return rows;
+    }
     private String area(TabularRow row, List<Issue> issues) {
         String sido = row.values().get(14).trim(), sgg = row.values().get(15).trim(), dong = row.values().get(16).trim();
+        // 세 칸이 모두 비면 경고 없이 거주지 없음. 거주지는 선택 칸이라 못 찾아도 오류가 아니라 경고(SFR-021-04).
         if (sido.isEmpty()) {
-            if (!sgg.isEmpty() || !dong.isEmpty()) issue(issues, row, 14, "시·도를 먼저 적어 주세요.", "오류");
+            if (!sgg.isEmpty() || !dong.isEmpty())
+                issue(issues, row, 14, "(빈칸)", "거주지를 못 찾아 비웠습니다.", "경고", "거주지(시·도)");
             return null;
         }
-        var sidoRows = mapper.selectAreasByName("SIDO", null, sido);
-        if (sidoRows.isEmpty()) { issue(issues, row, 14, "시·도를 찾을 수 없습니다.", "오류"); return null; }
+        var sidoRows = sido(sido);
+        if (sidoRows.isEmpty()) {
+            issue(issues, row, 14, sido, "거주지를 못 찾아 비웠습니다.", "경고", "거주지(시·도)");
+            return null;
+        }
         var top = sidoRows.get(0);
         if (sgg.isEmpty()) {
             if (!dong.isEmpty()) return emd(row, top.areaCode, top.areaName, dong, issues);
@@ -233,7 +248,7 @@ public class DeveloperUploadForm implements UploadForm {
         String normalized = dong.replaceAll("제([0-9])", "$1");
         var mapped = mapper.selectHdongAreas(parent, normalized);
         if (mapped.size() == 1) {
-            issue(issues, row, 16, dong, "‘" + mapped.get(0).areaName + "’으로 바꿔 읽었습니다.", "경고", "거주지(동)");
+            issue(issues, row, 16, dong, CodeTextResolver.readAs(mapped.get(0).areaName), "경고", "거주지(동)");
             return mapped.get(0).areaCode;
         }
         issue(issues, row, 16, dong, "동을 못 찾아 비웠습니다. 「" + parentName + "」까지 저장합니다.", "경고", "거주지(동)");

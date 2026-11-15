@@ -27,8 +27,9 @@ class DeveloperStatusRulesTest {
     }
     @Test void followingDayLeaveIsValidAndReturnBoundaryIsInclusive() {
         var rows=new ArrayList<State>();rows.add(row("LEAVE",1,day.minusDays(2),day.minusDays(1)));
-        DeveloperStatusRules.append(rows,new StatusInput("재직",day,null,null),"dev","admin");
-        DeveloperStatusRules.append(rows,new StatusInput("휴직",day.plusDays(1),null,null),"dev","admin");
+        // 시안: 재직은 오늘 진행 중인 휴직에서만(어제가 휴직 마지막 날)
+        DeveloperStatusRules.append(rows,new StatusInput("재직",day,null,null),"dev","admin",day.minusDays(1));
+        DeveloperStatusRules.append(rows,new StatusInput("휴직",day.plusDays(1),null,null),"dev","admin",day.minusDays(1));
         assertThat(rows).hasSize(3);
     }
     @Test void statusIdentifiersMustBeExactIntegersAndBelongToDeveloper() {

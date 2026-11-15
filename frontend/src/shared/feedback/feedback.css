@@ -68,32 +68,67 @@
   color: white;
   border-color: #b91c1c;
 }
+/* 시안 .toasts/.toast: 머리줄 아래 오른쪽 흰 카드, 18px 아이콘 */
 .app-toast {
   position: fixed;
-  right: 24px;
-  bottom: 24px;
+  top: calc(64px + env(safe-area-inset-top, 0px));
+  right: 16px;
   z-index: 120;
-  border: 1px solid #15803d;
-  background: #f0fdf4;
-  color: #166534;
-  border-radius: 4px;
-  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 240px;
+  max-width: min(380px, calc(100vw - 32px));
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text);
   margin: 0;
+  animation: app-toast-in 0.18s ease-out;
+}
+.app-toast > svg {
+  flex: none;
+}
+.app-toast-ok {
+  color: #15803d;
+}
+.app-toast-warn {
+  color: #b45309;
+}
+.app-toast-info > svg {
+  color: #0369a1;
+}
+@keyframes app-toast-in {
+  from {
+    transform: translateY(-6px);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
 }
 @media (max-width: 767px) {
   .app-dialog {
     padding: 18px;
   }
-  .app-toast {
-    left: 16px;
-    right: 16px;
-    bottom: 16px;
-  }
 }
 @media (prefers-color-scheme: dark) {
   .app-toast {
-    color: #bbf7d0;
-    background: #14532d;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+  .app-toast-ok {
+    color: #4ade80;
+  }
+  .app-toast-warn {
+    color: #fbbf24;
+  }
+  .app-toast-info > svg {
+    color: #7dd3fc;
   }
   .field-error,
   .field-required {

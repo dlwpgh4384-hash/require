@@ -17,6 +17,8 @@ import {
 import "./developers.css";
 
 const SELF = "__self";
+/** 법정동코드: 시·군·구 단계는 끝 5자리가 00000, 읍·면·동은 아니다(세종처럼 시·군·구가 없는 시·도 구분). */
+const isDong = (code: string) => code.slice(5) !== "00000";
 /** 시안 문구: 「직원구분을 입력해 주세요.」「주 직무를 입력해 주세요.」(받침에 따라 을/를) */
 const enter = (label: string) => {
   const code = label.charCodeAt(label.length - 1) - 0xac00;
@@ -102,11 +104,18 @@ export function DeveloperForm({
         if (code) {
           selected[0] = root.find((a) => a.areaCode.slice(0, 2) === code.slice(0, 2))?.areaCode || "";
           if (selected[0] && selected[0] !== code) {
-            lists[1] = (await getCommonDeveloperAreas(selected[0])).items;
-            selected[1] = lists[1].find((a) => a.areaCode.slice(0, 5) === code.slice(0, 5))?.areaCode || "";
-            if (selected[1] && selected[1] !== code) {
-              lists[2] = (await getCommonDeveloperAreas(selected[1])).items;
-              selected[2] = lists[2].find((a) => a.areaCode === code)?.areaCode || "";
+            const children = (await getCommonDeveloperAreas(selected[0])).items;
+            if (children.length && children.every((a) => isDong(a.areaCode))) {
+              // SFR-021-01: 시·군·구가 없는 시·도(세종)는 동 목록을 바로 보인다
+              lists[2] = children;
+              selected[2] = children.find((a) => a.areaCode === code)?.areaCode || "";
+            } else {
+              lists[1] = children;
+              selected[1] = lists[1].find((a) => a.areaCode.slice(0, 5) === code.slice(0, 5))?.areaCode || "";
+              if (selected[1] && selected[1] !== code) {
+                lists[2] = (await getCommonDeveloperAreas(selected[1])).items;
+                selected[2] = lists[2].find((a) => a.areaCode === code)?.areaCode || "";
+              }
             }
           }
         }
@@ -148,7 +157,10 @@ export function DeveloperForm({
     setAreaBusy(true);
     try {
       const response = await getCommonDeveloperAreas(value);
-      if (request === areaRequest.current) setAreas((old) => old.map((list, i) => (i === level + 1 ? response.items : list)));
+      // 시·도 아래가 바로 동이면(세종) 시·군·구 칸을 건너뛰고 동 목록에 넣는다
+      const skip = level === 0 && response.items.length > 0 && response.items.every((a) => isDong(a.areaCode));
+      if (request === areaRequest.current)
+        setAreas((old) => old.map((list, i) => (skip ? (i === 2 ? response.items : i === 1 ? [] : list) : i === level + 1 ? response.items : list)));
     } catch (reason) {
       if (request === areaRequest.current) setAreaError(developerFailure(reason));
     } finally {
@@ -323,7 +335,7 @@ export function DeveloperForm({
         data-testid={`developer-area-${level}`}
         className="ls-in"
         value={location[level]}
-        disabled={busy || (level > 0 && !location[level - 1])}
+        disabled={busy || (level === 1 ? !location[0] || areas[1].length === 0 : level === 2 ? areas[2].length === 0 : false)}
         onChange={(e) => void selectArea(level, e.target.value)}
       >
         <option value="">선택</option>

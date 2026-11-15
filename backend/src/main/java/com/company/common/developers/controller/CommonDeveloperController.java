@@ -48,7 +48,7 @@ public class CommonDeveloperController {
     @GetMapping("/api/common/developers/{developerId}/change-history")
     public Response<Items<Change>> getCommonDeveloperChangeHistory(@PathVariable String developerId) { return Response.of(service.getCommonDeveloperChangeHistory(developerId)); }
     @GetMapping("/api/common/developers/{developerId}/statuses")
-    public Response<Items<Status>> getCommonDeveloperStatuses(@PathVariable String developerId) { return Response.of(service.getCommonDeveloperStatuses(developerId)); }
+    public Response<StatusList> getCommonDeveloperStatuses(@PathVariable String developerId) { return Response.of(service.getCommonDeveloperStatuses(developerId)); }
     @PostMapping(value="/api/common/developers",consumes="application/json")
     public Response<Developer> postCommonDeveloper(@RequestBody JsonNode body) { return Response.of(service.postCommonDeveloper(DeveloperRules.input(body,false))); }
     @PutMapping(value="/api/common/developers/{developerId}",consumes="application/json")
@@ -59,19 +59,19 @@ public class CommonDeveloperController {
     @PutMapping(value="/api/common/developers/use-status",consumes="application/json")
     public Response<UseResult> putCommonDeveloperUseStatus(@RequestBody JsonNode body) { return Response.of(service.putCommonDeveloperUseStatus(DeveloperRules.use(body))); }
     @PostMapping(value="/api/common/developers/{developerId}/statuses",consumes="application/json")
-    public Response<Items<Status>> postCommonDeveloperStatus(@PathVariable String developerId,@RequestBody JsonNode body) { return Response.of(service.postCommonDeveloperStatus(developerId,DeveloperRules.status(body))); }
+    public Response<StatusList> postCommonDeveloperStatus(@PathVariable String developerId,@RequestBody JsonNode body) { return Response.of(service.postCommonDeveloperStatus(developerId,DeveloperRules.status(body))); }
     @PutMapping(value="/api/common/developers/{developerId}/statuses/{statusId}/end-date",consumes="application/json")
-    public Response<Items<Status>> putCommonDeveloperStatusEndDate(@PathVariable String developerId,@PathVariable String statusId,@RequestBody JsonNode body) {
+    public Response<StatusList> putCommonDeveloperStatusEndDate(@PathVariable String developerId,@PathVariable String statusId,@RequestBody JsonNode body) {
         ClientRules.object(body,Set.of("endDate"));
         if (!body.has("endDate")) throw DeveloperRules.invalid("endDate");
         return Response.of(service.putCommonDeveloperStatusEndDate(developerId,statusId,DeveloperRules.date(body,"endDate",false)));
     }
     @PostMapping("/api/common/developers/{developerId}/statuses/{statusId}/return-cancel")
-    public Response<Items<Status>> postCommonDeveloperReturnCancel(@PathVariable String developerId,@PathVariable String statusId) {
+    public Response<StatusList> postCommonDeveloperReturnCancel(@PathVariable String developerId,@PathVariable String statusId) {
         return Response.of(service.postCommonDeveloperReturnCancel(developerId,statusId));
     }
     @PostMapping(value="/api/common/developers/{developerId}/statuses/{statusId}/retirement-cancel",consumes="application/json")
-    public Response<Items<Status>> postCommonDeveloperRetirementCancel(@PathVariable String developerId,@PathVariable String statusId,@RequestBody JsonNode body) {
+    public Response<StatusList> postCommonDeveloperRetirementCancel(@PathVariable String developerId,@PathVariable String statusId,@RequestBody JsonNode body) {
         ClientRules.object(body,Set.of("reason"));
         return Response.of(service.postCommonDeveloperRetirementCancel(developerId,statusId,DeveloperRules.text(body,"reason",300,true)));
     }

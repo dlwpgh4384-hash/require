@@ -106,7 +106,7 @@ public class ClientUploadRules implements UploadForm {
         if (text.isEmpty() || row.formulaColumns().contains(column)) return null;
         try {
             var result = resolver.resolve(group, text);
-            if (result.warning() != null) issue(issues, row, column, result.warning(), "경고");
+            if (result.warning() != null) issue(issues, row, column, CodeTextResolver.readAs(result.codeName()), "경고");
             return result.code();
         } catch (CodeFailure failure) {
             issue(issues, row, column, failure.getMessage(), "오류");

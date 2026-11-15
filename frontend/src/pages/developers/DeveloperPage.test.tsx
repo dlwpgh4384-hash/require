@@ -50,6 +50,7 @@ const options: DeveloperOptions = {
 };
 let row: Developer;
 let statuses: DeveloperStatus[];
+let permission: { canManageStatuses: boolean; canCancelPastRetirement: boolean };
 let request: ReturnType<typeof vi.fn>;
 let failed: boolean;
 let empty: boolean;
@@ -110,6 +111,7 @@ beforeEach(() => {
     retirementDate: null,
     useYn: "Y",
   };
+  permission = { canManageStatuses: true, canCancelPastRetirement: true };
   statuses = [
     {
       statusId: "1",
@@ -156,7 +158,7 @@ beforeEach(() => {
           errorCount: 0,
           items: [],
         });
-      if (path.includes("/statuses")) return ok({ items: statuses });
+      if (path.includes("/statuses")) return ok({ items: statuses, ...permission });
       row = { ...row, ...JSON.parse(String(init?.body)) };
       return ok(row);
     }
@@ -203,7 +205,7 @@ beforeEach(() => {
                   ],
       });
     }
-    if (path.endsWith("/statuses")) return ok({ items: statuses });
+    if (path.endsWith("/statuses")) return ok({ items: statuses, ...permission });
     if (path.endsWith("/assignments")) return ok({ items: [] });
     if (path.endsWith("/change-history"))
       return ok({
@@ -505,6 +507,7 @@ it("renders four detail tabs and the readonly skills/address", async () => {
       onClose={vi.fn()}
       onEdit={vi.fn()}
       onStop={vi.fn()}
+      onNotice={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
@@ -526,6 +529,7 @@ it("highlights ongoing leave and keeps hire-date working row below it", async ()
       onClose={vi.fn()}
       onEdit={vi.fn()}
       onStop={vi.fn()}
+      onNotice={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
@@ -539,19 +543,70 @@ it("highlights ongoing leave and keeps hire-date working row below it", async ()
   expect(screen.queryByTestId("developer-return-null")).not.toBeInTheDocument();
 });
 it("does not offer end-date edit for a finished leave", async () => {
-  statuses[0].ongoing = false;
+  statuses[0] = { ...statuses[0], ongoing: false, startDate: "2020-01-01", endDate: "2020-01-31" };
   render(
     <DeveloperDetail
       developerId="d"
       onClose={vi.fn()}
       onEdit={vi.fn()}
       onStop={vi.fn()}
+      onNotice={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
   await screen.findByText("서울 강남구 역삼동");
   fireEvent.click(screen.getByRole("tab", { name: "근무 상태 이력" }));
   expect(screen.queryByTestId("developer-end-1")).not.toBeInTheDocument();
+  expect(screen.getByText("끝남")).toBeVisible();
+});
+const openStatusTab = async () => {
+  await screen.findByText("서울 강남구 역삼동");
+  fireEvent.click(screen.getByRole("tab", { name: "근무 상태 이력" }));
+};
+const renderDetail = (onChanged = vi.fn(), onNotice = vi.fn()) =>
+  render(
+    <DeveloperDetail developerId="d" onClose={vi.fn()} onEdit={vi.fn()} onStop={vi.fn()} onNotice={onNotice} onChanged={onChanged} />,
+  );
+it("offers end-date edit for a leave that has not started yet (mockup)", async () => {
+  statuses[0] = { ...statuses[0], ongoing: false, startDate: "2099-01-01", endDate: null };
+  renderDetail();
+  await openStatusTab();
+  expect(screen.getByTestId("developer-end-1")).toBeVisible();
+  expect(screen.getByText("복직일 미정")).toBeVisible();
+  fireEvent.click(screen.getByTestId("developer-end-1"));
+  // 시안: 「시작 ~ 복직일 미정 · 사유」, 종료일 칸은 오늘로 시작
+  expect(screen.getByText("2099-01-01 ~ 복직일 미정 · 휴직 사유")).toBeVisible();
+  expect(screen.getByTestId("developer-status-end")).not.toHaveValue("");
+});
+it("labels rows the mockup way: closed by return, closed month, admin only", async () => {
+  permission.canCancelPastRetirement = false;
+  statuses = [
+    { statusId: "3", statusName: "퇴사", startDate: "2020-03-01", endDate: null, reason: null, registeredBy: "admin" },
+    { statusId: "2", statusName: "재직", startDate: "2020-02-01", endDate: null, reason: "휴직 복귀", registeredBy: "admin", monthClosed: true },
+    { statusId: "1", statusName: "휴직", startDate: "2020-01-01", endDate: "2020-01-31", reason: null, registeredBy: "admin", closedByReturn: true },
+  ];
+  renderDetail();
+  await openStatusTab();
+  expect(screen.getByText("관리자만 취소")).toBeVisible();
+  expect(screen.getByText("마감됨")).toBeVisible();
+  expect(screen.getByText("재직으로 닫힘")).toBeVisible();
+  expect(screen.queryByTestId("developer-retire-3")).not.toBeInTheDocument();
+});
+it("hides status actions from people who cannot manage statuses", async () => {
+  permission.canManageStatuses = false;
+  renderDetail();
+  await openStatusTab();
+  expect(screen.queryByTestId("developer-status-add")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("developer-end-1")).not.toBeInTheDocument();
+});
+it("tells the list page the mockup message after saving an end date", async () => {
+  const onChanged = vi.fn();
+  renderDetail(onChanged);
+  await openStatusTab();
+  fireEvent.click(screen.getByTestId("developer-end-1"));
+  fireEvent.change(screen.getByTestId("developer-status-end"), { target: { value: "2026-12-31" } });
+  fireEvent.click(screen.getByTestId("developer-status-save"));
+  await waitFor(() => expect(onChanged).toHaveBeenCalledWith("휴직 종료일을 바꿨습니다."));
 });
 it("hides status registration after retirement", async () => {
   row.workStatusName = "퇴사";
@@ -561,6 +616,7 @@ it("hides status registration after retirement", async () => {
       onClose={vi.fn()}
       onEdit={vi.fn()}
       onStop={vi.fn()}
+      onNotice={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
@@ -577,6 +633,7 @@ it("shows scheduled retirement without a date attached to the status label", asy
       onClose={vi.fn()}
       onEdit={vi.fn()}
       onStop={vi.fn()}
+      onNotice={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
@@ -591,6 +648,7 @@ it("return cancellation sends no body", async () => {
       onClose={vi.fn()}
       onEdit={vi.fn()}
       onStop={vi.fn()}
+      onNotice={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
@@ -609,6 +667,7 @@ it("retirement cancellation requires a reason before HTTP", async () => {
       onClose={vi.fn()}
       onEdit={vi.fn()}
       onStop={vi.fn()}
+      onNotice={vi.fn()}
       onChanged={vi.fn()}
     />,
   );
@@ -627,6 +686,7 @@ it("end-date error stays in its small dialog", async () => {
       onClose={vi.fn()}
       onEdit={vi.fn()}
       onStop={vi.fn()}
+      onNotice={vi.fn()}
       onChanged={vi.fn()}
     />,
   );

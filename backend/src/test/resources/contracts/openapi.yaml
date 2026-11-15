@@ -6992,6 +6992,16 @@ components:
           type: boolean
         retirementScheduled:
           type: boolean
+        closedByReturn:
+          type: boolean
+          description: 휴직 줄이 재직(복귀)으로 닫혔는지(시안 「재직으로 닫힘」)
+        monthClosed:
+          type: boolean
+          description: 재직·퇴사 줄의 달이 마감됐는지(시안 「마감됨」)
+        restoreEndDate:
+          type: string
+          format: date
+          description: 재직 줄을 취소하면 돌아갈 휴직 종료일(없으면 복직일 미정)
       required:
       - statusName
       - startDate
@@ -7006,8 +7016,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommonDeveloperStatus'
+        canManageStatuses:
+          type: boolean
+          description: 근무 상태 등록·수정·취소 가능(관리자·재무)
+        canCancelPastRetirement:
+          type: boolean
+          description: 퇴사일이 지난 퇴사 취소 가능(시스템 관리자)
       required:
       - items
+      - canManageStatuses
+      - canCancelPastRetirement
       additionalProperties: false
     CommonDeveloperEndDateInput:
       type: object

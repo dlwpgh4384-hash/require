@@ -154,10 +154,13 @@ public class CommonDeveloperService {
             if (name.length()>50 || !names.add(name)) throw CodeFailure.invalid("skillCodes","스킬 이름이 중복됩니다. 공통코드를 확인해 주세요.");
         }
         Address address=in.homeAreaCode()==null?null:mapper.selectAddress(in.homeAreaCode());
-        if (in.homeAreaCode()!=null && address==null) throw DeveloperRules.invalid("homeAreaCode");
+        // SFR-021-02: 없어진 구역(USE_YN='N')은 목록에 안 나오지만 이미 저장된 거주지는 그대로 둔다
+        boolean unchanged=previous!=null && in.homeAreaCode()!=null && in.homeAreaCode().equals(previous.homeAreaCode);
+        if (in.homeAreaCode()!=null && address==null && !unchanged) throw DeveloperRules.invalid("homeAreaCode");
+        String homeAddress=address!=null?address.address:unchanged?previous.homeAddress:null;
         return new Input(number,in.name(),in.employeeTypeCode(),in.organizationId(),in.gradeCode(),in.primaryJobCode(),
             in.secondaryJobCode(),position,in.directClassCode(),in.salesPartId(),in.hireDate(),in.monthlyRate(),in.monthlyPay(),
-            in.skillCodes(),in.homeAreaCode(),address==null?null:address.address);
+            in.skillCodes(),in.homeAreaCode(),homeAddress);
     }
     public Developer postCommonDeveloper(Input request) {
         lock(); var used=new HashSet<>(mapper.selectManagementNumbers()); used.addAll(reservations.numbers());
@@ -227,30 +230,50 @@ public class CommonDeveloperService {
         map.put(key,mapper.selectCodes(group).stream().filter(c -> c.code.equals(code)).map(c -> c.name).findFirst().orElse(code));
     }
     private static String text(Object value) { return value==null?null:value.toString(); }
-    public Items<Status> getCommonDeveloperStatuses(String id) {
+    public StatusList getCommonDeveloperStatuses(String id) {
         lock(); Developer d=require(id); refresh(d,false); return statuses(d);
     }
-    private Items<Status> statuses(Developer d) {
-        var rows=new ArrayList<Status>();
-        for (State s: mapper.selectStatuses(d.developerId)) rows.add(new Status(Integer.toString(s.sequence),
-            "WORK".equals(s.code)?"재직":statusName(s.code),s.startDate,s.endDate,s.reason,s.registeredBy,
-            DeveloperStatusRules.activeLeave(s,calendar.today()),"RETIRE".equals(s.code) && !s.startDate.isBefore(calendar.today())));
-        if (d.hireDate!=null) rows.add(new Status(null,"재직",d.hireDate,null,"입사",null,false,false));
-        return new Items<>(rows);
+    private StatusList statuses(Developer d) {
+        var rows=new ArrayList<Status>(); var states=mapper.selectStatuses(d.developerId);
+        LocalDate today=calendar.today(), retire=DeveloperStatusRules.retirement(states);
+        // 시안: 시작일이 늦은 줄부터, 맨 아래 입사일의 재직 줄
+        for (State s: states.stream().sorted(Comparator.comparing((State x) -> x.startDate).thenComparing(x -> x.sequence).reversed()).toList()) {
+            boolean closedByReturn="LEAVE".equals(s.code) && states.stream().anyMatch(w -> "WORK".equals(w.code) && Integer.valueOf(s.sequence).equals(w.closedLeaveSequence));
+            boolean monthClosed=!"LEAVE".equals(s.code) && closed(s.startDate);
+            LocalDate restore=!"WORK".equals(s.code)?null
+                :retire!=null && (s.originalEndDate==null || !s.originalEndDate.isBefore(retire))?retire.minusDays(1):s.originalEndDate;
+            rows.add(new Status(Integer.toString(s.sequence),
+                "WORK".equals(s.code)?"재직":statusName(s.code),s.startDate,s.endDate,s.reason,s.registeredBy,
+                DeveloperStatusRules.activeLeave(s,today),"RETIRE".equals(s.code) && !s.startDate.isBefore(today),
+                closedByReturn,monthClosed,restore));
+        }
+        if (d.hireDate!=null) rows.add(new Status(null,"재직",d.hireDate,null,"입사",null,false,false,false,false,null));
+        var roles=actor.roles();
+        return new StatusList(rows,DeveloperBusinessPolicy.canManageStatuses(roles),roles.contains("ADMIN"));
     }
     private boolean closed(LocalDate date) { return mapper.closedMonth(calendar.toDatabaseMonth(YearMonth.from(date))); }
-    public Items<Status> postCommonDeveloperStatus(String id,StatusInput input) {
+    public StatusList postCommonDeveloperStatus(String id,StatusInput input) {
         lock(); Developer d=require(id); var original=mapper.selectStatuses(id);
         LocalDate retire=DeveloperStatusRules.retirement(original);
         if (DeveloperBusinessPolicy.retired(retire,calendar.today())) throw CodeFailure.invalid("date","퇴사한 개발자는 상태를 등록할 수 없습니다.");
-        if ("퇴사".equals(input.statusName())) {
-            if (closed(input.date())) throw CodeFailure.invalid("date","퇴사한 달이 마감되어 등록할 수 없습니다.");
-            long n=mapper.selectAssignments(id).stream().filter(a -> a.endDate.isAfter(input.date())).count();
-            if (n>0) throw CodeFailure.invalid("date","퇴사일 뒤 남은 배정 "+n+"건이 있습니다. 프로젝트·투입 › 투입 배정에서 조기 철수하세요.");
+        if ("퇴사".equals(input.statusName()) && retire==null) {
+            if (closed(input.date())) {
+                // 시안: 「마감한 달(마지막 마감 달 이전)로는…」
+                YearMonth last=YearMonth.from(input.date());
+                while (last.isBefore(calendar.currentMonth()) && closed(last.plusMonths(1).atDay(1))) last=last.plusMonths(1);
+                throw CodeFailure.invalid("date","마감한 달("+last+" 이전)로는 퇴사일을 넣을 수 없습니다.");
+            }
+            if (d.hireDate!=null && input.date().isBefore(d.hireDate)) throw CodeFailure.invalid("date","입사일("+d.hireDate+")보다 앞선 날짜입니다.");
+            var left=mapper.selectAssignments(id).stream().filter(a -> a.endDate.isAfter(input.date())).toList();
+            if (!left.isEmpty()) throw CodeFailure.invalid("date","퇴사일 이후 투입 배정이 "+left.size()+"건 있습니다("
+                +String.join(", ",left.stream().map(a -> a.projectName+" ~"+a.endDate).toList())+"). 「프로젝트·투입 › 투입 배정」에서 먼저 조기 철수해 주세요.");
         }
-        var next=DeveloperStatusRules.copy(original); State added=DeveloperStatusRules.append(next,input,id,actor.userId());
+        var next=DeveloperStatusRules.copy(original); State added=DeveloperStatusRules.append(next,input,id,actor.userId(),calendar.today());
         persistEnds(original,next); mapper.insertStatus(added);
-        mapper.insertHistory(new Audit(id,"INS","근무 상태",null,input.statusName(),input.reason()));
+        // 시안 변경 이력: 재직 = 근무 상태 휴직 → 재직(복귀일 복귀), 퇴사 = 퇴사일 – → 날짜
+        if ("WORK".equals(added.code)) mapper.insertHistory(new Audit(id,"INS","근무 상태","휴직","재직("+added.startDate+" 복귀)",added.reason));
+        else if ("RETIRE".equals(added.code)) mapper.insertHistory(new Audit(id,"INS","퇴사일",null,text(added.startDate),added.reason));
+        else mapper.insertHistory(new Audit(id,"INS","근무 상태",null,input.statusName(),input.reason()));
         refresh(d,false); return statuses(d);
     }
     private void persistEnds(List<State> before,List<State> next) {
@@ -258,26 +281,32 @@ public class CommonDeveloperService {
             (!Objects.equals(old.endDate,s.endDate) || !Objects.equals(old.closedLeaveSequence,s.closedLeaveSequence)
                 || !Objects.equals(old.originalEndDate,s.originalEndDate)))) mapper.updateStatus(s);
     }
-    public Items<Status> putCommonDeveloperStatusEndDate(String id,String statusId,LocalDate endDate) {
+    public StatusList putCommonDeveloperStatusEndDate(String id,String statusId,LocalDate endDate) {
         lock(); Developer d=require(id); var before=mapper.selectStatuses(id); var next=DeveloperStatusRules.copy(before);
         State leave=DeveloperStatusRules.target(next,statusId);
         if (!"LEAVE".equals(leave.code)) throw DeveloperRules.invalid("statusId");
         if (next.stream().anyMatch(s -> "WORK".equals(s.code) && Integer.valueOf(leave.sequence).equals(s.closedLeaveSequence)))
-            throw CodeFailure.invalid("endDate","재직을 먼저 취소하세요.");
-        if (!DeveloperStatusRules.activeLeave(leave,calendar.today())) throw CodeFailure.invalid("endDate","끝난 휴직은 수정할 수 없습니다.");
+            throw CodeFailure.invalid("endDate","재직(복귀)으로 닫힌 휴직입니다. 바꾸려면 재직을 먼저 취소하세요.");
+        // 시안: 진행 중이거나 아직 시작 안 한 휴직만 고친다
+        if (leave.endDate!=null && leave.endDate.isBefore(calendar.today())) throw CodeFailure.invalid("endDate","끝난 휴직은 수정할 수 없습니다.");
+        if (endDate==null || endDate.isBefore(leave.startDate)) throw CodeFailure.invalid("endDate","시작일 이후 날짜를 넣어 주세요.");
+        LocalDate retire=DeveloperStatusRules.retirement(next);
+        if (retire!=null && !endDate.isBefore(retire)) throw CodeFailure.invalid("endDate","퇴사일("+retire+") 전날까지만 넣을 수 있습니다.");
         leave.endDate=endDate; DeveloperStatusRules.validate(next); persistEnds(before,next);
         mapper.insertHistory(new Audit(id,"UPD","휴직 종료일",text(DeveloperStatusRules.target(before,statusId).endDate),text(endDate),null));
         refresh(d,false); return statuses(d);
     }
-    public Items<Status> postCommonDeveloperReturnCancel(String id,String statusId) { return cancel(id,statusId,null,false); }
-    public Items<Status> postCommonDeveloperRetirementCancel(String id,String statusId,String reason) {
+    public StatusList postCommonDeveloperReturnCancel(String id,String statusId) { return cancel(id,statusId,null,false); }
+    public StatusList postCommonDeveloperRetirementCancel(String id,String statusId,String reason) {
         if(reason==null || reason.isBlank()) throw DeveloperRules.invalid("reason");
         return cancel(id,statusId,reason,true);
     }
-    private Items<Status> cancel(String id,String statusId,String reason,boolean retirement) {
+    private StatusList cancel(String id,String statusId,String reason,boolean retirement) {
         lock(); Developer d=require(id); var before=mapper.selectStatuses(id); var next=DeveloperStatusRules.copy(before);
         State target=DeveloperStatusRules.target(next,statusId);
         if (!(retirement?"RETIRE":"WORK").equals(target.code)) throw DeveloperRules.invalid("statusId");
+        if (retirement && target.startDate.isBefore(calendar.today()) && !actor.roles().contains("ADMIN"))
+            throw CodeFailure.invalid("statusId","퇴사일이 지난 퇴사는 시스템 관리자만 취소할 수 있습니다.");
         if (closed(target.startDate)) throw CodeFailure.invalid("statusId",retirement?
             "퇴사한 달("+YearMonth.from(target.startDate)+")이 마감되어 취소할 수 없습니다. 다시 쓰려면 새로 등록하세요.":"복귀한 달이 마감되어 취소할 수 없습니다.");
         DeveloperStatusRules.cancel(next,target);

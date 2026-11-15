@@ -111,6 +111,12 @@ class CommonUploadControllerTest {
         return List.of("고객사","검사 거래처",number,"대표","정보통신","담당","010","client@example.test","","","");
     }
     private byte[] workbook(List<List<String>> rows) { return workbooks.tabularFile(ClientUploadRules.HEADERS,rows,null); }
+    private org.springframework.test.web.servlet.request.RequestPostProcessor clientFile(byte[] bytes) {
+        return request -> multipart(request.getRequestURI())
+            .file(new MockMultipartFile("file","clients.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",bytes))
+            .param("formTypeCode","B7").buildRequest(request.getServletContext());
+    }
     private org.springframework.test.web.servlet.ResultActions check(byte[] bytes) throws Exception {
         return mvc.perform(multipart("/api/common/uploads").file(new MockMultipartFile("file","clients.xlsx",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",bytes)).param("formTypeCode","B7"));
@@ -121,9 +127,7 @@ class CommonUploadControllerTest {
     @Test
     @DisplayName("auth happy side-effect: TB_SY_UPLD 검사 결과 저장, TB_BS_CLNT 쓰기 없음")
     void anonymousCheckReturnsCountsAndGetPersistsResultWithoutRegisteringClients() throws Exception {
-        mvc.perform(multipart("/api/common/uploads").file(new MockMultipartFile("file", "clients.xlsx",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            workbook(List.of(customer("123-45-67890"))))).param("formTypeCode", "B7"))
+        mvc.perform(post("/api/common/uploads").with(clientFile(workbook(List.of(customer("123-45-67890"))))))
             .andExpect(status().isOk())
             .andExpect(response("POST", "/api/common/uploads"))
             .andExpect(jsonPath("$.success").value(true)).andExpect(jsonPath("$.data.uploadId").value("81"))
@@ -138,9 +142,9 @@ class CommonUploadControllerTest {
     @DisplayName("validation side-effect: 이메일 누락은 TB_SY_UPLD_ERR에 행·열 오류로 저장한다")
     void customerMissingEmailIsADataErrorWithPhysicalRowAndColumn() throws Exception {
         var row=new ArrayList<>(customer("123-45-67890")); row.set(7,"");
-        mvc.perform(multipart("/api/common/uploads").file(new MockMultipartFile("file", "clients.xlsx",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", workbook(List.of(row))))
-            .param("formTypeCode", "B7")).andExpect(status().isOk()).andExpect(jsonPath("$.data.errorCount").value(1))
+        mvc.perform(post("/api/common/uploads").with(clientFile(workbook(List.of(row)))))
+            .andExpect(status().isOk()).andExpect(response("POST","/api/common/uploads"))
+            .andExpect(jsonPath("$.data.errorCount").value(1))
             .andExpect(jsonPath("$.data.issues[0].row").value(2)).andExpect(jsonPath("$.data.issues[0].column").value("이메일"))
             .andExpect(jsonPath("$.data.issues[0].reason").value("필수 입력입니다."));
         assertThat(writes).isEmpty();
@@ -151,18 +155,21 @@ class CommonUploadControllerTest {
     @DisplayName("business: 등록된 사업자번호는 검사 오류이며 TB_BS_CLNT 수정은 없다")
     void registeredBusinessNumberIsNeverUpdated() throws Exception {
         when(clients.selectBusinessOwner("123-45-67890")).thenReturn("기존 거래처");
-        mvc.perform(multipart("/api/common/uploads").file(new MockMultipartFile("file", "clients.xlsx",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            workbook(List.of(customer("123-45-67890"))))).param("formTypeCode", "B7")).andExpect(status().isOk())
+        mvc.perform(post("/api/common/uploads").with(clientFile(workbook(List.of(customer("123-45-67890"))))))
+            .andExpect(status().isOk()).andExpect(response("POST","/api/common/uploads"))
             .andExpect(jsonPath("$.data.errorCount").value(1));
         apply("{\"modifiedAt\":null}").andExpect(status().isOk()).andExpect(jsonPath("$.data.errorCount").value(1));
         verify(clients,never()).updateClient(any()); assertThat(writes).isEmpty();
     }
-    @Test void mappedTextWarnsAndOriginalWarningSurvivesGet() throws Exception {
+    @Test
+    @DisplayName("side-effect: 대응 표기는 TB_SY_UPLD_ERR 경고이며 TB_SY_UPLD 결과와 재조회가 일치")
+    void mappedTextWarnsAndOriginalWarningSurvivesGet() throws Exception {
         var mapped=new CodeTextRow(); mapped.groupId="CLNT_TYPE"; mapped.code="CUST"; mapped.codeName="고객사";
         when(codes.selectMappedText("CLNT_TYPE","옛 고객")).thenReturn(mapped);
         var row=new ArrayList<>(customer("123-45-67890")); row.set(0,"옛 고객");
-        check(workbook(List.of(row))).andExpect(status().isOk()).andExpect(jsonPath("$.data.successCount").value(0))
+        mvc.perform(post("/api/common/uploads").with(clientFile(workbook(List.of(row)))))
+            .andExpect(status().isOk()).andExpect(response("POST","/api/common/uploads"))
+            .andExpect(jsonPath("$.data.successCount").value(0))
             .andExpect(jsonPath("$.data.warningCount").value(1)).andExpect(jsonPath("$.data.issues[0].inputValue").value("옛 고객"));
         mvc.perform(get("/api/common/uploads/81")).andExpect(jsonPath("$.data.issues[0].severity").value("경고"));
         verify(mapper).insertIssue(argThat(value -> "경고".equals(value.issue().severity())));

@@ -44,14 +44,15 @@ class ClientPartSchemaPreparationTest {
     }
     @Test void createsOnlyOriginalDependenciesWithKeysIndexesAndNoProductFixtureRows() throws Exception {
         preparation.prepare();
-        for (String table : new String[]{"tb_bs_clnt", "tb_sy_upld", "tb_sy_upld_err", "tb_sy_adm_area",
+        for (String table : new String[]{"tb_bs_clnt", "tb_sy_upld", "tb_sy_upld_err",
             "tb_hr_dev", "tb_pj_asgn", "tb_pj_proj_part", "tb_co_part_setl"}) {
             assertThat(text("SELECT count(*)::text FROM " + table)).isEqualTo("0");
             assertThat(text("SELECT count(*)::text FROM pg_constraint WHERE conrelid='" + table + "'::regclass AND contype='p'"))
                 .isEqualTo("1");
         }
         assertThat(text("SELECT count(*)::text FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f'"))
-            .isEqualTo("12");
+            .isEqualTo("18");
+        assertThat(text("SELECT count(*)::text FROM tb_sy_adm_area")).isNotEqualTo("0");
         assertThat(text("SELECT indexdef FROM pg_indexes WHERE schemaname=current_schema() AND indexname='ix_tb_pj_asgn_02'"))
             .contains("(dev_id, input_bgn_dt, input_end_dt)");
         assertThat(text("SELECT count(*)::text FROM tb_sy_user WHERE user_id='admin'")).isEqualTo("1");

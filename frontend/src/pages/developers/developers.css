@@ -1,0 +1,402 @@
+/* 시안 UI-02 개발자 풀 — 거래처 화면과 같은 목록·폼·창 틀 */
+.developer-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  color: var(--text);
+}
+/* 제목줄: [사용 중지 포함] [급여 양식] [급여 업로드] [양식] [엑셀 업로드] [+ 등록] */
+.developer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.developer-stopped {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin-right: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.developer-title-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.developer-search {
+  width: 180px;
+}
+/* 표: 이름 아래 작은 관리번호(시안 .pname) */
+/* 시안 .pname: 세로 두 줄, 줄 높이 18px(작은 글자도 같은 줄 높이) */
+.developer-pname {
+  display: flex;
+  flex-direction: column;
+  line-height: 18px;
+}
+.developer-pname small {
+  font-size: 12px;
+  color: var(--text-sub);
+}
+.developer-project {
+  color: var(--primary-text);
+}
+.developer-sub-inline {
+  color: var(--text-sub);
+}
+.developer-empty {
+  margin: 0;
+  color: var(--text-sub);
+}
+/* 상세 */
+.developer-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.developer-chips .ls-chip {
+  margin: 0;
+}
+.developer-num {
+  font-variant-numeric: tabular-nums;
+}
+.ls-db .developer-free {
+  max-height: none;
+  min-height: 0;
+}
+.developer-status-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.developer-status-head .ls-cap {
+  flex: 1 1 240px;
+}
+.developer-lnk {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+.developer-blocked-list {
+  margin: 0;
+  padding: 0 24px 0 42px;
+}
+
+/* 등록·수정(폼 화면): 탭 없음, 카드 h2, 칸 이름 오른쪽 정렬·필수 *, 아래 고정 단추 줄 */
+.screen-tab-panel:has(.developer-form),
+.developer-workspace:has(.developer-form) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+.developer-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 24px;
+  min-width: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+.developer-form-banner {
+  margin: 0;
+}
+.developer-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+  min-width: 0;
+}
+.developer-card h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.developer-fgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+}
+.developer-fld {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: start;
+}
+.developer-fl {
+  padding-top: 8px;
+  text-align: right;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.developer-fl.req::after,
+.developer-req::after {
+  content: " *";
+  color: var(--ls-bad);
+}
+.developer-fv {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.developer-fv .ls-in {
+  width: 240px;
+  max-width: 100%;
+}
+.developer-fv select.ls-in {
+  padding: 0 4px 0 10px;
+}
+.developer-fv .ls-in[readonly] {
+  background: var(--ls-head-bg);
+  color: var(--text-sub);
+}
+.developer-fv .ls-in[aria-invalid="true"] {
+  border-color: var(--ls-bad);
+}
+.developer-fv .developer-date,
+.developer-fv .developer-money {
+  width: 160px;
+}
+.developer-money {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.developer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.developer-unit {
+  color: var(--text-sub);
+}
+.developer-help {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.developer-form .field-error {
+  color: var(--ls-bad);
+  font-size: 12px;
+}
+.developer-error {
+  color: var(--ls-bad);
+}
+.developer-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.developer-bad {
+  color: var(--ls-bad);
+}
+.developer-form .developer-form-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: auto -24px -24px;
+  padding: 12px 24px;
+  background: var(--surface);
+  border-top: 1px solid var(--divider);
+}
+@media (max-width: 767px) {
+  .developer-fgrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 시안 .modal: 폭 400·테두리 없음, 머리 16·16·8·24, 본문 4·24·16(칸 간격 12), 단추 줄 12·24·20 */
+.developer-workspace .app-dialog {
+  width: min(400px, 100%);
+  padding: 0;
+  border: 0;
+}
+.developer-workspace .app-dialog:has(.developer-pay-form) {
+  width: min(720px, 100%);
+}
+.developer-workspace .app-dialog > h2,
+.developer-workspace .app-dialog-head {
+  margin: 0;
+  padding: 16px 16px 8px 24px;
+}
+.developer-workspace .app-dialog h2 {
+  line-height: 24px;
+}
+.developer-workspace .app-dialog-close {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+}
+.developer-workspace .app-dialog > p {
+  margin: 0;
+  padding: 4px 24px 16px;
+  color: var(--text-sub);
+}
+.developer-workspace .app-dialog > form,
+.developer-workspace .app-dialog > form > fieldset {
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+.developer-workspace .app-dialog > form > fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 24px 16px;
+}
+.developer-workspace .app-dialog .developer-upload-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 24px 0;
+  color: var(--text-sub);
+}
+.developer-fc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+}
+.developer-fc input,
+.developer-fc select {
+  width: 100%;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+}
+.developer-fc input[type="file"] {
+  min-height: 40px;
+  height: auto;
+  padding: 5px 8px;
+  line-height: 28px;
+}
+.developer-fc .developer-help {
+  font-weight: 400;
+}
+.developer-cap {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.developer-workspace .app-dialog .app-actions,
+.developer-workspace .app-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 -24px;
+  padding: 12px 24px 20px;
+}
+.developer-workspace .app-dialog > div.app-actions {
+  margin: 0;
+}
+.developer-workspace .app-dialog .app-actions button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  font-weight: 500;
+}
+.developer-workspace .app-dialog > form > .app-actions {
+  margin: 0;
+}
+/* 업로드 창은 제목줄에서 열리므로 화면 영역 밖에 있다: 창 안의 폼으로 찾는다 */
+.app-dialog:has(.developer-upload-form) {
+  width: min(400px, 100%);
+  padding: 0;
+  border: 0;
+}
+.app-dialog:has(.developer-pay-form) {
+  width: min(720px, 100%);
+}
+.app-dialog:has(.developer-upload-form) > .app-dialog-head {
+  margin: 0;
+  padding: 16px 16px 8px 24px;
+}
+.app-dialog:has(.developer-upload-form) .app-dialog-head h2 {
+  line-height: 24px;
+}
+.app-dialog:has(.developer-upload-form) .app-dialog-close {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+}
+.app-dialog .developer-upload-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 24px 0;
+  color: var(--text-sub);
+}
+.app-dialog .developer-upload-form > .app-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 -24px;
+  padding: 12px 24px 20px;
+}
+.app-dialog .developer-upload-form > .app-actions button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  font-weight: 500;
+}
+
+/* 창 안 칸(시안 .fc): 공통 창의 label 여백(위 16·아래 6)·굵기를 쓰지 않는다 */
+.app-dialog .developer-fc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  font-weight: 500;
+}
+.app-dialog .developer-fc .developer-help {
+  line-height: 16px;
+}
+
+/* 시안 .sub(복직일 미정), 사용 중지 띠 아이콘 */
+.developer-sub {
+  color: var(--text-sub);
+}
+.developer-banner-icon {
+  flex: none;
+  vertical-align: -3px;
+  margin-right: 6px;
+}
+
+/* 시안 .mb > p·.errmsg: 창 안 글줄은 바깥 여백 없음 */
+.developer-status-form fieldset > p,
+.developer-status-form .developer-errmsg,
+.developer-status-form .developer-errmsg p {
+  margin: 0;
+}

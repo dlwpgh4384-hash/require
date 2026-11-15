@@ -5,9 +5,15 @@ import com.company.common.uploads.mapper.UploadRows;
 import com.company.common.support.service.CodeFailure;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Instant;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -16,46 +22,65 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import static com.company.common.uploads.dto.UploadContracts.*;
 
+/** SFR-012 공통 업로드: 양식(UploadForm)마다 열 규칙만 다르고 검사 기록·결과·반영 흐름은 같다. */
 @Service
 public class CommonUploadService {
+    private static final DateTimeFormatter DB_MONTH = DateTimeFormatter.ofPattern("uuuuMM");
     private final UploadMapper mapper;
-    private final ClientUploadRules rules;
-    private final UploadClientWriter writer;
+    private final Map<String, UploadForm> forms;
     private final UploadFileStore files;
     private final UploadWorkbookService workbooks;
     private final TransactionTemplate transaction;
 
-    public CommonUploadService(UploadMapper mapper, ClientUploadRules rules, UploadClientWriter writer,
+    public CommonUploadService(UploadMapper mapper, List<UploadForm> forms,
         UploadFileStore files, UploadWorkbookService workbooks, PlatformTransactionManager transactions) {
         this.mapper = mapper;
-        this.rules = rules;
-        this.writer = writer;
+        this.forms = forms.stream().collect(Collectors.toUnmodifiableMap(UploadForm::formTypeCode, Function.identity()));
         this.files = files;
         this.workbooks = workbooks;
         this.transaction = new TransactionTemplate(transactions);
         this.transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
-    public byte[] getCommonUploadTemplate(String formTypeCode) {
-        rules.form(formTypeCode);
-        return workbooks.tabularFile(ClientUploadRules.HEADERS, java.util.Collections.emptyList(),
-            "B.7 신규 이관 전용. 구분·상호·사업자등록번호 필수. 고객사/고객·협력은 이메일, "
-            + "협력사/고객·협력은 은행·계좌번호·예금주 필수. 코드·코드 이름 사용 가능, 대응 표기는 경고로 표시합니다. "
-            + "최대 10MB·첫 시트·데이터 5,000행. 수식 칸은 계산된 결과값으로 읽습니다.");
+    private UploadForm form(String formTypeCode) {
+        UploadForm form = formTypeCode == null ? null : forms.get(formTypeCode);
+        if (form == null) throw CodeFailure.invalid("formTypeCode", "업로드 양식을 확인해 주세요.");
+        return form;
     }
-    public Result postCommonUpload(String formTypeCode, String fileName, byte[] bytes) {
-        rules.form(formTypeCode);
-        var rows = workbooks.readTabular(fileName, bytes, ClientUploadRules.HEADERS);
+    public String templateFileName(String formTypeCode) { return form(formTypeCode).templateFileName(); }
+    public byte[] getCommonUploadTemplate(String formTypeCode) {
+        UploadForm form = form(formTypeCode);
+        return workbooks.tabularFile(form.headers(), java.util.Collections.emptyList(), form.templateNote());
+    }
+    /** yearMonth: 한 달 양식(B.1 급여)만, YYYY-MM. */
+    public static YearMonth month(String value) {
+        if (value == null || value.isBlank()) return null;
+        if (!value.matches("[0-9]{4}-[0-9]{2}")) throw CodeFailure.invalid("yearMonth", "연월을 확인해 주세요.");
+        try { return YearMonth.parse(value); }
+        catch (RuntimeException failure) { throw CodeFailure.invalid("yearMonth", "연월을 확인해 주세요."); }
+    }
+    private YearMonth month(UploadForm form, String value) {
+        YearMonth month = month(value);
+        if (form.monthly() && month == null) throw CodeFailure.invalid("yearMonth", "연월을 골라 주세요.");
+        if (!form.monthly() && month != null) throw CodeFailure.invalid("yearMonth", "이 양식은 연월을 받지 않습니다.");
+        if (month != null) form.checkMonth(month);
+        return month;
+    }
+    public Result postCommonUpload(String formTypeCode, String yearMonth, String fileName, byte[] bytes) {
+        UploadForm form = form(formTypeCode);
+        YearMonth month = month(form, yearMonth);
+        var rows = workbooks.readTabular(fileName, bytes, form.headers());
         long[] retained = {0};
         try {
             return transaction.execute(status -> {
-                var inspection = rules.inspect(rows);
+                var inspection = form.inspect(rows, month);
                 long id = mapper.nextUploadId();
                 files.retain(id, bytes);
                 retained[0] = id;
-                if (mapper.insertUpload(new Check(id, formTypeCode, fileName, bytes.length, inspection)) != 1)
+                if (mapper.insertUpload(new Check(id, formTypeCode, form.screenId(),
+                    month == null ? null : month.format(DB_MONTH), fileName, bytes.length, inspection)) != 1)
                     throw new IllegalStateException("검사 결과를 기록하지 못했습니다.");
                 issues(id, inspection.issues());
-                return result(require(mapper.selectUpload(id)));
+                return result(require(mapper.selectUpload(id)), inspection.assigned());
             });
         } catch (RuntimeException failure) {
             if (retained[0] != 0) {
@@ -67,7 +92,16 @@ public class CommonUploadService {
     }
     @Transactional(readOnly = true)
     public Result getCommonUpload(String uploadId) {
-        return result(require(mapper.selectUpload(id(uploadId))));
+        var row = require(mapper.selectUpload(id(uploadId)));
+        Map<Integer, String> assigned = Map.of();
+        // B.8 「붙을 번호」: 반영 전 검사 결과는 저장된 파일을 다시 읽어 지금 붙을 번호를 계산한다.
+        // 오류가 있는 파일도 시안처럼 오류 없는 줄의 붙을 번호를 보여 준다(반영은 막힘).
+        if ("CHECKED".equals(row.statusCode) && "B8".equals(row.formTypeCode)) {
+            UploadForm form = form(row.formTypeCode);
+            assigned = form.inspect(workbooks.readTabular(row.fileName, files.read(row.uploadId), form.headers()),
+                targetMonth(row)).assigned();
+        }
+        return result(row, assigned);
     }
     public byte[] getCommonUploadErrors(String uploadId) {
         var result = getCommonUpload(uploadId);
@@ -86,23 +120,30 @@ public class CommonUploadService {
                 // execute가 rollback을 마친 뒤 파일 전체를 새 트랜잭션에서 재검사한다.
             }
         }
-        throw new IllegalStateException("거래처를 반영하지 못했습니다.");
+        throw new IllegalStateException("업로드를 반영하지 못했습니다.");
+    }
+    private static YearMonth targetMonth(UploadRows.Upload row) {
+        return row.targetMonth == null ? null : YearMonth.parse(row.targetMonth, DB_MONTH);
     }
     private Result apply(long id, Apply input) {
-        writer.lock();
+        var current = require(mapper.selectUpload(id));
+        UploadForm form = form(current.formTypeCode);
+        form.lock();
         var upload = require(mapper.lockUpload(id));
-        if ("APPLIED".equals(upload.statusCode)) return result(upload);
+        if ("APPLIED".equals(upload.statusCode)) return result(upload, Map.of());
         if (!"CHECKED".equals(upload.statusCode)) throw CodeFailure.invalid("uploadId", "반영할 수 없는 상태입니다.");
         if (!Objects.equals(upload.modifiedAt, input.modifiedAt())) throw CodeFailure.conflict();
-        var rows = workbooks.readTabular(upload.fileName, files.read(id), ClientUploadRules.HEADERS);
-        var inspection = rules.inspect(rows);
+        YearMonth month = targetMonth(upload);
+        if (month != null) form.checkMonth(month);
+        var rows = workbooks.readTabular(upload.fileName, files.read(id), form.headers());
+        var inspection = form.inspect(rows, month);
         boolean applied = inspection.errorCount() == 0;
-        if (applied) for (var client : inspection.clients()) writer.insert(client);
+        Map<Integer, String> assigned = applied ? form.apply(inspection, month, id) : Map.of();
         mapper.deleteIssues(id);
         issues(id, inspection.issues());
         if (mapper.completeUpload(new Completion(id, inspection, applied)) != 1)
             throw new IllegalStateException("반영 결과를 기록하지 못했습니다.");
-        return result(require(mapper.selectUpload(id)));
+        return result(require(mapper.selectUpload(id)), applied ? assigned : inspection.assigned());
     }
     private void issues(long id, List<Issue> issues) {
         int sequence = 0;
@@ -111,11 +152,15 @@ public class CommonUploadService {
                 throw new IllegalStateException("행 결과를 기록하지 못했습니다.");
         }
     }
-    private Result result(UploadRows.Upload row) {
+    private Result result(UploadRows.Upload row, Map<Integer, String> assigned) {
+        var issues = mapper.selectIssues(row.uploadId).stream().map(issue -> new Issue(issue.row, issue.column,
+            issue.inputValue, issue.reason, issue.severity)).toList();
+        YearMonth month = targetMonth(row);
+        List<PlannedDeveloper> planned = "B8".equals(row.formTypeCode) ? assigned.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey()).map(e -> new PlannedDeveloper(e.getKey(), e.getValue())).toList() : null;
         return new Result(Long.toString(row.uploadId), row.modifiedAt == null ? null : row.modifiedAt.toString(),
-            row.statusName, row.successCount, row.warningCount, row.errorCount,
-            mapper.selectIssues(row.uploadId).stream().map(issue -> new Issue(issue.row, issue.column,
-                issue.inputValue, issue.reason, issue.severity)).toList());
+            row.statusName, row.successCount, row.warningCount, row.errorCount, issues,
+            planned, month == null ? null : month.toString());
     }
     private UploadRows.Upload require(UploadRows.Upload row) {
         if (row == null) throw CodeFailure.invalid("uploadId", "업로드 결과를 찾을 수 없습니다.");

@@ -79,4 +79,10 @@ class CodeTextResolverTest {
         assertThatThrownBy(() -> resolver.resolve(group, "정규직")).isInstanceOf(CodeFailure.class);
         verifyNoInteractions(mapper);
     }
+    @Test void uploadWordingPicksTheParticleLikeTheMockup() {
+        assertThat(CodeTextResolver.readAs("정규직")).isEqualTo("'정규직'으로 바꿔 읽었습니다.");
+        assertThat(CodeTextResolver.readAs("협력사")).isEqualTo("'협력사'로 바꿔 읽었습니다.");
+        assertThat(CodeTextResolver.readAs("월단위")).isEqualTo("'월단위'로 바꿔 읽었습니다.");
+        assertThat(CodeTextResolver.readAs("서울")).isEqualTo("'서울'로 바꿔 읽었습니다.");
+    }
 }

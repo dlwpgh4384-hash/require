@@ -15,21 +15,36 @@ import org.springframework.stereotype.Service;
 import static com.company.common.uploads.dto.UploadContracts.*;
 
 @Service
-public class ClientUploadRules {
+public class ClientUploadRules implements UploadForm {
     public static final List<String> HEADERS = List.of("구분", "상호", "사업자등록번호", "대표자", "업종",
         "담당자", "연락처", "이메일", "은행", "계좌번호", "예금주");
     private final ClientMapper clients;
     private final CodeTextResolver resolver;
     private final CurrentBusinessActor actor;
+    private final UploadClientWriter writer;
 
-    public ClientUploadRules(ClientMapper clients, CodeTextResolver resolver, CurrentBusinessActor actor) {
+    public ClientUploadRules(ClientMapper clients, CodeTextResolver resolver, CurrentBusinessActor actor,
+        UploadClientWriter writer) {
         this.clients = clients;
         this.resolver = resolver;
         this.actor = actor;
+        this.writer = writer;
     }
-    public void form(String code) {
-        if (!"B7".equals(code) || !clients.codeExists("FORM_TYPE", code))
-            throw CodeFailure.invalid("formTypeCode", "거래처 B.7 양식을 선택해 주세요.");
+    @Override public String formTypeCode() { return "B7"; }
+    @Override public String targetName() { return "거래처"; }
+    @Override public String screenId() { return "UI-15"; }
+    @Override public List<String> headers() { return HEADERS; }
+    @Override public String templateFileName() { return "client-template.xlsx"; }
+    @Override public String templateNote() {
+        return "B.7 신규 이관 전용. 구분·상호·사업자등록번호 필수. 고객사/고객·협력은 이메일, "
+            + "협력사/고객·협력은 은행·계좌번호·예금주 필수. 코드·코드 이름 사용 가능, 대응 표기는 경고로 표시합니다. "
+            + "최대 10MB·첫 시트·데이터 5,000행. 수식 칸은 계산된 결과값으로 읽습니다.";
+    }
+    @Override public Inspection inspect(List<TabularRow> rows, java.time.YearMonth month) { return inspect(rows); }
+    @Override public void lock() { writer.lock(); }
+    @Override public java.util.Map<Integer, String> apply(Inspection inspection, java.time.YearMonth month, long uploadId) {
+        for (var record : inspection.records()) writer.insert((Input) record);
+        return java.util.Map.of();
     }
     public Inspection inspect(List<TabularRow> rows) {
         var frequencies = new HashMap<String, Integer>();
@@ -91,7 +106,7 @@ public class ClientUploadRules {
         if (text.isEmpty() || row.formulaColumns().contains(column)) return null;
         try {
             var result = resolver.resolve(group, text);
-            if (result.warning() != null) issue(issues, row, column, result.warning(), "경고");
+            if (result.warning() != null) issue(issues, row, column, CodeTextResolver.readAs(result.codeName()), "경고");
             return result.code();
         } catch (CodeFailure failure) {
             issue(issues, row, column, failure.getMessage(), "오류");

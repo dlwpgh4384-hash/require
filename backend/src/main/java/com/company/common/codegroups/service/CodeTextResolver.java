@@ -34,6 +34,14 @@ public class CodeTextResolver {
         return result(mapped, "‘" + text + "’을 ‘" + mapped.codeName + "’으로 바꿈");
     }
 
+    /** 시안 업로드 결과 문구: 「'정규직'으로 바꿔 읽었습니다.」(받침 없거나 ㄹ이면 「로」). */
+    public static String readAs(String name) {
+        char last = name.isEmpty() ? ' ' : name.charAt(name.length() - 1);
+        String particle = last < 0xAC00 || last > 0xD7A3 ? "(으)로"
+            : (last - 0xAC00) % 28 == 0 || (last - 0xAC00) % 28 == 8 ? "로" : "으로";
+        return "'" + name + "'" + particle + " 바꿔 읽었습니다.";
+    }
+
     private TextResolution result(CodeTextRow row, String warning) {
         return new TextResolution(row.groupId, row.code, row.codeName, warning);
     }

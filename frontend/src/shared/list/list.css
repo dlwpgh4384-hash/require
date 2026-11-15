@@ -271,6 +271,11 @@ table.ls-t {
 .ls-t.ls-dense th {
   height: 32px;
 }
+/* 시안 좁게 보기: 줄 높이 32, 위아래 여백 0. 화면 설정의 일반 표 규칙(위아래 4px)을 목록 표에는 쓰지 않는다 */
+.is-dense .ls-t.ls-dense td,
+.is-dense .ls-t.ls-dense th {
+  padding-block: 0;
+}
 .ls-t tbody tr[tabindex] {
   cursor: pointer;
 }
@@ -565,4 +570,53 @@ table.ls-t {
   padding: 12px 24px;
   border-top: 1px solid var(--divider);
   flex: none;
+}
+
+/* 시안 휴대폰 목록: [조건] 단추(.fl-toggle), 카드(.mcard), [더 보기](.more) */
+.ls-fl-toggle {
+  width: 100%;
+  height: 44px;
+}
+.ls-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ls-mcard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px 14px;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.ls-mcard .ls-r1 {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+.ls-mcard .ls-r2 {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-sub);
+}
+.ls-mcard .ls-r2 b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.ls-more .ls-btn {
+  width: 100%;
+}
+.ls-filters[hidden] {
+  display: none;
 }

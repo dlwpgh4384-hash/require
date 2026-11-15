@@ -44,7 +44,7 @@ const content: Record<
   "pc-only": {
     title: "PC에서 이용해 주세요",
     description:
-      "이 화면은 큰 표를 다루는 화면이라 휴대폰에서는 열리지 않습니다",
+      "이 화면은 큰 표를 다루는 화면이라 휴대폰에서는 열리지 않습니다.",
     icon: "screen",
   },
   missing: {

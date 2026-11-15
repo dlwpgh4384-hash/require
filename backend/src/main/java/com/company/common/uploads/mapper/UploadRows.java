@@ -7,6 +7,7 @@ public final class UploadRows {
     public static class Upload {
         public long uploadId;
         public String formTypeCode;
+        public String targetMonth;
         public String fileName;
         public String statusCode;
         public String statusName;

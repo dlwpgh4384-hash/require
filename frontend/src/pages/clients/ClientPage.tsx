@@ -292,6 +292,7 @@ export function ClientPage({
           setPage(1);
         }}
         onReset={reset}
+        activeCount={[applied.clientTypeCode, applied.useYn, applied.keyword].filter(Boolean).length}
       >
         <ListFilter label="구분" htmlFor="client-type">
           <select
@@ -377,6 +378,22 @@ export function ClientPage({
           },
         ]}
         onRowClick={(row) => setDetail({ id: row.clientId, tab: "basic" })}
+        mobileRows={sorted}
+        renderCard={(row) => (
+          // 시안 휴대폰 카드: 상호 + 구분 / 사업자번호 · 담당자 + 사용 여부
+          <>
+            <div className="ls-r1">
+              <strong>{row.clientName}</strong>
+              <Badge kind={row.clientTypeCode === "VNDR" ? "neutral" : "info"}>
+                {codeName(codes, "CLNT_TYPE", row.clientTypeCode)}
+              </Badge>
+            </div>
+            <div className="ls-r2">
+              <span>{[row.businessNumber, row.contactName].filter(Boolean).join(" · ")}</span>
+              <Badge kind={row.useYn === "Y" ? "ok" : "lock"}>{row.useYn === "Y" ? "사용" : "중지"}</Badge>
+            </div>
+          </>
+        )}
         highlightKey={highlight}
         onDownload={() => void download()}
         downloading={downloading}

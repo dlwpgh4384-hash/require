@@ -216,14 +216,18 @@ export function InlineConfirmation({
 }
 
 /** 완료 알림: 초록색으로 3초 보여 준다. */
+/** 시안 toast(msg, kind): ok=초록 글·체크 아이콘, info=보통 글·파란 i, warn=주황 글·i. */
+export type ToastKind = "ok" | "info" | "warn";
 export function Toast({
   message,
   onDismiss,
   testId = "app-toast",
+  kind = "ok",
 }: {
   message: string;
   onDismiss: () => void;
   testId?: string;
+  kind?: ToastKind;
 }) {
   const dismiss = useRef(onDismiss);
   dismiss.current = onDismiss;
@@ -232,8 +236,11 @@ export function Toast({
     return () => window.clearTimeout(timer);
   }, [message]);
   return (
-    <p role="status" data-testid={testId} className="app-toast">
-      {message}
-    </p>
+    <div role="status" data-testid={testId} className={`app-toast app-toast-${kind}`}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d={kind === "ok" ? "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6" : "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01"} />
+      </svg>
+      <span>{message}</span>
+    </div>
   );
 }

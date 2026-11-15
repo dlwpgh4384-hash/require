@@ -507,7 +507,7 @@ export function NavigationRoot({
     routeBody = (
       <NavigationState
         kind="pc-only"
-        description={`「${menuFor(shown)?.menuNm ?? shown}」은 큰 표를 다루는 화면이라 휴대폰에서는 열리지 않습니다`}
+        description={`「${menuFor(shown)?.menuNm ?? shown}」은 큰 표를 다루는 화면이라 휴대폰에서는 열리지 않습니다.`}
       >
         <Link
           className="primary-button"

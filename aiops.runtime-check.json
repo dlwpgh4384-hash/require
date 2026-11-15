@@ -7,7 +7,10 @@
       "operation_id": "getHealth",
       "method": "GET",
       "path": "/api/health",
-      "expect": [{ "path": "success", "op": "equals", "value": true }]
+      "expect": [
+        { "path": "success", "op": "type", "value": "boolean" },
+        { "path": "success", "op": "equals", "value": true }
+      ]
     }
   },
   "auth": { "required": false },

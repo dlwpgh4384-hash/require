@@ -1,4 +1,4 @@
-package com.company.common.common;
+package com.company.common.developers.schema;
 
 import com.company.common.schema.SchemaPreparation;
 import java.nio.charset.StandardCharsets;

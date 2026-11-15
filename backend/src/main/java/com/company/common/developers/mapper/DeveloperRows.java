@@ -17,8 +17,19 @@ public final class DeveloperRows {
         public BigDecimal monthlyRate, monthlyPay;
         public List<String> skillCodes;
         public boolean retirementScheduled;
+        public String secondaryJobName, positionName, directClassName, salesPartName;
+        /** 동시 수정 막기: 저장할 때 그대로 돌려보내고 다르면 409. */
+        public Instant modifiedAt;
         @JsonIgnore public String workStatusCode;
     }
+    public static class PayTarget {
+        public String developerId, name, employeeTypeCode, directClassCode, positionCode;
+        public LocalDate retirementDate;
+    }
+    public record MonthPay(String month, String developerId, BigDecimal pay, BigDecimal allowance,
+        BigDecimal insuranceCompany, BigDecimal insuranceSelf, BigDecimal retirement, BigDecimal incomeTax,
+        BigDecimal withholding, BigDecimal realPay, BigDecimal vendorSupply, String employeeTypeCode,
+        String directClassCode, long uploadId, String actor) {}
     public static class ListRow {
         public String developerId, managementNumber, name, employeeTypeCode, organizationId,
             gradeCode, primaryJobCode, secondaryJobCode, positionCode, directClassCode, salesPartId;

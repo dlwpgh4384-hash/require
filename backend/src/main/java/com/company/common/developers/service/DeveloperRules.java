@@ -48,7 +48,7 @@ public final class DeveloperRules {
     }
     public static Input input(JsonNode body, boolean editing) {
         var allowed = new HashSet<>(FIELDS);
-        if (editing) allowed.remove("managementNumber");
+        if (editing) { allowed.remove("managementNumber"); allowed.add("modifiedAt"); }
         ClientRules.object(body, allowed);
         String number = editing ? null : text(body, "managementNumber", 20, false);
         if (number != null && !number.matches("[A-Za-z0-9-]{1,20}")) throw invalid("managementNumber");

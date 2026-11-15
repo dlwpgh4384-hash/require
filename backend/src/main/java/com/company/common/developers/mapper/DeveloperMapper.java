@@ -40,4 +40,16 @@ public interface DeveloperMapper {
     void insertHistory(Audit audit);
     List<DeveloperRows.Change> selectChanges(String id);
     void insertAccess(@Param("actor") String actor, @Param("count") int count);
+    List<String> selectVendorIdsByName(@Param("name") String name);
+    List<String> selectPartIdsByName(@Param("name") String name);
+    List<DeveloperRows.Area> selectAreasByName(@Param("level") String level, @Param("parent") String parent, @Param("name") String name);
+    List<DeveloperRows.Area> selectHdongAreas(@Param("parent") String parent, @Param("name") String name);
+    String selectSameNameHire(@Param("name") String name, @Param("date") LocalDate date);
+    DeveloperRows.PayTarget selectPayTarget(@Param("number") String number);
+    DeveloperRows.PayTarget selectPayTargetById(@Param("id") String id);
+    BigDecimal selectCodeValue(@Param("groupId") String groupId, @Param("code") String code);
+    void deleteMonthPay(@Param("month") String month);
+    void insertMonthPay(DeveloperRows.MonthPay row);
+    String selectClientName(@Param("id") String id);
+    String selectPartName(@Param("id") String id);
 }

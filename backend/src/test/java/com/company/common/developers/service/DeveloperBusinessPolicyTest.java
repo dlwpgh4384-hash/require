@@ -1,4 +1,4 @@
-package com.company.common.common;
+package com.company.common.developers.service;
 
 import com.company.common.developers.service.DeveloperBusinessPolicy;
 import com.company.common.developers.service.DeveloperBusinessPolicy.Actor;

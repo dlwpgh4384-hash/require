@@ -52,7 +52,10 @@ public class CommonDeveloperController {
     @PostMapping(value="/api/common/developers",consumes="application/json")
     public Response<Developer> postCommonDeveloper(@RequestBody JsonNode body) { return Response.of(service.postCommonDeveloper(DeveloperRules.input(body,false))); }
     @PutMapping(value="/api/common/developers/{developerId}",consumes="application/json")
-    public Response<Developer> putCommonDeveloper(@PathVariable String developerId,@RequestBody JsonNode body) { return Response.of(service.putCommonDeveloper(developerId,DeveloperRules.input(body,true))); }
+    public Response<Developer> putCommonDeveloper(@PathVariable String developerId,@RequestBody JsonNode body) {
+        Input input=DeveloperRules.input(body,true);
+        return Response.of(service.putCommonDeveloper(developerId,input,ClientRules.token(body)));
+    }
     @PutMapping(value="/api/common/developers/use-status",consumes="application/json")
     public Response<UseResult> putCommonDeveloperUseStatus(@RequestBody JsonNode body) { return Response.of(service.putCommonDeveloperUseStatus(DeveloperRules.use(body))); }
     @PostMapping(value="/api/common/developers/{developerId}/statuses",consumes="application/json")

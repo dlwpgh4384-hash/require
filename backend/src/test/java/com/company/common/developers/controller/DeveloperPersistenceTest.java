@@ -77,50 +77,57 @@ class DeveloperPersistenceTest {
     }
     @BeforeEach void setup() { db=new JdbcTemplate(source); }
     @AfterEach void cleanup() throws Exception { try(var connection=source.getConnection();var statement=connection.createStatement()) { statement.execute("DROP SCHEMA "+owned.name()+" CASCADE"); } }
+    // 업무 달력은 2026-11-15(한국)로 고정되어 있다(위 BusinessCalendar).
+    private static final String THIS="202611", LATER="202701", BEFORE="202610";
+    /** 동시 수정 막기: 화면처럼 상세의 modifiedAt을 그대로 돌려보낸다. */
+    private String token(String id) throws Exception {
+        return json.readTree(mvc.perform(get("/api/common/developers/"+id)).andReturn().getResponse().getContentAsString()).path("data").path("modifiedAt").asText();
+    }
     private ObjectNode input() {
         String part=db.queryForObject("SELECT part_id FROM TB_BS_PART WHERE use_yn='Y' ORDER BY hq_yn DESC,part_id LIMIT 1",String.class);
-        return json.createObjectNode().put("name","통합 개발자").put("employeeTypeCode","FT").put("organizationId","").put("primaryJobCode","DEV").put("directClassCode","DRCT").put("salesPartId",part);
+        return json.createObjectNode().put("name","통합 개발자").put("employeeTypeCode","FT").put("organizationId","").put("primaryJobCode","BE").put("directClassCode","DRCT").put("salesPartId",part);
     }
     private String create() throws Exception {
         String body=mvc.perform(post("/api/common/developers").contentType("application/json").content(input().toString())).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         return json.readTree(body).path("data").path("developerId").asText();
     }
     @Test void firstSeededAdminCreatesAndASecondRequestReadsPersistedSkillsAndAddress() throws Exception {
-        var body=input().put("homeAreaCode","1168010100");body.putArray("skillCodes").add("JAVA");
+        String java=db.queryForObject("SELECT code FROM TB_SY_CODE WHERE code_grp_id='SKILL' AND code_nm='Java'",String.class);
+        var body=input().put("homeAreaCode","1168010100");body.putArray("skillCodes").add(java);
         String raw=mvc.perform(post("/api/common/developers").contentType("application/json").content(body.toString())).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         String id=json.readTree(raw).path("data").path("developerId").asText();
-        mvc.perform(get("/api/common/developers/"+id)).andExpect(status().isOk()).andExpect(jsonPath("$.data.skillCodes[0]").value("JAVA")).andExpect(jsonPath("$.data.homeAreaCode").value("1168010100"));
+        mvc.perform(get("/api/common/developers/"+id)).andExpect(status().isOk()).andExpect(jsonPath("$.data.skillCodes[0]").value(java)).andExpect(jsonPath("$.data.homeAreaCode").value("1168010100"));
         assertThat(db.queryForObject("SELECT count(*) FROM TB_HR_DEV_SKILL WHERE dev_id=?",Integer.class,id)).isEqualTo(1);
         assertThat(db.queryForObject("SELECT reg_user_id FROM TB_HR_DEV WHERE dev_id=?",String.class,id)).isEqualTo("admin");
     }
     @Test void sameKoreanMonthUpdatesOnePricePeriodKeepsFutureAndWritesEachAudit() throws Exception {
-        String id=create();db.update("INSERT INTO TB_HR_DEV_PRC(dev_id,aply_bgn_ym,mon_uprc,reg_user_id) VALUES(?, '202701',999,'admin')",id);
-        for(int amount:new int[]{100,200}) mvc.perform(put("/api/common/developers/"+id).contentType("application/json").content(input().put("monthlyRate",amount).put("monthlyPay",50).toString())).andExpect(status().isOk());
-        assertThat(db.queryForObject("SELECT count(*) FROM TB_HR_DEV_PRC WHERE dev_id=? AND aply_bgn_ym='202611'",Integer.class,id)).isEqualTo(1);
-        assertThat(db.queryForObject("SELECT mon_uprc FROM TB_HR_DEV_PRC WHERE dev_id=? AND aply_bgn_ym='202611'",Integer.class,id)).isEqualTo(200);
-        assertThat(db.queryForObject("SELECT mon_uprc FROM TB_HR_DEV_PRC WHERE dev_id=? AND aply_bgn_ym='202701'",Integer.class,id)).isEqualTo(999);
+        String id=create();db.update("INSERT INTO TB_HR_DEV_PRC(dev_id,aply_bgn_ym,mon_uprc,reg_user_id) VALUES(?, '"+LATER+"',999,'admin')",id);
+        for(int amount:new int[]{100,200}) mvc.perform(put("/api/common/developers/"+id).contentType("application/json").content(input().put("modifiedAt",token(id)).put("monthlyRate",amount).put("monthlyPay",50).toString())).andExpect(status().isOk());
+        assertThat(db.queryForObject("SELECT count(*) FROM TB_HR_DEV_PRC WHERE dev_id=? AND aply_bgn_ym='"+THIS+"'",Integer.class,id)).isEqualTo(1);
+        assertThat(db.queryForObject("SELECT mon_uprc FROM TB_HR_DEV_PRC WHERE dev_id=? AND aply_bgn_ym='"+THIS+"'",Integer.class,id)).isEqualTo(200);
+        assertThat(db.queryForObject("SELECT mon_uprc FROM TB_HR_DEV_PRC WHERE dev_id=? AND aply_bgn_ym='"+LATER+"'",Integer.class,id)).isEqualTo(999);
         assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_key=? AND chg_item_nm='월 단가'",Integer.class,id)).isEqualTo(2);
     }
     @Test
     @DisplayName("auth side-effect: 개발자 수정은 TB_HR_DEV_PRC·TB_SY_CHG_HIST 저장, 과거 TB_HR_MON_PAY.EMP_TYPE_CD 보존")
     void employeeTypeChangeDoesNotRewriteExistingMonthlyPayrollSnapshot() throws Exception {
         String id=create();
-        db.update("INSERT INTO TB_HR_MON_PAY(pay_ym,dev_id,pay_amt,alwnc_amt,insr_cmpny_amt,retire_rsv_amt,emp_type_cd,drct_cls_cd,reg_user_id) VALUES('202610',?,100,0,0,0,'FT','DRCT','admin')",id);
+        db.update("INSERT INTO TB_HR_MON_PAY(pay_ym,dev_id,pay_amt,alwnc_amt,insr_cmpny_amt,retire_rsv_amt,emp_type_cd,drct_cls_cd,reg_user_id) VALUES('"+BEFORE+"',?,100,0,0,0,'FT','DRCT','admin')",id);
         String nextType=db.queryForObject("SELECT code FROM TB_SY_CODE WHERE code_grp_id='EMP_TYPE' AND code<>'FT' AND use_yn='Y' AND del_yn='N' ORDER BY sort_ord,code LIMIT 1",String.class);
         mvc.perform(put("/api/common/developers/{developerId}",id).contentType("application/json")
-            .content(input().put("employeeTypeCode",nextType).put("monthlyRate",200).put("monthlyPay",100).toString()))
+            .content(input().put("modifiedAt",token(id)).put("employeeTypeCode",nextType).put("monthlyRate",200).put("monthlyPay",100).toString()))
             .andExpect(status().isOk())
             .andExpect(com.company.common.support.controller.OpenApiResponseContract.response("PUT","/api/common/developers/{developerId}"))
             .andExpect(jsonPath("$.data.employeeTypeCode").value(nextType));
         assertThat(db.queryForObject("SELECT emp_type_cd FROM TB_HR_DEV WHERE dev_id=?",String.class,id)).isEqualTo(nextType);
-        assertThat(db.queryForObject("SELECT emp_type_cd FROM TB_HR_MON_PAY WHERE dev_id=? AND pay_ym='202610'",String.class,id)).isEqualTo("FT");
-        assertThat(db.queryForObject("SELECT pay_amt FROM TB_HR_MON_PAY WHERE dev_id=? AND pay_ym='202610'",Integer.class,id)).isEqualTo(100);
-        assertThat(db.queryForObject("SELECT mon_uprc FROM TB_HR_DEV_PRC WHERE dev_id=? AND aply_bgn_ym='202611'",Integer.class,id)).isEqualTo(200);
-        assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_key=? AND chg_item_nm='직원구분' AND bfr_val='FT' AND aft_val=? AND reg_user_id='admin'",Integer.class,id,nextType)).isEqualTo(1);
+        assertThat(db.queryForObject("SELECT emp_type_cd FROM TB_HR_MON_PAY WHERE dev_id=? AND pay_ym='"+BEFORE+"'",String.class,id)).isEqualTo("FT");
+        assertThat(db.queryForObject("SELECT pay_amt FROM TB_HR_MON_PAY WHERE dev_id=? AND pay_ym='"+BEFORE+"'",Integer.class,id)).isEqualTo(100);
+        assertThat(db.queryForObject("SELECT mon_uprc FROM TB_HR_DEV_PRC WHERE dev_id=? AND aply_bgn_ym='"+THIS+"'",Integer.class,id)).isEqualTo(200);
+        assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_key=? AND chg_item_nm='직원구분' AND bfr_val='정규직' AND aft_val=(SELECT code_nm FROM TB_SY_CODE WHERE code_grp_id='EMP_TYPE' AND code=?) AND reg_user_id='admin'",Integer.class,id,nextType)).isEqualTo(1);
     }
     @Test void auditFailureRollsBackMasterSkillAndPriceTogether() throws Exception {
         String id=create();db.execute("ALTER TABLE TB_SY_CHG_HIST ADD CONSTRAINT developer_history_guard CHECK(chg_item_nm <> '이름')");
-        mvc.perform(put("/api/common/developers/"+id).contentType("application/json").content(input().put("name","롤백 대상").put("monthlyRate",500).toString())).andExpect(status().is5xxServerError());
+        mvc.perform(put("/api/common/developers/"+id).contentType("application/json").content(input().put("modifiedAt",token(id)).put("name","롤백 대상").put("monthlyRate",500).toString())).andExpect(status().is5xxServerError());
         assertThat(db.queryForObject("SELECT dev_nm FROM TB_HR_DEV WHERE dev_id=?",String.class,id)).isEqualTo("통합 개발자");
         assertThat(db.queryForObject("SELECT mon_uprc FROM TB_HR_DEV_PRC WHERE dev_id=?",Object.class,id)).isNull();
     }

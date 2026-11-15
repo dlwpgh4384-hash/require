@@ -152,9 +152,9 @@ class CommonDeveloperControllerTest {
     @Test
     @DisplayName("auth happy side-effect: admin 수정은 TB_HR_DEV_PRC·TB_SY_CHG_HIST 기록, 과거 EMP_TYPE_CD 변경 없음")
     void publicUpdateRecordsEveryChangedFieldAndCurrentKoreaMonth() throws Exception {
-        mvc.perform(put("/api/common/developers/dev").contentType("application/json").content(input().put("name","새 이름").put("primaryJobCode","PM").put("monthlyPay",100).put("monthlyRate",200).toString()))
+        mvc.perform(put("/api/common/developers/dev").contentType("application/json").content(input().putNull("modifiedAt").put("name","새 이름").put("primaryJobCode","PM").put("monthlyPay",100).put("monthlyRate",200).toString()))
             .andExpect(status().isOk()).andExpect(response("PUT","/api/common/developers/{developerId}")).andExpect(jsonPath("$.data.name").value("새 이름"));
-        assertThat(audits).extracting(Audit::fieldName).contains("이름","주 직무","월 단가","월 급여");
+        assertThat(audits).extracting(Audit::fieldName).contains("이름","주 직무","월 단가","월 급여·지급액");
         verify(mapper).savePrice(argThat(p -> p.month().equals("202611") && p.monthlyPay().equals(new BigDecimal("100"))));
         verify(mapper).updateDeveloper(argThat(w -> "admin".equals(w.actor()) && "FT".equals(w.input().employeeTypeCode())));
     }
@@ -163,7 +163,7 @@ class CommonDeveloperControllerTest {
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("managementNumber")); verify(mapper,never()).updateDeveloper(any());
     }
     @Test void longNamePreservesOldValue() throws Exception {
-        mvc.perform(put("/api/common/developers/dev").contentType("application/json").content(input().put("name","가".repeat(51)).toString())).andExpect(status().isBadRequest()); assertThat(developers.get("dev").name).isEqualTo("개발자");
+        mvc.perform(put("/api/common/developers/dev").contentType("application/json").content(input().putNull("modifiedAt").put("name","가".repeat(51)).toString())).andExpect(status().isBadRequest()); assertThat(developers.get("dev").name).isEqualTo("개발자");
     }
     @Test
     @DisplayName("auth happy side-effect: 재직 등록은 TB_HR_DEV_STAT 휴직 종료·원종료일 보관과 TB_HR_DEV 상태 재판정")
@@ -309,7 +309,8 @@ class CommonDeveloperControllerTest {
                 var hire=json.readTree(result.getResponse().getContentAsByteArray()).path("data").path("items").get(1);
                 assertThat(hire.has("statusId")).isFalse();
                 assertThat(hire.has("endDate")).isTrue(); assertThat(hire.get("endDate").isNull()).isTrue();
-                assertThat(hire.has("reason")).isTrue(); assertThat(hire.get("reason").isNull()).isTrue();
+                // 시안: 입사일 재직 줄은 사유 「입사」, 등록자 없음(–)
+                assertThat(hire.get("reason").asText()).isEqualTo("입사"); assertThat(hire.get("registeredBy").isNull()).isTrue();
             });
     }
     @Test void literalCollectionRouteReachesItsOwnHandlerAndMapper() throws Exception {

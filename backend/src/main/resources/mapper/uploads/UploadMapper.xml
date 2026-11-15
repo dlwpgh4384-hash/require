@@ -4,6 +4,7 @@
   <resultMap id="upload" type="com.company.common.uploads.mapper.UploadRows$Upload" autoMapping="false">
     <id column="upld_id" property="uploadId" javaType="_long"/>
     <result column="form_type_cd" property="formTypeCode" javaType="java.lang.String"/>
+    <result column="trgt_ym" property="targetMonth" javaType="java.lang.String"/>
     <result column="file_nm" property="fileName" javaType="java.lang.String"/>
     <result column="upld_stat_cd" property="statusCode" javaType="java.lang.String"/>
     <result column="status_name" property="statusName" javaType="java.lang.String"/>
@@ -20,7 +21,7 @@
     <result column="severity" property="severity" javaType="java.lang.String"/>
   </resultMap>
   <sql id="columns">
-    u.upld_id, u.form_type_cd, u.file_nm, u.upld_stat_cd, c.code_nm AS status_name,
+    u.upld_id, u.form_type_cd, u.trgt_ym, u.file_nm, u.upld_stat_cd, c.code_nm AS status_name,
     u.succ_cnt, u.warn_cnt, u.err_cnt, u.mod_dttm
   </sql>
   <select id="nextUploadId" resultType="long">
@@ -30,13 +31,13 @@
     SELECT <include refid="columns"/>
     FROM TB_SY_UPLD u
     JOIN TB_SY_CODE c ON c.code_grp_id='UPLD_STAT' AND c.code=u.upld_stat_cd
-    WHERE u.upld_id=#{uploadId} AND u.form_type_cd='B7'
+    WHERE u.upld_id=#{uploadId}
   </select>
   <select id="lockUpload" resultMap="upload">
     SELECT <include refid="columns"/>
     FROM TB_SY_UPLD u
     JOIN TB_SY_CODE c ON c.code_grp_id='UPLD_STAT' AND c.code=u.upld_stat_cd
-    WHERE u.upld_id=#{uploadId} AND u.form_type_cd='B7'
+    WHERE u.upld_id=#{uploadId}
     FOR UPDATE OF u
   </select>
   <select id="selectIssues" resultMap="issue">
@@ -47,9 +48,9 @@
   </select>
   <insert id="insertUpload">
     INSERT INTO TB_SY_UPLD
-      (upld_id, form_type_cd, scrn_id, file_nm, file_size, tot_row_cnt,
+      (upld_id, form_type_cd, scrn_id, file_nm, file_size, trgt_ym, tot_row_cnt,
        succ_cnt, warn_cnt, err_cnt, upld_stat_cd, reg_user_id, reg_dttm)
-    VALUES (#{uploadId}, #{formTypeCode}, 'UI-15', #{fileName}, #{fileSize},
+    VALUES (#{uploadId}, #{formTypeCode}, #{screenId}, #{fileName}, #{fileSize}, #{targetMonth},
       #{inspection.totalCount}, #{inspection.successCount}, #{inspection.warningCount},
       #{inspection.errorCount}, 'CHECKED', 'admin', clock_timestamp())
   </insert>

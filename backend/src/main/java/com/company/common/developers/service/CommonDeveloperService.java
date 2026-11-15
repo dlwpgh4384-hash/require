@@ -177,9 +177,11 @@ public class CommonDeveloperService {
         var price=new PriceWrite(id,month(),calendar.toDatabaseMonth(calendar.currentMonth().minusMonths(1)),input.monthlyRate(),input.monthlyPay(),actor.userId());
         mapper.closePreviousPrice(price); mapper.savePrice(price);
     }
-    public Developer putCommonDeveloper(String id,Input request) {
-        lock(); Developer old=detail(require(id)); Input input=prepare(request,old,old.managementNumber);
-        var before=fields(old); var after=fields(input);
+    public Developer putCommonDeveloper(String id,Input request,java.time.Instant modifiedAt) {
+        lock(); Developer old=detail(require(id));
+        if (!Objects.equals(old.modifiedAt,modifiedAt)) throw CodeFailure.conflict();
+        Input input=prepare(request,old,old.managementNumber);
+        var before=named(fields(old)); var after=named(fields(input));
         boolean priceChanged = !Objects.equals(old.monthlyPay,input.monthlyPay())
             || !Objects.equals(old.monthlyRate,input.monthlyRate());
         mapper.updateDeveloper(new Write(id,input,actor.userId())); saveSkills(id,input);
@@ -197,8 +199,27 @@ public class CommonDeveloperService {
         map.put("이름",d.name()); map.put("직원구분",d.employeeTypeCode()); map.put("소속",d.organizationId()); map.put("등급",d.gradeCode());
         map.put("주 직무",d.primaryJobCode()); map.put("보조 직무",d.secondaryJobCode()); map.put("직위",d.positionCode());
         map.put("직접/간접",d.directClassCode()); map.put("영업 파트",d.salesPartId()); map.put("입사일",text(d.hireDate()));
-        map.put("월 단가",text(d.monthlyRate())); map.put("월 급여",text(d.monthlyPay())); map.put("스킬",String.join(",",d.skillCodes()));
-        map.put("거주지 코드",d.homeAreaCode()); map.put("거주지",d.homeAddress()); return map;
+        map.put("월 단가",text(d.monthlyRate())); map.put("월 급여·지급액",text(d.monthlyPay())); map.put("보유 스킬",String.join(",",d.skillCodes()));
+        map.put("거주지",d.homeAddress()); return map;
+    }
+    /** 변경 이력은 코드 대신 화면에 보이는 이름으로 남긴다(예: FT → 정규직, HQ → 본사(직접 영업)). */
+    private Map<String,String> named(Map<String,String> map) {
+        var result=new LinkedHashMap<String,String>(map);
+        name(result,"직원구분","EMP_TYPE"); name(result,"등급","GRADE"); name(result,"주 직무","JOB"); name(result,"보조 직무","JOB");
+        name(result,"직위","JBPS"); name(result,"직접/간접","DRCT_CLS");
+        String org=result.get("소속"); result.put("소속",org==null||org.isEmpty()?"자사":mapper.selectClientName(org));
+        String part=result.get("영업 파트"); if (part!=null) result.put("영업 파트",mapper.selectPartName(part));
+        String skills=result.get("보유 스킬");
+        if (skills!=null && !skills.isEmpty()) {
+            var codes=mapper.selectCodes("SKILL");
+            result.put("보유 스킬",String.join(", ",java.util.Arrays.stream(skills.split(",")).map(s -> codes.stream()
+                .filter(c -> c.code.equals(s)).map(c -> c.name).findFirst().orElse(s)).toList()));
+        }
+        return result;
+    }
+    private void name(Map<String,String> map,String key,String group) {
+        String code=map.get(key); if (code==null) return;
+        map.put(key,mapper.selectCodes(group).stream().filter(c -> c.code.equals(code)).map(c -> c.name).findFirst().orElse(code));
     }
     private static String text(Object value) { return value==null?null:value.toString(); }
     public Items<Status> getCommonDeveloperStatuses(String id) {
@@ -209,7 +230,7 @@ public class CommonDeveloperService {
         for (State s: mapper.selectStatuses(d.developerId)) rows.add(new Status(Integer.toString(s.sequence),
             "WORK".equals(s.code)?"재직":statusName(s.code),s.startDate,s.endDate,s.reason,s.registeredBy,
             DeveloperStatusRules.activeLeave(s,calendar.today()),"RETIRE".equals(s.code) && !s.startDate.isBefore(calendar.today())));
-        if (d.hireDate!=null) rows.add(new Status(null,"재직",d.hireDate,null,null,"admin",false,false));
+        if (d.hireDate!=null) rows.add(new Status(null,"재직",d.hireDate,null,"입사",null,false,false));
         return new Items<>(rows);
     }
     private boolean closed(LocalDate date) { return mapper.closedMonth(calendar.toDatabaseMonth(YearMonth.from(date))); }

@@ -25,6 +25,19 @@
     <result column="use_yn" property="useYn" javaType="java.lang.String"/>
     <result column="mon_uprc" property="monthlyRate" javaType="java.math.BigDecimal"/>
     <result column="mon_pay_amt" property="monthlyPay" javaType="java.math.BigDecimal"/>
+    <result column="sub_job_name" property="secondaryJobName" javaType="java.lang.String"/>
+    <result column="position_name" property="positionName" javaType="java.lang.String"/>
+    <result column="direct_name" property="directClassName" javaType="java.lang.String"/>
+    <result column="part_name" property="salesPartName" javaType="java.lang.String"/>
+    <result column="modified_at" property="modifiedAt" javaType="java.time.Instant"/>
+  </resultMap>
+  <resultMap id="payTarget" type="com.company.common.developers.mapper.DeveloperRows$PayTarget" autoMapping="false">
+    <id column="dev_id" property="developerId" javaType="java.lang.String"/>
+    <result column="dev_nm" property="name" javaType="java.lang.String"/>
+    <result column="emp_type_cd" property="employeeTypeCode" javaType="java.lang.String"/>
+    <result column="drct_cls_cd" property="directClassCode" javaType="java.lang.String"/>
+    <result column="jbps_cd" property="positionCode" javaType="java.lang.String"/>
+    <result column="retire_dt" property="retirementDate" javaType="java.time.LocalDate"/>
   </resultMap>
   <resultMap id="assignment" type="com.company.common.developers.mapper.DeveloperRows$Assignment" autoMapping="false">
     <id column="asgn_id" property="assignmentId" javaType="java.lang.String"/>
@@ -75,13 +88,20 @@
     d.job_cd,d.sub_job_cd,d.jbps_cd,d.drct_cls_cd,d.part_id,d.jncmp_dt,d.retire_dt,d.home_area_cd,d.home_addr,
     d.work_stat_cd,d.use_yn,COALESCE(c.clnt_nm,'자사') AS organization_name,
     COALESCE(e.code_nm,d.emp_type_cd) AS employee_name,g.code_nm AS grade_name,
-    COALESCE(j.code_nm,d.job_cd) AS job_name,r.mon_uprc,r.mon_pay_amt
+    COALESCE(j.code_nm,d.job_cd) AS job_name,r.mon_uprc,r.mon_pay_amt,
+    sj.code_nm AS sub_job_name,COALESCE(jp.code_nm,d.jbps_cd) AS position_name,COALESCE(dc.code_nm,d.drct_cls_cd) AS direct_name,
+    CASE WHEN p.hq_yn='Y' THEN '본사(직접 영업)' ELSE COALESCE(p.part_nm,d.part_id) END AS part_name,
+    COALESCE(d.mod_dttm,d.reg_dttm) AS modified_at
   </sql>
   <sql id="joins">
     LEFT JOIN TB_BS_CLNT c ON c.clnt_id=d.blng_clnt_id
     LEFT JOIN TB_SY_CODE e ON e.code_grp_id='EMP_TYPE' AND e.code=d.emp_type_cd
     LEFT JOIN TB_SY_CODE g ON g.code_grp_id='GRADE' AND g.code=d.grade_cd
     LEFT JOIN TB_SY_CODE j ON j.code_grp_id='JOB' AND j.code=d.job_cd
+    LEFT JOIN TB_SY_CODE sj ON sj.code_grp_id='JOB' AND sj.code=d.sub_job_cd
+    LEFT JOIN TB_SY_CODE jp ON jp.code_grp_id='JBPS' AND jp.code=d.jbps_cd
+    LEFT JOIN TB_SY_CODE dc ON dc.code_grp_id='DRCT_CLS' AND dc.code=d.drct_cls_cd
+    LEFT JOIN TB_BS_PART p ON p.part_id=d.part_id
     LEFT JOIN TB_HR_DEV_PRC r ON r.dev_id=d.dev_id AND r.aply_bgn_ym &lt;= #{month}
       AND (r.aply_end_ym IS NULL OR r.aply_end_ym &gt;= #{month})
   </sql>
@@ -204,4 +224,51 @@
     INSERT INTO TB_SY_ACCS_LOG(user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id)
     VALUES(#{actor},'DNLD','UI-02',concat('개발자 목록 ',#{count},'건'),clock_timestamp(),#{actor})
   </insert>
+  <!-- 엑셀 업로드(B.8 개발자·B.1 급여) -->
+  <select id="selectVendorIdsByName" resultType="string">
+    SELECT clnt_id FROM TB_BS_CLNT WHERE clnt_nm=#{name} AND use_yn='Y' AND clnt_type_cd IN ('VNDR','BOTH') ORDER BY clnt_id
+  </select>
+  <select id="selectPartIdsByName" resultType="string">
+    SELECT part_id FROM TB_BS_PART WHERE part_nm=#{name} AND use_yn='Y' AND hq_yn='N' ORDER BY part_id
+  </select>
+  <select id="selectAreasByName" resultMap="area">
+    SELECT a.area_cd, a.sido_nm||COALESCE(' '||a.sgg_nm,'')||COALESCE(' '||a.emd_nm,'') AS area_name
+    FROM TB_SY_ADM_AREA a
+    WHERE a.area_lvl_cd=#{level} AND a.use_yn='Y'
+    <choose>
+      <when test="level == 'SIDO'">AND (a.sido_nm=#{name} OR a.sido_full_nm=#{name})</when>
+      <when test="level == 'SGG'">AND a.upper_area_cd=#{parent} AND a.sgg_nm=#{name}</when>
+      <otherwise>AND a.upper_area_cd=#{parent} AND a.emd_nm=#{name}</otherwise>
+    </choose>
+    ORDER BY a.area_cd
+  </select>
+  <select id="selectHdongAreas" resultMap="area">
+    SELECT DISTINCT a.area_cd, a.emd_nm AS area_name
+    FROM TB_SY_ADM_HDONG h JOIN TB_SY_ADM_AREA a ON a.area_cd=h.area_cd
+    WHERE a.upper_area_cd=#{parent} AND regexp_replace(h.hdong_nm,'제([0-9])','\1','g')=#{name}
+    ORDER BY a.area_cd
+  </select>
+  <select id="selectSameNameHire" resultType="string">
+    SELECT mng_no FROM TB_HR_DEV WHERE dev_nm=#{name} AND jncmp_dt=#{date} ORDER BY mng_no LIMIT 1
+  </select>
+  <select id="selectPayTarget" resultMap="payTarget">
+    SELECT dev_id,dev_nm,emp_type_cd,drct_cls_cd,jbps_cd,retire_dt FROM TB_HR_DEV WHERE mng_no=#{number}
+  </select>
+  <select id="selectPayTargetById" resultMap="payTarget">
+    SELECT dev_id,dev_nm,emp_type_cd,drct_cls_cd,jbps_cd,retire_dt FROM TB_HR_DEV WHERE dev_id=#{id}
+  </select>
+  <select id="selectCodeValue" resultType="java.math.BigDecimal">
+    SELECT code_val FROM TB_SY_CODE WHERE code_grp_id=#{groupId} AND code=#{code} AND use_yn='Y' AND del_yn='N'
+  </select>
+  <delete id="deleteMonthPay">DELETE FROM TB_HR_MON_PAY WHERE pay_ym=#{month}</delete>
+  <insert id="insertMonthPay">
+    INSERT INTO TB_HR_MON_PAY(pay_ym,dev_id,pay_amt,alwnc_amt,insr_cmpny_amt,insr_self_amt,retire_rsv_amt,incm_tax_amt,
+      wthld_tax_amt,real_pay_amt,vndr_sply_amt,emp_type_cd,drct_cls_cd,upld_id,reg_user_id,reg_dttm)
+    VALUES(#{month},#{developerId},#{pay},#{allowance},#{insuranceCompany},#{insuranceSelf},#{retirement},#{incomeTax},
+      #{withholding},#{realPay},#{vendorSupply},#{employeeTypeCode},#{directClassCode},#{uploadId},#{actor},clock_timestamp())
+  </insert>
+  <select id="selectClientName" resultType="string">SELECT COALESCE((SELECT clnt_nm FROM TB_BS_CLNT WHERE clnt_id=#{id}),#{id})</select>
+  <select id="selectPartName" resultType="string">
+    SELECT COALESCE((SELECT CASE WHEN hq_yn='Y' THEN '본사(직접 영업)' ELSE part_nm END FROM TB_BS_PART WHERE part_id=#{id}),#{id})
+  </select>
 </mapper>

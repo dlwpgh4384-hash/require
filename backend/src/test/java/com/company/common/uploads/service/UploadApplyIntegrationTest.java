@@ -154,7 +154,7 @@ class UploadApplyIntegrationTest {
         assertThat(db.queryForObject("SELECT row_to_json(p)::text FROM TB_HR_MON_PAY p WHERE dev_id='upload-guard'",String.class)).isEqualTo(payroll);
         mvc.perform(post("/api/common/uploads/{uploadId}/apply",uploadId).contentType("application/json").content("{\"modifiedAt\":null}"))
             .andExpect(status().isOk()).andExpect(response("POST","/api/common/uploads/{uploadId}/apply"))
-            .andExpect(jsonPath("$.data.statusName").value("반영완료"))
+            .andExpect(jsonPath("$.data.statusName").value("반영"))
             .andExpect(jsonPath("$.data.errorCount").value(0));
         assertThat(count("TB_BS_CLNT")).isEqualTo(clientCount+1);
         assertThat(db.queryForObject("SELECT row_to_json(d)::text FROM TB_HR_DEV d WHERE dev_id='upload-guard'",String.class)).isEqualTo(developer);

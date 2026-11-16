@@ -47,36 +47,25 @@ class MenuPreparationBoundaryTest {
     }
 
     @Test
-    void normalBeanStartupRunsPackagedFlywayWithoutManualPreparationOrSqlInitialization() {
+    void normalBeanStartupDoesNotRunFlywaySqlInitializationOrPreparation() {
         var yaml = new YamlPropertiesFactoryBean();
         yaml.setResources(new ClassPathResource("application.yml"));
         var properties = yaml.getObject();
         assertThat(properties).isNotNull();
-        assertThat(properties.getProperty("spring.flyway.enabled")).isEqualTo("true");
-        assertThat(properties.getProperty("spring.flyway.baseline-on-migrate")).isEqualTo("true");
-        assertThat(properties.getProperty("spring.flyway.baseline-version")).isEqualTo("0");
+        assertThat(properties.getProperty("spring.flyway.enabled")).isEqualTo("false");
         assertThat(properties.getProperty("spring.sql.init.mode")).isEqualTo("never");
         var dataSource = mock(DataSource.class);
-        var strategy = mock(org.springframework.boot.autoconfigure.flyway.FlywayMigrationStrategy.class);
         new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(FlywayAutoConfiguration.class,
                 SqlInitializationAutoConfiguration.class))
             .withPropertyValues("spring.flyway.enabled=" + properties.getProperty("spring.flyway.enabled"),
-                "spring.flyway.url=jdbc:postgresql://127.0.0.1/unused",
-                "spring.flyway.baseline-on-migrate=" + properties.getProperty("spring.flyway.baseline-on-migrate"),
-                "spring.flyway.baseline-version=" + properties.getProperty("spring.flyway.baseline-version"),
                 "spring.sql.init.mode=" + properties.getProperty("spring.sql.init.mode"))
-            .withBean(org.springframework.boot.autoconfigure.flyway.FlywayMigrationStrategy.class, () -> strategy)
             .withBean(DataSource.class, () -> dataSource)
             .withBean(SchemaPreparation.class, () -> preparation)
             .run(context -> {
                 assertThat(context).hasNotFailed();
                 assertThat(context).hasSingleBean(SchemaPreparation.class);
-                assertThat(context).hasSingleBean(org.flywaydb.core.Flyway.class);
-                var flyway = context.getBean(org.flywaydb.core.Flyway.class);
-                assertThat(flyway.getConfiguration().isBaselineOnMigrate()).isTrue();
-                assertThat(flyway.getConfiguration().getBaselineVersion().getVersion()).isEqualTo("0");
-                verify(strategy).migrate(flyway);
+                assertThat(context).doesNotHaveBean(org.flywaydb.core.Flyway.class);
                 verifyNoInteractions(factory, session, connection, statement, dataSource);
             });
     }

@@ -26,7 +26,7 @@ public class ProjectDistributionUploadForm implements UploadForm {
     public String targetName() { return "프로젝트 배분표"; }
     public String screenId() { return "UI-01"; }
     public String templateFileName() { return "distribution-template.xlsx"; }
-    public String templateNote() { return "프로젝트 계약기간 월별 원 단위 금액. 빈칸은 0, 합계는 비교용. 사람은 관리번호·확인 이름 필수. 수식은 값으로 바꿔 주세요."; }
+    public String templateNote() { return "구분은 사람 또는 항목. 프로젝트 계약기간 월별 원 단위 금액. 빈칸은 0, 합계는 비교용. 사람은 관리번호·확인 이름 필수, 항목은 항목명 필수."; }
     private static CodeFailure contextError() { return CodeFailure.invalid("projectId","배분표 화면에서 프로젝트와 단계를 선택해 주세요."); }
     public List<String> headers() { throw contextError(); }
     public Inspection inspect(List<TabularRow> rows,YearMonth month) { throw contextError(); }
@@ -66,9 +66,14 @@ public class ProjectDistributionUploadForm implements UploadForm {
             for (var r:rows) {
                 var local=new ArrayList<Issue>(); var v=r.values();
                 try {
-                    for (int col:r.formulaColumns()) issue(local,r,col,"수식은 값으로 바꿔 주세요.","오류",headers);
-                    var result=resolver.resolve("ROW_TYPE",v.get(0).trim()); String type=result.code();
-                    if(result.warning()!=null) issue(local,r,0,CodeTextResolver.readAs(result.codeName()),"경고",headers);
+                    // 구분: 명세 B.6 표기 「사람」/「항목」, 또는 공통코드 「턴키 배분 줄 유형」 이름·코드.
+                    String kind=v.get(0).trim(); String type;
+                    if ("사람".equals(kind)) type="DEV";
+                    else if ("항목".equals(kind)) type="ITEM";
+                    else {
+                        var result=resolver.resolve("ROW_TYPE",kind); type=result.code();
+                        if(result.warning()!=null) issue(local,r,0,CodeTextResolver.readAs(result.codeName()),"경고",headers);
+                    }
                     String dev=null,item=null;
                     if ("DEV".equals(type)) {
                         var person=mapper.uploadDeveloper(v.get(1).trim());
@@ -81,14 +86,14 @@ public class ProjectDistributionUploadForm implements UploadForm {
                     if (!identities.add(identity)) issue(local,r,"DEV".equals(type)?1:3,"같은 사람 또는 항목이 중복되었습니다.","오류",headers);
                     var amounts=new LinkedHashMap<String,BigDecimal>(); BigDecimal total=BigDecimal.ZERO;
                     for (int col=4;col<headers.size()-1;col++) {
-                        String text=v.get(col).trim(); BigDecimal value=BigDecimal.ZERO;
+                        String text=v.get(col).trim().replace(",",""); BigDecimal value=BigDecimal.ZERO; // 천 단위 쉼표는 지우고 읽는다
                         if (!text.isEmpty()) {
                             if(!text.matches("[0-9]{1,15}")) issue(local,r,col,"0 이상의 정수 원 단위 금액을 적어 주세요.","오류",headers);
                             else value=new BigDecimal(text);
                         }
                         amounts.put(headers.get(col).replace("-",""),value); total=total.add(value);
                     }
-                    String sum=v.get(headers.size()-1).trim();
+                    String sum=v.get(headers.size()-1).trim().replace(",","");
                     if(!sum.isEmpty() && (!sum.matches("[0-9]+") || total.compareTo(new BigDecimal(sum))!=0)) issue(local,r,headers.size()-1,"월 금액 합계와 다릅니다. 합계는 저장하지 않습니다.","경고",headers);
                     if(local.stream().noneMatch(i -> "오류".equals(i.severity()))) records.add(new DistributionLine(r.rowNumber(),type,dev,item,amounts));
                 } catch(CodeFailure e) { issue(local,r,0,e.getMessage(),"오류",headers); }

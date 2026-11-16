@@ -3,7 +3,7 @@ package com.company.common.projects.service;
 import com.company.common.calculation.mapper.CalculationRuleMapper;
 import com.company.common.calculation.service.CalculationRuleService;
 import com.company.common.codegroups.service.CodeTextResolver;
-import com.company.common.common.ProjectAmountRules;
+import com.company.common.projects.service.ProjectAmountRules;
 import com.company.common.projects.controller.CommonProjectController;
 import com.company.common.projects.mapper.ProjectMapper;
 import com.company.common.preferences.mapper.UserPreferencePeriodSourceMapper;

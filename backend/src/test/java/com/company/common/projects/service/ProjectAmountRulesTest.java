@@ -1,4 +1,4 @@
-package com.company.common.common;
+package com.company.common.projects.service;
 
 import com.company.common.calculation.dto.CalculationRuleContracts.Definition;
 import com.company.common.calculation.dto.CalculationRuleContracts.Standard;
@@ -37,6 +37,16 @@ class ProjectAmountRulesTest {
         assertThat(rules.automaticBudget(new BigDecimal("1000000"), month)).isEqualByComparingTo("750000");
         verify(metadata, times(2)).definition("식-00");
         verify(metadata, times(2)).definition("식-19");
+    }
+
+    @Test
+    void budgetRuleGivesTheScreenTheFactorAndMarginWithoutTheFormula() {
+        var rule = rules.budgetRule(month);
+        assertThat(rule.budgetFactor()).isEqualByComparingTo("0.80");
+        assertThat(rule.targetMarginRate()).isEqualByComparingTo("20");
+        when(metadata.effectiveStandard("TGT_MRGN_RT", month))
+            .thenReturn(new Standard("TGT_MRGN_RT", month, new BigDecimal("25")));
+        assertThat(rules.budgetRule(month).budgetFactor()).isEqualByComparingTo("0.75");
     }
 
     @Test

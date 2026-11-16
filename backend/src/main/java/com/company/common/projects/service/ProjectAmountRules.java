@@ -1,4 +1,4 @@
-package com.company.common.common;
+package com.company.common.projects.service;
 
 import com.company.common.calculation.dto.CalculationRuleContracts.Definition;
 import com.company.common.calculation.service.CalculationRuleService;
@@ -27,6 +27,11 @@ public class ProjectAmountRules {
     /** Call only for automatic, non-internal budgets; manual budget ownership stays with the command. */
     public BigDecimal automaticBudget(BigDecimal contractAmount, YearMonth month) {
         nonnegative(contractAmount, "contractAmount");
+        return contractAmount.multiply(budgetRule(month).budgetFactor()).setScale(0, RoundingMode.DOWN);
+    }
+
+    /** 식-19 예산 기본값의 곱하는 수(계약금액 × (기준 − 목표 마진율))와 그 달 목표 마진율. 화면이 식을 따로 적지 않게 서버가 준다. */
+    public com.company.common.projects.dto.ProjectContracts.BudgetRule budgetRule(YearMonth month) {
         metadata.definition("식-00");
         var definition = metadata.definition("식-19");
         var factor = BUDGET_FACTOR.matcher(definition.formula());
@@ -38,7 +43,7 @@ public class ProjectAmountRules {
         }
         BigDecimal multiplier = base.subtract(margin.movePointLeft(2));
         if (multiplier.signum() < 0) throw unsupported("식-19");
-        return contractAmount.multiply(multiplier).setScale(0, RoundingMode.DOWN);
+        return new com.company.common.projects.dto.ProjectContracts.BudgetRule(margin, multiplier);
     }
 
     public PersonnelDirectCost personnelDirectCost(String employeeTypeCode, BigDecimal monthlyTeamAmount,

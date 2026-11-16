@@ -40,10 +40,19 @@ class ProjectUploadTest {
         var check=b9.inspect(List.of(project(2,"P-file"),project(3,"P-file")),null);assertThat(check.errorCount()).isEqualTo(1);
         assertThat(check.issues()).anyMatch(i->i.row()==3&&i.column().equals("프로젝트ID"));
     }
-    @Test void reversedB9DatesAndFormulasAreRejectedBeforeWriting() {
+    @Test void reversedB9DatesAreRejectedBeforeWriting() {
+        // 수식 칸은 엑셀이 저장해 둔 값으로 읽으므로(SFR-012-03) 날짜 오류만 본다.
         var row=project(2,"");var values=new ArrayList<>(row.values());values.set(5,"2026-10-01");
-        var check=b9.inspect(List.of(new TabularRow(2,values,List.of(10))),null);assertThat(check.errorCount()).isEqualTo(1);
-        assertThat(check.issues()).anyMatch(i->i.column().equals("종료일")).anyMatch(i->i.column().equals("계약금액"));verifyNoInteractions(projects);
+        var check=b9.inspect(List.of(new TabularRow(2,values,List.of())),null);assertThat(check.errorCount()).isEqualTo(1);
+        assertThat(check.issues()).anyMatch(i->i.column().equals("종료일")&&i.reason().equals("종료일이 시작일보다 앞입니다."));
+        verifyNoInteractions(projects);
+    }
+    @Test void blankB9StatusMeansInProgressAndAmountsMayHaveCommas() {
+        var values=new ArrayList<>(project(2,"").values());values.set(8,"");values.set(9,"1,200,000");
+        var check=b9.inspect(List.of(new TabularRow(2,values,List.of())),null);
+        assertThat(check.errorCount()).isZero();
+        var input=((ProjectUploadForm.Row)check.records().get(0)).input();
+        assertThat(input.statusCode()).isEqualTo("ING");assertThat(input.estimateAmount()).isEqualByComparingTo("1200000");
     }
     @Test void ambiguousCustomerListsEveryBusinessNumber() {
         when(mapper.uploadCustomers()).thenReturn(List.of(new ProjectMapper.Customer("one","같은상호","111-11-11111"),new ProjectMapper.Customer("two","같은상호","222-22-22222")));

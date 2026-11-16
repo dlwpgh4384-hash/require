@@ -16,7 +16,34 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping(produces = "application/json")
 public class CommonProjectController {
     private final CommonProjectService service;
-    public CommonProjectController(CommonProjectService service) { this.service = service; }
+    private final com.company.common.support.service.ExcelExportService excel;
+    public CommonProjectController(CommonProjectService service, com.company.common.support.service.ExcelExportService excel) {
+        this.service = service;
+        this.excel = excel;
+    }
+    @GetMapping(value = "/api/common/projects/excel", produces = {
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/json"})
+    public ResponseEntity<byte[]> getCommonProjectsExcel(@ModelAttribute ExcelFilter filter) {
+        var rows = service.getCommonProjectsForDownload(filter).stream().map(p -> java.util.List.of(
+            p.projectId, p.projectName, value(p.customerName), "IN".equals(p.contractTypeCode) ? "내부" : value(p.contractTypeName),
+            p.startDate + " ~ " + p.endDate, "IN".equals(p.contractTypeCode) ? "–" : value(p.contractAmount),
+            p.assignedPeopleCount + "명",
+            "IN".equals(p.contractTypeCode) ? "없음(내부)" : p.salesPartId == null ? "미지정" : "HQ".equals(p.salesPartId) ? "본사(직접 영업)" : value(p.salesPartName),
+            value(p.statusName),
+            "TK".equals(p.contractTypeCode) ? (p.distributionStepName == null ? "없음" : p.distributionStepName) : "–")).toList();
+        var now = service.now();
+        int year = filter.year() == null ? now.atZone(java.time.ZoneId.of("Asia/Seoul")).getYear() : filter.year();
+        byte[] bytes = excel.write("프로젝트", java.util.List.of("프로젝트ID", "프로젝트명", "고객사", "계약유형", "계약 기간", "계약금액",
+            "투입 인원", "영업 파트", "상태", "배분표"), rows, service.currentUserId(), now);
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            .header(HttpHeaders.CONTENT_DISPOSITION, org.springframework.http.ContentDisposition.attachment()
+                .filename(excel.fileName("프로젝트", year + "년", now), java.nio.charset.StandardCharsets.UTF_8).build().toString())
+            .body(bytes);
+    }
+    private static String value(Object o) { return o == null ? "" : o.toString(); }
+    @GetMapping("/api/common/projects/budget-rule")
+    public Response<BudgetRule> getCommonProjectBudgetRule() { return Response.of(service.getCommonProjectBudgetRule()); }
     @GetMapping("/api/common/projects")
     public Response<ProjectList> getCommonProjects() { return Response.of(service.getCommonProjects()); }
     @GetMapping("/api/common/projects/{projectId}")

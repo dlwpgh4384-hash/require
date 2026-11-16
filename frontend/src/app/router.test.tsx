@@ -982,7 +982,7 @@ describe("project route composition", () => {
       await screen.findByTestId("list-empty");
       expect(screen.getAllByTestId("project-page")).toHaveLength(1);
       expect(
-        screen.getByTestId("project-title-register").closest(".screen-actions"),
+        (await screen.findByTestId("project-register")).closest(".screen-actions"),
       ).not.toBeNull();
       expect(request).toHaveBeenCalledWith("/api/common/projects", {
         signal: expect.any(AbortSignal),
@@ -1003,10 +1003,10 @@ describe("project route composition", () => {
     const { request } = respondWithProjects();
     mount("/screens/UI-01");
     await screen.findByTestId("list-empty");
-    fireEvent.click(screen.getByTestId("project-title-register"));
+    fireEvent.click(await screen.findByTestId("project-register"));
     expect(await screen.findByTestId("project-form")).toBeVisible();
     expect(router?.state.location.pathname).toBe("/screens/UI-01");
-    fireEvent.click(screen.getByTestId("project-form-cancel"));
+    fireEvent.click(screen.getByTestId("project-cancel"));
     expect(screen.queryByTestId("project-form")).not.toBeInTheDocument();
     expect(
       request.mock.calls.filter(

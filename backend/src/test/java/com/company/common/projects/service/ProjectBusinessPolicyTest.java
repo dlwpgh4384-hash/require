@@ -1,6 +1,6 @@
 package com.company.common.projects.service;
 
-import com.company.common.common.ProjectAmountRules;
+import com.company.common.projects.service.ProjectAmountRules;
 import com.company.common.projects.dto.ProjectContracts.*;
 import com.company.common.projects.mapper.ProjectMapper;
 import com.company.common.support.service.*;

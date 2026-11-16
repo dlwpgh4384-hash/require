@@ -41,7 +41,8 @@ class ProjectProjectionTest {
                 assertThat(meta.hasSetter(label)).as(name+":"+label).isTrue();
                 Class<?> type = meta.getSetterType(label);
                 Object value = type == LocalDate.class ? LocalDate.of(2026,11,15) : type == BigDecimal.class ? new BigDecimal("123.45") :
-                    type == int.class ? 17 : type == long.class ? 19L : type == boolean.class ? true : "value:"+label;
+                    type == int.class ? 17 : type == long.class ? 19L : type == boolean.class ? true :
+                    type == java.time.Instant.class ? java.time.Instant.parse("2026-11-15T00:00:00Z") : "value:"+label;
                 assertThat(c.getTypeHandlerRegistry().getTypeHandler(type)).as(label).isNotNull();
                 meta.setValue(label,value); assertThat(meta.getValue(label)).isEqualTo(value);
             }

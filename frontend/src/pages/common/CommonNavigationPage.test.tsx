@@ -383,7 +383,7 @@ describe("common placeholder screen contract", () => {
       await expectScreenContent(id);
       expect(screen.getByLabelText("주소")).toHaveTextContent(`/screens/${id}`);
     }
-  });
+  }, 15000); // 모든 처음 화면을 차례로 열어 보는 긴 시험: 전체 시험을 함께 돌릴 때 5초를 넘길 수 있다
 
   it("a PC-only duplicate representative cannot be replaced by another mobile link", async () => {
     mobile = true;

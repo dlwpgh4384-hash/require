@@ -13,10 +13,16 @@ export function UploadActions({
   onApplied,
   disabled = false,
   formTypeCode = "B7",
+  targetName,
+  notes,
 }: {
   onApplied: () => void;
   disabled?: boolean;
   formTypeCode?: string;
+  /** 결과 창 제목 「엑셀 업로드 결과 · {대상}」. 비우면 거래처. */
+  targetName?: string;
+  /** 결과 표 아래 안내(시안 양식별 설명). */
+  notes?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
@@ -77,6 +83,8 @@ export function UploadActions({
         <UploadResultDialog
           uploadId={result.uploadId}
           initialResult={result}
+          targetName={targetName}
+          notes={notes}
           onClose={() => setResult(null)}
           onApplied={onApplied}
         />

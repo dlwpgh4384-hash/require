@@ -1,52 +1,20 @@
-import {
-  createContext,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 
-export function useProjectWorkspaceState() {
-  const [revision, setRevision] = useState(0);
-  const [registering, setRegistering] = useState(false);
-  const [readOnly, setReadOnly] = useState(false);
-  return useMemo(
-    () => ({
-      revision,
-      registering,
-      readOnly,
-      setReadOnly,
-      openRegistration: () => setRegistering(true),
-      closeRegistration: () => setRegistering(false),
-      refresh: () => setRevision((n) => n + 1),
-    }),
-    [revision, registering, readOnly],
-  );
-}
-type ProjectWorkspace = ReturnType<typeof useProjectWorkspaceState>;
-const Context = createContext<ProjectWorkspace | null>(null);
-export function ProjectWorkspaceProvider({
-  children,
-  value,
-}: {
-  children: ReactNode;
-  value?: ProjectWorkspace;
-}) {
-  const owned = useProjectWorkspaceState();
-  return <Context.Provider value={value ?? owned}>{children}</Context.Provider>;
-}
-export const useOptionalProjectWorkspace = () => useContext(Context);
-export function ProjectTitleActions() {
-  const workspace = useOptionalProjectWorkspace();
+/** 화면 틀 제목줄 오른쪽 자리. 프로젝트 화면이 이 자리에 [양식 내려받기][엑셀 업로드][+ 등록]을 그린다(시안). */
+const ProjectWorkspaceContext = createContext({
+  host: null as HTMLDivElement | null,
+  setHost: (_host: HTMLDivElement | null) => {},
+});
+export function ProjectWorkspaceProvider({ children }: { children: ReactNode }) {
+  const [host, setHost] = useState<HTMLDivElement | null>(null);
   return (
-    <button
-      type="button"
-      className="primary-button"
-      data-testid="project-title-register"
-      disabled={!workspace || workspace.readOnly}
-      onClick={() => workspace?.openRegistration()}
-    >
-      프로젝트 등록
-    </button>
+    <ProjectWorkspaceContext.Provider value={{ host, setHost }}>
+      {children}
+    </ProjectWorkspaceContext.Provider>
   );
 }
+export function ProjectTitleActions() {
+  const context = useContext(ProjectWorkspaceContext);
+  return <div ref={context.setHost} className="project-title-actions" data-testid="project-title-actions" />;
+}
+export const useProjectTitleHost = () => useContext(ProjectWorkspaceContext).host;

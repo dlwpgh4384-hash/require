@@ -1,6 +1,6 @@
 package com.company.common.projects.service;
 
-import com.company.common.common.ProjectAmountRules;
+import com.company.common.projects.service.ProjectAmountRules;
 import com.company.common.projects.dto.ProjectContracts.*;
 import com.company.common.projects.mapper.ProjectMapper;
 import com.company.common.projects.mapper.ProjectRows.*;
@@ -47,6 +47,25 @@ public class CommonProjectService {
         rows.forEach(this::decorate);
         return new ProjectList(rows, rows.stream().filter(p -> !internal(p) && p.salesPartId == null).count());
     }
+    /** 목록 엑셀 다운로드: 화면과 같은 조건(연도·계약유형·상태·영업 파트·프로젝트명 또는 고객사), 시작일 늦은 순. */
+    public List<Project> getCommonProjectsForDownload(ExcelFilter f) {
+        int year = f.year() == null ? calendar.today().getYear() : f.year();
+        LocalDate first = LocalDate.of(year, 1, 1), last = LocalDate.of(year, 12, 31);
+        String q = f.q() == null ? "" : f.q().trim().toLowerCase();
+        return getCommonProjects().items().stream()
+            .filter(p -> !p.startDate.isAfter(last) && !p.endDate.isBefore(first))
+            .filter(p -> blank(f.contractTypeCode()) || f.contractTypeCode().equals(p.contractTypeCode))
+            .filter(p -> blank(f.statusCode()) || f.statusCode().equals(p.statusCode))
+            .filter(p -> blank(f.salesPartId()) || ("unassigned".equals(f.salesPartId())
+                ? !internal(p) && p.salesPartId == null : f.salesPartId().equals(p.salesPartId)))
+            .filter(p -> q.isEmpty() || (p.projectName + " " + (p.customerName == null ? "" : p.customerName)).toLowerCase().contains(q))
+            .sorted(java.util.Comparator.comparing((Project p) -> p.startDate).reversed().thenComparing(p -> p.projectId))
+            .toList();
+    }
+    private static boolean blank(String v) { return v == null || v.isBlank(); }
+    public String currentUserId() { return actor.userId(); }
+    public BudgetRule getCommonProjectBudgetRule() { return amounts.budgetRule(calendar.currentMonth()); }
+    public java.time.Instant now() { return calendar.now(); }
     public Project getCommonProject(String id) {
         Project p = require(id);
         decorate(p);
@@ -93,8 +112,9 @@ public class CommonProjectService {
         if ("TK".equals(p.contractTypeCode)) {
             var cells = mapper.distributionCells(p.projectId);
             BigDecimal sum = cells.stream().map(c -> c.amount).reduce(BigDecimal.ZERO, BigDecimal::add);
-            p.distributionTotalWarning = sum.compareTo(p.contractAmount) != 0;
-            p.distributionMismatchCount = mapper.mismatches(p.projectId).size();
+            // 배분표를 올리기 전(줄 없음)은 비교할 합계가 없으므로 경고하지 않는다.
+            p.distributionTotalWarning = !cells.isEmpty() && sum.compareTo(p.contractAmount) != 0;
+            p.distributionMismatchCount = (int) mapper.mismatches(p.projectId).stream().map(c -> c.name + "|" + c.kind).distinct().count();
         }
     }
     public List<Cost> getProjectCosts(String id) {
@@ -361,8 +381,11 @@ public class CommonProjectService {
             rows.add(new DistributionRow(first.rowTypeCode, first.managementNumber, first.name, jobs,
                 first.itemName, months, months.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add)));
         }
-        var mismatches = mapper.mismatches(id).stream()
-            .map(c -> new Mismatch(c.name, c.kind, List.of(c.yearMonth))).toList();
+        // 사람·구분마다 한 줄로 묶고 해당 월을 모은다(시안 「투입 배정과 안 맞는 곳 n건」 표).
+        var grouped = new LinkedHashMap<String, Mismatch>();
+        for (var c : mapper.mismatches(id))
+            grouped.computeIfAbsent(c.name + "|" + c.kind, k -> new Mismatch(c.name, c.kind, new ArrayList<>())).months().add(c.yearMonth);
+        var mismatches = List.copyOf(grouped.values());
         return new Distribution(p, rows, mapper.distributionUploads(id), mismatches, p.distributionTotalWarning);
     }
     public byte[] getCommonProjectDistributionTemplate(String id) {

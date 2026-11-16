@@ -8,6 +8,10 @@ public final class ProjectContracts {
     private ProjectContracts() {}
     public record Items<T>(List<T> items) {}
     public record ProjectList(List<Project> items, long unassignedCount) {}
+    /** 예산 기본값(식-19): 예산 = 계약금액 × budgetFactor(원 단위 버림). targetMarginRate는 안내 문구용(%). */
+    public record BudgetRule(java.math.BigDecimal targetMarginRate, java.math.BigDecimal budgetFactor) {}
+    /** 목록 엑셀 다운로드 조건(salesPartId 「unassigned」 = 미지정). */
+    public record ExcelFilter(Integer year, String contractTypeCode, String statusCode, String salesPartId, String q) {}
     @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     public static class Project {
         public String projectId, projectName, customerId, customerName, contractTypeCode, contractTypeName;
@@ -46,7 +50,8 @@ public final class ProjectContracts {
     }
     public record DeletedExpense(String expenseId, boolean deleted) {}
     public static class History {
-        public String changedAt, itemName, beforeValue, afterValue, changedBy;
+        public java.time.Instant changedAt;
+        public String itemName, beforeValue, afterValue, changedBy;
     }
     public static class SalesPart {
         public String salesPartId, salesPartName, effectiveMonth, reason, changedBy;
@@ -75,6 +80,7 @@ public final class ProjectContracts {
         BigDecimal totalAmount) {}
     public record Mismatch(String name, String kind, List<String> months) {}
     public static class DistributionUpload {
-        public String uploadedAt, stepCode, stepName, fileName, uploadedBy;
+        public java.time.Instant uploadedAt;
+        public String stepCode, stepName, fileName, uploadedBy;
     }
 }

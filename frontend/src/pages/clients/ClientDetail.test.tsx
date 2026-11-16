@@ -26,7 +26,7 @@ beforeEach(() => {
     clientName: "거래처A",
     businessNumber: "123-45-67890",
     representativeName: "대표",
-    industryCode: "IT",
+    industryCode: "FIN_BANK",
     contactName: "담당",
     contactPhone: "010",
     taxEmail: "a@example.test",
@@ -193,7 +193,7 @@ it.each([
       signal: undefined,
     });
     expect(screen.getByTestId("client-assignments")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("project-detail-dialog-close"));
+    fireEvent.click(screen.getByTestId("project-detail-close"));
     expect(screen.queryByTestId("project-detail")).not.toBeInTheDocument();
     expect(screen.getByTestId("client-detail-tab-assignments")).toHaveAttribute(
       "aria-selected",

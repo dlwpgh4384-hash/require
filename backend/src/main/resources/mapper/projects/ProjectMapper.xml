@@ -69,17 +69,17 @@
       EST_AMT=#{project.estimateAmount}, ORGNL_CTRT_AMT=#{project.originalContractAmount}, CTRT_AMT=#{project.contractAmount},
       BDGT_AMT=#{project.budgetAmount}, BDGT_MANUAL_YN=#{project.budgetManualYn},
       TEAM_EXPS_AMT=#{project.teamExpenseAmount}, PROJ_EXPS_AMT=#{project.projectExpenseAmount},
-      FEATURE_CN=#{project.feature}, PROJ_STAT_CD=#{project.statusCode}, MOD_USER_ID=#{actor}, MOD_DTTM=CURRENT_TIMESTAMP
+      FEATURE_CN=#{project.feature}, PROJ_STAT_CD=#{project.statusCode}, MOD_USER_ID=#{actor}, MOD_DTTM=clock_timestamp()
     WHERE PROJ_ID=#{project.projectId}
   </update>
   <insert id="insertHistory">
     INSERT INTO TB_PJ_PROJ_CHG (PROJ_ID, HIST_SN, CHG_ITEM_CD, CHG_ITEM_NM, BFR_VAL, AFT_VAL, CHG_DT, REG_USER_ID)
     SELECT #{projectId}, COALESCE(MAX(HIST_SN),0)+1, #{code}, #{name}, #{beforeValue}, #{afterValue},
-      (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date, #{actor}
+      (clock_timestamp() AT TIME ZONE 'Asia/Seoul')::date, #{actor}
     FROM TB_PJ_PROJ_CHG WHERE PROJ_ID=#{projectId}
   </insert>
   <select id="histories" resultType="com.company.common.projects.dto.ProjectContracts$History">
-    SELECT h.REG_DTTM::text AS "changedAt", h.CHG_ITEM_NM AS "itemName", h.BFR_VAL AS "beforeValue",
+    SELECT h.REG_DTTM AS "changedAt", h.CHG_ITEM_NM AS "itemName", h.BFR_VAL AS "beforeValue",
       h.AFT_VAL AS "afterValue", COALESCE(u.USER_NM,h.REG_USER_ID) AS "changedBy"
     FROM TB_PJ_PROJ_CHG h LEFT JOIN TB_SY_USER u ON u.USER_ID=h.REG_USER_ID
     WHERE h.PROJ_ID=#{id} ORDER BY h.REG_DTTM DESC, h.HIST_SN DESC
@@ -158,11 +158,11 @@
     UPDATE TB_PJ_ASGN SET
     <choose><when test="kind == 'EARLY'">INPUT_END_DT=#{today}, EARLY_WTHDR_YN='Y',</when>
       <otherwise>ASGN_STAT_CD='CNCL',</otherwise></choose>
-    MOD_USER_ID=#{actor},MOD_DTTM=CURRENT_TIMESTAMP WHERE ASGN_ID=#{assignmentId}
+    MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp() WHERE ASGN_ID=#{assignmentId}
   </update>
   <update id="lose">
     UPDATE TB_PJ_PROJ SET PROJ_STAT_CD='LOSE',LOSE_DT=#{today},LOSE_RSN_CD=#{input.reasonCode},
-      LOSE_MEMO=#{input.memo},MOD_USER_ID=#{actor},MOD_DTTM=CURRENT_TIMESTAMP WHERE PROJ_ID=#{projectId}
+      LOSE_MEMO=#{input.memo},MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp() WHERE PROJ_ID=#{projectId}
   </update>
   <select id="impactAssignments" resultType="com.company.common.projects.mapper.ProjectRows$ActiveAssignment">
     SELECT ASGN_ID AS "assignmentId", DEV_ID AS "developerId", INPUT_BGN_DT AS "startDate", INPUT_END_DT AS "endDate"
@@ -191,7 +191,7 @@
     INSERT INTO TB_PJ_MNPW_PLAN (PROJ_ID,JOB_CD,PLAN_MM,SRC_CD,REG_USER_ID)
     VALUES (#{projectId},#{job.jobCode},#{job.plannedMm},'MANUAL',#{actor})
     ON CONFLICT (PROJ_ID,JOB_CD) DO UPDATE SET PLAN_MM=EXCLUDED.PLAN_MM,SRC_CD='MANUAL',
-      MOD_USER_ID=EXCLUDED.REG_USER_ID,MOD_DTTM=CURRENT_TIMESTAMP
+      MOD_USER_ID=EXCLUDED.REG_USER_ID,MOD_DTTM=clock_timestamp()
   </insert>
   <select id="expenses" resultType="com.company.common.projects.dto.ProjectContracts$Expense">
     SELECT e.EXPS_YM||':'||e.EXPS_SN::text AS "expenseId",
@@ -255,7 +255,7 @@
     WHERE d.PROJ_ID=#{id} AND d.DSTRB_STEP_CD=(<include refid="chosenStage"/>) ORDER BY d.ROW_SN,d.DSTRB_YM
   </select>
   <select id="distributionUploads" resultType="com.company.common.projects.dto.ProjectContracts$DistributionUpload">
-    SELECT u.REG_DTTM::text AS "uploadedAt",u.TRGT_DSTRB_STEP_CD AS "stepCode",c.CODE_NM AS "stepName",
+    SELECT u.REG_DTTM AS "uploadedAt",u.TRGT_DSTRB_STEP_CD AS "stepCode",c.CODE_NM AS "stepName",
       u.FILE_NM AS "fileName",COALESCE(a.USER_NM,u.REG_USER_ID) AS "uploadedBy"
     FROM TB_SY_UPLD u LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='DSTRB_STEP' AND c.CODE=u.TRGT_DSTRB_STEP_CD
     LEFT JOIN TB_SY_USER a ON a.USER_ID=u.REG_USER_ID WHERE u.TRGT_PROJ_ID=#{id} AND u.FORM_TYPE_CD='B6'

@@ -1,3 +1,4 @@
+import { koreanToday } from "../../shared/time";
 import { downloadFile } from "../../shared/list/download";
 
 export interface Project {
@@ -247,13 +248,8 @@ export const getCommonProjectDistributionTemplate = (id: string) =>
     `${root}/${encodeURIComponent(id)}/distribution/template`,
     "distribution.xlsx",
   );
-export const projectToday = () =>
-  new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+/** 한국 날짜 「오늘」(YYYY-MM-DD). 공통 shared/time을 쓴다. */
+export const projectToday = () => koreanToday();
 export const won = (value: number | null | undefined) =>
   value == null ? "–" : value.toLocaleString("ko-KR");
 export const projectFailure = (error: unknown) =>
@@ -298,3 +294,36 @@ export function filterProjects(rows: Project[], f: ProjectFilters) {
       ),
   };
 }
+
+/** 시안 계약유형 배지 글자: 내부(자체 개발)는 「내부」. */
+export const typeLabel = (p: Pick<Project, "contractTypeCode" | "contractTypeName">) =>
+  p.contractTypeCode === "IN" ? "내부" : p.contractTypeName;
+/** 시안 상태 배지 색: 진행 파랑, 수주예정 주황, 종료·실주 회색. */
+export const statusKind = (code: string) =>
+  code === "ING" ? "info" : code === "PRE" ? "warn" : "lock";
+export const HQ_PART = "HQ";
+export interface ProjectListQuery {
+  year: string;
+  contractTypeCode: string;
+  statusCode: string;
+  salesPartId: string;
+  q: string;
+}
+export const projectsExcelUrl = (f: ProjectListQuery) => {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(f)) if (value) query.set(key, value);
+  return `${root}/excel?${query}`;
+};
+export interface ProjectBudgetRule {
+  targetMarginRate: number;
+  budgetFactor: number;
+}
+/** 예산 기본값 규칙(식-19). 계산식은 서버가 계산표에서 읽어 곱하는 수만 준다. */
+export const getCommonProjectBudgetRule = async (): Promise<ProjectBudgetRule | null> => {
+  const rule = await projectRequest<ProjectBudgetRule>(`${root}/budget-rule`);
+  const factor = Number(rule?.budgetFactor);
+  const margin = Number(rule?.targetMarginRate);
+  return Number.isFinite(factor) && Number.isFinite(margin) ? { budgetFactor: factor, targetMarginRate: margin } : null;
+};
+export const defaultBudget = (contractAmount: number, rule: ProjectBudgetRule | null) =>
+  rule ? Math.floor(contractAmount * rule.budgetFactor) : null;

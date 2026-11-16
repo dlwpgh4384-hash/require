@@ -134,9 +134,13 @@ export function UploadResultDialog({
     }
   };
   // B.8: 관리번호를 비운 줄에 붙을 번호(행번호 → 번호)
+  // B.9: 프로젝트ID를 비운 줄에 붙을 ID(시안 「새 프로젝트ID」 열). 같은 방식으로 보인다.
   const planned = result?.plannedDevelopers
     ? new Map(result.plannedDevelopers.map((p) => [p.row, p.managementNumber]))
-    : null;
+    : result?.plannedProjects
+      ? new Map(result.plannedProjects.map((p) => [p.row, p.projectId]))
+      : null;
+  const plannedLabel = result?.plannedProjects ? "새 프로젝트ID" : "붙을 번호";
   // 시안: 오류 줄을 먼저, 그다음 경고(같은 구분 안에서는 행 순서)
   const ordered = result
     ? [...result.issues].sort(
@@ -213,24 +217,6 @@ export function UploadResultDialog({
                   가능합니다.
                 </p>
               )}
-              {result.plannedProjects && (
-                <table data-testid="upload-project-identities">
-                  <thead>
-                    <tr>
-                      <th>행</th>
-                      <th>새 프로젝트ID</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.plannedProjects.map((p) => (
-                      <tr key={p.row} data-testid={`upload-project-${p.row}`}>
-                        <td>{p.row}</td>
-                        <td>{p.projectId}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
               {!!total && !result.issues.length && (
                 <p>행 오류와 경고가 없습니다.</p>
               )}
@@ -248,7 +234,7 @@ export function UploadResultDialog({
                         <th>열</th>
                         <th>입력값</th>
                         <th>이유</th>
-                        {planned && <th>붙을 번호</th>}
+                        {planned && <th>{plannedLabel}</th>}
                       </tr>
                     </thead>
                     <tbody>

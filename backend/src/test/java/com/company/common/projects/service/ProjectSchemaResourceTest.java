@@ -1,4 +1,4 @@
-package com.company.common.common;
+package com.company.common.projects.service;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;

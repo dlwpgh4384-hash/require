@@ -4,7 +4,7 @@ import com.company.common.projects.dto.ProjectContracts.*;
 import com.company.common.projects.mapper.ProjectMapper;
 import com.company.common.projects.mapper.ProjectRows.*;
 import com.company.common.projects.service.CommonProjectService;
-import com.company.common.common.ProjectAmountRules;
+import com.company.common.projects.service.ProjectAmountRules;
 import com.company.common.support.controller.ApiExceptionHandler;
 import com.company.common.support.controller.CodeExceptionHandler;
 import com.company.common.support.service.*;
@@ -167,13 +167,28 @@ class CommonProjectControllerTest {
             .andExpect(jsonPath("$.data.items[0].projectId").value("P-0001"));
         verify(mapper).selectProjects(today, "202611");
     }
+    @Test void budgetRuleReturnsTheServerFactor() throws Exception {
+        when(amounts.budgetRule(any())).thenReturn(new com.company.common.projects.dto.ProjectContracts.BudgetRule(
+            new java.math.BigDecimal("20"), new java.math.BigDecimal("0.80")));
+        mvc.perform(get("/api/common/projects/budget-rule")).andExpect(status().isOk())
+            .andExpect(response("GET", "/api/common/projects/budget-rule"))
+            .andExpect(jsonPath("$.data.budgetFactor").value(0.80))
+            .andExpect(jsonPath("$.data.targetMarginRate").value(20));
+    }
+    @Test void excelDownloadIsAnXlsxWithTheYearInTheFileName() throws Exception {
+        mvc.perform(get("/api/common/projects/excel").param("year", "2026"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("2026")));
+    }
     @Test void changeHistoryReturnsStoredValues() throws Exception {
         var h = new History(); h.itemName="계약금액"; h.beforeValue="100"; h.afterValue="200";
-        h.changedAt="2026-11-15T00:00:00Z"; h.changedBy="admin";
+        h.changedAt=java.time.Instant.parse("2026-11-15T00:00:00Z"); h.changedBy="admin";
         when(mapper.histories("P-0001")).thenReturn(List.of(h));
         mvc.perform(get("/api/common/projects/P-0001/change-history")).andExpect(status().isOk())
             .andExpect(response("GET", "/api/common/projects/{projectId}/change-history"))
-            .andExpect(jsonPath("$.data.items[0].afterValue").value("200"));
+            .andExpect(jsonPath("$.data.items[0].afterValue").value("200"))
+            .andExpect(jsonPath("$.data.items[0].changedAt").value("2026-11-15T00:00:00Z"));
         verify(mapper).histories("P-0001");
     }
     @Test void salesPartsReturnsInitialStoredPart() throws Exception {

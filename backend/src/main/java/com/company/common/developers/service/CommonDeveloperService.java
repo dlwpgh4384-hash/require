@@ -103,6 +103,7 @@ public class CommonDeveloperService {
             .sorted(Comparator.comparing((Assignment a) -> a.startDate).thenComparing(a -> a.projectId)).toList();
         if (!active.isEmpty()) {
             r.currentProjectName=active.get(0).projectName;
+            r.currentProjectId=active.get(0).projectId;
             r.additionalProjectCount=Math.toIntExact(active.stream().map(a -> a.projectId).distinct().count()-1);
             r.withdrawalDate=active.stream().map(a -> a.endDate).min(LocalDate::compareTo).orElse(null);
         }

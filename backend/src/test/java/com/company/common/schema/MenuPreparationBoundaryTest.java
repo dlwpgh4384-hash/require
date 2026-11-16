@@ -32,7 +32,7 @@ class MenuPreparationBoundaryTest {
         "V5__role_permissions.sql", "V6__role_schema_contract.sql",
         "V7__code_definitions_schema.sql", "V8__calculation_rule_seed.sql",
         "V9__common_entity_contract.sql", "V10__client_part_upload_schema.sql",
-        "V11__developer_pool_schema.sql");
+        "V11__developer_pool_schema.sql", "V12__project_operations_schema.sql");
     private final SqlSessionFactory factory = mock(SqlSessionFactory.class);
     private final SqlSession session = mock(SqlSession.class);
     private final Connection connection = mock(Connection.class);
@@ -47,25 +47,36 @@ class MenuPreparationBoundaryTest {
     }
 
     @Test
-    void normalBeanStartupDoesNotRunFlywaySqlInitializationOrPreparation() {
+    void normalBeanStartupRunsPackagedFlywayWithoutManualPreparationOrSqlInitialization() {
         var yaml = new YamlPropertiesFactoryBean();
         yaml.setResources(new ClassPathResource("application.yml"));
         var properties = yaml.getObject();
         assertThat(properties).isNotNull();
-        assertThat(properties.getProperty("spring.flyway.enabled")).isEqualTo("false");
+        assertThat(properties.getProperty("spring.flyway.enabled")).isEqualTo("true");
+        assertThat(properties.getProperty("spring.flyway.baseline-on-migrate")).isEqualTo("true");
+        assertThat(properties.getProperty("spring.flyway.baseline-version")).isEqualTo("0");
         assertThat(properties.getProperty("spring.sql.init.mode")).isEqualTo("never");
         var dataSource = mock(DataSource.class);
+        var strategy = mock(org.springframework.boot.autoconfigure.flyway.FlywayMigrationStrategy.class);
         new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(FlywayAutoConfiguration.class,
                 SqlInitializationAutoConfiguration.class))
             .withPropertyValues("spring.flyway.enabled=" + properties.getProperty("spring.flyway.enabled"),
+                "spring.flyway.url=jdbc:postgresql://127.0.0.1/unused",
+                "spring.flyway.baseline-on-migrate=" + properties.getProperty("spring.flyway.baseline-on-migrate"),
+                "spring.flyway.baseline-version=" + properties.getProperty("spring.flyway.baseline-version"),
                 "spring.sql.init.mode=" + properties.getProperty("spring.sql.init.mode"))
+            .withBean(org.springframework.boot.autoconfigure.flyway.FlywayMigrationStrategy.class, () -> strategy)
             .withBean(DataSource.class, () -> dataSource)
             .withBean(SchemaPreparation.class, () -> preparation)
             .run(context -> {
                 assertThat(context).hasNotFailed();
                 assertThat(context).hasSingleBean(SchemaPreparation.class);
-                assertThat(context).doesNotHaveBean(org.flywaydb.core.Flyway.class);
+                assertThat(context).hasSingleBean(org.flywaydb.core.Flyway.class);
+                var flyway = context.getBean(org.flywaydb.core.Flyway.class);
+                assertThat(flyway.getConfiguration().isBaselineOnMigrate()).isTrue();
+                assertThat(flyway.getConfiguration().getBaselineVersion().getVersion()).isEqualTo("0");
+                verify(strategy).migrate(flyway);
                 verifyNoInteractions(factory, session, connection, statement, dataSource);
             });
     }
@@ -89,7 +100,7 @@ class MenuPreparationBoundaryTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {5, 6, 7, 8, 9, 10, 11})
+    @ValueSource(ints = {5, 6, 7, 8, 9, 10, 11, 12})
     void permissionPreparationFailureRollsBackTheWholePreparation(int failingResource) throws Exception {
         int[] executions = {0};
         when(statement.execute(anyString())).thenAnswer(call -> {
@@ -117,7 +128,9 @@ class MenuPreparationBoundaryTest {
             "TB_BS_PART", "TB_SY_ACCS_LOG", "TB_SY_CHG_HIST", "TB_SY_ROLE_MENU_AUTH",
             "TB_SY_CODE_MAP", "TB_SY_CALC_RULE", "TB_BS_CLNT", "TB_SY_UPLD", "TB_SY_UPLD_ERR",
             "TB_SY_ADM_AREA", "TB_HR_DEV", "TB_PJ_ASGN", "TB_PJ_PROJ_PART", "TB_CO_PART_SETL",
-            "TB_HR_DEV_PRC", "TB_HR_DEV_SKILL", "TB_HR_DEV_STAT", "TB_HR_MON_PAY", "TB_SY_ADM_HDONG");
+            "TB_HR_DEV_PRC", "TB_HR_DEV_SKILL", "TB_HR_DEV_STAT", "TB_HR_MON_PAY", "TB_SY_ADM_HDONG",
+            "TB_PJ_PROJ_CHG", "TB_PJ_MNPW_PLAN", "TB_PJ_STEP", "TB_PJ_WEEK_MEMO", "TB_PJ_ISSUE",
+            "TB_PJ_TK_DSTRB", "TB_PJ_DRCT_EXPS", "TB_PJ_ASGN_HIST", "TB_PJ_ASGN_MON", "TB_CO_MON_COST");
     }
 
     @Test

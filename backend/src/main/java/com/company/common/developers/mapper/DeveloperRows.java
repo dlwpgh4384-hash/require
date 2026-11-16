@@ -39,7 +39,7 @@ public final class DeveloperRows {
         public String organizationName, employeeTypeName, gradeName, primaryJobName, workStatusName, useYn;
         public BigDecimal monthlyRate, currentMonthMm;
         public boolean retirementScheduled, overOneMm;
-        public String currentProjectName;
+        public String currentProjectName, currentProjectId;
         public int additionalProjectCount;
         public LocalDate withdrawalDate;
     }
@@ -47,7 +47,8 @@ public final class DeveloperRows {
         public String projectName, jobName;
         public LocalDate startDate, endDate;
         public BigDecimal mm;
-        @JsonIgnore public String assignmentId, projectId;
+        @JsonIgnore public String assignmentId;
+        public String projectId;
     }
     public static class State {
         public String developerId, code, reason, registeredBy;

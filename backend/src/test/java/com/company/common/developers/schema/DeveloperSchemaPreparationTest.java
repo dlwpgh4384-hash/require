@@ -64,7 +64,7 @@ class DeveloperSchemaPreparationTest {
         String part = rows("tb_bs_part");
         preparation.prepare();
         assertThat(text("SELECT count(*)::text FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'"))
-            .isEqualTo("34");
+            .isEqualTo("44");
         for (var entry : before.entrySet()) assertThat(definition(entry.getKey())).isEqualTo(entry.getValue());
         assertThat(rows("tb_hr_dev")).isEqualTo(developer);
         assertThat(rows("tb_bs_clnt")).isEqualTo(client);

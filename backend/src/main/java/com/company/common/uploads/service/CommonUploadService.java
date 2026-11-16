@@ -66,7 +66,12 @@ public class CommonUploadService {
         return month;
     }
     public Result postCommonUpload(String formTypeCode, String yearMonth, String fileName, byte[] bytes) {
-        UploadForm form = form(formTypeCode);
+        return postCommonUpload(formTypeCode, yearMonth, fileName, bytes, null, null);
+    }
+    public Result postCommonUpload(String formTypeCode, String yearMonth, String fileName, byte[] bytes,
+            String projectId, String distributionStepCode) {
+        UploadForm form = projectId == null && distributionStepCode == null && !"B6".equals(formTypeCode)
+            ? form(formTypeCode) : form(formTypeCode).withContext(new UploadForm.Context(projectId, distributionStepCode));
         YearMonth month = month(form, yearMonth);
         var rows = workbooks.readTabular(fileName, bytes, form.headers());
         long[] retained = {0};
@@ -80,6 +85,8 @@ public class CommonUploadService {
                     month == null ? null : month.format(DB_MONTH), fileName, bytes.length, inspection)) != 1)
                     throw new IllegalStateException("검사 결과를 기록하지 못했습니다.");
                 issues(id, inspection.issues());
+                if ("B6".equals(formTypeCode)) mapper.storeProjectReceipt(
+                    new UploadMapper.ProjectReceipt(id, projectId, distributionStepCode));
                 return result(require(mapper.selectUpload(id)), inspection.assigned());
             });
         } catch (RuntimeException failure) {
@@ -96,8 +103,8 @@ public class CommonUploadService {
         Map<Integer, String> assigned = Map.of();
         // B.8 「붙을 번호」: 반영 전 검사 결과는 저장된 파일을 다시 읽어 지금 붙을 번호를 계산한다.
         // 오류가 있는 파일도 시안처럼 오류 없는 줄의 붙을 번호를 보여 준다(반영은 막힘).
-        if ("CHECKED".equals(row.statusCode) && "B8".equals(row.formTypeCode)) {
-            UploadForm form = form(row.formTypeCode);
+        if ("CHECKED".equals(row.statusCode) && Set.of("B8", "B9").contains(row.formTypeCode)) {
+            UploadForm form = contextual(row);
             assigned = form.inspect(workbooks.readTabular(row.fileName, files.read(row.uploadId), form.headers()),
                 targetMonth(row)).assigned();
         }
@@ -127,7 +134,7 @@ public class CommonUploadService {
     }
     private Result apply(long id, Apply input) {
         var current = require(mapper.selectUpload(id));
-        UploadForm form = form(current.formTypeCode);
+        UploadForm form = contextual(current);
         form.lock();
         var upload = require(mapper.lockUpload(id));
         if ("APPLIED".equals(upload.statusCode)) return result(upload, Map.of());
@@ -160,7 +167,17 @@ public class CommonUploadService {
             .sorted(Map.Entry.comparingByKey()).map(e -> new PlannedDeveloper(e.getKey(), e.getValue())).toList() : null;
         return new Result(Long.toString(row.uploadId), row.modifiedAt == null ? null : row.modifiedAt.toString(),
             row.statusName, row.successCount, row.warningCount, row.errorCount, issues,
-            planned, month == null ? null : month.toString());
+            planned, month == null ? null : month.toString(),
+            "B9".equals(row.formTypeCode) ? projectAssignments(assigned) : null,
+            "B6".equals(row.formTypeCode) ? contextual(row).distributionMismatchCount() : null);
+    }
+    private UploadForm contextual(UploadRows.Upload row) {
+        return "B6".equals(row.formTypeCode) ? form(row.formTypeCode).withContext(new UploadForm.Context(row.projectId, row.distributionStepCode)) : form(row.formTypeCode);
+    }
+    /** B.9 「새 프로젝트ID」: 개발자 풀(B.8)처럼 표에 저장하지 않고 이번 검사·반영 응답으로만 돌려준다. */
+    private static List<PlannedProject> projectAssignments(Map<Integer, String> assigned) {
+        return assigned.entrySet().stream().sorted(Map.Entry.comparingByKey())
+            .map(e -> new PlannedProject(e.getKey(), e.getValue())).toList();
     }
     private UploadRows.Upload require(UploadRows.Upload row) {
         if (row == null) throw CodeFailure.invalid("uploadId", "업로드 결과를 찾을 수 없습니다.");

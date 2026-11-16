@@ -10,6 +10,13 @@ import java.util.List;
  * 공통 서비스가 파일 읽기·검사 기록·반영 트랜잭션을 맡고, 양식은 열 규칙과 반영만 맡는다.
  */
 public interface UploadForm {
+    record Context(String projectId, String distributionStepCode) {}
+    default UploadForm withContext(Context context) {
+        if (context != null && (context.projectId() != null || context.distributionStepCode() != null))
+            throw com.company.common.support.service.CodeFailure.invalid("projectId", "이 양식은 프로젝트 문맥을 받지 않습니다.");
+        return this;
+    }
+    default Integer distributionMismatchCount() { return null; }
     String formTypeCode();
     /** 결과 창 제목 「엑셀 업로드 결과 · {대상}」과 업로드 기록의 화면 번호. */
     String targetName();

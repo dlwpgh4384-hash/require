@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ProjectLink } from "../projects/ProjectLink";
 import { Dialog, Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
@@ -45,9 +46,25 @@ const emptyFilter: DeveloperFilter = {
 };
 /** 시안 상태 배지: 투입중 파랑, 철수예정 주황, 대기 빨강, 휴직·퇴사 회색. */
 const statusKind = (name: string) =>
-  name === "투입중" ? "info" : name === "철수예정" ? "warn" : name === "대기" ? "bad" : "lock";
+  name === "투입중"
+    ? "info"
+    : name === "철수예정"
+      ? "warn"
+      : name === "대기"
+        ? "bad"
+        : "lock";
 const icon = (d: string) => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d={d} />
   </svg>
 );
@@ -74,8 +91,13 @@ export function DeveloperPage({
   const [page, setPage] = useState(1);
   // 시안: 처음에는 이름순(정렬 표시 없음), 머리를 누르면 그 열로 정렬
   const [sort, setSort] = useState<ListSort | null>(null);
-  const [pendingUse, setPendingUse] = useState<{ ids: string[]; useYn: string } | null>(null);
-  const [blocked, setBlocked] = useState<{ developerId: string; name: string; reason: string }[] | null>(null);
+  const [pendingUse, setPendingUse] = useState<{
+    ids: string[];
+    useYn: string;
+  } | null>(null);
+  const [blocked, setBlocked] = useState<
+    { developerId: string; name: string; reason: string }[] | null
+  >(null);
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const [notice, setNotice] = useState("");
@@ -90,7 +112,10 @@ export function DeveloperPage({
     const controller = new AbortController();
     setError("");
     setRows(null);
-    Promise.all([getCommonDevelopers(applied, controller.signal), getDeveloperOptions()])
+    Promise.all([
+      getCommonDevelopers(applied, controller.signal),
+      getDeveloperOptions(),
+    ])
       .then(([r, o]) => {
         if (!controller.signal.aborted) {
           setRows(r.items);
@@ -129,7 +154,9 @@ export function DeveloperPage({
         label: "상태",
         render: (r) => (
           <>
-            <Badge kind={statusKind(r.workStatusName)}>{r.workStatusName}</Badge>
+            <Badge kind={statusKind(r.workStatusName)}>
+              {r.workStatusName}
+            </Badge>
             {r.retirementScheduled && <Badge kind="warn">퇴사 예정</Badge>}
           </>
         ),
@@ -141,21 +168,38 @@ export function DeveloperPage({
           r.currentProjectName ? (
             <span className="developer-pname">
               <span>
-                <span className="developer-project">{r.currentProjectName}</span>
+                <ProjectLink
+                  projectId={r.currentProjectId}
+                  name={r.currentProjectName}
+                  testId={`developer-project-${r.developerId}`}
+                />
                 {r.additionalProjectCount > 0 && (
-                  <span className="developer-sub-inline"> 외 {r.additionalProjectCount}건</span>
+                  <span className="developer-sub-inline">
+                    {" "}
+                    외 {r.additionalProjectCount}건
+                  </span>
                 )}
               </span>
               <small>
-                이번 달 {r.currentMonthMm.toFixed(2)} MM{r.overOneMm ? " · 1.0 초과" : ""}
+                이번 달 {r.currentMonthMm.toFixed(2)} MM
+                {r.overOneMm ? " · 1.0 초과" : ""}
               </small>
             </span>
           ) : (
             "–"
           ),
       },
-      { key: "withdrawalDate", label: "철수 예정일", render: (r) => r.withdrawalDate || "" },
-      { key: "monthlyRate", label: "월 단가", align: "right", render: (r) => won(r.monthlyRate) },
+      {
+        key: "withdrawalDate",
+        label: "철수 예정일",
+        render: (r) => r.withdrawalDate || "",
+      },
+      {
+        key: "monthlyRate",
+        label: "월 단가",
+        align: "right",
+        render: (r) => won(r.monthlyRate),
+      },
     ],
     [],
   );
@@ -167,8 +211,12 @@ export function DeveloperPage({
       return typeof v === "number" ? v : String(v ?? "");
     };
     const list = [...rows].sort((a, b) => {
-      const x = value(a), y = value(b);
-      const order = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "ko");
+      const x = value(a),
+        y = value(b);
+      const order =
+        typeof x === "number" && typeof y === "number"
+          ? x - y
+          : String(x).localeCompare(String(y), "ko");
       return sort?.dir === "desc" ? -order : order;
     });
     return list;
@@ -179,7 +227,11 @@ export function DeveloperPage({
       .filter((r) => selected.includes(r.developerId) && r.useYn !== useYn)
       .map((r) => r.developerId);
     if (!ids.length) {
-      setNotice(useYn === "Y" ? "고른 것 중 사용 중지된 개발자가 없습니다." : "고른 것 중 사용 중인 개발자가 없습니다.");
+      setNotice(
+        useYn === "Y"
+          ? "고른 것 중 사용 중지된 개발자가 없습니다."
+          : "고른 것 중 사용 중인 개발자가 없습니다.",
+      );
       return;
     }
     setPendingUse({ ids, useYn });
@@ -190,7 +242,10 @@ export function DeveloperPage({
     setBusy(true);
     setError("");
     try {
-      const value = await putCommonDeveloperUseStatus(pendingUse.ids, pendingUse.useYn);
+      const value = await putCommonDeveloperUseStatus(
+        pendingUse.ids,
+        pendingUse.useYn,
+      );
       setPendingUse(null);
       if (value.rejected.length) setBlocked(value.rejected);
       if (value.processedDeveloperIds.length)
@@ -289,21 +344,35 @@ export function DeveloperPage({
         {options?.codes[group]
           ?.filter((c) => key !== "workStatusName" || c.code !== "WORK")
           .map((c) => (
-            <option key={c.code} value={key === "workStatusName" ? c.codeName : c.code}>
+            <option
+              key={c.code}
+              value={key === "workStatusName" ? c.codeName : c.code}
+            >
               {key === "directClassCode" ? directLabel(c.codeName) : c.codeName}
             </option>
           ))}
       </select>
     </ListFilter>
   );
-  const selectedRows = rows?.filter((r) => pendingUse?.ids.includes(r.developerId)) || [];
+  const selectedRows =
+    rows?.filter((r) => pendingUse?.ids.includes(r.developerId)) || [];
   return (
-    <section className="developer-page" data-testid="developer-page" data-screen-id="UI-02">
+    <section
+      className="developer-page"
+      data-testid="developer-page"
+      data-screen-id="UI-02"
+    >
       {renderActions ? titleActions : actions}
       <ListFilters
         testId="developer-filters"
         activeCount={
-          [applied.directClassCode, applied.employeeTypeCode, applied.jobCode, applied.workStatusName, applied.q].filter(Boolean).length
+          [
+            applied.directClassCode,
+            applied.employeeTypeCode,
+            applied.jobCode,
+            applied.workStatusName,
+            applied.q,
+          ].filter(Boolean).length
         }
         onSearch={() => {
           setApplied({ ...filter });
@@ -311,7 +380,10 @@ export function DeveloperPage({
         }}
         onReset={() => {
           setFilter({ ...emptyFilter, includeStopped: applied.includeStopped });
-          setApplied({ ...emptyFilter, includeStopped: applied.includeStopped });
+          setApplied({
+            ...emptyFilter,
+            includeStopped: applied.includeStopped,
+          });
           setPage(1);
         }}
       >
@@ -341,7 +413,10 @@ export function DeveloperPage({
         rows={
           error
             ? []
-            : (sorted?.slice((page - 1) * presentation.pageSize, page * presentation.pageSize) ?? null)
+            : (sorted?.slice(
+                (page - 1) * presentation.pageSize,
+                page * presentation.pageSize,
+              ) ?? null)
         }
         rowKey={(r) => r.developerId}
         total={rows?.length || 0}
@@ -362,10 +437,17 @@ export function DeveloperPage({
         selectable
         selected={selected}
         onSelect={setSelected}
-        onSelectAllResults={() => setSelected(rows?.map((r) => r.developerId) || [])}
+        onSelectAllResults={() =>
+          setSelected(rows?.map((r) => r.developerId) || [])
+        }
         allResultsSelected={!!rows?.length && selected.length === rows.length}
         bulkActions={[
-          { key: "stop", label: "사용 중지", danger: true, onClick: () => askUse("N") },
+          {
+            key: "stop",
+            label: "사용 중지",
+            danger: true,
+            onClick: () => askUse("N"),
+          },
           { key: "resume", label: "다시 사용", onClick: () => askUse("Y") },
         ]}
         onRowClick={(r) => setDetail(r.developerId)}
@@ -380,15 +462,35 @@ export function DeveloperPage({
                   {r.managementNumber} · {r.organizationName}
                 </small>
               </span>
-              <Badge kind={statusKind(r.workStatusName)}>{r.workStatusName}</Badge>
+              <Badge kind={statusKind(r.workStatusName)}>
+                {r.workStatusName}
+              </Badge>
             </div>
             <div className="ls-r2">
-              <span>{[r.primaryJobName, r.gradeName, r.employeeTypeName].filter(Boolean).join(" · ")}</span>
+              <span>
+                {[r.primaryJobName, r.gradeName, r.employeeTypeName]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
               <b>{won(r.monthlyRate)}</b>
             </div>
             <div className="ls-r2">
-              <span>{r.currentProjectName || "–"}</span>
-              <span>{r.currentProjectName ? `${r.currentMonthMm.toFixed(2)} MM` : ""}</span>
+              <span>
+                {r.currentProjectName ? (
+                  <ProjectLink
+                    projectId={r.currentProjectId}
+                    name={r.currentProjectName}
+                    testId={`developer-mobile-project-${r.developerId}`}
+                  />
+                ) : (
+                  "–"
+                )}
+              </span>
+              <span>
+                {r.currentProjectName
+                  ? `${r.currentMonthMm.toFixed(2)} MM`
+                  : ""}
+              </span>
             </div>
           </>
         )}
@@ -406,7 +508,12 @@ export function DeveloperPage({
             setForm({ developer: d });
             setDetail(null);
           }}
-          onStop={(d) => setPendingUse({ ids: [d.developerId], useYn: d.useYn === "Y" ? "N" : "Y" })}
+          onStop={(d) =>
+            setPendingUse({
+              ids: [d.developerId],
+              useYn: d.useYn === "Y" ? "N" : "Y",
+            })
+          }
           onNotice={(message) => {
             setNoticeKind("warn");
             setNotice(message);
@@ -442,11 +549,17 @@ export function DeveloperPage({
               : "다시 배정 후보에 넣습니다."}
           </p>
           <div className="app-actions">
-            <button data-testid="developer-use-cancel" disabled={busy} onClick={() => setPendingUse(null)}>
+            <button
+              data-testid="developer-use-cancel"
+              disabled={busy}
+              onClick={() => setPendingUse(null)}
+            >
               취소
             </button>
             <button
-              className={pendingUse.useYn === "N" ? "app-danger" : "primary-button"}
+              className={
+                pendingUse.useYn === "N" ? "app-danger" : "primary-button"
+              }
               data-testid="developer-use-confirm"
               disabled={busy || pendingUse.ids.length === 0}
               onClick={() => void use()}
@@ -457,17 +570,29 @@ export function DeveloperPage({
         </Dialog>
       )}
       {blocked && (
-        <Dialog title="사용을 중지할 수 없습니다" closable onClose={() => setBlocked(null)} testId="developer-use-result">
+        <Dialog
+          title="사용을 중지할 수 없습니다"
+          closable
+          onClose={() => setBlocked(null)}
+          testId="developer-use-result"
+        >
           <p>아래 개발자는 처리하지 못했습니다.</p>
           <ul className="developer-blocked-list">
             {blocked.map((r) => (
-              <li key={r.developerId} data-testid={`developer-rejected-${r.developerId}`}>
+              <li
+                key={r.developerId}
+                data-testid={`developer-rejected-${r.developerId}`}
+              >
                 {r.name} — {r.reason}
               </li>
             ))}
           </ul>
           <div className="app-actions">
-            <button className="primary-button" data-testid="developer-use-result-close" onClick={() => setBlocked(null)}>
+            <button
+              className="primary-button"
+              data-testid="developer-use-result-close"
+              onClick={() => setBlocked(null)}
+            >
               확인
             </button>
           </div>
@@ -488,10 +613,19 @@ export function DeveloperPage({
 }
 
 /** 시안 순서: [급여 양식 내려받기] [급여 업로드] [양식 내려받기] [엑셀 업로드]. 휴대폰에서는 숨긴다. */
-function DeveloperUploads({ disabled, onApplied }: { disabled: boolean; onApplied: () => void }) {
+function DeveloperUploads({
+  disabled,
+  onApplied,
+}: {
+  disabled: boolean;
+  onApplied: () => void;
+}) {
   const { mobile } = useViewport();
   const [kind, setKind] = useState<"B8" | "B1" | null>(null);
-  const [result, setResult] = useState<{ value: UploadResult; kind: string } | null>(null);
+  const [result, setResult] = useState<{
+    value: UploadResult;
+    kind: string;
+  } | null>(null);
   const [error, setError] = useState("");
   const [downloading, setDownloading] = useState(false);
   const template = async (code: string) => {
@@ -508,16 +642,40 @@ function DeveloperUploads({ disabled, onApplied }: { disabled: boolean; onApplie
   if (mobile) return null;
   return (
     <>
-      <button type="button" className="upload-title-button" data-testid="developer-pay-template" disabled={disabled || downloading} onClick={() => void template("B1")}>
+      <button
+        type="button"
+        className="upload-title-button"
+        data-testid="developer-pay-template"
+        disabled={disabled || downloading}
+        onClick={() => void template("B1")}
+      >
         {downIcon}급여 양식 내려받기
       </button>
-      <button type="button" className="upload-title-button" data-testid="developer-pay-upload" disabled={disabled} onClick={() => setKind("B1")}>
+      <button
+        type="button"
+        className="upload-title-button"
+        data-testid="developer-pay-upload"
+        disabled={disabled}
+        onClick={() => setKind("B1")}
+      >
         {upIcon}급여 업로드
       </button>
-      <button type="button" className="upload-title-button" data-testid="developer-template" disabled={disabled || downloading} onClick={() => void template("B8")}>
+      <button
+        type="button"
+        className="upload-title-button"
+        data-testid="developer-template"
+        disabled={disabled || downloading}
+        onClick={() => void template("B8")}
+      >
         {downIcon}양식 내려받기
       </button>
-      <button type="button" className="upload-title-button" data-testid="developer-upload" disabled={disabled} onClick={() => setKind("B8")}>
+      <button
+        type="button"
+        className="upload-title-button"
+        data-testid="developer-upload"
+        disabled={disabled}
+        onClick={() => setKind("B8")}
+      >
         {upIcon}엑셀 업로드
       </button>
       {error && (
@@ -537,7 +695,11 @@ function DeveloperUploads({ disabled, onApplied }: { disabled: boolean; onApplie
       )}
       {result && (
         <UploadResultDialog
-          targetName={result.kind === "B1" ? `급여 ${result.value.yearMonth ?? ""}`.trim() : "개발자"}
+          targetName={
+            result.kind === "B1"
+              ? `급여 ${result.value.yearMonth ?? ""}`.trim()
+              : "개발자"
+          }
           notes={result.kind === "B8" ? DEVELOPER_NOTES : []}
           uploadId={result.value.uploadId}
           initialResult={result.value}
@@ -564,7 +726,9 @@ function DeveloperUploadDialog({
   onChecked: (value: UploadResult) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
-  const [months, setMonths] = useState<{ value: string; closed: boolean }[]>([]);
+  const [months, setMonths] = useState<{ value: string; closed: boolean }[]>(
+    [],
+  );
   const [month, setMonth] = useState("");
   const [periodLoading, setPeriodLoading] = useState(kind === "B1");
   const [periodError, setPeriodError] = useState("");
@@ -580,7 +744,10 @@ function DeveloperUploadDialog({
     getCommonOperatingStandards(controller.signal)
       .then((value) => {
         if (controller.signal.aborted) return;
-        const base = value.items.find((s) => s.standardCode === "CASH_BASE_YM")?.value.replace(/[^0-9]/g, "") || "";
+        const base =
+          value.items
+            .find((s) => s.standardCode === "CASH_BASE_YM")
+            ?.value.replace(/[^0-9]/g, "") || "";
         const closedUntil = (value.closedMonth || "").replace("-", "");
         const now = koreanThisMonth();
         let year = Number(now.slice(0, 4)),
@@ -588,7 +755,11 @@ function DeveloperUploadDialog({
         const list: { value: string; closed: boolean }[] = [];
         for (let i = 0; i < 10; i++) {
           const ym = `${year}${String(m).padStart(2, "0")}`;
-          list.push({ value: `${year}-${String(m).padStart(2, "0")}`, closed: (!!base && ym < base) || (!!closedUntil && ym <= closedUntil) });
+          list.push({
+            value: `${year}-${String(m).padStart(2, "0")}`,
+            closed:
+              (!!base && ym < base) || (!!closedUntil && ym <= closedUntil),
+          });
           m -= 1;
           if (m === 0) {
             m = 12;
@@ -599,7 +770,8 @@ function DeveloperUploadDialog({
         setMonth(list.find((x) => !x.closed)?.value || "");
       })
       .catch((reason) => {
-        if (!controller.signal.aborted) setPeriodError(developerFailure(reason));
+        if (!controller.signal.aborted)
+          setPeriodError(developerFailure(reason));
       })
       .finally(() => {
         if (!controller.signal.aborted) setPeriodLoading(false);
@@ -609,16 +781,27 @@ function DeveloperUploadDialog({
   const inspect = async () => {
     if (pending.current || periodLoading || periodError) return;
     setError(null);
-    if (!file || !file.name.toLowerCase().endsWith(".xlsx") || file.size === 0 || file.size > 10_000_000) {
+    if (
+      !file ||
+      !file.name.toLowerCase().endsWith(".xlsx") ||
+      file.size === 0 ||
+      file.size > 10_000_000
+    ) {
       setError(
-        new DeveloperRequestError(400, "10MB 이하의 xlsx 파일을 선택해 주세요.", [
-          { field: "file", message: "xlsx 파일을 확인해 주세요." },
-        ]),
+        new DeveloperRequestError(
+          400,
+          "10MB 이하의 xlsx 파일을 선택해 주세요.",
+          [{ field: "file", message: "xlsx 파일을 확인해 주세요." }],
+        ),
       );
       return;
     }
     if (kind === "B1" && !month) {
-      setError(new DeveloperRequestError(400, "마감하지 않은 연월을 골라 주세요.", [{ field: "yearMonth", message: "연월을 골라 주세요." }]));
+      setError(
+        new DeveloperRequestError(400, "마감하지 않은 연월을 골라 주세요.", [
+          { field: "yearMonth", message: "연월을 골라 주세요." },
+        ]),
+      );
       return;
     }
     pending.current = true;
@@ -628,7 +811,12 @@ function DeveloperUploadDialog({
       body.set("formTypeCode", kind);
       body.set("file", file);
       if (kind === "B1") body.set("yearMonth", month);
-      onChecked(await developerRequest<UploadResult>("/api/common/uploads", { method: "POST", body }));
+      onChecked(
+        await developerRequest<UploadResult>("/api/common/uploads", {
+          method: "POST",
+          body,
+        }),
+      );
     } catch (reason) {
       setError(reason);
     } finally {
@@ -671,12 +859,18 @@ function DeveloperUploadDialog({
                 </option>
               ))}
             </select>
-            <span className="developer-help">마감한 달은 올릴 수 없습니다.</span>
+            <span className="developer-help">
+              마감한 달은 올릴 수 없습니다.
+            </span>
             {periodLoading && <p role="status">마감 정보 읽는 중…</p>}
             {periodError && (
               <p role="alert">
                 {periodError}
-                <button type="button" data-testid="developer-period-retry" onClick={() => setRevision((v) => v + 1)}>
+                <button
+                  type="button"
+                  data-testid="developer-period-retry"
+                  onClick={() => setRevision((v) => v + 1)}
+                >
                   다시 시도
                 </button>
               </p>
@@ -698,10 +892,16 @@ function DeveloperUploadDialog({
         </div>
         {kind === "B1" ? (
           <p className="developer-cap">
-            재무 담당만 보이는 버튼입니다. 급여 엑셀에는 직원구분·직접/간접 칸이 없고, 올릴 때 그 달 개발자의 직원구분·직접/간접 값을 급여 줄에 복사해 둡니다. 직원구분이 바뀌면(예: 11월부터 프리랜서) 그 달 급여를 올리기 전에 개발자 풀에서 먼저 바꾸세요. 지난 달은 그대로입니다.
+            재무 담당만 보이는 버튼입니다. 급여 엑셀에는 직원구분·직접/간접 칸이
+            없고, 올릴 때 그 달 개발자의 직원구분·직접/간접 값을 급여 줄에
+            복사해 둡니다. 직원구분이 바뀌면(예: 11월부터 프리랜서) 그 달 급여를
+            올리기 전에 개발자 풀에서 먼저 바꾸세요. 지난 달은 그대로입니다.
           </p>
         ) : (
-          <p className="developer-cap">xlsx 파일만 올릴 수 있고, 10MB·첫 시트·5,000행까지 읽습니다. 올리면 먼저 검사 결과를 보여 줍니다.</p>
+          <p className="developer-cap">
+            xlsx 파일만 올릴 수 있고, 10MB·첫 시트·5,000행까지 읽습니다. 올리면
+            먼저 검사 결과를 보여 줍니다.
+          </p>
         )}
         {error != null && (
           <div role="alert" className="field-error">
@@ -709,10 +909,20 @@ function DeveloperUploadDialog({
           </div>
         )}
         <div className="app-actions">
-          <button type="button" data-testid="developer-upload-close" disabled={busy} onClick={onClose}>
+          <button
+            type="button"
+            data-testid="developer-upload-close"
+            disabled={busy}
+            onClick={onClose}
+          >
             취소
           </button>
-          <button type="submit" className="primary-button" data-testid="developer-upload-check" disabled={busy || periodLoading || !!periodError}>
+          <button
+            type="submit"
+            className="primary-button"
+            data-testid="developer-upload-check"
+            disabled={busy || periodLoading || !!periodError}
+          >
             {busy ? "검사 중…" : "올리기"}
           </button>
         </div>

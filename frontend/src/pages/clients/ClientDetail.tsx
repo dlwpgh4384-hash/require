@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { ProjectLink } from "../projects/ProjectLink";
 import { formatDateTime } from "../../shared/time";
 import { Badge, DetailPanel, KeyValues } from "../../shared/list";
 import {
@@ -68,7 +69,12 @@ export function ClientDetail({
 
   const actions = client && (
     <>
-      <button type="button" className="ls-btn ls-btn-sm" data-testid="client-detail-edit" onClick={() => onEdit(client)}>
+      <button
+        type="button"
+        className="ls-btn ls-btn-sm"
+        data-testid="client-detail-edit"
+        onClick={() => onEdit(client)}
+      >
         수정
       </button>
       <div className="client-more">
@@ -80,7 +86,19 @@ export function ClientDetail({
           data-testid="client-detail-more"
           onClick={() => setMenu((value) => !value)}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h.01M12 12h.01M19 12h.01" /></svg>
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 12h.01M12 12h.01M19 12h.01" />
+          </svg>
         </button>
         {menu && (
           <div className="client-more-menu" role="menu">
@@ -98,7 +116,9 @@ export function ClientDetail({
             <button
               type="button"
               role="menuitem"
-              className={client.useYn === "Y" ? "client-more-danger" : undefined}
+              className={
+                client.useYn === "Y" ? "client-more-danger" : undefined
+              }
               data-testid="client-detail-status"
               onClick={() => {
                 setMenu(false);
@@ -118,14 +138,27 @@ export function ClientDetail({
   const basicTab = client && (
     <KeyValues
       items={[
-        ["구분", <Badge kind={client.clientTypeCode === "VNDR" ? "neutral" : "info"}>{label("CLNT_TYPE", client.clientTypeCode)}</Badge>],
+        [
+          "구분",
+          <Badge kind={client.clientTypeCode === "VNDR" ? "neutral" : "info"}>
+            {label("CLNT_TYPE", client.clientTypeCode)}
+          </Badge>,
+        ],
         ["상호", client.clientName],
         ["사업자번호", client.businessNumber],
         ["대표자", dash(client.representativeName)],
-        ["업종", client.industryCode ? label("INDUTY", client.industryCode) : "–"],
+        [
+          "업종",
+          client.industryCode ? label("INDUTY", client.industryCode) : "–",
+        ],
         ["담당자", dash(client.contactName)],
         ["연락처", dash(client.contactPhone)],
-        ...(customer ? ([["세금계산서 이메일", dash(client.taxEmail)]] as [string, string][]) : []),
+        ...(customer
+          ? ([["세금계산서 이메일", dash(client.taxEmail)]] as [
+              string,
+              string,
+            ][])
+          : []),
         ...(vendor
           ? ([
               [
@@ -154,44 +187,85 @@ export function ClientDetail({
                     </button>
                   )}
                   <div className="ls-cap">
-                    {account ? `예금주 ${account.accountHolder} · ` : ""}재무 권한에만 보임. 처음엔 끝 4자리만,
-                    [보기]를 누르면 전체가 보이고 접근 기록에 남습니다
+                    {account ? `예금주 ${account.accountHolder} · ` : ""}재무
+                    권한에만 보임. 처음엔 끝 4자리만, [보기]를 누르면 전체가
+                    보이고 접근 기록에 남습니다
                   </div>
                 </div>,
               ],
             ] as [string, ReactNode][])
           : []),
-        ["사용 여부", <Badge kind={client.useYn === "Y" ? "ok" : "lock"}>{client.useYn === "Y" ? "사용" : "중지"}</Badge>],
+        [
+          "사용 여부",
+          <Badge kind={client.useYn === "Y" ? "ok" : "lock"}>
+            {client.useYn === "Y" ? "사용" : "중지"}
+          </Badge>,
+        ],
       ]}
     />
   );
-  const assignmentsTab = assignments.length ? (
-    <div className="ls-twrap">
-      <table className="ls-t" data-testid="client-assignments">
-        <thead>
-          <tr>
-            <th>프로젝트</th>
-            <th>이름</th>
-            <th>소속</th>
-            <th>직무</th>
-            <th>철수일</th>
-          </tr>
-        </thead>
-        <tbody>
-          {assignments.map((line, index) => (
-            <tr key={`${line.projectId}-${index}`} data-testid={`client-assignment-${index}`}>
-              <td>{line.projectName}</td>
-              <td>{line.personName}</td>
-              <td>{dash(line.companyName)}</td>
-              <td>{dash(line.jobName)}</td>
-              <td>{dash(line.withdrawalDate)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  ) : (
-    <p className="ls-cap">오늘 투입 중인 사람이 없습니다.</p>
+  const assignmentProjects = [
+    ...new Map(
+      assignments.map((line) => [line.projectId, line.projectName]),
+    ).entries(),
+  ];
+  const assignmentsTab = (
+    <>
+      <p className="ls-cap">
+        오늘 기준 투입 내역입니다. 프로젝트 이름을 누르면 상세를 이 자리에서
+        확인할 수 있습니다.
+      </p>
+      <div data-testid="client-assignment-projects">
+        <span className="ls-cap">프로젝트 {assignmentProjects.length}건</span>{" "}
+        {assignmentProjects.map(([projectId, projectName]) => (
+          <span
+            key={projectId}
+            data-testid={`client-assignment-project-${projectId.toLowerCase()}`}
+          >
+            <Badge kind="info">{projectName}</Badge>{" "}
+          </span>
+        ))}
+      </div>
+      {assignments.length ? (
+        <div className="ls-twrap">
+          <table className="ls-t" data-testid="client-assignments">
+            <thead>
+              <tr>
+                <th>프로젝트</th>
+                <th>이름</th>
+                <th>소속 · 직무</th>
+                <th>철수일</th>
+              </tr>
+            </thead>
+            <tbody>
+              {assignments.map((line, index) => (
+                <tr
+                  key={`${line.projectId}-${index}`}
+                  data-testid={`client-assignment-${index}`}
+                >
+                  <td>
+                    <ProjectLink
+                      projectId={line.projectId}
+                      name={line.projectName}
+                      testId={`client-project-${index}`}
+                    />
+                  </td>
+                  <td>{line.personName}</td>
+                  <td>
+                    <span>{dash(line.companyName)}</span>
+                    <br />
+                    <span>{dash(line.jobName)}</span>
+                  </td>
+                  <td>{dash(line.withdrawalDate)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="ls-cap">오늘 투입 중인 사람이 없습니다.</p>
+      )}
+    </>
   );
   const historyTab = changes.length ? (
     <div className="ls-twrap">
@@ -225,7 +299,11 @@ export function ClientDetail({
   return (
     <DetailPanel
       title={client?.clientName ?? "거래처"}
-      sub={client ? `${label("CLNT_TYPE", client.clientTypeCode)} · ${client.businessNumber}` : undefined}
+      sub={
+        client
+          ? `${label("CLNT_TYPE", client.clientTypeCode)} · ${client.businessNumber}`
+          : undefined
+      }
       actions={actions}
       activeTab={tab}
       onTab={setTab}
@@ -235,8 +313,16 @@ export function ClientDetail({
         client && !error
           ? [
               { key: "basic", label: "기본 정보", content: basicTab },
-              { key: "assignments", label: `투입 내역 (${client.personCount})`, content: assignmentsTab },
-              { key: "history", label: `변경 이력 (${changes.length})`, content: historyTab },
+              {
+                key: "assignments",
+                label: `투입 내역 (${client.personCount})`,
+                content: assignmentsTab,
+              },
+              {
+                key: "history",
+                label: `변경 이력 (${changes.length})`,
+                content: historyTab,
+              },
             ]
           : undefined
       }

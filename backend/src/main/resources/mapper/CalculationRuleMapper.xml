@@ -16,10 +16,16 @@
     <id column="code" property="code" javaType="java.lang.String"/>
     <result column="code_nm" property="codeName" javaType="java.lang.String"/>
   </resultMap>
-  <select id="selectDefinition" resultMap="definition">
+  <select id="selectDefinition"
+          resultMap="definition"
+          flushCache="true"
+          useCache="false">
     SELECT calc_id, frml_cn, dtl_cn FROM TB_SY_CALC_RULE WHERE calc_id = #{calcId}
   </select>
-  <select id="selectEffectiveStandard" resultMap="standard">
+  <select id="selectEffectiveStandard"
+          resultMap="standard"
+          flushCache="true"
+          useCache="false">
     SELECT std_cd, aply_bgn_ym, std_val FROM TB_SY_OPER_STD
     WHERE std_cd = #{standardCode}
     <choose>

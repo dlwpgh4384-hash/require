@@ -926,6 +926,112 @@ describe("common code route composition", () => {
   });
 });
 
+function respondWithProjects() {
+  const menus = response();
+  menus.data.push({
+    ...menus.data[0],
+    menuId: "projects-menu",
+    menuNm: "프로젝트",
+    scrnId: "UI-01",
+    sortOrd: 2,
+  });
+  menus.meta.screenAccess.push({
+    scrnId: "UI-01",
+    available: true,
+    pcOnlyYn: "N",
+  });
+  const success = (data: unknown) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      success: true,
+      meta: {},
+      data: structuredClone(data),
+    }),
+  });
+  const list = vi.fn(async () => success({ items: [], unassignedCount: 0 }));
+  const request = vi.fn(async (url: string, _init?: RequestInit) => {
+    if (url === "/api/common/menus")
+      return { ok: true, status: 200, json: async () => menus };
+    if (url.startsWith("/api/common/user-preferences/"))
+      return {
+        ok: true,
+        status: 200,
+        json: async () => preferenceResponse(url),
+      };
+    if (url === "/api/common/projects") return list();
+    if (
+      url.startsWith("/api/common/code-groups/") ||
+      url.startsWith("/api/common/clients?") ||
+      url === "/api/common/parts" ||
+      url === "/api/common/operating-standards"
+    )
+      return success({ items: [] });
+    throw new Error(`예상하지 않은 요청: ${url}`);
+  });
+  vi.stubGlobal("fetch", request);
+  return { request, list };
+}
+
+describe("project route composition", () => {
+  it.each(["/screens/UI-01", "/#UI-01"])(
+    "%s renders the real project page with one shell and its existing client",
+    async (path) => {
+      const { request } = respondWithProjects();
+      mount(path);
+      await screen.findByTestId("list-empty");
+      expect(screen.getAllByTestId("project-page")).toHaveLength(1);
+      expect(
+        screen.getByTestId("project-title-register").closest(".screen-actions"),
+      ).not.toBeNull();
+      expect(request).toHaveBeenCalledWith("/api/common/projects", {
+        signal: expect.any(AbortSignal),
+      });
+      expect(
+        request.mock.calls.some(
+          ([url]) =>
+            url.startsWith("/api/common/projects?") ||
+            url.startsWith("/api/auth/"),
+        ),
+      ).toBe(false);
+      expect(router?.state.location.pathname).toBe("/screens/UI-01");
+      expectSingleShell();
+    },
+  );
+
+  it("the registered title action opens the shared project form without adding a route or sending a command", async () => {
+    const { request } = respondWithProjects();
+    mount("/screens/UI-01");
+    await screen.findByTestId("list-empty");
+    fireEvent.click(screen.getByTestId("project-title-register"));
+    expect(await screen.findByTestId("project-form")).toBeVisible();
+    expect(router?.state.location.pathname).toBe("/screens/UI-01");
+    fireEvent.click(screen.getByTestId("project-form-cancel"));
+    expect(screen.queryByTestId("project-form")).not.toBeInTheDocument();
+    expect(
+      request.mock.calls.filter(
+        ([url, init]) =>
+          url.startsWith("/api/common/projects") &&
+          ["POST", "PUT"].includes(init?.method ?? ""),
+      ),
+    ).toHaveLength(0);
+    expectSingleShell();
+  });
+
+  it("project list failure retries the same API inside the original route", async () => {
+    const { list } = respondWithProjects();
+    list.mockRejectedValueOnce(
+      new Error("프로젝트 목록을 불러오지 못했습니다."),
+    );
+    mount("/screens/UI-01");
+    fireEvent.click(await screen.findByTestId("list-retry"));
+    expect(await screen.findByTestId("list-empty")).toBeVisible();
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(router?.state.location.pathname).toBe("/screens/UI-01");
+    expectSingleShell();
+  });
+});
+
 describe("application route registration", () => {
   it("UI-25 direct entry dispatches MenuPage and saves through its real client, refreshing the single shell", async () => {
     const { request, list } = respondWithMenuSettings();

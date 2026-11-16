@@ -139,7 +139,11 @@ export function UploadResultDialog({
     : null;
   // 시안: 오류 줄을 먼저, 그다음 경고(같은 구분 안에서는 행 순서)
   const ordered = result
-    ? [...result.issues].sort((x, y) => Number(y.severity === "오류") - Number(x.severity === "오류") || x.row - y.row)
+    ? [...result.issues].sort(
+        (x, y) =>
+          Number(y.severity === "오류") - Number(x.severity === "오류") ||
+          x.row - y.row,
+      )
     : [];
   const shown =
     ordered.slice(
@@ -164,22 +168,30 @@ export function UploadResultDialog({
           {busy && <p role="status">처리 중…</p>}
           {result && (
             <>
-              <span className="ls-sr" data-testid="upload-status">{result.statusName}</span>
+              <span className="ls-sr" data-testid="upload-status">
+                {result.statusName}
+              </span>
               {/* 시안 .kpis: 성공·경고(반영은 됨)·오류(고쳐야 반영됨) */}
               <div className="upload-kpis" data-testid="upload-counts">
                 <div className="upload-kpi">
                   <span className="upload-kpi-l">성공</span>
-                  <span className="upload-kpi-v upload-ok">{result.successCount}건</span>
+                  <span className="upload-kpi-v upload-ok">
+                    {result.successCount}건
+                  </span>
                   <span className="upload-kpi-d" />
                 </div>
                 <div className="upload-kpi">
                   <span className="upload-kpi-l">경고</span>
-                  <span className="upload-kpi-v upload-warning">{result.warningCount}건</span>
+                  <span className="upload-kpi-v upload-warning">
+                    {result.warningCount}건
+                  </span>
                   <span className="upload-kpi-d">반영은 됨</span>
                 </div>
                 <div className="upload-kpi">
                   <span className="upload-kpi-l">오류</span>
-                  <span className="upload-kpi-v upload-invalid">{result.errorCount}건</span>
+                  <span className="upload-kpi-v upload-invalid">
+                    {result.errorCount}건
+                  </span>
                   <span className="upload-kpi-d">고쳐야 반영됨</span>
                 </div>
               </div>
@@ -189,12 +201,42 @@ export function UploadResultDialog({
                 </p>
               )}
               {result.errorCount > 0 && (
-                <p>오류가 하나라도 있으면 파일 전체를 반영하지 않습니다. 아래 오류를 고쳐 다시 올려 주세요.</p>
+                <p>
+                  오류가 하나라도 있으면 파일 전체를 반영하지 않습니다. 아래
+                  오류를 고쳐 다시 올려 주세요.
+                </p>
               )}
               {!total && <p>검사할 데이터 행이 없습니다.</p>}
-              {!!total && !result.issues.length && <p>행 오류와 경고가 없습니다.</p>}
+              {result.distributionMismatchCount !== undefined && (
+                <p data-testid="upload-distribution-mismatch">
+                  배분표 불일치 {result.distributionMismatchCount}건 · 반영은
+                  가능합니다.
+                </p>
+              )}
+              {result.plannedProjects && (
+                <table data-testid="upload-project-identities">
+                  <thead>
+                    <tr>
+                      <th>행</th>
+                      <th>새 프로젝트ID</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.plannedProjects.map((p) => (
+                      <tr key={p.row} data-testid={`upload-project-${p.row}`}>
+                        <td>{p.row}</td>
+                        <td>{p.projectId}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {!!total && !result.issues.length && (
+                <p>행 오류와 경고가 없습니다.</p>
+              )}
               <p className="upload-cap">
-                xlsx 파일만 올릴 수 있고, 10MB·첫 시트·5,000행까지 읽습니다. 넘으면 파일을 나눠 올려 주세요.
+                xlsx 파일만 올릴 수 있고, 10MB·첫 시트·5,000행까지 읽습니다.
+                넘으면 파일을 나눠 올려 주세요.
               </p>
               {!!result.issues.length && (
                 <div className="ls-twrap upload-table-scroll">
@@ -216,15 +258,27 @@ export function UploadResultDialog({
                           data-testid={`upload-issue-${page}-${index}`}
                         >
                           <td>
-                            <span className={`ls-b ${issue.severity === "오류" ? "ls-b-bad" : "ls-b-warn"}`}>
+                            <span
+                              className={`ls-b ${issue.severity === "오류" ? "ls-b-bad" : "ls-b-warn"}`}
+                            >
                               {issue.severity}
                             </span>
                           </td>
                           <td className="ls-right">{issue.row}</td>
                           <td>{issue.column}</td>
-                          <td>{issue.inputValue === "" ? "(빈칸)" : issue.inputValue}</td>
+                          <td>
+                            {issue.inputValue === ""
+                              ? "(빈칸)"
+                              : issue.inputValue}
+                          </td>
                           <td>{issue.reason}</td>
-                          {planned && <td>{(issue.severity !== "오류" && planned.get(issue.row)) || "–"}</td>}
+                          {planned && (
+                            <td>
+                              {(issue.severity !== "오류" &&
+                                planned.get(issue.row)) ||
+                                "–"}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -252,7 +306,9 @@ export function UploadResultDialog({
                     type="button"
                     className="ls-btn ls-btn-sm"
                     data-testid="upload-next"
-                    disabled={(page + 1) * presentation.pageSize >= result.issues.length}
+                    disabled={
+                      (page + 1) * presentation.pageSize >= result.issues.length
+                    }
                     onClick={() => setPage((value) => value + 1)}
                   >
                     다음
@@ -262,7 +318,11 @@ export function UploadResultDialog({
             </>
           )}
           {error && (
-            <div role="alert" data-testid="upload-result-error" className="field-error">
+            <div
+              role="alert"
+              data-testid="upload-result-error"
+              className="field-error"
+            >
               {error}
               <button
                 type="button"

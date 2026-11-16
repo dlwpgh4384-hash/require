@@ -179,6 +179,7 @@ export function ProjectForm({
       teamExpenseAmount: amount(draft.teamExpenseAmount),
       projectExpenseAmount: amount(draft.projectExpenseAmount),
     };
+    if (project) body.modifiedAt = project.modifiedAt ?? null;
     if (!project) {
       body.contractTypeCode = draft.contractTypeCode;
       body.statusCode = draft.statusCode;

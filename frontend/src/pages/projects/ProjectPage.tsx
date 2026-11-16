@@ -441,6 +441,7 @@ export function ProjectPage() {
       {detail && (
         <ProjectDetail
           key={detail}
+          dirtyScreenId="UI-01"
           projectId={detail}
           readOnly={readOnly}
           onClose={() => setDetail(null)}

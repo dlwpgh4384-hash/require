@@ -58,7 +58,8 @@ public class ProjectDistributionUploadForm implements UploadForm {
             headers.add("합계"); return headers;
         }
         public void lock() { mapper.lockSources(); }
-        public Integer distributionMismatchCount() { return mapper.mismatches(context.projectId()).size(); }
+        // 목록 「불일치 N」과 같게 사람·구분마다 한 건으로 센다.
+        public Integer distributionMismatchCount() { return (int) mapper.mismatches(context.projectId()).stream().map(c -> c.name + "|" + c.kind).distinct().count(); }
         public Inspection inspect(List<TabularRow> rows,YearMonth ignored) {
             var headers=headers(); var issues=new ArrayList<Issue>(); var records=new ArrayList<DistributionLine>();
             int success=0,warnings=0,errors=0;

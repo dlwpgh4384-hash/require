@@ -174,6 +174,7 @@ class ProjectPersistenceTest {
         update.put("projectName", "등록 재조회 프로젝트").put("customerId", "project-customer")
             .put("startDate", "2026-11-01").put("endDate", "2026-12-31")
             .put("contractAmount", 2000000).put("estimateAmount", 2200000).put("workplace", "부산");
+        update.put("modifiedAt", data(mvc.perform(get("/api/common/projects/" + id))).path("modifiedAt").asText());
         mvc.perform(put("/api/common/projects/" + id).contentType("application/json").content(update.toString()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.budgetAmount").value(650000));
         assertThat(db.queryForObject("SELECT BDGT_MANUAL_YN FROM TB_PJ_PROJ WHERE PROJ_ID=?", String.class, id)).isEqualTo("Y");
@@ -228,7 +229,8 @@ class ProjectPersistenceTest {
         assertThat(db.queryForObject("SELECT PART_ID FROM TB_PJ_PROJ_PART WHERE PROJ_ID=?", String.class, id))
             .isEqualTo("project-part-a");
         var history = data(mvc.perform(get("/api/common/projects/" + id + "/change-history")).andExpect(status().isOk()));
-        assertThat(history.path("items").get(0).path("afterValue").asText()).contains("영업 가", "변경 취소");
+        assertThat(history.path("items").get(0).path("beforeValue").asText()).contains("2026-12부터 영업 나");
+        assertThat(history.path("items").get(0).path("afterValue").asText()).isEqualTo("변경 취소");
     }
     @Test void b9InspectionIsReceiptOnlyAndApplyPersistsMatchingIdsFirstHistoriesAndRetryReceipt()throws Exception{
         long before=count("TB_PJ_PROJ");var checked=uploadProjects(List.of(row("첫 프로젝트"),row("둘째 프로젝트")));

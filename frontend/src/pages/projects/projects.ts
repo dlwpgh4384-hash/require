@@ -39,8 +39,20 @@ export interface Project {
   loseDate: string | null;
   loseReasonName: string | null;
   loseMemo: string | null;
+  /** 동시 수정 확인용 마지막 수정 시각(UTC). 수정·예산 저장 때 그대로 보낸다. */
+  modifiedAt?: string | null;
+  /** 상세에서만: 마지막 마감월(YYYY-MM). */
+  closedMonth?: string | null;
+  memos?: {
+    writtenDate: string;
+    thisWeek: string | null;
+    nextWeek: string | null;
+    request: string | null;
+    actualProgressRate: number | null;
+  }[];
   assignments?: {
     name: string;
+    managementNumber?: string | null;
     jobName: string;
     startDate: string;
     endDate: string;
@@ -59,6 +71,8 @@ export interface Project {
   };
   issues?: {
     issueTitle: string;
+    importanceCode?: string;
+    statusCode?: string;
     importanceName: string;
     dueDate: string | null;
     statusName: string;
@@ -66,6 +80,8 @@ export interface Project {
   }[];
 }
 export interface ProjectInput {
+  /** 수정 때만: 읽은 프로젝트의 modifiedAt(다르면 409). */
+  modifiedAt?: string | null;
   projectName: string;
   customerId?: string;
   contractTypeCode?: string;
@@ -183,8 +199,8 @@ export const postCommonProject = (body: ProjectInput) =>
   });
 export const putCommonProject = (id: string, body: ProjectInput) =>
   command<Project>(id, "", "PUT", body);
-export const putCommonProjectBudget = (id: string, budgetAmount: number) =>
-  command<Project>(id, "/budget", "PUT", { budgetAmount });
+export const putCommonProjectBudget = (id: string, budgetAmount: number, modifiedAt?: string | null) =>
+  command<Project>(id, "/budget", "PUT", { budgetAmount, modifiedAt: modifiedAt ?? null });
 export const getCommonProjectChangeHistory = (id: string) =>
   command<{ items: ProjectHistory[] }>(id, "/change-history", "GET");
 export const getCommonProjectDirectExpenses = (id: string) =>

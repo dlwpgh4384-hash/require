@@ -8199,6 +8199,10 @@ components:
     CommonProject:
       type: object
       properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          description: 마지막 수정 시각(없으면 등록 시각, UTC). 수정·예산 저장 때 그대로 돌려보내 동시 수정을 확인한다
         projectId:
           type: string
           description: PROJ_ID 자동 발급; 등록 입력 아님
@@ -8306,6 +8310,54 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommonProjectAssignment'
+        closedMonth:
+          type: string
+          nullable: true
+          description: 상세에서만. 마지막 마감월(YYYY-MM). 영업 파트 변경·직접 경비 창 안내와 마감 표시에 쓴다
+        memos:
+          type: array
+          description: 상세에서만. 주간 메모(진행 현황 탭 보기용, 최근 순)
+          items:
+            type: object
+            properties:
+              writtenDate:
+                type: string
+                format: date
+              thisWeek:
+                type: string
+                nullable: true
+              nextWeek:
+                type: string
+                nullable: true
+              request:
+                type: string
+                nullable: true
+              actualProgressRate:
+                type: integer
+                nullable: true
+        issues:
+          type: array
+          description: 상세에서만. 이슈(열린 것 먼저, 중요도·기한 순)
+          items:
+            type: object
+            properties:
+              issueTitle:
+                type: string
+              importanceCode:
+                type: string
+              importanceName:
+                type: string
+              statusCode:
+                type: string
+              statusName:
+                type: string
+              action:
+                type: string
+                nullable: true
+              dueDate:
+                type: string
+                format: date
+                nullable: true
       required:
       - projectId
       - projectName
@@ -8623,6 +8675,11 @@ components:
     CommonProjectUpdateInput:
       type: object
       properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 읽은 프로젝트의 modifiedAt. 지금 값과 다르면 409
         projectName:
           type: string
           maxLength: 100
@@ -8656,12 +8713,18 @@ components:
           maxLength: 500
           nullable: true
       required:
+      - modifiedAt
       - projectName
       - startDate
       - endDate
     CommonProjectBudgetInput:
       type: object
       properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 있으면 읽은 프로젝트의 modifiedAt과 지금 값을 비교해 다르면 409
         budgetAmount:
           type: number
       required:
@@ -8748,6 +8811,9 @@ components:
       properties:
         name:
           type: string
+        managementNumber:
+          type: string
+          description: 개발자 관리번호(이름 아래 작은 글자)
         jobName:
           type: string
         startDate:

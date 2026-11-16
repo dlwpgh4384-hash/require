@@ -24,7 +24,8 @@ public class CommonProjectController {
     @GetMapping(value = "/api/common/projects/excel", produces = {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/json"})
     public ResponseEntity<byte[]> getCommonProjectsExcel(@ModelAttribute ExcelFilter filter) {
-        var rows = service.getCommonProjectsForDownload(filter).stream().map(p -> java.util.List.of(
+        var found = service.getCommonProjectsForDownload(filter);
+        var rows = found.stream().map(p -> java.util.List.of(
             p.projectId, p.projectName, value(p.customerName), "IN".equals(p.contractTypeCode) ? "내부" : value(p.contractTypeName),
             p.startDate + " ~ " + p.endDate, "IN".equals(p.contractTypeCode) ? "–" : value(p.contractAmount),
             p.assignedPeopleCount + "명",
@@ -33,6 +34,7 @@ public class CommonProjectController {
             "TK".equals(p.contractTypeCode) ? (p.distributionStepName == null ? "없음" : p.distributionStepName) : "–")).toList();
         var now = service.now();
         int year = filter.year() == null ? now.atZone(java.time.ZoneId.of("Asia/Seoul")).getYear() : filter.year();
+        service.recordDownload(found.size(), year);
         byte[] bytes = excel.write("프로젝트", java.util.List.of("프로젝트ID", "프로젝트명", "고객사", "계약유형", "계약 기간", "계약금액",
             "투입 인원", "영업 파트", "상태", "배분표"), rows, service.currentUserId(), now);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(
@@ -79,7 +81,8 @@ public class CommonProjectController {
     public ResponseEntity<byte[]> getCommonProjectDistributionTemplate(@PathVariable String projectId) {
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=distribution.xlsx")
+            .header(HttpHeaders.CONTENT_DISPOSITION, org.springframework.http.ContentDisposition.attachment()
+                .filename(excel.fileName("배분표 양식", projectId, service.now()), java.nio.charset.StandardCharsets.UTF_8).build().toString())
             .body(service.getCommonProjectDistributionTemplate(projectId));
     }
     @PostMapping(value = "/api/common/projects", consumes = "application/json")
@@ -88,12 +91,14 @@ public class CommonProjectController {
     }
     @PutMapping(value = "/api/common/projects/{projectId}", consumes = "application/json")
     public Response<Project> putCommonProject(@PathVariable String projectId, @RequestBody JsonNode body) {
-        return Response.of(service.putCommonProject(projectId, ProjectRules.input(body, true)));
+        var input = ProjectRules.input(body, true);
+        return Response.of(service.putCommonProject(projectId, input, ClientRules.token(body)));
     }
     @PutMapping(value = "/api/common/projects/{projectId}/budget", consumes = "application/json")
     public Response<Project> putCommonProjectBudget(@PathVariable String projectId, @RequestBody JsonNode body) {
-        ClientRules.object(body, Set.of("budgetAmount"));
-        return Response.of(service.putCommonProjectBudget(projectId, ProjectRules.money(body, "budgetAmount", true)));
+        ClientRules.object(body, Set.of("budgetAmount", "modifiedAt"));
+        java.time.Instant token = body.has("modifiedAt") ? ClientRules.token(body) : null;
+        return Response.of(service.putCommonProjectBudget(projectId, ProjectRules.money(body, "budgetAmount", true), token, body.has("modifiedAt")));
     }
     @PutMapping(value = "/api/common/projects/{projectId}/sales-part", consumes = "application/json")
     public Response<Items<SalesPart>> putCommonProjectSalesPart(@PathVariable String projectId, @RequestBody JsonNode body) {

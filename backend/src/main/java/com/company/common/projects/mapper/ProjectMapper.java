@@ -59,6 +59,9 @@ public interface ProjectMapper {
     int deleteExpense(ExpenseKey key);
     List<Step> steps(String id);
     List<Issue> issues(String id);
+    List<Memo> memos(String id);
+    /** SER-006 접근 기록(프로젝트 화면 UI-01): 목록 다운로드(DNLD). */
+    int insertAccess(@org.apache.ibatis.annotations.Param("userId") String userId, @org.apache.ibatis.annotations.Param("action") String action, @org.apache.ibatis.annotations.Param("target") String target);
     BigDecimal actualProgress(String id);
     HealthSource healthSource(@Param("id") String id, @Param("today") LocalDate today);
     List<Cost> costs(@Param("id") String id, @Param("month") String month);

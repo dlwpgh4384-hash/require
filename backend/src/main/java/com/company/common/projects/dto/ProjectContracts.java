@@ -27,6 +27,16 @@ public final class ProjectContracts {
         public List<Assignment> assignments;
         public Progress progress;
         public List<Issue> issues;
+        /** 상세에서만: 마지막 마감월(YYYY-MM, 없으면 null)과 주간 메모(진행 현황 탭 보기용). */
+        public String closedMonth;
+        /** 동시 수정 확인용: 마지막 수정 시각(없으면 등록 시각). 수정·예산 저장 때 그대로 돌려보낸다. */
+        public java.time.Instant modifiedAt;
+        public List<Memo> memos;
+    }
+    public static class Memo {
+        public LocalDate writtenDate;
+        public String thisWeek, nextWeek, request;
+        public Integer actualProgressRate;
     }
     public record Input(String projectName, String customerId, String contractTypeCode,
         LocalDate startDate, LocalDate endDate, String salesPartId, String workplace,
@@ -58,7 +68,7 @@ public final class ProjectContracts {
         public boolean scheduled;
     }
     public static class Assignment {
-        public String name, jobName;
+        public String name, managementNumber, jobName;
         public LocalDate startDate, endDate;
         public BigDecimal mm;
     }
@@ -70,7 +80,7 @@ public final class ProjectContracts {
     }
     public record Progress(BigDecimal plannedProgressRate, BigDecimal actualProgressRate, List<Step> steps) {}
     public static class Issue {
-        public String issueTitle, importanceName, statusName, action;
+        public String issueTitle, importanceCode, importanceName, statusCode, statusName, action;
         public LocalDate dueDate;
     }
     public record Distribution(Project project, List<DistributionRow> items, List<DistributionUpload> uploads,

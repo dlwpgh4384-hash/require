@@ -39,6 +39,7 @@ const base = (over: Partial<Project> = {}): Project => ({
   teamExpenseAmount: 50000,
   projectExpenseAmount: 50000,
   feature: "특징",
+  modifiedAt: "2026-11-14T01:00:00Z",
   pmName: "담당PM",
   trafficLight: null,
   canEdit: true,
@@ -228,7 +229,7 @@ it("budget change validates, saves through PUT and shows the mockup toast", asyn
   fireEvent.click(dialog.getByTestId("project-command-save"));
   await waitFor(() => expect(writes()).toHaveLength(1));
   expect(writes()[0][0]).toBe("/api/common/projects/P-0001/budget");
-  expect(body(writes()[0])).toEqual({ budgetAmount: 900000 });
+  expect(body(writes()[0])).toEqual({ budgetAmount: 900000, modifiedAt: "2026-11-14T01:00:00Z" });
   expect(await screen.findByTestId("project-toast")).toHaveTextContent("예산(목표 원가)을 바꿨습니다.");
 });
 
@@ -314,6 +315,38 @@ it("manpower plan saves planned MM, and a denied plan is read only", async () =>
   fireEvent.click(await detail.findByTestId("project-detail-tab-plan"));
   expect(await detail.findByText("지금은 보기만 할 수 있습니다.")).toBeVisible();
   expect(detail.queryByTestId("project-job-mm-be")).not.toBeInTheDocument();
+});
+
+it("a blank plan with assignments shows 초과 and Ctrl+S saves the plan", async () => {
+  shell();
+  const detail = await openDetail();
+  fireEvent.click(await detail.findByTestId("project-detail-tab-plan"));
+  expect(await detail.findByText("초과 3.00")).toBeVisible();
+  fireEvent.change(detail.getByTestId("project-job-mm-be"), { target: { value: "3" } });
+  expect(detail.getByText("맞음")).toBeVisible();
+  await act(async () => {
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+  });
+  await waitFor(() => expect(writes()).toHaveLength(1));
+  expect(body(writes()[0])).toEqual({ jobs: [{ jobCode: "BE", plannedMm: 3 }] });
+});
+
+it("edit sends the read modifiedAt and shows the conflict message on 409", async () => {
+  const original = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    init?.method === "PUT" && url === "/api/common/projects/P-0001"
+      ? { ok: false, status: 409, json: async () => ({ success: false, message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.", errors: [] }) }
+      : original(url, init),
+  );
+  shell();
+  const detail = await openDetail();
+  fireEvent.click(await detail.findByTestId("project-edit"));
+  const form = within(await screen.findByTestId("project-form"));
+  await waitFor(() => expect(form.getByTestId("project-save")).toBeEnabled());
+  fireEvent.change(form.getByTestId("project-projectName"), { target: { value: "이름 바꿈" } });
+  fireEvent.click(form.getByTestId("project-save"));
+  expect(await form.findByTestId("project-form-error")).toHaveTextContent("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.");
+  expect(body(writes()[0]).modifiedAt).toBe("2026-11-14T01:00:00Z");
 });
 
 it("change history shows the Korean date of a UTC time", async () => {

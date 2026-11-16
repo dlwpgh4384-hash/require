@@ -62,6 +62,11 @@ public class CommonProjectService {
             .sorted(java.util.Comparator.comparing((Project p) -> p.startDate).reversed().thenComparing(p -> p.projectId))
             .toList();
     }
+    /** 목록 엑셀을 내려받은 기록(SER-006). */
+    @Transactional
+    public void recordDownload(int rows, int year) {
+        mapper.insertAccess(actor.userId(), "DNLD", "프로젝트 목록 " + year + "년 " + rows + "건");
+    }
     private static boolean blank(String v) { return v == null || v.isBlank(); }
     public String currentUserId() { return actor.userId(); }
     public BudgetRule getCommonProjectBudgetRule() { return amounts.budgetRule(calendar.currentMonth()); }
@@ -71,6 +76,9 @@ public class CommonProjectService {
         decorate(p);
         p.assignments = mapper.assignments(id);
         p.issues = mapper.issues(id);
+        p.memos = mapper.memos(id);
+        String closed = mapper.lastClosedMonth();
+        p.closedMonth = closed == null ? null : closed.substring(0, 4) + "-" + closed.substring(4, 6);
         return p;
     }
     private Project require(String id) {
@@ -169,7 +177,7 @@ public class CommonProjectService {
             p.budgetAmount = amounts.automaticBudget(p.contractAmount, calendar.currentMonth());
         }
         if (!"LOSE".equals(p.statusCode) && p.endDate.isBefore(calendar.today())) p.statusCode = "END";
-        else if (old != null && "END".equals(old.statusCode) && p.endDate.isAfter(calendar.today())) p.statusCode = "ING";
+        else if (old != null && "END".equals(old.statusCode) && !p.endDate.isBefore(calendar.today())) p.statusCode = "ING";
         return p;
     }
     public void validateRegistration(Input input) {
@@ -209,8 +217,9 @@ public class CommonProjectService {
         return getCommonProject(p.projectId);
     }
     @Transactional
-    public Project putCommonProject(String id, Input input) {
+    public Project putCommonProject(String id, Input input, java.time.Instant modifiedAt) {
         var old = locked(id); writable(old);
+        if (!Objects.equals(old.modifiedAt, modifiedAt)) throw CodeFailure.conflict();
         var p = values(input, old); references(p, old.salesPartId);
         if (!old.startDate.equals(p.startDate) || !old.endDate.equals(p.endDate)) {
             var outside = mapper.outside(id, p.startDate, p.endDate, calendar.today());
@@ -235,6 +244,9 @@ public class CommonProjectService {
         mapper.updateProject(new Write(p, actor.userId()));
         return getCommonProject(id);
     }
+    private static String partLabel(SalesPart r) {
+        return r.salesPartId == null ? "미지정" : "HQ".equals(r.salesPartId) ? "본사(직접 영업)" : r.salesPartName;
+    }
     private static boolean equalAmount(BigDecimal a, BigDecimal b) {
         return a == null ? b == null : b != null && a.compareTo(b) == 0;
     }
@@ -250,10 +262,15 @@ public class CommonProjectService {
     public Items<SalesPart> getCommonProjectSalesParts(String id) { require(id); return new Items<>(mapper.salesParts(id, currentMonth())); }
     @Transactional
     public Project putCommonProjectBudget(String id, BigDecimal budget) {
+        return putCommonProjectBudget(id, budget, null, false);
+    }
+    @Transactional
+    public Project putCommonProjectBudget(String id, BigDecimal budget, java.time.Instant modifiedAt, boolean checked) {
         var p = locked(id); writable(p);
+        if (checked && !Objects.equals(p.modifiedAt, modifiedAt)) throw CodeFailure.conflict();
         if (internal(p)) throw ProjectRules.invalid("budgetAmount");
         if (budget == null || budget.signum() < 0 || budget.stripTrailingZeros().scale() > 0) throw ProjectRules.invalid("budgetAmount");
-        history(id, "BUDGET", "예산(목표원가)", p.budgetAmount, budget);
+        change(id, "BUDGET", "예산(목표원가)", p.budgetAmount, budget);
         p.budgetAmount = budget; p.budgetManualYn = "Y";
         mapper.updateProject(new Write(p, actor.userId()));
         return getCommonProject(id);
@@ -283,8 +300,12 @@ public class CommonProjectService {
         if (!cancel) mapper.insertPart(new PartWrite(id, db(month), input.salesPartId(), input.reason(), actor.userId()));
         String targetName = cancel ? original.salesPartName : mapper.salesParts(id, currentMonth()).stream()
             .filter(r -> Objects.equals(r.salesPartId, input.salesPartId())).map(r -> r.salesPartName).findFirst().orElse(input.salesPartId());
-        history(id, "PART", "영업파트", original.salesPartName,
-            targetName + " (" + input.effectiveMonth() + (cancel ? " 변경 취소)" : " 적용)"));
+        String pending = rows.stream().filter(r -> db(YearMonth.parse(r.effectiveMonth)).compareTo(boundary) > 0 && r != rows.get(0))
+            .map(r -> r.effectiveMonth + "부터 " + partLabel(r)).reduce((a, b) -> a + ", " + b).orElse("");
+        if (cancel) history(id, "PART", "영업파트", pending.isEmpty() ? partLabel(original) : pending, "변경 취소");
+        else history(id, "PART", "영업파트", partLabel(original),
+            ("HQ".equals(input.salesPartId()) ? "본사(직접 영업)" : targetName) + " (" + input.effectiveMonth() + "부터)"
+            + (pending.isEmpty() ? "" : " · 잡혀 있던 " + pending + " 대신"));
         return getCommonProjectSalesParts(id);
     }
     public ManpowerList getCommonProjectManpowerPlan(String id) {

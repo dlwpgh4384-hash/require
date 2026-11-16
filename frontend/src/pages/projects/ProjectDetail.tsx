@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ConfirmDialog, Dialog } from "../../shared/feedback/Dialog";
 import type { ToastKind } from "../../shared/feedback/Dialog";
 import { Badge, Banner, DetailPanel, KeyValues } from "../../shared/list";
+import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { formatDateTime } from "../../shared/time";
 import { getCommonCodes } from "../codegroups/codeGroups";
 import { getCommonParts } from "../parts/parts";
@@ -38,7 +39,10 @@ export function ProjectDetail({
   onChanged,
   onDistribution,
   onEdit,
+  dirtyScreenId,
 }: {
+  /** 이 패널을 연 화면 번호. 저장 안 한 인원 계획이 있으면 그 화면 탭에 「●」를 보인다. */
+  dirtyScreenId?: string;
   projectId: string;
   onClose: () => void;
   readOnly?: boolean;
@@ -70,6 +74,23 @@ export function ProjectDetail({
   const [newJob, setNewJob] = useState("");
   const [planMessage, setPlanMessage] = useState("");
   const loadVersion = useRef(0);
+  const setScreenDirty = useScreenDirty();
+  const shortcut = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        shortcut.current();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+  useEffect(() => {
+    if (!dirtyScreenId) return;
+    setScreenDirty(dirtyScreenId, planDirty);
+    return () => setScreenDirty(dirtyScreenId, false);
+  }, [dirtyScreenId, planDirty, setScreenDirty]);
   const load = async () => {
     const version = ++loadVersion.current;
     setError("");
@@ -119,6 +140,17 @@ export function ProjectDetail({
   const internal = p?.contractTypeCode === "IN";
   const canSavePlan = writable && !!p?.canSaveManpowerPlan && planAllowed;
   const thisMonth = api.projectToday().slice(0, 7);
+  const closedMonth = p?.closedMonth ?? null;
+  const nextMonth = (m: string) => {
+    let [y, mo] = m.split("-").map(Number);
+    mo++;
+    if (mo > 12) {
+      mo = 1;
+      y++;
+    }
+    return `${y}-${String(mo).padStart(2, "0")}`;
+  };
+  const firstOpen = closedMonth ? nextMonth(closedMonth) : thisMonth;
   const close = () => (planDirty ? setClosing(true) : onClose());
   const open = async (next: Mode) => {
     setMenu(false);
@@ -128,7 +160,7 @@ export function ProjectDetail({
     setValues({
       budgetAmount: p?.budgetAmount != null ? p.budgetAmount.toLocaleString("ko-KR") : "",
       salesPartId: partChoices(current?.salesPartId)[0]?.[0] ?? "",
-      effectiveMonth: thisMonth,
+      effectiveMonth: firstOpen > thisMonth ? firstOpen : thisMonth,
       reason: "",
       yearMonth: thisMonth,
       itemCode: codes.items[0]?.code ?? "",
@@ -178,10 +210,11 @@ export function ProjectDetail({
     if (mode === "budget") {
       const v = Number(digits(values.budgetAmount));
       if (!v) return setModalError("예산은 0보다 커야 합니다.");
-      return void run(() => api.putCommonProjectBudget(projectId, v), "예산(목표 원가)을 바꿨습니다.");
+      return void run(() => api.putCommonProjectBudget(projectId, v, p.modifiedAt), "예산(목표 원가)을 바꿨습니다.");
     }
     if (mode === "part") {
-      if (!values.effectiveMonth) return setModalError(`적용 시작 월은 ${thisMonth} 이후로 골라 주세요.`);
+      if (!values.effectiveMonth || (closedMonth && values.effectiveMonth <= closedMonth))
+        return setModalError(`적용 시작 월은 ${firstOpen} 이후로 골라 주세요.`);
       const current = parts.filter((s) => !s.scheduled).at(-1);
       const cancel = values.salesPartId === current?.salesPartId;
       return void run(
@@ -196,6 +229,8 @@ export function ProjectDetail({
     }
     if (mode === "expense") {
       if (!values.yearMonth) return setModalError("경비 월을 넣어 주세요.");
+      if (closedMonth && values.yearMonth <= closedMonth)
+        return setModalError("마감한 달에는 넣을 수 없습니다. 이번 달에 넣으면 전월 조정으로 처리됩니다.");
       const amount = Number(digits(values.amount));
       if (!amount) return setModalError("금액을 넣어 주세요.");
       return void run(
@@ -219,6 +254,28 @@ export function ProjectDetail({
         true,
       );
     }
+  };
+  const savePlan = async () => {
+    if (busy || !planDirty) return;
+    setPlanMessage("");
+    setBusy(true);
+    try {
+      await api.putCommonProjectManpowerPlan(
+        projectId,
+        jobs.map((j) => ({ jobCode: j.jobCode, plannedMm: j.plannedMm ?? 0 })),
+      );
+      await load();
+      onChanged?.("인원 계획을 저장했습니다. 인원 계획 대비 투입(UI-11)에 바로 반영됩니다.");
+    } catch (e) {
+      setPlanMessage(api.projectFailure(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  // 공통 기능: Ctrl+S — 열린 창이 있으면 그 창을 저장, 아니면 인원 계획 탭의 저장
+  shortcut.current = () => {
+    if (mode) submit();
+    else if (tab === "plan" && planDirty && canSavePlan) void savePlan();
   };
   const set = (key: string, value: string) => setValues((v) => ({ ...v, [key]: value }));
   const fc = (id: string, label: string, required: boolean, control: ReactNode, help?: string) => (
@@ -272,7 +329,7 @@ export function ProjectDetail({
   const projectMonths = (ey - sy) * 12 + (em - sm) + 1;
   const jobChoices = codes.jobs.filter((o) => !jobs.some((j) => j.jobCode === o.code));
   const jobChoice = jobChoices.some((j) => j.code === newJob) ? newJob : jobChoices[0]?.code ?? "";
-  const openIssues = (p.issues ?? []).filter((i) => i.statusName !== "종료");
+  const openIssues = (p.issues ?? []).filter((i) => i.statusCode !== "CLOSE");
   const assignments = p.assignments ?? [];
   const thisMonthExpense = expenses.filter((e) => e.yearMonth === thisMonth).reduce((s, e) => s + e.amount, 0);
   const partHistory = parts.length > 1 && (
@@ -308,14 +365,16 @@ export function ProjectDetail({
               </tr>
             </thead>
             <tbody>
-              {[...expenses].reverse().map((e) => (
+              {expenses.map((e) => (
                 <tr key={e.expenseId} data-testid={`project-expense-${e.expenseId.replace(":", "-")}`}>
                   <td>{e.yearMonth}</td>
                   <td>{e.itemName}</td>
                   <td className="ls-right">{api.won(e.amount)}</td>
                   <td className="project-sub">{e.memo ?? ""}</td>
                   <td>
-                    {writable && (
+                    {closedMonth && e.yearMonth <= closedMonth ? (
+                      <span className="project-sub">마감</span>
+                    ) : writable && (
                       <button
                         type="button"
                         className="ls-ibtn ls-ibtn-sm"
@@ -427,22 +486,77 @@ export function ProjectDetail({
       )}
     </>
   );
+  const today = api.projectToday();
+  const stepState = (s: { plannedStartDate: string; plannedEndDate: string; completedDate: string | null }) =>
+    s.completedDate ? "완료" : s.plannedEndDate < today ? "지연" : s.plannedStartDate <= today ? "진행 중" : "예정";
+  const stepKind = (state: string) => (state === "완료" ? "ok" : state === "지연" ? "bad" : state === "진행 중" ? "info" : "neutral");
+  const steps = p.progress?.steps ?? [];
+  const currentStep = steps.find((s) => !s.completedDate);
+  // 시안: 진척률·차이는 정수 %로 보인다
+  const planRate = p.progress?.plannedProgressRate == null ? null : Math.round(p.progress.plannedProgressRate);
+  const actRate = p.progress?.actualProgressRate == null ? null : Math.round(p.progress.actualProgressRate);
+  const lastMemo = p.memos?.[0];
+  const daysAgo = lastMemo
+    ? Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${lastMemo.writtenDate}T00:00:00Z`)) / 86400000)
+    : null;
+  const bar = (label: string, value: number | null | undefined, muted: boolean) => (
+    <div className="project-bar">
+      <span className="project-cap project-bar-label">{label}</span>
+      <div className="project-track">
+        <div className={`project-fill${muted ? " project-fill-plan" : ""}`} style={{ width: `${Math.min(100, value ?? 0)}%` }} />
+      </div>
+      <span className="project-cap project-bar-value">{value == null ? "–" : `${value}%`}</span>
+    </div>
+  );
   const progress = (
     <>
       {p.trafficLight && (
         <Banner kind={p.trafficLight === "위험" ? "bad" : p.trafficLight === "주의" ? "warn" : "info"}>
-          <strong>{p.trafficLight}</strong> — 계획대로 진행 중인지 진척률·원가·이슈로 봅니다.
+          <strong>{p.trafficLight}</strong>
+          {p.trafficLight === "정상" ? " — 계획대로 진행 중입니다." : ""}
         </Banner>
       )}
       <KeyValues
         items={[
           ["PM", p.pmName || "–"],
           [
+            "현재 단계",
+            currentStep ? (
+              <>
+                {currentStep.stepName} <Badge kind={stepKind(stepState(currentStep))}>{stepState(currentStep)}</Badge>
+              </>
+            ) : (
+              "–"
+            ),
+          ],
+          [
             "진척률",
-            `계획 ${p.progress?.plannedProgressRate ?? "–"}% · 실적 ${p.progress?.actualProgressRate ?? "–"}%`,
+            <>
+              <div className="project-bars">
+                {bar("계획", planRate, true)}
+                {bar("실적", actRate, false)}
+              </div>
+              {planRate != null && actRate != null && (
+                <div className="project-cap">
+                  계획 대비 {actRate - planRate >= 0 ? "+" : ""}
+                  {actRate - planRate}%p
+                </div>
+              )}
+            </>,
+          ],
+          [
+            "마지막 업데이트",
+            lastMemo ? (
+              <>
+                {lastMemo.writtenDate} <span className="project-sub">({daysAgo}일 전)</span>
+              </>
+            ) : (
+              "–"
+            ),
           ],
         ]}
       />
+      <h3 className="project-h3">단계</h3>
       <div className="ls-twrap">
         <table className="ls-t" data-testid="project-steps">
           <thead>
@@ -451,10 +565,11 @@ export function ProjectDetail({
               <th className="ls-right">비중</th>
               <th>예정 기간</th>
               <th>완료일</th>
+              <th>상태</th>
             </tr>
           </thead>
           <tbody>
-            {(p.progress?.steps ?? []).map((s, i) => (
+            {steps.map((s, i) => (
               <tr key={i} data-testid={`project-progress-${i}`}>
                 <td>{s.stepName}</td>
                 <td className="ls-right">{s.weightRate}%</td>
@@ -462,43 +577,86 @@ export function ProjectDetail({
                   {s.plannedStartDate.slice(2, 7)} ~ {s.plannedEndDate.slice(2, 7)}
                 </td>
                 <td>{s.completedDate ? s.completedDate.slice(2) : "–"}</td>
+                <td>
+                  <Badge kind={stepKind(stepState(s))}>{stepState(s)}</Badge>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {!p.progress?.steps.length && <p className="project-sub project-empty">등록된 단계가 없습니다.</p>}
+        {!steps.length && <p className="project-sub project-empty">등록된 단계가 없습니다.</p>}
       </div>
+      <h3 className="project-h3">주간 메모</h3>
+      {(p.memos ?? []).length ? (
+        <div className="project-memos" data-testid="project-memos">
+          {(p.memos ?? []).map((m, i) => (
+            <div key={i} className="project-memo">
+              <div className="project-memo-head">
+                <strong>{m.writtenDate}</strong>
+                {m.actualProgressRate != null && <span className="project-cap">실적 진척률 {m.actualProgressRate}%</span>}
+              </div>
+              {m.thisWeek && (
+                <div>
+                  <span className="project-cap">한 일</span> {m.thisWeek}
+                </div>
+              )}
+              {m.nextWeek && (
+                <div>
+                  <span className="project-cap">할 일</span> {m.nextWeek}
+                </div>
+              )}
+              {m.request && (
+                <div>
+                  <span className="project-cap">요청</span> <span className="project-warn-text">{m.request}</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="project-sub project-empty">적은 주간 메모가 없습니다.</p>
+      )}
     </>
   );
   const issues = (
-    <div className="ls-twrap">
-      <table className="ls-t" data-testid="project-issues">
-        <thead>
-          <tr>
-            <th>중요도</th>
-            <th>제목 · 조치 내용</th>
-            <th>기한</th>
-            <th>상태</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(p.issues ?? []).map((i, index) => (
-            <tr key={index} data-testid={`project-issue-${index}`}>
-              <td>
-                <Badge kind={i.importanceName === "높음" ? "bad" : i.importanceName === "보통" ? "warn" : "neutral"}>{i.importanceName}</Badge>
-              </td>
-              <td className="project-wrap">
-                {i.issueTitle}
-                {i.action && <div className="project-cap">{i.action}</div>}
-              </td>
-              <td>{i.dueDate ?? "–"}</td>
-              <td>{i.statusName}</td>
+    <>
+      <p className="project-cap">기한이 지난 이슈는 빨간색으로 보입니다.</p>
+      <div className="ls-twrap">
+        <table className="ls-t" data-testid="project-issues">
+          <thead>
+            <tr>
+              <th>중요도</th>
+              <th>제목 · 조치 내용</th>
+              <th>담당자</th>
+              <th>기한</th>
+              <th>상태</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      {!p.issues?.length && <p className="project-sub project-empty">등록된 이슈가 없습니다.</p>}
-    </div>
+          </thead>
+          <tbody>
+            {(p.issues ?? []).map((i, index) => {
+              const overdue = !!i.dueDate && i.dueDate < today && i.statusCode !== "CLOSE";
+              return (
+                <tr key={index} data-testid={`project-issue-${index}`} className={overdue ? "project-overdue" : undefined}>
+                  <td>
+                    <Badge kind={i.importanceCode === "HIGH" ? "bad" : i.importanceCode === "MID" ? "warn" : "neutral"}>{i.importanceName}</Badge>
+                  </td>
+                  <td className="project-wrap">
+                    {i.issueTitle}
+                    {i.action && <div className="project-cap">{i.action}</div>}
+                  </td>
+                  <td>{p.pmName || "–"}</td>
+                  <td>{i.dueDate ? i.dueDate.slice(5) : "–"}</td>
+                  <td>
+                    <Badge kind={i.statusCode === "OPEN" ? "info" : i.statusCode === "ACT" ? "warn" : "lock"}>{i.statusName}</Badge>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {!p.issues?.length && <p className="project-sub project-empty">등록된 이슈가 없습니다.</p>}
+      </div>
+    </>
   );
   const plan = (
     <>
@@ -522,7 +680,7 @@ export function ProjectDetail({
           </thead>
           <tbody>
             {jobs.map((j, i) => {
-              const d = j.differenceMm;
+              const d = j.differenceMm ?? j.actualMm - (j.plannedMm ?? 0);
               return (
                 <tr key={j.jobCode} data-testid={`project-job-${j.jobCode.toLowerCase()}`}>
                   <td>{j.jobName}</td>
@@ -620,22 +778,7 @@ export function ProjectDetail({
             className="ls-btn ls-btn-sm ls-btn-p"
             data-testid="project-plan-save"
             disabled={busy || !planDirty}
-            onClick={async () => {
-              setPlanMessage("");
-              setBusy(true);
-              try {
-                await api.putCommonProjectManpowerPlan(
-                  projectId,
-                  jobs.map((j) => ({ jobCode: j.jobCode, plannedMm: j.plannedMm ?? 0 })),
-                );
-                await load();
-                onChanged?.("인원 계획을 저장했습니다. 인원 계획 대비 투입(UI-11)에 바로 반영됩니다.");
-              } catch (e) {
-                setPlanMessage(api.projectFailure(e));
-              } finally {
-                setBusy(false);
-              }
-            }}
+            onClick={() => void savePlan()}
           >
             저장
           </button>
@@ -662,7 +805,12 @@ export function ProjectDetail({
         <tbody>
           {assignments.map((a, i) => (
             <tr key={i} data-testid={`project-assignment-${i}`}>
-              <td>{a.name}</td>
+              <td>
+                <span className="project-pname">
+                  {a.name}
+                  {a.managementNumber && <small>{a.managementNumber}</small>}
+                </span>
+              </td>
               <td>{a.jobName}</td>
               <td>
                 {a.startDate} ~ {a.endDate}
@@ -802,7 +950,10 @@ export function ProjectDetail({
         )}
         {mode === "part" && (
           <>
-            <p>「{p.projectName}」의 영업 파트를 바꿉니다. 적용 시작 월부터 새 파트로 잡히고, 마감한 달의 실적·정산은 바뀌지 않습니다.</p>
+            <p>
+              「{p.projectName}」의 영업 파트를 바꿉니다. 적용 시작 월부터 새 파트로 잡히고, 마감한 달{closedMonth ? `(${closedMonth}까지)` : ""}의
+              실적·정산은 바뀌지 않습니다.
+            </p>
             {pending.length > 0 && (
               <div className="project-note-box">
                 마감 안 된 달부터 잡힌 변경이 있습니다: <b>{pendingText}</b>. 저장하면 이 변경은 지워지고 새로 넣은 내용으로 바뀝니다. 원래 파트(
@@ -829,11 +980,11 @@ export function ProjectDetail({
                 id="project-part-month"
                 data-testid="project-command-effectivemonth"
                 type="month"
-                min={thisMonth}
+                min={closedMonth ? firstOpen : undefined}
                 value={values.effectiveMonth}
                 onChange={(e) => set("effectiveMonth", e.target.value)}
               />,
-              `마감 안 된 달(${thisMonth})부터 고를 수 있습니다.`,
+              `마감 안 된 달(${firstOpen})부터 고를 수 있습니다.`,
             )}
             {fc(
               "project-part-reason",

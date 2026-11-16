@@ -19,6 +19,7 @@
     p.BDGT_AMT AS "budgetAmount", p.BDGT_MANUAL_YN AS "budgetManualYn",
     p.TEAM_EXPS_AMT AS "teamExpenseAmount", p.PROJ_EXPS_AMT AS "projectExpenseAmount",
     p.FEATURE_CN AS "feature", pp.PART_ID AS "salesPartId", pp.PART_NM AS "salesPartName",
+    COALESCE(p.MOD_DTTM, p.REG_DTTM) AS "modifiedAt",
     p.LOSE_DT AS "loseDate", lr.CODE_NM AS "loseReasonName", p.LOSE_MEMO AS "loseMemo",
     (SELECT string_agg(u.USER_NM, ', ' ORDER BY u.USER_ID) FROM TB_SY_USER u
       WHERE EXISTS (SELECT 1 FROM TB_SY_USER_SCOPE sc WHERE sc.USER_ID=u.USER_ID
@@ -137,7 +138,7 @@
       (c.CLOSE_YM &lt; to_char(#{start}::date,'YYYYMM') OR c.CLOSE_YM &gt; to_char(#{end}::date,'YYYYMM')))
   </select>
   <select id="assignments" resultType="com.company.common.projects.dto.ProjectContracts$Assignment">
-    SELECT d.DEV_NM AS "name", c.CODE_NM AS "jobName", a.INPUT_BGN_DT AS "startDate",
+    SELECT d.DEV_NM AS "name", d.MNG_NO AS "managementNumber", c.CODE_NM AS "jobName", a.INPUT_BGN_DT AS "startDate",
       a.INPUT_END_DT AS "endDate", a.CTRT_MM AS "mm"
     FROM TB_PJ_ASGN a JOIN TB_HR_DEV d ON d.DEV_ID=a.DEV_ID
     LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='JOB' AND c.CODE=a.JOB_CD
@@ -150,8 +151,8 @@
   <insert id="assignmentHistory">
     INSERT INTO TB_PJ_ASGN_HIST (ASGN_ID,HIST_SN,ASGN_CHG_TYPE_CD,APLY_DT,BFR_VAL,AFT_VAL,ASGN_CHG_RSN_CD,CHG_MEMO,REG_USER_ID)
     SELECT a.ASGN_ID,(SELECT COALESCE(MAX(h.HIST_SN),0)+1 FROM TB_PJ_ASGN_HIST h WHERE h.ASGN_ID=a.ASGN_ID),
-      #{kind},#{today},CASE WHEN #{kind}='EARLY' THEN a.INPUT_END_DT::text ELSE a.ASGN_STAT_CD END,
-      CASE WHEN #{kind}='EARLY' THEN #{today}::text ELSE 'CNCL' END,'ETC',#{memo},#{actor}
+      #{kind},#{today},CASE WHEN #{kind}='EARLY' THEN '종료 '||a.INPUT_END_DT::text ELSE a.INPUT_BGN_DT::text||' ~ '||a.INPUT_END_DT::text END,
+      CASE WHEN #{kind}='EARLY' THEN '철수 '||#{today}::text ELSE '배정 취소' END,'ETC',#{memo},#{actor}
     FROM TB_PJ_ASGN a WHERE a.ASGN_ID=#{assignmentId}
   </insert>
   <update id="changeAssignment">
@@ -217,11 +218,21 @@
     WHERE s.PROJ_ID=#{id} ORDER BY s.STEP_SN
   </select>
   <select id="issues" resultType="com.company.common.projects.dto.ProjectContracts$Issue">
-    SELECT i.ISSUE_TTL AS "issueTitle",c.CODE_NM AS "importanceName",i.DDLN_DT AS "dueDate",
-      s.CODE_NM AS "statusName",i.ACTN_CN AS "action"
+    SELECT i.ISSUE_TTL AS "issueTitle",i.IMPR_CD AS "importanceCode",c.CODE_NM AS "importanceName",i.DDLN_DT AS "dueDate",
+      i.ISSUE_STAT_CD AS "statusCode",s.CODE_NM AS "statusName",i.ACTN_CN AS "action"
     FROM TB_PJ_ISSUE i LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='IMPR' AND c.CODE=i.IMPR_CD
     LEFT JOIN TB_SY_CODE s ON s.CODE_GRP_ID='ISSUE_STAT' AND s.CODE=i.ISSUE_STAT_CD
-    WHERE i.PROJ_ID=#{id} ORDER BY i.ISSUE_ID DESC
+    WHERE i.PROJ_ID=#{id}
+    ORDER BY CASE WHEN i.ISSUE_STAT_CD='CLOSE' THEN 1 ELSE 0 END, c.SORT_ORD NULLS LAST, i.DDLN_DT NULLS LAST, i.ISSUE_ID
+  </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES (#{userId},#{action},'UI-01',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
+  <select id="memos" resultType="com.company.common.projects.dto.ProjectContracts$Memo">
+    SELECT WRT_DT AS "writtenDate",THIS_WEEK_CN AS "thisWeek",NEXT_WEEK_CN AS "nextWeek",REQ_CN AS "request",
+      ACTL_PRGRS_RT AS "actualProgressRate"
+    FROM TB_PJ_WEEK_MEMO WHERE PROJ_ID=#{id} ORDER BY WRT_DT DESC, MEMO_SN DESC
   </select>
   <select id="actualProgress" resultType="java.math.BigDecimal">
     SELECT ACTL_PRGRS_RT FROM TB_PJ_WEEK_MEMO WHERE PROJ_ID=#{id} AND ACTL_PRGRS_RT IS NOT NULL

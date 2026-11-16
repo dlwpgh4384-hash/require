@@ -19,6 +19,7 @@ public final class ProjectRules {
     public static Input input(JsonNode body, boolean update) {
         var allowed = new HashSet<>(MUTABLE);
         if (!update) allowed.addAll(Set.of("contractTypeCode", "statusCode", "salesPartId"));
+        else allowed.add("modifiedAt");
         ClientRules.object(body, allowed);
         LocalDate start = date(body, "startDate"), end = date(body, "endDate");
         if (end.isBefore(start)) throw invalid("endDate");

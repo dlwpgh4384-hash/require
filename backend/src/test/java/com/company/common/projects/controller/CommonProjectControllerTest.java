@@ -109,7 +109,8 @@ class CommonProjectControllerTest {
         b.put("estimateAmount",1200000); b.put("feature","특징"); return b;
     }
     ObjectNode updateInput() {
-        var b=createInput(); b.remove(List.of("contractTypeCode","statusCode","salesPartId")); return b;
+        // 동시 수정 확인: 읽은 프로젝트의 modifiedAt(시험 자료는 null)을 그대로 돌려보낸다.
+        var b=createInput(); b.remove(List.of("contractTypeCode","statusCode","salesPartId")); b.putNull("modifiedAt"); return b;
     }
     @Test
     @DisplayName("auth happy side-effect: 무인증 admin 프로젝트 등록과 최초 계약·파트 이력")
@@ -180,6 +181,12 @@ class CommonProjectControllerTest {
             .andExpect(status().isOk())
             .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("2026")));
+    }
+    @Test void staleModifiedAtIsAConflictAndWritesNothing() throws Exception {
+        var b=updateInput(); b.put("modifiedAt","2026-01-01T00:00:00Z");
+        mvc.perform(put("/api/common/projects/P-0001").contentType("application/json").content(b.toString()))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요."));
+        verify(mapper, never()).updateProject(any());
     }
     @Test void changeHistoryReturnsStoredValues() throws Exception {
         var h = new History(); h.itemName="계약금액"; h.beforeValue="100"; h.afterValue="200";
@@ -467,8 +474,9 @@ class CommonProjectControllerTest {
         assertThat(parts.get(0).salesPartId).isEqualTo("first");
         verify(mapper, never()).insertPart(any());
         assertThat(history).singleElement().satisfies(h -> {
-            assertThat(h.beforeValue()).isEqualTo("원래 파트");
-            assertThat(h.afterValue()).contains("원래 파트", "변경 취소");
+            // 시안: 변경 전은 잡혀 있던 변경, 변경 후는 「변경 취소」
+            assertThat(h.beforeValue()).contains("2026-12부터");
+            assertThat(h.afterValue()).isEqualTo("변경 취소");
         });
     }
     @Test void distributionAndTemplateReturnActualWorkbook() throws Exception {

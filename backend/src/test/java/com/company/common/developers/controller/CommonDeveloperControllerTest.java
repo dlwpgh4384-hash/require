@@ -290,7 +290,13 @@ class CommonDeveloperControllerTest {
         verify(mapper).selectChanges("dev");
     }
     @Test void assignmentsUseApprovedShapeAndDatabaseResult() throws Exception {
-        mvc.perform(get("/api/common/developers/dev/assignments")).andExpect(status().isOk()).andExpect(response("GET","/api/common/developers/{developerId}/assignments"));
+        var assignment=new DeveloperRows.Assignment();
+        assignment.assignmentId="assignment"; assignment.projectId="project"; assignment.projectName="프로젝트";
+        assignment.jobName="개발"; assignment.startDate=today; assignment.endDate=today.plusDays(1); assignment.mm=BigDecimal.ONE;
+        when(mapper.selectAssignments("dev")).thenReturn(List.of(assignment));
+        mvc.perform(get("/api/common/developers/dev/assignments")).andExpect(status().isOk()).andExpect(response("GET","/api/common/developers/{developerId}/assignments"))
+            .andExpect(jsonPath("$.data.items[0].projectId").value("project"))
+            .andExpect(jsonPath("$.data.items[0].assignmentId").doesNotExist());
         verify(mapper,atLeastOnce()).selectAssignments("dev");
     }
     @Test void statusesUseApprovedShapeAndDatabaseResult() throws Exception {

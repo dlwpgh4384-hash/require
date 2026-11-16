@@ -11,6 +11,11 @@ import {
   useUserPreferences,
 } from "../userpreferences";
 import { PlaceholderScreen } from "./PlaceholderScreen";
+import { ProjectPage } from "../projects/ProjectPage";
+import {
+  ProjectTitleActions,
+  ProjectWorkspaceProvider,
+} from "../projects/ProjectWorkspace";
 import { UserPage } from "../users/UserPage";
 import { RolePage } from "../roles/RolePage";
 import { MenuPage } from "../menusettings/MenuPage";
@@ -48,7 +53,9 @@ import {
 } from "../users/UserWorkspace";
 
 const renderScreen = (scrnId: string) =>
-  scrnId === "UI-02" ? (
+  scrnId === "UI-01" ? (
+    <ProjectPage />
+  ) : scrnId === "UI-02" ? (
     <DeveloperWorkspace />
   ) : scrnId === "UI-15" ? (
     <ClientPartWorkspace partPage={<PartPage />} />
@@ -114,7 +121,9 @@ function PreferenceNavigation() {
         const menus = context.menus as ShellMenuItem[];
         return {
           screenActions:
-            context.screenId === "UI-02" ? (
+            context.screenId === "UI-01" ? (
+              <ProjectTitleActions />
+            ) : context.screenId === "UI-02" ? (
               <DeveloperTitleActions />
             ) : context.screenId === "UI-15" ? (
               <ClientPartTitleActions partActions={<PartTitleActions />} />
@@ -170,32 +179,36 @@ export function CommonNavigationPage() {
           <CodeWorkspaceProvider>
             <ClientPartWorkspaceProvider>
               <DeveloperWorkspaceProvider>
-                {preferences ? (
-                  <PreferenceNavigation />
-                ) : (
-                  <NavigationRoot
-                    tabs
-                    renderScreen={renderScreen}
-                    extensions={(context) => ({
-                      screenActions:
-                        context.screenId === "UI-02" ? (
-                          <DeveloperTitleActions />
-                        ) : context.screenId === "UI-15" ? (
-                          <ClientPartTitleActions
-                            partActions={<PartTitleActions />}
-                          />
-                        ) : context.screenId === "UI-23" ? (
-                          <UserRegistrationButton />
-                        ) : context.screenId === "UI-24" ? (
-                          <RoleTitleActions />
-                        ) : context.screenId === "UI-25" ? (
-                          <MenuTitleActions />
-                        ) : context.screenId === "UI-27" ? (
-                          <CodeTitleActions />
-                        ) : undefined,
-                    })}
-                  />
-                )}
+                <ProjectWorkspaceProvider>
+                  {preferences ? (
+                    <PreferenceNavigation />
+                  ) : (
+                    <NavigationRoot
+                      tabs
+                      renderScreen={renderScreen}
+                      extensions={(context) => ({
+                        screenActions:
+                          context.screenId === "UI-01" ? (
+                            <ProjectTitleActions />
+                          ) : context.screenId === "UI-02" ? (
+                            <DeveloperTitleActions />
+                          ) : context.screenId === "UI-15" ? (
+                            <ClientPartTitleActions
+                              partActions={<PartTitleActions />}
+                            />
+                          ) : context.screenId === "UI-23" ? (
+                            <UserRegistrationButton />
+                          ) : context.screenId === "UI-24" ? (
+                            <RoleTitleActions />
+                          ) : context.screenId === "UI-25" ? (
+                            <MenuTitleActions />
+                          ) : context.screenId === "UI-27" ? (
+                            <CodeTitleActions />
+                          ) : undefined,
+                      })}
+                    />
+                  )}
+                </ProjectWorkspaceProvider>
               </DeveloperWorkspaceProvider>
             </ClientPartWorkspaceProvider>
           </CodeWorkspaceProvider>

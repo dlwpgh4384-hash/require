@@ -35,7 +35,7 @@ class ClientProjectionTest {
             var labels = new LinkedHashMap<String, Object>();
             for (var field : mapping.getResultMappings()) {
                 Class<?> type = field.getJavaType();
-                Object value = type == long.class ? 7L : type == Instant.class ? Instant.parse("2030-01-01T00:00:00.123456Z") :
+                Object value = type == java.math.BigDecimal.class ? new java.math.BigDecimal("1.25") : type == long.class ? 7L : type == Instant.class ? Instant.parse("2030-01-01T00:00:00.123456Z") :
                     type == LocalDate.class ? LocalDate.of(2030, 1, 2) : "value:" + field.getProperty();
                 labels.put(field.getColumn(), value);
             }

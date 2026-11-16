@@ -190,7 +190,9 @@ async function expectScreenContent(id: string) {
   await waitFor(() => expect(panel).toBeVisible());
   // 비활성 탭도 마운트되어 있으므로 현재 화면 안에서만 내용을 찾는다.
   const content = within(panel);
-  if (id === "UI-02") {
+  if (id === "UI-01") {
+    expect(await content.findByTestId("project-page")).toBeVisible();
+  } else if (id === "UI-02") {
     expect(
       await content.findByText("조건에 맞는 결과가 없습니다."),
     ).toBeVisible();
@@ -381,7 +383,7 @@ describe("common placeholder screen contract", () => {
       await expectScreenContent(id);
       expect(screen.getByLabelText("주소")).toHaveTextContent(`/screens/${id}`);
     }
-  });
+  }, 15000); // 모든 처음 화면을 차례로 열어 보는 긴 시험: 전체 시험을 함께 돌릴 때 5초를 넘길 수 있다
 
   it("a PC-only duplicate representative cannot be replaced by another mobile link", async () => {
     mobile = true;
@@ -427,7 +429,12 @@ describe("common placeholder screen contract", () => {
       expect(screen.getAllByRole("banner")).toHaveLength(1);
       expect(screen.getAllByRole("complementary")).toHaveLength(1);
       expect(screen.getAllByRole("main")).toHaveLength(1);
-      if (id !== "UI-23" && id !== "UI-15" && id !== "UI-02") {
+      if (
+        id !== "UI-23" &&
+        id !== "UI-15" &&
+        id !== "UI-02" &&
+        id !== "UI-01"
+      ) {
         expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
         for (const name of ["조회", "저장", "다운로드", "업로드", "편집"]) {
           if (id === "UI-25" && name === "저장")

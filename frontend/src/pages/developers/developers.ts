@@ -45,12 +45,14 @@ export interface DeveloperListRow
     "monthlyPay" | "homeAreaCode" | "homeAddress" | "skillCodes" | "modifiedAt"
   > {
   currentProjectName: string | null;
+  currentProjectId?: string | null;
   additionalProjectCount: number;
   currentMonthMm: number;
   overOneMm: boolean;
   withdrawalDate: string | null;
 }
 export interface DeveloperAssignment {
+  projectId?: string;
   projectName: string;
   jobName: string;
   startDate: string;

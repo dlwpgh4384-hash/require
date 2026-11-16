@@ -22,7 +22,7 @@ class UploadProjectionTest {
             new XMLMapperBuilder(stream,config,resource,config.getSqlFragments()).parse();
         }
         var labels=new LinkedHashMap<String,Object>();
-        labels.put("upld_id",81L); labels.put("form_type_cd","B7"); labels.put("trgt_ym","202610"); labels.put("file_nm","clients.xlsx");
+        labels.put("upld_id",81L); labels.put("form_type_cd","B7"); labels.put("trgt_ym","202610"); labels.put("trgt_proj_id",null); labels.put("trgt_dstrb_step_cd",null); labels.put("file_nm","clients.xlsx");
         labels.put("upld_stat_cd","CHECKED"); labels.put("status_name","검사완료"); labels.put("succ_cnt",3);
         labels.put("warn_cnt",2); labels.put("err_cnt",1); labels.put("mod_dttm",nullable?null:Instant.parse("2030-01-01T00:00:00.123456Z"));
         var row=new UploadRows.Upload(); map(config,"selectUpload",row,labels);
@@ -37,7 +37,7 @@ class UploadProjectionTest {
         assertThat(issue.row).isEqualTo(7); assertThat(issue.column).isEqualTo("업종");
         assertThat(issue.inputValue).isEqualTo("원문"); assertThat(issue.reason).isEqualTo("변환 경고");
         assertThat(issue.severity).isEqualTo("경고");
-        var inspection=new UploadContracts.Inspection(java.util.List.of(),java.util.List.of(),3,2,1,6);
+        var inspection=new UploadContracts.Inspection(java.util.List.of(),java.util.List.of(),3,2,1,6,java.util.Map.of());
         var bound=config.getMappedStatement(UploadMapper.class.getName()+".insertUpload")
             .getBoundSql(new UploadContracts.Check(81,"B7","UI-15",null,"clients.xlsx",1234,inspection));
         var meta=config.newMetaObject(bound.getParameterObject());

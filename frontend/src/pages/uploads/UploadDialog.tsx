@@ -13,11 +13,19 @@ export function UploadDialog({
   formTypeCode,
   onClose,
   onChecked,
+  projectId,
+  distributionSteps = [],
+  defaultStep = "",
 }: {
   formTypeCode: string;
   onClose: () => void;
   onChecked: (result: UploadResult) => void;
+  projectId?: string;
+  distributionSteps?: { code: string; codeName: string }[];
+  /** B.6 처음 고른 단계(시안: 지금 계산에 쓰는 단계). */
+  defaultStep?: string;
 }) {
+  const [step, setStep] = useState(defaultStep);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -44,7 +52,18 @@ export function UploadDialog({
     busyRef.current = true;
     setBusy(true);
     try {
-      onChecked(await postCommonUpload(formTypeCode, file));
+      if (formTypeCode === "B6" && (!projectId || !step)) {
+        setError("배분표 단계를 선택해 주세요.");
+        return;
+      }
+      onChecked(
+        formTypeCode === "B6"
+          ? await postCommonUpload(formTypeCode, file, {
+              projectId: projectId!,
+              distributionStepCode: step,
+            })
+          : await postCommonUpload(formTypeCode, file),
+      );
     } catch (reason) {
       setError(uploadFailure(reason));
       if (reason instanceof UploadRequestError) setFields(reason.errors);
@@ -55,7 +74,7 @@ export function UploadDialog({
   };
   return (
     <Dialog
-      title="거래처 엑셀 업로드"
+      title={`${formTypeCode === "B6" ? "배분표" : formTypeCode === "B9" ? "프로젝트" : "거래처"} 엑셀 업로드`}
       testId="upload-dialog"
       closable
       onClose={() => !busyRef.current && onClose()}
@@ -65,14 +84,41 @@ export function UploadDialog({
         data-testid="upload-form"
         data-screen-id="UI-15-M3"
       >
-        <p>
-          B.7:
-          구분·상호·사업자등록번호·대표자·업종·담당자·연락처·이메일·은행·계좌번호·예금주
-        </p>
-        <p className="upload-help">
-          신규 이관 전용입니다. 검사만으로 거래처를 등록하지 않습니다. 첫 시트,
-          최대 5,000개 데이터 행을 검사합니다.
-        </p>
+        {formTypeCode === "B6" && (
+          <label>
+            단계
+            <select
+              data-testid="upload-distribution-step"
+              value={step}
+              disabled={busy}
+              onChange={(e) => setStep(e.target.value)}
+            >
+              <option value="">선택</option>
+              {distributionSteps.map((s) => (
+                <option key={s.code} value={s.code}>
+                  {s.codeName}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {formTypeCode === "B6" ? (
+          <p className="upload-help">
+            표 전체에 단계 하나를 정합니다. 계산에는 가장 나중 단계의 표를 씁니다.
+          </p>
+        ) : (
+          <>
+            <p>
+              {formTypeCode === "B9"
+                ? "B.9 프로젝트 신규 등록 전용 · 빈 프로젝트ID는 자동 발급"
+                : "B.7: 구분·상호·사업자등록번호·대표자·업종·담당자·연락처·이메일·은행·계좌번호·예금주"}
+            </p>
+            <p className="upload-help">
+              신규 이관 전용입니다. 검사만으로 {formTypeCode === "B9" ? "프로젝트" : "거래처"}를 등록하지 않습니다. 첫 시트,
+              최대 5,000개 데이터 행을 검사합니다.
+            </p>
+          </>
+        )}
         <label htmlFor="upload-file">
           엑셀 파일<span className="field-required">*</span>
         </label>
@@ -89,6 +135,9 @@ export function UploadDialog({
             setFields([]);
           }}
         />
+        {formTypeCode === "B6" && (
+          <p className="upload-help">[양식 받기]로 받은 파일에 사람·항목 줄 × 월 금액을 채워 올립니다.</p>
+        )}
         {file && <p data-testid="upload-selected-file">{file.name}</p>}
         {busy && <p role="status">검사 중…</p>}
         {error && (

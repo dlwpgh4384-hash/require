@@ -14,4 +14,6 @@ public interface UploadMapper {
     int completeUpload(UploadContracts.Completion value);
     int deleteIssues(long uploadId);
     int insertIssue(UploadContracts.IssueWrite value);
+    record ProjectReceipt(long uploadId, String projectId, String distributionStepCode) {}
+    int storeProjectReceipt(ProjectReceipt value);
 }

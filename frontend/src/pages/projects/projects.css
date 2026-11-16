@@ -1,0 +1,525 @@
+/* 시안 UI-01 프로젝트 — 개발자 풀·거래처 화면과 같은 목록·상세 패널·폼·창 틀 */
+.project-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  color: var(--text);
+}
+/* 제목줄: [양식 내려받기] [엑셀 업로드] [+ 등록] */
+.project-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.project-title-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.project-search {
+  width: 180px;
+}
+.project-sub {
+  color: var(--text-sub);
+}
+.project-cap {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.project-pre {
+  white-space: pre-wrap;
+}
+.project-wrap {
+  white-space: normal;
+}
+/* 시안 .lnk: 파란 글자 단추 */
+.project-lnk {
+  display: inline-block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.project-lnk:hover {
+  text-decoration: underline;
+}
+.project-dist-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+.project-warn {
+  display: inline-flex;
+  color: var(--ls-warn);
+}
+.project-warn-icon {
+  flex: none;
+}
+/* 상세 패널 안 */
+.project-part-history {
+  margin-top: 4px;
+}
+.project-expenses {
+  margin-top: 4px;
+}
+.project-expense-wrap {
+  max-height: 260px;
+  overflow: auto;
+}
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.project-expense-foot {
+  margin-top: 6px;
+}
+.project-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.project-empty {
+  margin: 8px 12px;
+}
+.project-mm {
+  width: 80px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.project-plan-foot {
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.project-plan-foot select.ls-in {
+  width: 160px;
+  height: 28px;
+}
+.project-error,
+.project-errmsg {
+  margin: 0;
+  color: var(--ls-bad);
+  font-size: 13px;
+}
+.project-menu-anchor {
+  position: relative;
+  display: inline-flex;
+}
+.project-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  padding: 4px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
+}
+.project-menu button {
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.project-menu button:hover {
+  background: var(--ls-head-bg);
+}
+
+/* 등록·수정(폼 화면): 카드 h2, 칸 이름 오른쪽 정렬·필수 *, 아래 고정 단추 줄 */
+.screen-tab-panel:has(.project-form) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+.project-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 24px;
+  min-width: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+.project-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+  min-width: 0;
+}
+.project-card h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.project-fgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+}
+.project-fld {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: start;
+}
+.project-fld.project-full {
+  grid-column: 1 / -1;
+}
+.project-fl {
+  padding-top: 8px;
+  text-align: right;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.project-fl.req::after {
+  content: " *";
+  color: var(--ls-bad);
+}
+.project-fv {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.project-fv .ls-in {
+  width: 240px;
+  max-width: 100%;
+}
+.project-fv select.ls-in {
+  padding: 0 4px 0 10px;
+}
+.project-fv .ls-in[readonly] {
+  background: var(--ls-head-bg);
+  color: var(--text-sub);
+}
+.project-fv .ls-in[aria-invalid="true"] {
+  border-color: var(--ls-bad);
+}
+.project-fv .project-wide {
+  width: 100%;
+}
+.project-fv .project-date,
+.project-fv .project-money {
+  width: 160px;
+}
+.project-money {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.project-unit {
+  color: var(--text-sub);
+}
+.project-fv .project-area {
+  width: 100%;
+  height: auto;
+  min-height: 80px;
+  padding: 8px 10px;
+  resize: vertical;
+  font: inherit;
+}
+.project-counter {
+  align-self: flex-end;
+  font-size: 12px;
+  color: var(--text-sub);
+}
+.project-help {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.project-form .field-error {
+  color: var(--ls-bad);
+  font-size: 12px;
+}
+.project-bad {
+  color: var(--ls-bad);
+}
+.project-form .project-form-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: auto -24px -24px;
+  padding: 12px 24px;
+  background: var(--surface);
+  border-top: 1px solid var(--divider);
+}
+@media (max-width: 767px) {
+  .project-fgrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 시안 .modal: 폭 400·테두리 없음, 본문 칸 간격 12, 단추 줄 12·24·20 */
+.app-dialog:has(.project-modal) {
+  width: min(400px, 100%);
+  padding: 0;
+  border: 0;
+}
+.app-dialog:has(.project-modal) > .app-dialog-head {
+  margin: 0;
+  padding: 16px 16px 8px 24px;
+}
+.app-dialog .project-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 24px 0;
+  font-size: 14px;
+}
+.app-dialog .project-modal > p {
+  margin: 0;
+}
+.project-fc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+}
+.project-fc input,
+.project-fc select,
+.project-fc textarea {
+  width: 100%;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+}
+.project-fc textarea {
+  height: 72px;
+  padding: 8px 10px;
+}
+.project-fc .project-row input {
+  flex: none;
+}
+.project-fc .project-help {
+  font-weight: 400;
+}
+.project-note-box {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--ls-head-bg);
+  font-size: 13px;
+  line-height: 20px;
+}
+.app-dialog .project-modal > .app-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 -24px;
+  padding: 12px 24px 20px;
+}
+.app-dialog .project-modal > .app-actions button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  font-weight: 500;
+}
+
+/* 배분표 화면 */
+.project-distribution {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  color: var(--text);
+}
+.project-banner {
+  padding: 12px 16px;
+  background: var(--ls-warn-bg);
+  border-radius: 8px;
+  color: var(--ls-warn);
+}
+.project-distribution table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.project-distribution td,
+.project-distribution th {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.project-table-scroll {
+  overflow: auto;
+}
+.project-spacer {
+  flex: 1;
+}
+.project-distribution .project-card {
+  gap: 12px;
+}
+.project-dist-head {
+  margin: 0 0 -2px;
+}
+.project-dist-empty {
+  padding: 24px 0;
+  text-align: center;
+}
+.project-dist-empty p {
+  margin: 0 0 4px;
+}
+.project-dist-current {
+  margin: 0;
+}
+.project-dist-h3 {
+  margin: 4px 0 -6px;
+  font-size: 14px;
+}
+/* 시안 .banner: 아이콘과 글 사이 간격 */
+.project-page .ls-banner svg,
+.project-distribution .ls-banner svg,
+.app-dialog .project-modal .ls-banner svg {
+  flex: none;
+  margin-right: 6px;
+  vertical-align: -3px;
+}
+
+/* 시안 .modal 본문: 글 회색, 칸 이름 굵기 500, 아래 여백 16, 제목 줄 높이 24 */
+.app-dialog:has(.project-modal) .app-dialog-head h2 {
+  line-height: 24px;
+}
+.app-dialog .project-modal {
+  padding-bottom: 16px;
+  color: var(--text-sub);
+}
+.app-dialog .project-modal > .app-actions {
+  margin: 0 -24px -16px;
+}
+.project-fc label {
+  font-weight: 500;
+}
+.project-fc select {
+  padding: 0 4px 0 10px;
+}
+.project-fc input,
+.project-fc select,
+.project-fc textarea {
+  margin: 0;
+}
+/* 시안 상세 [⋯] 메뉴: 폭 220 */
+.project-menu {
+  min-width: 220px;
+  padding: 0;
+}
+.project-menu button {
+  height: 40px;
+  padding: 0 16px;
+}
+/* 진행 현황: 진척률 막대, 주간 메모 */
+.project-h3 {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.project-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 150px;
+}
+.project-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.project-bar-label {
+  width: 28px;
+}
+.project-bar-value {
+  width: 34px;
+  text-align: right;
+}
+.project-track {
+  flex: 1;
+  min-width: 60px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--ls-head-bg);
+  overflow: hidden;
+}
+.project-fill {
+  height: 100%;
+  background: var(--primary-text);
+}
+.project-fill-plan {
+  background: var(--text-sub);
+}
+.project-memos {
+  display: flex;
+  flex-direction: column;
+}
+.project-memo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 0;
+  border-top: 1px solid var(--divider);
+  font-size: 13px;
+}
+.project-memo-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.project-warn-text {
+  color: var(--ls-warn);
+}
+.ls-t tr.project-overdue td {
+  color: var(--ls-bad);
+}
+.project-pname {
+  display: flex;
+  flex-direction: column;
+  line-height: 18px;
+}
+.project-pname small {
+  font-size: 12px;
+  color: var(--text-sub);
+}

@@ -79,3 +79,50 @@
     color: #fde68a;
   }
 }
+
+/* 시안 .pbar(연도만 고르는 화면): 줄 높이 28, 간격 8·12, 연도 16px 굵게, 화살표 28×28 회색, 설명 12px */
+.year-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 28px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text);
+}
+.year-bar-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.year-bar-nav strong {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+}
+.year-bar-arrow {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-sub);
+  cursor: pointer;
+}
+.year-bar-arrow:hover:not(:disabled) {
+  background: var(--ls-head-bg);
+}
+.year-bar-arrow:disabled {
+  color: var(--text-dis);
+  cursor: default;
+}
+.year-bar-cap {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}

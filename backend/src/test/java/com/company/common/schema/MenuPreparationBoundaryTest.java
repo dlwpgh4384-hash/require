@@ -32,7 +32,7 @@ class MenuPreparationBoundaryTest {
         "V5__role_permissions.sql", "V6__role_schema_contract.sql",
         "V7__code_definitions_schema.sql", "V8__calculation_rule_seed.sql",
         "V9__common_entity_contract.sql", "V10__client_part_upload_schema.sql",
-        "V11__developer_pool_schema.sql");
+        "V11__developer_pool_schema.sql", "V12__project_operations_schema.sql");
     private final SqlSessionFactory factory = mock(SqlSessionFactory.class);
     private final SqlSession session = mock(SqlSession.class);
     private final Connection connection = mock(Connection.class);
@@ -89,7 +89,7 @@ class MenuPreparationBoundaryTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {5, 6, 7, 8, 9, 10, 11})
+    @ValueSource(ints = {5, 6, 7, 8, 9, 10, 11, 12})
     void permissionPreparationFailureRollsBackTheWholePreparation(int failingResource) throws Exception {
         int[] executions = {0};
         when(statement.execute(anyString())).thenAnswer(call -> {
@@ -117,7 +117,9 @@ class MenuPreparationBoundaryTest {
             "TB_BS_PART", "TB_SY_ACCS_LOG", "TB_SY_CHG_HIST", "TB_SY_ROLE_MENU_AUTH",
             "TB_SY_CODE_MAP", "TB_SY_CALC_RULE", "TB_BS_CLNT", "TB_SY_UPLD", "TB_SY_UPLD_ERR",
             "TB_SY_ADM_AREA", "TB_HR_DEV", "TB_PJ_ASGN", "TB_PJ_PROJ_PART", "TB_CO_PART_SETL",
-            "TB_HR_DEV_PRC", "TB_HR_DEV_SKILL", "TB_HR_DEV_STAT", "TB_HR_MON_PAY", "TB_SY_ADM_HDONG");
+            "TB_HR_DEV_PRC", "TB_HR_DEV_SKILL", "TB_HR_DEV_STAT", "TB_HR_MON_PAY", "TB_SY_ADM_HDONG",
+            "TB_PJ_PROJ_CHG", "TB_PJ_MNPW_PLAN", "TB_PJ_STEP", "TB_PJ_WEEK_MEMO", "TB_PJ_ISSUE",
+            "TB_PJ_TK_DSTRB", "TB_PJ_DRCT_EXPS", "TB_PJ_ASGN_HIST", "TB_PJ_ASGN_MON", "TB_CO_MON_COST");
     }
 
     @Test

@@ -1,0 +1,296 @@
+-- Original project command tables and read-only monthly/progress sources.
+CREATE SEQUENCE IF NOT EXISTS SQ_TB_PJ_ISSUE START WITH 1 INCREMENT BY 1;
+DO $project_schema$
+DECLARE
+    definitions text[] := ARRAY[
+$ddl$CREATE TABLE IF NOT EXISTS TB_PJ_PROJ_CHG (
+ PROJ_ID VARCHAR(20) NOT NULL,
+ HIST_SN NUMERIC(5) NOT NULL,
+ CHG_ITEM_CD VARCHAR(10) NOT NULL,
+ CHG_ITEM_NM VARCHAR(50) NOT NULL,
+ BFR_VAL VARCHAR(500),
+ AFT_VAL VARCHAR(500),
+ CHG_DT DATE NOT NULL,
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMPTZ,
+ CONSTRAINT PK_TB_PJ_PROJ_CHG PRIMARY KEY (PROJ_ID, HIST_SN)
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_PJ_MNPW_PLAN (
+ PROJ_ID VARCHAR(20) NOT NULL,
+ JOB_CD VARCHAR(10) NOT NULL,
+ PLAN_MM NUMERIC(6,2) NOT NULL,
+ SRC_CD VARCHAR(10) NOT NULL,
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMPTZ,
+ CONSTRAINT PK_TB_PJ_MNPW_PLAN PRIMARY KEY (PROJ_ID, JOB_CD)
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_PJ_STEP (
+ PROJ_ID VARCHAR(20) NOT NULL,
+ STEP_SN NUMERIC(2) NOT NULL,
+ PROJ_STEP_CD VARCHAR(10) NOT NULL,
+ STEP_WGHT_RT NUMERIC(5,2) NOT NULL,
+ PLAN_BGN_DT DATE NOT NULL,
+ PLAN_END_DT DATE NOT NULL,
+ CMPL_DT DATE,
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMPTZ,
+ CONSTRAINT PK_TB_PJ_STEP PRIMARY KEY (PROJ_ID, STEP_SN)
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_PJ_WEEK_MEMO (
+ PROJ_ID VARCHAR(20) NOT NULL,
+ MEMO_SN NUMERIC(5) NOT NULL,
+ WRT_DT DATE NOT NULL,
+ THIS_WEEK_CN VARCHAR(200),
+ NEXT_WEEK_CN VARCHAR(200),
+ REQ_CN VARCHAR(200),
+ ACTL_PRGRS_RT NUMERIC(3),
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMPTZ,
+ CONSTRAINT PK_TB_PJ_WEEK_MEMO PRIMARY KEY (PROJ_ID, MEMO_SN)
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_PJ_ISSUE (
+ ISSUE_ID NUMERIC(10) DEFAULT nextval('SQ_TB_PJ_ISSUE') NOT NULL,
+ PROJ_ID VARCHAR(20) NOT NULL,
+ ISSUE_TTL VARCHAR(100) NOT NULL,
+ IMPR_CD VARCHAR(10) NOT NULL,
+ DDLN_DT DATE NOT NULL,
+ ISSUE_STAT_CD VARCHAR(10) NOT NULL,
+ ACTN_CN VARCHAR(500),
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMPTZ,
+ CONSTRAINT PK_TB_PJ_ISSUE PRIMARY KEY (ISSUE_ID)
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_PJ_TK_DSTRB (
+ PROJ_ID VARCHAR(20) NOT NULL,
+ DSTRB_STEP_CD VARCHAR(10) NOT NULL,
+ ROW_SN NUMERIC(5) NOT NULL,
+ DSTRB_YM CHAR(6) NOT NULL,
+ ROW_TYPE_CD VARCHAR(10) NOT NULL,
+ DEV_ID VARCHAR(20),
+ ITEM_NM VARCHAR(50),
+ DSTRB_AMT NUMERIC(15) NOT NULL,
+ UPLD_ID NUMERIC(12),
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMPTZ,
+ CONSTRAINT PK_TB_PJ_TK_DSTRB PRIMARY KEY (PROJ_ID, DSTRB_STEP_CD, ROW_SN, DSTRB_YM)
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_PJ_DRCT_EXPS (
+ PROJ_ID VARCHAR(20) NOT NULL,
+ EXPS_YM CHAR(6) NOT NULL,
+ EXPS_SN NUMERIC(5) NOT NULL,
+ DRCT_EXPS_ITEM_CD VARCHAR(10) NOT NULL,
+ EXPS_AMT NUMERIC(15) NOT NULL,
+ RMRK VARCHAR(500),
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMPTZ,
+ CONSTRAINT PK_TB_PJ_DRCT_EXPS PRIMARY KEY (PROJ_ID, EXPS_YM, EXPS_SN)
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_PJ_ASGN_HIST (
+ ASGN_ID VARCHAR(20) NOT NULL,
+ HIST_SN NUMERIC(5) NOT NULL,
+ ASGN_CHG_TYPE_CD VARCHAR(10) NOT NULL,
+ APLY_DT DATE NOT NULL,
+ BFR_VAL VARCHAR(200),
+ AFT_VAL VARCHAR(200),
+ ASGN_CHG_RSN_CD VARCHAR(10),
+ CHG_MEMO VARCHAR(200),
+ NEW_UPRC NUMERIC(15),
+ NEW_CTRT_MM NUMERIC(4,2),
+ RTRO_YN CHAR(1) DEFAULT 'N' NOT NULL,
+ CLOSE_CROSS_YN CHAR(1) DEFAULT 'N' NOT NULL,
+ CRCT_YN CHAR(1) DEFAULT 'N' NOT NULL,
+ CRCT_TRGT_SN NUMERIC(5),
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ CONSTRAINT PK_TB_PJ_ASGN_HIST PRIMARY KEY (ASGN_ID, HIST_SN),
+ CONSTRAINT CK_TB_PJ_ASGN_HIST_01 CHECK (RTRO_YN IN ('Y', 'N')),
+ CONSTRAINT CK_TB_PJ_ASGN_HIST_02 CHECK (CLOSE_CROSS_YN IN ('Y', 'N')),
+ CONSTRAINT CK_TB_PJ_ASGN_HIST_03 CHECK (CRCT_YN IN ('Y', 'N'))
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_PJ_ASGN_MON (
+ ASGN_ID VARCHAR(20) NOT NULL,
+ INPUT_YM CHAR(6) NOT NULL,
+ DEV_ID VARCHAR(20) NOT NULL,
+ PROJ_ID VARCHAR(20) NOT NULL,
+ INPUT_DAY_CNT NUMERIC(3) NOT NULL,
+ MON_MM NUMERIC(6,2) NOT NULL,
+ APLY_UPRC NUMERIC(15),
+ SALES_AMT NUMERIC(15) NOT NULL,
+ FIX_YN CHAR(1) DEFAULT 'N' NOT NULL,
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMPTZ,
+ CONSTRAINT PK_TB_PJ_ASGN_MON PRIMARY KEY (ASGN_ID, INPUT_YM),
+ CONSTRAINT CK_TB_PJ_ASGN_MON_01 CHECK (FIX_YN IN ('Y', 'N'))
+)$ddl$,
+$ddl$CREATE TABLE IF NOT EXISTS TB_CO_MON_COST (
+ COST_YM CHAR(6) NOT NULL,
+ DEV_ID VARCHAR(20) NOT NULL,
+ PROJ_ID VARCHAR(20) NOT NULL,
+ ASGN_ID VARCHAR(20) NOT NULL,
+ ASGN_MM NUMERIC(6,2) NOT NULL,
+ FREE_MM NUMERIC(6,2) NOT NULL,
+ SALES_AMT NUMERIC(15) NOT NULL,
+ LABOR_ALLOC_AMT NUMERIC(15) NOT NULL,
+ TEAM_EXPS_AMT NUMERIC(15) NOT NULL,
+ PROJ_EXPS_AMT NUMERIC(15) NOT NULL,
+ DRCT_EXPS_AMT NUMERIC(15) NOT NULL,
+ COST_CLS_CD VARCHAR(10) NOT NULL,
+ CTRT_TYPE_CD VARCHAR(10),
+ PART_ID VARCHAR(20),
+ FIX_YN CHAR(1) DEFAULT 'N' NOT NULL,
+ REG_USER_ID VARCHAR(30) NOT NULL,
+ REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ MOD_USER_ID VARCHAR(30),
+ MOD_DTTM TIMESTAMPTZ,
+ CONSTRAINT PK_TB_CO_MON_COST PRIMARY KEY (COST_YM, DEV_ID, PROJ_ID, ASGN_ID),
+ CONSTRAINT CK_TB_CO_MON_COST_01 CHECK (FIX_YN IN ('Y', 'N'))
+)$ddl$];
+    ddl text;
+    table_name text;
+    relation regclass;
+    expected_columns text[];
+    actual_columns text[];
+    expected_constraints text[];
+    actual_constraints text[];
+BEGIN
+    PERFORM pg_advisory_xact_lock(734901, 1);
+    FOREACH ddl IN ARRAY definitions LOOP
+        table_name := lower(substring(ddl FROM 'EXISTS ([A-Z_]+)'));
+        relation := to_regclass(format('%I.%I', current_schema(), table_name));
+        IF relation IS NOT NULL THEN
+            IF NOT EXISTS (SELECT 1 FROM pg_class WHERE oid=relation AND relkind='r') THEN
+                RAISE EXCEPTION USING MESSAGE=table_name || ': expected ordinary table', ERRCODE='P0001';
+            END IF;
+            EXECUTE format('LOCK TABLE %s IN ACCESS EXCLUSIVE MODE', relation);
+            EXECUTE regexp_replace(ddl, 'CREATE TABLE IF NOT EXISTS [A-Z_]+', 'CREATE TEMP TABLE project_expected');
+            SELECT array_agg(a.attname || ':' || format_type(a.atttypid,a.atttypmod) || ':' || a.attnotnull::text
+                || ':' || coalesce(pg_get_expr(d.adbin,d.adrelid),'') ORDER BY a.attnum)
+              INTO expected_columns FROM pg_attribute a
+              LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum
+             WHERE a.attrelid='pg_temp.project_expected'::regclass AND a.attnum>0 AND NOT a.attisdropped;
+            SELECT array_agg(a.attname || ':' || format_type(a.atttypid,a.atttypmod) || ':' || a.attnotnull::text
+                || ':' || coalesce(pg_get_expr(d.adbin,d.adrelid),'') ORDER BY a.attnum)
+              INTO actual_columns FROM pg_attribute a
+              LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum
+             WHERE a.attrelid=relation AND a.attnum>0 AND NOT a.attisdropped;
+            SELECT array_agg(conname || ':' || pg_get_constraintdef(oid) ORDER BY conname)
+              INTO expected_constraints FROM pg_constraint
+             WHERE conrelid='pg_temp.project_expected'::regclass AND contype IN ('p','c','u');
+            SELECT array_agg(conname || ':' || pg_get_constraintdef(oid) ORDER BY conname)
+              INTO actual_constraints FROM pg_constraint
+             WHERE conrelid=relation AND contype IN ('p','c','u') AND convalidated;
+            DROP TABLE pg_temp.project_expected;
+            IF actual_columns IS DISTINCT FROM expected_columns OR actual_constraints IS DISTINCT FROM expected_constraints THEN
+                RAISE EXCEPTION USING MESSAGE=table_name || ': original columns, defaults, nullability, PK or checks differ', ERRCODE='P0001';
+            END IF;
+        ELSE
+            EXECUTE ddl;
+        END IF;
+    END LOOP;
+END
+$project_schema$;
+
+DO $project_references$
+DECLARE
+    spec record;
+    definition text;
+    expected text;
+BEGIN
+    FOR spec IN SELECT * FROM (VALUES
+        ('TB_PJ_PROJ_CHG','FK_TB_PJ_PROJ_CHG_01','PROJ_ID','TB_PJ_PROJ','PROJ_ID'),
+        ('TB_PJ_MNPW_PLAN','FK_TB_PJ_MNPW_PLAN_01','PROJ_ID','TB_PJ_PROJ','PROJ_ID'),
+        ('TB_PJ_STEP','FK_TB_PJ_STEP_01','PROJ_ID','TB_PJ_PROJ','PROJ_ID'),
+        ('TB_PJ_WEEK_MEMO','FK_TB_PJ_WEEK_MEMO_01','PROJ_ID','TB_PJ_PROJ','PROJ_ID'),
+        ('TB_PJ_ISSUE','FK_TB_PJ_ISSUE_01','PROJ_ID','TB_PJ_PROJ','PROJ_ID'),
+        ('TB_PJ_TK_DSTRB','FK_TB_PJ_TK_DSTRB_01','PROJ_ID','TB_PJ_PROJ','PROJ_ID'),
+        ('TB_PJ_TK_DSTRB','FK_TB_PJ_TK_DSTRB_02','DEV_ID','TB_HR_DEV','DEV_ID'),
+        ('TB_PJ_TK_DSTRB','FK_TB_PJ_TK_DSTRB_03','UPLD_ID','TB_SY_UPLD','UPLD_ID'),
+        ('TB_PJ_DRCT_EXPS','FK_TB_PJ_DRCT_EXPS_01','PROJ_ID','TB_PJ_PROJ','PROJ_ID'),
+        ('TB_PJ_ASGN_HIST','FK_TB_PJ_ASGN_HIST_01','ASGN_ID','TB_PJ_ASGN','ASGN_ID'),
+        ('TB_PJ_ASGN_MON','FK_TB_PJ_ASGN_MON_01','ASGN_ID','TB_PJ_ASGN','ASGN_ID')
+    ) AS refs(table_name,name,column_name,target,target_column) LOOP
+        expected := format('FOREIGN KEY (%s) REFERENCES %s(%s)', lower(spec.column_name),lower(spec.target),lower(spec.target_column));
+        SELECT pg_get_constraintdef(oid) INTO definition FROM pg_constraint
+         WHERE conrelid=to_regclass(lower(spec.table_name)) AND conname=lower(spec.name);
+        IF definition IS NULL THEN
+            EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I %s',lower(spec.table_name),lower(spec.name),expected);
+        ELSIF lower(definition) IS DISTINCT FROM lower(expected) OR NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conrelid=to_regclass(lower(spec.table_name))
+             AND conname=lower(spec.name) AND convalidated AND NOT condeferrable
+        ) THEN
+            RAISE EXCEPTION USING MESSAGE=spec.table_name || '.' || spec.name || ': expected original foreign key', ERRCODE='P0001';
+        END IF;
+    END LOOP;
+END
+$project_references$;
+
+CREATE INDEX IF NOT EXISTS IX_TB_PJ_WEEK_MEMO_01 ON TB_PJ_WEEK_MEMO (WRT_DT);
+CREATE INDEX IF NOT EXISTS IX_TB_PJ_ISSUE_01 ON TB_PJ_ISSUE (PROJ_ID);
+CREATE INDEX IF NOT EXISTS IX_TB_PJ_ISSUE_02 ON TB_PJ_ISSUE (ISSUE_STAT_CD);
+CREATE INDEX IF NOT EXISTS IX_TB_PJ_TK_DSTRB_01 ON TB_PJ_TK_DSTRB (DEV_ID);
+CREATE INDEX IF NOT EXISTS IX_TB_PJ_TK_DSTRB_02 ON TB_PJ_TK_DSTRB (UPLD_ID);
+CREATE INDEX IF NOT EXISTS IX_TB_PJ_ASGN_HIST_01 ON TB_PJ_ASGN_HIST (ASGN_CHG_TYPE_CD);
+CREATE INDEX IF NOT EXISTS IX_TB_PJ_ASGN_MON_01 ON TB_PJ_ASGN_MON (INPUT_YM);
+CREATE INDEX IF NOT EXISTS IX_TB_PJ_ASGN_MON_02 ON TB_PJ_ASGN_MON (DEV_ID);
+CREATE INDEX IF NOT EXISTS IX_TB_PJ_ASGN_MON_03 ON TB_PJ_ASGN_MON (PROJ_ID);
+CREATE INDEX IF NOT EXISTS IX_TB_CO_MON_COST_01 ON TB_CO_MON_COST (DEV_ID);
+CREATE INDEX IF NOT EXISTS IX_TB_CO_MON_COST_02 ON TB_CO_MON_COST (PROJ_ID);
+CREATE INDEX IF NOT EXISTS IX_TB_CO_MON_COST_03 ON TB_CO_MON_COST (ASGN_ID);
+CREATE INDEX IF NOT EXISTS IX_TB_CO_MON_COST_04 ON TB_CO_MON_COST (PART_ID);
+
+COMMENT ON TABLE TB_PJ_PROJ_CHG IS '프로젝트 계약과 예산 등 명시된 변경 이력.';
+COMMENT ON TABLE TB_PJ_MNPW_PLAN IS '프로젝트 직무별 인원 계획.';
+COMMENT ON TABLE TB_PJ_TK_DSTRB IS '프로젝트 단계별 월별 턴키 매출 배분표.';
+COMMENT ON TABLE TB_PJ_DRCT_EXPS IS '프로젝트 월별 추가 직접경비. 개인 원가나 지급 줄로 배분하지 않는다.';
+COMMENT ON TABLE TB_PJ_ASGN_HIST IS '투입 변경 이력. 취소된 투입 원본도 보존한다.';
+COMMENT ON TABLE TB_PJ_ASGN_MON IS '원본 월별투입. 프로젝트 상세의 월별 투입 및 매출 조회 원천.';
+COMMENT ON TABLE TB_CO_MON_COST IS '원본 월별원가배분 마감 스냅샷. 프로젝트 조회에서만 읽고 프로젝트 명령은 변경하지 않는다.';
+COMMENT ON TABLE TB_PJ_STEP IS '원본 프로젝트 단계. 프로젝트 상세 진척 조회 원천이며 이번 변경에서는 읽기 전용.';
+COMMENT ON TABLE TB_PJ_WEEK_MEMO IS '원본 주간메모. 프로젝트 상세 실제 진척률 조회 원천이며 이번 변경에서는 읽기 전용.';
+COMMENT ON TABLE TB_PJ_ISSUE IS '원본 프로젝트 이슈. 프로젝트 상세 조회 원천이며 이번 변경에서는 읽기 전용.';
+COMMENT ON COLUMN TB_PJ_ISSUE.ISSUE_STAT_CD IS 'OPEN:열림|ACT:조치 중|CLOSE:종료';
+COMMENT ON COLUMN TB_CO_MON_COST.COST_CLS_CD IS 'ALLOC:매출원가|IDLE:대기원가|RND:연구개발비|INDRCT:간접인건비|PRE:선투입';
+COMMENT ON COLUMN TB_PJ_ASGN_MON.DEV_ID IS 'TB_HR_DEV.DEV_ID 참조 의도 (FK 미선언)';
+COMMENT ON COLUMN TB_PJ_ASGN_MON.PROJ_ID IS 'TB_PJ_PROJ.PROJ_ID 참조 의도 (FK 미선언)';
+COMMENT ON COLUMN TB_CO_MON_COST.DEV_ID IS 'TB_HR_DEV.DEV_ID 참조 의도 (FK 미선언)';
+COMMENT ON COLUMN TB_CO_MON_COST.PROJ_ID IS 'TB_PJ_PROJ.PROJ_ID 참조 의도 (FK 미선언). IDLE 및 INDRCT는 원본의 예약 식별자.';
+COMMENT ON COLUMN TB_CO_MON_COST.ASGN_ID IS 'TB_PJ_ASGN.ASGN_ID 참조 의도 (FK 미선언). IDLE 및 INDRCT는 원본의 예약 식별자.';
+COMMENT ON COLUMN TB_CO_MON_COST.PART_ID IS 'TB_BS_PART.PART_ID 참조 의도 (FK 미선언)';
+COMMENT ON COLUMN TB_CO_MON_COST.ASGN_MM IS '마감 처리 주체가 마감 시 TB_PJ_ASGN_MON.MON_MM에서 고정 저장';
+COMMENT ON COLUMN TB_CO_MON_COST.FREE_MM IS '마감 처리 주체가 마감 시 무상지원 투입 MM을 고정 저장';
+COMMENT ON COLUMN TB_CO_MON_COST.SALES_AMT IS '마감 처리 주체가 마감 시 개인 매출을 고정 저장';
+COMMENT ON COLUMN TB_CO_MON_COST.LABOR_ALLOC_AMT IS '마감 처리 주체가 마감 시 인건비 배분을 고정 저장';
+COMMENT ON COLUMN TB_CO_MON_COST.TEAM_EXPS_AMT IS '마감 처리 주체가 마감 시 자사 개인 월 팀비 × 개인 프로젝트 MM을 원 단위 버림하여 고정 저장. 외주 기여 0';
+COMMENT ON COLUMN TB_CO_MON_COST.PROJ_EXPS_AMT IS '마감 처리 주체가 마감 시 자사 개인 월 경비 × 개인 프로젝트 MM을 원 단위 버림하여 고정 저장. 외주 기여 0';
+COMMENT ON COLUMN TB_CO_MON_COST.DRCT_EXPS_AMT IS '마감 처리 주체가 마감 시 팀비와 프로젝트경비 합을 고정 저장. 추가 직접경비는 별도 프로젝트 월 합계에만 가산';
+COMMENT ON COLUMN TB_PJ_ASGN_HIST.CRCT_TRGT_SN IS '동일 ASGN_ID의 TB_PJ_ASGN_HIST.HIST_SN 참조 의도 (FK 미선언)';
+
+DO $project_audit_comments$
+DECLARE
+    table_name text;
+BEGIN
+    FOREACH table_name IN ARRAY ARRAY['tb_pj_proj_chg','tb_pj_mnpw_plan','tb_pj_step','tb_pj_week_memo',
+        'tb_pj_issue','tb_pj_tk_dstrb','tb_pj_drct_exps','tb_pj_asgn_hist','tb_pj_asgn_mon','tb_co_mon_cost'] LOOP
+        EXECUTE format('COMMENT ON COLUMN %I.REG_USER_ID IS %L',table_name,'TB_SY_USER.USER_ID 참조 의도 (FK 미선언)');
+        IF table_name <> 'tb_pj_asgn_hist' THEN
+            EXECUTE format('COMMENT ON COLUMN %I.MOD_USER_ID IS %L',table_name,'TB_SY_USER.USER_ID 참조 의도 (FK 미선언)');
+        END IF;
+    END LOOP;
+END
+$project_audit_comments$;

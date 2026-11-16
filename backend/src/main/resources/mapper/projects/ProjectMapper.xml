@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.projects.mapper.ProjectMapper">
+  <resultMap id="project" type="com.company.common.projects.dto.ProjectContracts$Project" autoMapping="true">
+    <id property="projectId" column="projectId"/>
+    <result property="startDate" column="startDate" javaType="java.time.LocalDate"/>
+    <result property="endDate" column="endDate" javaType="java.time.LocalDate"/>
+  </resultMap>
+  <sql id="projectColumns">
+    p.PROJ_ID AS "projectId", p.PROJ_NM AS "projectName", p.CUST_CLNT_ID AS "customerId",
+    CASE WHEN p.CTRT_TYPE_CD='IN' THEN '(자체)' ELSE c.CLNT_NM END AS "customerName",
+    p.CTRT_TYPE_CD AS "contractTypeCode", t.CODE_NM AS "contractTypeName",
+    p.CTRT_BGN_DT AS "startDate", p.CTRT_END_DT AS "endDate", p.WORK_PLC_ADDR AS "workplace",
+    CASE WHEN p.PROJ_STAT_CD!='LOSE' AND p.CTRT_END_DT &lt; #{today} THEN 'END'
+      ELSE p.PROJ_STAT_CD END AS "statusCode",
+    (SELECT s.CODE_NM FROM TB_SY_CODE s WHERE s.CODE_GRP_ID='PROJ_STAT' AND s.CODE=
+      CASE WHEN p.PROJ_STAT_CD!='LOSE' AND p.CTRT_END_DT &lt; #{today} THEN 'END' ELSE p.PROJ_STAT_CD END) AS "statusName",
+    p.EST_AMT AS "estimateAmount", p.ORGNL_CTRT_AMT AS "originalContractAmount", p.CTRT_AMT AS "contractAmount",
+    p.BDGT_AMT AS "budgetAmount", p.BDGT_MANUAL_YN AS "budgetManualYn",
+    p.TEAM_EXPS_AMT AS "teamExpenseAmount", p.PROJ_EXPS_AMT AS "projectExpenseAmount",
+    p.FEATURE_CN AS "feature", pp.PART_ID AS "salesPartId", pp.PART_NM AS "salesPartName",
+    COALESCE(p.MOD_DTTM, p.REG_DTTM) AS "modifiedAt",
+    p.LOSE_DT AS "loseDate", lr.CODE_NM AS "loseReasonName", p.LOSE_MEMO AS "loseMemo",
+    (SELECT string_agg(u.USER_NM, ', ' ORDER BY u.USER_ID) FROM TB_SY_USER u
+      WHERE EXISTS (SELECT 1 FROM TB_SY_USER_SCOPE sc WHERE sc.USER_ID=u.USER_ID
+        AND sc.SCOPE_TYPE_CD='PROJ' AND sc.PROJ_ID=p.PROJ_ID)
+      AND EXISTS (SELECT 1 FROM TB_SY_USER_ROLE ur WHERE ur.USER_ID=u.USER_ID AND ur.ROLE_ID='PM')) AS "pmName",
+    (SELECT COUNT(DISTINCT a.DEV_ID) FROM TB_PJ_ASGN a WHERE a.PROJ_ID=p.PROJ_ID
+      AND a.ASGN_STAT_CD!='CNCL' AND a.INPUT_BGN_DT &lt;= #{today} AND a.INPUT_END_DT &gt;= #{today}) AS "assignedPeopleCount",
+    (SELECT cd.CODE_NM FROM TB_PJ_TK_DSTRB d JOIN TB_SY_CODE cd
+      ON cd.CODE_GRP_ID='DSTRB_STEP' AND cd.CODE=d.DSTRB_STEP_CD WHERE d.PROJ_ID=p.PROJ_ID
+      ORDER BY cd.SORT_ORD DESC LIMIT 1) AS "distributionStepName"
+  </sql>
+  <sql id="projectFrom">
+    FROM TB_PJ_PROJ p
+    LEFT JOIN TB_BS_CLNT c ON c.CLNT_ID=p.CUST_CLNT_ID
+    LEFT JOIN TB_SY_CODE t ON t.CODE_GRP_ID='CTRT_TYPE' AND t.CODE=p.CTRT_TYPE_CD
+    LEFT JOIN TB_SY_CODE lr ON lr.CODE_GRP_ID='LOSE_RSN' AND lr.CODE=p.LOSE_RSN_CD
+    LEFT JOIN LATERAL (SELECT h.PART_ID, b.PART_NM FROM TB_PJ_PROJ_PART h
+      LEFT JOIN TB_BS_PART b ON b.PART_ID=h.PART_ID
+      WHERE h.PROJ_ID=p.PROJ_ID AND h.APLY_BGN_YM &lt;= #{month}
+      ORDER BY h.APLY_BGN_YM DESC LIMIT 1) pp ON TRUE
+  </sql>
+  <select id="selectProjects" resultMap="project">
+    SELECT <include refid="projectColumns"/> <include refid="projectFrom"/>
+    ORDER BY p.CTRT_BGN_DT DESC, p.PROJ_ID ASC
+  </select>
+  <select id="selectProject" resultMap="project">
+    SELECT <include refid="projectColumns"/> <include refid="projectFrom"/> WHERE p.PROJ_ID=#{id}
+  </select>
+  <select id="lockProject" resultType="string">SELECT PROJ_ID FROM TB_PJ_PROJ WHERE PROJ_ID=#{id} FOR UPDATE</select>
+  <update id="lockSources">
+    LOCK TABLE TB_PJ_PROJ, TB_PJ_PROJ_PART, TB_PJ_PROJ_CHG, TB_PJ_ASGN, TB_PJ_ASGN_HIST,
+      TB_PJ_TK_DSTRB, TB_PJ_DRCT_EXPS, TB_PJ_MNPW_PLAN, TB_CL_CLOSE, TB_BL_BILL
+      IN SHARE ROW EXCLUSIVE MODE
+  </update>
+  <select id="projectIds" resultType="string">SELECT PROJ_ID FROM TB_PJ_PROJ ORDER BY PROJ_ID</select>
+  <insert id="insertProject">
+    INSERT INTO TB_PJ_PROJ (PROJ_ID, PROJ_NM, CUST_CLNT_ID, CTRT_TYPE_CD, PROJ_STAT_CD,
+      CTRT_BGN_DT, CTRT_END_DT, WORK_PLC_ADDR, EST_AMT, ORGNL_CTRT_AMT, CTRT_AMT, BDGT_AMT,
+      BDGT_MANUAL_YN, TEAM_EXPS_AMT, PROJ_EXPS_AMT, FEATURE_CN, REG_USER_ID)
+    VALUES (#{project.projectId}, #{project.projectName}, #{project.customerId}, #{project.contractTypeCode},
+      #{project.statusCode}, #{project.startDate}, #{project.endDate}, #{project.workplace},
+      #{project.estimateAmount}, #{project.originalContractAmount}, #{project.contractAmount}, #{project.budgetAmount},
+      #{project.budgetManualYn}, #{project.teamExpenseAmount}, #{project.projectExpenseAmount}, #{project.feature}, #{actor})
+  </insert>
+  <update id="updateProject">
+    UPDATE TB_PJ_PROJ SET PROJ_NM=#{project.projectName}, CUST_CLNT_ID=#{project.customerId},
+      CTRT_BGN_DT=#{project.startDate}, CTRT_END_DT=#{project.endDate}, WORK_PLC_ADDR=#{project.workplace},
+      EST_AMT=#{project.estimateAmount}, ORGNL_CTRT_AMT=#{project.originalContractAmount}, CTRT_AMT=#{project.contractAmount},
+      BDGT_AMT=#{project.budgetAmount}, BDGT_MANUAL_YN=#{project.budgetManualYn},
+      TEAM_EXPS_AMT=#{project.teamExpenseAmount}, PROJ_EXPS_AMT=#{project.projectExpenseAmount},
+      FEATURE_CN=#{project.feature}, PROJ_STAT_CD=#{project.statusCode}, MOD_USER_ID=#{actor}, MOD_DTTM=clock_timestamp()
+    WHERE PROJ_ID=#{project.projectId}
+  </update>
+  <insert id="insertHistory">
+    INSERT INTO TB_PJ_PROJ_CHG (PROJ_ID, HIST_SN, CHG_ITEM_CD, CHG_ITEM_NM, BFR_VAL, AFT_VAL, CHG_DT, REG_USER_ID)
+    SELECT #{projectId}, COALESCE(MAX(HIST_SN),0)+1, #{code}, #{name}, #{beforeValue}, #{afterValue},
+      (clock_timestamp() AT TIME ZONE 'Asia/Seoul')::date, #{actor}
+    FROM TB_PJ_PROJ_CHG WHERE PROJ_ID=#{projectId}
+  </insert>
+  <select id="histories" resultType="com.company.common.projects.dto.ProjectContracts$History">
+    SELECT h.REG_DTTM AS "changedAt", h.CHG_ITEM_NM AS "itemName", h.BFR_VAL AS "beforeValue",
+      h.AFT_VAL AS "afterValue", COALESCE(u.USER_NM,h.REG_USER_ID) AS "changedBy"
+    FROM TB_PJ_PROJ_CHG h LEFT JOIN TB_SY_USER u ON u.USER_ID=h.REG_USER_ID
+    WHERE h.PROJ_ID=#{id} ORDER BY h.REG_DTTM DESC, h.HIST_SN DESC
+  </select>
+  <select id="salesParts" resultType="com.company.common.projects.dto.ProjectContracts$SalesPart">
+    SELECT h.PART_ID AS "salesPartId", b.PART_NM AS "salesPartName",
+      substring(h.APLY_BGN_YM,1,4)||'-'||substring(h.APLY_BGN_YM,5,2) AS "effectiveMonth",
+      h.CHG_RSN AS "reason", COALESCE(u.USER_NM,h.REG_USER_ID) AS "changedBy",
+      h.APLY_BGN_YM &gt; #{month} AS "scheduled"
+    FROM TB_PJ_PROJ_PART h LEFT JOIN TB_BS_PART b ON b.PART_ID=h.PART_ID
+    LEFT JOIN TB_SY_USER u ON u.USER_ID=h.REG_USER_ID
+    WHERE h.PROJ_ID=#{id} ORDER BY h.APLY_BGN_YM ASC
+  </select>
+  <insert id="insertPart">
+    INSERT INTO TB_PJ_PROJ_PART (PROJ_ID,APLY_BGN_YM,PART_ID,CHG_RSN,REG_USER_ID)
+    VALUES (#{projectId},#{month},#{partId},#{reason},#{actor})
+  </insert>
+  <delete id="deleteOpenParts">
+    DELETE FROM TB_PJ_PROJ_PART h WHERE h.PROJ_ID=#{id} AND h.APLY_BGN_YM &gt; #{closed}
+      AND h.APLY_BGN_YM != (SELECT MIN(x.APLY_BGN_YM) FROM TB_PJ_PROJ_PART x WHERE x.PROJ_ID=#{id})
+  </delete>
+  <select id="lastClosedMonth" resultType="string">
+    SELECT MAX(CLOSE_YM) FROM TB_CL_CLOSE WHERE CLOSE_STAT_CD='CLOSE'
+  </select>
+  <select id="allowance" resultType="java.math.BigDecimal">
+    SELECT CODE_VAL FROM TB_SY_CODE WHERE CODE_GRP_ID='ALWNC' AND CODE=#{code} AND USE_YN='Y' AND DEL_YN='N'
+  </select>
+  <select id="eligibleCustomer" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_BS_CLNT WHERE CLNT_ID=#{id} AND USE_YN='Y' AND CLNT_TYPE_CD IN ('CUST','BOTH'))
+  </select>
+  <select id="eligiblePart" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_BS_PART WHERE PART_ID=#{id} AND USE_YN='Y')
+  </select>
+  <select id="customerName" resultType="string">SELECT CLNT_NM FROM TB_BS_CLNT WHERE CLNT_ID=#{id}</select>
+  <select id="codeName" resultType="string">
+    SELECT CODE_NM FROM TB_SY_CODE WHERE CODE_GRP_ID=#{group} AND CODE=#{code} AND USE_YN='Y' AND DEL_YN='N'
+  </select>
+  <select id="hasBills" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_BL_BILL WHERE PROJ_ID=#{id} AND CNCL_YN='N')
+  </select>
+  <select id="outside" resultType="com.company.common.projects.mapper.ProjectRows$Outside">
+    SELECT (SELECT COUNT(*) FROM TB_PJ_ASGN a WHERE a.PROJ_ID=#{id} AND a.ASGN_STAT_CD!='CNCL'
+      AND (a.INPUT_BGN_DT &lt; #{start} OR a.INPUT_END_DT &gt; #{end})) AS "assignments",
+      (SELECT COUNT(DISTINCT d.DSTRB_YM) FROM TB_PJ_TK_DSTRB d WHERE d.PROJ_ID=#{id} AND d.DSTRB_AMT!=0
+      AND (d.DSTRB_YM &lt; to_char(#{start}::date,'YYYYMM') OR d.DSTRB_YM &gt; to_char(#{end}::date,'YYYYMM'))) AS "distributionMonths",
+      (SELECT COUNT(*) FROM TB_PJ_DRCT_EXPS e WHERE e.PROJ_ID=#{id}
+      AND (e.EXPS_YM &lt; to_char(#{start}::date,'YYYYMM') OR e.EXPS_YM &gt; to_char(#{end}::date,'YYYYMM'))) AS "expenses",
+      (SELECT COUNT(*) FROM TB_PJ_ASGN a WHERE a.PROJ_ID=#{id} AND a.ASGN_STAT_CD!='CNCL'
+        AND a.INPUT_BGN_DT &lt;= #{today} AND a.INPUT_BGN_DT &lt; #{start}) AS "started"
+  </select>
+  <select id="removesClosedMonth" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_PJ_PROJ p JOIN TB_CL_CLOSE c
+      ON c.CLOSE_YM BETWEEN to_char(p.CTRT_BGN_DT,'YYYYMM') AND to_char(p.CTRT_END_DT,'YYYYMM')
+      WHERE p.PROJ_ID=#{id} AND c.CLOSE_STAT_CD='CLOSE' AND
+      (c.CLOSE_YM &lt; to_char(#{start}::date,'YYYYMM') OR c.CLOSE_YM &gt; to_char(#{end}::date,'YYYYMM')))
+  </select>
+  <select id="assignments" resultType="com.company.common.projects.dto.ProjectContracts$Assignment">
+    SELECT d.DEV_NM AS "name", d.MNG_NO AS "managementNumber", c.CODE_NM AS "jobName", a.INPUT_BGN_DT AS "startDate",
+      a.INPUT_END_DT AS "endDate", a.CTRT_MM AS "mm"
+    FROM TB_PJ_ASGN a JOIN TB_HR_DEV d ON d.DEV_ID=a.DEV_ID
+    LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='JOB' AND c.CODE=a.JOB_CD
+    WHERE a.PROJ_ID=#{id} AND a.ASGN_STAT_CD!='CNCL' ORDER BY a.INPUT_BGN_DT,a.ASGN_ID
+  </select>
+  <select id="lockAssignments" resultType="com.company.common.projects.mapper.ProjectRows$ActiveAssignment">
+    SELECT ASGN_ID AS "assignmentId", DEV_ID AS "developerId", INPUT_BGN_DT AS "startDate", INPUT_END_DT AS "endDate"
+    FROM TB_PJ_ASGN WHERE PROJ_ID=#{id} AND ASGN_STAT_CD!='CNCL' ORDER BY ASGN_ID FOR UPDATE
+  </select>
+  <insert id="assignmentHistory">
+    INSERT INTO TB_PJ_ASGN_HIST (ASGN_ID,HIST_SN,ASGN_CHG_TYPE_CD,APLY_DT,BFR_VAL,AFT_VAL,ASGN_CHG_RSN_CD,CHG_MEMO,REG_USER_ID)
+    SELECT a.ASGN_ID,(SELECT COALESCE(MAX(h.HIST_SN),0)+1 FROM TB_PJ_ASGN_HIST h WHERE h.ASGN_ID=a.ASGN_ID),
+      #{kind},#{today},CASE WHEN #{kind}='EARLY' THEN '종료 '||a.INPUT_END_DT::text ELSE a.INPUT_BGN_DT::text||' ~ '||a.INPUT_END_DT::text END,
+      CASE WHEN #{kind}='EARLY' THEN '철수 '||#{today}::text ELSE '배정 취소' END,'ETC',#{memo},#{actor}
+    FROM TB_PJ_ASGN a WHERE a.ASGN_ID=#{assignmentId}
+  </insert>
+  <update id="changeAssignment">
+    UPDATE TB_PJ_ASGN SET
+    <choose><when test="kind == 'EARLY'">INPUT_END_DT=#{today}, EARLY_WTHDR_YN='Y',</when>
+      <otherwise>ASGN_STAT_CD='CNCL',</otherwise></choose>
+    MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp() WHERE ASGN_ID=#{assignmentId}
+  </update>
+  <update id="lose">
+    UPDATE TB_PJ_PROJ SET PROJ_STAT_CD='LOSE',LOSE_DT=#{today},LOSE_RSN_CD=#{input.reasonCode},
+      LOSE_MEMO=#{input.memo},MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp() WHERE PROJ_ID=#{projectId}
+  </update>
+  <select id="impactAssignments" resultType="com.company.common.projects.mapper.ProjectRows$ActiveAssignment">
+    SELECT ASGN_ID AS "assignmentId", DEV_ID AS "developerId", INPUT_BGN_DT AS "startDate", INPUT_END_DT AS "endDate"
+    FROM TB_PJ_ASGN WHERE PROJ_ID=#{id} AND ASGN_STAT_CD!='CNCL' ORDER BY ASGN_ID
+  </select>
+  <update id="start">UPDATE TB_PJ_PROJ SET PROJ_STAT_CD='ING' WHERE PROJ_ID=#{id} AND PROJ_STAT_CD='PRE'</update>
+  <select id="roles" resultType="string">
+    SELECT ur.ROLE_ID FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.ROLE_ID=ur.ROLE_ID
+    WHERE ur.USER_ID=#{userId} AND r.USE_YN='Y'
+  </select>
+  <select id="projectScopes" resultType="string">
+    SELECT PROJ_ID FROM TB_SY_USER_SCOPE WHERE USER_ID=#{userId} AND SCOPE_TYPE_CD='PROJ'
+  </select>
+  <select id="manpower" resultType="com.company.common.projects.dto.ProjectContracts$Manpower">
+    WITH actual AS (SELECT a.JOB_CD,SUM(a.CTRT_MM) mm FROM TB_PJ_ASGN a
+      WHERE a.PROJ_ID=#{id} AND a.ASGN_STAT_CD!='CNCL' GROUP BY a.JOB_CD),
+      jobs AS (SELECT JOB_CD FROM actual UNION SELECT JOB_CD FROM TB_PJ_MNPW_PLAN WHERE PROJ_ID=#{id})
+    SELECT j.JOB_CD AS "jobCode",c.CODE_NM AS "jobName",p.PLAN_MM AS "plannedMm",
+      COALESCE(a.mm,0) AS "actualMm",
+      CASE WHEN p.PLAN_MM IS NOT NULL THEN COALESCE(a.mm,0)-p.PLAN_MM END AS "differenceMm"
+    FROM jobs j LEFT JOIN actual a ON a.JOB_CD=j.JOB_CD
+    LEFT JOIN TB_PJ_MNPW_PLAN p ON p.PROJ_ID=#{id} AND p.JOB_CD=j.JOB_CD
+    LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='JOB' AND c.CODE=j.JOB_CD ORDER BY c.SORT_ORD,j.JOB_CD
+  </select>
+  <insert id="savePlan">
+    INSERT INTO TB_PJ_MNPW_PLAN (PROJ_ID,JOB_CD,PLAN_MM,SRC_CD,REG_USER_ID)
+    VALUES (#{projectId},#{job.jobCode},#{job.plannedMm},'MANUAL',#{actor})
+    ON CONFLICT (PROJ_ID,JOB_CD) DO UPDATE SET PLAN_MM=EXCLUDED.PLAN_MM,SRC_CD='MANUAL',
+      MOD_USER_ID=EXCLUDED.REG_USER_ID,MOD_DTTM=clock_timestamp()
+  </insert>
+  <select id="expenses" resultType="com.company.common.projects.dto.ProjectContracts$Expense">
+    SELECT e.EXPS_YM||':'||e.EXPS_SN::text AS "expenseId",
+      substring(e.EXPS_YM,1,4)||'-'||substring(e.EXPS_YM,5,2) AS "yearMonth",
+      e.DRCT_EXPS_ITEM_CD AS "itemCode",c.CODE_NM AS "itemName",e.EXPS_AMT AS "amount",e.RMRK AS "memo"
+    FROM TB_PJ_DRCT_EXPS e LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='DRCT_EXPS_ITEM' AND c.CODE=e.DRCT_EXPS_ITEM_CD
+    WHERE e.PROJ_ID=#{id} ORDER BY e.REG_DTTM DESC,e.EXPS_YM DESC,e.EXPS_SN DESC
+  </select>
+  <select id="nextExpenseSequence" resultType="int">
+    SELECT COALESCE(MAX(EXPS_SN),0)+1 FROM TB_PJ_DRCT_EXPS WHERE PROJ_ID=#{id} AND EXPS_YM=#{month}
+  </select>
+  <insert id="insertExpense">
+    INSERT INTO TB_PJ_DRCT_EXPS (PROJ_ID,EXPS_YM,EXPS_SN,DRCT_EXPS_ITEM_CD,EXPS_AMT,RMRK,REG_USER_ID)
+    VALUES (#{key.projectId},#{key.month},#{key.sequence},#{input.itemCode},#{input.amount},#{input.memo},#{actor})
+  </insert>
+  <delete id="deleteExpense">
+    DELETE FROM TB_PJ_DRCT_EXPS WHERE PROJ_ID=#{projectId} AND EXPS_YM=#{month} AND EXPS_SN=#{sequence}
+  </delete>
+  <select id="steps" resultType="com.company.common.projects.dto.ProjectContracts$Step">
+    SELECT c.CODE_NM AS "stepName",s.STEP_WGHT_RT AS "weightRate",s.PLAN_BGN_DT AS "plannedStartDate",
+      s.PLAN_END_DT AS "plannedEndDate",s.CMPL_DT AS "completedDate"
+    FROM TB_PJ_STEP s LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='PROJ_STEP' AND c.CODE=s.PROJ_STEP_CD
+    WHERE s.PROJ_ID=#{id} ORDER BY s.STEP_SN
+  </select>
+  <select id="issues" resultType="com.company.common.projects.dto.ProjectContracts$Issue">
+    SELECT i.ISSUE_TTL AS "issueTitle",i.IMPR_CD AS "importanceCode",c.CODE_NM AS "importanceName",i.DDLN_DT AS "dueDate",
+      i.ISSUE_STAT_CD AS "statusCode",s.CODE_NM AS "statusName",i.ACTN_CN AS "action"
+    FROM TB_PJ_ISSUE i LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='IMPR' AND c.CODE=i.IMPR_CD
+    LEFT JOIN TB_SY_CODE s ON s.CODE_GRP_ID='ISSUE_STAT' AND s.CODE=i.ISSUE_STAT_CD
+    WHERE i.PROJ_ID=#{id}
+    ORDER BY CASE WHEN i.ISSUE_STAT_CD='CLOSE' THEN 1 ELSE 0 END, c.SORT_ORD NULLS LAST, i.DDLN_DT NULLS LAST, i.ISSUE_ID
+  </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES (#{userId},#{action},'UI-01',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
+  <select id="memos" resultType="com.company.common.projects.dto.ProjectContracts$Memo">
+    SELECT WRT_DT AS "writtenDate",THIS_WEEK_CN AS "thisWeek",NEXT_WEEK_CN AS "nextWeek",REQ_CN AS "request",
+      ACTL_PRGRS_RT AS "actualProgressRate"
+    FROM TB_PJ_WEEK_MEMO WHERE PROJ_ID=#{id} ORDER BY WRT_DT DESC, MEMO_SN DESC
+  </select>
+  <select id="actualProgress" resultType="java.math.BigDecimal">
+    SELECT ACTL_PRGRS_RT FROM TB_PJ_WEEK_MEMO WHERE PROJ_ID=#{id} AND ACTL_PRGRS_RT IS NOT NULL
+    ORDER BY WRT_DT DESC,MEMO_SN DESC LIMIT 1
+  </select>
+  <select id="healthSource" resultType="com.company.common.projects.mapper.ProjectRows$HealthSource">
+    SELECT (SELECT MAX(WRT_DT) FROM TB_PJ_WEEK_MEMO WHERE PROJ_ID=#{id}) AS "latestMemoDate",
+      EXISTS (SELECT 1 FROM TB_PJ_ISSUE WHERE PROJ_ID=#{id} AND ISSUE_STAT_CD!='CLOSE'
+        AND DDLN_DT &lt; #{today}) AS "overdueIssue",
+      EXISTS (SELECT 1 FROM TB_PJ_ISSUE WHERE PROJ_ID=#{id} AND ISSUE_STAT_CD!='CLOSE'
+        AND IMPR_CD='HIGH' AND DDLN_DT &lt; #{today}) AS "overdueHighIssue",
+      COALESCE((SELECT SUM(e.EXPS_AMT) FROM TB_PJ_DRCT_EXPS e WHERE e.PROJ_ID=#{id}
+        AND e.EXPS_YM &lt;= to_char(CAST(#{today} AS date),'YYYYMM')),0) AS "additionalExpenseAmount"
+  </select>
+  <select id="costs" resultType="com.company.common.projects.mapper.ProjectRows$Cost">
+    SELECT COST_YM AS "yearMonth", COST_CLS_CD AS "costClassCode",
+      SUM(LABOR_ALLOC_AMT + DRCT_EXPS_AMT) AS "totalAmount"
+    FROM TB_CO_MON_COST WHERE PROJ_ID=#{id} AND COST_YM &lt;= #{month}
+    GROUP BY COST_YM, COST_CLS_CD ORDER BY COST_YM, COST_CLS_CD
+  </select>
+  <sql id="chosenStage">
+    SELECT d.DSTRB_STEP_CD FROM TB_PJ_TK_DSTRB d JOIN TB_SY_CODE c
+      ON c.CODE_GRP_ID='DSTRB_STEP' AND c.CODE=d.DSTRB_STEP_CD WHERE d.PROJ_ID=#{id}
+    ORDER BY c.SORT_ORD DESC LIMIT 1
+  </sql>
+  <select id="distributionCells" resultType="com.company.common.projects.mapper.ProjectRows$Cell">
+    SELECT d.ROW_SN AS "rowNumber",d.ROW_TYPE_CD AS "rowTypeCode",d.DEV_ID AS "developerId",
+      h.MNG_NO AS "managementNumber",h.DEV_NM AS "name",d.ITEM_NM AS "itemName",
+      substring(d.DSTRB_YM,1,4)||'-'||substring(d.DSTRB_YM,5,2) AS "yearMonth",d.DSTRB_AMT AS "amount"
+    FROM TB_PJ_TK_DSTRB d LEFT JOIN TB_HR_DEV h ON h.DEV_ID=d.DEV_ID
+    WHERE d.PROJ_ID=#{id} AND d.DSTRB_STEP_CD=(<include refid="chosenStage"/>) ORDER BY d.ROW_SN,d.DSTRB_YM
+  </select>
+  <select id="distributionUploads" resultType="com.company.common.projects.dto.ProjectContracts$DistributionUpload">
+    SELECT u.REG_DTTM AS "uploadedAt",u.TRGT_DSTRB_STEP_CD AS "stepCode",c.CODE_NM AS "stepName",
+      u.FILE_NM AS "fileName",COALESCE(a.USER_NM,u.REG_USER_ID) AS "uploadedBy"
+    FROM TB_SY_UPLD u LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='DSTRB_STEP' AND c.CODE=u.TRGT_DSTRB_STEP_CD
+    LEFT JOIN TB_SY_USER a ON a.USER_ID=u.REG_USER_ID WHERE u.TRGT_PROJ_ID=#{id} AND u.FORM_TYPE_CD='B6'
+    ORDER BY u.REG_DTTM DESC,u.UPLD_ID DESC
+  </select>
+  <select id="distributionJobs" resultType="com.company.common.projects.mapper.ProjectRows$Job">
+    WITH jobs AS (SELECT a.JOB_CD,MIN(a.INPUT_BGN_DT) first_date FROM TB_PJ_ASGN a
+      WHERE a.PROJ_ID=#{id} AND a.DEV_ID=#{developerId} AND a.ASGN_STAT_CD!='CNCL' GROUP BY a.JOB_CD),
+      chosen AS (SELECT j.JOB_CD,j.first_date FROM jobs j UNION ALL
+      SELECT d.JOB_CD,NULL::date FROM TB_HR_DEV d WHERE d.DEV_ID=#{developerId} AND NOT EXISTS(SELECT 1 FROM jobs))
+    SELECT j.JOB_CD AS "code",c.CODE_NM AS "name" FROM chosen j
+    LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='JOB' AND c.CODE=j.JOB_CD ORDER BY j.first_date,j.JOB_CD
+  </select>
+  <select id="mismatches" resultType="com.company.common.projects.mapper.ProjectRows$MismatchCell">
+    WITH distributed AS (SELECT DISTINCT d.DEV_ID,d.DSTRB_YM ym FROM TB_PJ_TK_DSTRB d
+      WHERE d.PROJ_ID=#{id} AND d.ROW_TYPE_CD='DEV' AND d.DSTRB_AMT!=0
+        AND d.DSTRB_STEP_CD=(<include refid="chosenStage"/>)),
+      assigned AS (SELECT DISTINCT a.DEV_ID,to_char(m,'YYYYMM') ym FROM TB_PJ_ASGN a
+        CROSS JOIN LATERAL generate_series(date_trunc('month',a.INPUT_BGN_DT),date_trunc('month',a.INPUT_END_DT),interval '1 month') m
+        WHERE a.PROJ_ID=#{id} AND a.ASGN_STAT_CD!='CNCL'),
+      missing AS (SELECT COALESCE(d.DEV_ID,a.DEV_ID) dev,COALESCE(d.ym,a.ym) ym,
+        CASE WHEN a.DEV_ID IS NULL THEN '배정 없음' ELSE '배분표 없음' END kind
+        FROM distributed d FULL JOIN assigned a ON a.DEV_ID=d.DEV_ID AND a.ym=d.ym
+        WHERE a.DEV_ID IS NULL OR d.DEV_ID IS NULL)
+    SELECT h.DEV_NM AS "name",m.kind AS "kind",substring(m.ym,1,4)||'-'||substring(m.ym,5,2) AS "yearMonth"
+    FROM missing m JOIN TB_HR_DEV h ON h.DEV_ID=m.dev ORDER BY h.DEV_ID,m.kind,m.ym
+  </select>
+  <resultMap id="customer" type="com.company.common.projects.mapper.ProjectMapper$Customer">
+    <constructor><arg column="id" javaType="string"/><arg column="name" javaType="string"/><arg column="businessNumber" javaType="string"/></constructor>
+  </resultMap>
+  <resultMap id="developer" type="com.company.common.projects.mapper.ProjectMapper$Developer">
+    <constructor><arg column="id" javaType="string"/><arg column="name" javaType="string"/></constructor>
+  </resultMap>
+  <select id="uploadCustomers" resultMap="customer">
+    SELECT CLNT_ID AS id,CLNT_NM AS name,BIZ_REG_NO AS "businessNumber" FROM TB_BS_CLNT
+    WHERE USE_YN='Y' AND CLNT_TYPE_CD IN ('CUST','BOTH') ORDER BY CLNT_ID
+  </select>
+  <select id="uploadParts" resultType="com.company.common.projects.mapper.ProjectRows$Job">
+    SELECT PART_ID AS code,PART_NM AS name FROM TB_BS_PART WHERE USE_YN='Y' ORDER BY PART_ID
+  </select>
+  <select id="uploadDeveloper" resultMap="developer">
+    SELECT DEV_ID AS id,DEV_NM AS name FROM TB_HR_DEV WHERE MNG_NO=#{managementNumber}
+  </select>
+  <delete id="deleteDistribution">DELETE FROM TB_PJ_TK_DSTRB WHERE PROJ_ID=#{id} AND DSTRB_STEP_CD=#{stage}</delete>
+  <insert id="insertDistribution">
+    INSERT INTO TB_PJ_TK_DSTRB(PROJ_ID,DSTRB_STEP_CD,ROW_SN,DSTRB_YM,ROW_TYPE_CD,DEV_ID,ITEM_NM,DSTRB_AMT,REG_USER_ID,UPLD_ID)
+    VALUES(#{projectId},#{stage},#{row},#{month},#{type},#{developerId},#{itemName},#{amount},#{actor},#{uploadId})
+  </insert>
+</mapper>

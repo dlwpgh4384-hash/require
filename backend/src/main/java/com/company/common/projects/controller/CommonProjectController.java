@@ -1,0 +1,127 @@
+package com.company.common.projects.controller;
+
+import com.company.common.clients.service.ClientRules;
+import com.company.common.projects.dto.ProjectContracts.*;
+import com.company.common.projects.service.CommonProjectService;
+import com.company.common.projects.service.ProjectRules;
+import com.company.common.users.dto.UserContracts.Response;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.Set;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping(produces = "application/json")
+public class CommonProjectController {
+    private final CommonProjectService service;
+    private final com.company.common.support.service.ExcelExportService excel;
+    public CommonProjectController(CommonProjectService service, com.company.common.support.service.ExcelExportService excel) {
+        this.service = service;
+        this.excel = excel;
+    }
+    @GetMapping(value = "/api/common/projects/excel", produces = {
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/json"})
+    public ResponseEntity<byte[]> getCommonProjectsExcel(@ModelAttribute ExcelFilter filter) {
+        var found = service.getCommonProjectsForDownload(filter);
+        var rows = found.stream().map(p -> java.util.List.of(
+            p.projectId, p.projectName, value(p.customerName), "IN".equals(p.contractTypeCode) ? "내부" : value(p.contractTypeName),
+            p.startDate + " ~ " + p.endDate, "IN".equals(p.contractTypeCode) ? "–" : value(p.contractAmount),
+            p.assignedPeopleCount + "명",
+            "IN".equals(p.contractTypeCode) ? "없음(내부)" : p.salesPartId == null ? "미지정" : "HQ".equals(p.salesPartId) ? "본사(직접 영업)" : value(p.salesPartName),
+            value(p.statusName),
+            "TK".equals(p.contractTypeCode) ? (p.distributionStepName == null ? "없음" : p.distributionStepName) : "–")).toList();
+        var now = service.now();
+        int year = filter.year() == null ? now.atZone(java.time.ZoneId.of("Asia/Seoul")).getYear() : filter.year();
+        service.recordDownload(found.size(), year);
+        byte[] bytes = excel.write("프로젝트", java.util.List.of("프로젝트ID", "프로젝트명", "고객사", "계약유형", "계약 기간", "계약금액",
+            "투입 인원", "영업 파트", "상태", "배분표"), rows, service.currentUserId(), now);
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            .header(HttpHeaders.CONTENT_DISPOSITION, org.springframework.http.ContentDisposition.attachment()
+                .filename(excel.fileName("프로젝트", year + "년", now), java.nio.charset.StandardCharsets.UTF_8).build().toString())
+            .body(bytes);
+    }
+    private static String value(Object o) { return o == null ? "" : o.toString(); }
+    @GetMapping("/api/common/projects/budget-rule")
+    public Response<BudgetRule> getCommonProjectBudgetRule() { return Response.of(service.getCommonProjectBudgetRule()); }
+    @GetMapping("/api/common/projects")
+    public Response<ProjectList> getCommonProjects() { return Response.of(service.getCommonProjects()); }
+    @GetMapping("/api/common/projects/{projectId}")
+    public Response<Project> getCommonProject(@PathVariable String projectId) {
+        return Response.of(service.getCommonProject(projectId));
+    }
+    @GetMapping("/api/common/projects/{projectId}/change-history")
+    public Response<Items<History>> getCommonProjectChangeHistory(@PathVariable String projectId) {
+        return Response.of(service.getCommonProjectChangeHistory(projectId));
+    }
+    @GetMapping("/api/common/projects/{projectId}/sales-parts")
+    public Response<Items<SalesPart>> getCommonProjectSalesParts(@PathVariable String projectId) {
+        return Response.of(service.getCommonProjectSalesParts(projectId));
+    }
+    @GetMapping("/api/common/projects/{projectId}/manpower-plan")
+    public Response<ManpowerList> getCommonProjectManpowerPlan(@PathVariable String projectId) {
+        return Response.of(service.getCommonProjectManpowerPlan(projectId));
+    }
+    @GetMapping("/api/common/projects/{projectId}/direct-expenses")
+    public Response<Items<Expense>> getCommonProjectDirectExpenses(@PathVariable String projectId) {
+        return Response.of(service.getCommonProjectDirectExpenses(projectId));
+    }
+    @GetMapping("/api/common/projects/{projectId}/lose-impact")
+    public Response<LoseImpact> getCommonProjectLoseImpact(@PathVariable String projectId) {
+        return Response.of(service.getCommonProjectLoseImpact(projectId));
+    }
+    @GetMapping("/api/common/projects/{projectId}/distribution")
+    public Response<Distribution> getCommonProjectDistribution(@PathVariable String projectId) {
+        return Response.of(service.getCommonProjectDistribution(projectId));
+    }
+    @GetMapping(value = "/api/common/projects/{projectId}/distribution/template", produces = {
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/json"})
+    public ResponseEntity<byte[]> getCommonProjectDistributionTemplate(@PathVariable String projectId) {
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            .header(HttpHeaders.CONTENT_DISPOSITION, org.springframework.http.ContentDisposition.attachment()
+                .filename(excel.fileName("배분표 양식", projectId, service.now()), java.nio.charset.StandardCharsets.UTF_8).build().toString())
+            .body(service.getCommonProjectDistributionTemplate(projectId));
+    }
+    @PostMapping(value = "/api/common/projects", consumes = "application/json")
+    public Response<Project> postCommonProject(@RequestBody JsonNode body) {
+        return Response.of(service.postCommonProject(ProjectRules.input(body, false)));
+    }
+    @PutMapping(value = "/api/common/projects/{projectId}", consumes = "application/json")
+    public Response<Project> putCommonProject(@PathVariable String projectId, @RequestBody JsonNode body) {
+        var input = ProjectRules.input(body, true);
+        return Response.of(service.putCommonProject(projectId, input, ClientRules.token(body)));
+    }
+    @PutMapping(value = "/api/common/projects/{projectId}/budget", consumes = "application/json")
+    public Response<Project> putCommonProjectBudget(@PathVariable String projectId, @RequestBody JsonNode body) {
+        ClientRules.object(body, Set.of("budgetAmount", "modifiedAt"));
+        java.time.Instant token = body.has("modifiedAt") ? ClientRules.token(body) : null;
+        return Response.of(service.putCommonProjectBudget(projectId, ProjectRules.money(body, "budgetAmount", true), token, body.has("modifiedAt")));
+    }
+    @PutMapping(value = "/api/common/projects/{projectId}/sales-part", consumes = "application/json")
+    public Response<Items<SalesPart>> putCommonProjectSalesPart(@PathVariable String projectId, @RequestBody JsonNode body) {
+        return Response.of(service.putCommonProjectSalesPart(projectId, ProjectRules.part(body)));
+    }
+    @PutMapping(value = "/api/common/projects/{projectId}/manpower-plan", consumes = "application/json")
+    public Response<ManpowerList> putCommonProjectManpowerPlan(@PathVariable String projectId, @RequestBody JsonNode body) {
+        return Response.of(service.putCommonProjectManpowerPlan(projectId, ProjectRules.manpower(body)));
+    }
+    @PostMapping(value = "/api/common/projects/{projectId}/direct-expenses", consumes = "application/json")
+    public Response<Expense> postCommonProjectDirectExpense(@PathVariable String projectId, @RequestBody JsonNode body) {
+        return Response.of(service.postCommonProjectDirectExpense(projectId, ProjectRules.expense(body)));
+    }
+    @PostMapping("/api/common/projects/{projectId}/direct-expenses/{expenseId}/delete")
+    public Response<DeletedExpense> postCommonProjectDirectExpenseDelete(@PathVariable String projectId, @PathVariable String expenseId) {
+        return Response.of(service.postCommonProjectDirectExpenseDelete(projectId, expenseId));
+    }
+    @PostMapping("/api/common/projects/{projectId}/start")
+    public Response<Project> postCommonProjectStart(@PathVariable String projectId) {
+        return Response.of(service.postCommonProjectStart(projectId));
+    }
+    @PostMapping(value = "/api/common/projects/{projectId}/lose", consumes = "application/json")
+    public Response<Project> postCommonProjectLose(@PathVariable String projectId, @RequestBody JsonNode body) {
+        return Response.of(service.postCommonProjectLose(projectId, ProjectRules.lose(body)));
+    }
+}

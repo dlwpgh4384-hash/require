@@ -25,11 +25,14 @@ public class CommonUploadController {
     }
     @PostMapping(value = "/api/common/uploads", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Response<UploadContracts.Result> postCommonUpload(@RequestParam String formTypeCode,
-        @RequestParam(required = false) String yearMonth, @RequestPart MultipartFile file) {
+        @RequestParam(required = false) String yearMonth, @RequestPart MultipartFile file,
+        @RequestParam(required = false) String projectId, @RequestParam(required = false) String distributionStepCode) {
         if (file.isEmpty() || file.getSize() > 10_000_000)
             throw CodeFailure.invalid("file", "10,000,000 bytes 이하의 엑셀 파일을 선택해 주세요.");
         try {
-            return Response.of(service.postCommonUpload(formTypeCode, yearMonth, file.getOriginalFilename(), file.getBytes()));
+            if (projectId == null && distributionStepCode == null)
+                return Response.of(service.postCommonUpload(formTypeCode, yearMonth, file.getOriginalFilename(), file.getBytes()));
+            return Response.of(service.postCommonUpload(formTypeCode, yearMonth, file.getOriginalFilename(), file.getBytes(), projectId, distributionStepCode));
         } catch (IOException failure) {
             throw CodeFailure.invalid("file", "파일을 읽지 못했습니다.");
         }

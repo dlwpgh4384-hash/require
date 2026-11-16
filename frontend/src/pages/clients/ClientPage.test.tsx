@@ -185,7 +185,8 @@ it.each(["client-projects-client-a", "client-people-client-a"])(
     render(<ClientPage />);
     await screen.findByText("거래처A");
     fireEvent.click(screen.getByTestId(id));
-    expect(await screen.findByText("오늘 프로젝트")).toBeVisible();
+    // 투입 내역은 프로젝트 묶음 머리(배지)와 줄의 프로젝트 이름에 두 번 나온다.
+    expect((await screen.findAllByText("오늘 프로젝트"))[0]).toBeVisible();
     expect(screen.getByText("김개발")).toBeVisible();
     expect(screen.getByText("협력 소속")).toBeVisible();
   },
@@ -211,17 +212,23 @@ it("loads full account only by explicit detail action", async () => {
       String(call[0]).endsWith("payment-account"),
     ),
   ).toBe(false);
-  expect(screen.getByTestId("client-account-masked")).toHaveTextContent("****5678");
+  expect(screen.getByTestId("client-account-masked")).toHaveTextContent(
+    "****5678",
+  );
   fireEvent.click(read);
   await waitFor(() =>
-    expect(screen.getByTestId("client-account-masked")).toHaveTextContent("12345678"),
+    expect(screen.getByTestId("client-account-masked")).toHaveTextContent(
+      "12345678",
+    ),
   );
   expect(screen.getByText(/예금주 계좌주/)).toBeVisible();
 });
 it("renders empty state", async () => {
   empty = true;
   render(<ClientPage />);
-  expect(await screen.findByTestId("list-empty")).toHaveTextContent("조건에 맞는 결과가 없습니다.");
+  expect(await screen.findByTestId("list-empty")).toHaveTextContent(
+    "조건에 맞는 결과가 없습니다.",
+  );
 });
 it("renders request failure with retry", async () => {
   failRead = true;
@@ -255,7 +262,9 @@ it("registration shows basic fields with guidance and changes category-dependent
   render(<ClientForm codes={codes} onCancel={vi.fn()} onSaved={vi.fn()} />);
   // 시안: 기본 정보 칸은 처음부터 보이고, 안내 띠가 구분별 칸을 알려 준다.
   expect(screen.getByLabelText("상호")).toBeVisible();
-  expect(screen.getByText(/구분을 고르면 고객사는 세금계산서 이메일/)).toBeVisible();
+  expect(
+    screen.getByText(/구분을 고르면 고객사는 세금계산서 이메일/),
+  ).toBeVisible();
   expect(screen.queryByLabelText("세금계산서 이메일")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("계좌번호")).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("구분"), {
@@ -447,7 +456,9 @@ it("failed full-account load disables edit save until retry succeeds", async () 
 
 it("contact phone keeps only digits and hyphens (FR-0106)", () => {
   render(<ClientForm codes={codes} onCancel={vi.fn()} onSaved={vi.fn()} />);
-  fireEvent.change(screen.getByLabelText("연락처"), { target: { value: "02-12ab34" } });
+  fireEvent.change(screen.getByLabelText("연락처"), {
+    target: { value: "02-12ab34" },
+  });
   expect(screen.getByLabelText("연락처")).toHaveValue("02-1234");
 });
 it("leaving a form with unsaved input asks first (FR-0106)", () => {
@@ -457,10 +468,14 @@ it("leaving a form with unsaved input asks first (FR-0106)", () => {
   expect(cancel).toHaveBeenCalledTimes(1);
   cancel.mockClear();
   render(<ClientForm codes={codes} onCancel={cancel} onSaved={vi.fn()} />);
-  fireEvent.change(screen.getAllByLabelText("상호")[1], { target: { value: "새 상호" } });
+  fireEvent.change(screen.getAllByLabelText("상호")[1], {
+    target: { value: "새 상호" },
+  });
   fireEvent.click(screen.getAllByTestId("client-form-cancel")[1]);
   expect(cancel).not.toHaveBeenCalled();
-  expect(screen.getByTestId("client-leave-confirm")).toHaveTextContent("나가면 입력한 내용이 사라집니다.");
+  expect(screen.getByTestId("client-leave-confirm")).toHaveTextContent(
+    "나가면 입력한 내용이 사라집니다.",
+  );
   fireEvent.click(screen.getByTestId("client-leave-go"));
   expect(cancel).toHaveBeenCalledTimes(1);
 });
@@ -471,7 +486,9 @@ it("거래가 남은 거래처는 중지하지 않고 시안 안내 창으로 �
   fireEvent.click(screen.getByTestId("list-select-client-a"));
   fireEvent.click(screen.getByTestId("list-bulk-stop"));
   expect(screen.getByText("사용을 중지할 수 없습니다")).toBeInTheDocument();
-  expect(screen.getByText("거래처A — 진행 프로젝트 2건, 투입 인력 3명")).toBeInTheDocument();
+  expect(
+    screen.getByText("거래처A — 진행 프로젝트 2건, 투입 인력 3명"),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByTestId("client-status-blocked-ok"));
   expect(writes()).toHaveLength(0);
 });

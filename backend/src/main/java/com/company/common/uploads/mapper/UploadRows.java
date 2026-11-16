@@ -8,6 +8,8 @@ public final class UploadRows {
         public long uploadId;
         public String formTypeCode;
         public String targetMonth;
+        public String projectId;
+        public String distributionStepCode;
         public String fileName;
         public String statusCode;
         public String statusName;

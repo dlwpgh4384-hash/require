@@ -5,6 +5,8 @@
     <id column="upld_id" property="uploadId" javaType="_long"/>
     <result column="form_type_cd" property="formTypeCode" javaType="java.lang.String"/>
     <result column="trgt_ym" property="targetMonth" javaType="java.lang.String"/>
+    <result column="trgt_proj_id" property="projectId" javaType="java.lang.String"/>
+    <result column="trgt_dstrb_step_cd" property="distributionStepCode" javaType="java.lang.String"/>
     <result column="file_nm" property="fileName" javaType="java.lang.String"/>
     <result column="upld_stat_cd" property="statusCode" javaType="java.lang.String"/>
     <result column="status_name" property="statusName" javaType="java.lang.String"/>
@@ -22,7 +24,7 @@
   </resultMap>
   <sql id="columns">
     u.upld_id, u.form_type_cd, u.trgt_ym, u.file_nm, u.upld_stat_cd, c.code_nm AS status_name,
-    u.succ_cnt, u.warn_cnt, u.err_cnt, u.mod_dttm
+    u.succ_cnt, u.warn_cnt, u.err_cnt, u.mod_dttm, u.trgt_proj_id, u.trgt_dstrb_step_cd
   </sql>
   <select id="nextUploadId" resultType="long">
     SELECT nextval('SQ_TB_SY_UPLD')
@@ -44,7 +46,7 @@
     SELECT e.row_no, e.col_nm, e.input_val, e.rsn_cn,
       CASE e.rslt_type_cd WHEN 'ERR' THEN '오류' ELSE '경고' END AS severity
     FROM TB_SY_UPLD_ERR e WHERE e.upld_id=#{uploadId}
-    ORDER BY e.rslt_sn
+    ORDER BY CASE WHEN e.rslt_type_cd='ERR' THEN 0 ELSE 1 END, e.rslt_sn
   </select>
   <insert id="insertUpload">
     INSERT INTO TB_SY_UPLD
@@ -70,4 +72,8 @@
       CASE WHEN #{issue.severity}='오류' THEN 'ERR' ELSE 'WARN' END,
       #{issue.row}, #{issue.column}, #{issue.inputValue}, #{issue.reason}, 'admin', clock_timestamp())
   </insert>
+  <update id="storeProjectReceipt">
+    UPDATE TB_SY_UPLD SET TRGT_PROJ_ID=#{projectId}, TRGT_DSTRB_STEP_CD=#{distributionStepCode}
+      WHERE UPLD_ID=#{uploadId}
+  </update>
 </mapper>

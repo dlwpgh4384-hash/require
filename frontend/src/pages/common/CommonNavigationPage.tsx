@@ -12,6 +12,7 @@ import {
 } from "../userpreferences";
 import { PlaceholderScreen } from "./PlaceholderScreen";
 import { ProjectPage } from "../projects/ProjectPage";
+import { AssignmentPage } from "../assignments/AssignmentPage";
 import {
   ProjectTitleActions,
   ProjectWorkspaceProvider,
@@ -55,6 +56,8 @@ import {
 const renderScreen = (scrnId: string) =>
   scrnId === "UI-01" ? (
     <ProjectPage />
+  ) : scrnId === "UI-12" ? (
+    <AssignmentPage />
   ) : scrnId === "UI-02" ? (
     <DeveloperWorkspace />
   ) : scrnId === "UI-15" ? (
@@ -121,7 +124,7 @@ function PreferenceNavigation() {
         const menus = context.menus as ShellMenuItem[];
         return {
           screenActions:
-            context.screenId === "UI-01" ? (
+            context.screenId === "UI-01" || context.screenId === "UI-12" ? (
               <ProjectTitleActions />
             ) : context.screenId === "UI-02" ? (
               <DeveloperTitleActions />
@@ -188,7 +191,8 @@ export function CommonNavigationPage() {
                       renderScreen={renderScreen}
                       extensions={(context) => ({
                         screenActions:
-                          context.screenId === "UI-01" ? (
+                          context.screenId === "UI-01" ||
+                          context.screenId === "UI-12" ? (
                             <ProjectTitleActions />
                           ) : context.screenId === "UI-02" ? (
                             <DeveloperTitleActions />

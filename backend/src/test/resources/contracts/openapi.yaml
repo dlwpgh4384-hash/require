@@ -3018,7 +3018,15 @@ paths:
       - REQ-399
       - REQ-407
       - REQ-453
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
+      - REQ-490
+      - REQ-541
+      - REQ-542
+      - REQ-543
+      - REQ-544
+      - REQ-545
+      - REQ-546
+      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다. B.5는
+        신규 투입 배정 전용이다. 실제 FORM_TYPE 코드로 선택한다. 대체투입 겹침은 오류/자동철수 없이 원배정 유지·대체 배정만 신규 등록한다(SPEC-REQUEST.md:122).
       parameters:
       - name: formTypeCode
         in: path
@@ -3068,7 +3076,15 @@ paths:
       - REQ-454
       - REQ-455
       - REQ-460
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
+      - REQ-490
+      - REQ-541
+      - REQ-542
+      - REQ-543
+      - REQ-544
+      - REQ-545
+      - REQ-546
+      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다. B.5는
+        신규 투입 배정 전용이다. 실제 FORM_TYPE 코드로 선택한다. 대체투입 겹침은 오류/자동철수 없이 원배정 유지·대체 배정만 신규 등록한다(SPEC-REQUEST.md:122).
       x-business-rules:
       - B.7 신규 이관만; 구분별 필수·코드 이름·사업자번호 중복 검사
       - TB_SY_CODE_MAP 매핑은 경고; 이 검사 단계는 거래처 등록 없음
@@ -3085,12 +3101,16 @@ paths:
       - 공통 업로드에서 B.9 파일을 검사하여 등록 전용과 동일한 필수·기본값을 적용하고 기존 프로젝트를 수정하지 않는다.
       - 활성 고객사/고객·협력을 상호 또는 사업자번호로 해석한다. 없는 거래처·동일상호 복수·역전기간은 오류이며 복수 상호의 모든 사업자번호를 안내한다.
       - 사람은 등록 관리번호와 확인 이름 일치 필수, 항목은 항목명50자 필수, 월 원단위 빈칸0, 합계는 비교만 하고 저장하지 않는다.
+      - 'B.5: 원문57행 10개 열·쉼표/코드표기/수식저장값을 해석한다. 빈 월MM=1.0·단가=개발자 월단가; 유상 두 단가 원천 없음은 오류.'
+      - 'B.5: 종료·실주 프로젝트/미등록 개발자/역전기간/MM범위/대체인력 누락은 행 오류. 파트차이는 경고만. 신규 전용·기존배정 조기철수0·TB_CO_PREV_ADJ 자동0.'
       x-side-effects:
       - TB_SY_UPLD 검사완료·TB_SY_UPLD_ERR 행 오류/경고 기록; TB_BS_CLNT 쓰기0
       - B.8/B.1 검사 결과만 TB_SY_UPLD/TB_SY_UPLD_ERR에 저장. TB_HR_DEV/TB_HR_MON_PAY는 무변경.
       - B.9/B.6는 TB_SY_UPLD·TB_SY_UPLD_ERR 검사만 저장·프로젝트/배분표 업무0쓰기
+      - B.5 검사만 TB_SY_UPLD/TB_SY_UPLD_ERR 저장·TB_PJ_ASGN/HIST 쓰기0.
       x-state-transitions:
       - 업로드 없음 -> 검사완료 기록
+      - B.5 검사 -> 검사완료·배정0쓰기
       x-required-tests:
       - 'happy: 유효 B.7 파일 검사 -> GET 결과 successCount와 uploadId·TB_BS_CLNT 증가0'
       - 'auth: 무인증 파일 검사 -> 200 admin 기록·로그인 이동0'
@@ -3106,6 +3126,11 @@ paths:
       - 'validation: B.6 projectId/단계 누락 -> 400 해당 multipart 필드 오류'
       - 'business: B.9 동일상호 복수 고객사 -> 해당행 오류·모든 후보 사업자번호 표시·프로젝트0쓰기'
       - 'side-effect: 이름 변환 경고와 오류 혼합 B.9 -> TB_SY_UPLD_ERR readAs 문구·오류우선 결과 재조회'
+      - 'happy: 월MM 빈 B.5 검사 -> 업로드 GET 성공·배정0쓰기·월MM 기본1.0'
+      - 'auth: 무인증 B.5 검사 -> 200·업로드 처리자admin'
+      - 'validation: B.5 대체인력 번호 누락 -> 결과 해당 행/열 오류1개·배정 증가0'
+      - 'business: 겹친 계약상 인력 B.5 -> 겹침 자체 오류0·기존 배정 endDate 불변'
+      - 'side-effect: 다른 영업파트 B.5 검사 -> TB_SY_UPLD_ERR 경고와 결과 영업 파트가 다른 배정 n건 목록 일치'
       responses:
         '200':
           description: 조회 또는 저장 결과
@@ -3139,7 +3164,7 @@ paths:
                 formTypeCode:
                   type: string
                   description: 기존 FORM_TYPE 실제 코드로 B.7/B.8/B.1 구분. 코드값은 DML에서 읽고 B.1/B.8 문자열을 DB enum으로 발명하지 않음. B.9
-                    프로젝트 신규/B.6 턴키도 실제 FORM_TYPE 코드로 선택.
+                    프로젝트 신규/B.6 턴키도 실제 FORM_TYPE 코드로 선택. B.5 투입 배정 신규 등록 포함.
                 file:
                   type: string
                   format: binary
@@ -3175,7 +3200,15 @@ paths:
       - REQ-412
       - REQ-418
       - REQ-419
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
+      - REQ-490
+      - REQ-541
+      - REQ-542
+      - REQ-543
+      - REQ-544
+      - REQ-545
+      - REQ-546
+      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다. B.5는
+        신규 투입 배정 전용이다. 실제 FORM_TYPE 코드로 선택한다. 대체투입 겹침은 오류/자동철수 없이 원배정 유지·대체 배정만 신규 등록한다(SPEC-REQUEST.md:122).
       parameters:
       - name: uploadId
         in: path
@@ -3228,7 +3261,15 @@ paths:
       - REQ-410
       - REQ-411
       - REQ-412
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
+      - REQ-490
+      - REQ-541
+      - REQ-542
+      - REQ-543
+      - REQ-544
+      - REQ-545
+      - REQ-546
+      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다. B.5는
+        신규 투입 배정 전용이다. 실제 FORM_TYPE 코드로 선택한다. 대체투입 겹침은 오류/자동철수 없이 원배정 유지·대체 배정만 신규 등록한다(SPEC-REQUEST.md:122).
       parameters:
       - name: uploadId
         in: path
@@ -3277,7 +3318,15 @@ paths:
       - REQ-412
       - REQ-456
       - REQ-459
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
+      - REQ-490
+      - REQ-541
+      - REQ-542
+      - REQ-543
+      - REQ-544
+      - REQ-545
+      - REQ-546
+      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다. B.5는
+        신규 투입 배정 전용이다. 실제 FORM_TYPE 코드로 선택한다. 대체투입 겹침은 오류/자동철수 없이 원배정 유지·대체 배정만 신규 등록한다(SPEC-REQUEST.md:122).
       parameters:
       - name: uploadId
         in: path
@@ -3301,14 +3350,18 @@ paths:
       - 사용 중지·퇴사자도 미마감월 급여를 허용하되 퇴사자는 퇴사월까지만 허용한다. 퇴사월 뒤 행만 해당 행 오류로 표시하고 오류가 있으면 월 전체 반영은 금지한다.
       - 등록 저장과 같은 원금액·파트 첫줄·계약 첫줄·기본값을 각 신규 행에 저장한다. 빈 ID는 P-nnnn 자동 발급한다.
       - 프로젝트는 배분표 화면, 단계는 업로드 창에서 정하고 같은 단계 재업로드로 줄을 교체하여 수정한다.
+      - 'B.5: 원문57행 10개 열·쉼표/코드표기/수식저장값을 해석한다. 빈 월MM=1.0·단가=개발자 월단가; 유상 두 단가 원천 없음은 오류.'
+      - 'B.5: 종료·실주 프로젝트/미등록 개발자/역전기간/MM범위/대체인력 누락은 행 오류. 파트차이는 경고만. 신규 전용·기존배정 조기철수0·TB_CO_PREV_ADJ 자동0.'
       x-side-effects:
       - 오류0건일 때만 TB_BS_CLNT 전량과 TB_SY_UPLD 결과 저장; 실패면 거래처 전체 rollback
       - 'B.8: TB_HR_DEV/PRC/SKILL 신규 전량. B.1: 선택월 TB_HR_MON_PAY 전체 삭제+새행 저장을 한 트랜잭션으로 처리. 다른월 보존. 오류1건이면 기존 월 전체 보존.'
       - B.9 프로젝트·파트첫줄·계약첫줄을 원자저장; B.6 선택단계 배분행 교체와 TB_SY_UPLD.TRGT_DSTRB_STEP_CD 스냅샷 보존
+      - B.5 반영 시 TB_PJ_ASGN 각1건·TB_PJ_ASGN_HIST 투입각1줄·TB_SY_UPLD 결과; 기존 계약상 인력 기간 불변.
       x-state-transitions:
       - 검사완료·오류0 -> 반영 결과; 오류 있음 -> 검사완료·거래처0행
       - B.1 검사완료 -> 미마감/오류0 전제 월 전체 교체; 반영 직전 마감 또는 행 오류 -> 기존월 유지
       - B.9 검사완료 -> 신규 프로젝트; B.6 검사완료 -> 선택 단계 배분행 교체·옛 업로드 단계 불변
+      - B.5 오류0 검사완료 -> 신규 유효 배정; 원배정 상태/기간 유지
       x-required-tests:
       - 'happy: 오류0·경고만 있는 동일 파일 반영 -> getCommonClients에 전체 신규 거래처·useYn=Y'
       - 'auth: 무인증 반영 -> 200·업로드 처리자 admin; 인증 scheme 없음'
@@ -3327,6 +3380,11 @@ paths:
       - 'validation: B.6 미등록 관리번호 -> 행 오류·기존 배분표 행 전량보존'
       - 'business: B.6 합계불일치 -> 경고만·반영 성공·불일치 건수 조회'
       - 'side-effect: B.6 같은단계 다시 반영 -> 새 배분행·이전 TB_SY_UPLD.TRGT_DSTRB_STEP_CD 그대로 조회'
+      - 'happy: 오류0 B.5 반영 -> getCommonAssignments 신규 줄과 extensionCount=0·유효 상태'
+      - 'auth: 무인증 B.5 반영 -> 200·admin 투입 이력'
+      - 'validation: 검사후 프로젝트 실주 -> 동일파일 재검사 오류·배정 추가0'
+      - 'business: 대체투입 기존기간 겹침 -> 신규 대체 배정만 저장·원배정 endDate 불변·조기철수 확인단계0'
+      - 'side-effect: B.5 유효행 반영 -> 각 TB_PJ_ASGN_HIST 투입1줄·TB_SY_UPLD 수와 일치·TB_CO_PREV_ADJ 증가0'
       requestBody:
         required: true
         content:
@@ -5425,6 +5483,747 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/assignments:
+    get:
+      operationId: getCommonAssignments
+      summary: 투입 배정 목록
+      security: []
+      x-related-requirements:
+      - REQ-499
+      - REQ-504
+      - REQ-506
+      - REQ-507
+      - REQ-498
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      parameters:
+      - name: year
+        in: query
+        description: 선택 연도
+        required: false
+        schema:
+          type: integer
+      - name: projectId
+        in: query
+        description: 종료·실주 제외 프로젝트
+        required: false
+        schema:
+          type: string
+      - name: jobCode
+        in: query
+        description: JOB 코드
+        required: false
+        schema:
+          type: string
+      - name: warning
+        in: query
+        description: MM 1.0 초과·미계약 선투입
+        required: false
+        schema:
+          type: string
+      - name: keyword
+        in: query
+        description: 이름 또는 관리번호
+        required: false
+        schema:
+          type: string
+      x-pagination-filtering:
+        pagination: 서버 전체 조회; 기존 목록 표시 부품이 건수/밀도를 적용
+        filtering:
+        - year
+        - projectId
+        - jobCode
+        - warning
+        - keyword
+        ordering: 기존 정렬 관례를 보존하며 신규 업무 정렬은 원문 미지정; OQ-ASGN-QUERY
+      x-aiops-query-role:
+        entity: TB_PJ_ASGN
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 투입 배정 목록 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignmentList'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    post:
+      operationId: postCommonAssignment
+      summary: 인력 투입 배정
+      security: []
+      x-related-requirements:
+      - REQ-508
+      - REQ-509
+      - REQ-510
+      - REQ-511
+      - REQ-512
+      - REQ-513
+      - REQ-515
+      - REQ-516
+      - REQ-517
+      - REQ-518
+      - REQ-519
+      - REQ-520
+      - REQ-521
+      - REQ-522
+      - REQ-523
+      - REQ-505
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      responses:
+        '200':
+          description: 인력 투입 배정 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignment'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: '상세 modifiedAt 불일치: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 배정·이력은 불변이다.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonAssignmentInput'
+      x-business-rules:
+      - 프로젝트·개발자·직무·투입일·철수일·월 MM을 받아 TB_PJ_ASGN에 등록한다. 월 MM 기본 1.00이다.
+      - 이름/관리번호 검색 결과 옆에 대기·투입 중 ~마지막 철수일·휴직만 표시한다.
+      - 종료·실주 프로젝트를 제외하고 철수일이 프로젝트 계약 종료일 또는 개발자 퇴사일보다 늦으면 지정 문구로 거부한다.
+      - 최초 투입일은 오늘·철수일은 기본 프로젝트 종료일이고 프로젝트 변경 시 계약 시작일~종료일로 바꾼다. AI 진입은 max(추천 시작월1일, 프로젝트 시작일)~종료일이다.
+      - 내부가 아닌 사람/프로젝트 영업 파트 차이는 원문 긴 안내를 보이고 저장 허용하며 매출·사람 이익 귀속을 설명한다.
+      - 월단위·파견 유상 배정은 청구 단가 >0 필수다. PM은 기본 월 단가를 쓰고 없으면 지정 문구로 거부하며 파트장·재무는 직접 입력한다.
+      - 배정 저장 시 TB_PJ_ASGN_HIST에 투입 1줄을 자동 기록한다.
+      - 투입 구분은 신규·추가투입·대체투입·무상지원이며 기본 신규다. 청구 단가는 월단위·파견만, 무상지원은 숨기고 0 저장한다. 연장 가능성은 입력 없이 미정이다.
+      - 대체투입 계약상 인력은 같은 프로젝트 배정 이력 인력을 사람당 1줄·본인 제외·철수일 표시로 조회한다.
+      - 월단위·파견은 계약상 인력 마지막 배정 최근 월 단가를 채우고 턴키·내부는 이름만 표시한다. 프로젝트/구분 변경 또는 본인 일치 시 선택을 비운다.
+      - 투입일에 걸친 계약상 인력 배정을 기본 전체 체크로 표시하고 같이 처리·대체투입만 저장·취소를 선택하게 한다. 겹침 없으면 바로 저장한다.
+      - 같이 처리 시 선택된 원배정을 투입일 전날로 조기 철수하며 사유 ASGN_CHG_RSN 필수·기본값 없음·메모 200자 기본 대체투입(실제 투입자)을 받는다.
+      - 같이 처리된 각 원배정에 조기 철수 이력과 ASGN_CHG_RSN_CD·CHG_MEMO를 남기고 인력 사정은 식-70 성과 점수 원천에 포함한다.
+      - 계산 배분표에 계약상 인력 줄이 있으면 확인창과 저장 안내에 재업로드·배분 불일치 문구를 보이고 배분표를 자동 변경하지 않는다.
+      - PM에게 청구 단가 입력을 숨기고 기본값으로 저장하며 단가 직접 수정은 파트장·재무로 한정하는 정책 함수를 보존한다. 로그인/메뉴 통제는 후속이다.
+      - 수주예정 선투입·휴직 중 배정·파견 프리랜서/외주·마감월 걸침을 경고하되 저장을 허용한다.
+      x-side-effects:
+      - TB_PJ_ASGN 신규와 TB_PJ_ASGN_HIST 투입1줄을 같은 트랜잭션에 저장한다.
+      - together 선택 시 체크 원배정 종료일=투입일 전날 및 각 조기 철수 이력·ASGN_CHG_RSN_CD·CHG_MEMO를 같은 경계에 기록한다.
+      - 배분표는 자동 변경하지 않고 재업로드 안내·프로젝트 집계를 갱신한다. TB_CO_PREV_ADJ 자동 행 생성은 없다.
+      x-required-tests:
+      - 'happy: 월 MM 1.00의 유효 배정 저장 -> getCommonAssignment에서 같은 프로젝트·개발자·기간·monthlyMm 재조회'
+      - 'auth: PM 정책 fixture의 임의 청구 단가 입력 -> 해당 입력 사용 거부·기본 단가만 저장; 현재 무인증 HTTP는 200·admin'
+      - 'validation: 개발자 누락 -> 400 errors.developerId에 개발자를 골라 주세요·TB_PJ_ASGN 추가0'
+      - 'business: 철수일이 계약 종료일 또는 퇴사일 초과 -> 400 endDate 오류·기존 배정 불변'
+      - 'side-effect: together와 철수 사유 제출 -> 선택 원배정 전날 종료·조기 철수 이력 및 새 투입 이력 조회'
+      - 'business: 함께 처리 사유 누락 -> 400 reasonCode에 철수 사유를 골라 주세요·신규/원배정 전체 불변'
+      - 'business: 무상지원·PM 기본 단가 없음 -> 200 billingPrice=0·유상 PM은 지정 월 단가 없음 오류'
+      - 'side-effect: 턴키 대체 등록 -> 배분표 원행 불변·재업로드 안내와 불일치 재조회'
+      x-state-transitions:
+      - 없음 -> 유효 배정·투입 이력
+      - 선택 원배정 -> 조기 철수(together만); assignment-only는 원배정 유지
+  /api/common/assignments/{assignmentId}:
+    get:
+      operationId: getCommonAssignment
+      summary: 투입 배정 상세
+      security: []
+      x-related-requirements:
+      - REQ-524
+      - REQ-489
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      parameters:
+      - name: assignmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-pagination-filtering:
+        pagination: 서버 전체 조회; 기존 목록 표시 부품이 건수/밀도를 적용
+        filtering: []
+        ordering: 기존 정렬 관례를 보존하며 신규 업무 정렬은 원문 미지정; OQ-ASGN-QUERY
+      x-aiops-query-role:
+        entity: TB_PJ_ASGN
+        result_path:
+        - data
+      responses:
+        '200':
+          description: 투입 배정 상세 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignment'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/assignments/candidates:
+    get:
+      operationId: getCommonAssignmentCandidates
+      summary: 수주 배정 후보
+      security: []
+      x-related-requirements:
+      - REQ-501
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      x-pagination-filtering:
+        pagination: 서버 전체 조회; 기존 목록 표시 부품이 건수/밀도를 적용
+        filtering: []
+        ordering: 기존 정렬 관례를 보존하며 신규 업무 정렬은 원문 미지정; OQ-ASGN-QUERY
+      x-aiops-query-role:
+        entity: TB_PJ_ASGN
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 수주 배정 후보 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignmentCandidateList'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/assignments/candidates/{candidateId}/remove:
+    post:
+      operationId: postCommonAssignmentCandidateRemove
+      summary: 배정 후보 제외
+      security: []
+      x-related-requirements:
+      - REQ-503
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      parameters:
+      - name: candidateId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 배정 후보 제외 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignmentCandidateRemoved'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: '상세 modifiedAt 불일치: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 배정·이력은 불변이다.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-no-request-body-reason: 후보 제외 대상은 path candidateId로 완전히 지정하며 추가 입력을 원문이 요구하지 않는다.
+      x-business-rules:
+      - 후보 빼기는 해당 인력을 후보에서 제외한다.
+      x-side-effects:
+      - 수주 가배정의 후보 노출에서만 제외하고 TB_PJ_ASGN을 생성/삭제하지 않는다.
+      x-required-tests:
+      - 'happy: 후보 빼기 호출 -> getCommonAssignmentCandidates에 그 candidateId 없음'
+      - 'auth: 무인증 후보 제외 -> 200·로그인 이동 없음'
+      - 'validation: 빈 candidateId -> 400 경로 식별자 오류·후보 목록 불변'
+      - 'business: 확정되지 않은 후보 빼기 -> 기존 TB_PJ_ASGN 배정 건수 불변'
+      - 'side-effect: 후보 제외 뒤 목록 재조회 -> 후보 수 감소·영업 기회 수주 상태 보존'
+      x-state-transitions:
+      - 후보 표시 -> 후보에서 제외; 실제 배정으로 자동 전환 없음
+  /api/common/assignments/contract-developers:
+    get:
+      operationId: getCommonAssignmentContractDevelopers
+      summary: 계약상 인력 선택
+      security: []
+      x-related-requirements:
+      - REQ-517
+      - REQ-518
+      - REQ-519
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      parameters:
+      - name: projectId
+        in: query
+        description: 선택 프로젝트
+        required: false
+        schema:
+          type: string
+      - name: developerId
+        in: query
+        description: 배정 본인 제외
+        required: false
+        schema:
+          type: string
+      - name: startDate
+        in: query
+        description: 겹침 판정 투입일
+        required: false
+        schema:
+          type: string
+      x-pagination-filtering:
+        pagination: 서버 전체 조회; 기존 목록 표시 부품이 건수/밀도를 적용
+        filtering:
+        - projectId
+        - developerId
+        - startDate
+        ordering: 기존 정렬 관례를 보존하며 신규 업무 정렬은 원문 미지정; OQ-ASGN-QUERY
+      x-aiops-query-role:
+        entity: TB_PJ_ASGN
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 계약상 인력 선택 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignmentContractDeveloperList'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/assignments/{assignmentId}/history:
+    get:
+      operationId: getCommonAssignmentHistory
+      summary: 투입 변경 이력
+      security: []
+      x-related-requirements:
+      - REQ-539
+      - REQ-493
+      - REQ-535
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      parameters:
+      - name: assignmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: changeTypeCode
+        in: query
+        description: 전체 또는 CHG_TYPE/ASGN_CHG_TYPE 실제 코드
+        required: false
+        schema:
+          type: string
+      x-pagination-filtering:
+        pagination: 서버 전체 조회; 기존 목록 표시 부품이 건수/밀도를 적용
+        filtering:
+        - changeTypeCode
+        ordering: 기존 정렬 관례를 보존하며 신규 업무 정렬은 원문 미지정; OQ-ASGN-QUERY
+      x-aiops-query-role:
+        entity: TB_PJ_ASGN_HIST
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 투입 변경 이력 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignmentHistoryList'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/assignments/{assignmentId}/changes:
+    post:
+      operationId: postCommonAssignmentChange
+      summary: 투입 배정 변경 기록
+      security: []
+      x-related-requirements:
+      - REQ-525
+      - REQ-526
+      - REQ-527
+      - REQ-528
+      - REQ-529
+      - REQ-530
+      - REQ-531
+      - REQ-532
+      - REQ-533
+      - REQ-534
+      - REQ-535
+      - REQ-536
+      - REQ-493
+      - REQ-489
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      parameters:
+      - name: assignmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 투입 배정 변경 기록 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignment'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: '상세 modifiedAt 불일치: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 배정·이력은 불변이다.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonAssignmentChangeInput'
+      x-business-rules:
+      - 변경 종류·적용일·종류별 새 값 필수, 적용일은 투입일 이전 불가다. 조기 철수·소급·마감월은 사유 필수이며 메모는 200자다.
+      - 새 종료일은 현재 종료일보다 늦고 프로젝트 계약 종료일·퇴사일 이하여야 하며 적용일 기본 현재 종료일+1·연장 횟수+1이다.
+      - 철수일은 기존 종료일 이하여야 하며 종료일을 그 날짜로 바꾼다.
+      - 월 선택을 그 달1일로 저장하며 새 단가는 양수·해당월과 다르게 받는다. 적용월 이후만 계산하고 같은 달은 나중 값이 이긴다.
+      - 현재 단가/월 MM은 오늘 월 적용값, 시작 전은 시작월 값이다. 변경 저장 시와 매달1일 배치로 다시 맞춘다.
+      - 턴키·내부·무상지원은 단가 변경 종류를 숨긴다.
+      - 새 연장 가능성은 현재와 다르게 받으며 미정 복귀를 허용한다.
+      - 신규·추가투입끼리만 배정 전체에 적용한다. 무상지원·대체투입으로/에서 변경은 거부하고 종료일은 이 명령으로 바꾸지 않는다.
+      - 적용 시작월부터 0 초과 1.00 이하이며 현재와 다른 월 MM을 적용하고 월 MM·월 원가·매출을 재계산한다. 앞달과 달별 수기값은 바꾸지 않는다.
+      - 변경 저장 시 해당 현재값 반영과 TB_PJ_ASGN_HIST 1줄을 함께 기록한다.
+      - 지난 날짜 입력은 TB_PJ_ASGN_HIST.RTRO_YN으로 소급 입력을 표시한다.
+      - 마감월에 걸치면 경고하고 그 달 금액은 유지하며 미마감월부터 반영한다. 전월 조정 자동 입력은 최신 명확화120행에 따라 금지한다.
+      - 변경 이력 전후 값은 코드가 아닌 이름·배정 취소 등의 화면 글로 남기고 동일 값 이력은 남기지 않는다.
+      - 상세 modifiedAt을 저장에 그대로 제출하고 불일치 시 409 공통 문구로 거부한다.
+      x-side-effects:
+      - 배정 유효 현재값·적용월별 단가/MM 및 TB_PJ_ASGN_HIST 1줄을 원자 반영한다.
+      - 지난 날짜 RTRO_YN 표시·마감 금액 보존·미마감 재계산. TB_CO_PREV_ADJ 자동 생성0.
+      x-required-tests:
+      - 'happy: 10월 800만 배정에 12월부터850만 저장 -> 10·11월 현재800만·12월부터850만 재조회'
+      - 'auth: PM 단가 수정 정책 호출 -> 수정 불허·기존 월 단가 보존; 현 HTTP는 고정 admin·인증403 생성 안 함'
+      - 'validation: 적용일이 투입일 이전 또는 메모201자 -> 400 effectiveDate/memo 오류·이력 증가0'
+      - 'business: 신규에서 무상지원으로 변경 -> 400 원문 조기철수/취소 후 새 배정 안내·inputTypeCode 불변'
+      - 'side-effect: 과거 적용일의 유효 월MM 변경 -> TB_PJ_ASGN_HIST RTRO_YN 표시·적용월 이전 불변·TB_CO_PREV_ADJ 증가0'
+      - 'business: 연장 종료일이 계약/퇴사일 초과 -> 400 newEndDate·endDate와 extensionCount 불변'
+      - 'business: 월MM 0 또는1 초과 -> 400 newMonthlyMm·월별 원가/매출 불변'
+      - 'side-effect: 유효 연장 -> extensionCount+1과 연장 이력1줄·같은 표시값은 이력0줄'
+      x-state-transitions:
+      - 현재 종료일 -> 새 종료일(연장/조기철수만)
+      - 신규 <-> 추가투입; 무상지원·대체투입 전환 거부
+      - 현 단가/MM -> 적용월부터 새값; 앞달·마감값 유지
+  /api/common/assignments/{assignmentId}/history/{historyId}/corrections:
+    post:
+      operationId: postCommonAssignmentHistoryCorrection
+      summary: 투입 이력 정정
+      security: []
+      x-related-requirements:
+      - REQ-537
+      - REQ-538
+      - REQ-489
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      parameters:
+      - name: assignmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: historyId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 투입 이력 정정 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignmentHistory'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: '상세 modifiedAt 불일치: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 배정·이력은 불변이다.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonAssignmentCorrectionInput'
+      x-business-rules:
+      - 바른 내용·사유로 원이력 CRCT_YN을 표시하고 정정 줄을 새로 남긴다.
+      - 투입·정정·이미 정정된 줄은 정정하지 못하며 정정이 현재 배정을 바꾸지 않는다.
+      - 상세 modifiedAt을 저장에 그대로 제출하고 불일치 시 409 공통 문구로 거부한다.
+      x-side-effects:
+      - TB_PJ_ASGN_HIST 원줄 CRCT_YN 표시·정정 줄 신규; TB_PJ_ASGN 현재값 무변경
+      x-required-tests:
+      - 'happy: 조기 철수 이력의 바른 내용·사유 저장 -> 이력 GET에 원줄 정정됨·신규 정정 줄 존재'
+      - 'auth: 무인증 정정 -> 200·admin 정정 기록; 메뉴 권한검사 새 연결 없음'
+      - 'validation: 정정 사유 누락 -> 400 errors.reason·CRCT_YN 불변'
+      - 'business: 투입/정정/이미 정정된 줄 정정 -> 400·원줄과 새 정정 행수 불변'
+      - 'side-effect: 허용 이력 정정 후 -> TB_PJ_ASGN 현재 종료일·단가·MM은 전부 기존값'
+      x-state-transitions:
+      - 미정정 변경 이력 -> CRCT_YN 정정됨 + 신규 정정 이력; 배정 현재값 유지
+  /api/common/assignments/extension-possibility:
+    put:
+      operationId: putCommonAssignmentExtensionPossibility
+      summary: 선택 배정 연장 가능성 변경
+      security: []
+      x-related-requirements:
+      - REQ-547
+      - REQ-489
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      responses:
+        '200':
+          description: 선택 배정 연장 가능성 변경 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignmentBulkResult'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: '상세 modifiedAt 불일치: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 배정·이력은 불변이다.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonAssignmentBulkInput'
+      x-business-rules:
+      - 선택 배정만 실제 EXT_PSBL 코드로 변경한다. 같은값은 이력 없음. 미정 복귀 허용.
+      - 일괄 stale/부분성공 정책은 OQ-ASGN-BULK에 국소 확인하며 새 전량/부분성공 보장을 추정하지 않는다.
+      x-side-effects:
+      - 선택 배정 연장 가능성 변경·동일값 이력 억제. 변경 전후 표시는 기존 표시명 원칙을 따른다.
+      x-required-tests:
+      - 'happy: 두 배정 연장 가능성 저장 -> 목록에서 그 두 배정만 새 이름'
+      - 'auth: 무인증 일괄 변경 -> 200·로그인 이동0; 실제 권한연결은 후속'
+      - 'validation: 선택 목록 없음 -> 400 assignments 필수 오류·배정 불변'
+      - 'business: 같은 연장 가능성 제출 -> 변경 이력 증가0·기존값 유지'
+      - 'side-effect: 변경된 선택 배정 재조회 -> EXT_PSBL 원천 새값·미선택 행 불변'
+      x-state-transitions:
+      - 기존 연장 가능성 -> 선택한 새 가능성; 동일값 유지
+  /api/common/assignments/cancel:
+    post:
+      operationId: postCommonAssignmentCancel
+      summary: 선택 투입 배정 취소
+      security: []
+      x-related-requirements:
+      - REQ-548
+      - REQ-549
+      - REQ-536
+      - REQ-489
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      responses:
+        '200':
+          description: 선택 투입 배정 취소 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignmentBulkResult'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: '상세 modifiedAt 불일치: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 배정·이력은 불변이다.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonAssignmentCancelInput'
+      x-business-rules:
+      - 마감/기존 실적 여부와 관계없이 취소 허용·물리삭제/조기철수 대체 금지.
+      - 목록/MM/원가 계산에서 제외; 월단위·파견 매출은 취소분 제외, 턴키 청구 매출은 불변.
+      - 마감월 매출·원가 보존, 경고만 표시·미마감 이번달 전월조정은 UI-10 사람이 직접 입력. TB_CO_PREV_ADJ 자동0.
+      x-side-effects:
+      - TB_PJ_ASGN 취소 상태 유지·각 TB_PJ_ASGN_HIST 취소1줄. 취소는 배정 취소 표시명.
+      - 프로젝트 투입인원/MM·미마감 월단위/파견 매출원가 재계산; 마감월/턴키 청구매출·TB_CO_PREV_ADJ 보존.
+      x-required-tests:
+      - 'happy: 실적 있는 배정 취소 -> 원행은 남고 getCommonAssignments 유효목록에서 제외·월 MM/원가에 미포함'
+      - 'auth: 무인증 취소 -> 200·admin 취소 이력·로그인 이동 없음'
+      - 'validation: assignmentId 없는 선택행 -> 400 assignments 필드 오류·취소 상태 변화0'
+      - 'business: 마감 실적 있는 월단위 배정 취소 -> 취소 허용·마감월 매출원가 이전값 유지·미마감 취소분 제외'
+      - 'side-effect: 취소 후 -> TB_PJ_ASGN_HIST 취소1줄·TB_CO_PREV_ADJ 행수 불변·턴키 청구 매출 불변'
+      x-state-transitions:
+      - 유효 배정 -> 취소 상태; 원행/마감 금액 유지
+  /api/common/assignments/excel:
+    get:
+      operationId: getCommonAssignmentsExcel
+      summary: 투입 배정 목록 엑셀
+      security: []
+      x-related-requirements:
+      - REQ-491
+      - REQ-492
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      parameters:
+      - name: year
+        in: query
+        description: 선택 연도
+        required: false
+        schema:
+          type: integer
+      - name: projectId
+        in: query
+        description: 종료·실주 제외 프로젝트
+        required: false
+        schema:
+          type: string
+      - name: jobCode
+        in: query
+        description: JOB 코드
+        required: false
+        schema:
+          type: string
+      - name: warning
+        in: query
+        description: MM 1.0 초과·미계약 선투입
+        required: false
+        schema:
+          type: string
+      - name: keyword
+        in: query
+        description: 이름 또는 관리번호
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: 현재 조건의 실제 xlsx 파일
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-side-effects:
+      - 현재 조건으로 파일 생성 후 기존 TB_SY_ACCS_LOG DNLD 기록
 components:
   schemas:
     CommonCodeGroup:
@@ -7057,7 +7856,7 @@ components:
           description: 신규 후 수정 이력이 없으면 null; null도 버전값으로 그대로 전송한다.
           nullable: true
       additionalProperties: false
-    CommonAssignment:
+    CommonClientAssignment:
       type: object
       required:
       - projectId
@@ -7090,7 +7889,7 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/CommonAssignment'
+            $ref: '#/components/schemas/CommonClientAssignment'
       additionalProperties: false
     CommonClientChange:
       type: object
@@ -8830,6 +9629,409 @@ components:
       - startDate
       - endDate
       - mm
+    CommonAssignment:
+      type: object
+      required:
+      - assignmentId
+      - projectId
+      - projectName
+      - developerId
+      - name
+      - jobName
+      - startDate
+      - endDate
+      - monthlyMm
+      - yearMm
+      - inputTypeName
+      - extensionPossibilityName
+      - extensionCount
+      - warnings
+      - historyCount
+      - modifiedAt
+      properties:
+        assignmentId:
+          type: string
+        projectId:
+          type: string
+        projectName:
+          type: string
+        developerId:
+          type: string
+        name:
+          type: string
+        managementNumber:
+          type: string
+        jobCode:
+          type: string
+        jobName:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        billingPrice:
+          type: number
+          nullable: true
+          description: PM 정책에서는 생략; 턴키는 목록 표시명 배분표
+        monthlyMm:
+          type: number
+        yearMm:
+          type: number
+        extensionPossibilityCode:
+          type: string
+        extensionPossibilityName:
+          type: string
+        inputTypeCode:
+          type: string
+        inputTypeName:
+          type: string
+        extensionCount:
+          type: integer
+        warnings:
+          type: array
+          items:
+            type: string
+        monthlyMmTotal:
+          type: number
+        historyCount:
+          type: integer
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+      additionalProperties: false
+    CommonAssignmentList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAssignment'
+      additionalProperties: false
+    CommonAssignmentCandidate:
+      type: object
+      required:
+      - candidateId
+      - projectId
+      - projectName
+      - developerId
+      - name
+      - jobCode
+      - jobName
+      - startDate
+      - endDate
+      properties:
+        candidateId:
+          type: string
+        projectId:
+          type: string
+        projectName:
+          type: string
+        developerId:
+          type: string
+        name:
+          type: string
+        jobCode:
+          type: string
+        jobName:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+      additionalProperties: false
+    CommonAssignmentCandidateList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAssignmentCandidate'
+      additionalProperties: false
+    CommonAssignmentCandidateRemoved:
+      type: object
+      required:
+      - candidateId
+      properties:
+        candidateId:
+          type: string
+      additionalProperties: false
+    CommonAssignmentHistory:
+      type: object
+      required:
+      - historyId
+      - assignmentId
+      - effectiveDate
+      - changeTypeCode
+      - changeTypeName
+      - beforeValue
+      - afterValue
+      - reason
+      - memo
+      - changedBy
+      - changedAt
+      - retroactiveYn
+      - correctedYn
+      - modifiedAt
+      properties:
+        historyId:
+          type: string
+        assignmentId:
+          type: string
+        effectiveDate:
+          type: string
+          format: date
+        changeTypeCode:
+          type: string
+        changeTypeName:
+          type: string
+        beforeValue:
+          type: string
+        afterValue:
+          type: string
+        reason:
+          type: string
+        memo:
+          type: string
+        changedBy:
+          type: string
+        changedAt:
+          type: string
+          format: date-time
+          nullable: true
+        retroactiveYn:
+          type: string
+          description: RTRO_YN 원천
+        correctedYn:
+          type: string
+          description: CRCT_YN 원천
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+      additionalProperties: false
+    CommonAssignmentHistoryList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAssignmentHistory'
+      additionalProperties: false
+    CommonAssignmentContractDeveloper:
+      type: object
+      required:
+      - developerId
+      - name
+      - endDate
+      - billingPrice
+      - overlappingAssignments
+      properties:
+        developerId:
+          type: string
+        name:
+          type: string
+        endDate:
+          type: string
+          format: date
+        billingPrice:
+          type: number
+          nullable: true
+        overlappingAssignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAssignment'
+      additionalProperties: false
+    CommonAssignmentContractDeveloperList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAssignmentContractDeveloper'
+      additionalProperties: false
+    CommonAssignmentInput:
+      type: object
+      required:
+      - projectId
+      - developerId
+      - jobCode
+      - startDate
+      - endDate
+      - monthlyMm
+      - inputTypeCode
+      properties:
+        projectId:
+          type: string
+        developerId:
+          type: string
+        jobCode:
+          type: string
+          description: JOB 실제 코드
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        monthlyMm:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          maximum: 1
+          default: 1
+        inputTypeCode:
+          type: string
+          description: INPUT_TYPE/ASGN_CHG_TYPE 실제 DML 코드; 이관 없음
+        billingPrice:
+          type: number
+          minimum: 0
+          description: 유상 월단위·파견 >0, 무상지원 0, PM 입력값 신뢰 금지
+        contractDeveloperId:
+          type: string
+          description: 대체투입만·CTRT_DEV_ID
+        replacementAction:
+          type: string
+          enum:
+          - together
+          - assignment-only
+          description: UI 결정 전달용 논리값; DB enum/공통코드 아님
+        earlyWithdrawalAssignmentIds:
+          type: array
+          items:
+            type: string
+        reasonCode:
+          type: string
+          description: 같이 처리일 때 ASGN_CHG_RSN 필수
+        memo:
+          type: string
+          maxLength: 200
+      additionalProperties: false
+    CommonAssignmentChangeInput:
+      type: object
+      required:
+      - modifiedAt
+      - changeTypeCode
+      - effectiveDate
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        changeTypeCode:
+          type: string
+          description: CHG_TYPE 실제 코드
+        effectiveDate:
+          type: string
+          format: date
+        newEndDate:
+          type: string
+          format: date
+        newBillingPrice:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        newMonthlyMm:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 1
+        newExtensionPossibilityCode:
+          type: string
+        newInputTypeCode:
+          type: string
+        reasonCode:
+          type: string
+        memo:
+          type: string
+          maxLength: 200
+      additionalProperties: false
+    CommonAssignmentCorrectionInput:
+      type: object
+      required:
+      - modifiedAt
+      - correctedValue
+      - reason
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        correctedValue:
+          type: string
+          description: 해당 이력 종류의 바른 표시 내용; 현재 배정 수정 아님
+        reason:
+          type: string
+      additionalProperties: false
+    CommonAssignmentBulkInput:
+      type: object
+      required:
+      - assignments
+      - extensionPossibilityCode
+      properties:
+        assignments:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+            - assignmentId
+            - modifiedAt
+            properties:
+              assignmentId:
+                type: string
+              modifiedAt:
+                type: string
+                format: date-time
+                nullable: true
+            additionalProperties: false
+        extensionPossibilityCode:
+          type: string
+      additionalProperties: false
+    CommonAssignmentBulkResult:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAssignment'
+      additionalProperties: false
+    CommonAssignmentCancelInput:
+      type: object
+      required:
+      - assignments
+      properties:
+        assignments:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+            - assignmentId
+            - modifiedAt
+            properties:
+              assignmentId:
+                type: string
+              modifiedAt:
+                type: string
+                format: date-time
+                nullable: true
+            additionalProperties: false
+      additionalProperties: false
 x-requirement-context:
   description: >-
     아래 항목은 관련 요구별 역할·관찰 증거다. 면제 목록이 아니다.
@@ -9443,6 +10645,51 @@ x-uncovered-requirements:
 - canonical_id: REQ-479
   status: data-constraint
   evidence: '프로젝트 저장 표 경계: 실주/등록 통합시험에서 위 업무표만 변화하며 개발자/공통코드 원본은 보존된다. 소유: data-model.md 프로젝트 변경 계약'
+- canonical_id: REQ-482
+  status: data-constraint
+  evidence: 'DB 계산식 소비: 소유 계약의 구현 제약; 식 정의를 바꾼 독립 fixture에서 서비스가 해당 DB 정의를 읽고 기존 식 행은 덮어쓰지 않는다.'
+- canonical_id: REQ-483
+  status: data-constraint
+  evidence: '공통코드 원천: 소유 계약의 구현 제약; 직무·투입구분·철수사유 옵션을 해당 공통코드 이름과 대조하며 새 코드값을 발명하지 않는다.'
+- canonical_id: REQ-484
+  status: out-of-scope
+  evidence: '인증 연결 제외: 소유 계약의 구현 제약; UI-12 진입·저장에 로그인 이동이나 메뉴 권한 검사를 추가하지 않는다.'
+- canonical_id: REQ-485
+  status: screen-only
+  evidence: 'YearBar 재사용: UI-12 공통 부품 제약; 연도 전환 시 기존 연도 줄과 정확한 설명이 하나만 보인다.'
+- canonical_id: REQ-486
+  status: screen-only
+  evidence: '오른쪽 상세 패널: UI-12 공통 부품 제약; 투입 상세는 오른쪽 600 패널이고 변경 기록 창은 기존 400 스타일이다.'
+- canonical_id: REQ-487
+  status: screen-only
+  evidence: '제목줄 단추 중복 금지: UI-12 공통 부품 제약; 배정·업로드 단추가 본문에 중복 렌더링되지 않는다.'
+- canonical_id: REQ-488
+  status: screen-only
+  evidence: '프로젝트 링크: UI-12 로컬 동작; 투입 목록의 프로젝트 이름을 누르면 같은 projectId의 기존 상세가 열린다.'
+- canonical_id: REQ-494
+  status: data-constraint
+  evidence: 'DDL·마이그레이션 보존: 소유 계약의 구현 제약; 물리 결합 전 DDL 대조에서 추가 표/열 0개, 기존 migration 파일명과 내용 보존을 확인한다.'
+- canonical_id: REQ-495
+  status: non-functional
+  evidence: '개발 설정 유지: 소유 계약의 구현 제약; 일반 기동 자동 migration과 인증 연결이 없고 유효 OpenAPI components에 securitySchemes가 없다.'
+- canonical_id: REQ-496
+  status: non-functional
+  evidence: '시각 표현: 소유 계약의 구현 제약; 같은 변경 시각의 API Instant와 한국 시각 표시가 같은 순간이다.'
+- canonical_id: REQ-497
+  status: non-functional
+  evidence: '구현 위치: 소유 계약의 구현 제약; 신규 파일 경로가 두 지정 폴더에 있고 common/common 폴더가 없다.'
+- canonical_id: REQ-500
+  status: screen-only
+  evidence: '지난해 읽기 전용: UI-12 로컬 동작; 지난해 선택 후 목록은 보이나 배정·업로드·체크 조작은 보이지 않는다.'
+- canonical_id: REQ-502
+  status: screen-only
+  evidence: '후보 확정 진입: UI-12 로컬 동작; 후보 확정 클릭만으로 TB_PJ_ASGN은 증가하지 않고 채워진 배정 창이 열린다.'
+- canonical_id: REQ-514
+  status: screen-only
+  evidence: 'AI 추천 진입: UI-12 로컬 동작; 버튼 클릭 시 UI-30으로 이동하며 새 추천 엔진·화면을 만들지 않는다.'
+- canonical_id: REQ-540
+  status: screen-only
+  evidence: '지난해 이력 수정 금지: UI-12 로컬 동작; 지난해 이력은 조회되나 변경 기록과 정정 단추가 보이지 않는다.'
 x-change-supersession:
   description: 기존 operation과 기준선 시험은 원형 보존한다. 이번 공통 기능 인수에는 다음 예외가 우선하며 기존 메뉴 조회 자체를 상태 저장 API로 바꾸지 않는다.
   ui-header: 'REQ-071·REQ-086: 제목줄 정보와 시스템 관리자 이름은 이번 원문으로 허용한다.'

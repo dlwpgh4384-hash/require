@@ -105,7 +105,7 @@ class SchemaPreparationTest {
     void migrationResourcesContainOnlyModelTablesAndBaseSeeds() throws Exception {
         preparation.prepare();
         var resources = ArgumentCaptor.forClass(String.class);
-        verify(statement, times(12)).execute(resources.capture());
+        verify(statement, times(13)).execute(resources.capture());
         String schema = resources.getAllValues().get(0);
         var tables = java.util.regex.Pattern.compile("CREATE TABLE IF NOT EXISTS (TB_[A-Z_]+)").matcher(schema);
         var names = new java.util.ArrayList<String>();
@@ -140,7 +140,7 @@ class SchemaPreparationTest {
     void everyPreparedTableIsPhysicalAndScreenSectionNamesCannotBecomeTables() throws Exception {
         preparation.prepare();
         var resources = ArgumentCaptor.forClass(String.class);
-        verify(statement, times(12)).execute(resources.capture());
+        verify(statement, times(13)).execute(resources.capture());
         var tablePattern = java.util.regex.Pattern.compile(
             "(?i)CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?([a-z_][a-z0-9_]*)\\s*\\(");
         // V12's regexp_replace search pattern is not a physical table definition.
@@ -148,7 +148,7 @@ class SchemaPreparationTest {
         var tables = resources.getAllValues().stream()
             .flatMap(sql -> tablePattern.matcher(sql).results().map(match -> match.group(1).toUpperCase(java.util.Locale.ROOT)))
             .toList();
-        assertThat(tables).hasSize(44).doesNotHaveDuplicates();
+        assertThat(tables).hasSize(47).doesNotHaveDuplicates();
         assertThat(tables).allMatch(name -> name.startsWith("TB_"));
         assertThat(tables).contains("TB_SY_CALC_RULE", "TB_SY_CHG_HIST", "TB_SY_CODE", "TB_SY_CODE_GRP",
             "TB_SY_CODE_MAP", "TB_SY_MENU", "TB_SY_OPER_STD", "TB_SY_ROLE_MENU_AUTH");

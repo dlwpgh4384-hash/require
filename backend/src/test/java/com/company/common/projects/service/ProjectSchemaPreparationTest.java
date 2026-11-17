@@ -65,7 +65,7 @@ class ProjectSchemaPreparationTest {
     void freshFlywayStartupCreatesAllProjectSourcesWithoutBusinessSeeds() throws Exception {
         flyway().migrate();
         assertThat(text("SELECT count(*)::text FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'"))
-            .isEqualTo("45");
+            .isEqualTo("48");
         assertThat(text("SELECT count(*)::text FROM tb_pj_proj")).isEqualTo("0");
         assertThat(text("SELECT count(*)::text FROM tb_pj_drct_exps")).isEqualTo("0");
         assertThat(text("SELECT count(*)::text FROM flyway_schema_history WHERE success AND version='12'"))

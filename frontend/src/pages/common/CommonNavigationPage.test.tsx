@@ -173,10 +173,13 @@ function respond(body: ShellMenuResponse) {
                   "/api/common/code-change-history",
                   "/api/common/parts",
                   "/api/common/developers/areas",
+                  "/api/common/projects",
+                  "/api/common/assignments/candidates",
                 ].includes(url) ||
                 url.startsWith("/api/common/clients?") ||
                 url.startsWith("/api/common/developers?") ||
-                /^\/api\/common\/code-groups\/(CLNT_TYPE|INDUTY|BANK|EMP_TYPE|JOB|GRADE|JBPS|DRCT_CLS|SKILL|WORK_STAT)\/codes$/.test(
+                url.startsWith("/api/common/assignments?") ||
+                /^\/api\/common\/code-groups\/(CLNT_TYPE|INDUTY|BANK|EMP_TYPE|JOB|GRADE|JBPS|DRCT_CLS|SKILL|WORK_STAT|EXT_PSBL)\/codes$/.test(
                   url,
                 )
               ? { success: true, meta: {}, data: { items: [] } }
@@ -192,6 +195,19 @@ async function expectScreenContent(id: string) {
   const content = within(panel);
   if (id === "UI-01") {
     expect(await content.findByTestId("project-page")).toBeVisible();
+  } else if (id === "UI-12") {
+    expect(await content.findByTestId("assignment-page")).toBeVisible();
+    expect(await content.findByTestId("assignment-empty")).toBeVisible();
+    expect(
+      content.getByRole("textbox", { name: "이름/관리번호" }),
+    ).toBeVisible();
+    const actions = within(screen.getByTestId("screen-actions"));
+    await waitFor(() =>
+      expect(actions.getByRole("button", { name: "+ 배정" })).toBeEnabled(),
+    );
+    expect(
+      actions.getByRole("button", { name: "엑셀 다운로드" }),
+    ).toBeEnabled();
   } else if (id === "UI-02") {
     expect(
       await content.findByText("조건에 맞는 결과가 없습니다."),
@@ -282,6 +298,35 @@ async function ensureOpen(name: string) {
 }
 
 describe("common placeholder screen contract", () => {
+  it("UI-12 keyword filtering keeps the registered screen and uses only relative read requests", async () => {
+    const request = respond(fixture());
+    mount("/screens/UI-12");
+    await expectScreenContent("UI-12");
+    fireEvent.change(screen.getByRole("textbox", { name: "이름/관리번호" }), {
+      target: { value: "D-0001" },
+    });
+    await waitFor(() =>
+      expect(
+        request.mock.calls.some(
+          ([url]) =>
+            url.startsWith("/api/common/assignments?") &&
+            new URLSearchParams(url.split("?")[1]).get("keyword") === "D-0001",
+        ),
+      ).toBe(true),
+    );
+    await expectScreenContent("UI-12");
+    expect(screen.getByRole("textbox", { name: "이름/관리번호" })).toHaveValue(
+      "D-0001",
+    );
+    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-12");
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(
+      request.mock.calls.every(
+        ([url, init]) => url.startsWith("/api/") && !init?.method,
+      ),
+    ).toBe(true);
+  });
+
   it("UI-02 title actions open and cancel the full form without preferences or another URL", async () => {
     const request = respond(fixture());
     mount("/screens/UI-02");
@@ -433,7 +478,8 @@ describe("common placeholder screen contract", () => {
         id !== "UI-23" &&
         id !== "UI-15" &&
         id !== "UI-02" &&
-        id !== "UI-01"
+        id !== "UI-01" &&
+        id !== "UI-12"
       ) {
         expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
         for (const name of ["조회", "저장", "다운로드", "업로드", "편집"]) {

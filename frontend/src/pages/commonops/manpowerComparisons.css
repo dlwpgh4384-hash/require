@@ -1,0 +1,19 @@
+/* 시안 .content: 띠·조건·목록 사이 24px(휴대폰 16px) */
+.manpower-comparison-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  color: var(--text);
+}
+@media (max-width: 767px) {
+  .manpower-comparison-page {
+    gap: 16px;
+  }
+}
+/* 조건·연도 아래 서버 칸 오류 */
+.manpower-comparison-page .field-error {
+  display: block;
+  color: var(--ls-bad);
+  font-size: 12px;
+}

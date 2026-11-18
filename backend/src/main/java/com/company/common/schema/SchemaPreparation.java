@@ -23,7 +23,8 @@ public class SchemaPreparation {
                         "db/migration/V9__common_entity_contract.sql", "db/migration/V10__client_part_upload_schema.sql",
                         "db/migration/V11__developer_pool_schema.sql",
                         "db/migration/V12__project_operations_schema.sql",
-                        "db/migration/V13__assignment_candidate_sources.sql"}) {
+                        "db/migration/V13__assignment_candidate_sources.sql",
+                        "db/migration/V14__recommendation_log_schema.sql"}) {
                     String sql = new ClassPathResource(resource).getContentAsString(StandardCharsets.UTF_8);
                     try (var statement = session.getConnection().createStatement()) {
                         statement.execute(sql);

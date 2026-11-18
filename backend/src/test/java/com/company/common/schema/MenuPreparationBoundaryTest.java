@@ -33,7 +33,7 @@ class MenuPreparationBoundaryTest {
         "V7__code_definitions_schema.sql", "V8__calculation_rule_seed.sql",
         "V9__common_entity_contract.sql", "V10__client_part_upload_schema.sql",
         "V11__developer_pool_schema.sql", "V12__project_operations_schema.sql",
-        "V13__assignment_candidate_sources.sql");
+        "V13__assignment_candidate_sources.sql", "V14__recommendation_log_schema.sql");
     private final SqlSessionFactory factory = mock(SqlSessionFactory.class);
     private final SqlSession session = mock(SqlSession.class);
     private final Connection connection = mock(Connection.class);
@@ -121,7 +121,7 @@ class MenuPreparationBoundaryTest {
             "TB_HR_DEV_PRC", "TB_HR_DEV_SKILL", "TB_HR_DEV_STAT", "TB_HR_MON_PAY", "TB_SY_ADM_HDONG",
             "TB_PJ_PROJ_CHG", "TB_PJ_MNPW_PLAN", "TB_PJ_STEP", "TB_PJ_WEEK_MEMO", "TB_PJ_ISSUE",
             "TB_PJ_TK_DSTRB", "TB_PJ_DRCT_EXPS", "TB_PJ_ASGN_HIST", "TB_PJ_ASGN_MON", "TB_CO_MON_COST",
-            "TB_SL_OPP", "TB_SL_OPP_NEED", "TB_SL_TENT_ASGN");
+            "TB_SL_OPP", "TB_SL_OPP_NEED", "TB_SL_TENT_ASGN", "TB_SL_RCMD_LOG");
     }
 
     @Test

@@ -139,6 +139,8 @@ interface ListViewProps<T> {
   renderCard?: (row: T) => ReactNode;
   /** 휴대폰 카드에 쓸 전체 결과(정렬된 순서). 없으면 rows. */
   mobileRows?: T[] | null;
+  /** 시안 합계 줄(cfg.foot): 열 키별 값. 주면 표 맨 아래에 첫 칸 「합계」와 값을 보인다(0건이어도 보임). */
+  footer?: Partial<Record<string, ReactNode>>;
 }
 
 /** SFR-010 목록 공통: 도구 줄, 열 설정, 좁게 보기, 엑셀, 정렬, 선택, 페이지. */
@@ -525,6 +527,22 @@ export function ListView<T>(props: ListViewProps<T>) {
                 })
               )}
             </tbody>
+            {props.footer && (
+              <tfoot className="ls-foot" data-testid="list-footer">
+                <tr>
+                  {selectable && <td />}
+                  {visibleColumns.map((column, index) => (
+                    <td
+                      key={column.key}
+                      className={`ls-${column.align ?? "left"}`}
+                      data-testid={`list-footer-${column.key}`}
+                    >
+                      {index === 0 ? "합계" : props.footer![column.key] ?? ""}
+                    </td>
+                  ))}
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       )}

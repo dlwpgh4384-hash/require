@@ -1,0 +1,106 @@
+openapi: 3.0.3
+info:
+  title: 인원 계획 대비 투입 추가 계약
+  version: 1.0.0
+paths:
+  /api/common/manpower-comparisons:
+    get:
+      operationId: getCommonManpowerComparisons
+      summary: 인원 계획 대비 투입 조회
+      security: []
+      parameters:
+      - name: year
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 2025
+          maximum: 2027
+        description: 조회 연도; 지난 해도 읽기 전용
+      - name: projectId
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 기존 프로젝트 식별자; 생략하면 연도 범위 전체
+      - name: differenceStatus
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [부족, 초과, 맞음]
+        description: 파생 차이 상태; 미등록 상태 없음
+      responses:
+        '200':
+          description: 프로젝트·직무별 연간 비교 행과 현재 조회 결과 합계
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonManpowerComparisonResult'
+        '400':
+          description: year 누락/형식/범위 또는 differenceStatus 허용값 오류; 해당 필드 오류 반환, 업무표 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+components:
+  schemas:
+    CommonManpowerComparisonRow:
+      type: object
+      required: [projectId, projectName, jobCode, jobName, plannedMm, actualMm, differenceMm, differenceStatus]
+      properties:
+        projectId:
+          type: string
+          description: 기존 프로젝트 상세 진입 식별자
+        projectName:
+          type: string
+          description: 프로젝트 이름
+        jobCode:
+          type: string
+          description: JOB 직무 코드; API/DB 원천
+        jobName:
+          type: string
+          description: JOB 직무 이름
+        plannedMm:
+          type: number
+          description: 선택 연도 몫 계획 MM; 원계획 안분·소수 둘째 자리 반올림, 계획 없으면0
+        actualMm:
+          type: number
+          description: 선택 연도 1~12월 실제·예정 월 MM 합; 투입 없으면0
+        differenceMm:
+          type: number
+          description: actualMm-plannedMm; 허용 오차 없음
+        differenceStatus:
+          type: string
+          enum: [부족, 초과, 맞음]
+          description: 차이 음수/양수/정확히0의 파생 상태; 새 저장 enum 아님
+    CommonManpowerComparisonTotals:
+      type: object
+      required: [plannedMm, actualMm, differenceMm]
+      properties:
+        plannedMm:
+          type: number
+          description: 조회 결과 전체 plannedMm 합; 빈 결과0
+        actualMm:
+          type: number
+          description: 조회 결과 전체 actualMm 합; 빈 결과0
+        differenceMm:
+          type: number
+          description: 조회 결과 전체 differenceMm 합; 빈 결과0
+    CommonManpowerComparisonResult:
+      type: object
+      required: [items, totals]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonManpowerComparisonRow'
+        totals:
+          $ref: '#/components/schemas/CommonManpowerComparisonTotals'

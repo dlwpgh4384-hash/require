@@ -109,7 +109,8 @@ class WithdrawalDefinitionPersistenceTest {
     @Test void existingPreparationIncludesWithdrawalMenuAndOnlyDeployedSourceTables() throws Exception {
         assertThat(text("SELECT menu_id||'/'||upper_menu_id FROM tb_sy_menu WHERE scrn_id='UI-05'"))
             .isEqualTo("M007/G003");
-        assertThat(text("SELECT to_regclass('tb_sl_rcmd_log')::text")).isNull();
+        // AI 추천 기록(TB_SL_RCMD_LOG)은 철수 리스트 명세의 읽는 표라 준비 파일 V14로 만든다(2026-11-18 사용자 결정). 쓰지는 않는다.
+        assertThat(text("SELECT to_regclass('tb_sl_rcmd_log')::text")).isEqualTo("tb_sl_rcmd_log");
         for (String table : List.of("tb_pj_asgn", "tb_pj_asgn_hist", "tb_sl_tent_asgn",
                 "tb_pj_asgn_mon", "tb_pj_mnpw_plan")) {
             assertThat(text("SELECT to_regclass('" + table + "')::text")).isEqualTo(table);

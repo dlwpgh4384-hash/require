@@ -22,7 +22,8 @@ class ManualContractPreservationTest {
             String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                 .digest(input.readAllBytes()));
             // 2026-11-18 사람이 manual에 거래처 투입 내역 칸·파트 [다시 사용] 경로를 더해 기준 지문을 새로 맞춤(LF 기준).
-            assertThat(digest).isEqualTo("45cd2fd634ac224b7b5599c22614a6abd4649043d69f0132d2ad401bfc2e37c2");
+            // 2026-11-18 인원 계획 대비 투입 엑셀(GET /api/common/manpower-comparisons/excel) 경로를 더해 다시 맞춤(LF 기준).
+            assertThat(digest).isEqualTo("fe3de77ee85aee3bb6e86dcdf523e1a4b961980fb8edd625a618e89633f9d256");
         }
     }
 

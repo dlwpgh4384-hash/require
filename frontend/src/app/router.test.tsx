@@ -974,6 +974,345 @@ function respondWithProjects() {
   return { request, list };
 }
 
+function respondWithManpowerComparisons(
+  available = true,
+  projectId = "P-comparison",
+) {
+  const menus = response();
+  menus.data.push(
+    {
+      ...menus.data[0],
+      menuId: "G003",
+      menuNm: "프로젝트·투입",
+      scrnId: null,
+      sortOrd: 2,
+    },
+    {
+      ...menus.data[0],
+      menuId: "M008",
+      upperMenuId: "G003",
+      menuNm: "인원 계획 대비 투입",
+      scrnId: "UI-11",
+      menuLvl: 2,
+      pcOnlyYn: "Y",
+    },
+  );
+  menus.meta.screenAccess.push({ scrnId: "UI-11", available, pcOnlyYn: "Y" });
+  const success = (data: unknown) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ success: true, meta: {}, data }),
+  });
+  const project = {
+    projectId,
+    projectName: "비교 프로젝트",
+    customerName: "(자체)",
+    contractTypeCode: "IN",
+    contractTypeName: "내부",
+    statusCode: "ING",
+    statusName: "진행",
+    startDate: "2025-01-01",
+    endDate: "2027-12-31",
+    contractAmount: 0,
+    originalContractAmount: 0,
+    budgetAmount: 0,
+    budgetManualYn: "N",
+    teamExpenseAmount: 0,
+    projectExpenseAmount: 0,
+    assignedPeopleCount: 0,
+    preContractPeopleCount: 0,
+    distributionMismatchCount: 0,
+    distributionTotalWarning: false,
+    canEdit: true,
+    canChangeBudget: true,
+    canChangeSalesPart: true,
+    canSaveManpowerPlan: true,
+    canLose: true,
+    canStart: true,
+    assignments: [],
+    issues: [],
+    memos: [],
+    progress: {
+      plannedProgressRate: null,
+      actualProgressRate: null,
+      steps: [],
+    },
+  };
+  const row = {
+    projectId: project.projectId,
+    projectName: project.projectName,
+    jobCode: "BE",
+    jobName: "개발",
+    plannedMm: 3,
+    actualMm: 1,
+    differenceMm: -2,
+    differenceStatus: "부족",
+  };
+  const list = vi.fn(async () =>
+    success({
+      items: [row],
+      totals: { plannedMm: 3, actualMm: 1, differenceMm: -2 },
+    }),
+  );
+  const request = vi.fn(async (url: string, _init?: RequestInit) => {
+    if (url === "/api/common/menus")
+      return { ok: true, status: 200, json: async () => menus };
+    if (url.startsWith("/api/common/user-preferences/"))
+      return {
+        ok: true,
+        status: 200,
+        json: async () => preferenceResponse(url),
+      };
+    if (url.startsWith("/api/common/manpower-comparisons?")) return list();
+    if (url === "/api/common/projects")
+      return success({ items: [project], unassignedCount: 0 });
+    if (url === `/api/common/projects/${row.projectId}`)
+      return success(project);
+    if (url === `/api/common/projects/${row.projectId}/manpower-plan`)
+      return success({ items: [row], canSave: true });
+    if (url === "/api/common/projects/budget-rule")
+      return success({ targetMarginRate: 20, budgetFactor: 0.8 });
+    if (
+      url.startsWith(`/api/common/projects/${row.projectId}/`) ||
+      url.startsWith("/api/common/code-groups/") ||
+      url === "/api/common/parts"
+    )
+      return success({ items: [] });
+    throw new Error(`예상하지 않은 요청: ${url}`);
+  });
+  vi.stubGlobal("fetch", request);
+  return { request, list, success, row };
+}
+
+describe("manpower comparison route composition", () => {
+  it.each(["/screens/UI-11", "/#UI-11"])(
+    "%s uses the registered page and direct API client in one shell",
+    async (path) => {
+      const { request, list, row } = respondWithManpowerComparisons();
+      mount(path);
+      expect(
+        await screen.findByTestId(`list-row-${row.projectId}-${row.jobCode}`),
+      ).toBeVisible();
+      expectSingleShell();
+      expect(screen.getAllByTestId("manpower-comparison-page")).toHaveLength(1);
+      expect(list).toHaveBeenCalledTimes(1);
+      expect(request).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /^\/api\/common\/manpower-comparisons\?year=202[567]$/,
+        ),
+        { signal: expect.any(AbortSignal) },
+      );
+      expect(request).toHaveBeenCalledWith("/api/common/projects", {
+        signal: expect.any(AbortSignal),
+      });
+      expect(
+        request.mock.calls.some(
+          ([url]) =>
+            url.startsWith("/api/common/projects?") ||
+            url.startsWith("/api/auth/"),
+        ),
+      ).toBe(false);
+      expect(screen.getByTestId("screen-actions")).toBeEmptyDOMElement();
+      // 시안 합계 줄: 계획 MM·실제·예정 MM만(차이 합계 없음)
+      expect(screen.getByTestId("list-footer")).toHaveTextContent(
+        /^합계3\.001\.00$/,
+      );
+    },
+  );
+
+  it("the existing M008 menu opens UI-11 without replacing preferences or duplicating title actions on return", async () => {
+    const { list } = respondWithManpowerComparisons();
+    mount("/screens/ADDED");
+    await screen.findByRole("region", { name: "ADDED 본문" });
+    const preferences = screen.getByTestId("user-preferences");
+    fireEvent.click(screen.getByTestId("menu-toggle-g003"));
+    fireEvent.click(screen.getByRole("link", { name: "인원 계획 대비 투입" }));
+    await screen.findByTestId("manpower-comparison-page");
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+    expect(router?.state.location.pathname).toBe("/screens/UI-11");
+    fireEvent.change(screen.getByTestId("manpower-comparison-difference"), {
+      target: { value: "초과" },
+    });
+    await act(async () => {
+      await router!.navigate("/screens/ADDED");
+    });
+    expect(screen.getByTestId("screen-panel-ui-11")).not.toBeVisible();
+    fireEvent.click(screen.getByTestId("screen-tab-select-ui-11"));
+    await waitFor(() =>
+      expect(screen.getByTestId("screen-panel-ui-11")).toBeVisible(),
+    );
+    expect(screen.getByTestId("manpower-comparison-difference")).toHaveValue(
+      "초과",
+    );
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
+    expect(screen.getByTestId("screen-actions")).toBeEmptyDOMElement();
+    expect(
+      within(screen.getByTestId("manpower-comparison-page")).getAllByRole(
+        "button",
+        { name: "조회" },
+      ),
+    ).toHaveLength(1);
+    expectSingleShell();
+  });
+
+  it.each(["P-comparison", "P-selected-other"])(
+    "FIX-COMPARE-011 opens response projectId %s in project detail on the [인원 계획] tab (editable, mockup openProject)",
+    async (projectId) => {
+      const { request, row } = respondWithManpowerComparisons(true, projectId);
+      mount("/screens/UI-11");
+      fireEvent.click(
+        await screen.findByTestId(`list-row-${row.projectId}-${row.jobCode}`),
+      );
+      const detail = within(await screen.findByTestId("project-detail"));
+      expect(
+        await detail.findByRole("tab", { name: "인원 계획", selected: true }),
+      ).toBeInTheDocument();
+      expect(await detail.findByTestId("project-job-be")).toBeVisible();
+      expect(screen.getByTestId("project-detail")).toHaveTextContent(
+        row.projectId,
+      );
+      expect(request).toHaveBeenCalledWith(
+        `/api/common/projects/${row.projectId}`,
+        { signal: undefined },
+      );
+      expect(detail.getByTestId("project-job-mm-be")).toBeInTheDocument();
+      // 바꾼 것이 없으면 Ctrl+S도 저장하지 않는다.
+      fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+      expect(
+        request.mock.calls.some(
+          ([url, init]) =>
+            url.startsWith("/api/common/projects") &&
+            ["POST", "PUT", "PATCH", "DELETE"].includes(init?.method ?? "GET"),
+        ),
+      ).toBe(false);
+      expect(router?.state.location.pathname).toBe("/screens/UI-11");
+      fireEvent.click(detail.getByRole("button", { name: "닫기" }));
+      expect(screen.queryByTestId("project-detail")).not.toBeInTheDocument();
+      expect(
+        screen.getByTestId(`list-row-${row.projectId}-${row.jobCode}`),
+      ).toBeVisible();
+      expectSingleShell();
+    },
+  );
+
+  it("a selected project detail failure stays local and retries the same identity", async () => {
+    const { request, row } = respondWithManpowerComparisons();
+    const original = request.getMockImplementation()!;
+    const path = `/api/common/projects/${row.projectId}`;
+    let fail = true;
+    request.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === path && fail) {
+        fail = false;
+        throw new Error("선택 프로젝트를 불러오지 못했습니다.");
+      }
+      return original(url, init);
+    });
+    mount("/screens/UI-11");
+    fireEvent.click(
+      await screen.findByTestId(
+        `manpower-comparison-project-${row.projectId}-${row.jobCode}`,
+      ),
+    );
+    expect(await screen.findByTestId("project-detail-error")).toHaveTextContent(
+      "선택 프로젝트를 불러오지 못했습니다.",
+    );
+    expect(screen.getByTestId("manpower-comparison-page")).toBeVisible();
+    expect(screen.queryByTestId("list-empty")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("project-detail-retry"));
+    const detail = within(screen.getByTestId("project-detail"));
+    await detail.findByRole("tab", { name: "인원 계획" });
+    expect(screen.getByTestId("project-detail")).toHaveTextContent(
+      row.projectId,
+    );
+    expect(request.mock.calls.filter(([url]) => url === path)).toHaveLength(2);
+    expect(
+      request.mock.calls.filter(([url]) =>
+        url.startsWith("/api/common/manpower-comparisons?"),
+      ),
+    ).toHaveLength(1);
+    expect(router?.state.location.pathname).toBe("/screens/UI-11");
+    expectSingleShell();
+  });
+
+  it("a routed empty comparison retains the controls, table headers and numeric zero totals", async () => {
+    const { list, success } = respondWithManpowerComparisons();
+    list.mockResolvedValueOnce(
+      success({
+        items: [],
+        totals: { plannedMm: 0, actualMm: 0, differenceMm: 0 },
+      }),
+    );
+    mount("/screens/UI-11");
+    expect(await screen.findByTestId("list-empty")).toHaveTextContent(
+      "조건에 맞는 결과가 없습니다.",
+    );
+    expect(screen.getByTestId("manpower-comparison-year")).toBeVisible();
+    expect(screen.getByTestId("manpower-comparison-banner")).toBeVisible();
+    expect(screen.getByTestId("manpower-comparison-filters")).toBeVisible();
+    expect(screen.getByTestId("list-download")).toBeVisible();
+    expect(screen.getAllByRole("columnheader")).toHaveLength(5);
+    expect(screen.getByTestId("list-footer")).toHaveTextContent(
+      /^합계0\.000\.00$/,
+    );
+    expectSingleShell();
+  });
+
+  it("a routed failure retries the last applied query instead of the edited draft", async () => {
+    const { request, list } = respondWithManpowerComparisons();
+    list.mockRejectedValueOnce(new Error("비교 조회 연결 실패"));
+    mount("/screens/UI-11");
+    const retry = await screen.findByTestId("list-retry");
+    const first = request.mock.calls.find(([url]) =>
+      url.startsWith("/api/common/manpower-comparisons?"),
+    )![0];
+    fireEvent.change(screen.getByTestId("manpower-comparison-difference"), {
+      target: { value: "초과" },
+    });
+    fireEvent.click(retry);
+    await screen.findByTestId("list-row-P-comparison-BE");
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(
+      request.mock.calls
+        .filter(([url]) => url.startsWith("/api/common/manpower-comparisons?"))
+        .map(([url]) => url),
+    ).toEqual([first, first]);
+    expect(screen.queryByTestId("list-error")).not.toBeInTheDocument();
+    expect(router?.state.location.pathname).toBe("/screens/UI-11");
+    expectSingleShell();
+  });
+
+  it("an unavailable comparison stays behind the existing menu guard before querying", async () => {
+    const { list } = respondWithManpowerComparisons(false);
+    mount("/screens/UI-11");
+    expect(await screen.findByText("사용할 수 없는 화면입니다")).toBeVisible();
+    expect(
+      screen.queryByTestId("manpower-comparison-page"),
+    ).not.toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
+    expectSingleShell();
+  });
+
+  it("mobile direct entry preserves the PC-only guard before the comparison client", async () => {
+    const { list } = respondWithManpowerComparisons();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query === "(max-width: 767px)",
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    mount("/screens/UI-11");
+    expect(await screen.findByText("PC에서 이용해 주세요")).toBeVisible();
+    expect(
+      screen.queryByTestId("manpower-comparison-page"),
+    ).not.toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
+    expectSingleShell();
+  });
+});
+
 describe("project route composition", () => {
   it.each(["/screens/UI-01", "/#UI-01"])(
     "%s renders the real project page with one shell and its existing client",
@@ -1307,14 +1646,16 @@ describe("assignment route composition", () => {
     mount("/screens/UI-12");
     await screen.findByTestId("assignment-empty");
     fireEvent.click(screen.getByTestId("assignment-year-prev"));
-    expect(await screen.findByTestId("assignment-lock-banner")).toHaveTextContent(
-      /^\d{4}년은 지난 해라 읽기만 할 수 있습니다\.$/,
-    );
+    expect(
+      await screen.findByTestId("assignment-lock-banner"),
+    ).toHaveTextContent(/^\d{4}년은 지난 해라 읽기만 할 수 있습니다\.$/);
     expect(screen.queryByTestId("assignment-create")).not.toBeInTheDocument();
     expect(screen.queryByTestId("upload-open")).not.toBeInTheDocument();
     expect(screen.queryByTestId("upload-template")).not.toBeInTheDocument();
     // 시안: 엑셀 다운로드는 지난 해에도 목록 도구 줄에 남는다(제목줄이 아님).
-    expect(screen.getByTestId("list-download")).toHaveTextContent("엑셀 다운로드");
+    expect(screen.getByTestId("list-download")).toHaveTextContent(
+      "엑셀 다운로드",
+    );
     expect(
       screen.getByTestId("list-download").closest(".screen-actions"),
     ).toBeNull();

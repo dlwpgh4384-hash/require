@@ -1849,6 +1849,58 @@ paths:
       - 가배정 없음 -> 선택 자리 가배정·점유1
       - 기존 가배정 -> 기존 점유 해제·새 기회 가배정만 유지
       - 검증/만석 실패 -> 기존 가배정 보존·새 점유 없음; 확정 배정 전환은 이 연산에 없음
+  /api/common/manpower-comparisons/excel:
+    get:
+      operationId: getCommonManpowerComparisonsExcel
+      summary: 인원 계획 대비 투입 엑셀 다운로드(SFR-011)
+      description: 목록과 같은 조건(year·projectId·differenceStatus)의 전체 결과를 목록 순서(차이 오름차순, 부족 큰 순) 그대로 xlsx로 내려준다. 열은 프로젝트·직무·계획 MM·실제·예정 MM·차이(부족 n.nn·초과 n.nn·맞음). 파일 1행에 받은 사람·한국 시각, 파일 이름 「인원 계획 대비 투입_{year}년_다운로드일시.xlsx」, 접근 기록 DNLD.
+      security: []
+      parameters:
+      - name: year
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 2025
+          maximum: 2027
+        description: 조회 연도
+      - name: projectId
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 기존 프로젝트 식별자; 생략하면 연도 범위 전체
+      - name: differenceStatus
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [부족, 초과, 맞음]
+        description: 파생 차이 상태
+      responses:
+        '200':
+          description: 인원 계획 대비 투입 엑셀 파일(0건이면 머리글만)
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: 기존 ExcelExportService 파일 이름·인코딩 관례(filename*=UTF-8'')
+            X-Total-Count:
+              schema:
+                type: integer
+              description: 파일에 담은 조회 결과 건수
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: year 누락/형식/범위 또는 differenceStatus 허용값 오류; 해당 필드 오류 반환, 파일·접근 기록 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
     ApiError:

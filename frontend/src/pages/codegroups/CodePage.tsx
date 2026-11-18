@@ -193,7 +193,12 @@ export function CodePage({
       return;
     }
     setNewGroup({ groupId: "", groupName: "" });
-    setNewCode({ code: "", codeName: "" });
+    // 시안 「수당코드 추가」: 값 0, 단위 「원」으로 시작한다.
+    setNewCode(
+      kind === "code" && numeric
+        ? { code: "", codeName: "", codeVal: 0, unitNm: "원" }
+        : { code: "", codeName: "" },
+    );
     setErrors({});
     setModalFailure("");
     setModal(kind);
@@ -256,12 +261,13 @@ export function CodePage({
       setNotice("바꾼 내용이 없습니다.");
       return;
     }
-    const invalid = Object.assign(
-      {},
-      ...changed.map((row) => api.validateCode(row, groupId)),
-    );
-    setErrors(invalid);
-    if (Object.keys(invalid).length) return;
+    // 시안: 표 저장 검사는 알림 한 줄(「코드 이름은 비울 수 없습니다.」 또는 「코드 · 오류」).
+    const problem = api.codeTableError(changed, groupId);
+    setErrors({});
+    if (problem) {
+      setNotice(problem);
+      return;
+    }
     lock.current = true;
     setBusy(true);
     setFailure("");
@@ -275,7 +281,11 @@ export function CodePage({
       setHistoryRevision((value) => value + 1);
       api.notifyCodeOptionsChanged(groupId);
       await refresh(groupId);
-      setNotice(`공통코드 ${count}건을 저장했습니다. 선택 목록에 바로 반영됩니다.`);
+      setNotice(
+        numeric
+          ? "수당코드를 저장했습니다."
+          : `공통코드 ${count}건을 저장했습니다. 선택 목록에 바로 반영됩니다.`,
+      );
     } catch (error) {
       setFailure(
         saved
@@ -297,14 +307,36 @@ export function CodePage({
   });
   const mutate = async () => {
     if (lock.current || !modal) return;
-    const invalid: Record<string, string> =
-      modal === "code" ? api.validateCode(newCode, groupId) : {};
+    // 시안: 그룹 ID·코드는 대문자로 바꿔 읽는다.
+    const groupInput = {
+      groupId: newGroup.groupId.trim().toUpperCase(),
+      groupName: newGroup.groupName,
+    };
+    const newCodeId = newCode.code.trim().toUpperCase();
+    const invalid: Record<string, string> = {};
+    if (modal === "code") {
+      if (numeric) {
+        // 시안 「수당코드 추가」 문구.
+        if (!newCode.code.trim() || !newCode.codeName.trim())
+          invalid.code = "코드와 이름을 넣어 주세요.";
+        else if (!/^[A-Za-z0-9_]{1,20}$/.test(newCode.code))
+          invalid.code = "코드는 영문 대문자·숫자·_ 로 넣어 주세요.";
+      } else Object.assign(invalid, api.validateCode(newCode, groupId));
+      if (!invalid.code && snapshot?.some((row) => row.code === newCodeId))
+        invalid.code = "이미 있는 코드입니다.";
+    }
     if (modal === "group") {
-      if (!/^[A-Z][A-Z0-9_]{0,29}$/.test(newGroup.groupId))
+      if (!/^[A-Z][A-Z0-9_]{0,29}$/.test(groupInput.groupId))
         invalid.groupId =
-          "그룹 ID는 대문자로 시작하고 대문자·숫자·_ 30자 이내로 입력해 주세요.";
-      if (!newGroup.groupName.trim() || [...newGroup.groupName].length > 50)
-        invalid.groupName = "그룹 이름을 1~50자로 입력해 주세요.";
+          "그룹 ID는 영문 대문자로 시작하고 영문 대문자·숫자·_ 만 넣어 주세요.";
+      else if (groups?.some((row) => row.groupId === groupInput.groupId))
+        invalid.groupId = "이미 있는 그룹 ID입니다.";
+      if (!newGroup.groupName.trim() || [...newGroup.groupName].length > 30)
+        invalid.groupName = "그룹 이름을 넣어 주세요.";
+      else if (
+        groups?.some((row) => row.groupName === newGroup.groupName.trim())
+      )
+        invalid.groupName = "이미 있는 그룹입니다.";
     }
     setErrors(invalid);
     if (Object.keys(invalid).length) return;
@@ -318,11 +350,13 @@ export function CodePage({
       modal === "group"
         ? `「${newGroup.groupName}」 그룹을 추가했습니다. [코드 추가]로 코드를 넣으세요.`
         : modal === "code"
-          ? `「${newCode.codeName}」 코드를 추가했습니다.`
+          ? numeric
+            ? `${newCode.codeName.trim()}을 추가했습니다.`
+            : `「${newCode.codeName}」 코드를 추가했습니다.`
           : `「${deleteTarget?.codeName ?? ""}」 코드를 삭제했습니다.`;
     try {
       if (modal === "group") {
-        const result = await api.postCommonCodeGroup(newGroup);
+        const result = await api.postCommonCodeGroup(groupInput);
         selected = result.groupId;
       } else if (modal === "code") await api.postCommonCode(groupId, newCode);
       else if (deleteTarget)
@@ -380,49 +414,38 @@ export function CodePage({
       ) : (
         field.label
       )}
-      {field.key === "targetField" ? (
-        <select
-          aria-label={`${id} ${field.label}`}
-          data-testid={`code-${id.toLowerCase()}-${field.key.toLowerCase()}`}
-          disabled={disabled}
-          value={String(value[field.key] ?? "")}
-          onChange={(event) => onChange({ [field.key]: event.target.value })}
-        >
-          <option value="">선택</option>
-          {api.targetFields.map((option) => (
-            <option key={option}>{option}</option>
-          ))}
-        </select>
-      ) : (
-        <input
-          className="ls-in ls-in-sm"
-          type={field.numeric && !field.money ? "number" : "text"}
-          inputMode={field.money ? "numeric" : undefined}
-          step={field.numeric ? "0.0001" : undefined}
-          aria-label={`${id} ${field.label}`}
-          data-testid={`code-${id.toLowerCase()}-${field.key.toLowerCase()}`}
-          disabled={disabled}
-          maxLength={field.numeric ? undefined : 100}
-          value={
-            field.money && value[field.key] !== undefined && value[field.key] !== null
-              ? Number(value[field.key]).toLocaleString("ko-KR")
-              : (value[field.key] ?? "")
-          }
-          onChange={(event) => {
-            // 금액은 콤마를 빼고 숫자만 받는다(FR-0106 숫자 칸).
-            const raw = field.money
-              ? event.target.value.replace(/[^0-9]/g, "")
+      {/* 시안: 이력서 이름표 「넣을 칸」도 글자 칸(NAME·TEL… 중 하나를 적는다). */}
+      <input
+        className="ls-in ls-in-sm"
+        type={field.numeric && !field.money ? "number" : "text"}
+        inputMode={field.money ? "numeric" : undefined}
+        step={field.numeric ? "0.0001" : undefined}
+        aria-label={`${id} ${field.label}`}
+        data-testid={`code-${id.toLowerCase()}-${field.key.toLowerCase()}`}
+        disabled={disabled}
+        maxLength={field.numeric ? undefined : 100}
+        value={
+          field.money && value[field.key] !== undefined && value[field.key] !== null
+            ? Number(value[field.key]).toLocaleString("ko-KR")
+            : (value[field.key] ?? "")
+        }
+        onChange={(event) => {
+          // 금액은 콤마를 빼고 숫자만 받는다(FR-0106 숫자 칸).
+          // 넣을 칸은 서버가 대문자 값만 받으므로 대문자로 바꿔 둔다.
+          const raw = field.money
+            ? event.target.value.replace(/[^0-9]/g, "")
+            : field.key === "targetField"
+              ? event.target.value.toUpperCase()
               : event.target.value;
-            onChange({
-              [field.key]: field.numeric
-                ? raw === ""
-                  ? undefined
-                  : Number(raw)
-                : raw,
-            });
-          }}
-        />
-      )}
+          onChange({
+            [field.key]: field.numeric
+              ? raw === ""
+                ? undefined
+                : Number(raw)
+              : raw,
+          });
+        }}
+      />
       {id === "new" && <span className="code-help">{field.help}</span>}
       {fieldError(field.key)}
     </label>
@@ -619,7 +642,7 @@ export function CodePage({
                                   className="ls-in ls-in-sm"
                                   aria-label={`${row.code} 이름`}
                                   data-testid={`code-name-${row.code.toLowerCase()}`}
-                                  maxLength={100}
+                                  maxLength={api.CODE_NAME_MAX}
                                   value={row.codeName}
                                   aria-invalid={!!errors.codeName}
                                   onChange={(event) =>
@@ -787,7 +810,8 @@ export function CodePage({
               data-testid="code-cancel"
               disabled={busy || refreshPending}
               onClick={() => {
-                if (!dirty) setNotice("바꾼 내용이 없습니다.");
+                // 시안 [취소] 알림.
+                setNotice(dirty ? "변경을 취소했습니다." : "바꾼 내용이 없습니다.");
                 discard();
               }}
             >
@@ -901,7 +925,7 @@ export function CodePage({
                     <input
                       aria-label="그룹 이름"
                       data-testid="new-code-group-name"
-                      maxLength={50}
+                      maxLength={30}
                       value={newGroup.groupName}
                       onChange={(event) =>
                         setNewGroup((current) => ({
@@ -945,7 +969,9 @@ export function CodePage({
                     <input
                       aria-label="새 코드 이름"
                       data-testid="new-code-name"
-                      maxLength={100}
+                      maxLength={
+                        numeric ? api.ALLOWANCE_NAME_MAX : api.CODE_NAME_MAX
+                      }
                       value={newCode.codeName}
                       onChange={(event) =>
                         setNewCode((current) => ({
@@ -988,7 +1014,6 @@ export function CodePage({
                             }))
                           }
                         >
-                          <option value="">선택</option>
                           <option value="원">원</option>
                           <option value="%">%</option>
                         </select>

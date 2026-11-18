@@ -148,21 +148,27 @@ export function validateOperatingChanges(
   month: string,
 ) {
   const errors: Record<string, string> = {};
+  // 시안 문구는 「줄 이름: 할 일」. 칸이 여러 개인 줄은 「칸마다 숫자를 넣어 주세요.」
+  const rowOf = (code: string) =>
+    operatingRows.find((row) => row.codes.includes(code));
+  const label = (code: string) => rowOf(code)?.label ?? code;
   for (const change of changes) {
     if (change.action === "delete") continue;
     if (change.standardCode === "CASH_BASE_YM") {
       if (!/^[0-9]{4}-(0[1-9]|1[0-2])$/.test(change.value ?? ""))
-        errors[change.standardCode] = "시작 월을 확인해 주세요.";
+        errors[change.standardCode] = `${label(change.standardCode)}: 연월을 골라 주세요.`;
       continue;
     }
     if (!/^-?[0-9]+(?:\.[0-9]{1,4})?$/.test(change.value ?? ""))
-      errors[change.standardCode] = "소수 네 자리 이내 숫자를 입력해 주세요.";
-    if (
+      errors[change.standardCode] = rowOf(change.standardCode)?.parts
+        ? `${label(change.standardCode)}: 칸마다 숫자를 넣어 주세요.`
+        : `${label(change.standardCode)}: 숫자로 넣어 주세요.`;
+    else if (
       (change.standardCode.startsWith("EXT_PRBL_") ||
         change.standardCode.startsWith("STEP_PRBL_")) &&
       (Number(change.value) < 0 || Number(change.value) > 100)
     )
-      errors[change.standardCode] = "확률은 0~100으로 입력해 주세요.";
+      errors[change.standardCode] = `${label(change.standardCode)}: 0~100 사이로 넣어 주세요.`;
   }
   const effective = new Map(
     currentOperatingRows(items, month).map((row) => [
@@ -174,25 +180,24 @@ export function validateOperatingChanges(
     .filter((row) => row.action !== "delete")
     .forEach((row) => effective.set(row.standardCode, row.value!));
   const ai = AI_CODES;
-  if (
-    changes.some((row) => ai.includes(row.standardCode)) &&
-    ai.reduce((sum, code) => sum + Number(effective.get(code)), 0) !== 100
-  )
+  const aiTotal = ai.reduce((sum, code) => sum + Number(effective.get(code)), 0);
+  if (changes.some((row) => ai.includes(row.standardCode)) && aiTotal !== 100)
     changes
       .filter((row) => ai.includes(row.standardCode))
       .forEach((row) => {
-        errors[row.standardCode] = "AI 배점 합계는 100이어야 합니다.";
+        errors[row.standardCode] ??=
+          `${label(row.standardCode)}: 합계가 ${aiTotal}점입니다. 100점으로 맞춰 주세요.`;
       });
   if (changes.some((row) => row.standardCode.startsWith("DUN_D"))) {
     const values = ["DUN_D1", "DUN_D2", "DUN_D3"].map((code) =>
       Number(effective.get(code)),
     );
-    if (!(values[0] < values[1] && values[1] < values[2]))
+    if (!(values[0] >= 1 && values[0] < values[1] && values[1] < values[2]))
       changes
         .filter((row) => row.standardCode.startsWith("DUN_D"))
         .forEach((row) => {
-          errors[row.standardCode] =
-            "미수 알림은 1단계 < 2단계 < 3단계로 입력해 주세요.";
+          errors[row.standardCode] ??=
+            `${label(row.standardCode)}: 1단계 < 2단계 < 3단계 순서로 넣어 주세요(1일 이상).`;
         });
   }
   return errors;

@@ -28,9 +28,11 @@ public final class ClientRows {
         public String projectId;
         public String projectName;
         public String personName;
+        public String managementNumber;
         public String companyName;
         public String jobName;
         public LocalDate withdrawalDate;
+        public java.math.BigDecimal monthlyMm;
     }
     public static class Change {
         public Instant changedAt;

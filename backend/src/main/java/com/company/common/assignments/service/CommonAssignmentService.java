@@ -27,7 +27,7 @@ public class CommonAssignmentService {
         this.mapper=mapper; this.projects=projects; this.calendar=calendar; this.actor=actor;
         this.rules=rules;
     }
-    private static final String OVER="MM 1.0 초과",PRE="미계약 선투입";
+    private static final String OVER="MM 1.0 초과",PRE="미계약 선투입",PART="영업 파트 다름";
     private static final int CHUNK=500;
     public Instant now() { return calendar.now(); }
     public String userId() { return actor.userId(); }
@@ -45,9 +45,10 @@ public class CommonAssignmentService {
         String q=blank(f.keyword())?null:f.keyword().trim().toLowerCase(Locale.ROOT);
         var rows=mapper.listRows(new ListFilter(y,blank(f.projectId())?null:f.projectId(),blank(f.jobCode())?null:f.jobCode(),blank(q)?null:q));
         var figures=figures(rows,y); var names=new HashMap<String,String>(); boolean direct=AssignmentPricePolicy.direct(roles());
+        var partDiff=partMismatches(rows);
         return new Items<>(rows.stream().map(r -> {
             Figures fig=figures.get(r.assignmentId());
-            return assemble(r,fig,listWarnings(r,fig.total()),names,direct);
+            return assemble(r,fig,listWarnings(r,fig.total(),partDiff.contains(r.assignmentId())),names,direct);
         }).filter(r -> blank(f.warning()) || r.warnings().contains(f.warning())).toList());
     }
     public Assignment getCommonAssignment(String id) { return view(required(id),calendar.today().getYear()); }
@@ -78,12 +79,23 @@ public class CommonAssignmentService {
         for (String id:ids) result.put(id,new Figures(yearMm.getOrDefault(id,BigDecimal.ZERO),total.getOrDefault(id,BigDecimal.ZERO),counts.getOrDefault(id,0)));
         return result;
     }
-    /** 목록 경고(SFR-112-02): MM 1.0 초과·미계약 선투입만. */
-    private List<String> listWarnings(Row r,BigDecimal total) {
+    /** 목록 경고(시안 warnOf 순서): MM 1.0 초과 · 영업 파트 다름 · 미계약 선투입(2026-11-18 사용자 결정: 시안대로 3개). */
+    private List<String> listWarnings(Row r,BigDecimal total,boolean partDiff) {
         var warnings=new ArrayList<String>();
         if (rules.over(total)) warnings.add(OVER);
+        if (partDiff) warnings.add(PART);
         if ("PRE".equals(r.projectStatusCode())) warnings.add(PRE);
         return warnings;
+    }
+    private java.util.Set<String> partMismatches(List<Row> rows) {
+        var ids=rows.stream().map(Row::assignmentId).toList();
+        var result=new java.util.HashSet<String>();
+        String month=db(calendar.currentMonth());
+        for (int i=0;i<ids.size();i+=CHUNK) {
+            var found=mapper.partMismatchIds(ids.subList(i,Math.min(ids.size(),i+CHUNK)),month);
+            if (found!=null) result.addAll(found);
+        }
+        return result;
     }
     private Assignment assemble(Row r,Figures fig,List<String> warnings,Map<String,String> names,boolean direct) {
         return assemble(r,fig,warnings,names,direct,null);
@@ -99,7 +111,7 @@ public class CommonAssignmentService {
     /** 상세·저장 응답: 목록 경고 + 배정 창 경고(휴직·파견·마감·파트·턴키). */
     private Assignment view(Row r,int year) {
         Figures fig=figures(List.of(r),year).get(r.assignmentId());
-        var warnings=new ArrayList<>(listWarnings(r,fig.total()));
+        var warnings=new ArrayList<>(listWarnings(r,fig.total(),partMismatches(List.of(r)).contains(r.assignmentId())));
         Person p=mapper.person(r.developerId(),db(YearMonth.from(r.startDate())),r.startDate(),r.endDate());
         if (p!=null && p.onLeave()) warnings.add("휴직 기간에 배정됩니다.");
         if (p!=null && "DP".equals(r.contractTypeCode()) && Set.of("FL","OS").contains(p.employeeTypeCode())) warnings.add("파견 프로젝트에 프리랜서/외주 인력을 배정합니다.");

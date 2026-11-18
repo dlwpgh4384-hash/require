@@ -238,7 +238,7 @@ it("행을 누르면 오른쪽 상세 패널에 계정 정보·접근 기록·�
   );
 });
 
-it("[등록]은 시안 「사용자 등록」 창을 열고, 빈 칸·형식 오류는 칸마다 보여 준다", async () => {
+it("[등록]은 시안 「사용자 등록」 창을 열고, 빈 칸·형식 오류는 맨 아래 한 줄로 하나씩 보여 준다", async () => {
   page();
   fireEvent.click(screen.getByTestId("user-register-open"));
   const dialog = await screen.findByTestId("user-dialog");
@@ -253,24 +253,44 @@ it("[등록]은 시안 「사용자 등록」 창을 열고, 빈 칸·형식 오
   ).toBeInTheDocument();
   expect(within(dialog).getByTestId("user-project-list")).toBeInTheDocument();
   expect(within(dialog).getByText("(지금 PM: 김명희)")).toBeInTheDocument();
+  const bottom = () => within(dialog).getByTestId("user-error");
   fireEvent.click(within(dialog).getByTestId("user-save"));
-  expect(
-    await within(dialog).findByText("아이디를 입력해 주세요."),
-  ).toBeInTheDocument();
-  expect(within(dialog).getByText("이름을 입력해 주세요.")).toBeInTheDocument();
-  expect(
-    within(dialog).getByText("역할을 1개 이상 골라 주세요."),
-  ).toBeInTheDocument();
+  await waitFor(() =>
+    expect(bottom()).toHaveTextContent(
+      "아이디는 영문 소문자·숫자 4~20자로 넣어 주세요.",
+    ),
+  );
+  expect(within(dialog).getAllByRole("alert")).toHaveLength(1);
   expect(within(dialog).getByTestId("user-userId-input")).toHaveFocus();
   fireEvent.change(within(dialog).getByTestId("user-userId-input"), {
     target: { value: "AB" },
   });
   fireEvent.click(within(dialog).getByTestId("user-save"));
-  expect(
-    await within(dialog).findByText(
-      "아이디는 영문 소문자·숫자 4~20자로 입력해 주세요.",
-    ),
-  ).toBeInTheDocument();
+  expect(bottom()).toHaveTextContent(
+    "아이디는 영문 소문자·숫자 4~20자로 넣어 주세요.",
+  );
+  fireEvent.change(within(dialog).getByTestId("user-userId-input"), {
+    target: { value: "newone" },
+  });
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  await waitFor(() =>
+    expect(bottom()).toHaveTextContent("이름을 넣어 주세요."),
+  );
+  expect(within(dialog).getByTestId("user-name-input")).toHaveFocus();
+  fireEvent.change(within(dialog).getByTestId("user-name-input"), {
+    target: { value: "새 사람" },
+  });
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  await waitFor(() =>
+    expect(bottom()).toHaveTextContent("이메일 형식이 맞지 않습니다."),
+  );
+  fireEvent.change(within(dialog).getByTestId("user-email-input"), {
+    target: { value: "new@example.invalid" },
+  });
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  await waitFor(() =>
+    expect(bottom()).toHaveTextContent("역할을 1개 이상 골라 주세요."),
+  );
   expect(writes()).toHaveLength(0);
 });
 
@@ -349,6 +369,37 @@ it("체크하면 「N건 선택」과 일괄 [사용 중지]가 나오고, 확�
   fireEvent.click(within(confirm).getByTestId("confirmation-proceed"));
   expect(await screen.findByTestId("user-toast")).toHaveTextContent(
     "1건의 사용을 중지했습니다.",
+  );
+});
+
+it("일괄 [다시 사용]은 중지된 계정이 없으면 시안 안내를 띄우고 확인 창 없이 끝낸다", async () => {
+  page();
+  await screen.findByTestId("list-row-test");
+  fireEvent.click(screen.getByTestId("list-select-test"));
+  fireEvent.click(screen.getByTestId("list-bulk-resume"));
+  expect(await screen.findByTestId("user-toast")).toHaveTextContent(
+    "고른 것 중 사용 중지된 계정이 없습니다.",
+  );
+  expect(
+    screen.queryByTestId("user-resume-bulk-confirm"),
+  ).not.toBeInTheDocument();
+  expect(writes()).toHaveLength(0);
+});
+
+it("일괄 [다시 사용] 확인 창·완료 알림은 시안 문구를 쓴다", async () => {
+  account = { ...account, userStatCd: "STOP" };
+  page();
+  await screen.findByTestId("list-row-test");
+  fireEvent.click(screen.getByTestId("list-select-test"));
+  fireEvent.click(screen.getByTestId("list-bulk-resume"));
+  const confirm = await screen.findByTestId("user-resume-bulk-confirm");
+  expect(confirm).toHaveTextContent("1건을 다시 사용할까요?");
+  expect(confirm).toHaveTextContent(
+    "시험 사용자 — 상태가 「사용」으로 돌아가고 변경 이력에 남습니다.",
+  );
+  fireEvent.click(within(confirm).getByTestId("confirmation-proceed"));
+  expect(await screen.findByTestId("user-toast")).toHaveTextContent(
+    "1건을 다시 사용합니다.",
   );
 });
 

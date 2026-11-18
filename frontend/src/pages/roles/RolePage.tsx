@@ -201,10 +201,15 @@ export function RolePage() {
       setNotice("바꾼 내용이 없습니다.");
       return;
     }
-    guard(() => setDraft(api.roleDraft(settings)));
+    // 「변경 내용을 버릴까요?」 확인(사용자 결정)은 그대로 두고, 되돌린 뒤 시안 알림을 띄운다.
+    guard(() => {
+      setDraft(api.roleDraft(settings));
+      setNotice("변경을 취소했습니다.");
+    });
   };
   const stop = async () => {
     if (lock.current || !settings || settings.role.basicRole) return;
+    const stopped = settings.role.roleName;
     lock.current = true;
     setBusy(true);
     setFailure("");
@@ -212,7 +217,7 @@ export function RolePage() {
       await api.postCommonRoleStop(selected);
       setSettings(null);
       setDraft(null);
-      setNotice("역할의 사용을 중지했습니다.");
+      setNotice(`「${stopped}」 역할의 사용을 중지했습니다.`);
       setListRevision((value) => value + 1);
       await getCommonUserOptions();
     } catch (error) {
@@ -247,6 +252,17 @@ export function RolePage() {
     !dialog && !impact && !pending,
   );
   const roleName = settings?.role.roleName ?? "";
+  // 시안: 추가한 역할 탭에서만 제목줄에 [사용 중지](기본 5개는 없음). 누르면 확인 창.
+  const [confirmStop, setConfirmStop] = useState(false);
+  const canStop = !!settings && !settings.role.basicRole && !busy;
+  const { setStopRole } = workspace;
+  // 제목줄 단추는 늘 최신 guard(저장 안 한 변경 확인)를 부르도록 ref를 거친다.
+  const openStop = useRef(() => {});
+  openStop.current = () => guard(() => setConfirmStop(true));
+  useEffect(() => {
+    setStopRole(canStop ? () => openStop.current() : null);
+    return () => setStopRole(null);
+  }, [canStop, setStopRole]);
   // 시안: 권한 표 아래 페이지 줄. 화면(메뉴) 줄을 한 화면 건수씩 나누고, 그 쪽에 있는 묶음 머리 줄을 함께 보인다.
   const presentation = useListPresentation();
   const menuCount = settings?.menuAuths.length ?? 0;
@@ -485,21 +501,6 @@ export function RolePage() {
             </p>
           </div>
           <div className="roles-footer">
-            {!settings.role.basicRole && (
-              <button
-                type="button"
-                className="app-danger"
-                data-testid="role-stop"
-                disabled={busy}
-                onClick={() =>
-                  guard(() => {
-                    void stop();
-                  })
-                }
-              >
-                사용 중지
-              </button>
-            )}
             <div className="app-actions">
               <button
                 type="button"
@@ -551,13 +552,31 @@ export function RolePage() {
           dataScopes={settings.dataScopes}
           onDirty={setCopyDirty}
           onClose={() => setDialog(null)}
-          onSaved={(created) => {
+          onSaved={(created, sourceName) => {
             setDialog(null);
             setDraft(null);
             setSettings(null);
             setSelected(created.role.roleId);
             setListRevision((value) => value + 1);
-            setNotice("새 역할을 만들었습니다.");
+            setNotice(
+              sourceName === null
+                ? `「${created.role.roleName}」 역할을 추가했습니다. 권한을 체크한 뒤 저장하세요.`
+                : `「${sourceName}」을 복사해 「${created.role.roleName}」 역할을 만들었습니다.`,
+            );
+          }}
+        />
+      )}
+      {confirmStop && settings && (
+        <ConfirmDialog
+          title={`「${settings.role.roleName}」 역할의 사용을 중지할까요?`}
+          description="역할 탭과 사용자 등록의 역할 목록에서 사라집니다. 삭제가 아니며 기록과 역할 번호는 그대로 남고, 번호는 다시 쓰지 않습니다."
+          proceedLabel="사용 중지"
+          destructive
+          testId="role-stop-confirm"
+          onCancel={() => setConfirmStop(false)}
+          onProceed={() => {
+            setConfirmStop(false);
+            void stop();
           }}
         />
       )}

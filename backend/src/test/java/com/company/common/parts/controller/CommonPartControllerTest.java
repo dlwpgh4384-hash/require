@@ -141,12 +141,14 @@ class CommonPartControllerTest {
     @Test void stoppedLeaderIsRejected() throws Exception {
         data.leaders.removeIf(row -> row.userId.equals("leader-a"));
         add(create("중지 파트장")).andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.errors[0].field").value("leaderUserId")); noWrites();
+            .andExpect(jsonPath("$.errors[0].field").value("leaderUserId"))
+            .andExpect(jsonPath("$.message").value("파트장을 골라 주세요.")); noWrites();
     }
     @Test void futureCreationIsVisibleWithRequiredValuesAndSchedule() throws Exception {
+        // 시안 「예정된 변경」 배지 형식: 「2027-02부터 40%」
         add(create("미래 파트").put("effectiveMonth", "2027-02")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.leaderUserId").value("leader-a"))
-            .andExpect(jsonPath("$.data.scheduledChange").value("2027-02월부터 40%"));
+            .andExpect(jsonPath("$.data.scheduledChange").value("2027-02부터 40%"));
     }
     @Test void currentMonthDefaultsAreReloadedWithoutChangingExistingPartValues() throws Exception {
         mvc.perform(get("/api/common/parts/options")).andExpect(status().isOk())
@@ -165,7 +167,8 @@ class CommonPartControllerTest {
     }
     @Test void lastClosedMonthIsRejectedEvenWhenEarlierMonthIsOpen() throws Exception {
         closed.add("202608"); add(create("마감 월").put("effectiveMonth", "2026-08"))
-            .andExpect(status().isBadRequest()); noWrites();
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("적용 시작월은 마감된 달(2026-08) 다음 달부터 고를 수 있습니다.")); noWrites();
     }
     @Test void followingClosedMonthAndFutureMonthAreAllowed() throws Exception {
         closed.add("202608"); add(create("열린 월")).andExpect(status().isOk());
@@ -195,7 +198,8 @@ class CommonPartControllerTest {
         verify(mapper, never()).rename(anyString(), anyString()); noWrites();
     }
     @Test void duplicateRenamePreservesBothNames() throws Exception {
-        data.master("part-b", "다른 파트"); rename("다른 파트").andExpect(status().isBadRequest());
+        data.master("part-b", "다른 파트"); rename("다른 파트").andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("같은 이름의 파트가 이미 있습니다."));
         assertThat(data.masters.values()).extracting(row -> row.partName).containsExactly("기존 파트", "다른 파트"); noWrites();
     }
     @Test void insertionPreservesScheduledRowAndEndsPredecessor() throws Exception {
@@ -254,7 +258,7 @@ class CommonPartControllerTest {
     }
     @Test void numericallyIdenticalValuesAreRejectedWithoutHistory() throws Exception {
         standard(values("2026-10", "40.00")).andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("지금 기준과 같습니다")); noWrites();
+            .andExpect(jsonPath("$.message").value("지금 기준과 같습니다. 바꿀 값을 입력해 주세요.")); noWrites();
     }
     @Test void closedStandardMonthRejectedBeforeMutation() throws Exception {
         closed.add("202610"); standard(values("2026-10", "45")).andExpect(status().isBadRequest()); noWrites();
@@ -266,6 +270,30 @@ class CommonPartControllerTest {
     @Test void renameStaleTokenIs409() throws Exception {
         data.masters.get("part-a").modifiedAt = Instant.parse("2026-09-01T00:00:00Z");
         rename("새 이름").andExpect(status().isConflict()); noWrites();
+    }
+    @Test
+    @org.junit.jupiter.api.DisplayName("시안 UI-15 [다시 사용]: 중지된 파트 useYn N→Y, 사용 여부 이력, 기준 기간 보존")
+    void resumeStoppedPartTurnsItBackOnAndWritesHistory() throws Exception {
+        data.masters.get("part-a").useYn = "N";
+        mvc.perform(put("/api/common/parts/part-a/resume").contentType("application/json").content("{\"modifiedAt\":null}"))
+            .andExpect(status().isOk())
+            .andExpect(response("PUT", "/api/common/parts/{partId}/resume"))
+            .andExpect(jsonPath("$.data.useYn").value("Y"));
+        verify(mapper).resume("part-a");
+        assertThat(data.histories).anySatisfy(h -> assertThat(h.toString()).contains("사용 여부"));
+        assertThat(data.rows.get("part-a:202601").distributionRate).isEqualByComparingTo("40");
+    }
+    @Test void resumeOfPartInUseWritesNothing() throws Exception {
+        mvc.perform(put("/api/common/parts/part-a/resume").contentType("application/json").content("{\"modifiedAt\":null}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.useYn").value("Y"));
+        verify(mapper, never()).resume(anyString()); noWrites();
+    }
+    @Test void resumeStaleTokenIs409() throws Exception {
+        data.masters.get("part-a").useYn = "N";
+        data.masters.get("part-a").modifiedAt = Instant.parse("2026-09-01T00:00:00Z");
+        mvc.perform(put("/api/common/parts/part-a/resume").contentType("application/json").content("{\"modifiedAt\":null}"))
+            .andExpect(status().isConflict());
+        verify(mapper, never()).resume(anyString()); noWrites();
     }
     @Test void stopStaleTokenIs409() throws Exception {
         data.masters.get("part-a").modifiedAt = Instant.parse("2026-09-01T00:00:00Z");

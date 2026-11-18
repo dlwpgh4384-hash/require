@@ -214,11 +214,13 @@
   <update id="updateUse">UPDATE TB_HR_DEV SET use_yn=#{useYn},mod_user_id=#{actor},mod_dttm=clock_timestamp() WHERE dev_id=#{id}</update>
   <insert id="insertHistory">
     INSERT INTO TB_SY_CHG_HIST(trgt_tbl_nm,trgt_key,chg_type_cd,chg_item_nm,bfr_val,aft_val,chg_rsn,reg_user_id)
-    VALUES('TB_HR_DEV',#{developerId},#{type},#{fieldName},#{beforeValue,jdbcType=VARCHAR},#{afterValue,jdbcType=VARCHAR},#{reason,jdbcType=VARCHAR},'admin')
+    VALUES('TB_HR_DEV',#{developerId},#{type},#{fieldName},#{beforeValue,jdbcType=VARCHAR},#{afterValue,jdbcType=VARCHAR},#{reason,jdbcType=VARCHAR},#{actor})
   </insert>
   <select id="selectChanges" resultMap="change">
-    SELECT reg_dttm,chg_item_nm,bfr_val,aft_val,reg_user_id,chg_rsn FROM TB_SY_CHG_HIST
-    WHERE trgt_tbl_nm='TB_HR_DEV' AND trgt_key=#{id} ORDER BY reg_dttm DESC,hist_id DESC
+    <!-- 처리자는 사람 이름(시안 UI-02), 사용자가 없으면 아이디 -->
+    SELECT h.reg_dttm,h.chg_item_nm,h.bfr_val,h.aft_val,COALESCE(u.user_nm,h.reg_user_id) AS reg_user_id,h.chg_rsn
+    FROM TB_SY_CHG_HIST h LEFT JOIN TB_SY_USER u ON u.user_id=h.reg_user_id
+    WHERE h.trgt_tbl_nm='TB_HR_DEV' AND h.trgt_key=#{id} ORDER BY h.reg_dttm DESC,h.hist_id DESC
   </select>
   <insert id="insertAccess">
     INSERT INTO TB_SY_ACCS_LOG(user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id)

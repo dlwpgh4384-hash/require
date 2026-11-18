@@ -65,6 +65,8 @@ export function UserDialog({
   const id = useId();
   const setDirty = useScreenDirty();
   const dirty = JSON.stringify(form) !== JSON.stringify(initial);
+  /** 시안 「#us-e」: 칸마다가 아니라 창 맨 아래 한 줄. */
+  const bottomMessage = Object.values(errors).find(Boolean) ?? error;
   useEffect(() => {
     setDirty("UI-23", dirty);
     return () => setDirty("UI-23", false);
@@ -134,28 +136,25 @@ export function UserDialog({
       result.account,
     );
   };
+  /** 시안: 위에서부터 첫 오류 하나만 창 맨 아래 한 줄에 보여 준다. */
   const validate = () => {
-    const invalid: Record<string, string> = {};
-    if (!editing) {
-      if (!form.userId.trim())
-        invalid.userId = feedbackMessages.required("아이디");
-      else if (!/^[a-z0-9]{4,20}$/.test(form.userId.trim()))
-        invalid.userId = feedbackMessages.format(
-          "아이디는 영문 소문자·숫자 4~20자로",
-        );
-    }
-    if (!form.name.trim()) invalid.name = feedbackMessages.required("이름");
-    else if (form.name.trim().length > 20)
-      invalid.name = feedbackMessages.format("이름은 20자 이내로");
-    if (!form.email.trim()) invalid.email = feedbackMessages.required("이메일");
-    else if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) ||
-      form.email.trim().length > 100
-    )
-      invalid.email = "이메일 형식이 맞지 않습니다.";
-    if (!form.roleCds.length) invalid.roleCds = "역할을 1개 이상 골라 주세요.";
-    setErrors(invalid);
-    return Object.keys(invalid).length === 0;
+    const first = (): [string, string] | null => {
+      if (!editing && !/^[a-z0-9]{4,20}$/.test(form.userId.trim()))
+        return ["userId", "아이디는 영문 소문자·숫자 4~20자로 넣어 주세요."];
+      if (!form.name.trim() || form.name.trim().length > 20)
+        return ["name", "이름을 넣어 주세요."];
+      if (
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) ||
+        form.email.trim().length > 100
+      )
+        return ["email", "이메일 형식이 맞지 않습니다."];
+      if (!form.roleCds.length)
+        return ["roleCds", "역할을 1개 이상 골라 주세요."];
+      return null;
+    };
+    const invalid = first();
+    setErrors(invalid ? { [invalid[0]]: invalid[1] } : {});
+    return invalid === null;
   };
   const submit = async () => {
     if (busyRef.current || closing || impact || !validate()) return;
@@ -225,7 +224,7 @@ export function UserDialog({
         autoComplete="off"
         aria-invalid={!!errors[key]}
         aria-describedby={
-          `${help ? `${id}-${key}-help` : ""}${errors[key] ? ` ${id}-${key}-error` : ""}`.trim() ||
+          `${help ? `${id}-${key}-help` : ""}${errors[key] ? ` ${id}-error` : ""}`.trim() ||
           undefined
         }
         onChange={(event) => setForm({ ...form, [key]: event.target.value })}
@@ -234,11 +233,6 @@ export function UserDialog({
         <span id={`${id}-${key}-help`} className="uf-help">
           {help}
         </span>
-      )}
-      {errors[key] && (
-        <p id={`${id}-${key}-error`} className="field-error">
-          {errors[key]}
-        </p>
       )}
     </div>
   );
@@ -298,12 +292,16 @@ export function UserDialog({
               disabled={busy}
               userId={account?.userId ?? null}
               leaderParts={account?.leaderParts ?? []}
-              errors={errors}
               onChange={(value) => setForm({ ...form, ...value })}
             />
-            {error && !Object.keys(errors).length && (
-              <p role="alert" className="field-error" data-testid="user-error">
-                {error}
+            {bottomMessage && (
+              <p
+                id={`${id}-error`}
+                role="alert"
+                className="field-error"
+                data-testid="user-error"
+              >
+                {bottomMessage}
               </p>
             )}
             <div className="app-actions">

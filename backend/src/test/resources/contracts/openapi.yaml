@@ -3007,6 +3007,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/parts/{partId}/resume:
+    put:
+      operationId: putCommonPartResume
+      summary: 영업 파트 다시 사용
+      security: []
+      x-related-requirements:
+      - REQ-342
+      - REQ-306
+      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
+      parameters:
+      - name: partId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-business-rules:
+      - 시안 UI-15 ⋯ [다시 사용]: 중지된 파트만 사용으로 되돌림, 확인 창 없음
+      - 수정버전 불일치409
+      x-side-effects:
+      - TB_BS_PART.useYn=Y; TB_SY_CHG_HIST 사용 여부 N→Y; 기준·소속 관계 불변
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonPartStopInput'
+      responses:
+        '200':
+          description: 조회 또는 저장 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonPart'
+        '400':
+          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 데이터·성공 이력 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/common/uploads/templates/{formTypeCode}:
     get:
       operationId: getCommonUploadTemplate
@@ -7867,9 +7920,11 @@ components:
       - projectId
       - projectName
       - personName
+      - managementNumber
       - companyName
       - jobName
       - withdrawalDate
+      - monthlyMm
       properties:
         projectId:
           type: string
@@ -7877,6 +7932,9 @@ components:
           type: string
         personName:
           type: string
+        managementNumber:
+          type: string
+          description: 이름 아래 작은 관리번호(시안 pname)
         companyName:
           type: string
         jobName:
@@ -7885,6 +7943,9 @@ components:
           type: string
           format: date
           nullable: true
+        monthlyMm:
+          type: number
+          description: 「직무 · n MM」의 월 MM(배정 CTRT_MM)
       additionalProperties: false
     CommonClientAssignmentList:
       type: object

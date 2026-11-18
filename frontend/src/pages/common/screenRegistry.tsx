@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { ProjectPage } from "../projects/ProjectPage";
 import { AssignmentPage } from "../assignments/AssignmentPage";
 import { ProjectTitleActions } from "../projects/ProjectWorkspace";
+import { AssignmentTitleActions } from "../assignments/AssignmentWorkspace";
 import { UserPage } from "../users/UserPage";
 import { RolePage } from "../roles/RolePage";
 import { MenuPage } from "../menusettings/MenuPage";
@@ -36,7 +37,7 @@ export interface ScreenEntry {
 export const screenRegistry: readonly ScreenEntry[] = [
   { id: "UI-01", Page: () => <ProjectPage />, TitleActions: () => <ProjectTitleActions />, rootTestId: "project-page", hasInputs: true },
   { id: "UI-02", Page: () => <DeveloperWorkspace />, TitleActions: () => <DeveloperTitleActions />, rootTestId: "developer-workspace", hasInputs: true },
-  { id: "UI-12", Page: () => <AssignmentPage />, TitleActions: () => <ProjectTitleActions />, rootTestId: "assignment-page", hasInputs: true },
+  { id: "UI-12", Page: () => <AssignmentPage />, TitleActions: () => <AssignmentTitleActions />, rootTestId: "assignment-page", hasInputs: true },
   {
     id: "UI-15",
     Page: () => <ClientPartWorkspace partPage={<PartPage />} />,

@@ -173,7 +173,7 @@ class CommonClientControllerTest {
     }
     @Test void sameNameDifferentBusinessNumberWarnsButCreates() throws Exception {
         create("CUST"); mvc.perform(post("/api/common/clients").contentType("application/json").content(input("CUST").put("businessNumber", "987-65-43210").toString()))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.data.warnings[0]").value("같은 상호의 거래처가 이미 있습니다(사업자번호 123-45-67890)")); assertThat(rows).hasSize(2);
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.warnings[0]").value("같은 상호의 거래처가 이미 있습니다(사업자번호 123-45-67890). 사업자번호가 달라 등록은 되었습니다(지점 등). 맞는지 확인해 주세요.")); assertThat(rows).hasSize(2);
     }
     @Test
     @DisplayName("auth happy side-effect: 담당자 수정은 TB_SY_CHG_HIST에 이전/이후 한 줄을 기록한다")
@@ -257,13 +257,15 @@ class CommonClientControllerTest {
         assertThat(histories.toString()).doesNotContain("12345678", "87654321", "예금주");
     }
     @Test void assignmentsRetainSeparateRowsAndEmptyResult() throws Exception {
-        String id = create("CUST"); var a = new ClientRows.Assignment(); a.projectId="p"; a.projectName="프로젝트"; a.personName="사람"; a.companyName="소속"; a.jobName="개발";
+        String id = create("CUST"); var a = new ClientRows.Assignment(); a.projectId="p"; a.projectName="프로젝트"; a.personName="사람"; a.companyName="소속"; a.jobName="개발"; a.managementNumber="K-0001"; a.monthlyMm=new java.math.BigDecimal("0.5");
         when(mapper.selectAssignments(eq(id), any())).thenReturn(List.of(a, a));
         mvc.perform(get("/api/common/clients/{clientId}/assignments", id)).andExpect(status().isOk())
             .andExpect(response("GET", "/api/common/clients/{clientId}/assignments"))
             .andExpect(jsonPath("$.data.items.length()").value(2))
             .andExpect(jsonPath("$.data.items[0].projectId").value("p"))
             .andExpect(jsonPath("$.data.items[0].personName").value("사람"))
+            .andExpect(jsonPath("$.data.items[0].managementNumber").value("K-0001"))
+            .andExpect(jsonPath("$.data.items[0].monthlyMm").value(0.5))
             .andExpect(jsonPath("$.data.items[1].companyName").value("소속"));
         verify(mapper).selectAssignments(eq(id), any());
     }

@@ -57,7 +57,7 @@ beforeEach(() => {
     modifiedAt: null,
     personCount: 0,
     projectCount: 0,
-    scheduledChange: "2026-12월부터 45%",
+    scheduledChange: "2026-12부터 45%",
   };
   options = {
     leaders: [{ userId: "leader", userName: "김파트장" }],
@@ -82,9 +82,9 @@ beforeEach(() => {
             message:
               failureStatus === 409
                 ? "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요."
-                : "지금 기준과 같습니다",
+                : "지금 기준과 같습니다. 바꿀 값을 입력해 주세요.",
             errors: [
-              { field: "distributionRate", message: "지금 기준과 같습니다" },
+              { field: "distributionRate", message: "지금 기준과 같습니다. 바꿀 값을 입력해 주세요." },
             ],
           }),
         };
@@ -97,6 +97,7 @@ beforeEach(() => {
         modifiedAt: "2026-09-01T01:00:00Z",
       };
       if (path.endsWith("/stop")) part.useYn = "N";
+      if (path.endsWith("/resume")) part.useYn = "Y";
       return success(part);
     }
     if (failedPath && path === failedPath)
@@ -136,7 +137,9 @@ it("목록에서 현재값·예정 변경·안내와 모든 업무 열을 표시
   render(<PartPage />);
   expect(await screen.findByText("영업 1파트")).toBeInTheDocument();
   expect(screen.getByText("38.25%")).toBeInTheDocument();
-  expect(screen.getByText("2026-12월부터 45%")).toBeInTheDocument();
+  // 시안: 예정된 변경은 파란(안내) 배지 「2026-12부터 45%」
+  expect(screen.getByText("2026-12부터 45%")).toBeInTheDocument();
+  expect(screen.getByText("2026-12부터 45%")).toHaveClass("ls-b-info");
   expect(screen.getByText(/지난 달 정산은 바뀌지 않습니다/)).toBeInTheDocument();
   for (const label of ["파트장", "소속 인력", "진행 프로젝트", "사용 여부"])
     expect(
@@ -198,7 +201,32 @@ it("숫자 아닌 글자를 제거하고 금액 콤마를 표시하며 범위를
   expect(screen.getByTestId("part-rate-input")).toHaveValue("101");
   expect(screen.getByTestId("part-expense-input")).toHaveValue("1,234,567");
   fireEvent.click(screen.getByTestId("part-save"));
-  expect(await screen.findByText(/배분율은 0~100/)).toBeInTheDocument();
+  // 시안: 창 아래 한 줄
+  expect(await screen.findByTestId("part-save-error")).toHaveTextContent(
+    "이익 배분율은 0~100 사이 숫자로 입력해 주세요.",
+  );
+  expect(writes()).toHaveLength(0);
+});
+it.each([
+  ["partName", "", "파트명을 입력해 주세요."],
+  ["leaderUserId", "", "파트장을 골라 주세요."],
+  ["salesExpense", "", "공통관리비를 입력해 주세요."],
+  ["effectiveMonth", "2026-08", "적용 시작월은 마감된 달(2026-08) 다음 달부터 고를 수 있습니다."],
+] as const)("추가 창 %s 오류는 시안 문구 한 줄로 알린다", async (key, value, message) => {
+  await readyCreate();
+  fillCreate();
+  const testIds = {
+    partName: "part-name-input",
+    leaderUserId: "part-leader-select",
+    salesExpense: "part-expense-input",
+    effectiveMonth: "part-month-input",
+  } as const;
+  fireEvent.change(screen.getByTestId(testIds[key]), { target: { value } });
+  fireEvent.click(screen.getByTestId("part-save"));
+  expect(await screen.findByTestId("part-save-error")).toHaveTextContent(message);
+  // 칸마다 따로 붙는 알림은 없다(한 줄만).
+  expect(screen.getAllByRole("alert")).toHaveLength(1);
+  expect(screen.getByTestId(testIds[key])).toHaveAttribute("aria-invalid", "true");
   expect(writes()).toHaveLength(0);
 });
 it("소수 초과 배분율·관리비 자릿수를 저장하지 않는다", async () => {
@@ -211,11 +239,21 @@ it("소수 초과 배분율·관리비 자릿수를 저장하지 않는다", asy
     target: { value: "1000000000000000" },
   });
   fireEvent.click(screen.getByTestId("part-save"));
-  expect(await screen.findByText(/15자리 이내/)).toBeInTheDocument();
+  // 한 줄에는 첫 오류(배분율)만, 두 칸 모두 잘못 표시는 남는다.
+  expect(await screen.findByTestId("part-save-error")).toHaveTextContent(/소수 둘째 자리/);
   expect(screen.getByTestId("part-rate-input")).toHaveAttribute(
     "aria-invalid",
     "true",
   );
+  expect(screen.getByTestId("part-expense-input")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  fireEvent.change(screen.getByTestId("part-rate-input"), {
+    target: { value: "1.23" },
+  });
+  fireEvent.click(screen.getByTestId("part-save"));
+  expect(await screen.findByText(/15자리 이내/)).toBeInTheDocument();
   expect(writes()).toHaveLength(0);
 });
 it("적격 파트장 없음은 저장 불가이고 옵션 실패는 다시 시도할 수 있다", async () => {
@@ -233,7 +271,9 @@ it("생성은 사용자 ID·수정토큰 없이 전송하고 성공 콜백을 �
   const { saved } = await readyCreate();
   fillCreate();
   fireEvent.click(screen.getByTestId("part-save"));
-  await waitFor(() => expect(saved).toHaveBeenCalledWith("owned-part"));
+  await waitFor(() =>
+    expect(saved).toHaveBeenCalledWith("owned-part", "새 영업 파트을 추가했습니다."),
+  );
   const [path, init] = writes()[0];
   expect(path).toBe("/api/common/parts");
   expect(JSON.parse(init.body)).toEqual({
@@ -330,6 +370,61 @@ it("관계 없는 중지는 nullable token을 그대로 전송한다", async () 
   expect(writes()[0][0]).toBe("/api/common/parts/owned-part/stop");
   expect(JSON.parse(writes()[0][1].body)).toEqual({ modifiedAt: null });
 });
+it("중지 확인 창은 시안 제목·본문이고 저장 알림은 「사용을 중지했습니다.」", async () => {
+  const saved = vi.fn();
+  render(<PartStopDialog part={part} onClose={vi.fn()} onSaved={saved} />);
+  expect(
+    screen.getByRole("dialog", { name: "영업 1파트의 사용을 중지할까요?" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("중지하면 새 인력·프로젝트에 고를 수 없습니다.")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("part-save"));
+  await waitFor(() =>
+    expect(saved).toHaveBeenCalledWith("owned-part", "사용을 중지했습니다."),
+  );
+});
+it("파트명 수정은 빈 이름을 막고 저장 알림은 「파트명을 바꿨습니다.」", async () => {
+  render(<PartPage />);
+  fireEvent.click(await screen.findByText("영업 1파트"));
+  fireEvent.click(await screen.findByTestId("part-more"));
+  fireEvent.click(screen.getByTestId("part-rename"));
+  fireEvent.change(screen.getByTestId("part-name-input"), { target: { value: " " } });
+  fireEvent.click(screen.getByTestId("part-save"));
+  expect(await screen.findByTestId("part-save-error")).toHaveTextContent("파트명을 입력해 주세요.");
+  expect(writes()).toHaveLength(0);
+  fireEvent.change(screen.getByTestId("part-name-input"), { target: { value: "영업 9파트" } });
+  fireEvent.click(screen.getByTestId("part-save"));
+  expect(await screen.findByTestId("part-saved-toast")).toHaveTextContent("파트명을 바꿨습니다.");
+});
+it("기준 변경 저장 알림은 「{파트} 기준을 바꿨습니다. {월}부터 적용됩니다.」", async () => {
+  const saved = vi.fn();
+  render(
+    <PartStandardChangeDialog part={part} onClose={vi.fn()} onSaved={saved} />,
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("part-rate-input")).toHaveValue("38.25"),
+  );
+  fireEvent.change(screen.getByTestId("part-rate-input"), { target: { value: "40" } });
+  fireEvent.click(screen.getByTestId("part-save"));
+  await waitFor(() =>
+    expect(saved).toHaveBeenCalledWith(
+      "owned-part",
+      "영업 1파트 기준을 바꿨습니다. 2026-09부터 적용됩니다.",
+    ),
+  );
+});
+it("기준 변경에서 지금 기준과 같으면 저장하지 않고 시안 문구로 알린다", async () => {
+  render(
+    <PartStandardChangeDialog part={part} onClose={vi.fn()} onSaved={vi.fn()} />,
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("part-rate-input")).toHaveValue("38.25"),
+  );
+  fireEvent.click(screen.getByTestId("part-save"));
+  expect(await screen.findByTestId("part-save-error")).toHaveTextContent(
+    "지금 기준과 같습니다. 바꿀 값을 입력해 주세요.",
+  );
+  expect(writes()).toHaveLength(0);
+});
 it("기준 변경은 선택월 기존값을 읽고 master 버전을 보낸다", async () => {
   const saved = vi.fn();
   standards.forEach((row) => {
@@ -398,4 +493,23 @@ it("중지 파트는 상세에서 중지 단추를 숨긴다", async () => {
   fireEvent.click(screen.getByTestId("part-more"));
   expect(screen.queryByTestId("part-stop")).not.toBeInTheDocument();
   expect(screen.getByTestId("part-rename")).toBeEnabled();
+});
+it("시안 UI-15: 중지 파트는 띠를 보이고 ⋯ [다시 사용]은 확인 없이 바로 되돌린다", async () => {
+  part.useYn = "N";
+  render(<PartPage />);
+  fireEvent.click(await screen.findByText("영업 1파트"));
+  const panel = await screen.findByTestId("part-detail-panel");
+  expect(within(panel).getByText("사용을 중지한 파트입니다.")).toBeVisible();
+  fireEvent.click(screen.getByTestId("part-more"));
+  fireEvent.click(screen.getByTestId("part-resume"));
+  expect(await screen.findByText("영업 1파트을 다시 사용합니다.")).toBeVisible();
+  const resume = writes().filter((call) => String(call[0]).endsWith("/owned-part/resume"));
+  expect(resume).toHaveLength(1);
+  expect(JSON.parse(String((resume[0][1] as RequestInit).body))).toEqual({ modifiedAt: null });
+  // 확인 창(작은 창)은 뜨지 않는다. 상세 패널 자체는 role=dialog라 제외하고 본다.
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  await waitFor(() =>
+    expect(within(screen.getByTestId("part-detail-panel")).queryByText("사용을 중지한 파트입니다.")).not.toBeInTheDocument(),
+  );
 });

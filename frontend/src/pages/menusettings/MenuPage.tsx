@@ -11,13 +11,17 @@ import * as api from "./menuSettings";
 import "../../shared/list/list.css";
 import "./menuSettings.css";
 
-/** 시안: 시스템 메뉴(LOCK_YN=Y) 이름 옆 자물쇠. */
-function LockIcon() {
+/** 시안: 시스템 메뉴·시스템 묶음(LOCK_YN=Y) 이름 옆 자물쇠. */
+function LockIcon({ group = false }: { group?: boolean }) {
   return (
     <span
       className="menu-settings-lock"
-      title="시스템 메뉴: 끌 수 없고 묶음 밖으로 옮길 수 없습니다. 이름만 바꿀 수 있습니다(LOCK_YN=Y)"
-      aria-label="시스템 메뉴"
+      title={
+        group
+          ? "시스템 묶음: 끌 수 없고, 안의 메뉴를 밖으로 옮길 수 없습니다(LOCK_YN=Y)"
+          : "시스템 메뉴: 끌 수 없고 묶음 밖으로 옮길 수 없습니다. 이름만 바꿀 수 있습니다(LOCK_YN=Y)"
+      }
+      aria-label={group ? "시스템 묶음" : "시스템 메뉴"}
       role="img"
     >
       <svg
@@ -47,6 +51,8 @@ export function MenuPage() {
   const [moved, setMoved] = useState<string[]>([]);
   const [failure, setFailure] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  /** 저장 전 이름 검사에 걸린 줄(시안: 문구는 알림 한 줄, 칸은 빨간 테두리만). */
+  const [badNames, setBadNames] = useState<string[]>([]);
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -94,11 +100,11 @@ export function MenuPage() {
     return () => controller.abort();
   }, [revision]);
   useEffect(() => {
-    if (Object.keys(errors).length)
+    if (Object.keys(errors).length || badNames.length)
       root.current
         ?.querySelector<HTMLElement>("[aria-invalid='true']")
         ?.focus();
-  }, [errors]);
+  }, [errors, badNames]);
   const refresh = async () => {
     const result = await api.getCommonMenuSettings();
     setSnapshot(result.items);
@@ -110,7 +116,15 @@ export function MenuPage() {
     if (snapshot) setDraft(snapshot);
     setMoved([]);
     setErrors({});
+    setBadNames([]);
     setFailure("");
+  };
+  /** 시안 [취소]: 되돌리고 「변경을 취소했습니다.」, 바뀐 것이 없으면 「바꾼 내용이 없습니다.」 */
+  const cancel = () => {
+    if (busy || refreshPending) return;
+    const had = dirty;
+    discard();
+    setNotice(had ? "변경을 취소했습니다." : "바꾼 내용이 없습니다.");
   };
   const save = async () => {
     if (lock.current || !snapshot || refreshPending) return;
@@ -118,13 +132,15 @@ export function MenuPage() {
       setNotice("바꾼 내용이 없습니다.");
       return;
     }
-    const invalid: Record<string, string> = {};
-    changed.forEach((row) => {
-      if (!row.menuNm.trim() || [...row.menuNm].length > 50)
-        invalid[row.menuId] = "메뉴 이름을 1~50자로 입력해 주세요.";
-    });
-    setErrors(invalid);
-    if (Object.keys(invalid).length) return;
+    const invalid = changed
+      .filter((row) => !row.menuNm.trim() || [...row.menuNm].length > 50)
+      .map((row) => row.menuId);
+    setErrors({});
+    setBadNames(invalid);
+    if (invalid.length) {
+      setNotice("메뉴 이름은 비울 수 없고 50자 이내여야 합니다.");
+      return;
+    }
     lock.current = true;
     setBusy(true);
     setFailure("");
@@ -176,6 +192,7 @@ export function MenuPage() {
       rows.map((row) => (row.menuId === id ? { ...row, ...value } : row)),
     );
     setErrors({});
+    setBadNames([]);
   };
   const move = (source: string, target: string) => {
     if (busy || refreshPending) return;
@@ -185,8 +202,17 @@ export function MenuPage() {
       setDraft(next);
       setMoved((ids) => (ids.includes(source) ? ids : [...ids, source]));
       setFailure("");
+      const before = draft.find((row) => row.menuId === source);
+      const after = next.find((row) => row.menuId === source);
+      if (before && after && before.upperMenuId !== after.upperMenuId) {
+        const group = next.find((row) => row.menuId === after.upperMenuId);
+        setNotice(
+          `「${after.menuNm}」을 「${group?.menuNm ?? ""}」 묶음으로 옮겼습니다. 저장해야 반영됩니다.`,
+        );
+      }
     } catch (error) {
-      setFailure(message(error));
+      // 시안: 시스템 묶음 메뉴를 밖으로 끌면 알림으로 막는다.
+      setNotice(message(error));
     }
   };
   return (
@@ -253,6 +279,7 @@ export function MenuPage() {
                   {api.menuTree(draft).map((row) => {
                     const key = row.menuId.toLowerCase();
                     const error = errors[row.menuId] ?? errors.menuNm;
+                    const invalidName = !!error || badNames.includes(row.menuId);
                     return (
                       <tr
                         key={row.menuId}
@@ -347,7 +374,7 @@ export function MenuPage() {
                             <input
                               className="ls-in ls-in-sm"
                               aria-label={`${row.menuId} 메뉴 이름`}
-                              aria-invalid={!!error}
+                              aria-invalid={invalidName}
                               data-testid={`menu-settings-name-${key}`}
                               maxLength={50}
                               value={row.menuNm}
@@ -357,8 +384,8 @@ export function MenuPage() {
                                 })
                               }
                             />
-                            {row.lockYn === "Y" && row.menuLvl === 2 && (
-                              <LockIcon />
+                            {row.lockYn === "Y" && (
+                              <LockIcon group={row.menuLvl === 1} />
                             )}
                           </span>
                           {error && (
@@ -417,7 +444,7 @@ export function MenuPage() {
               <button
                 type="button"
                 data-testid="menu-settings-cancel"
-                onClick={discard}
+                onClick={cancel}
               >
                 취소
               </button>

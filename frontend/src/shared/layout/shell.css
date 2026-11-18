@@ -744,7 +744,9 @@ a.header-brand:focus-visible {
   margin-right: 0;
 }
 .screen-tab-panel[hidden] {
-  display: none;
+  /* 등록 폼 화면 규칙(.screen-tab-panel:has(.client-form) 등 display:flex)이 덮지 못하게 한다.
+     덮이면 다른 탭으로 옮겨도 숨긴 탭의 등록 폼이 보인다(2026-11-18 사용자 발견). */
+  display: none !important;
 }
 
 /* 00-1 제목줄 작업 버튼 자리·즐겨찾기 별 */

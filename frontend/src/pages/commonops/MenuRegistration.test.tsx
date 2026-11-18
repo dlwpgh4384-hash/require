@@ -311,6 +311,31 @@ it("등록된 화면은 선택지에서 제외하며 중지 행도 등록된 것
   expect(
     within(select).getByRole("option", { name: /UI-25/ }),
   ).toBeInTheDocument();
+  // 시안: 화면 번호만 보인다.
+  expect(
+    within(select).getByRole("option", { name: "UI-25" }),
+  ).toBeInTheDocument();
+  expect(within(select).queryByText(/메뉴/)).not.toBeInTheDocument();
+});
+it("대메뉴는 시안 안내 두 문장을 보이고, 등록하면 「이름」 메뉴를 등록했다고 알린다", async () => {
+  await mount();
+  await open();
+  fireEvent.change(screen.getByLabelText("메뉴 이름 *"), {
+    target: { value: "새 묶음" },
+  });
+  fireEvent.click(screen.getByTestId("menu-registration-level-1"));
+  expect(
+    screen.getByText(
+      "대메뉴는 화면 번호가 없습니다. 서브메뉴를 넣거나 다른 메뉴를 끌어 넣어야 메뉴에 보입니다.",
+    ),
+  ).toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.getByTestId("menu-registration-submit")).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByTestId("menu-registration-submit"));
+  expect(await screen.findByTestId("menu-registration-toast")).toHaveTextContent(
+    "「새 묶음」 메뉴를 등록했습니다.",
+  );
 });
 it("미등록 개발 화면이 없으면 서브메뉴 저장 금지, 대메뉴는 가능", async () => {
   options.screens = [options.screens[0]];
@@ -366,16 +391,19 @@ it("옵션 실패시 재시도하고 입력을 보존한다", async () => {
 it("필수 누락은 필드 오류와 첫 오류 포커스, POST 0회", async () => {
   await mount();
   await open();
+  // 시안: 상위 대메뉴는 첫 묶음이 골라진 채로 열리고, 그 상태는 바꾼 것이 아니다.
+  expect(screen.getByLabelText("상위 대메뉴 *")).toHaveValue("G007");
+  expect(screen.getByTestId("dialog-dirty")).toHaveTextContent("false");
   fireEvent.click(screen.getByTestId("menu-registration-submit"));
+  expect(screen.getByTestId("menu-registration-error-menunm")).toHaveTextContent(
+    "메뉴 이름을 넣어 주세요.",
+  );
   expect(
-    screen.getByTestId("menu-registration-error-menunm"),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByTestId("menu-registration-error-uppermenuid"),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByTestId("menu-registration-error-scrnid"),
-  ).toBeInTheDocument();
+    screen.queryByTestId("menu-registration-error-uppermenuid"),
+  ).not.toBeInTheDocument();
+  expect(screen.getByTestId("menu-registration-error-scrnid")).toHaveTextContent(
+    "화면 번호를 골라 주세요.",
+  );
   expect(screen.getByLabelText("메뉴 이름 *")).toHaveFocus();
   expect(writes()).toHaveLength(0);
 });

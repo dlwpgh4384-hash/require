@@ -42,25 +42,31 @@ beforeEach(() => {
       projectId: "P-0001",
       projectName: "같은 이름",
       personName: "김개발",
+      managementNumber: "K-0001",
       companyName: "협력 소속",
       jobName: "개발",
       withdrawalDate: "2030-12-31",
+      monthlyMm: 1,
     },
     {
       projectId: "P-0001",
       projectName: "같은 이름",
       personName: "이개발",
-      companyName: "자사",
+      managementNumber: "K-0002",
+      companyName: "",
       jobName: "개발",
       withdrawalDate: null,
+      monthlyMm: 0.5,
     },
     {
       projectId: "P-0002",
       projectName: "같은 이름",
       personName: "박설계",
+      managementNumber: "K-0003",
       companyName: "협력 소속",
       jobName: "설계",
       withdrawalDate: "2031-01-31",
+      monthlyMm: 1,
     },
   ];
   failAssignments = false;
@@ -124,7 +130,7 @@ it("shows assignment failure separately and retries the selected client's real A
   );
   expect(screen.queryByTestId("client-assignments")).not.toBeInTheDocument();
   expect(
-    screen.queryByText("오늘 투입 중인 사람이 없습니다."),
+    screen.queryByText("지금 투입 중인 내역이 없습니다."),
   ).not.toBeInTheDocument();
   failAssignments = false;
   fireEvent.click(screen.getByTestId("client-detail-retry"));
@@ -136,29 +142,33 @@ it("shows assignment failure separately and retries the selected client's real A
 it("renders distinct project badges and only the approved assignment fields", async () => {
   mount();
   const table = await screen.findByTestId("client-assignments");
-  expect(screen.getByText(/오늘 기준.*프로젝트 이름/)).toBeVisible();
+  // 시안 UI-15: 안내 문장(오늘 날짜·구분별 대상·프로젝트 n건·인력 n명), 칩 「프로젝트명 n명」
+  expect(
+    screen.getByText(/투입 배정\(UI-12\)에서 오늘\(\d{4}-\d{2}-\d{2}\) 투입 중인 내역입니다\./),
+  ).toHaveTextContent("프로젝트 2건, 인력 3명.");
   const summary = screen.getByTestId("client-assignment-projects");
-  expect(summary).toHaveTextContent("프로젝트 2건");
   expect(
     within(summary).getByTestId("client-assignment-project-p-0001"),
-  ).toHaveTextContent("같은 이름");
+  ).toHaveTextContent("같은 이름 2명");
   expect(
     within(summary).getByTestId("client-assignment-project-p-0002"),
-  ).toHaveTextContent("같은 이름");
+  ).toHaveTextContent("같은 이름 1명");
   expect(
     within(table)
       .getAllByRole("columnheader")
       .map((cell) => cell.textContent),
   ).toEqual(["프로젝트", "이름", "소속 · 직무", "철수일"]);
   const first = within(screen.getByTestId("client-assignment-0"));
+  // 이름 아래 관리번호, 소속 아래 「직무 · n MM」, 소속이 없으면 「자사」(시안 816줄)
   expect(first.getByText("김개발")).toBeVisible();
+  expect(first.getByText("K-0001")).toBeVisible();
   expect(first.getByText("협력 소속")).toBeVisible();
-  expect(first.getByText("개발")).toBeVisible();
+  expect(first.getByText("개발 · 1 MM")).toBeVisible();
   expect(first.getByText("2030-12-31")).toBeVisible();
-  expect(
-    within(screen.getByTestId("client-assignment-1")).getByText("–"),
-  ).toBeVisible();
-  expect(table).not.toHaveTextContent("MM");
+  const second = within(screen.getByTestId("client-assignment-1"));
+  expect(second.getByText("자사")).toBeVisible();
+  expect(second.getByText("개발 · 0.5 MM")).toBeVisible();
+  expect(second.getByText("–")).toBeVisible();
   expect(within(table).getAllByRole("row")).toHaveLength(4);
   expect(request).toHaveBeenCalledWith(
     `/api/common/clients/${client.clientId}/assignments`,
@@ -169,7 +179,7 @@ it("keeps an empty assignment list empty without fabricated badges", async () =>
   assignments = [];
   mount();
   expect(
-    await screen.findByText("오늘 투입 중인 사람이 없습니다."),
+    await screen.findByText("지금 투입 중인 내역이 없습니다."),
   ).toBeVisible();
   expect(screen.queryByTestId("client-assignments")).not.toBeInTheDocument();
   expect(
@@ -215,14 +225,15 @@ it("reopening rereads assignments and derives badges and job names from the new 
   mount();
   const table = await screen.findByTestId("client-assignments");
   expect(screen.getByTestId("client-assignment-projects")).toHaveTextContent(
-    "프로젝트 1건",
+    "같은 이름 1명",
   );
+  expect(screen.getByText(/투입 중인 내역입니다/)).toHaveTextContent("프로젝트 1건, 인력 1명.");
   expect(
     screen.queryByTestId("client-assignment-project-p-0001"),
   ).not.toBeInTheDocument();
-  expect(within(table).getByText("변경된 직무")).toBeVisible();
+  expect(within(table).getByText("변경된 직무 · 1 MM")).toBeVisible();
   expect(within(table).queryByText("김개발")).not.toBeInTheDocument();
-  expect(table).not.toHaveTextContent("MM");
+  expect(table).toHaveTextContent("1 MM");
   expect(
     request.mock.calls.filter(([path]) => path.endsWith("/assignments")),
   ).toHaveLength(2);

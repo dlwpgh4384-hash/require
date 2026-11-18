@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ConfirmDialog, Dialog } from "../../shared/feedback/Dialog";
+import { ConfirmDialog, Dialog, Toast } from "../../shared/feedback/Dialog";
 import type { ToastKind } from "../../shared/feedback/Dialog";
 import { Badge, Banner, DetailPanel, KeyValues } from "../../shared/list";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
@@ -73,6 +73,10 @@ export function ProjectDetail({
   const [closing, setClosing] = useState(false);
   const [newJob, setNewJob] = useState("");
   const [planMessage, setPlanMessage] = useState("");
+  /** 계획 MM 칸에 적은 글자 그대로(저장할 때 시안 규칙으로 검사) */
+  const [planText, setPlanText] = useState<Record<string, string>>({});
+  /** 시안 toast(…,'info'): 창 안 입력 검사 알림 */
+  const [hint, setHint] = useState("");
   const loadVersion = useRef(0);
   const setScreenDirty = useScreenDirty();
   const shortcut = useRef<() => void>(() => undefined);
@@ -109,6 +113,7 @@ export function ProjectDetail({
       setParts(s.items);
       setHistory(h.items);
       setJobs(m.items);
+      setPlanText({});
       setPlanAllowed(m.canSave);
       setPlanDirty(false);
     } catch (reason) {
@@ -213,10 +218,13 @@ export function ProjectDetail({
       return void run(() => api.putCommonProjectBudget(projectId, v, p.modifiedAt), "예산(목표 원가)을 바꿨습니다.");
     }
     if (mode === "part") {
+      // 시안: 적용 시작 월이 틀리면 창은 그대로 두고 info 알림
       if (!values.effectiveMonth || (closedMonth && values.effectiveMonth <= closedMonth))
-        return setModalError(`적용 시작 월은 ${firstOpen} 이후로 골라 주세요.`);
+        return setHint(`적용 시작 월은 ${firstOpen} 이후로 골라 주세요.`);
       const current = parts.filter((s) => !s.scheduled).at(-1);
       const cancel = values.salesPartId === current?.salesPartId;
+      if (!cancel && current && values.effectiveMonth <= current.effectiveMonth)
+        return setHint(`적용 시작 월은 ${nextMonth(current.effectiveMonth)} 이후로 골라 주세요.`);
       return void run(
         () =>
           api.putCommonProjectSalesPart(projectId, {
@@ -257,6 +265,12 @@ export function ProjectDetail({
   };
   const savePlan = async () => {
     if (busy || !planDirty) return;
+    // 시안 plansave: 비우거나 0 이상 숫자(소수 둘째 자리까지)만
+    const wrong = jobs.find((j) => {
+      const text = planText[j.jobCode]?.trim();
+      return text != null && text !== "" && !/^\d+(\.\d{1,2})?$/.test(text);
+    });
+    if (wrong) return setHint(`${wrong.jobName} 계획 MM은 0 이상 숫자(소수 둘째 자리까지)로 넣어 주세요.`);
     setPlanMessage("");
     setBusy(true);
     try {
@@ -499,6 +513,7 @@ export function ProjectDetail({
   const daysAgo = lastMemo
     ? Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${lastMemo.writtenDate}T00:00:00Z`)) / 86400000)
     : null;
+  const stale = daysAgo != null && daysAgo > 14 && p.statusCode !== "END" && p.statusCode !== "LOSE";
   const bar = (label: string, value: number | null | undefined, muted: boolean) => (
     <div className="project-bar">
       <span className="project-cap project-bar-label">{label}</span>
@@ -548,7 +563,14 @@ export function ProjectDetail({
             "마지막 업데이트",
             lastMemo ? (
               <>
-                {lastMemo.writtenDate} <span className="project-sub">({daysAgo}일 전)</span>
+                {/* 시안: 끝나지 않은 프로젝트가 14일 넘게 업데이트가 없으면 경고 색 */}
+                {lastMemo.writtenDate}{" "}
+                <span
+                  className={stale ? "project-warn-text" : "project-sub"}
+                  data-testid="project-last-update-age"
+                >
+                  ({daysAgo}일 전)
+                </span>
               </>
             ) : (
               "–"
@@ -692,13 +714,19 @@ export function ProjectDetail({
                         aria-label={`${j.jobName} 계획 MM`}
                         data-testid={`project-job-mm-${j.jobCode.toLowerCase()}`}
                         inputMode="decimal"
-                        value={j.plannedMm ?? ""}
+                        value={planText[j.jobCode] ?? j.plannedMm ?? ""}
                         disabled={busy}
                         onChange={(e) => {
-                          const raw = e.target.value.replace(/[^0-9.]/g, "");
-                          const v = raw === "" ? null : Number(raw);
+                          // 적은 글자는 그대로 두고 저장할 때 검사한다(시안). 숫자로 읽히면 차이를 바로 다시 센다.
+                          const text = e.target.value;
+                          const raw = text.trim();
+                          setPlanText((t) => ({ ...t, [j.jobCode]: text }));
                           setJobs((all) =>
-                            all.map((x, n) => (n === i ? { ...x, plannedMm: v, differenceMm: x.actualMm - (v ?? 0) } : x)),
+                            all.map((x, n) => {
+                              if (n !== i) return x;
+                              const v = raw === "" ? null : Number.isFinite(Number(raw)) ? Number(raw) : x.plannedMm;
+                              return { ...x, plannedMm: v, differenceMm: x.actualMm - (v ?? 0) };
+                            }),
                           );
                           setPlanDirty(true);
                         }}
@@ -1007,7 +1035,7 @@ export function ProjectDetail({
             {fc(
               "project-expense-month",
               "경비 월",
-              false,
+              true,
               <input
                 id="project-expense-month"
                 data-testid="project-command-yearmonth"
@@ -1020,7 +1048,7 @@ export function ProjectDetail({
             {fc(
               "project-expense-item",
               "항목",
-              false,
+              true,
               <select id="project-expense-item" data-testid="project-command-itemcode" value={values.itemCode} onChange={(e) => set("itemCode", e.target.value)}>
                 {codes.items.map((c) => (
                   <option key={c.code} value={c.code}>
@@ -1030,7 +1058,7 @@ export function ProjectDetail({
               </select>,
               "공통코드 「직접 경비 항목」에서 고릅니다.",
             )}
-            {fc("project-command-amount", "금액", false, moneyInput("project-command-amount", "amount", 180), "이 프로젝트에서 쓴 금액")}
+            {fc("project-command-amount", "금액", true, moneyInput("project-command-amount", "amount", 180), "이 프로젝트에서 쓴 금액")}
             {fc(
               "project-expense-memo",
               "메모",
@@ -1052,7 +1080,7 @@ export function ProjectDetail({
             {fc(
               "project-lose-reason",
               "실주 사유",
-              false,
+              true,
               <select id="project-lose-reason" data-testid="project-command-reasoncode" value={values.reasonCode} onChange={(e) => set("reasonCode", e.target.value)}>
                 <option value="">선택</option>
                 {codes.reasons.map((c) => (
@@ -1147,6 +1175,7 @@ export function ProjectDetail({
           onProceed={onClose}
         />
       )}
+      {hint && <Toast message={hint} kind="info" onDismiss={() => setHint("")} testId="project-detail-toast" />}
     </>
   );
 }

@@ -108,6 +108,13 @@ public class CommonClientService {
         return mapper.selectSameNameNumbers(input.clientName(), id).stream()
             .map(number -> "같은 상호의 거래처가 이미 있습니다(사업자번호 " + number + ")").toList();
     }
+    /** 시안 등록 안내 문구 그대로: 같은 상호의 사업자번호를 한 문장에 모은다. */
+    private List<String> creationWarnings(Input input) {
+        var numbers = mapper.selectSameNameNumbers(input.clientName(), null);
+        if (numbers.isEmpty()) return List.of();
+        return List.of("같은 상호의 거래처가 이미 있습니다(사업자번호 " + String.join(", ", numbers)
+            + "). 사업자번호가 달라 등록은 되었습니다(지점 등). 맞는지 확인해 주세요.");
+    }
     private void lock() {
         management.lockManagement();
         mapper.lockClientRelations();
@@ -127,7 +134,7 @@ public class CommonClientService {
                     String owner = mapper.selectBusinessOwner(input.businessNumber());
                     if (owner != null) throw CodeFailure.invalid("businessNumber",
                         "이미 등록된 사업자번호입니다 (" + owner + ")");
-                    var notices = warnings(input, null);
+                    var notices = creationWarnings(input);
                     if (mapper.insertClient(new Write(id, input, cipher.encrypt(input.accountNumber()),
                         actor.userId(), null)) != 1) throw new IllegalStateException("거래처를 등록하지 못했습니다.");
                     history(id, "NEW", "신규 등록", null, "신규 등록");

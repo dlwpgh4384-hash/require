@@ -14,6 +14,12 @@ const monthNow = () => {
   const month = koreanThisMonth();
   return `${month.slice(0, 4)}-${month.slice(4)}`;
 };
+/** YYYY-MM 다음 달. */
+const nextMonth = (month: string) => {
+  const [year, value] = month.split("-").map(Number);
+  const date = new Date(Date.UTC(year, value, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+};
 
 /** SCR-UI-27 운영 기준값 탭. 네 탭의 CodePage 작업 공간에서 이 패널을 사용한다. */
 export function OperatingStandardsPanel({
@@ -102,6 +108,8 @@ export function OperatingStandardsPanel({
     await onChanged?.();
     setRefreshPending(false);
   };
+  /** 시안: 적용 시작월은 마감한 달 다음 달부터 고를 수 있다. */
+  const firstOpenMonth = closedMonth ? nextMonth(closedMonth) : "";
   const submit = async (changes: api.OperatingStandardChange[]) => {
     if (lock.current || refreshPending || !changes.length) return;
     const invalid = api.validateOperatingChanges(
@@ -109,6 +117,12 @@ export function OperatingStandardsPanel({
       changes,
       changes.find((row) => row.effectiveMonth)?.effectiveMonth ?? month,
     );
+    if (
+      changes.some((row) => row.action !== "delete" && row.effectiveMonth !== null) &&
+      firstOpenMonth &&
+      (!month || month < firstOpenMonth)
+    )
+      invalid.effectiveMonth = `적용 시작월은 ${firstOpenMonth} 이후로 골라 주세요.`;
     setErrors(invalid);
     if (Object.keys(invalid).length) return;
     lock.current = true;
@@ -161,7 +175,10 @@ export function OperatingStandardsPanel({
       month,
     );
     setErrors(invalid);
-    if (!Object.keys(invalid).length) setConfirmSave(true);
+    if (Object.keys(invalid).length) return;
+    // 시안: 적용 시작월은 기준월 다음 달로 채워 둔다.
+    setMonth(nextMonth(monthNow()));
+    setConfirmSave(true);
   };
   // 공통 기능 FR-0104: Ctrl+S = 저장(이 탭이 보일 때, 창이 없을 때)
   usePreferenceBusinessShortcuts({
@@ -175,6 +192,11 @@ export function OperatingStandardsPanel({
     setDraft({});
     setErrors({});
     setFailure("");
+  };
+  /** 시안 [취소] 알림. */
+  const cancel = () => {
+    setNotice(dirty ? "변경을 취소했습니다." : "바꾼 내용이 없습니다.");
+    discard();
   };
   const blocked = busy || refreshPending;
   const historyDef = api.operatingRows.find((def) => def.key === historyCode);
@@ -402,7 +424,7 @@ export function OperatingStandardsPanel({
               type="button"
               data-testid="operating-cancel"
               disabled={blocked}
-              onClick={discard}
+              onClick={cancel}
             >
               취소
             </button>
@@ -477,6 +499,7 @@ export function OperatingStandardsPanel({
                 aria-label="적용 시작월"
                 data-testid="operating-effective-month"
                 value={month}
+                min={firstOpenMonth || undefined}
                 disabled={blocked}
                 onChange={(event) => {
                   setMonth(event.target.value);
@@ -488,6 +511,12 @@ export function OperatingStandardsPanel({
                 없습니다. 그 앞 달은 예전 값 그대로 계산합니다.
               </span>
             </label>
+          )}
+          {changed.some((row) => row.immediate) && (
+            <p className="operating-help" data-testid="operating-cash-note">
+              자금수지 시작 월·기초 잔액은 적용 시작월 없이 바로 바뀌고,
+              자금수지표를 다시 계산합니다.
+            </p>
           )}
           {errors.effectiveMonth && (
             <p className="field-error" role="alert">

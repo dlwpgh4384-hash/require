@@ -139,6 +139,18 @@ public class CommonPartService {
         }
         return item(require(id), mapper.selectCurrentMonth());
     }
+    /** 다시 사용: 중지된 파트만 사용으로 되돌리고 변경 이력을 남긴다. 이미 사용 중이면 그대로 돌려준다. */
+    @Transactional
+    public Part putCommonPartResume(String id, Version input) {
+        lock();
+        var old = current(id, input.modifiedAt());
+        if ("N".equals(old.useYn)) {
+            affected(mapper.touch(id, input.modifiedAt()));
+            affected(mapper.resume(id));
+            history("TB_BS_PART", id, "UPD", "사용 여부", old.useYn, "Y");
+        }
+        return item(require(id), mapper.selectCurrentMonth());
+    }
     @Transactional
     public Items<Standard> putCommonPartStandards(String id, StandardInput input) {
         lock();
@@ -151,7 +163,7 @@ public class CommonPartService {
         var same = rows.stream().filter(row -> row.month.equals(month)).findFirst().orElse(null);
         var before = applicable(rows, month);
         if (before != null && unchanged(before, input.values()))
-            throw invalid("distributionRate", "지금 기준과 같습니다");
+            throw invalid("distributionRate", "지금 기준과 같습니다. 바꿀 값을 입력해 주세요.");
         if (same != null && month.compareTo(mapper.selectCurrentMonth()) <= 0)
             throw invalid("effectiveMonth", "같은 시작월 수정은 미래 예정 기준만 가능합니다.");
         boolean amountChanged = before == null
@@ -189,10 +201,15 @@ public class CommonPartService {
         mapper.lockSources();
     }
     private void validate(Values values) {
-        if (PartRules.month(values.effectiveMonth()).isBefore(earliest(lastClosed())))
-            throw invalid("effectiveMonth", "마지막 마감 다음 달(마감이 없으면 자금수지 시작월)부터 선택해 주세요.");
+        String closed = lastClosed();
+        // 시안 문구: 마감된 달이 있으면 「적용 시작월은 마감된 달(..) 다음 달부터 고를 수 있습니다.」
+        YearMonth first = earliest(closed);
+        if (PartRules.month(values.effectiveMonth()).isBefore(first))
+            throw invalid("effectiveMonth", closed == null || !first.equals(fromDb(closed).plusMonths(1))
+                ? "마지막 마감 다음 달(마감이 없으면 자금수지 시작월)부터 선택해 주세요."
+                : "적용 시작월은 마감된 달(" + publicMonth(closed) + ") 다음 달부터 고를 수 있습니다.");
         if (mapper.selectLeaders().stream().noneMatch(row -> row.userId.equals(values.leaderUserId())))
-            throw invalid("leaderUserId", "사용 중인 영업 파트장 사용자를 선택해 주세요.");
+            throw invalid("leaderUserId", "파트장을 골라 주세요.");
     }
     private YearMonth earliest(String closed) {
         BigDecimal value = periods.selectCashBaseYm();
@@ -207,7 +224,7 @@ public class CommonPartService {
         return periods.selectClosedMonths().stream().max(String::compareTo).orElse(null);
     }
     private void uniqueName(String name, String exceptId) {
-        if (mapper.nameExists(name, exceptId)) throw invalid("partName", "이미 쓰고 있는 파트명입니다.");
+        if (mapper.nameExists(name, exceptId)) throw invalid("partName", "같은 이름의 파트가 이미 있습니다.");
     }
     private PartRows.Master require(String id) {
         if (id == null || id.isBlank() || id.length() > 20) throw invalid("partId", "파트를 확인해 주세요.");
@@ -227,7 +244,8 @@ public class CommonPartService {
             .orElseThrow(() -> invalid("partId", "파트의 기준 기간을 확인해 주세요."));
         var next = rows.stream().filter(value -> value.month.compareTo(now) > 0)
             .min(Comparator.comparing(value -> value.month)).orElse(null);
-        String scheduled = next == null ? null : publicMonth(next.month) + "월부터 "
+        // 시안 「예정된 변경」 배지: 「2026-12부터 40%」
+        String scheduled = next == null ? null : publicMonth(next.month) + "부터 "
             + next.distributionRate.stripTrailingZeros().toPlainString() + "%";
         return new Part(master.partId, master.partName, row.leaderUserId, row.leaderName,
             row.distributionRate, row.salesExpense, publicMonth(row.month), publicMonth(row.endMonth),

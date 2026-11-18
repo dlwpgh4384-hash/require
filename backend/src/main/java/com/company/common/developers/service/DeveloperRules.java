@@ -51,7 +51,7 @@ public final class DeveloperRules {
         if (editing) { allowed.remove("managementNumber"); allowed.add("modifiedAt"); }
         ClientRules.object(body, allowed);
         String number = editing ? null : text(body, "managementNumber", 20, false);
-        if (number != null && !number.matches("[A-Za-z0-9-]{1,20}")) throw invalid("managementNumber");
+        if (number != null && !number.matches("[A-Za-z0-9-]{1,20}")) throw CodeFailure.invalid("managementNumber", "관리번호는 영문·숫자·하이픈으로 20자 이내로 적어 주세요.");
         if (!body.has("organizationId") || !body.get("organizationId").isTextual()) throw invalid("organizationId");
         String organization = body.get("organizationId").textValue().trim();
         if (organization.length() > 20) throw invalid("organizationId");

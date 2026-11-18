@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ProjectLink } from "../projects/ProjectLink";
 import { Badge, Banner, DetailPanel, KeyValues } from "../../shared/list";
 import { Dialog } from "../../shared/feedback/Dialog";
 import { formatDateTime, koreanToday } from "../../shared/time";
@@ -320,13 +319,8 @@ export function DeveloperDetail({
                       key={`${a.projectName}-${a.startDate}-${i}`}
                       data-testid={`developer-assignment-${i}`}
                     >
-                      <td>
-                        <ProjectLink
-                          projectId={a.projectId}
-                          name={a.projectName}
-                          testId={`developer-history-project-${i}`}
-                        />
-                      </td>
+                      {/* 시안: 투입 이력의 프로젝트는 글자만(링크 아님) */}
+                      <td>{a.projectName}</td>
                       <td>{a.jobName}</td>
                       <td>
                         {a.startDate} ~ {a.endDate}

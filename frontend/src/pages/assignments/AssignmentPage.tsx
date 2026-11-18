@@ -18,7 +18,7 @@ import { feedbackMessages } from "../../shared/feedback/messages";
 import { getCommonCodes } from "../codegroups/codeGroups";
 import { ProjectLink } from "../projects/ProjectLink";
 import { getCommonProjects, projectFailure, won, type Project } from "../projects/projects";
-import { useProjectTitleHost } from "../projects/ProjectWorkspace";
+import { useAssignmentTitleHost } from "./AssignmentWorkspace";
 import { UploadActions } from "../uploads/UploadActions";
 import { AssignmentDetail } from "./AssignmentDetail";
 import { AssignmentForm } from "./AssignmentForm";
@@ -76,7 +76,7 @@ const sortValue = (a: Assignment, key: string): string | number => {
 
 /** 시안 투입 배정(UI-12): 연도 줄, 조건, 배정 후보 카드, 공통 목록, 상세·배정 창. */
 export function AssignmentPage({ roles = developmentRoles }: { roles?: readonly string[] }) {
-  const host = useProjectTitleHost();
+  const host = useAssignmentTitleHost();
   const presentation = useListPresentation();
   const currentYear = Number(koreanToday().slice(0, 4));
   const [year, setYear] = useState(currentYear);

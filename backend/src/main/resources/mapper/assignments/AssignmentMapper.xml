@@ -19,6 +19,14 @@
   </sql>
   <sql id="joins">FROM TB_PJ_ASGN a JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID JOIN TB_HR_DEV d ON d.DEV_ID=a.DEV_ID
     LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=a.JOB_CD</sql>
+  <!-- 목록 경고 「영업 파트 다름」(시안 warnOf): 내부 제외, 지금 달 프로젝트 파트와 개발자 소속 파트가 모두 있고 다름 -->
+  <select id="partMismatchIds" resultType="string">
+    SELECT a.ASGN_ID FROM TB_PJ_ASGN a JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID JOIN TB_HR_DEV d ON d.DEV_ID=a.DEV_ID
+    JOIN LATERAL (SELECT h.PART_ID FROM TB_PJ_PROJ_PART h WHERE h.PROJ_ID=p.PROJ_ID AND h.APLY_BGN_YM &lt;= #{month}
+      ORDER BY h.APLY_BGN_YM DESC LIMIT 1) pp ON true
+    WHERE a.ASGN_ID IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+      AND p.CTRT_TYPE_CD&lt;&gt;'IN' AND pp.PART_ID IS NOT NULL AND d.PART_ID IS NOT NULL AND d.PART_ID&lt;&gt;pp.PART_ID
+  </select>
   <select id="rows" resultMap="row">SELECT <include refid="columns"/> <include refid="joins"/> ORDER BY a.INPUT_BGN_DT ASC,a.ASGN_ID ASC</select>
   <select id="listRows" resultMap="row">SELECT <include refid="columns"/> <include refid="joins"/>
     WHERE a.ASGN_STAT_CD='ACT' AND a.INPUT_BGN_DT &lt;= make_date(#{year},12,31) AND a.INPUT_END_DT &gt;= make_date(#{year},1,1)

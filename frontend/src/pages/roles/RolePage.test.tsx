@@ -169,7 +169,7 @@ beforeEach(() => {
     if (path === "/api/common/roles") {
       if (init?.method === "POST") {
         if (failCopy)
-          return error("roleName", "이미 쓰고 있는 역할 이름입니다.");
+          return error("roleName", "이미 있는 역할입니다.");
         const input = JSON.parse(String(init.body));
         const blank = !input.sourceRoleId;
         const source = settings.get(input.sourceRoleId ?? "ADMIN")!;
@@ -495,7 +495,11 @@ it("copy (시안): picks the role to copy, sends its scope and selects the new t
   ).toBeInTheDocument();
   expect(screen.queryByTestId("role-copy-scope")).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId("role-copy-save"));
-  await screen.findByText("새 역할 이름을 1~50자로 입력해 주세요.");
+  await screen.findByText("역할 이름을 넣어 주세요.");
+  expect(screen.getByTestId("role-copy-name")).toHaveAttribute(
+    "maxLength",
+    "30",
+  );
   expect(writes("POST")).toHaveLength(0);
   fireEvent.change(screen.getByTestId("role-copy-source"), {
     target: { value: "PM" },
@@ -516,6 +520,9 @@ it("copy (시안): picks the role to copy, sends its scope and selects the new t
     dataScopeCd: "PROJ",
   });
   expect(screen.queryByTestId("role-copy-dialog")).not.toBeInTheDocument();
+  expect(await screen.findByTestId("role-toast")).toHaveTextContent(
+    "「일반 사용자(PM)」을 복사해 「 합성 새 역할 」 역할을 만들었습니다.",
+  );
 });
 it("add (시안): name and scope only, starts with every menu 「권한 없음」", async () => {
   renderPage();
@@ -541,6 +548,9 @@ it("add (시안): name and scope only, starts with every menu 「권한 없음�
     roleName: "프로젝트 지원",
     dataScopeCd: "PROJ",
   });
+  expect(await screen.findByTestId("role-toast")).toHaveTextContent(
+    "「프로젝트 지원」 역할을 추가했습니다. 권한을 체크한 뒤 저장하세요.",
+  );
   await waitFor(() =>
     expect(screen.getByTestId("role-m028-readyn")).not.toBeChecked(),
   );
@@ -608,7 +618,20 @@ it("copy duplicate errors preserve the entered name and modal", async () => {
       "true",
     ),
   );
+  expect(screen.getByText("이미 있는 역할입니다.")).toBeInTheDocument();
+  expect(writes("POST")).toHaveLength(0);
   expect(screen.getByTestId("role-copy-name")).toHaveValue("경영진");
+  // 목록에 없는 이름(사용 중지된 역할 등)은 서버가 막고, 입력과 창은 그대로 둔다.
+  fireEvent.change(screen.getByTestId("role-copy-name"), {
+    target: { value: "중지된 역할" },
+  });
+  fireEvent.click(screen.getByTestId("role-copy-save"));
+  await waitFor(() => expect(writes("POST")).toHaveLength(1));
+  await waitFor(() =>
+    expect(screen.getByTestId("role-copy-save")).not.toBeDisabled(),
+  );
+  expect(screen.getByText("이미 있는 역할입니다.")).toBeInTheDocument();
+  expect(screen.getByTestId("role-copy-name")).toHaveValue("중지된 역할");
 });
 it("copy cancel reuses dirty confirmation without creating a role", async () => {
   renderPage();
@@ -626,11 +649,16 @@ it("copy cancel reuses dirty confirmation without creating a role", async () => 
   expect(screen.queryByTestId("role-copy-dialog")).not.toBeInTheDocument();
   expect(writes()).toHaveLength(0);
 });
-it("stop runs directly, refetches active tabs and user options, without a stop confirmation", async () => {
+it("시안 UI-24: 제목줄 [사용 중지] → 확인 창 → 중지하고 탭·사용자 선택지를 다시 읽는다", async () => {
   renderPage();
   await loaded();
   await select("R-001");
   fireEvent.click(screen.getByTestId("role-stop"));
+  const confirm = await screen.findByTestId("role-stop-confirm");
+  expect(confirm).toHaveTextContent(/「.+」 역할의 사용을 중지할까요\?/);
+  expect(confirm).toHaveTextContent("삭제가 아니며 기록과 역할 번호는 그대로 남고, 번호는 다시 쓰지 않습니다.");
+  expect(writes("POST")).toHaveLength(0);
+  fireEvent.click(screen.getByTestId("confirmation-proceed"));
   await waitFor(() =>
     expect(screen.queryByTestId("role-tab-r-001")).not.toBeInTheDocument(),
   );
@@ -641,6 +669,18 @@ it("stop runs directly, refetches active tabs and user options, without a stop c
     ).toBe(true),
   );
   expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  expect(await screen.findByText(/「.+」 역할의 사용을 중지했습니다\./)).toBeVisible();
+});
+it("시안 UI-24: 사용 중지 확인 창에서 [취소]하면 아무것도 쓰지 않는다", async () => {
+  renderPage();
+  await loaded();
+  await select("R-001");
+  fireEvent.click(screen.getByTestId("role-stop"));
+  await screen.findByTestId("role-stop-confirm");
+  fireEvent.click(screen.getByTestId("confirmation-cancel"));
+  expect(screen.queryByTestId("role-stop-confirm")).not.toBeInTheDocument();
+  expect(writes("POST")).toHaveLength(0);
+  expect(screen.getByTestId("role-tab-r-001")).toBeInTheDocument();
 });
 it("assigned-role stop displays exact count and user-screen guidance and keeps its active tab", async () => {
   stopAssigned = true;
@@ -648,6 +688,7 @@ it("assigned-role stop displays exact count and user-screen guidance and keeps i
   await loaded();
   await select("R-001");
   fireEvent.click(screen.getByTestId("role-stop"));
+  fireEvent.click(await screen.findByTestId("confirmation-proceed"));
   await screen.findByTestId("role-failure");
   expect(screen.getByTestId("role-failure")).toHaveTextContent(
     "2명이 이 역할을 쓰고 있습니다. 시스템 › 사용자에서 먼저 빼 주세요.",
@@ -671,5 +712,8 @@ it("dirty cancel and role navigation use existing confirmation and notify the sh
   fireEvent.click(screen.getByTestId("role-cancel"));
   fireEvent.click(screen.getByTestId("confirmation-proceed"));
   expect(screen.getByTestId("role-sensitive")).toBeChecked();
+  expect(await screen.findByTestId("role-toast")).toHaveTextContent(
+    "변경을 취소했습니다.",
+  );
   expect(writes()).toHaveLength(0);
 });

@@ -25,8 +25,8 @@
       WHERE EXISTS (SELECT 1 FROM TB_SY_USER_SCOPE sc WHERE sc.USER_ID=u.USER_ID
         AND sc.SCOPE_TYPE_CD='PROJ' AND sc.PROJ_ID=p.PROJ_ID)
       AND EXISTS (SELECT 1 FROM TB_SY_USER_ROLE ur WHERE ur.USER_ID=u.USER_ID AND ur.ROLE_ID='PM')) AS "pmName",
-    (SELECT COUNT(DISTINCT a.DEV_ID) FROM TB_PJ_ASGN a WHERE a.PROJ_ID=p.PROJ_ID
-      AND a.ASGN_STAT_CD!='CNCL' AND a.INPUT_BGN_DT &lt;= #{today} AND a.INPUT_END_DT &gt;= #{today}) AS "assignedPeopleCount",
+    (SELECT COUNT(*) FROM TB_PJ_ASGN a WHERE a.PROJ_ID=p.PROJ_ID
+      AND a.ASGN_STAT_CD!='CNCL') AS "assignedPeopleCount",
     (SELECT cd.CODE_NM FROM TB_PJ_TK_DSTRB d JOIN TB_SY_CODE cd
       ON cd.CODE_GRP_ID='DSTRB_STEP' AND cd.CODE=d.DSTRB_STEP_CD WHERE d.PROJ_ID=p.PROJ_ID
       ORDER BY cd.SORT_ORD DESC LIMIT 1) AS "distributionStepName"
@@ -178,7 +178,8 @@
     SELECT PROJ_ID FROM TB_SY_USER_SCOPE WHERE USER_ID=#{userId} AND SCOPE_TYPE_CD='PROJ'
   </select>
   <select id="manpower" resultType="com.company.common.projects.dto.ProjectContracts$Manpower">
-    WITH actual AS (SELECT a.JOB_CD,SUM(a.CTRT_MM) mm FROM TB_PJ_ASGN a
+    WITH actual AS (SELECT a.JOB_CD,SUM(m.MON_MM) mm FROM TB_PJ_ASGN a
+      JOIN TB_PJ_ASGN_MON m ON m.ASGN_ID=a.ASGN_ID
       WHERE a.PROJ_ID=#{id} AND a.ASGN_STAT_CD!='CNCL' GROUP BY a.JOB_CD),
       jobs AS (SELECT JOB_CD FROM actual UNION SELECT JOB_CD FROM TB_PJ_MNPW_PLAN WHERE PROJ_ID=#{id})
     SELECT j.JOB_CD AS "jobCode",c.CODE_NM AS "jobName",p.PLAN_MM AS "plannedMm",

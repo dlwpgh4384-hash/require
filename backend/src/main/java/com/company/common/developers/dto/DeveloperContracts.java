@@ -35,6 +35,7 @@ public final class DeveloperContracts {
     public record UseInput(List<String> developerIds, String useYn) {}
     public record UseIssue(String developerId, String name, String reason) {}
     public record UseResult(List<String> processedDeveloperIds, List<UseIssue> rejected) {}
+    /** actor = 처리자(TB_SY_CHG_HIST.REG_USER_ID). */
     public record Audit(String developerId, String type, String fieldName, String beforeValue,
-        String afterValue, String reason) {}
+        String afterValue, String reason, String actor) {}
 }

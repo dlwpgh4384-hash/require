@@ -98,10 +98,12 @@ public final class ProjectRules {
             String code = text(job, "jobCode", 10, true);
             if (!seen.add(code)) throw invalid("jobs");
             var n = job.get("plannedMm");
-            if (n != null && !n.isNull() && !n.isNumber()) throw invalid("jobs");
+            // 시안 문구: 「{직무} 계획 MM은 0 이상 숫자(소수 둘째 자리까지)로 넣어 주세요.」(서버는 직무 이름을 몰라 코드로 적는다)
+            var wrongMm = CodeFailure.invalid("jobs", code + " 계획 MM은 0 이상 숫자(소수 둘째 자리까지)로 넣어 주세요.");
+            if (n != null && !n.isNull() && !n.isNumber()) throw wrongMm;
             BigDecimal mm = n == null || n.isNull() ? BigDecimal.ZERO : n.decimalValue();
             if (mm.signum() < 0 || mm.stripTrailingZeros().scale() > 2
-                || mm.compareTo(new BigDecimal("9999.99")) > 0) throw invalid("jobs");
+                || mm.compareTo(new BigDecimal("9999.99")) > 0) throw wrongMm;
             result.add(new JobInput(code, mm));
         }
         return new ManpowerInput(result);

@@ -33,8 +33,14 @@ export function MenuRegistrationDialog({
   const [closing, setClosing] = useState(false);
   const lock = useRef(false);
   const form = useRef<HTMLFormElement>(null);
+  /** 시안: 상위 대메뉴는 첫 묶음이 골라진 채로 열린다. 그 값은 바꾼 것으로 보지 않는다. */
+  const firstParent = options?.upperMenus[0]?.menuId ?? "";
   const dirty =
-    name !== "" || parent !== "" || screenId !== "" || pcOnly || level !== 2;
+    name !== "" ||
+    (parent !== "" && parent !== firstParent) ||
+    screenId !== "" ||
+    pcOnly ||
+    level !== 2;
   useEffect(() => {
     onDirty?.(dirty);
     return () => onDirty?.(false);
@@ -45,7 +51,10 @@ export function MenuRegistrationDialog({
     setOptionFailure("");
     void api.getCommonMenuOptions(level, controller.signal).then(
       (value) => {
-        if (!controller.signal.aborted) setOptions(value);
+        if (controller.signal.aborted) return;
+        setOptions(value);
+        if (level === 2)
+          setParent((current) => current || value.upperMenus[0]?.menuId || "");
       },
       () => {
         if (!controller.signal.aborted)
@@ -73,12 +82,12 @@ export function MenuRegistrationDialog({
     if (lock.current) return;
     const invalid: Record<string, string> = {};
     if (!name.trim() || [...name].length > 50)
-      invalid.menuNm = "메뉴 이름을 1~50자로 입력해 주세요.";
+      invalid.menuNm = "메뉴 이름을 넣어 주세요.";
     if (level === 2) {
       if (!options?.upperMenus.some((row) => row.menuId === parent))
         invalid.upperMenuId = "상위 대메뉴를 선택해 주세요.";
       if (!screens.some((row) => row.scrnId === screenId))
-        invalid.scrnId = "개발된 미등록 화면을 선택해 주세요.";
+        invalid.scrnId = "화면 번호를 골라 주세요.";
     }
     setErrors(invalid);
     if (Object.keys(invalid).length || !options) return;
@@ -200,7 +209,9 @@ export function MenuRegistrationDialog({
                 aria-invalid={!!errors.upperMenuId}
                 onChange={(event) => setParent(event.target.value)}
               >
-                <option value="">선택해 주세요</option>
+                {!options?.upperMenus.length && (
+                  <option value="">선택해 주세요</option>
+                )}
                 {options?.upperMenus.map((row) => (
                   <option key={row.menuId} value={row.menuId}>
                     {row.menuNm}
@@ -226,7 +237,7 @@ export function MenuRegistrationDialog({
                 </option>
                 {screens.map((row) => (
                   <option key={row.scrnId} value={row.scrnId}>
-                    {row.scrnId} · {row.menuNm}
+                    {row.scrnId}
                   </option>
                 ))}
               </select>
@@ -261,7 +272,10 @@ export function MenuRegistrationDialog({
               )}
             </>
           ) : (
-            <p>대메뉴는 화면 번호가 없습니다.</p>
+            <p className="menu-registration-help">
+              대메뉴는 화면 번호가 없습니다. 서브메뉴를 넣거나 다른 메뉴를 끌어
+              넣어야 메뉴에 보입니다.
+            </p>
           )}
           {!options && !optionFailure && (
             <p role="status">선택 목록을 불러오는 중입니다.</p>

@@ -23,6 +23,7 @@ public interface PartMapper {
     int touch(@Param("id") String id, @Param("token") Instant token);
     int rename(@Param("id") String id, @Param("name") String name);
     int stop(@Param("id") String id);
+    int resume(@Param("id") String id);
     String selectLastConfirmed(@Param("id") String id, @Param("month") String month);
     List<UserRows.Change> selectHistory(@Param("id") String id);
     /** SER-006 접근 기록(UI-15): 영업 파트 목록 다운로드. */

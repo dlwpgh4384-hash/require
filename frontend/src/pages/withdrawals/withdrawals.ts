@@ -198,3 +198,6 @@ export async function getCommonWithdrawalsExcel(
 export const withdrawalRefreshEvent = "withdrawal-source-changed";
 export const notifyWithdrawalChanged = () =>
   window.dispatchEvent(new Event(withdrawalRefreshEvent));
+/** 시안은 연장 가능성을 「높음·보통·낮음」으로만 쓴다. 공통코드 이름의 「 (80%)」 같은 확률 표기는 화면에서 뺀다(2026-11-18 사용자). */
+export const extensionText = (name: string | null | undefined) =>
+  (name ?? "").replace(/\s*\(\s*\d+(\.\d+)?\s*%\s*\)\s*$/, "");

@@ -61,6 +61,8 @@ button:disabled {
   height: 100%;
   display: grid;
   grid-template-rows: 56px minmax(0, 1fr);
+  /* 열 폭을 창 폭에 맞춘다. 없으면 넓은 표가 화면 틀 전체를 창보다 넓혀 제목줄 오른쪽 단추가 잘린다(2026-11-18 사용자 발견). */
+  grid-template-columns: minmax(0, 1fr);
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -99,6 +101,7 @@ button:disabled {
   position: relative;
   display: flex;
   min-height: 0;
+  min-width: 0;
 }
 .sidebar {
   flex-shrink: 0;

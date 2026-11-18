@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
-  Banner,
   ListFilter,
   ListFilters,
   ListView,
@@ -29,6 +28,7 @@ import {
   type WithdrawalFilter,
   type WithdrawalList,
   type WithdrawalRow,
+  extensionText,
 } from "./withdrawals";
 import "../projects/projects.css";
 import "./withdrawals.css";
@@ -143,7 +143,7 @@ export function WithdrawalPage({ roles = [] }: { roles?: readonly string[] }) {
       .then(([j, e]) => {
         if (active) {
           setJobs(j.items ?? []);
-          setExtensions(e.items ?? []);
+          setExtensions((e.items ?? []).map((item) => ({ ...item, codeName: extensionText(item.codeName) })));
         }
       })
       .catch((reason) => {
@@ -435,22 +435,22 @@ export function WithdrawalPage({ roles = [] }: { roles?: readonly string[] }) {
         }}
       />
       {year === currentYear && (
-        <Banner kind={unassigned > 0 ? "warn" : "info"}>
+        // 시안 .banner: 아이콘과 글을 나란히 둔다(공통 Banner는 둘을 한 span에 넣어 줄이 바뀌면 둘째 줄이 아이콘 밑으로 간다).
+        <div className={`ls-banner ls-banner-${unassigned > 0 ? "warn" : "info"}`} role="status" data-testid={`banner-${unassigned > 0 ? "warn" : "info"}`}>
           {sparkle(16)}
           <span data-testid="withdrawal-next-banner">
             3개월 안 철수 {soon}명 중 연장 가능성이 높지 않고 다음 배정도 없는 사람{" "}
             <strong>{unassigned}명</strong> — 이 중 {matched}명은 맞는 자리가 있습니다. [다음 배정] 칸의{" "}
             <strong>추천</strong>을 눌러 가배정하세요.
           </span>
-        </Banner>
+        </div>
       )}
-      <Banner kind="info">
+      <div className="ls-banner ls-banner-info" role="status" data-testid="banner-info">
         {infoIcon}
         <span data-testid="withdrawal-info-banner">
-          {" "}
           {year}년에 철수하는(했던) 인력입니다. [기간] 조건으로 &apos;3개월 안&apos;만 볼 수 있습니다. 연장 가능성을 바꾸면 인력 운영 보드와 수요 예측에 바로 반영됩니다.
         </span>
-      </Banner>
+      </div>
       <ListFilters
         testId="withdrawal-filters"
         onSearch={() => {
@@ -528,7 +528,7 @@ export function WithdrawalPage({ roles = [] }: { roles?: readonly string[] }) {
               <span>{row.endDate}</span>
             </div>
             <div className="ls-r2">
-              <span>연장 {row.extensionPossibilityName || "미정"}</span>
+              <span>연장 {extensionText(row.extensionPossibilityName) || "미정"}</span>
               <span>
                 {row.nextAssignment.hasTentativeAssignment
                   ? "가배정 있음"

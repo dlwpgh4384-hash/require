@@ -8,6 +8,7 @@ import {
   type WithdrawalRecommendation,
   type WithdrawalRecommendationsData,
   type WithdrawalRow,
+  extensionText,
 } from "./withdrawals";
 
 const infoIcon = (
@@ -131,7 +132,7 @@ export function WithdrawalRecommendations({
                   </span>
                 )),
               ],
-              ["연장 가능성", target?.extensionPossibilityName ?? row.extensionPossibilityName ?? "미정"],
+              ["연장 가능성", extensionText(target?.extensionPossibilityName ?? row.extensionPossibilityName) || "미정"],
               [
                 "대기 시작",
                 `${target?.waitingStartDate ?? dayAfter(row.endDate)}부터 (다음 자리가 없으면)`,

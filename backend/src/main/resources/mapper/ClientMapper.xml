@@ -24,6 +24,8 @@
     <result column="proj_id" property="projectId" javaType="java.lang.String"/>
     <result column="proj_nm" property="projectName" javaType="java.lang.String"/>
     <result column="dev_nm" property="personName" javaType="java.lang.String"/>
+    <result column="mng_no" property="managementNumber" javaType="java.lang.String"/>
+    <result column="ctrt_mm" property="monthlyMm" javaType="java.math.BigDecimal"/>
     <result column="company_name" property="companyName" javaType="java.lang.String"/>
     <result column="job_name" property="jobName" javaType="java.lang.String"/>
     <result column="input_end_dt" property="withdrawalDate" javaType="java.time.LocalDate"/>
@@ -75,7 +77,8 @@
           OR strpos(c.biz_reg_no, #{filter.keyword}) &gt; 0)
       </if>
     </where>
-    ORDER BY c.reg_dttm DESC, c.clnt_id
+    <!-- 시안 UI-15: 처음 정렬은 상호 가나다순 -->
+    ORDER BY c.clnt_nm, c.clnt_id
   </select>
   <select id="selectClient" resultMap="client">
     SELECT <include refid="columns"/>, <include refid="counts"/>
@@ -137,8 +140,8 @@
     SELECT EXISTS (SELECT 1 FROM TB_HR_DEV d WHERE d.blng_clnt_id=#{clientId})
   </select>
   <select id="selectAssignments" resultMap="assignment">
-    SELECT p.proj_id, p.proj_nm, d.dev_nm, COALESCE(v.clnt_nm,'') AS company_name,
-      COALESCE(j.code_nm,a.job_cd) AS job_name, a.input_end_dt
+    SELECT p.proj_id, p.proj_nm, d.dev_nm, d.mng_no, COALESCE(v.clnt_nm,'') AS company_name,
+      COALESCE(j.code_nm,a.job_cd) AS job_name, a.input_end_dt, a.ctrt_mm
     FROM TB_BS_CLNT c
     JOIN TB_PJ_ASGN a ON a.asgn_stat_cd='ACT'
     JOIN TB_PJ_PROJ p ON p.proj_id=a.proj_id
@@ -148,9 +151,21 @@
     WHERE c.clnt_id=#{clientId} AND <include refid="todayMembership"/>
     ORDER BY p.proj_nm, d.dev_nm, a.asgn_id
   </select>
+  <!-- 시안 UI-15 변경 이력: 코드 칸은 이름, 사용 여부는 사용/중지, 처리자는 사람 이름(없으면 아이디) -->
   <select id="selectChanges" resultMap="change">
-    SELECT h.reg_dttm, h.chg_item_nm, h.bfr_val, h.aft_val, h.reg_user_id
-    FROM TB_SY_CHG_HIST h WHERE h.trgt_tbl_nm='TB_BS_CLNT' AND h.trgt_key=#{clientId}
+    SELECT h.reg_dttm, h.chg_item_nm,
+      CASE WHEN h.chg_item_nm='사용 여부' THEN CASE h.bfr_val WHEN 'Y' THEN '사용' WHEN 'N' THEN '중지' ELSE h.bfr_val END
+           ELSE COALESCE(cb.code_nm, h.bfr_val) END AS bfr_val,
+      CASE WHEN h.chg_item_nm='사용 여부' THEN CASE h.aft_val WHEN 'Y' THEN '사용' WHEN 'N' THEN '중지' ELSE h.aft_val END
+           ELSE COALESCE(ca.code_nm, h.aft_val) END AS aft_val,
+      COALESCE(u.user_nm, h.reg_user_id) AS reg_user_id
+    FROM TB_SY_CHG_HIST h
+    LEFT JOIN TB_SY_CODE cb ON cb.code = h.bfr_val AND cb.code_grp_id =
+      CASE h.chg_item_nm WHEN '구분' THEN 'CLNT_TYPE' WHEN '업종' THEN 'INDUTY' WHEN '은행' THEN 'BANK' END
+    LEFT JOIN TB_SY_CODE ca ON ca.code = h.aft_val AND ca.code_grp_id =
+      CASE h.chg_item_nm WHEN '구분' THEN 'CLNT_TYPE' WHEN '업종' THEN 'INDUTY' WHEN '은행' THEN 'BANK' END
+    LEFT JOIN TB_SY_USER u ON u.user_id = h.reg_user_id
+    WHERE h.trgt_tbl_nm='TB_BS_CLNT' AND h.trgt_key=#{clientId}
     ORDER BY h.reg_dttm DESC, h.hist_id DESC
   </select>
   <select id="selectSelectableClientIds" resultType="java.lang.String">

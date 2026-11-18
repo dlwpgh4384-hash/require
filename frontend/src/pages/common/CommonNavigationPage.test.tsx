@@ -137,6 +137,17 @@ function fixture(): ShellMenuResponse {
   ]);
 }
 function respond(body: ShellMenuResponse) {
+  const withdrawalResponse = (url: string) => {
+    if (url.startsWith("/api/common/withdrawals?"))
+      return {
+        success: true,
+        meta: {},
+        data: { items: [], totalCount: 0, banner: null },
+      };
+    if (url.startsWith("/api/common/withdrawals/tentative-assignments?"))
+      return { success: true, meta: {}, data: { items: [] } };
+    return body;
+  };
   const request = vi.fn(async (url: string, _init?: RequestInit) => ({
     ok: true,
     status: 200,
@@ -184,7 +195,7 @@ function respond(body: ShellMenuResponse) {
                   url,
                 )
               ? { success: true, meta: {}, data: { items: [] } }
-              : body,
+              : withdrawalResponse(url),
   }));
   vi.stubGlobal("fetch", request);
   return request;
@@ -196,11 +207,15 @@ type Content = ReturnType<typeof within>;
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
   "UI-01": async () => undefined,
+  "UI-05": async (content) => {
+    expect(await content.findByTestId("list-empty")).toBeVisible();
+    expect(content.getByLabelText("기간")).toBeVisible();
+    // 엑셀 다운로드는 목록 도구줄 한 곳(사용자 결정 2026-11-18)
+    expect(content.getByTestId("list-download")).toBeVisible();
+  },
   "UI-12": async (content) => {
     expect(await content.findByTestId("assignment-empty")).toBeVisible();
-    expect(
-      content.getByRole("textbox", { name: "이름" }),
-    ).toBeVisible();
+    expect(content.getByRole("textbox", { name: "이름" })).toBeVisible();
     expect(content.getByRole("textbox", { name: "이름" })).toHaveAttribute(
       "placeholder",
       "이름 또는 관리번호",
@@ -348,9 +363,7 @@ describe("common placeholder screen contract", () => {
       ).toBe(true),
     );
     await expectScreenContent("UI-12");
-    expect(screen.getByRole("textbox", { name: "이름" })).toHaveValue(
-      "D-0001",
-    );
+    expect(screen.getByRole("textbox", { name: "이름" })).toHaveValue("D-0001");
     expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-12");
     expect(screen.getAllByRole("main")).toHaveLength(1);
     expect(
@@ -512,6 +525,8 @@ describe("common placeholder screen contract", () => {
         expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
         for (const name of ["조회", "저장", "다운로드", "업로드", "편집"]) {
           if (id === "UI-25" && name === "저장")
+            expect(screen.getByRole("button", { name })).toBeEnabled();
+          else if (id === "UI-05" && name === "조회")
             expect(screen.getByRole("button", { name })).toBeEnabled();
           else
             expect(

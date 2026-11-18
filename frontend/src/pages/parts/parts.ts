@@ -101,6 +101,8 @@ export const putCommonPartStandards = (
   );
 export const putCommonPartStop = (id: string, modifiedAt: string | null) =>
   partRequest<Part>(`${idPath(id)}/stop`, write("PUT", { modifiedAt }));
+export const putCommonPartResume = (id: string, modifiedAt: string | null) =>
+  partRequest<Part>(`${idPath(id)}/resume`, write("PUT", { modifiedAt }));
 export const partErrorMessage = (value: unknown) =>
   value instanceof Error
     ? value.message

@@ -252,6 +252,55 @@ it("draft marks UI-27 dirty and cancel restores server values with zero writes",
   fireEvent.click(screen.getByTestId("operating-cancel"));
   expect(screen.getByLabelText("부가세율")).toHaveValue("10");
   expect(dirty).toHaveBeenLastCalledWith("UI-27", false);
+  expect(screen.getByTestId("operating-toast")).toHaveTextContent(
+    "변경을 취소했습니다.",
+  );
+  expect(writes()).toHaveLength(0);
+});
+it("[취소] with nothing changed says 바꾼 내용이 없습니다 (시안)", async () => {
+  await mount();
+  fireEvent.click(screen.getByTestId("operating-cancel"));
+  expect(screen.getByTestId("operating-toast")).toHaveTextContent(
+    "바꾼 내용이 없습니다.",
+  );
+  expect(writes()).toHaveLength(0);
+});
+it("save dialog starts at the month after this month, min is the month after the closed month (시안)", async () => {
+  closedMonth = "2026-11";
+  await mount();
+  change("vat-rt", "11");
+  openSave();
+  const input = screen.getByTestId("operating-effective-month");
+  expect(input).toHaveValue("2026-12");
+  expect(input).toHaveAttribute("min", "2026-12");
+  expect(screen.queryByTestId("operating-cash-note")).not.toBeInTheDocument();
+  fireEvent.change(input, { target: { value: "2026-11" } });
+  fireEvent.click(screen.getByTestId("operating-save-confirm"));
+  expect(
+    within(screen.getByTestId("operating-save-dialog")).getAllByText(
+      "적용 시작월은 2026-12 이후로 골라 주세요.",
+    ).length,
+  ).toBeGreaterThan(0);
+  expect(writes()).toHaveLength(0);
+});
+it("save dialog shows the 자금수지 line when those values are included (시안)", async () => {
+  await mount();
+  change("cash-base-amt", "2000");
+  openSave();
+  expect(screen.getByTestId("operating-cash-note")).toHaveTextContent(
+    "자금수지 시작 월·기초 잔액은 적용 시작월 없이 바로 바뀌고, 자금수지표를 다시 계산합니다.",
+  );
+});
+it("number boxes use the mockup 「이름: 숫자로 넣어 주세요.」 wording", async () => {
+  await mount();
+  change("vat-rt", ".");
+  openSave();
+  expect(screen.getByText("부가세율: 숫자로 넣어 주세요.")).toBeInTheDocument();
+  change("dun-d1", ".");
+  openSave();
+  expect(
+    screen.getByText("미수 알림 1·2·3단계: 칸마다 숫자를 넣어 주세요."),
+  ).toBeInTheDocument();
   expect(writes()).toHaveLength(0);
 });
 it("M4 cancel preserves parent draft and sends no PUT", async () => {
@@ -307,7 +356,9 @@ it("AI sum other than 100 has a field error and zero calls", async () => {
   change("ai-score-job", "26");
   openSave();
   expect(
-    screen.getByText("AI 배점 합계는 100이어야 합니다."),
+    screen.getByText(
+      "AI 추천 배점(합계 100): 합계가 101점입니다. 100점으로 맞춰 주세요.",
+    ),
   ).toBeInTheDocument();
   expect(screen.queryByTestId("operating-save-dialog")).not.toBeInTheDocument();
   expect(writes()).toHaveLength(0);
@@ -331,8 +382,20 @@ it("reversed receivable stages reject before a write", async () => {
   change("dun-d2", "7");
   openSave();
   expect(
-    screen.getAllByText("미수 알림은 1단계 < 2단계 < 3단계로 입력해 주세요.")
-      .length,
+    screen.getAllByText(
+      "미수 알림 1·2·3단계: 1단계 < 2단계 < 3단계 순서로 넣어 주세요(1일 이상).",
+    ).length,
+  ).toBeGreaterThan(0);
+  expect(writes()).toHaveLength(0);
+});
+it("receivable first stage under 1 day is rejected (시안 1일 이상)", async () => {
+  await mount();
+  change("dun-d1", "0");
+  openSave();
+  expect(
+    screen.getAllByText(
+      "미수 알림 1·2·3단계: 1단계 < 2단계 < 3단계 순서로 넣어 주세요(1일 이상).",
+    ).length,
   ).toBeGreaterThan(0);
   expect(writes()).toHaveLength(0);
 });
@@ -343,7 +406,7 @@ it.each(["-1", "100.0001"])(
     change("ext-prbl-h", value);
     openSave();
     expect(
-      screen.getByText("확률은 0~100으로 입력해 주세요."),
+      screen.getByText("연장 확률 높음·보통·낮음·미정: 0~100 사이로 넣어 주세요."),
     ).toBeInTheDocument();
     expect(writes()).toHaveLength(0);
   },

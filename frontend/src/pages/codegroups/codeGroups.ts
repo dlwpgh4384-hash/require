@@ -124,22 +124,48 @@ export const targetFields = [
   "FROM",
   "VNDR",
 ];
+/** 시안 코드 이름 칸 maxlength(입력 규칙, DB 칸 크기는 그대로). */
+export const CODE_NAME_MAX = 50;
+/** 시안 「수당코드 추가」 이름 칸 maxlength. */
+export const ALLOWANCE_NAME_MAX = 30;
+/** 시안 추가값 칸 이름: 괄호 설명을 뺀 이름(예: 견적 기준 단가(원) → 견적 기준 단가). */
+const extraName = (label: string) => label.replace(/\s*\(.*\)/, "");
+/** 시안 문구로 코드 입력을 검사한다. 칸마다 첫 오류 하나. */
 export function validateCode(
   input: CodeInput,
   groupId: string,
 ): Record<string, string> {
   const errors: Record<string, string> = {};
   if (!/^[A-Za-z0-9_]{1,20}$/.test(input.code))
-    errors.code = "코드는 대문자·숫자·_ 20자 이내로 입력해 주세요.";
-  if (!input.codeName.trim() || [...input.codeName].length > 100)
-    errors.codeName = "이름을 1~100자로 입력해 주세요.";
+    errors.code = "코드는 영문 대문자·숫자·_ 로 넣어 주세요.";
+  if (!input.codeName.trim() || [...input.codeName].length > CODE_NAME_MAX)
+    errors.codeName = "이름을 넣어 주세요.";
   for (const field of codeExtraFields(groupId)) {
     const value = input[field.key];
     if (value === undefined || value === null || String(value).trim() === "")
-      errors[field.key] = `${field.label}을 입력해 주세요.`;
+      errors[field.key] = `「${extraName(field.label)}」 칸을 채워 주세요.`;
   }
-  if (input.targetField && !targetFields.includes(input.targetField))
+  if (
+    input.targetField &&
+    !targetFields.includes(input.targetField.trim().toUpperCase())
+  )
     errors.targetField =
       "넣을 칸은 NAME·TEL·MAIL·ADDR·SKILL·WANT·FROM·VNDR 중 하나로 넣어 주세요.";
   return errors;
+}
+/**
+ * 시안 코드 표 [저장] 검사: 이름이 빈 줄이 있으면 「코드 이름은 비울 수 없습니다.」,
+ * 추가값 오류는 「코드 · 오류」 한 줄. 문제가 없으면 빈 문자열.
+ */
+export function codeTableError(rows: CodeItem[], groupId: string): string {
+  if (rows.some((row) => !row.codeName.trim()))
+    return "코드 이름은 비울 수 없습니다.";
+  for (const row of rows) {
+    const errors = validateCode(row, groupId);
+    const first = codeExtraFields(groupId)
+      .map((field) => errors[field.key])
+      .find(Boolean);
+    if (first) return `${row.code} · ${first}`;
+  }
+  return "";
 }

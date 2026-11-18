@@ -96,12 +96,14 @@ class CommonRoleControllerTest {
     @ParameterizedTest @ValueSource(strings={"", "   ", "\u00a0"})
     void whitespaceNamesAreRejected(String name) throws Exception {
         mvc.perform(post("/api/common/roles").contentType("application/json").content(copy(name)))
-            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("roleName"));
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("roleName"))
+            .andExpect(jsonPath("$.errors[0].message").value("역할 이름을 넣어 주세요."));
     }
     @Test void unicodeNameLimitCountsCodePointsAndPreservesAcceptedSpaces() throws Exception {
-        mvc.perform(post("/api/common/roles").contentType("application/json").content(copy("😀".repeat(51))))
+        // 시안 역할 이름 칸 maxlength 30(입력 규칙). DB 칸 크기는 그대로.
+        mvc.perform(post("/api/common/roles").contentType("application/json").content(copy("😀".repeat(31))))
             .andExpect(status().isBadRequest());
-        mvc.perform(post("/api/common/roles").contentType("application/json").content(copy("😀".repeat(50))))
+        mvc.perform(post("/api/common/roles").contentType("application/json").content(copy("😀".repeat(30))))
             .andExpect(status().isOk());
         mvc.perform(post("/api/common/roles").contentType("application/json").content(copy(" 합성 ")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.role.roleName").value(" 합성 "));
@@ -110,7 +112,8 @@ class CommonRoleControllerTest {
         var before = List.copyOf(data.menus.get("R-001"));
         data.roles.get("R-001").useYn="N";
         mvc.perform(post("/api/common/roles").contentType("application/json").content(copy("합성 추가 역할")))
-            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("roleName"));
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("roleName"))
+            .andExpect(jsonPath("$.errors[0].message").value("이미 있는 역할입니다."));
         verify(mapper,never()).insertRole(anyString(),any(),any(),anyInt());
         assertThat(data.roles).hasSize(6);
         assertThat(data.roles.get("R-001").useYn).isEqualTo("N");

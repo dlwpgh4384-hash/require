@@ -141,6 +141,18 @@ class AssignmentPersistenceTest {
         assertThat(db.queryForList("SELECT * FROM TB_PJ_ASGN_MON WHERE ASGN_ID=? AND INPUT_YM='202610'",id)).isEqualTo(closedMonth);
         assertThat(db.queryForObject("SELECT COUNT(*) FROM TB_PJ_ASGN_MON WHERE ASGN_ID=? AND INPUT_YM>'202610'",Long.class,id)).isZero();assertThat(count("TB_CO_MON_COST")).isZero();assertThat(db.queryForObject("SELECT ASGN_STAT_CD FROM TB_PJ_ASGN WHERE ASGN_ID=?",String.class,id)).isEqualTo("CNCL");
     }
+    /** 시안 warnOf: 프로젝트 지금 파트와 개발자 소속 파트가 다르면 목록 경고 「영업 파트 다름」, 내부 프로젝트는 제외(2026-11-18 시안대로). */
+    @Test void listWarnsWhenDeveloperPartDiffersFromProjectPart()throws Exception {
+        String id=create("assignment-dev-a").path("assignmentId").asText();
+        java.util.function.Supplier<String> warnings=()->{try{var items=data(mvc.perform(get("/api/common/assignments").param("year","2026")).andExpect(status().isOk())).path("items");
+            for(var i:items) if(i.path("assignmentId").asText().equals(id)) return i.path("warnings").toString(); return "";}catch(Exception e){throw new IllegalStateException(e);}};
+        assertThat(warnings.get()).doesNotContain("영업 파트 다름");
+        db.update("INSERT INTO TB_BS_PART(PART_ID,PART_NM,HQ_YN,USE_YN,REG_USER_ID) VALUES('assignment-part-2','다른 영업파트','N','Y','admin')");
+        db.update("UPDATE TB_HR_DEV SET PART_ID='assignment-part-2' WHERE DEV_ID='assignment-dev-a'");
+        assertThat(warnings.get()).contains("영업 파트 다름");
+        db.update("UPDATE TB_PJ_PROJ SET CTRT_TYPE_CD='IN' WHERE PROJ_ID='P-TEST'");
+        assertThat(warnings.get()).doesNotContain("영업 파트 다름");
+    }
     @Test void overloadWarningOnlyCountsMonthsTheAssignmentCovers()throws Exception {
         String first=data(mvc.perform(post("/api/common/assignments").contentType("application/json").content(input("assignment-dev-a").put("startDate","2026-10-01").put("endDate","2026-11-30").toString())).andExpect(status().isOk())).path("assignmentId").asText();
         String second=data(mvc.perform(post("/api/common/assignments").contentType("application/json").content(input("assignment-dev-a").put("startDate","2026-11-01").put("endDate","2026-11-30").put("monthlyMm",0.5).toString())).andExpect(status().isOk())).path("assignmentId").asText();
@@ -355,6 +367,12 @@ class AssignmentPersistenceTest {
         create("assignment-dev-b");
         assertThat(projects.selectProject("P-TEST",LocalDate.of(2026,11,15),"202611").assignedPeopleCount)
             .isEqualTo(2);
+        // 인원 계획 실제 MM = 투입 기간 전체 MM(월별 투입 합, 시안 asgTotal·SFR-101-11). 월 MM 1 × 두 명을 더한 2가 아니다.
+        var total=db.queryForObject("SELECT SUM(MON_MM) FROM TB_PJ_ASGN_MON WHERE PROJ_ID='P-TEST'",java.math.BigDecimal.class);
+        assertThat(projects.manpower("P-TEST")).singleElement().satisfies(row -> {
+            assertThat(row.actualMm).isEqualByComparingTo(total);
+            assertThat(row.actualMm).isGreaterThan(new java.math.BigDecimal("2"));
+        });
         assertThat(projects.mismatches("P-TEST"))
             .noneSatisfy(warning -> assertThat(warning.kind).isEqualTo("배정 없음"));
         mvc.perform(post("/api/common/assignments/cancel")

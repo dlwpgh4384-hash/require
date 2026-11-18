@@ -285,16 +285,20 @@ public class CommonProjectService {
         if (internal(p) || !mapper.eligiblePart(input.salesPartId())) throw ProjectRules.invalid("salesPartId");
         var month = ProjectRules.month(input.effectiveMonth(), "effectiveMonth");
         if (month.isBefore(YearMonth.from(p.startDate)) || month.isAfter(YearMonth.from(p.endDate))) throw ProjectRules.invalid("effectiveMonth");
-        open(db(month), "effectiveMonth");
+        String closed = mapper.lastClosedMonth();
+        // 시안 문구: 「적용 시작 월은 {마감 다음 달} 이후로 골라 주세요.」
+        if (closed != null && db(month).compareTo(closed) <= 0) throw CodeFailure.invalid("effectiveMonth",
+            "적용 시작 월은 " + YearMonth.parse(closed.substring(0, 4) + "-" + closed.substring(4)).plusMonths(1) + " 이후로 골라 주세요.");
         var rows = mapper.salesParts(id, currentMonth());
         if (rows.isEmpty()) throw CodeFailure.invalid("salesPartId", "최초 파트 이력이 없습니다.");
-        String closed = mapper.lastClosedMonth();
         String boundary = closed == null ? "000000" : closed;
         SalesPart original = rows.get(0);
         for (var row : rows) if (db(YearMonth.parse(row.effectiveMonth)).compareTo(boundary) <= 0) original = row;
         boolean cancel = Objects.equals(original.salesPartId, input.salesPartId());
         if (!cancel && !month.isAfter(YearMonth.parse(rows.get(0).effectiveMonth))) {
-            throw CodeFailure.invalid("effectiveMonth", "최초 파트 이력은 보존됩니다. 최초 적용월 다음달부터 변경해 주세요.");
+            // 시안 문구: 「적용 시작 월은 {지금 파트 적용 월 다음 달} 이후로 골라 주세요.」(최초 파트 이력은 보존)
+            throw CodeFailure.invalid("effectiveMonth",
+                "적용 시작 월은 " + YearMonth.parse(rows.get(0).effectiveMonth).plusMonths(1) + " 이후로 골라 주세요.");
         }
         mapper.deleteOpenParts(id, boundary);
         if (!cancel) mapper.insertPart(new PartWrite(id, db(month), input.salesPartId(), input.reason(), actor.userId()));

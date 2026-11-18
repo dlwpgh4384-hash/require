@@ -14,8 +14,8 @@ public final class RoleRules {
     }
     public static void name(String name) {
         if (name == null || name.codePoints().allMatch(c -> Character.isWhitespace(c) || Character.isSpaceChar(c))
-            || name.codePointCount(0, name.length()) > 50)
-            throw RoleFailure.invalid("roleName", "새 역할 이름을 공백 없이 1~50자로 입력해 주세요.");
+            || name.codePointCount(0, name.length()) > 30)
+            throw RoleFailure.invalid("roleName", "역할 이름을 넣어 주세요.");
     }
     public static void flag(String value, String field) {
         if (!"Y".equals(value) && !"N".equals(value))
@@ -35,7 +35,9 @@ public final class RoleRules {
     }
     public static Copy copy(JsonNode body) {
         keys(body, Set.of("sourceRoleId", "roleName", "dataScopeCd"));
-        String name = text(body, "roleName");
+        // 비었거나 빈칸뿐인 이름도 시안 문구 「역할 이름을 넣어 주세요.」로 알린다(공통 필수 문구가 아니라).
+        JsonNode raw = body.get("roleName");
+        String name = raw != null && raw.isTextual() ? raw.textValue() : null;
         name(name);
         // sourceRoleId가 없으면 「역할 추가」(시안), 있으면 「역할 복사」.
         String source = body.hasNonNull("sourceRoleId") ? text(body, "sourceRoleId") : null;

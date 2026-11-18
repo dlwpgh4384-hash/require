@@ -1,7 +1,10 @@
 import type { ReactElement } from "react";
 import { ProjectPage } from "../projects/ProjectPage";
 import { AssignmentPage } from "../assignments/AssignmentPage";
+import { WithdrawalPage } from "../withdrawals/WithdrawalPage";
 import { ProjectTitleActions } from "../projects/ProjectWorkspace";
+import { AssignmentTitleActions } from "../assignments/AssignmentWorkspace";
+import { WithdrawalTitleActions } from "../withdrawals/WithdrawalWorkspace";
 import { UserPage } from "../users/UserPage";
 import { RolePage } from "../roles/RolePage";
 import { MenuPage } from "../menusettings/MenuPage";
@@ -10,10 +13,16 @@ import { CodeTitleActions } from "../codegroups/CodeWorkspace";
 import { CodeMapsPanel } from "../codemaps/CodeMapsPanel";
 import { OperatingStandardsPanel } from "../operatingstandards/OperatingStandardsPanel";
 import { CodeHistoryPanel } from "../commonops/CodeHistoryPanel";
-import { ClientPartWorkspace, ClientPartTitleActions } from "../clients/ClientPartWorkspace";
+import {
+  ClientPartWorkspace,
+  ClientPartTitleActions,
+} from "../clients/ClientPartWorkspace";
 import { PartPage } from "../parts/PartPage";
 import { PartTitleActions } from "../parts/ClientPartWorkspace";
-import { DeveloperWorkspace, DeveloperTitleActions } from "../developers/DeveloperWorkspace";
+import {
+  DeveloperWorkspace,
+  DeveloperTitleActions,
+} from "../developers/DeveloperWorkspace";
 import { MenuTitleActions } from "../menusettings/MenuWorkspace";
 import { RoleTitleActions } from "../roles/RoleWorkspace";
 import { UserRegistrationButton } from "../users/UserWorkspace";
@@ -34,26 +43,82 @@ export interface ScreenEntry {
  * 공통 화면 틀 시험도 여기서 만든 화면과 「준비 중」 화면을 나눈다. 새 화면은 여기에 한 줄만 더한다.
  */
 export const screenRegistry: readonly ScreenEntry[] = [
-  { id: "UI-01", Page: () => <ProjectPage />, TitleActions: () => <ProjectTitleActions />, rootTestId: "project-page", hasInputs: true },
-  { id: "UI-02", Page: () => <DeveloperWorkspace />, TitleActions: () => <DeveloperTitleActions />, rootTestId: "developer-workspace", hasInputs: true },
-  { id: "UI-12", Page: () => <AssignmentPage />, TitleActions: () => <ProjectTitleActions />, rootTestId: "assignment-page", hasInputs: true },
+  {
+    id: "UI-01",
+    Page: () => <ProjectPage />,
+    TitleActions: () => <ProjectTitleActions />,
+    rootTestId: "project-page",
+    hasInputs: true,
+  },
+  {
+    id: "UI-02",
+    Page: () => <DeveloperWorkspace />,
+    TitleActions: () => <DeveloperTitleActions />,
+    rootTestId: "developer-workspace",
+    hasInputs: true,
+  },
+  {
+    id: "UI-12",
+    Page: () => <AssignmentPage />,
+    TitleActions: () => <AssignmentTitleActions />,
+    rootTestId: "assignment-page",
+    hasInputs: true,
+  },
+  {
+    id: "UI-05",
+    Page: () => <WithdrawalPage />,
+    TitleActions: () => <WithdrawalTitleActions />,
+    rootTestId: "withdrawal-page",
+    hasInputs: false,
+  },
   {
     id: "UI-15",
     Page: () => <ClientPartWorkspace partPage={<PartPage />} />,
-    TitleActions: () => <ClientPartTitleActions partActions={<PartTitleActions />} />,
+    TitleActions: () => (
+      <ClientPartTitleActions partActions={<PartTitleActions />} />
+    ),
     rootTestId: "client-part-workspace",
     hasInputs: true,
   },
-  { id: "UI-23", Page: () => <UserPage />, TitleActions: () => <UserRegistrationButton />, rootTestId: "user-page", hasInputs: true },
-  { id: "UI-24", Page: () => <RolePage />, TitleActions: () => <RoleTitleActions />, rootTestId: "role-page", hasInputs: false },
-  { id: "UI-25", Page: () => <MenuPage />, TitleActions: () => <MenuTitleActions />, rootTestId: "menu-settings-page", hasInputs: false },
+  {
+    id: "UI-23",
+    Page: () => <UserPage />,
+    TitleActions: () => <UserRegistrationButton />,
+    rootTestId: "user-page",
+    hasInputs: true,
+  },
+  {
+    id: "UI-24",
+    Page: () => <RolePage />,
+    TitleActions: () => <RoleTitleActions />,
+    rootTestId: "role-page",
+    hasInputs: false,
+  },
+  {
+    id: "UI-25",
+    Page: () => <MenuPage />,
+    TitleActions: () => <MenuTitleActions />,
+    rootTestId: "menu-settings-page",
+    hasInputs: false,
+  },
   {
     id: "UI-27",
     Page: () => (
       <CodePage
         panels={({ dirty, onDirtyChange, onChanged, historyRevision }) => ({
-          maps: <CodeMapsPanel dirty={dirty} onDirtyChange={onDirtyChange} onChanged={onChanged} />,
-          standards: <OperatingStandardsPanel onDirtyChange={onDirtyChange} onChanged={onChanged} />,
+          maps: (
+            <CodeMapsPanel
+              dirty={dirty}
+              onDirtyChange={onDirtyChange}
+              onChanged={onChanged}
+            />
+          ),
+          standards: (
+            <OperatingStandardsPanel
+              onDirtyChange={onDirtyChange}
+              onChanged={onChanged}
+            />
+          ),
           history: <CodeHistoryPanel refreshKey={historyRevision} />,
         })}
       />
@@ -66,4 +131,5 @@ export const screenRegistry: readonly ScreenEntry[] = [
 
 const byId = new Map(screenRegistry.map((entry) => [entry.id, entry]));
 /** 화면 ID로 만든 화면을 찾는다(없으면 「준비 중」 화면). */
-export const findScreen = (id: string | null | undefined) => (id ? byId.get(id) : undefined);
+export const findScreen = (id: string | null | undefined) =>
+  id ? byId.get(id) : undefined;

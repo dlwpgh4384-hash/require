@@ -40,9 +40,11 @@ export interface ClientAssignment {
   projectId: string;
   projectName: string;
   personName: string;
+  managementNumber: string;
   companyName: string;
   jobName: string;
   withdrawalDate: string | null;
+  monthlyMm: number;
 }
 export interface ClientChange {
   changedAt: string;

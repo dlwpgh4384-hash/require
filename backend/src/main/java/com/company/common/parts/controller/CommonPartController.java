@@ -111,6 +111,11 @@ public class CommonPartController {
     public Response<Part> putCommonPartStop(@PathVariable String partId, @RequestBody String body) {
         return Response.of(service.putCommonPartStop(partId, PartRules.version(parse(body))));
     }
+    /** 시안 UI-15: 중지된 파트 ⋯ [다시 사용](사람 처리 API는 PUT). */
+    @PutMapping(value = "/api/common/parts/{partId}/resume", consumes = "application/json")
+    public Response<Part> putCommonPartResume(@PathVariable String partId, @RequestBody String body) {
+        return Response.of(service.putCommonPartResume(partId, PartRules.version(parse(body))));
+    }
     private JsonNode parse(String body) {
         try {
             return json.reader().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readTree(body);

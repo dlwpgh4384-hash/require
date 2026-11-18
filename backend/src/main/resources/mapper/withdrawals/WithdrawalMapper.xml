@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.withdrawals.mapper.WithdrawalMapper">
+  <resultMap id="source" type="com.company.common.withdrawals.mapper.WithdrawalRows$Source"><constructor>
+    <idArg column="assignmentId" javaType="string"/>
+    <arg column="developerId" javaType="string"/><arg column="name" javaType="string"/>
+    <arg column="projectName" javaType="string"/><arg column="jobCode" javaType="string"/>
+    <arg column="jobName" javaType="string"/><arg column="endDate" javaType="java.time.LocalDate"/>
+    <arg column="extensionPossibilityCode" javaType="string"/><arg column="extensionCount" javaType="_int"/>
+    <arg column="modifiedAt" javaType="java.time.Instant"/><arg column="statusCode" javaType="string"/>
+    <arg column="primaryJobCode" javaType="string"/><arg column="gradeCode" javaType="string"/>
+    <arg column="customerId" javaType="string"/><arg column="gradeName" javaType="string"/>
+    <arg column="projectId" javaType="string"/><arg column="managementNumber" javaType="string"/>
+  </constructor></resultMap>
+  <sql id="sourceSelect">
+    SELECT a.ASGN_ID AS "assignmentId",a.DEV_ID AS "developerId",d.DEV_NM AS "name",
+      p.PROJ_NM AS "projectName",a.JOB_CD AS "jobCode",COALESCE(j.CODE_NM,a.JOB_CD) AS "jobName",
+      a.INPUT_END_DT AS "endDate",a.EXT_PSBL_CD AS "extensionPossibilityCode",a.EXT_CNT AS "extensionCount",
+      COALESCE(a.MOD_DTTM,a.REG_DTTM) AS "modifiedAt",a.ASGN_STAT_CD AS "statusCode",
+      d.JOB_CD AS "primaryJobCode",d.GRADE_CD AS "gradeCode",p.CUST_CLNT_ID AS "customerId",
+      COALESCE(g.CODE_NM,d.GRADE_CD) AS "gradeName",a.PROJ_ID AS "projectId",d.MNG_NO AS "managementNumber"
+    FROM TB_PJ_ASGN a JOIN TB_HR_DEV d ON d.DEV_ID=a.DEV_ID
+    JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID
+    LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=a.JOB_CD
+    LEFT JOIN TB_SY_CODE g ON g.CODE_GRP_ID='GRADE' AND g.CODE=d.GRADE_CD
+  </sql>
+  <select id="list" resultMap="source">
+    <include refid="sourceSelect"/>
+    WHERE a.ASGN_STAT_CD='ACT'
+    <if test="year != null">AND a.INPUT_END_DT BETWEEN make_date(#{year},1,1) AND make_date(#{year},12,31)</if>
+    <if test="from != null">AND a.INPUT_END_DT &gt;= #{from}</if>
+    <if test="through != null">AND a.INPUT_END_DT &lt;= #{through}</if>
+    <if test="jobCode != null">AND a.JOB_CD=#{jobCode}</if>
+    <if test="extensionPossibilityCode != null">
+      <choose><when test="extensionPossibilityCode == ''">AND a.EXT_PSBL_CD IS NULL</when>
+        <otherwise>AND a.EXT_PSBL_CD=#{extensionPossibilityCode}</otherwise></choose>
+    </if>
+    ORDER BY a.INPUT_END_DT,a.ASGN_ID
+  </select>
+  <select id="source" resultMap="source"><include refid="sourceSelect"/> WHERE a.ASGN_ID=#{id}</select>
+  <select id="lockSource" resultMap="source"><include refid="sourceSelect"/> WHERE a.ASGN_ID=#{id} FOR UPDATE OF a</select>
+  <select id="shared" resultMap="source">
+    <include refid="sourceSelect"/> WHERE a.ASGN_STAT_CD='ACT'
+    <if test="developerId != null">AND a.DEV_ID=#{developerId}</if>
+    <if test="opportunityId != null">
+      AND EXISTS(SELECT 1 FROM TB_SL_TENT_ASGN t WHERE t.DEV_ID=a.DEV_ID
+        AND t.OPP_ID=#{opportunityId} AND t.TENT_STAT_CD IN ('ACT','CNVT'))
+    </if>
+    ORDER BY a.INPUT_END_DT,a.ASGN_ID
+  </select>
+  <select id="lockDeveloper" resultType="string">SELECT d.DEV_ID FROM TB_HR_DEV d WHERE d.DEV_ID=#{id} FOR UPDATE</select>
+  <resultMap id="need" type="com.company.common.withdrawals.mapper.WithdrawalRows$Need"><constructor>
+    <arg column="opportunityId" javaType="string"/><arg column="needSn" javaType="_int"/>
+    <arg column="opportunityName" javaType="string"/><arg column="jobCode" javaType="string"/>
+    <arg column="jobName" javaType="string"/><arg column="gradeCode" javaType="string"/>
+    <arg column="gradeName" javaType="string"/><arg column="startMonth" javaType="string"/>
+    <arg column="durationMonths" javaType="_int"/><arg column="requiredCount" javaType="_int"/>
+    <arg column="occupiedCount" javaType="_int"/><arg column="statusCode" javaType="string"/>
+    <arg column="customerId" javaType="string"/><arg column="winningProbability" javaType="java.math.BigDecimal"/>
+    <arg column="monthlyMm" javaType="java.math.BigDecimal"/><arg column="customerName" javaType="string"/>
+    <arg column="stageName" javaType="string"/>
+  </constructor></resultMap>
+  <select id="needs" resultMap="need">
+    SELECT n.OPP_ID AS "opportunityId",n.NEED_SN::int AS "needSn",o.OPP_NM AS "opportunityName",
+      n.JOB_CD AS "jobCode",COALESCE(j.CODE_NM,n.JOB_CD) AS "jobName",
+      COALESCE(n.GRADE_CD,'MD') AS "gradeCode",COALESCE(g.CODE_NM,n.GRADE_CD,'MD') AS "gradeName",
+      n.BGN_YM AS "startMonth",n.PRD_MCNT::int AS "durationMonths",n.NEED_CNT::int AS "requiredCount",
+      (SELECT COUNT(*)::int FROM TB_SL_TENT_ASGN t WHERE t.OPP_ID=n.OPP_ID AND t.NEED_SN=n.NEED_SN
+        AND t.TENT_STAT_CD IN ('ACT','CNVT')) AS "occupiedCount",
+      o.OPP_STAT_CD AS "statusCode",o.CUST_CLNT_ID AS "customerId",o.WIN_PRBL_RT AS "winningProbability",
+      n.MON_MM AS "monthlyMm",COALESCE(c.CLNT_NM,o.CUST_CLNT_ID) AS "customerName",
+      COALESCE(s.CODE_NM,o.SALES_STEP_CD) AS "stageName"
+    FROM TB_SL_OPP_NEED n JOIN TB_SL_OPP o ON o.OPP_ID=n.OPP_ID
+    LEFT JOIN TB_BS_CLNT c ON c.CLNT_ID=o.CUST_CLNT_ID
+    LEFT JOIN TB_SY_CODE s ON s.CODE_GRP_ID='SALES_STEP' AND s.CODE=o.SALES_STEP_CD
+    LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=n.JOB_CD
+    LEFT JOIN TB_SY_CODE g ON g.CODE_GRP_ID='GRADE' AND g.CODE=COALESCE(n.GRADE_CD,'MD')
+    ORDER BY n.OPP_ID,n.NEED_SN
+  </select>
+  <select id="lockNeeds" resultType="string">
+    SELECT n.OPP_ID FROM TB_SL_OPP_NEED n JOIN TB_SL_OPP o ON o.OPP_ID=n.OPP_ID
+    ORDER BY n.OPP_ID,n.NEED_SN FOR UPDATE OF n,o
+  </select>
+  <resultMap id="reservation" type="com.company.common.withdrawals.mapper.WithdrawalRows$Reservation"><constructor>
+    <arg column="tentativeId" javaType="string"/><arg column="developerId" javaType="string"/>
+    <arg column="opportunityId" javaType="string"/><arg column="opportunityName" javaType="string"/>
+    <arg column="needSn" javaType="_int"/><arg column="startMonth" javaType="string"/>
+    <arg column="statusCode" javaType="string"/>
+  </constructor></resultMap>
+  <select id="reservations" resultMap="reservation">
+    SELECT t.TENT_ID::text AS "tentativeId",t.DEV_ID AS "developerId",t.OPP_ID AS "opportunityId",
+      o.OPP_NM AS "opportunityName",t.NEED_SN::int AS "needSn",t.BGN_YM AS "startMonth",t.TENT_STAT_CD AS "statusCode"
+    FROM TB_SL_TENT_ASGN t JOIN TB_SL_OPP o ON o.OPP_ID=t.OPP_ID
+    WHERE t.DEV_ID=#{developerId} AND t.TENT_STAT_CD IN ('ACT','CNVT') ORDER BY t.TENT_ID
+  </select>
+  <select id="reservationsFor" resultMap="reservation">
+    SELECT t.TENT_ID::text AS "tentativeId",t.DEV_ID AS "developerId",t.OPP_ID AS "opportunityId",
+      o.OPP_NM AS "opportunityName",t.NEED_SN::int AS "needSn",t.BGN_YM AS "startMonth",t.TENT_STAT_CD AS "statusCode"
+    FROM TB_SL_TENT_ASGN t JOIN TB_SL_OPP o ON o.OPP_ID=t.OPP_ID
+    WHERE t.TENT_STAT_CD IN ('ACT','CNVT') AND t.DEV_ID IN
+      <foreach collection="developerIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    ORDER BY t.DEV_ID,t.TENT_ID
+  </select>
+  <resultMap id="early" type="com.company.common.withdrawals.mapper.WithdrawalRows$EarlyRow"><constructor>
+    <arg column="assignmentId" javaType="string"/><arg column="effectiveDate" javaType="java.time.LocalDate"/>
+    <arg column="afterValue" javaType="string"/>
+  </constructor></resultMap>
+  <!-- 투입 배정 변경 이력 조회와 같은 순서(등록 시각·순번 내림차순)로 조기 철수 줄만 한 번에 읽는다 -->
+  <select id="earlyHistory" resultMap="early">
+    SELECT h.ASGN_ID AS "assignmentId",h.APLY_DT AS "effectiveDate",COALESCE(h.AFT_VAL,'') AS "afterValue"
+    FROM TB_PJ_ASGN_HIST h WHERE h.ASGN_CHG_TYPE_CD='EARLY' AND h.ASGN_ID IN
+      <foreach collection="assignmentIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    ORDER BY h.ASGN_ID,h.REG_DTTM DESC,h.HIST_SN DESC
+  </select>
+  <select id="skills" resultType="string">
+    SELECT s.SKILL_NM FROM TB_HR_DEV_SKILL s WHERE s.DEV_ID=#{developerId} ORDER BY s.SORT_ORD,s.SKILL_NM
+  </select>
+  <update id="release">
+    UPDATE TB_SL_TENT_ASGN SET TENT_STAT_CD='REL',PROC_DTTM=clock_timestamp(),
+      MOD_DTTM=clock_timestamp(),MOD_USER_ID=#{actor}
+    WHERE TENT_ID=CAST(#{id} AS numeric) AND TENT_STAT_CD='ACT'
+  </update>
+  <insert id="insertReservation">
+    INSERT INTO TB_SL_TENT_ASGN(OPP_ID,NEED_SN,DEV_ID,BGN_YM,TENT_STAT_CD,SRC_SCRN_ID,REG_USER_ID,REG_DTTM)
+    VALUES(#{opportunityId},#{needSn},#{developerId},#{startMonth},'ACT','UI-05',#{actor},clock_timestamp())
+  </insert>
+  <resultMap id="supply" type="com.company.common.withdrawals.mapper.WithdrawalRows$SupplyRow"><constructor>
+    <arg column="developerId" javaType="string"/><arg column="confirmedMm" javaType="java.math.BigDecimal"/>
+  </constructor></resultMap>
+  <sql id="supplyPeople">
+    d.USE_YN='Y' AND d.DRCT_CLS_CD='DRCT' AND d.JOB_CD=#{jobCode}
+    AND (d.JNCMP_DT IS NULL OR d.JNCMP_DT &lt;= #{lastDay})
+    AND (d.RETIRE_DT IS NULL OR d.RETIRE_DT &gt;= #{firstDay})
+    AND NOT EXISTS(SELECT 1 FROM TB_HR_DEV_STAT s WHERE s.DEV_ID=d.DEV_ID AND s.WORK_STAT_CD='LEAVE'
+      AND s.BGN_DT &lt;= #{lastDay} AND (s.END_DT IS NULL OR s.END_DT &gt;= #{firstDay}))
+  </sql>
+  <select id="supply" resultMap="supply">
+    SELECT d.DEV_ID AS "developerId",COALESCE((SELECT SUM(m.MON_MM) FROM TB_PJ_ASGN_MON m
+      JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID AND a.ASGN_STAT_CD='ACT'
+      WHERE m.DEV_ID=d.DEV_ID AND m.INPUT_YM=#{month}),0) AS "confirmedMm"
+    FROM TB_HR_DEV d WHERE <include refid="supplyPeople"/> ORDER BY d.DEV_ID
+  </select>
+  <resultMap id="extension" type="com.company.common.withdrawals.mapper.WithdrawalRows$ExtensionRow"><constructor>
+    <arg column="developerId" javaType="string"/><arg column="monthlyMm" javaType="java.math.BigDecimal"/>
+    <arg column="extensionPossibilityCode" javaType="string"/>
+  </constructor></resultMap>
+  <select id="extensions" resultMap="extension">
+    SELECT d.DEV_ID AS "developerId",COALESCE((SELECT h.NEW_CTRT_MM FROM TB_PJ_ASGN_HIST h
+      WHERE h.ASGN_ID=a.ASGN_ID AND h.ASGN_CHG_TYPE_CD IN ('INPUT','RATE') AND h.NEW_CTRT_MM IS NOT NULL
+        AND to_char(h.APLY_DT,'YYYYMM') &lt;= to_char(a.INPUT_END_DT,'YYYYMM')
+      ORDER BY h.APLY_DT DESC,h.HIST_SN DESC LIMIT 1),a.CTRT_MM) AS "monthlyMm",
+      a.EXT_PSBL_CD AS "extensionPossibilityCode"
+    FROM TB_HR_DEV d JOIN TB_PJ_ASGN a ON a.DEV_ID=d.DEV_ID
+    WHERE <include refid="supplyPeople"/> AND a.ASGN_STAT_CD='ACT' AND a.INPUT_END_DT &lt; #{firstDay}
+    ORDER BY d.DEV_ID,a.ASGN_ID
+  </select>
+  <resultMap id="opportunityDemand" type="com.company.common.withdrawals.mapper.WithdrawalRows$OpportunityDemandRow"><constructor>
+    <arg column="requiredCount" javaType="java.math.BigDecimal"/><arg column="monthlyMm" javaType="java.math.BigDecimal"/>
+    <arg column="winningProbability" javaType="java.math.BigDecimal"/>
+  </constructor></resultMap>
+  <select id="opportunityDemand" resultMap="opportunityDemand">
+    SELECT n.NEED_CNT AS "requiredCount",n.MON_MM AS "monthlyMm",o.WIN_PRBL_RT AS "winningProbability"
+    FROM TB_SL_OPP_NEED n JOIN TB_SL_OPP o ON o.OPP_ID=n.OPP_ID
+    WHERE o.OPP_STAT_CD='ING' AND n.JOB_CD=#{jobCode}
+      AND to_date(n.BGN_YM,'YYYYMM') &lt;= #{firstDay}
+      AND to_date(n.BGN_YM,'YYYYMM')+make_interval(months =&gt; n.PRD_MCNT::int) &gt; #{firstDay}
+    ORDER BY n.OPP_ID,n.NEED_SN
+  </select>
+  <resultMap id="projectDemand" type="com.company.common.withdrawals.mapper.WithdrawalRows$ProjectDemandRow"><constructor>
+    <arg column="plannedMm" javaType="java.math.BigDecimal"/><arg column="confirmedMm" javaType="java.math.BigDecimal"/>
+    <arg column="remainingMonths" javaType="_int"/>
+  </constructor></resultMap>
+  <select id="projectDemand" resultMap="projectDemand">
+    SELECT p.PLAN_MM AS "plannedMm",COALESCE((SELECT SUM(m.MON_MM) FROM TB_PJ_ASGN_MON m
+      JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID AND a.ASGN_STAT_CD='ACT'
+      WHERE m.PROJ_ID=p.PROJ_ID AND a.JOB_CD=p.JOB_CD),0) AS "confirmedMm",
+      ((extract(year FROM j.CTRT_END_DT)::int-extract(year FROM CAST(#{firstDay} AS date))::int)*12
+        +extract(month FROM j.CTRT_END_DT)::int-extract(month FROM CAST(#{firstDay} AS date))::int+1) AS "remainingMonths"
+    FROM TB_PJ_MNPW_PLAN p JOIN TB_PJ_PROJ j ON j.PROJ_ID=p.PROJ_ID
+    WHERE p.JOB_CD=#{jobCode} AND j.PROJ_STAT_CD='ING' AND j.CTRT_BGN_DT &lt;= #{lastDay}
+      AND j.CTRT_END_DT &gt;= #{firstDay} ORDER BY p.PROJ_ID,p.JOB_CD
+  </select>
+</mapper>

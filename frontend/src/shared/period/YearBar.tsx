@@ -2,7 +2,17 @@ import { Badge } from "../list";
 import "./period.css";
 
 const chevron = (d: string) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d={d} />
   </svg>
 );
@@ -18,6 +28,7 @@ export function YearBar({
   max,
   caption,
   onChange,
+  pastReadOnly = true,
   testId = "year-bar",
 }: {
   year: number;
@@ -26,10 +37,16 @@ export function YearBar({
   max: number;
   caption: string;
   onChange: (year: number) => void;
+  pastReadOnly?: boolean;
   testId?: string;
 }) {
   return (
-    <div className="year-bar" role="group" aria-label="조회 연도" data-testid={testId}>
+    <div
+      className="year-bar"
+      role="group"
+      aria-label="조회 연도"
+      data-testid={testId}
+    >
       <div className="year-bar-nav">
         <button
           type="button"
@@ -54,7 +71,9 @@ export function YearBar({
         </button>
       </div>
       {year < currentYear ? (
-        <Badge kind="lock">지난 해 · 읽기 전용</Badge>
+        <Badge kind={pastReadOnly ? "lock" : "info"}>
+          {pastReadOnly ? "지난 해 · 읽기 전용" : "지난 해"}
+        </Badge>
       ) : year > currentYear ? (
         <Badge kind="warn">내년 · 계획</Badge>
       ) : (

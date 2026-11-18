@@ -57,6 +57,8 @@ let empty: boolean;
 let writeError: string;
 let rejection: boolean;
 let over: boolean;
+/** 목록 줄에 현재 프로젝트(투입 중)가 있는지 */
+let current: boolean;
 const ok = (data: unknown) => ({
   ok: true,
   status: 200,
@@ -82,6 +84,7 @@ beforeEach(() => {
   writeError = "";
   rejection = false;
   over = false;
+  current = true;
   row = {
     developerId: "d",
     managementNumber: "K-0001",
@@ -228,11 +231,11 @@ beforeEach(() => {
           : [
               {
                 ...row,
-                currentProjectName: "대표 프로젝트",
-                additionalProjectCount: 2,
+                currentProjectName: current ? "대표 프로젝트" : null,
+                additionalProjectCount: current ? 2 : 0,
                 currentMonthMm: over ? 1.01 : 1,
                 overOneMm: over,
-                withdrawalDate: "2026-12-31",
+                withdrawalDate: current ? "2026-12-31" : null,
               },
             ],
       });
@@ -373,6 +376,8 @@ it("hides all four upload/template CTAs on mobile", async () => {
 });
 it("requires confirmation and reports an all-rejected stop with name and reason", async () => {
   rejection = true;
+  // 화면이 모르는 투입(시작 전 배정)은 서버가 막고 결과 창으로 알린다
+  current = false;
   render(<DeveloperPage />);
   await screen.findByText("김개발");
   fireEvent.click(screen.getByTestId("list-select-d"));
@@ -736,4 +741,120 @@ it("payload never sends editable lifecycle identity on update", () => {
     "managementNumber",
     "K-0001",
   );
+});
+it("시안 UI-02: 상세 [다시 사용]은 확인 창 없이 바로 하고 「이름님을 다시 사용합니다.」", async () => {
+  row.useYn = "N";
+  render(<DeveloperPage />);
+  fireEvent.click(await screen.findByText("김개발"));
+  const resume = await screen.findByTestId("developer-stop");
+  await waitFor(() => expect(resume).toBeEnabled());
+  expect(resume).toHaveTextContent("다시 사용");
+  fireEvent.click(resume);
+  expect(await screen.findByText("김개발님을 다시 사용합니다.")).toBeVisible();
+  expect(screen.queryByTestId("developer-use-confirm-dialog")).not.toBeInTheDocument();
+  const sent = writes().filter((c) => String(c[0]).endsWith("use-status"));
+  expect(sent).toHaveLength(1);
+  expect(JSON.parse(String((sent[0][1] as RequestInit).body))).toMatchObject({ useYn: "Y" });
+});
+it("시안 UI-02: 퇴사일이 지난 개발자는 [다시 사용]을 눌러도 경고만 하고 쓰지 않는다", async () => {
+  row.useYn = "N";
+  row.retirementDate = "2020-01-31";
+  render(<DeveloperPage />);
+  fireEvent.click(await screen.findByText("김개발"));
+  const resume = await screen.findByTestId("developer-stop");
+  await waitFor(() => expect(resume).toBeEnabled());
+  fireEvent.click(resume);
+  expect(await screen.findByText("퇴사한 개발자는 다시 사용할 수 없습니다. 새로 등록하세요.")).toBeVisible();
+  expect(writes()).toHaveLength(0);
+});
+it("시안 UI-02: 투입 중인 개발자는 확인 창 전에 막고 「이름 (번호) — 프로젝트 ~날짜」를 보인다", async () => {
+  render(<DeveloperPage />);
+  await screen.findByText("김개발");
+  fireEvent.click(screen.getByTestId("list-select-d"));
+  fireEvent.click(screen.getByRole("button", { name: "사용 중지" }));
+  const box = await screen.findByTestId("developer-stop-blocked");
+  expect(box).toHaveTextContent("사용을 중지할 수 없습니다");
+  expect(box).toHaveTextContent(
+    "아래 개발자는 투입 중인 배정이 있어 중지할 수 없습니다. 먼저 투입 배정의 [변경 기록]에서 조기 철수로 배정을 끝내 주세요.",
+  );
+  expect(screen.getByTestId("developer-busy-d")).toHaveTextContent(
+    "김개발 (K-0001) — 대표 프로젝트 외 2건 ~2026-12-31",
+  );
+  expect(screen.queryByTestId("developer-use-confirm-dialog")).not.toBeInTheDocument();
+  expect(writes()).toHaveLength(0);
+});
+it("시안 UI-02: 중지 확인 창은 이름을 모두 보이고 결과는 「n명의 사용을 중지했습니다.」", async () => {
+  current = false;
+  render(<DeveloperPage />);
+  await screen.findByText("김개발");
+  fireEvent.click(screen.getByTestId("list-select-d"));
+  fireEvent.click(screen.getByRole("button", { name: "사용 중지" }));
+  const box = await screen.findByTestId("developer-use-confirm-dialog");
+  expect(box).toHaveTextContent("1명의 사용을 중지할까요?");
+  expect(box).toHaveTextContent("김개발 — 삭제가 아니라 배정 후보에서 빼는 것이며 기록은 남습니다.");
+  fireEvent.click(screen.getByTestId("developer-use-confirm"));
+  expect(await screen.findByText("1명의 사용을 중지했습니다.")).toBeVisible();
+});
+it("시안 UI-02: 고른 사람이 모두 이미 중지면 「이미 사용 중지된 개발자입니다.」", async () => {
+  row.useYn = "N";
+  render(<DeveloperPage />);
+  await screen.findByText("김개발");
+  fireEvent.click(screen.getByTestId("list-select-d"));
+  fireEvent.click(screen.getByRole("button", { name: "사용 중지" }));
+  expect(await screen.findByText("이미 사용 중지된 개발자입니다.")).toBeVisible();
+  expect(screen.queryByTestId("developer-use-confirm-dialog")).not.toBeInTheDocument();
+  expect(writes()).toHaveLength(0);
+});
+it("시안 UI-02: 여러 명 다시 사용은 「상태가 「사용」으로 돌아가고 변경 이력에 남습니다.」 → 「n명을 다시 사용합니다.」", async () => {
+  row.useYn = "N";
+  current = false;
+  render(<DeveloperPage />);
+  await screen.findByText("김개발");
+  fireEvent.click(screen.getByTestId("list-select-d"));
+  fireEvent.click(screen.getByRole("button", { name: "다시 사용" }));
+  const box = await screen.findByTestId("developer-use-confirm-dialog");
+  expect(box).toHaveTextContent("1명을 다시 사용할까요?");
+  expect(box).toHaveTextContent("김개발 — 상태가 「사용」으로 돌아가고 변경 이력에 남습니다.");
+  fireEvent.click(screen.getByTestId("developer-use-confirm"));
+  expect(await screen.findByText("1명을 다시 사용합니다.")).toBeVisible();
+});
+it("시안 UI-02: 여러 명 다시 사용에서 퇴사한 사람은 빼고, 남는 사람이 없으면 알림만", async () => {
+  row.useYn = "N";
+  row.retirementDate = "2020-01-31";
+  current = false;
+  render(<DeveloperPage />);
+  await screen.findByText("김개발");
+  fireEvent.click(screen.getByTestId("list-select-d"));
+  fireEvent.click(screen.getByRole("button", { name: "다시 사용" }));
+  expect(await screen.findByText("고른 것 중 사용 중지된 개발자가 없습니다.")).toBeVisible();
+  expect(writes()).toHaveLength(0);
+});
+it("시안 UI-02: 관리번호는 칸을 떠날 때 형식·중복을 그 칸 아래에 보인다", async () => {
+  render(
+    <DeveloperForm options={options} managementNumbers={["K-0001"]} onSaved={vi.fn()} onCancel={vi.fn()} />,
+  );
+  const number = screen.getByTestId("developer-management-number");
+  fireEvent.change(number, { target: { value: "K_1" } });
+  expect(screen.queryByText("관리번호는 영문·숫자·하이픈으로 20자 이내로 적어 주세요.")).not.toBeInTheDocument();
+  fireEvent.blur(number);
+  expect(await screen.findByText("관리번호는 영문·숫자·하이픈으로 20자 이내로 적어 주세요.")).toBeVisible();
+  fireEvent.change(number, { target: { value: "K-0001" } });
+  fireEvent.blur(number);
+  expect(await screen.findByText("이미 등록된 관리번호입니다.")).toBeVisible();
+  fireEvent.change(number, { target: { value: "K-0099" } });
+  fireEvent.blur(number);
+  await waitFor(() => expect(screen.queryByText("이미 등록된 관리번호입니다.")).not.toBeInTheDocument());
+});
+it("시안 UI-02: 이름은 떠날 때, 고르는 칸은 바꿀 때 바로 검사하고 저장 때는 첫 오류 칸으로 간다", async () => {
+  render(<DeveloperForm options={options} onSaved={vi.fn()} onCancel={vi.fn()} />);
+  await waitFor(() => expect(screen.getByTestId("developer-area-0")).not.toBeDisabled());
+  fireEvent.blur(screen.getByTestId("developer-name"));
+  expect(await screen.findByText("이름을 입력해 주세요.")).toBeVisible();
+  const type = screen.getByTestId("developer-employeeTypeCode");
+  fireEvent.change(type, { target: { value: "FT" } });
+  fireEvent.change(type, { target: { value: "" } });
+  expect(await screen.findByText("직원구분을 입력해 주세요.")).toBeVisible();
+  fireEvent.click(screen.getByTestId("developer-save"));
+  await waitFor(() => expect(screen.getByTestId("developer-name")).toHaveFocus());
+  expect(writes()).toHaveLength(0);
 });

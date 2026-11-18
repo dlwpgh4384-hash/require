@@ -122,9 +122,21 @@ class CommonCodeControllerTest {
         mvc.perform(post("/api/common/code-groups").contentType("application/json")
             .content("{\"groupId\":\"CUSTOM\",\"groupName\":\"변조\"}"))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.errors[0].field").value("groupId"));
+            .andExpect(jsonPath("$.errors[0].field").value("groupId"))
+            .andExpect(jsonPath("$.errors[0].message").value("이미 있는 그룹 ID입니다."));
         assertThat(groups.get("CUSTOM").groupName).isEqualTo("CUSTOM"); verify(mapper,never()).insertGroup(any());
         verify(management, never()).insertHistory(any());
+    }
+    @Test void groupNameOver30IsRejectedWithoutSideEffects() throws Exception {
+        // 시안 그룹 이름 칸 maxlength 30. 30자는 받고 31자는 막는다.
+        mvc.perform(post("/api/common/code-groups").contentType("application/json")
+            .content("{\"groupId\":\"LONG_NAME\",\"groupName\":\"" + "가".repeat(31) + "\"}"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("groupName"));
+        verify(mapper, never()).insertGroup(any());
+        verify(management, never()).insertHistory(any());
+        mvc.perform(post("/api/common/code-groups").contentType("application/json")
+            .content("{\"groupId\":\"LONG_NAME\",\"groupName\":\"" + "가".repeat(30) + "\"}"))
+            .andExpect(status().isOk());
     }
     @Test void anonymousGroupSideEffectWritesChangeHistory() throws Exception {
         mvc.perform(post("/api/common/code-groups").contentType("application/json")

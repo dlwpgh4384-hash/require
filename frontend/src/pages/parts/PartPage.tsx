@@ -43,7 +43,9 @@ const columns: ListColumn<api.Part>[] = [
     key: "scheduledChange",
     label: "예정된 변경",
     sortable: false,
-    render: (row) => row.scheduledChange ?? "–",
+    // 시안: 예정이 있으면 파란(안내) 배지 「2026-12부터 40%」, 없으면 「–」.
+    render: (row) =>
+      row.scheduledChange ? <Badge kind="info">{row.scheduledChange}</Badge> : "–",
   },
   { key: "personCount", label: "소속 인력", align: "right", render: (row) => `${row.personCount}명` },
   { key: "projectCount", label: "진행 프로젝트", align: "right", render: (row) => `${row.projectCount}건` },
@@ -142,7 +144,7 @@ export function PartPage() {
     });
   }, [data, sort]);
   const selected = data?.find((row) => row.partId === detailId);
-  const saved = (id?: string) => {
+  const saved = (id?: string, message?: string) => {
     setAdding(false);
     workspace.setAddingPart(false);
     setEditing(null);
@@ -152,7 +154,16 @@ export function PartPage() {
     }
     setRevision((value) => value + 1);
     setPage(1);
-    setNotice("파트 정보를 저장했습니다.");
+    setNotice(message ?? "저장했습니다.");
+  };
+  const resume = async (part: api.Part) => {
+    try {
+      await api.putCommonPartResume(part.partId, part.modifiedAt);
+      setRevision((value) => value + 1);
+      setNotice(`${part.partName}을 다시 사용합니다.`);
+    } catch (failure) {
+      setNotice(api.partErrorMessage(failure));
+    }
   };
   const closeCreate = () => {
     setAdding(false);
@@ -276,7 +287,7 @@ export function PartPage() {
                     >
                       파트명 수정
                     </button>
-                    {selected.useYn === "Y" && (
+                    {selected.useYn === "Y" ? (
                       <button
                         type="button"
                         role="menuitem"
@@ -289,6 +300,19 @@ export function PartPage() {
                       >
                         사용 중지
                       </button>
+                    ) : (
+                      // 시안 UI-15: 중지된 파트는 같은 자리에 [다시 사용], 확인 창 없이 바로 되돌린다.
+                      <button
+                        type="button"
+                        role="menuitem"
+                        data-testid="part-resume"
+                        onClick={() => {
+                          setMenu(false);
+                          void resume(selected);
+                        }}
+                      >
+                        다시 사용
+                      </button>
                     )}
                   </div>
                 )}
@@ -296,6 +320,9 @@ export function PartPage() {
             </>
           }
         >
+          {selected.useYn !== "Y" && (
+            <Banner kind="lock">사용을 중지한 파트입니다.</Banner>
+          )}
           <KeyValues
             items={[
               ["파트장", selected.leaderName],

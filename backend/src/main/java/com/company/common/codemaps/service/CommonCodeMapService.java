@@ -67,7 +67,7 @@ public class CommonCodeMapService {
     }
 
     private CodeFailure duplicate() {
-        return new CodeFailure("excelText", "같은 코드 그룹에 이미 등록된 표기입니다.");
+        return new CodeFailure("excelText", "같은 그룹에 이미 있는 표기입니다.");
     }
 
     private String describe(Item item) {

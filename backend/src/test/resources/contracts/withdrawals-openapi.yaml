@@ -1,0 +1,192 @@
+# Withdrawal response-contract subset from the approved OpenAPI contract.
+# Isolated from the shared baseline, following assignments-openapi.yaml.
+openapi: 3.0.3
+info:
+  title: 철수 인력 응답 계약
+  version: 1.0.0
+security: []
+paths:
+  /api/common/withdrawals:
+    get:
+      operationId: getCommonWithdrawals
+      security: []
+      responses:
+        '200':
+          description: 철수 인력 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data: {$ref: '#/components/schemas/CommonWithdrawalList'}
+  /api/common/withdrawals/{assignmentId}/recommendations:
+    get:
+      operationId: getCommonWithdrawalRecommendations
+      security: []
+      responses:
+        '200':
+          description: 철수 인력 다음 자리 추천
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data: {$ref: '#/components/schemas/CommonWithdrawalRecommendations'}
+  /api/common/withdrawals/{assignmentId}/tentative-assignment:
+    get:
+      operationId: getCommonWithdrawalTentativeAssignment
+      security: []
+      responses:
+        '200':
+          description: 철수 인력 현재 가배정
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data: {$ref: '#/components/schemas/CommonWithdrawalTentativeResult'}
+  /api/common/withdrawals/tentative-assignments:
+    get:
+      operationId: getCommonWithdrawalAssignments
+      security: []
+      responses:
+        '200':
+          description: 철수 인력 공유 배정 조회
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data: {$ref: '#/components/schemas/CommonWithdrawalSharedList'}
+components:
+  schemas:
+    ApiResponse:
+      type: object
+      required: [success, meta]
+      properties:
+        success: {type: boolean, enum: [true]}
+        meta: {type: object, additionalProperties: true}
+    CommonWithdrawalNextAssignment:
+      type: object
+      required: [opportunityName, recommendationCount, hasTentativeAssignment]
+      properties:
+        opportunityName: {type: string, nullable: true}
+        recommendationCount: {type: integer, minimum: 0}
+        hasTentativeAssignment: {type: boolean}
+    CommonWithdrawalRow:
+      type: object
+      required: [assignmentId, developerId, name, projectName, jobName, endDate, remainingDays, withdrawalCompleted, extensionCount, earlyWithdrawalHistory, extensionPossibilityCode, extensionPossibilityName, nextAssignment, modifiedAt]
+      properties:
+        assignmentId: {type: string}
+        developerId: {type: string}
+        name: {type: string}
+        projectName: {type: string}
+        jobName: {type: string}
+        endDate: {type: string, format: date}
+        remainingDays: {type: integer}
+        withdrawalCompleted: {type: boolean}
+        extensionCount: {type: integer, minimum: 0}
+        earlyWithdrawalHistory:
+          type: array
+          items: {type: string}
+        extensionPossibilityCode: {type: string}
+        extensionPossibilityName: {type: string}
+        nextAssignment: {$ref: '#/components/schemas/CommonWithdrawalNextAssignment'}
+        modifiedAt: {type: string, format: date-time, nullable: true}
+    CommonWithdrawalList:
+      type: object
+      required: [items, totalCount, banner]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/CommonWithdrawalRow'}
+        totalCount: {type: integer, minimum: 0}
+        banner:
+          type: object
+          nullable: true
+          required: [unassignedCount, matchedCount]
+          properties:
+            unassignedCount: {type: integer, minimum: 0}
+            matchedCount: {type: integer, minimum: 0}
+    CommonWithdrawalRecommendation:
+      type: object
+      required: [needSn, opportunityId, opportunityName, jobName, gradeName, startMonth, score, reasons, waitingDays, waitingLabel]
+      properties:
+        needSn: {type: integer}
+        opportunityId: {type: string}
+        opportunityName: {type: string}
+        jobName: {type: string}
+        gradeName: {type: string}
+        startMonth: {type: string}
+        score: {type: number, minimum: 0, maximum: 100}
+        reasons:
+          type: array
+          items: {type: string}
+        waitingDays: {type: integer}
+        waitingLabel: {type: string}
+    CommonWithdrawalShortage:
+      type: object
+      required: [month, jobName, shortageCount]
+      properties:
+        month: {type: string}
+        jobName: {type: string}
+        shortageCount: {type: number}
+    CommonWithdrawalRecommendations:
+      type: object
+      required: [items, shortages]
+      properties:
+        items:
+          type: array
+          maxItems: 5
+          items: {$ref: '#/components/schemas/CommonWithdrawalRecommendation'}
+        shortages:
+          type: array
+          items: {$ref: '#/components/schemas/CommonWithdrawalShortage'}
+    CommonWithdrawalTentativeAssignment:
+      type: object
+      required: [assignmentId, developerId, opportunityId, opportunityName, needSn, startMonth]
+      properties:
+        assignmentId: {type: string}
+        developerId: {type: string}
+        opportunityId: {type: string}
+        opportunityName: {type: string}
+        needSn: {type: integer}
+        startMonth: {type: string}
+    CommonWithdrawalTentativeResult:
+      type: object
+      required: [assignment]
+      properties:
+        assignment:
+          $ref: '#/components/schemas/CommonWithdrawalTentativeAssignment'
+          nullable: true
+    CommonWithdrawalSharedRow:
+      type: object
+      required: [assignmentId, developerId, name, extensionPossibilityCode, extensionPossibilityName, tentativeAssignment]
+      properties:
+        assignmentId: {type: string}
+        developerId: {type: string}
+        name: {type: string}
+        extensionPossibilityCode: {type: string}
+        extensionPossibilityName: {type: string}
+        tentativeAssignment:
+          $ref: '#/components/schemas/CommonWithdrawalTentativeAssignment'
+          nullable: true
+    CommonWithdrawalSharedList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/CommonWithdrawalSharedRow'}

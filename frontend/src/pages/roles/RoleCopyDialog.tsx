@@ -22,7 +22,8 @@ export function RoleCopyDialog({
   selectedRoleId: string;
   dataScopes: { code: string; name: string }[];
   onClose: () => void;
-  onSaved: (settings: api.RoleSettings) => void;
+  /** sourceName: 복사일 때 원본 역할 이름(시안 알림 문구용). 추가는 null. */
+  onSaved: (settings: api.RoleSettings, sourceName: string | null) => void;
   onDirty: (dirty: boolean) => void;
 }) {
   const adding = mode === "add";
@@ -53,8 +54,11 @@ export function RoleCopyDialog({
     if (lock.current) return;
     const source = roles.find((role) => role.roleId === sourceId);
     const invalid: Record<string, string> = {};
-    if (!name.trim() || [...name].length > 50)
-      invalid.roleName = "새 역할 이름을 1~50자로 입력해 주세요.";
+    // 시안: 칸 maxlength 30(입력 규칙, DB 칸 크기는 그대로), 빈 이름·같은 이름은 아래 문구.
+    if (!name.trim() || [...name].length > 30)
+      invalid.roleName = "역할 이름을 넣어 주세요.";
+    else if (roles.some((role) => role.roleName === name.trim()))
+      invalid.roleName = "이미 있는 역할입니다.";
     if (adding && !scope) invalid.dataScopeCd = "데이터 범위를 선택해 주세요.";
     if (!adding && !source)
       invalid.sourceRoleId = "복사할 역할을 선택해 주세요.";
@@ -74,6 +78,7 @@ export function RoleCopyDialog({
                 dataScopeCd: source!.dataScopeCd,
               },
         ),
+        adding ? null : (source?.roleName ?? null),
       );
     } catch (error) {
       setFailure(
@@ -101,6 +106,7 @@ export function RoleCopyDialog({
         data-testid="role-copy-name"
         autoComplete="off"
         placeholder="예: 프로젝트 지원"
+        maxLength={30}
         value={name}
         disabled={busy}
         aria-invalid={!!errors.roleName}

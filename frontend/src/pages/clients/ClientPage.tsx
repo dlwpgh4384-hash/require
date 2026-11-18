@@ -52,13 +52,20 @@ export function ClientPage({
   const [filter, setFilter] = useState(emptyFilter);
   const [applied, setApplied] = useState(emptyFilter);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [toast, setToast] = useState<{ message: string; kind: "ok" | "info" } | null>(null);
+  // 시안: 같은 상호 안내는 저장 알림과 따로 한 장 더 뜬다(안내).
+  const [warning, setWarning] = useState("");
+  const setNotice = (message: string, kind: "ok" | "info" = "ok") =>
+    setToast(message ? { message, kind } : null);
   const [revision, setRevision] = useState(0);
   const [form, setForm] = useState<{ client: Client | null } | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ id: string; tab: string } | null>(null);
-  const [pending, setPending] = useState<{ items: Client[]; useYn: string } | null>(null);
+  // blocked: 거래가 남아 이번에 빼는 거래처(시안: 확인 창 안에 목록으로 보인다).
+  const [pending, setPending] = useState<{ items: Client[]; useYn: string; blocked: Client[] } | null>(null);
+  // 시안: 고른 것을 하나도 중지할 수 없으면 중지하지 않고 안내 창만 띄운다.
+  const [stopBlocked, setStopBlocked] = useState<Client[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [sort, setSort] = useState<ListSort | null>(null);
@@ -93,10 +100,12 @@ export function ClientPage({
         label: "진행 프로젝트",
         align: "right",
         calc: "오늘 투입 중인 내역이 있는 진행 프로젝트 수",
-        render: (row) => (
+        // 시안: 0이면 링크 없이 「0건」만 쓴다.
+        render: (row) => !row.projectCount ? "0건" : (
           <button
             type="button"
             className="ls-lnk"
+            title="투입 내역 보기"
             data-testid={`client-projects-${row.clientId}`}
             onClick={(event) => {
               event.stopPropagation();
@@ -112,10 +121,11 @@ export function ClientPage({
         label: "투입 인력",
         align: "right",
         calc: "오늘 투입 중인 사람 수(한 사람은 한 번만)",
-        render: (row) => (
+        render: (row) => !row.personCount ? "0명" : (
           <button
             type="button"
             className="ls-lnk"
+            title="투입 내역 보기"
             data-testid={`client-people-${row.clientId}`}
             onClick={(event) => {
               event.stopPropagation();
@@ -203,14 +213,49 @@ export function ClientPage({
     setDetail(form?.client ? { id: client.clientId, tab: "basic" } : null);
     setForm(null);
     setHighlight(client.clientId);
-    setNotice(["저장했습니다.", ...warnings].join(" "));
+    setNotice("저장했습니다.");
+    // 시안: 같은 상호 안내는 등록할 때만, 저장 알림과 따로 안내 알림으로 띄운다.
+    setWarning(form?.client ? "" : warnings.join(" "));
     setRevision((value) => value + 1);
   };
-  const blocked =
-    pending?.useYn === "N"
-      ? pending.items.filter((item) => item.projectCount > 0 || item.personCount > 0)
-      : [];
-  const allBlocked = !!pending && blocked.length > 0 && blocked.length === pending.items.length;
+  const unchanged = () => {
+    if (form?.client) setDetail({ id: form.client.clientId, tab: "basic" });
+    setForm(null);
+    setNotice("바뀐 내용이 없습니다.", "info");
+  };
+  // 시안 clientStop: 사용 중인 것만, 거래가 남은 것은 빼고 묻는다.
+  const askStop = (items: Client[]) => {
+    const list = items.filter((item) => item.useYn === "Y");
+    const blocked = list.filter((item) => item.projectCount > 0 || item.personCount > 0);
+    const ok = list.filter((item) => !blocked.includes(item));
+    if (!ok.length) setStopBlocked(blocked);
+    else setPending({ items: ok, useYn: "N", blocked });
+  };
+  // 시안 bulkResume: 사용 중지된 것만 고르고, 없으면 안내 알림만.
+  const askResume = (items: Client[]) => {
+    const list = items.filter((item) => item.useYn !== "Y");
+    if (!list.length) setNotice("고른 것 중 사용 중지된 거래처가 없습니다.", "info");
+    else setPending({ items: list, useYn: "Y", blocked: [] });
+  };
+  // 시안: 상세 [⋯]의 [다시 사용]은 묻지 않고 바로 돌리고 상세를 그대로 둔다.
+  const resumeNow = async (client: Client) => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await putCommonClientUseStatus(
+        [{ clientId: client.clientId, modifiedAt: client.modifiedAt }],
+        "Y",
+      );
+      if (result.failed.length) setError(result.failed.map((item) => item.reason).join(" "));
+      else setNotice("다시 사용합니다.");
+      setRevision((value) => value + 1);
+    } catch (reason) {
+      setError(reason instanceof ClientRequestError ? reason.message : "변경하지 못했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  };
   const changeStatus = async () => {
     if (!pending || busy) return;
     setBusy(true);
@@ -220,9 +265,11 @@ export function ClientPage({
         pending.items.map(({ clientId, modifiedAt }) => ({ clientId, modifiedAt })),
         pending.useYn,
       );
-      const verb = pending.useYn === "N" ? "사용 중지" : "다시 사용";
+      const left = pending.blocked.length + result.failed.length;
       setNotice(
-        `${result.changed.length}건을 ${verb}했습니다.${result.failed.length ? ` ${result.failed.length}건은 처리하지 못했습니다. ${result.failed.map((item) => item.reason).join(" ")}` : ""}`,
+        pending.useYn === "N"
+          ? `${result.changed.length}건의 사용을 중지했습니다.${left ? ` (${left}건은 거래가 남아 제외)` : ""}`
+          : `${result.changed.length}건을 다시 사용합니다.${result.failed.length ? ` ${result.failed.length}건은 처리하지 못했습니다. ${result.failed.map((item) => item.reason).join(" ")}` : ""}`,
       );
       setPending(null);
       setDetail(null);
@@ -234,6 +281,21 @@ export function ClientPage({
       setBusy(false);
     }
   };
+  // 시안 why: 진행 프로젝트가 있으면 「진행 프로젝트 n건」, 아니면 「소속 인력 n명」.
+  const why = (item: Client) =>
+    item.projectCount > 0 ? `진행 프로젝트 ${item.projectCount}건` : `소속 인력 ${item.personCount}명`;
+  const blockedList = (items: Client[]) => (
+    <>
+      <p>아래 거래처는 거래가 남아 있어 중지할 수 없습니다.</p>
+      <ul className="client-blocked-list">
+        {items.map((item) => (
+          <li key={item.clientId}>
+            {item.clientName} — {why(item)}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
   const download = async () => {
     if (downloading) return;
     setDownloading(true);
@@ -367,14 +429,12 @@ export function ClientPage({
             key: "stop",
             label: "사용 중지",
             danger: true,
-            onClick: () =>
-              setPending({ items: (rows ?? []).filter((row) => selected.includes(row.clientId)), useYn: "N" }),
+            onClick: () => askStop((rows ?? []).filter((row) => selected.includes(row.clientId))),
           },
           {
             key: "resume",
             label: "다시 사용",
-            onClick: () =>
-              setPending({ items: (rows ?? []).filter((row) => selected.includes(row.clientId)), useYn: "Y" }),
+            onClick: () => askResume((rows ?? []).filter((row) => selected.includes(row.clientId))),
           },
         ]}
         onRowClick={(row) => setDetail({ id: row.clientId, tab: "basic" })}
@@ -406,7 +466,17 @@ export function ClientPage({
           {error}
         </p>
       )}
-      {notice && <Toast message={notice} onDismiss={() => setNotice("")} testId="client-toast" />}
+      {toast && (
+        <Toast
+          message={toast.message}
+          kind={toast.kind}
+          onDismiss={() => setToast(null)}
+          testId="client-toast"
+        />
+      )}
+      {warning && (
+        <Toast message={warning} kind="info" onDismiss={() => setWarning("")} testId="client-warning-toast" />
+      )}
       {form?.client && (
         <ClientForm
           key={form.client.clientId}
@@ -417,11 +487,12 @@ export function ClientPage({
             setForm(null);
           }}
           onSaved={saved}
+          onUnchanged={unchanged}
         />
       )}
       {detail && (
         <ClientDetail
-          key={detail.id}
+          key={`${detail.id}-${revision}`}
           clientId={detail.id}
           initialTab={detail.tab}
           codes={codes}
@@ -430,40 +501,27 @@ export function ClientPage({
             setDetail(null);
             setForm({ client });
           }}
-          onStatus={(client) => setPending({ items: [client], useYn: client.useYn === "Y" ? "N" : "Y" })}
+          onStatus={(client) => (client.useYn === "Y" ? askStop([client]) : void resumeNow(client))}
+          onNotice={setNotice}
         />
       )}
-      {pending && allBlocked && (
-        // 시안: 고른 거래처 모두 거래가 남아 있으면 중지하지 않고 목록으로 알린다.
-        // 일부만 남아 있으면 SFR-115-06대로 가능한 건만 중지하고 못 한 건수·이유를 알린다.
+      {stopBlocked && (
+        // 시안: 고른 거래처를 하나도 중지할 수 없으면 중지하지 않고 목록으로 알린다.
         <Dialog
           title="사용을 중지할 수 없습니다"
           testId="client-status-blocked"
           closable
-          onClose={() => setPending(null)}
+          onClose={() => setStopBlocked(null)}
         >
-          <p>아래 거래처는 거래가 남아 있어 중지할 수 없습니다.</p>
-          <ul className="client-blocked-list">
-            {blocked.map((item) => (
-              <li key={item.clientId}>
-                {item.clientName} —{" "}
-                {[
-                  item.projectCount > 0 ? `진행 프로젝트 ${item.projectCount}건` : "",
-                  item.personCount > 0 ? `투입 인력 ${item.personCount}명` : "",
-                ]
-                  .filter(Boolean)
-                  .join(", ")}
-              </li>
-            ))}
-          </ul>
+          {stopBlocked.length ? blockedList(stopBlocked) : <p>이미 중지된 거래처입니다.</p>}
           <div className="app-actions">
-            <button type="button" className="primary-button" data-testid="client-status-blocked-ok" onClick={() => setPending(null)}>
+            <button type="button" className="primary-button" data-testid="client-status-blocked-ok" onClick={() => setStopBlocked(null)}>
               확인
             </button>
           </div>
         </Dialog>
       )}
-      {pending && !allBlocked && (
+      {pending && (
         <Dialog
           title={
             pending.useYn === "N"
@@ -474,15 +532,14 @@ export function ClientPage({
           closable
           onClose={() => !busy && setPending(null)}
         >
+          {/* 시안: 고른 이름을 모두 쓰고, 거래가 남아 빠지는 거래처는 아래에 목록으로 보인다. */}
           <p>
-            {pending.items.length === 1
-              ? pending.items[0].clientName
-              : `${pending.items[0].clientName} 외 ${pending.items.length - 1}건`}{" "}
-            —{" "}
+            {pending.items.map((item) => item.clientName).join(", ")} —{" "}
             {pending.useYn === "N"
               ? "중지하면 새 프로젝트에서 고를 수 없습니다. 기록은 그대로 남습니다."
-              : "다시 사용하면 새 프로젝트에서 고를 수 있습니다."}
+              : "상태가 「사용」으로 돌아가고 변경 이력에 남습니다."}
           </p>
+          {pending.blocked.length > 0 && blockedList(pending.blocked)}
           <div className="app-actions">
             <button type="button" data-testid="client-status-cancel" disabled={busy} onClick={() => setPending(null)}>
               취소

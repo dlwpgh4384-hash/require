@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ProjectLink } from "../projects/ProjectLink";
-import { formatDateTime } from "../../shared/time";
-import { Badge, DetailPanel, KeyValues } from "../../shared/list";
+import { formatDateTime, koreanToday } from "../../shared/time";
+import { Badge, Banner, DetailPanel, KeyValues } from "../../shared/list";
 import {
   detailAccount,
   getCommonClient,
@@ -25,6 +25,7 @@ export function ClientDetail({
   onClose,
   onEdit,
   onStatus,
+  onNotice,
 }: {
   clientId: string;
   initialTab?: string;
@@ -32,6 +33,8 @@ export function ClientDetail({
   onClose: () => void;
   onEdit: (client: Client) => void;
   onStatus: (client: Client) => void;
+  /** 시안 알림(toast). [보기]로 계좌 전체를 본 뒤 안내한다. */
+  onNotice?: (message: string, kind?: "ok" | "info") => void;
 }) {
   const [client, setClient] = useState<Client | null>(null);
   const [assignments, setAssignments] = useState<ClientAssignment[]>([]);
@@ -136,6 +139,11 @@ export function ClientDetail({
   const vendor = client ? client.clientTypeCode !== "CUST" : false;
   const customer = client ? client.clientTypeCode !== "VNDR" : false;
   const basicTab = client && (
+    <>
+    {client.useYn !== "Y" && (
+      // 시안: 사용을 중지한 거래처는 기본 정보 위에 잠금 띠를 보인다.
+      <Banner kind="lock">사용을 중지한 거래처입니다. 새 프로젝트에서 고를 수 없습니다.</Banner>
+    )}
     <KeyValues
       items={[
         [
@@ -178,7 +186,13 @@ export function ClientDetail({
                       onClick={() => {
                         setAccountBusy(true);
                         void getCommonClientPaymentAccount(clientId)
-                          .then(setAccount)
+                          .then((value) => {
+                            setAccount(value);
+                            onNotice?.(
+                              "계좌번호 전체를 보았습니다. 접근 기록에 남습니다.",
+                              "info",
+                            );
+                          })
                           .catch((reason) => setError(reason.message))
                           .finally(() => setAccountBusy(false));
                       }}
@@ -203,69 +217,91 @@ export function ClientDetail({
         ],
       ]}
     />
+    </>
   );
   const assignmentProjects = [
     ...new Map(
       assignments.map((line) => [line.projectId, line.projectName]),
     ).entries(),
   ];
-  const assignmentsTab = (
+  const assignmentPeople = new Set(
+    assignments.map((line) => line.managementNumber || line.personName),
+  ).size;
+  // 시안: 구분마다 누구를 세는지 한 문장으로 알려 준다.
+  const assignmentWho = !client
+    ? ""
+    : client.clientTypeCode === "CUST"
+      ? "이 고객사 프로젝트에 들어간 사람"
+      : client.clientTypeCode === "VNDR"
+        ? "이 협력사 소속으로 들어간 사람"
+        : "이 회사 프로젝트에 들어갔거나 이 회사 소속인 사람";
+  const assignmentsTab = assignments.length ? (
     <>
       <p className="ls-cap">
-        오늘 기준 투입 내역입니다. 프로젝트 이름을 누르면 상세를 이 자리에서
-        확인할 수 있습니다.
+        투입 배정(UI-12)에서 오늘({koreanToday()}) 투입 중인 내역입니다.{" "}
+        {assignmentWho} — 프로젝트 {assignmentProjects.length}건, 인력{" "}
+        {assignmentPeople}명.
       </p>
-      <div data-testid="client-assignment-projects">
-        <span className="ls-cap">프로젝트 {assignmentProjects.length}건</span>{" "}
+      <div className="client-assignment-chips" data-testid="client-assignment-projects">
         {assignmentProjects.map(([projectId, projectName]) => (
           <span
             key={projectId}
             data-testid={`client-assignment-project-${projectId.toLowerCase()}`}
           >
-            <Badge kind="info">{projectName}</Badge>{" "}
+            <Badge kind="info">
+              {projectName}{" "}
+              {assignments.filter((line) => line.projectId === projectId).length}명
+            </Badge>
           </span>
         ))}
       </div>
-      {assignments.length ? (
-        <div className="ls-twrap">
-          <table className="ls-t" data-testid="client-assignments">
-            <thead>
-              <tr>
-                <th>프로젝트</th>
-                <th>이름</th>
-                <th>소속 · 직무</th>
-                <th>철수일</th>
+      <div className="ls-twrap">
+        <table className="ls-t" data-testid="client-assignments">
+          <thead>
+            <tr>
+              <th>프로젝트</th>
+              <th>이름</th>
+              <th>소속 · 직무</th>
+              <th>철수일</th>
+            </tr>
+          </thead>
+          <tbody>
+            {assignments.map((line, index) => (
+              <tr
+                key={`${line.projectId}-${index}`}
+                data-testid={`client-assignment-${index}`}
+              >
+                <td>
+                  <ProjectLink
+                    projectId={line.projectId}
+                    name={line.projectName}
+                    testId={`client-project-${index}`}
+                  />
+                </td>
+                <td>
+                  {/* 시안 .pname: 이름 아래 작은 관리번호 */}
+                  <span className="client-pname">
+                    {line.personName}
+                    {line.managementNumber && <small>{line.managementNumber}</small>}
+                  </span>
+                </td>
+                <td>
+                  <span className="client-pname">
+                    {line.companyName || "자사"}
+                    <small>
+                      {dash(line.jobName)} · {Number(line.monthlyMm)} MM
+                    </small>
+                  </span>
+                </td>
+                <td>{dash(line.withdrawalDate)}</td>
               </tr>
-            </thead>
-            <tbody>
-              {assignments.map((line, index) => (
-                <tr
-                  key={`${line.projectId}-${index}`}
-                  data-testid={`client-assignment-${index}`}
-                >
-                  <td>
-                    <ProjectLink
-                      projectId={line.projectId}
-                      name={line.projectName}
-                      testId={`client-project-${index}`}
-                    />
-                  </td>
-                  <td>{line.personName}</td>
-                  <td>
-                    <span>{dash(line.companyName)}</span>
-                    <br />
-                    <span>{dash(line.jobName)}</span>
-                  </td>
-                  <td>{dash(line.withdrawalDate)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p className="ls-cap">오늘 투입 중인 사람이 없습니다.</p>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </div>
     </>
+  ) : (
+    <p className="ls-cap">지금 투입 중인 내역이 없습니다.</p>
   );
   const historyTab = changes.length ? (
     <div className="ls-twrap">

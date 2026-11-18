@@ -12,7 +12,7 @@ import {
   type ListColumn,
   type ListSort,
 } from "../../shared/list";
-import { koreanThisMonth } from "../../shared/time";
+import { koreanThisMonth, koreanToday } from "../../shared/time";
 import { useViewport } from "../../shared/layout/useViewport";
 import { getCommonOperatingStandards } from "../operatingstandards/operatingStandards";
 import { getCommonUploadTemplate, type UploadResult } from "../uploads/uploads";
@@ -94,7 +94,15 @@ export function DeveloperPage({
   const [pendingUse, setPendingUse] = useState<{
     ids: string[];
     useYn: string;
+    names: string[];
+    /** 시안: 투입 중이라 중지 대상에서 뺀 사람(창에 함께 보임) */
+    busyRows: DeveloperListRow[];
+    /** 시안: 퇴사해 다시 사용 대상에서 뺀 사람 수 */
+    retired: number;
   } | null>(null);
+  const [stopBlocked, setStopBlocked] = useState<DeveloperListRow[] | null>(
+    null,
+  );
   const [blocked, setBlocked] = useState<
     { developerId: string; name: string; reason: string }[] | null
   >(null);
@@ -221,21 +229,66 @@ export function DeveloperPage({
     });
     return list;
   }, [rows, sort]);
-  // 시안: 고른 것 중 바꿀 대상이 없으면 창 대신 알림(「고른 것 중 사용 중지된 개발자가 없습니다.」)
-  const askUse = (useYn: string) => {
-    const ids = (rows || [])
-      .filter((r) => selected.includes(r.developerId) && r.useYn !== useYn)
-      .map((r) => r.developerId);
-    if (!ids.length) {
-      setNotice(
-        useYn === "Y"
-          ? "고른 것 중 사용 중지된 개발자가 없습니다."
-          : "고른 것 중 사용 중인 개발자가 없습니다.",
-      );
+  const info = (message: string) => {
+    setNoticeKind("info");
+    setNotice(message);
+  };
+  // 시안 devStop·bulkResume: 고른 것 중 바꿀 대상이 없으면 창 대신 알림.
+  // 중지는 투입 중(현재 프로젝트가 있는) 사람을 창을 열기 전에 골라내 보이고, 다시 사용은 퇴사한 사람을 뺀다.
+  const askUse = (useYn: string, ids: string[] = selected) => {
+    const targets = (rows || []).filter(
+      (r) => ids.includes(r.developerId) && r.useYn !== useYn,
+    );
+    if (useYn === "N") {
+      if (!targets.length) return info("이미 사용 중지된 개발자입니다.");
+      const busyRows = targets.filter((r) => r.currentProjectName);
+      const free = targets.filter((r) => !r.currentProjectName);
+      if (!free.length) return setStopBlocked(busyRows);
+      setPendingUse({
+        ids: free.map((r) => r.developerId),
+        useYn,
+        names: free.map((r) => r.name),
+        busyRows,
+        retired: 0,
+      });
       return;
     }
-    setPendingUse({ ids, useYn });
+    const today = koreanToday();
+    const gone = targets.filter(
+      (r) => r.retirementDate && r.retirementDate < today,
+    );
+    const free = targets.filter((r) => !gone.includes(r));
+    if (!free.length) return info("고른 것 중 사용 중지된 개발자가 없습니다.");
+    setPendingUse({
+      ids: free.map((r) => r.developerId),
+      useYn,
+      names: free.map((r) => r.name),
+      busyRows: [],
+      retired: gone.length,
+    });
   };
+  const busyNotice = (list: DeveloperListRow[]) => (
+    <>
+      <p>
+        아래 개발자는 투입 중인 배정이 있어 중지할 수 없습니다. 먼저 투입
+        배정의 [변경 기록]에서 조기 철수로 배정을 끝내 주세요.
+      </p>
+      <ul className="developer-blocked-list">
+        {list.map((r) => (
+          <li
+            key={r.developerId}
+            data-testid={`developer-busy-${r.developerId}`}
+          >
+            {r.name} ({r.managementNumber}) — {r.currentProjectName}
+            {r.additionalProjectCount > 0
+              ? ` 외 ${r.additionalProjectCount}건`
+              : ""}
+            {r.withdrawalDate ? ` ~${r.withdrawalDate}` : ""}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
   const use = async () => {
     if (pending.current || !pendingUse) return;
     pending.current = true;
@@ -248,15 +301,53 @@ export function DeveloperPage({
       );
       setPendingUse(null);
       if (value.rejected.length) setBlocked(value.rejected);
-      if (value.processedDeveloperIds.length)
+      const done = value.processedDeveloperIds.length;
+      if (done) {
+        // 시안 문구: 「n명의 사용을 중지했습니다. (m명은 투입 중이라 제외)」「n명을 다시 사용합니다. (m명은 퇴사해 제외)」
+        const skipped =
+          pendingUse.useYn === "N"
+            ? pendingUse.busyRows.length + value.rejected.length
+            : pendingUse.retired + value.rejected.length;
+        setNoticeKind("ok");
         setNotice(
-          `${value.processedDeveloperIds.length}명을 ${pendingUse.useYn === "N" ? "사용 중지" : "다시 사용"}했습니다.`,
+          pendingUse.useYn === "N"
+            ? `${done}명의 사용을 중지했습니다.` +
+                (skipped ? ` (${skipped}명은 투입 중이라 제외)` : "")
+            : `${done}명을 다시 사용합니다.` +
+                (skipped ? ` (${skipped}명은 퇴사해 제외)` : ""),
         );
+      }
       setDetail(null);
       refresh();
     } catch (reason) {
       setError(developerFailure(reason));
       setPendingUse(null);
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
+  };
+  // 시안: 상세의 [다시 사용]은 확인 창 없이 바로. 퇴사일이 지난 사람은 다시 쓸 수 없다.
+  const resumeOne = async (d: { developerId: string; name: string; retirementDate: string | null }) => {
+    if (pending.current) return;
+    if (d.retirementDate && d.retirementDate < koreanToday()) {
+      setNoticeKind("warn");
+      setNotice("퇴사한 개발자는 다시 사용할 수 없습니다. 새로 등록하세요.");
+      return;
+    }
+    pending.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const value = await putCommonDeveloperUseStatus([d.developerId], "Y");
+      if (value.rejected.length) setBlocked(value.rejected);
+      if (value.processedDeveloperIds.length) {
+        setNoticeKind("ok");
+        setNotice(`${d.name}님을 다시 사용합니다.`);
+      }
+      refresh();
+    } catch (reason) {
+      setError(developerFailure(reason));
     } finally {
       pending.current = false;
       setBusy(false);
@@ -317,6 +408,7 @@ export function DeveloperPage({
         <DeveloperForm
           developer={form.developer}
           options={options}
+          managementNumbers={rows?.map((r) => r.managementNumber) || []}
           onCancel={() => setForm(null)}
           onSaved={() => {
             setForm(null);
@@ -354,8 +446,6 @@ export function DeveloperPage({
       </select>
     </ListFilter>
   );
-  const selectedRows =
-    rows?.filter((r) => pendingUse?.ids.includes(r.developerId)) || [];
   return (
     <section
       className="developer-page"
@@ -509,10 +599,17 @@ export function DeveloperPage({
             setDetail(null);
           }}
           onStop={(d) =>
-            setPendingUse({
-              ids: [d.developerId],
-              useYn: d.useYn === "Y" ? "N" : "Y",
-            })
+            d.useYn !== "Y"
+              ? void resumeOne(d)
+              : rows?.some((r) => r.developerId === d.developerId)
+                ? askUse("N", [d.developerId])
+                : setPendingUse({
+                    ids: [d.developerId],
+                    useYn: "N",
+                    names: [d.name],
+                    busyRows: [],
+                    retired: 0,
+                  })
           }
           onNotice={(message) => {
             setNoticeKind("warn");
@@ -540,14 +637,12 @@ export function DeveloperPage({
           testId="developer-use-confirm-dialog"
         >
           <p>
-            {selectedRows.length === 1
-              ? selectedRows[0].name
-              : `${selectedRows[0]?.name ?? ""} 외 ${Math.max(selectedRows.length - 1, 0)}명`}{" "}
-            —{" "}
+            {pendingUse.names.join(", ")} —{" "}
             {pendingUse.useYn === "N"
               ? "삭제가 아니라 배정 후보에서 빼는 것이며 기록은 남습니다."
-              : "다시 배정 후보에 넣습니다."}
+              : "상태가 「사용」으로 돌아가고 변경 이력에 남습니다."}
           </p>
+          {pendingUse.busyRows.length > 0 && busyNotice(pendingUse.busyRows)}
           <div className="app-actions">
             <button
               data-testid="developer-use-cancel"
@@ -565,6 +660,25 @@ export function DeveloperPage({
               onClick={() => void use()}
             >
               {pendingUse.useYn === "N" ? "사용 중지" : "다시 사용"}
+            </button>
+          </div>
+        </Dialog>
+      )}
+      {stopBlocked && (
+        <Dialog
+          title="사용을 중지할 수 없습니다"
+          closable
+          onClose={() => setStopBlocked(null)}
+          testId="developer-stop-blocked"
+        >
+          {busyNotice(stopBlocked)}
+          <div className="app-actions">
+            <button
+              className="primary-button"
+              data-testid="developer-stop-blocked-close"
+              onClick={() => setStopBlocked(null)}
+            >
+              확인
             </button>
           </div>
         </Dialog>

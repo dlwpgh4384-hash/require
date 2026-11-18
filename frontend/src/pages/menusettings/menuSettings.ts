@@ -87,7 +87,9 @@ export function moveMenu(
         ? target.menuId
         : target.upperMenuId;
   if (source.lockYn === "Y" && parent !== source.upperMenuId)
-    throw new Error("시스템 메뉴는 다른 묶음으로 옮길 수 없습니다.");
+    throw new Error(
+      `「${source.menuNm}」은 시스템 묶음 메뉴라 다른 묶음으로 옮길 수 없습니다.`,
+    );
   const siblings = rows
     .filter((row) => row.menuId !== sourceId && row.upperMenuId === parent)
     .sort(menuOrder);

@@ -21,7 +21,7 @@ class CommonCodeMapServiceTest {
         when(mapper.selectableCode(item)).thenReturn(true);
         when(mapper.insertMap(any())).thenThrow(new DuplicateKeyException("unique violation"));
         assertThatThrownBy(() -> service.postCommonCodeMap(item))
-            .isInstanceOf(CodeFailure.class).hasMessageContaining("이미 등록");
+            .isInstanceOf(CodeFailure.class).hasMessageContaining("같은 그룹에 이미 있는 표기입니다."); // 시안 UI-27 문구
         verify(management, never()).insertHistory(any());
     }
     @Test void missingGeneratedKeyNeverCreatesFabricatedSuccess() {

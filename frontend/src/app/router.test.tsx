@@ -767,8 +767,9 @@ describe("common code route composition", () => {
         screen.queryByTestId("code-map-add-dialog"),
       ).not.toBeInTheDocument(),
     );
-    await waitFor(() => expect(groups).toHaveBeenCalledTimes(3));
-    expect(codes).toHaveBeenCalledTimes(3);
+    // 등록 뒤 목록에 생긴 줄의 그룹·코드 이름을 보이려고(시안 UI-27 표기 대응 목록) 그룹 목록과 그 그룹 코드를 한 번씩 더 읽는다.
+    await waitFor(() => expect(groups).toHaveBeenCalledTimes(4));
+    expect(codes).toHaveBeenCalledTimes(4);
     expect(maps).toHaveBeenCalledTimes(2);
     expect(request).toHaveBeenCalledWith("/api/common/code-maps", {
       method: "POST",

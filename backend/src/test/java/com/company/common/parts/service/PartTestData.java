@@ -64,6 +64,9 @@ public final class PartTestData {
         when(mapper.stop(anyString())).thenAnswer(call -> {
             masters.get(call.getArgument(0)).useYn = "N"; return 1;
         });
+        when(mapper.resume(anyString())).thenAnswer(call -> {
+            masters.get(call.getArgument(0)).useYn = "Y"; return 1;
+        });
         when(mapper.selectLastConfirmed(anyString(), anyString())).thenAnswer(call -> confirmed);
         doAnswer(call -> { histories.add(call.getArgument(0)); return null; }).when(management).insertHistory(any());
         when(mapper.selectHistory(anyString())).thenAnswer(call -> histories.stream()

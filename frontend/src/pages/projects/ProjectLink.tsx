@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { ProjectDetail } from "./ProjectDetail";
 import "./projects.css";
 
@@ -15,6 +16,8 @@ export function ProjectLink({
   readOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // 다른 화면(철수 리스트 상세 등)에서 연 상세에서 저장해도 완료 알림이 보이게 한다(2026-11-19 사용자 발견: 인원 계획 저장 뒤 알림 없음).
+  const [notice, setNotice] = useState<{ message: string; kind?: ToastKind } | null>(null);
   if (!projectId) return <span>{name}</span>;
   return (
     <>
@@ -39,8 +42,21 @@ export function ProjectLink({
               projectId={projectId}
               readOnly={readOnly}
               onClose={() => setOpen(false)}
+              onChanged={(message, kind) => {
+                if (message) setNotice({ message, kind });
+              }}
             />
           </div>,
+          document.body,
+        )}
+      {notice &&
+        createPortal(
+          <Toast
+            message={notice.message}
+            kind={notice.kind}
+            testId="project-link-toast"
+            onDismiss={() => setNotice(null)}
+          />,
           document.body,
         )}
     </>

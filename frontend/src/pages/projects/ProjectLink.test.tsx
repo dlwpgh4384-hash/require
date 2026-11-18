@@ -1,7 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ProjectLink } from "./ProjectLink";
+import { subscribeProjectEdit } from "./projectEdit";
+import type { Project } from "./projects";
 
 // 다른 화면(철수 리스트 상세·개발자 풀·거래처)의 표 안에서 연 프로젝트 상세에서 인원 계획을 저장하면
 // 완료 알림이 보이고, 다시 고치면 [저장]이 다시 살아나야 한다(2026-11-19 사용자 발견).
@@ -17,6 +20,7 @@ const project = {
   startDate: "2026-01-01",
   endDate: "2026-12-31",
   canSaveManpowerPlan: true,
+  canEdit: true,
 };
 let request: ReturnType<typeof vi.fn>;
 beforeEach(() => {
@@ -56,4 +60,26 @@ it("shows the save notice and re-enables save after editing again, when opened f
   await waitFor(() => expect(detail.getByTestId("project-plan-save")).toBeDisabled());
   fireEvent.change(await detail.findByTestId("project-job-mm-be"), { target: { value: "5" } });
   expect(detail.getByTestId("project-plan-save")).toBeEnabled();
+});
+
+// 시안 editform: 다른 화면에서 연 상세의 [수정]은 상세를 닫고 프로젝트(UI-01) 화면의 수정 폼을 연다(2026-11-19 사용자 결정).
+it("[수정] in a detail opened from another screen closes it and asks the project screen to open its edit form", async () => {
+  const received: Project[] = [];
+  render(
+    <MemoryRouter initialEntries={["/screens/UI-05"]}>
+      <Routes>
+        <Route path="/screens/UI-05" element={<ProjectLink projectId="P-1" name="링크 프로젝트" testId="link-p1" />} />
+        <Route path="/screens/UI-01" element={<p data-testid="project-screen">프로젝트 화면</p>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByTestId("link-p1"));
+  const detail = within(await screen.findByTestId("project-detail"));
+  fireEvent.click(await detail.findByTestId("project-edit"));
+  expect(await screen.findByTestId("project-screen")).toBeInTheDocument();
+  expect(screen.queryByTestId("project-detail")).not.toBeInTheDocument();
+  // 프로젝트 화면이 열리면서 받아 갈 요청이 남아 있다.
+  const stop = subscribeProjectEdit((p) => received.push(p));
+  stop();
+  expect(received.map((p) => p.projectId)).toEqual(["P-1"]);
 });

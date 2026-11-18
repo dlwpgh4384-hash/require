@@ -5,6 +5,7 @@ import { ProjectPage } from "./ProjectPage";
 import { ProjectDistribution } from "./ProjectDistribution";
 import { ProjectWorkspaceProvider, ProjectTitleActions } from "./ProjectWorkspace";
 import type { Project } from "./projects";
+import { requestProjectEdit } from "./projectEdit";
 
 const viewport = vi.hoisted(() => ({ mobile: false, width: 1280 }));
 vi.mock("../../shared/layout/useViewport", () => ({ useViewport: () => viewport }));
@@ -564,4 +565,19 @@ it("시안 UI-01: 배분표 불일치 이유 문구", async () => {
   const table = within(await screen.findByTestId("project-distribution-mismatches"));
   expect(table.getByText("배분표에는 금액이 있는데 그 달 투입 배정이 없습니다.")).toBeVisible();
   expect(table.getByText("투입 배정은 있는데 배분표에 줄이 없어 「그 달 원가 × 계약금액 ÷ 예산」으로 계산합니다.")).toBeVisible();
+});
+
+// 시안 editform: 다른 화면에서 연 상세의 [수정] 요청을 받으면 이 화면이 수정 폼을 연다(열려 있을 때·나중에 열릴 때 모두).
+it("opens the edit form when another screen asks to edit a project", async () => {
+  shell();
+  await screen.findByTestId("list-row-P-0001");
+  act(() => requestProjectEdit(base()));
+  const form = within(await screen.findByTestId("project-form"));
+  expect(form.getByTestId("project-projectName")).toHaveValue("가온은행 모바일 앱");
+});
+it("opens the edit form for a request left before the project screen opened", async () => {
+  requestProjectEdit(base({ projectId: "P-0003", projectName: "파트 없는 운영" }));
+  shell();
+  const form = within(await screen.findByTestId("project-form"));
+  expect(form.getByTestId("project-projectName")).toHaveValue("파트 없는 운영");
 });

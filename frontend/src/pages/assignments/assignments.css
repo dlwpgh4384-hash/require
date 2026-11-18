@@ -1,0 +1,197 @@
+/* 시안 투입 배정(UI-12). 목록·패널·작은 창은 공통(shared/list, 프로젝트 창 모양)을 쓰고 여기에는 이 화면만의 모양만 둔다. */
+.assignment-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  color: var(--text);
+}
+/* 시안 .warn: 경고 아이콘·⚠ 글자 주황 */
+.assignment-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ls-warn);
+}
+.assignment-warn-icon {
+  flex: none;
+  vertical-align: -2px;
+}
+/* 시안 .pname: 이름 아래 작은 관리번호 */
+.assignment-pname {
+  display: flex;
+  flex-direction: column;
+  line-height: 18px;
+}
+.assignment-pname small {
+  font-size: 12px;
+  color: var(--text-sub);
+}
+.assignment-tnum {
+  font-variant-numeric: tabular-nums;
+}
+/* 시안 배정 후보 카드(.card·.card-h): 안 여백 20·24, 줄 간격 12, 머리 양끝 맞춤, 머리 밑줄 없음 */
+.assignment-candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px 24px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.assignment-card-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* 시안 .twrap.free: 표 높이 제한 없음 */
+.assignment-candidates .ls-twrap {
+  max-height: none;
+  min-height: 0;
+}
+.assignment-candidate-acts {
+  text-align: right;
+  white-space: nowrap;
+}
+/* 시안 빈 목록: 24px 돋보기 아이콘 + 문구 + [조건 초기화]. PC 표의 빈 줄에만(불러오는 중·오류·휴대폰 빈 목록에는 없음) */
+[data-testid="assignment-list"] td > .ls-empty[data-testid="list-empty"]::before {
+  content: "";
+  width: 24px;
+  height: 24px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27black%27 stroke-width=%271.8%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3%27/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27black%27 stroke-width=%271.8%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3%27/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+[data-testid="assignment-list"] .ls-empty p {
+  margin: 0;
+}
+/* 시안 확인 창(.modal) 폭 400 */
+.app-dialog[data-testid="assignment-cancel-confirm"],
+.app-dialog[data-testid="candidate-remove-confirm"] {
+  width: min(400px, 100%);
+}
+/* 시안 작은 창 칸 줄(.fld·.fl·.fc): 이름표 왼쪽 120px 오른쪽 맞춤, 칸은 오른쪽. 휴대폰은 위아래로 */
+.assignment-fld {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: start;
+}
+.app-dialog .assignment-fl {
+  margin: 0;
+  padding-top: 8px;
+  text-align: right;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.assignment-fv {
+  min-width: 0;
+}
+@media (max-width: 767px) {
+  .assignment-fld {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-dialog .assignment-fl {
+    text-align: left;
+    padding-top: 0;
+  }
+}
+/* 시안 배정 창(.fsec) */
+.assignment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.assignment-form .project-fc select,
+.assignment-form .project-fc input:not([type="checkbox"]) {
+  width: 100%;
+}
+.assignment-form .assignment-row,
+.app-dialog .assignment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.assignment-form .assignment-row input[type="date"] {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.assignment-form .assignment-row .project-money {
+  flex: none;
+}
+.assignment-ai {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.assignment-err {
+  margin: 0;
+}
+.assignment-sub-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.assignment-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+/* 시안 변경 이력 도구 줄: 칩 + 오른쪽 [+ 변경 기록] */
+.assignment-htool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.assignment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.assignment-chip {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.assignment-chip.on {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+.assignment-htool .ls-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.assignment-muted td {
+  color: var(--text-sub);
+  text-decoration: line-through;
+}
+.assignment-muted td:last-child,
+.assignment-muted td:nth-child(2) {
+  text-decoration: none;
+}
+.ls-mcard .assignment-pname {
+  text-align: left;
+}

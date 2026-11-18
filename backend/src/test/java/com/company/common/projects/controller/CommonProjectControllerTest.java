@@ -24,7 +24,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import static org.assertj.core.api.Assertions.*;
-import static com.company.common.support.controller.OpenApiResponseContract.response;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -486,5 +485,12 @@ class CommonProjectControllerTest {
         try (var wb=new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(bytes))) {
             assertThat(wb.getSheetAt(0).getRow(2).getCell(0).getStringCellValue()).isEqualTo("구분");
         }
+    }
+    /** Hand-added fields and paths live in openapi-manual.yaml because regenerating openapi.yaml drops them. */
+    private static final java.util.Set<String> MANUAL_PATHS = java.util.Set.of("/api/common/projects", "/api/common/projects/excel", "/api/common/projects/budget-rule", "/api/common/projects/{projectId}", "/api/common/projects/{projectId}/budget", "/api/common/projects/{projectId}/start", "/api/common/projects/{projectId}/distribution", "/api/common/projects/{projectId}/lose");
+    private static org.springframework.test.web.servlet.ResultMatcher response(String method, String path) {
+        return MANUAL_PATHS.contains(path)
+            ? com.company.common.support.controller.OpenApiResponseContract.response(method, path, "contracts/openapi-manual.yaml")
+            : com.company.common.support.controller.OpenApiResponseContract.response(method, path);
     }
 }

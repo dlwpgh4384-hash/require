@@ -982,7 +982,9 @@ describe("project route composition", () => {
       await screen.findByTestId("list-empty");
       expect(screen.getAllByTestId("project-page")).toHaveLength(1);
       expect(
-        (await screen.findByTestId("project-register")).closest(".screen-actions"),
+        (await screen.findByTestId("project-register")).closest(
+          ".screen-actions",
+        ),
       ).not.toBeNull();
       expect(request).toHaveBeenCalledWith("/api/common/projects", {
         signal: expect.any(AbortSignal),
@@ -1028,6 +1030,332 @@ describe("project route composition", () => {
     expect(await screen.findByTestId("list-empty")).toBeVisible();
     expect(list).toHaveBeenCalledTimes(2);
     expect(router?.state.location.pathname).toBe("/screens/UI-01");
+    expectSingleShell();
+  });
+});
+
+function respondWithAssignments() {
+  const menus = response();
+  menus.data.push(
+    {
+      ...menus.data[0],
+      menuId: "G003",
+      menuNm: "프로젝트·투입",
+      scrnId: null,
+      sortOrd: 2,
+    },
+    {
+      ...menus.data[0],
+      menuId: "M006",
+      upperMenuId: "G003",
+      menuNm: "투입 배정",
+      scrnId: "UI-12",
+      menuLvl: 2,
+      sortOrd: 1,
+    },
+    {
+      ...menus.data[0],
+      menuId: "recommendations-menu",
+      menuNm: "AI 추천",
+      scrnId: "UI-30",
+      sortOrd: 3,
+    },
+  );
+  menus.meta.screenAccess.push(
+    { scrnId: "UI-12", available: true, pcOnlyYn: "N" },
+    { scrnId: "UI-30", available: true, pcOnlyYn: "N" },
+  );
+  const success = (data: unknown) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ success: true, meta: {}, data }),
+  });
+  const list = vi.fn(async () => success({ items: [] }));
+  const upload = {
+    uploadId: "assignment-upload",
+    modifiedAt: null,
+    statusName: "검사완료",
+    successCount: 0,
+    warningCount: 0,
+    errorCount: 1,
+    issues: [
+      {
+        row: 4,
+        column: "프로젝트ID",
+        inputValue: "",
+        reason: "프로젝트를 선택해 주세요.",
+        severity: "오류",
+      },
+    ],
+  };
+  const request = vi.fn(
+    async (
+      url: string,
+      init?: RequestInit,
+    ): Promise<Pick<Response, "ok" | "status" | "json">> => {
+      if (url === "/api/common/menus")
+        return { ok: true, status: 200, json: async () => menus };
+      if (url.startsWith("/api/common/user-preferences/"))
+        return {
+          ok: true,
+          status: 200,
+          json: async () => preferenceResponse(url),
+        };
+      if (url.startsWith("/api/common/assignments?")) return list();
+      if (url === "/api/common/assignments/candidates")
+        return success({ items: [] });
+      if (url === "/api/common/projects")
+        return success({ items: [], unassignedCount: 0 });
+      if (
+        url.startsWith("/api/common/code-groups/") ||
+        url.startsWith("/api/common/developers?")
+      )
+        return success({ items: [] });
+      if (
+        (url === "/api/common/uploads" && init?.method === "POST") ||
+        url === "/api/common/uploads/assignment-upload"
+      )
+        return success(upload);
+      throw new Error(`예상하지 않은 요청: ${url}`);
+    },
+  );
+  vi.stubGlobal("fetch", request);
+  return { request, list };
+}
+
+describe("assignment route composition", () => {
+  it.each(["/screens/UI-12", "/#UI-12"])(
+    "%s uses the real assignment client and a single title action host",
+    async (path) => {
+      const { request } = respondWithAssignments();
+      mount(path);
+      await screen.findByTestId("assignment-empty");
+      expect(screen.getAllByTestId("assignment-page")).toHaveLength(1);
+      expect(screen.getAllByTestId("assignment-create")).toHaveLength(1);
+      expect(
+        screen.getByTestId("assignment-create").closest(".screen-actions"),
+      ).not.toBeNull();
+      expect(
+        screen.getByTestId("upload-open").closest(".screen-actions"),
+      ).not.toBeNull();
+      expect(screen.getAllByTestId("upload-actions")).toHaveLength(1);
+      expect(request).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/api\/common\/assignments\?year=\d{4}$/),
+        { signal: expect.any(AbortSignal) },
+      );
+      expect(request).toHaveBeenCalledWith(
+        "/api/common/assignments/candidates",
+        undefined,
+      );
+      expect(
+        request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
+      ).toBe(false);
+      expect(router?.state.location.pathname).toBe("/screens/UI-12");
+      expectSingleShell();
+    },
+  );
+
+  it("title registration opens the existing assignment form without another route or command", async () => {
+    const { request } = respondWithAssignments();
+    mount("/screens/UI-12");
+    await screen.findByTestId("assignment-empty");
+    fireEvent.click(screen.getByTestId("assignment-create"));
+    expect(await screen.findByTestId("assignment-form")).toBeVisible();
+    expect(router?.state.location.pathname).toBe("/screens/UI-12");
+    expect(
+      request.mock.calls.some(
+        ([url, init]) =>
+          url.startsWith("/api/common/assignments") && !!init?.method,
+      ),
+    ).toBe(false);
+    expectSingleShell();
+  });
+
+  it("title upload sends B5 through the shared multipart client and keeps errors unapplied", async () => {
+    const { request } = respondWithAssignments();
+    mount("/screens/UI-12");
+    await screen.findByTestId("assignment-empty");
+    fireEvent.click(screen.getByTestId("upload-open"));
+    fireEvent.change(await screen.findByTestId("upload-file"), {
+      target: { files: [new File(["workbook"], "assignments.xlsx")] },
+    });
+    fireEvent.click(screen.getByTestId("upload-check"));
+    await screen.findByRole("dialog", { name: "엑셀 업로드 결과 · 투입 목록" });
+    await waitFor(() =>
+      expect(screen.queryByText("검사 결과 조회 중…")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("upload-apply")).toBeDisabled();
+    const sent = request.mock.calls.find(
+      ([url, init]) => url === "/api/common/uploads" && init?.method === "POST",
+    )!;
+    const form = sent[1]?.body as FormData;
+    expect(form.get("formTypeCode")).toBe("B5");
+    expect(form.get("file")).toBeInstanceOf(File);
+    fireEvent.click(screen.getByTestId("upload-result-close"));
+    expect(request.mock.calls.some(([url]) => url.endsWith("/apply"))).toBe(
+      false,
+    );
+    expect(router?.state.location.pathname).toBe("/screens/UI-12");
+    expectSingleShell();
+  });
+
+  it.each([200, 409])(
+    "B5 apply status %s uses the receipt version and refreshes assignments only on success",
+    async (status) => {
+      const { request, list } = respondWithAssignments();
+      const original = request.getMockImplementation()!;
+      const receipt = {
+        uploadId: "assignment-upload",
+        modifiedAt: "2026-11-17T00:00:00.123456Z",
+        statusName: "검사완료",
+        successCount: 0,
+        warningCount: 1,
+        errorCount: 0,
+        issues: [
+          {
+            row: 2,
+            column: "프로젝트ID",
+            inputValue: "assignment-project",
+            reason: "영업 파트가 다른 배정 1건",
+            severity: "경고",
+          },
+        ],
+      };
+      const success = (data: unknown) => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, meta: {}, data }),
+      });
+      request.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (
+          (url === "/api/common/uploads" && init?.method === "POST") ||
+          url === `/api/common/uploads/${receipt.uploadId}`
+        )
+          return success(receipt);
+        if (url === `/api/common/uploads/${receipt.uploadId}/apply`)
+          return status === 200
+            ? success({ ...receipt, statusName: "반영완료" })
+            : {
+                ok: false,
+                status,
+                json: async () => ({
+                  success: false,
+                  meta: {},
+                  message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+                  errors: [
+                    { field: "modifiedAt", message: "다시 불러와 주세요." },
+                  ],
+                }),
+              };
+        return original(url, init);
+      });
+      mount("/screens/UI-12");
+      await screen.findByTestId("assignment-empty");
+      const initialReads = list.mock.calls.length;
+      fireEvent.click(screen.getByTestId("upload-open"));
+      fireEvent.change(await screen.findByTestId("upload-file"), {
+        target: { files: [new File(["workbook"], "assignments.xlsx")] },
+      });
+      fireEvent.click(screen.getByTestId("upload-check"));
+      await screen.findByRole("dialog", {
+        name: "엑셀 업로드 결과 · 투입 목록",
+      });
+      await waitFor(() =>
+        expect(screen.getByTestId("upload-apply")).toBeEnabled(),
+      );
+      expect(screen.getByTestId("upload-issue-0-0")).toHaveTextContent(
+        receipt.issues[0].reason,
+      );
+      expect(list).toHaveBeenCalledTimes(initialReads);
+      fireEvent.click(screen.getByTestId("upload-apply"));
+      if (status === 200) {
+        await screen.findByTestId("upload-applied");
+        await waitFor(() =>
+          expect(list).toHaveBeenCalledTimes(initialReads + 1),
+        );
+        expect(screen.getByTestId("upload-apply")).toBeDisabled();
+        expect(screen.getByTestId("upload-issue-0-0")).toHaveTextContent(
+          receipt.issues[0].reason,
+        );
+      } else {
+        expect(
+          await screen.findByTestId("upload-result-error"),
+        ).toHaveTextContent("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.");
+        expect(screen.queryByTestId("upload-applied")).not.toBeInTheDocument();
+        expect(list).toHaveBeenCalledTimes(initialReads);
+      }
+      const applies = request.mock.calls.filter(([url]) =>
+        url.endsWith("/apply"),
+      );
+      expect(applies).toHaveLength(1);
+      expect(applies[0]).toEqual([
+        `/api/common/uploads/${receipt.uploadId}/apply`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ modifiedAt: receipt.modifiedAt }),
+        },
+      ]);
+      expect(router?.state.location.pathname).toBe("/screens/UI-12");
+      expectSingleShell();
+    },
+  );
+
+  it("last-year routing retains the list but removes mutating title actions", async () => {
+    respondWithAssignments();
+    mount("/screens/UI-12");
+    await screen.findByTestId("assignment-empty");
+    fireEvent.click(screen.getByTestId("assignment-year-prev"));
+    expect(await screen.findByTestId("assignment-lock-banner")).toHaveTextContent(
+      /^\d{4}년은 지난 해라 읽기만 할 수 있습니다\.$/,
+    );
+    expect(screen.queryByTestId("assignment-create")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("upload-open")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("upload-template")).not.toBeInTheDocument();
+    // 시안: 엑셀 다운로드는 지난 해에도 목록 도구 줄에 남는다(제목줄이 아님).
+    expect(screen.getByTestId("list-download")).toHaveTextContent("엑셀 다운로드");
+    expect(
+      screen.getByTestId("list-download").closest(".screen-actions"),
+    ).toBeNull();
+    expectSingleShell();
+  });
+
+  it("list failure retries the real client in the same shell", async () => {
+    const { list } = respondWithAssignments();
+    list.mockRejectedValueOnce(new Error("배정 목록을 불러오지 못했습니다."));
+    mount("/screens/UI-12");
+    const retry = await screen.findByTestId("list-retry");
+    expect(screen.getByTestId("list-error")).toHaveTextContent(
+      "배정 목록을 불러오지 못했습니다.",
+    );
+    // 시안: 목록을 못 불러와도 제목줄 [배정]은 막지 않는다.
+    expect(screen.getByTestId("assignment-create")).toBeEnabled();
+    fireEvent.click(retry);
+    expect(await screen.findByTestId("assignment-empty")).toBeVisible();
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(router?.state.location.pathname).toBe("/screens/UI-12");
+    expectSingleShell();
+  });
+
+  it("UI-30 remains navigation-only and preserves the preferences scope on return", async () => {
+    respondWithAssignments();
+    mount("/screens/UI-12");
+    await screen.findByTestId("assignment-empty");
+    const preferences = screen.getByTestId("user-preferences");
+    await act(async () => {
+      await router!.navigate("/screens/UI-30");
+    });
+    expect(
+      await screen.findByRole("region", { name: "UI-30 본문" }),
+    ).toHaveTextContent("준비 중");
+    expect(screen.queryByTestId("assignment-create")).not.toBeInTheDocument();
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
+    await act(async () => {
+      await router!.navigate("/screens/UI-12");
+    });
+    expect(await screen.findByTestId("assignment-empty")).toBeVisible();
+    expect(screen.getAllByTestId("assignment-create")).toHaveLength(1);
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
     expectSingleShell();
   });
 });

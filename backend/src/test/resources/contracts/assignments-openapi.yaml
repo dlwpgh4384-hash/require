@@ -1,0 +1,334 @@
+# Assignment response-contract subset, isolated from the shared baseline fixture.
+# Schemas preserve the approved assignment operations, required fields and nullability.
+openapi: 3.0.3
+info:
+  title: 투입 배정 응답 계약
+  version: 1.0.0
+security: []
+paths:
+  /api/common/assignments:
+    get:
+      operationId: getCommonAssignments
+      security: []
+      responses:
+        '200':
+          description: 투입 배정 목록 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data: {$ref: '#/components/schemas/CommonAssignmentList'}
+    post:
+      operationId: postCommonAssignment
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommonAssignmentInput'}
+      responses:
+        '200':
+          description: 인력 투입 배정 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data: {$ref: '#/components/schemas/CommonAssignment'}
+  /api/common/assignments/{assignmentId}:
+    get:
+      operationId: getCommonAssignment
+      security: []
+      responses:
+        '200':
+          description: 투입 배정 상세 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data: {$ref: '#/components/schemas/CommonAssignment'}
+  /api/common/assignments/candidates:
+    get:
+      operationId: getCommonAssignmentCandidates
+      security: []
+      responses:
+        '200':
+          description: 수주 배정 후보 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data: {$ref: '#/components/schemas/CommonAssignmentCandidateList'}
+  /api/common/assignments/candidates/{candidateId}/remove:
+    post:
+      operationId: postCommonAssignmentCandidateRemove
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommonAssignmentCandidateRemoveInput'}
+      responses:
+        '200':
+          description: 배정 후보 제외 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data: {$ref: '#/components/schemas/CommonAssignmentCandidateRemoved'}
+  /api/common/assignments/contract-developers:
+    get:
+      operationId: getCommonAssignmentContractDevelopers
+      security: []
+      responses:
+        '200':
+          description: 계약상 인력 선택 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data: {$ref: '#/components/schemas/CommonAssignmentContractDeveloperList'}
+  /api/common/assignments/{assignmentId}/history:
+    get:
+      operationId: getCommonAssignmentHistory
+      security: []
+      responses:
+        '200':
+          description: 투입 변경 이력 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data: {$ref: '#/components/schemas/CommonAssignmentHistoryList'}
+  /api/common/assignments/extension-possibility:
+    put:
+      operationId: putCommonAssignmentExtensionPossibility
+      security: []
+      responses:
+        '200':
+          description: 선택 배정 연장 가능성 변경 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data: {$ref: '#/components/schemas/CommonAssignmentBulkResult'}
+  /api/common/assignments/cancel:
+    post:
+      operationId: postCommonAssignmentCancel
+      security: []
+      responses:
+        '200':
+          description: 선택 투입 배정 취소 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data: {$ref: '#/components/schemas/CommonAssignmentBulkResult'}
+components:
+  schemas:
+    CommonAssignmentInput:
+      type: object
+      required: [projectId, developerId, jobCode, startDate, endDate, monthlyMm, inputTypeCode]
+      properties:
+        projectId: {type: string}
+        developerId: {type: string}
+        jobCode: {type: string}
+        startDate: {type: string, format: date}
+        endDate: {type: string, format: date}
+        monthlyMm: {type: number, minimum: 0, exclusiveMinimum: true, maximum: 1}
+        inputTypeCode: {type: string}
+        billingPrice: {type: number, minimum: 0}
+        contractDeveloperId: {type: string}
+        replacementAction: {type: string, enum: [together, assignment-only]}
+        earlyWithdrawalAssignmentIds: {type: array, items: {type: string}}
+        reasonCode: {type: string}
+        memo: {type: string, maxLength: 200}
+        candidateId:
+          type: string
+          pattern: '^[0-9]{1,12}$'
+          description: 배정 후보 [확정]으로 연 경우만. 같은 저장 안에서 가배정 줄을 DONE(배정 확정)으로 바꿈. 이미 처리된 후보면 409
+      additionalProperties: false
+    ApiResponse:
+      type: object
+      required: [success, meta]
+      properties:
+        success: {type: boolean, enum: [true]}
+        meta: {type: object, additionalProperties: true}
+    CommonAssignment:
+      type: object
+      required: [assignmentId, projectId, projectName, developerId, name, jobName, startDate, endDate, monthlyMm, yearMm, inputTypeName, extensionPossibilityName, extensionCount, warnings, historyCount, modifiedAt]
+      properties:
+        assignmentId: {type: string}
+        projectId: {type: string}
+        projectName: {type: string}
+        developerId: {type: string}
+        name: {type: string}
+        managementNumber: {type: string}
+        jobCode: {type: string}
+        jobName: {type: string}
+        startDate: {type: string, format: date}
+        endDate: {type: string, format: date}
+        billingPrice: {type: number, nullable: true}
+        monthlyMm: {type: number}
+        yearMm: {type: number}
+        extensionPossibilityCode: {type: string}
+        extensionPossibilityName: {type: string}
+        inputTypeCode: {type: string}
+        inputTypeName: {type: string}
+        extensionCount: {type: integer}
+        warnings:
+          type: array
+          items: {type: string}
+        monthlyMmTotal: {type: number}
+        historyCount: {type: integer}
+        modifiedAt: {type: string, format: date-time, nullable: true}
+        months:
+          type: array
+          description: 상세·저장 응답만. 투입 기간의 달마다 그 달에 적용되는 계약 월 MM·청구 단가
+          items:
+            type: object
+            required: [month, monthlyMm, billingPrice]
+            properties:
+              month: {type: string, pattern: '^[0-9]{6}$'}
+              monthlyMm: {type: number}
+              billingPrice: {type: number, nullable: true, description: 단가를 볼 수 없는 역할이면 null}
+            additionalProperties: false
+      additionalProperties: false
+    CommonAssignmentList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/CommonAssignment'}
+      additionalProperties: false
+    CommonAssignmentBulkResult:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/CommonAssignment'}
+      additionalProperties: false
+    CommonAssignmentCandidate:
+      type: object
+      required: [candidateId, projectId, projectName, developerId, name, managementNumber, jobCode, jobName, startDate, endDate, modifiedAt]
+      properties:
+        candidateId: {type: string}
+        projectId: {type: string}
+        projectName: {type: string}
+        developerId: {type: string}
+        name: {type: string}
+        managementNumber: {type: string}
+        jobCode: {type: string}
+        jobName: {type: string}
+        startDate: {type: string, format: date}
+        endDate: {type: string, format: date}
+        modifiedAt: {type: string, format: date-time, nullable: true}
+      additionalProperties: false
+    CommonAssignmentCandidateList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/CommonAssignmentCandidate'}
+      additionalProperties: false
+    CommonAssignmentCandidateRemoved:
+      type: object
+      required: [candidateId]
+      properties:
+        candidateId: {type: string}
+      additionalProperties: false
+    CommonAssignmentCandidateRemoveInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 후보 목록의 modifiedAt. 보내면 TB_SL_TENT_ASGN의 수정 시각과 다를 때 409
+      additionalProperties: false
+    CommonAssignmentHistory:
+      type: object
+      required: [historyId, assignmentId, effectiveDate, changeTypeCode, changeTypeName, beforeValue, afterValue, reason, memo, changedBy, changedAt, retroactiveYn, correctedYn, modifiedAt]
+      properties:
+        historyId: {type: string}
+        assignmentId: {type: string}
+        effectiveDate: {type: string, format: date}
+        changeTypeCode: {type: string}
+        changeTypeName: {type: string}
+        beforeValue: {type: string}
+        afterValue: {type: string}
+        reason: {type: string}
+        memo: {type: string}
+        changedBy: {type: string}
+        changedAt: {type: string, format: date-time, nullable: true}
+        retroactiveYn: {type: string}
+        correctedYn: {type: string}
+        modifiedAt: {type: string, format: date-time, nullable: true}
+      additionalProperties: false
+    CommonAssignmentHistoryList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/CommonAssignmentHistory'}
+      additionalProperties: false
+    CommonAssignmentContractDeveloper:
+      type: object
+      required: [developerId, name, jobName, endDate, billingPrice, overlappingAssignments]
+      properties:
+        developerId: {type: string}
+        name: {type: string}
+        jobName: {type: string}
+        endDate: {type: string, format: date}
+        billingPrice: {type: number, nullable: true}
+        overlappingAssignments:
+          type: array
+          items: {$ref: '#/components/schemas/CommonAssignment'}
+      additionalProperties: false
+    CommonAssignmentContractDeveloperList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/CommonAssignmentContractDeveloper'}
+      additionalProperties: false

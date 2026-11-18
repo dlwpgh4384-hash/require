@@ -51,7 +51,13 @@ class ClientPartSchemaPreparationTest {
                 .isEqualTo("1");
         }
         assertThat(text("SELECT count(*)::text FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f'"))
-            .isEqualTo("29");
+            .isEqualTo(Integer.toString(MigrationResources.foreignKeyCount()));
+        for (String key : new String[]{"fk_tb_hr_dev_01", "fk_tb_hr_dev_02", "fk_tb_hr_dev_03", "fk_tb_pj_asgn_01",
+            "fk_tb_pj_asgn_02", "fk_tb_pj_asgn_03", "fk_tb_pj_proj_part_01", "fk_tb_pj_proj_part_02",
+            "fk_tb_co_part_setl_01", "fk_tb_co_part_setl_02", "fk_tb_sy_upld_err_01", "fk_tb_sy_adm_area_01"}) {
+            assertThat(text("SELECT count(*)::text FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND conname='" + key + "'"))
+                .as(key).isEqualTo("1");
+        }
         assertThat(text("SELECT count(*)::text FROM tb_sy_adm_area")).isNotEqualTo("0");
         assertThat(text("SELECT indexdef FROM pg_indexes WHERE schemaname=current_schema() AND indexname='ix_tb_pj_asgn_02'"))
             .contains("(dev_id, input_bgn_dt, input_end_dt)");

@@ -1,0 +1,2909 @@
+# Hand-added API contract kept apart from the generated openapi.yaml (tool drops these on regeneration).
+openapi: 3.0.3
+info:
+  title: 사람이 직접 더한 API 응답 계약
+  version: 1.0.0
+  description: 도구가 openapi.yaml을 다시 만들 때 빠뜨리는 사람이 더한 경로·칸. openapi.yaml도 그대로 둔다.
+security: []
+paths:
+  /api/common/developers:
+    get:
+      operationId: getCommonDevelopers
+      summary: 개발자 목록
+      security: []
+      description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
+      x-related-requirements:
+      - REQ-366
+      - REQ-367
+      - REQ-368
+      - REQ-369
+      - REQ-397
+      parameters:
+      - name: employeeTypeCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: jobCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: workStatusName
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - 투입중
+          - 철수예정
+          - 대기
+          - 휴직
+          - 퇴사
+      - name: directClassCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          description: 이름 또는 관리번호
+      - name: includeStopped
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      x-aiops-query-role:
+        entity: TB_HR_DEV
+        result_path:
+        - data
+        - items
+      x-pagination-filtering:
+        pagination: 전체 일치 결과; 기존 useListPresentation으로 표시 건수/밀도 적용. 미요청 서버 page 추가 안 함.
+        filtering:
+        - employeeTypeCode
+        - jobCode
+        - workStatusName
+        - directClassCode
+        - q
+        - includeStopped
+        ordering: 개발자 목록 이름순; 상태 이력의 입사일 재직 줄은 맨 아래. 나머지는 원천 순서 보존.
+      responses:
+        '200':
+          description: 개발자 목록 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonDeveloperList'
+        '400':
+          description: 필수/형식/기간 또는 해당 업무 규칙 위반. ApiError.errors에 입력 필드와 한국어 사유. 기존 업무행 불변.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-business-rules:
+      - 월급여는 관리자/경영진/재무만, 단가는 파트장 자기파트만 추가 허용, PM 둘 다 비노출. 현재 admin 전체.
+      - 파트장 타파트 상세 거부 정책은 UI-22 연결 전 정책 단위시험으로 검증.
+    post:
+      operationId: postCommonDeveloper
+      summary: 개발자 등록
+      security: []
+      description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
+      x-related-requirements:
+      - REQ-370
+      - REQ-371
+      - REQ-372
+      - REQ-373
+      - REQ-374
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonDeveloperInput'
+      x-business-rules:
+      - 전체 화면에서 이름·직원구분·소속·주 직무·영업 파트·직접/간접 필수 및 등급·보조 직무·직위·입사일·월 단가·월 급여·스킬·거주지를 저장한다. 직위 기본 팀원·직접/간접 기본 직접, 영업 파트 기본값 없음. 연락처·번지는 받지 않는다.
+      x-side-effects:
+      - TB_HR_DEV·스킬 연결·월 단가/급여 이력 저장. 자동번호 발급은 동시 유일성 보장.
+      x-state-transitions:
+      - 미등록 -> 개발자/초기 단가급여/스킬 저장; 실패 -> 미등록 유지
+      x-required-tests:
+      - 'happy: 필수값과 빈 관리번호로 등록 -> getCommonDeveloper에 K-nnnn·입력 이름·salesPartId 저장값 조회'
+      - 'auth: 무인증 개발 단계 요청 -> 200·처리자 admin이며 로그인 요구 없음; 후속 역할 검사는 현재 활성화하지 않음'
+      - 'validation: 이름 누락 또는 관리번호21자 -> 400 errors의 name/managementNumber·TB_HR_DEV 추가0행'
+      - 'business: 이미 등록된 관리번호 제출 -> 400 이미 등록된 관리번호입니다.·기존 개발자 불변'
+      - 'side-effect: 스킬/거주지 포함 등록 -> TB_HR_DEV_SKILL 관계와 HOME_AREA_CD/HOME_ADDR를 상세에서 재조회'
+      responses:
+        '200':
+          description: 개발자 등록 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonDeveloper'
+        '400':
+          description: 필수/형식/기간 또는 해당 업무 규칙 위반. ApiError.errors에 입력 필드와 한국어 사유. 기존 업무행 불변.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/developers/{developerId}:
+    get:
+      operationId: getCommonDeveloper
+      summary: 개발자 기본 정보
+      security: []
+      description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
+      x-related-requirements:
+      - REQ-380
+      - REQ-381
+      - REQ-397
+      parameters:
+      - name: developerId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-aiops-query-role:
+        entity: TB_HR_DEV
+        result_path:
+        - data
+      x-pagination-filtering:
+        pagination: 전체 일치 결과; 기존 useListPresentation으로 표시 건수/밀도 적용. 미요청 서버 page 추가 안 함.
+        filtering: path 식별자만
+        ordering: 개발자 목록 이름순; 상태 이력의 입사일 재직 줄은 맨 아래. 나머지는 원천 순서 보존.
+      responses:
+        '200':
+          description: 개발자 기본 정보 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonDeveloper'
+        '400':
+          description: 필수/형식/기간 또는 해당 업무 규칙 위반. ApiError.errors에 입력 필드와 한국어 사유. 기존 업무행 불변.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-business-rules:
+      - 월급여는 관리자/경영진/재무만, 단가는 파트장 자기파트만 추가 허용, PM 둘 다 비노출. 현재 admin 전체.
+      - 파트장 타파트 상세 거부 정책은 UI-22 연결 전 정책 단위시험으로 검증.
+    put:
+      operationId: putCommonDeveloper
+      summary: 개발자 정보 수정
+      security: []
+      description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
+      x-related-requirements:
+      - REQ-375
+      - REQ-376
+      - REQ-377
+      - REQ-378
+      - REQ-379
+      parameters:
+      - name: developerId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonDeveloperUpdateInput'
+      x-business-rules:
+      - 등록 폼에 기존값을 채우고 지정 수정 항목을 저장한다. 거주지는 HOME_AREA_CD로 복원하고 HOME_ADDR 문자열을 분해하지 않는다.
+      x-side-effects:
+      - 변경 항목별 TB_SY_CHG_HIST·월 단가/급여 TB_HR_DEV_PRC. 기존 월급여 EMP_TYPE_CD는 수정하지 않음.
+      x-state-transitions:
+      - 기존 정보 -> 수정 정보; 과거 급여/정산 보존
+      x-required-tests:
+      - 'happy: 이름과 주 직무 수정 -> getCommonDeveloper의 name/primaryJobCode가 새값'
+      - 'auth: 무인증 개발 단계 요청 -> 200·처리자 admin이며 로그인 요구 없음; 후속 역할 검사는 현재 활성화하지 않음'
+      - 'validation: 이름51자 -> 400 errors.name·TB_HR_DEV 기존 이름 유지'
+      - 'business: managementNumber 변경 필드를 직접 제출 -> 400 errors.managementNumber·관리번호 불변'
+      - 'side-effect: 월단가/급여 변경 -> TB_HR_DEV_PRC 한국 저장월 이력 및 TB_SY_CHG_HIST 각 변경 항목 조회'
+      responses:
+        '200':
+          description: 개발자 정보 수정 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonDeveloper'
+        '400':
+          description: 필수/형식/기간 또는 해당 업무 규칙 위반. ApiError.errors에 입력 필드와 한국어 사유. 기존 업무행 불변.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/developers/{developerId}/assignments:
+    get:
+      operationId: getCommonDeveloperAssignments
+      summary: 개발자 투입 이력
+      security: []
+      description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
+      x-related-requirements:
+      - REQ-380
+      parameters:
+      - name: developerId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-aiops-query-role:
+        entity: TB_PJ_ASGN
+        result_path:
+        - data
+        - items
+      x-pagination-filtering:
+        pagination: 전체 일치 결과; 기존 useListPresentation으로 표시 건수/밀도 적용. 미요청 서버 page 추가 안 함.
+        filtering: path 식별자만
+        ordering: 개발자 목록 이름순; 상태 이력의 입사일 재직 줄은 맨 아래. 나머지는 원천 순서 보존.
+      responses:
+        '200':
+          description: 개발자 투입 이력 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonDeveloperAssignmentList'
+        '400':
+          description: 필수/형식/기간 또는 해당 업무 규칙 위반. ApiError.errors에 입력 필드와 한국어 사유. 기존 업무행 불변.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/developers/{developerId}/statuses:
+    get:
+      operationId: getCommonDeveloperStatuses
+      summary: 개발자 근무 상태 이력
+      security: []
+      description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
+      x-related-requirements:
+      - REQ-380
+      - REQ-381
+      parameters:
+      - name: developerId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-aiops-query-role:
+        entity: TB_HR_DEV_STAT
+        result_path:
+        - data
+        - items
+      x-pagination-filtering:
+        pagination: 전체 일치 결과; 기존 useListPresentation으로 표시 건수/밀도 적용. 미요청 서버 page 추가 안 함.
+        filtering: path 식별자만
+        ordering: 개발자 목록 이름순; 상태 이력의 입사일 재직 줄은 맨 아래. 나머지는 원천 순서 보존.
+      responses:
+        '200':
+          description: 개발자 근무 상태 이력 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonDeveloperStatusList'
+        '400':
+          description: 필수/형식/기간 또는 해당 업무 규칙 위반. ApiError.errors에 입력 필드와 한국어 사유. 기존 업무행 불변.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    post:
+      operationId: postCommonDeveloperStatus
+      summary: 근무 상태 등록
+      security: []
+      description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
+      x-related-requirements:
+      - REQ-382
+      - REQ-384
+      - REQ-387
+      - REQ-388
+      - REQ-389
+      - REQ-392
+      - REQ-393
+      - REQ-386
+      parameters:
+      - name: developerId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonDeveloperStatusInput'
+      x-business-rules:
+      - 근무 상태 이력에서 상태·날짜 필수와 휴직 종료일 선택·사유를 작은 창으로 등록한다. 휴직 기간에는 휴직이고 배정 때 경고한다.
+      - 재직은 진행 휴직에서 돌아올 때만, 복귀일은 기존 휴직 종료일 다음 날까지이며 종료일 없으면 제한 없다. 저장 시 휴직 종료일을 복귀 전날로 닫는다.
+      - 퇴사일만 등록하고 상태 이력 퇴사 줄을 원본으로 기본정보 퇴사일 복사값을 함께 갱신한다. 진행 휴직은 퇴사 전날로 닫는다.
+      - 기존 퇴사·마감월·퇴사일 뒤 남은 투입 배정은 거부하며 배정 건수와 프로젝트·투입 › 투입 배정 조기 철수를 안내한다. 퇴사 뒤 날짜 상태 등록은 불가다.
+      - 퇴사일이 지나면 퇴사·자동 사용 중지하고 더 이상 상태 등록을 허용하지 않는다.
+      - 등록·종료일 수정·재직 취소·퇴사 취소 저장 전 휴직 비중첩·종료≥시작·퇴사전날 상한/종료필수·복귀=다음날/휴직당1개·새휴직은 복귀다음날부터·퇴사1개를 전체 검사한다. 어긋나면 이유 표시·저장0, 저장 뒤 이력으로 상태 재판정한다.
+      - 근무 상태 업무는 관리자·재무만 허용하고 퇴사일 경과 취소는 시스템 관리자만 허용한다. 현재 HTTP는 admin 고정이다.
+      - 재직·퇴사 줄마다 닫은 휴직 줄 번호와 원래 휴직 종료일을 보관한다.
+      x-side-effects:
+      - TB_HR_DEV_STAT에 닫은 휴직 줄/원래 종료일 보관·TB_HR_DEV 퇴사일/상태 파생값 함께 갱신.
+      x-state-transitions:
+      - 휴직 등록 -> 기간 휴직; 휴직 -> 재직 복귀; 재직/휴직 -> 퇴사예정; 한국 퇴사일 경과 -> 퇴사/자동중지
+      x-required-tests:
+      - 'happy: 진행 휴직에 유효 복귀일로 재직 등록 -> getCommonDeveloperStatuses의 휴직 종료일=복귀 전날·재직 줄1개'
+      - 'auth: 무인증 개발 단계 요청 -> 200·처리자 admin이며 로그인 요구 없음; 후속 역할 검사는 현재 활성화하지 않음'
+      - 'validation: statusName 또는 date 누락 -> 400 해당 필드 오류·TB_HR_DEV_STAT 추가0행'
+      - 'business: 퇴사일 뒤 배정 남은 개발자 퇴사 등록 -> 400 배정 건수/조기철수 안내·퇴사 줄과 기본정보 불변'
+      - 'side-effect: 진행 휴직 있는 개발자 퇴사 등록 -> 원휴직 종료일 보관·퇴사전날 닫힘·TB_HR_DEV 퇴사일 복사값 동일'
+      - 'business: 진행 휴직 없음 또는 복귀일이 휴직 종료일 다음 날보다 늦음 -> 400 지정 재직 안내·이력 불변'
+      - 'business: 겹친 휴직/종료<시작/퇴사2개/퇴사뒤휴직/휴직당재직2개/복귀일 새휴직 -> 400 정합성 이유·전체 쓰기0'
+      responses:
+        '200':
+          description: 근무 상태 등록 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonDeveloperStatusList'
+        '400':
+          description: 필수/형식/기간 또는 해당 업무 규칙 위반. ApiError.errors에 입력 필드와 한국어 사유. 기존 업무행 불변.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/developers/{developerId}/statuses/{statusId}/end-date:
+    put:
+      operationId: putCommonDeveloperStatusEndDate
+      summary: 휴직 종료일 수정
+      security: []
+      description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
+      x-related-requirements:
+      - REQ-383
+      - REQ-392
+      parameters:
+      - name: developerId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: statusId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonDeveloperEndDateInput'
+      x-business-rules:
+      - 진행 휴직은 종료일 수정으로 연장하며 끝난 휴직 수정/삭제는 불가, 재직으로 닫혔으면 재직을 먼저 취소하세요로 거부한다.
+      x-side-effects:
+      - 동일 트랜잭션에서 근무 상태 이력과 개발자 기본정보의 파생 상태를 갱신한다.
+      x-state-transitions:
+      - 저장 전 이력 -> 전체 정합성 검사 성공 시 변경 이력과 재판정된 상태; 실패 시 모든 기존 행 유지
+      x-required-tests:
+      - 'happy: 진행 휴직의 유효 종료일 연장 -> getCommonDeveloperStatuses에 새 endDate 조회'
+      - 'auth: 무인증 개발 단계 요청 -> 200·처리자 admin이며 로그인 요구 없음; 후속 역할 검사는 현재 활성화하지 않음'
+      - 'validation: endDate 날짜 형식 오류 -> 400 errors.endDate·기존 종료일 불변'
+      - 'business: 재직으로 닫힌 휴직 수정 -> 400 재직을 먼저 취소하세요·endDate 불변'
+      - 'side-effect: 유효 연장 후 -> 같은 TB_HR_DEV_STAT 줄의 종료일 갱신과 WORK_STAT_CD 이력 재판정 결과 조회'
+      responses:
+        '200':
+          description: 휴직 종료일 수정 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonDeveloperStatusList'
+        '400':
+          description: 필수/형식/기간 또는 해당 업무 규칙 위반. ApiError.errors에 입력 필드와 한국어 사유. 기존 업무행 불변.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/developers/{developerId}/statuses/{statusId}/return-cancel:
+    post:
+      operationId: postCommonDeveloperReturnCancel
+      summary: 재직 등록 취소
+      security: []
+      description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
+      x-related-requirements:
+      - REQ-385
+      - REQ-392
+      parameters:
+      - name: developerId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: statusId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-no-request-body-reason: path의 상태 줄을 취소하는 행동이며 추가 입력은 원문에 없다.
+      x-business-rules:
+      - 복귀한 달 마감 전 재직 취소 시 원래 휴직 종료일을 복원하며 퇴사 있어도 가능하되 퇴사 전날 상한을 지킨다.
+      x-side-effects:
+      - 동일 트랜잭션에서 근무 상태 이력과 개발자 기본정보의 파생 상태를 갱신한다.
+      x-state-transitions:
+      - 저장 전 이력 -> 전체 정합성 검사 성공 시 변경 이력과 재판정된 상태; 실패 시 모든 기존 행 유지
+      x-required-tests:
+      - 'happy: 미마감 복귀월 재직 취소 -> 상태이력에서 원휴직 종료일 복원·유효 재직 연결 해제'
+      - 'auth: 무인증 개발 단계 요청 -> 200·처리자 admin이며 로그인 요구 없음; 후속 역할 검사는 현재 활성화하지 않음'
+      - 'validation: 상태 줄 식별자가 재직 줄이 아님 -> 400 상태 줄 오류·원휴직 불변'
+      - 'business: 복귀월 마감 후 취소 -> 400 마감 안내·재직과 휴직 종료일 불변'
+      - 'side-effect: 퇴사예정이 있는 재직 취소 -> TB_HR_DEV_STAT 복원 종료일은 퇴사 전날 이하·상태 재판정'
+      responses:
+        '200':
+          description: 재직 등록 취소 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonDeveloperStatusList'
+        '400':
+          description: 필수/형식/기간 또는 해당 업무 규칙 위반. ApiError.errors에 입력 필드와 한국어 사유. 기존 업무행 불변.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/developers/{developerId}/statuses/{statusId}/retirement-cancel:
+    post:
+      operationId: postCommonDeveloperRetirementCancel
+      summary: 퇴사 등록 취소
+      security: []
+      description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
+      x-related-requirements:
+      - REQ-390
+      - REQ-391
+      - REQ-392
+      - REQ-393
+      parameters:
+      - name: developerId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: statusId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonDeveloperRetirementCancelInput'
+      x-business-rules:
+      - 미마감 퇴사는 취소 사유 필수이며 퇴사 전 등록 권한자·퇴사 후 시스템 관리자만 취소한다. 취소 시 기본정보 복사값·중지를 풀고 닫힌 휴직 원종료를 복원한다.
+      x-side-effects:
+      - 동일 트랜잭션에서 근무 상태 이력과 개발자 기본정보의 파생 상태를 갱신한다.
+      x-state-transitions:
+      - 저장 전 이력 -> 전체 정합성 검사 성공 시 변경 이력과 재판정된 상태; 실패 시 모든 기존 행 유지
+      x-required-tests:
+      - 'happy: 미마감 퇴사에 사유 입력 후 취소 -> 상태이력 퇴사 취소·TB_HR_DEV 퇴사일 복사값 해제·useYn 복구'
+      - 'auth: 무인증 개발 단계 요청 -> 200·처리자 admin이며 로그인 요구 없음; 후속 역할 검사는 현재 활성화하지 않음'
+      - 'validation: 취소 사유 빈 문자열 -> 400 errors.reason·퇴사 유지'
+      - 'business: 퇴사월 마감 후 취소 -> 400 퇴사한 달(YYYY-MM)이 마감되어 취소할 수 없습니다. 다시 쓰려면 새로 등록하세요.·모든 행 불변'
+      - 'side-effect: 미마감 취소 완료 -> TB_SY_CHG_HIST 수정/퇴사 취소/입력 사유·원휴직 종료일 복원 조회'
+      - 'auth: 후속 정책 함수에 지난 퇴사/재무 입력 -> 허용=false·변경0; admin/미마감은 허용=true. HTTP403 활성화는 UI-22 후속'
+      responses:
+        '200':
+          description: 퇴사 등록 취소 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonDeveloperStatusList'
+        '400':
+          description: 필수/형식/기간 또는 해당 업무 규칙 위반. ApiError.errors에 입력 필드와 한국어 사유. 기존 업무행 불변.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/projects:
+    get:
+      operationId: getCommonProjects
+      summary: 프로젝트 목록 조회
+      security: []
+      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
+      x-related-requirements:
+      - REQ-420
+      - REQ-430
+      - REQ-432
+      responses:
+        '200':
+          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectList'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters: []
+      x-pagination-filtering:
+        pagination: 원문은 페이지 규칙 미지정; 기존 목록 부품으로 전체 결과 표시, 서버 페이지 파라미터 추가 금지
+        filtering: 프로젝트 목록만 year·contractTypeCode·statusCode·salesPartId·unassignedOnly·keyword; 하위 조회는 projectId만
+        ordering: 프로젝트 시작일 내림차순; 파트이력 적용월순; 경비 최근등록순; 나머지 세부동순위는 OQ-QUERY-001
+      x-aiops-query-role:
+        entity: TB_PJ_PROJ
+        result_path:
+        - data
+        - items
+    post:
+      operationId: postCommonProject
+      summary: 프로젝트 등록
+      security: []
+      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
+      x-related-requirements:
+      - REQ-433
+      - REQ-434
+      - REQ-435
+      - REQ-437
+      - REQ-440
+      responses:
+        '200':
+          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProject'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters: []
+      x-business-rules:
+      - 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력 없이 (자체)이고 빈 계약금액은 0·매출 제외다.
+      - 프로젝트명100자·근무지200자·특징500자와 유형별 필수, 종료일≥시작일을 검증하고 등록 상태는 진행/수주예정만 허용한다.
+      - 등록 시 계약 시작월 파트 첫 이력과 계약 변경 이력 계약 한 줄을 함께 저장한다.
+      - 계약금액 입력 시 DB 식-19의 계약금액×(1−목표 마진율)을 채운다.
+      - TEAM_FEE·PEXP_FEE 각각 기본50000원을 읽고 프로젝트별로 수정 가능하다.
+      x-side-effects:
+      - 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력 없이 (자체)이고 빈 계약금액은 0·매출 제외다.
+      - 등록 시 계약 시작월 파트 첫 이력과 계약 변경 이력 계약 한 줄을 함께 저장한다.
+      x-state-transitions:
+      - 검증 통과한 해당 프로젝트 업무값만 저장; 실패하면 기존 상태와 이력 불변
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonProjectInput'
+      x-required-tests:
+      - 'happy: 등록 후 프로젝트 GET에 같은 필드·자동ID·선택 상태; 내부 빈금액 저장 후 CTRT_AMT=0이다.'
+      - 'auth: 무인증 프로젝트 등록 -> 200·실행자 admin, 현재 인증 401/403 추가0'
+      - 'validation: projectName101자 -> 400 errors.projectName·TB_PJ_PROJ 추가0'
+      - 'business: 등록 statusCode가 종료 -> 400·프로젝트 신규0행'
+      - 'side-effect: 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력 없이 (자체)이고 빈 계약금액은 0·매출 제외다. -> 해당 업무 GET/DB에서 위 행·필드 대조'
+  /api/common/projects/excel:
+    get:
+      operationId: getCommonProjectsExcel
+      summary: 프로젝트 목록 엑셀
+      security: []
+      description: UI-22 전 무인증·현재 사용자 admin. 화면 목록과 같은 조건(연도·계약유형·상태·영업 파트·프로젝트명 또는 고객사)과 순서(시작일 늦은 순)로 내려받는다.
+      parameters:
+      - name: year
+        in: query
+        required: false
+        schema:
+          type: integer
+          description: 조회 연도(그 해에 수행 기간이 걸친 프로젝트). 비우면 올해
+      - name: contractTypeCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: statusCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: salesPartId
+        in: query
+        required: false
+        schema:
+          type: string
+          description: 영업 파트ID. unassigned = 미지정
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          description: 프로젝트명 또는 고객사
+      responses:
+        '200':
+          description: 프로젝트 목록 엑셀 결과
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 형식 위반. ApiError.errors에 입력 필드와 한국어 사유.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/projects/budget-rule:
+    get:
+      operationId: getCommonProjectBudgetRule
+      summary: 예산 기본값 규칙(식-19)
+      security: []
+      description: 예산 기본값 = 계약금액 × budgetFactor(원 단위 버림). budgetFactor는 TB_SY_CALC_RULE 식-19와 이번 달 운영 기준값 TGT_MRGN_RT로 서버가 계산한다. 화면은 등록·수정 폼과 예산 변경 창의 기본값·안내 문구에 쓴다.
+      responses:
+        '200':
+          description: 예산 기본값 규칙
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - meta
+                - data
+                properties:
+                  success:
+                    type: boolean
+                  meta:
+                    type: object
+                  data:
+                    type: object
+                    required:
+                    - targetMarginRate
+                    - budgetFactor
+                    properties:
+                      targetMarginRate:
+                        type: number
+                        description: 목표 마진율(%)
+                      budgetFactor:
+                        type: number
+                        description: 계약금액에 곱하는 수(예 0.80)
+  /api/common/projects/{projectId}:
+    get:
+      operationId: getCommonProject
+      summary: 프로젝트 상세 조회
+      security: []
+      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
+      x-related-requirements:
+      - REQ-423
+      - REQ-424
+      - REQ-449
+      - REQ-451
+      - REQ-452
+      responses:
+        '200':
+          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProject'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-pagination-filtering:
+        pagination: 원문은 페이지 규칙 미지정; 기존 목록 부품으로 전체 결과 표시, 서버 페이지 파라미터 추가 금지
+        filtering: 프로젝트 목록만 year·contractTypeCode·statusCode·salesPartId·unassignedOnly·keyword; 하위 조회는 projectId만
+        ordering: 프로젝트 시작일 내림차순; 파트이력 적용월순; 경비 최근등록순; 나머지 세부동순위는 OQ-QUERY-001
+      x-aiops-query-role:
+        entity: TB_PJ_PROJ
+        result_path:
+        - data
+    put:
+      operationId: putCommonProject
+      summary: 프로젝트 계약 수정
+      security: []
+      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
+      x-related-requirements:
+      - REQ-431
+      - REQ-436
+      - REQ-442
+      - REQ-443
+      - REQ-480
+      - REQ-481
+      responses:
+        '200':
+          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProject'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-business-rules:
+      - 지난 해 화면은 읽기 전용, 연속 프로젝트는 올해에서 수정하며 마감월 실적·정산은 바꾸지 않고 전월 조정 경계로 넘긴다.
+      - 등록/수주 시 ORGNL_CTRT_AMT에 계약금액을 복사한다. 수정 시 CNCL_YN=N 청구가 없으면 원금액도 수정하고 있으면 현재 금액만 수정한다. 입력칸·안내는 추가하지 않는다.
+      - 기존값을 등록폼에 복원하여 변경값을 저장하고 견적금액 EST_AMT도 등록·수정에서 보존한다.
+      - 수정폼의 영업 파트·계약유형·상태는 회색 readonly와 원문 안내를 보여 준다. 유형 변경·진행→수주예정은 허용하지 않고 실주에 수정 버튼이 없다.
+      - 명확화122행에 따라 새 기간 밖 투입건수·금액있는 배분월수·추가경비건수를 안내하고 저장을 거부한다. 자동 절단·삭제하지 않고 셋을 정리한 뒤만 변경한다. 마감월과 이미 시작한 배정 시작일을 침범할 수 없다.
+      - 종료일 경과 시 자동 종료하고 종료도 진행과 같은 수정범위를 갖되 지난 해/마감 보호를 적용한다. 종료일을 오늘 이후로 연장하면 진행으로 자동복귀하며 ⋯는 종료에 없다.
+      x-side-effects:
+      - TB_PJ_PROJ_CHG 변경 항목별 전후 표시명 기록
+      x-state-transitions:
+      - 등록/수주 시 ORGNL_CTRT_AMT에 계약금액을 복사한다. 수정 시 CNCL_YN=N 청구가 없으면 원금액도 수정하고 있으면 현재 금액만 수정한다. 입력칸·안내는 추가하지 않는다.
+      - 종료일 경과 시 자동 종료하고 종료도 진행과 같은 수정범위를 갖되 지난 해/마감 보호를 적용한다. 종료일을 오늘 이후로 연장하면 진행으로 자동복귀하며 ⋯는 종료에 없다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonProjectUpdateInput'
+      x-required-tests:
+      - 'happy: 지난 해 저장은 거부·원값 유지; 같은 연속 프로젝트 올해 저장은 허용하되 마감 실적·정산은 불변이다.'
+      - 'auth: 무인증 프로젝트 계약 수정 -> 200·실행자 admin, 현재 인증 401/403 추가0'
+      - 'validation: endDate<startDate -> 400 errors.endDate·계약기간 불변'
+      - 'business: 새기간 밖 배정/배분월/경비 존재 -> 400 세건수 안내·계약기간과 관련행 불변'
+      - 'side-effect: TB_PJ_PROJ_CHG 변경 항목별 전후 표시명 기록 -> 해당 업무 GET/DB에서 위 행·필드 대조'
+  /api/common/projects/{projectId}/budget:
+    put:
+      operationId: putCommonProjectBudget
+      summary: 프로젝트 예산 변경
+      security: []
+      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
+      x-related-requirements:
+      - REQ-438
+      - REQ-439
+      responses:
+        '200':
+          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProject'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-business-rules:
+      - 직접 예산을 고치거나 상세 변경 창에서 저장하면 BDGT_MANUAL_YN=Y로 저장하고 이후 계약금액 변경이 덮어쓰지 않는다.
+      - 수정 폼·상세 예산 변경 모두 CHG_ITEM=BUDGET으로 예산(목표원가) 전후 한 줄을 남긴다.
+      x-side-effects:
+      - 수정 폼·상세 예산 변경 모두 CHG_ITEM=BUDGET으로 예산(목표원가) 전후 한 줄을 남긴다.
+      x-state-transitions:
+      - 직접 예산을 고치거나 상세 변경 창에서 저장하면 BDGT_MANUAL_YN=Y로 저장하고 이후 계약금액 변경이 덮어쓰지 않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonProjectBudgetInput'
+      x-required-tests:
+      - 'happy: 예산 직접 저장 후 Y; 이어 계약금액 수정 후 예산은 직전 수기값 그대로다. 절대 수치는 OQ-CALC-001.'
+      - 'auth: 무인증 프로젝트 예산 변경 -> 200·실행자 admin, 현재 인증 401/403 추가0'
+      - 'validation: budgetAmount 누락 -> 400 errors.budgetAmount·BDGT_AMT 불변'
+      - 'business: 실주 프로젝트 예산변경 -> 400·BDGT_AMT/수기여부 불변'
+      - 'side-effect: 수정 폼·상세 예산 변경 모두 CHG_ITEM=BUDGET으로 예산(목표원가) 전후 한 줄을 남긴다. -> 해당 업무 GET/DB에서 위 행·필드 대조'
+  /api/common/projects/{projectId}/start:
+    post:
+      operationId: postCommonProjectStart
+      summary: 수주예정 프로젝트 진행 전환
+      security: []
+      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
+      x-related-requirements:
+      - REQ-450
+      responses:
+        '200':
+          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProject'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-business-rules:
+      - 수주예정에만 ⋯와 진행으로/실주 처리를 표시한다. 진행으로는 확인 후 진행 저장이다.
+      x-side-effects:
+      - TB_PJ_PROJ.PROJ_STAT_CD만 진행으로 변경; 추가 이력 정책은 OQ-AUDIT-001
+      x-state-transitions:
+      - 수주예정에만 ⋯와 진행으로/실주 처리를 표시한다. 진행으로는 확인 후 진행 저장이다.
+      x-no-request-body-reason: 경로 대상의 진행 확인 동작으로 별도 입력 없음
+      x-required-tests:
+      - 'happy: 확인 취소는 요청0회·수주예정 유지; 확인 저장 뒤 상세 상태 진행이고 ⋯가 없다.'
+      - 'auth: 무인증 수주예정 프로젝트 진행 전환 -> 200·실행자 admin, 현재 인증 401/403 추가0'
+      - 'validation: 빈 경로 식별자 -> 400 식별자 오류·대상행 불변'
+      - 'business: 종료 또는 진행 프로젝트 진행전환 -> 400·PROJ_STAT_CD 불변'
+      - 'side-effect: TB_PJ_PROJ.PROJ_STAT_CD만 진행으로 변경; 추가 이력 정책은 OQ-AUDIT-001 -> 해당 업무 GET/DB에서 위 행·필드 대조'
+  /api/common/projects/{projectId}/distribution:
+    get:
+      operationId: getCommonProjectDistribution
+      summary: 턴키 배분표 조회
+      security: []
+      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
+      x-related-requirements:
+      - REQ-457
+      - REQ-461
+      - REQ-462
+      - REQ-463
+      responses:
+        '200':
+          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectDistribution'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-pagination-filtering:
+        pagination: 원문은 페이지 규칙 미지정; 기존 목록 부품으로 전체 결과 표시, 서버 페이지 파라미터 추가 금지
+        filtering: 프로젝트 목록만 year·contractTypeCode·statusCode·salesPartId·unassignedOnly·keyword; 하위 조회는 projectId만
+        ordering: 프로젝트 시작일 내림차순; 파트이력 적용월순; 경비 최근등록순; 나머지 세부동순위는 OQ-QUERY-001
+      x-aiops-query-role:
+        entity: TB_PJ_PROJ
+        result_path:
+        - data
+  /api/common/projects/{projectId}/lose:
+    post:
+      operationId: postCommonProjectLose
+      summary: 수주예정 프로젝트 실주 처리
+      security: []
+      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
+      x-related-requirements:
+      - REQ-472
+      - REQ-473
+      - REQ-475
+      - REQ-476
+      - REQ-477
+      responses:
+        '200':
+          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProject'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-business-rules:
+      - 수주예정에서 사유 LOSE_RSN 필수·메모500자를 입력하고 서버 한국 오늘 처리일로 실주 저장하며 프로젝트 선택 목록에서 제외한다.
+      - 수주예정 이외 실주처리·사유 누락·메모500자 초과는 거부하고 처리일 입력을 받지 않는다.
+      - 실주와 함께 투입중 철수일을 오늘로·미래배정을 취소 CNCL로 처리하고 이미 끝난 배정은 보존한다.
+      - '조기철수 사유 기타·메모 프로젝트 실주: 사유와 미래배정 취소 이력을 TB_PJ_ASGN_HIST에 남기고 삭제하지 않는다.'
+      - 쌓인 선투입 원가를 식-16 대기원가로 옮기며 수주 영업기회는 수주 그대로 두고 파이프라인으로 돌아가지 않는다.
+      x-side-effects:
+      - 실주와 함께 투입중 철수일을 오늘로·미래배정을 취소 CNCL로 처리하고 이미 끝난 배정은 보존한다.
+      - '조기철수 사유 기타·메모 프로젝트 실주: 사유와 미래배정 취소 이력을 TB_PJ_ASGN_HIST에 남기고 삭제하지 않는다.'
+      x-state-transitions:
+      - 수주예정에서 사유 LOSE_RSN 필수·메모500자를 입력하고 서버 한국 오늘 처리일로 실주 저장하며 프로젝트 선택 목록에서 제외한다.
+      - 쌓인 선투입 원가를 식-16 대기원가로 옮기며 수주 영업기회는 수주 그대로 두고 파이프라인으로 돌아가지 않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonProjectLoseInput'
+      x-required-tests:
+      - 'happy: 저장 후 PROJ_STAT_CD는 실주 해당 DB코드·LOSE_DT는 오늘·사유/메모 재조회, 투입/청구 선택 원천에 없다.'
+      - 'auth: 무인증 수주예정 프로젝트 실주 처리 -> 200·실행자 admin, 현재 인증 401/403 추가0'
+      - 'validation: reasonCode 누락 -> 400 errors.reasonCode·실주/배정변경0'
+      - 'business: 진행 프로젝트 실주 요청 -> 400·프로젝트와 배정 불변'
+      - 'side-effect: 실주와 함께 투입중 철수일을 오늘로·미래배정을 취소 CNCL로 처리하고 이미 끝난 배정은 보존한다. -> 해당 업무 GET/DB에서 위 행·필드 대조'
+  /api/common/clients/excel:
+    get:
+      operationId: getCommonClientsExcel
+      summary: 거래처 목록 엑셀 다운로드(SFR-011)
+      description: 지금 조건의 전체 결과를 보이는 열·정렬 그대로 xlsx로 내려준다. 파일에 받은 사람·한국 시각(SER-007), 접근 기록 DNLD(SER-006).
+      security: []
+      parameters:
+      - name: clientTypeCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: useYn
+        in: query
+        required: false
+        schema:
+          type: string
+          default: Y
+      - name: keyword
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - type
+          - name
+          - businessNumber
+          - representative
+          - industry
+          - contact
+          - phone
+          - taxEmail
+          - account
+          - projects
+          - people
+          - use
+      - name: dir
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+      - name: columns
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
+      responses:
+        '200':
+          description: 엑셀 파일
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 모르는 열·정렬 값
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/parts/excel:
+    get:
+      operationId: getCommonPartsExcel
+      summary: 영업 파트 목록 엑셀 다운로드(SFR-011)
+      description: 보이는 열·정렬 그대로 xlsx로 내려준다. 파일에 받은 사람·한국 시각(SER-007), 접근 기록 DNLD(SER-006).
+      security: []
+      parameters:
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - partName
+          - leaderName
+          - distributionRate
+          - salesExpense
+          - effectiveMonth
+          - scheduledChange
+          - personCount
+          - projectCount
+          - useYn
+      - name: dir
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+      - name: columns
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
+      responses:
+        '200':
+          description: 엑셀 파일
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 모르는 열·정렬 값
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/roles/{roleId}/change-history:
+    get:
+      operationId: getCommonRoleChangeHistory
+      summary: 역할 권한 변경 이력 조회(시안 「변경 이력 (n)」)
+      security: []
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 바뀐 항목마다 1줄, 최근 순
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      type: object
+                      required:
+                      - items
+                      properties:
+                        items:
+                          type: array
+                          items:
+                            type: object
+                            required:
+                            - changedAt
+                            - item
+                            properties:
+                              changedAt:
+                                type: string
+                                format: date-time
+                              item:
+                                type: string
+                              before:
+                                type: string
+                                nullable: true
+                              after:
+                                type: string
+                                nullable: true
+                              changedBy:
+                                type: string
+                                nullable: true
+        '404':
+          description: 역할이 존재하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/excel:
+    get:
+      operationId: getCommonUsersExcel
+      summary: 사용자 목록 엑셀 다운로드(SFR-011)
+      description: 지금 조건의 전체 결과를 보이는 열 그대로 xlsx로 내려준다. 1행 「사용자 · 다운로드 admin · 한국 시각」, 3행부터 머리글. 파일 이름은 「화면이름_기간_다운로드일시.xlsx」. 접근 기록(DNLD)을 남긴다.
+      security: []
+      parameters:
+      - name: includeStopped
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+        description: 시안 [사용 중지 포함]. false면 사용 중지 계정을 숨긴다(상태 조건에서 중지를 고르면 함께 보임).
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - userId
+          - name
+          - role
+          - state
+          - last
+        description: 정렬 열. 없으면 이름순.
+      - name: dir
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+      - name: roleCd
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: userStatCd
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - USE
+          - LOCK
+          - STOP
+      - name: keyword
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: columns
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
+      responses:
+        '200':
+          description: 엑셀 파일
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 모르는 열·정렬 값
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/{userId}/change-history:
+    get:
+      operationId: getCommonUserChangeHistory
+      summary: 사용자 변경 이력 조회(상세 패널 「변경 이력」 탭)
+      description: 바뀐 항목마다 1줄(이름·이메일·역할·고른 본사·담당 프로젝트·상태·등록), 최근 순.
+      security: []
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 변경 이력 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        type: object
+                        required:
+                        - changedAt
+                        - item
+                        properties:
+                          changedAt:
+                            type: string
+                            format: date-time
+                          item:
+                            type: string
+                          before:
+                            type: string
+                            nullable: true
+                          after:
+                            type: string
+                            nullable: true
+                          changedBy:
+                            type: string
+                            nullable: true
+        '400':
+          description: 아이디 형식 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/assignments:
+    post:
+      operationId: postCommonAssignment
+      summary: 인력 투입 배정
+      security: []
+      x-related-requirements:
+      - REQ-508
+      - REQ-509
+      - REQ-510
+      - REQ-511
+      - REQ-512
+      - REQ-513
+      - REQ-515
+      - REQ-516
+      - REQ-517
+      - REQ-518
+      - REQ-519
+      - REQ-520
+      - REQ-521
+      - REQ-522
+      - REQ-523
+      - REQ-505
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      responses:
+        '200':
+          description: 인력 투입 배정 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignment'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: '상세 modifiedAt 불일치: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 배정·이력은 불변이다.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonAssignmentInput'
+      x-business-rules:
+      - 프로젝트·개발자·직무·투입일·철수일·월 MM을 받아 TB_PJ_ASGN에 등록한다. 월 MM 기본 1.00이다.
+      - 이름/관리번호 검색 결과 옆에 대기·투입 중 ~마지막 철수일·휴직만 표시한다.
+      - 종료·실주 프로젝트를 제외하고 철수일이 프로젝트 계약 종료일 또는 개발자 퇴사일보다 늦으면 지정 문구로 거부한다.
+      - 최초 투입일은 오늘·철수일은 기본 프로젝트 종료일이고 프로젝트 변경 시 계약 시작일~종료일로 바꾼다. AI 진입은 max(추천 시작월1일, 프로젝트 시작일)~종료일이다.
+      - 내부가 아닌 사람/프로젝트 영업 파트 차이는 원문 긴 안내를 보이고 저장 허용하며 매출·사람 이익 귀속을 설명한다.
+      - 월단위·파견 유상 배정은 청구 단가 >0 필수다. PM은 기본 월 단가를 쓰고 없으면 지정 문구로 거부하며 파트장·재무는 직접 입력한다.
+      - 배정 저장 시 TB_PJ_ASGN_HIST에 투입 1줄을 자동 기록한다.
+      - 투입 구분은 신규·추가투입·대체투입·무상지원이며 기본 신규다. 청구 단가는 월단위·파견만, 무상지원은 숨기고 0 저장한다. 연장 가능성은 입력 없이 미정이다.
+      - 대체투입 계약상 인력은 같은 프로젝트 배정 이력 인력을 사람당 1줄·본인 제외·철수일 표시로 조회한다.
+      - 월단위·파견은 계약상 인력 마지막 배정 최근 월 단가를 채우고 턴키·내부는 이름만 표시한다. 프로젝트/구분 변경 또는 본인 일치 시 선택을 비운다.
+      - 투입일에 걸친 계약상 인력 배정을 기본 전체 체크로 표시하고 같이 처리·대체투입만 저장·취소를 선택하게 한다. 겹침 없으면 바로 저장한다.
+      - 같이 처리 시 선택된 원배정을 투입일 전날로 조기 철수하며 사유 ASGN_CHG_RSN 필수·기본값 없음·메모 200자 기본 대체투입(실제 투입자)을 받는다.
+      - 같이 처리된 각 원배정에 조기 철수 이력과 ASGN_CHG_RSN_CD·CHG_MEMO를 남기고 인력 사정은 식-70 성과 점수 원천에 포함한다.
+      - 계산 배분표에 계약상 인력 줄이 있으면 확인창과 저장 안내에 재업로드·배분 불일치 문구를 보이고 배분표를 자동 변경하지 않는다.
+      - PM에게 청구 단가 입력을 숨기고 기본값으로 저장하며 단가 직접 수정은 파트장·재무로 한정하는 정책 함수를 보존한다. 로그인/메뉴 통제는 후속이다.
+      - 수주예정 선투입·휴직 중 배정·파견 프리랜서/외주·마감월 걸침을 경고하되 저장을 허용한다.
+      x-side-effects:
+      - TB_PJ_ASGN 신규와 TB_PJ_ASGN_HIST 투입1줄을 같은 트랜잭션에 저장한다.
+      - together 선택 시 체크 원배정 종료일=투입일 전날 및 각 조기 철수 이력·ASGN_CHG_RSN_CD·CHG_MEMO를 같은 경계에 기록한다.
+      - 배분표는 자동 변경하지 않고 재업로드 안내·프로젝트 집계를 갱신한다. TB_CO_PREV_ADJ 자동 행 생성은 없다.
+      x-required-tests:
+      - 'happy: 월 MM 1.00의 유효 배정 저장 -> getCommonAssignment에서 같은 프로젝트·개발자·기간·monthlyMm 재조회'
+      - 'auth: PM 정책 fixture의 임의 청구 단가 입력 -> 해당 입력 사용 거부·기본 단가만 저장; 현재 무인증 HTTP는 200·admin'
+      - 'validation: 개발자 누락 -> 400 errors.developerId에 개발자를 골라 주세요·TB_PJ_ASGN 추가0'
+      - 'business: 철수일이 계약 종료일 또는 퇴사일 초과 -> 400 endDate 오류·기존 배정 불변'
+      - 'side-effect: together와 철수 사유 제출 -> 선택 원배정 전날 종료·조기 철수 이력 및 새 투입 이력 조회'
+      - 'business: 함께 처리 사유 누락 -> 400 reasonCode에 철수 사유를 골라 주세요·신규/원배정 전체 불변'
+      - 'business: 무상지원·PM 기본 단가 없음 -> 200 billingPrice=0·유상 PM은 지정 월 단가 없음 오류'
+      - 'side-effect: 턴키 대체 등록 -> 배분표 원행 불변·재업로드 안내와 불일치 재조회'
+      x-state-transitions:
+      - 없음 -> 유효 배정·투입 이력
+      - 선택 원배정 -> 조기 철수(together만); assignment-only는 원배정 유지
+  /api/common/assignments/candidates:
+    get:
+      operationId: getCommonAssignmentCandidates
+      summary: 수주 배정 후보
+      security: []
+      x-related-requirements:
+      - REQ-501
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      x-pagination-filtering:
+        pagination: 서버 전체 조회; 기존 목록 표시 부품이 건수/밀도를 적용
+        filtering: []
+        ordering: 기존 정렬 관례를 보존하며 신규 업무 정렬은 원문 미지정; OQ-ASGN-QUERY
+      x-aiops-query-role:
+        entity: TB_PJ_ASGN
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 수주 배정 후보 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignmentCandidateList'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/assignments/candidates/{candidateId}/remove:
+    post:
+      operationId: postCommonAssignmentCandidateRemove
+      summary: 배정 후보 제외
+      security: []
+      x-related-requirements:
+      - REQ-503
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      parameters:
+      - name: candidateId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 배정 후보 제외 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignmentCandidateRemoved'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: '상세 modifiedAt 불일치: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 배정·이력은 불변이다.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonAssignmentCandidateRemoveInput'
+      x-business-rules:
+      - 후보 빼기는 해당 인력을 후보에서 제외한다.
+      x-side-effects:
+      - 수주 가배정의 후보 노출에서만 제외하고 TB_PJ_ASGN을 생성/삭제하지 않는다.
+      x-required-tests:
+      - 'happy: 후보 빼기 호출 -> getCommonAssignmentCandidates에 그 candidateId 없음'
+      - 'auth: 무인증 후보 제외 -> 200·로그인 이동 없음'
+      - 'validation: 빈 candidateId -> 400 경로 식별자 오류·후보 목록 불변'
+      - 'business: 확정되지 않은 후보 빼기 -> 기존 TB_PJ_ASGN 배정 건수 불변'
+      - 'side-effect: 후보 제외 뒤 목록 재조회 -> 후보 수 감소·영업 기회 수주 상태 보존'
+      x-state-transitions:
+      - 후보 표시 -> 후보에서 제외; 실제 배정으로 자동 전환 없음
+  /api/common/assignments/contract-developers:
+    get:
+      operationId: getCommonAssignmentContractDevelopers
+      summary: 계약상 인력 선택
+      security: []
+      x-related-requirements:
+      - REQ-517
+      - REQ-518
+      - REQ-519
+      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
+      parameters:
+      - name: projectId
+        in: query
+        description: 선택 프로젝트
+        required: false
+        schema:
+          type: string
+      - name: developerId
+        in: query
+        description: 배정 본인 제외
+        required: false
+        schema:
+          type: string
+      - name: startDate
+        in: query
+        description: 겹침 판정 투입일
+        required: false
+        schema:
+          type: string
+      x-pagination-filtering:
+        pagination: 서버 전체 조회; 기존 목록 표시 부품이 건수/밀도를 적용
+        filtering:
+        - projectId
+        - developerId
+        - startDate
+        ordering: 기존 정렬 관례를 보존하며 신규 업무 정렬은 원문 미지정; OQ-ASGN-QUERY
+      x-aiops-query-role:
+        entity: TB_PJ_ASGN
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 계약상 인력 선택 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAssignmentContractDeveloperList'
+        '400':
+          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+components:
+  schemas:
+    ApiError:
+      type: object
+      required:
+      - success
+      - meta
+      properties:
+        message:
+          type: string
+          description: 사용자에게 보여 줄 존댓말 오류. 내부 코드·영문 오류는 표시하지 않는다.
+        errors:
+          type: array
+          items:
+            type: object
+            required:
+            - field
+            - message
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+        success:
+          type: boolean
+          enum:
+          - false
+        meta:
+          type: object
+          description: 실패 메타데이터. 오류 코드·메시지·추적 필드 정책은 확인 필요다.
+          additionalProperties: true
+    ApiResponse:
+      type: object
+      required:
+      - success
+      - meta
+      properties:
+        success:
+          type: boolean
+          enum:
+          - true
+        meta:
+          type: object
+          description: 공통 메타데이터. 하위 필드 정책은 미제공이며 requestId·시각을 발명하지 않는다.
+          additionalProperties: true
+    CommonAssignment:
+      type: object
+      required:
+      - assignmentId
+      - projectId
+      - projectName
+      - developerId
+      - name
+      - jobName
+      - startDate
+      - endDate
+      - monthlyMm
+      - yearMm
+      - inputTypeName
+      - extensionPossibilityName
+      - extensionCount
+      - warnings
+      - historyCount
+      - modifiedAt
+      properties:
+        assignmentId:
+          type: string
+        projectId:
+          type: string
+        projectName:
+          type: string
+        developerId:
+          type: string
+        name:
+          type: string
+        managementNumber:
+          type: string
+        jobCode:
+          type: string
+        jobName:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        billingPrice:
+          type: number
+          nullable: true
+          description: PM 정책에서는 생략; 턴키는 목록 표시명 배분표
+        monthlyMm:
+          type: number
+        yearMm:
+          type: number
+        extensionPossibilityCode:
+          type: string
+        extensionPossibilityName:
+          type: string
+        inputTypeCode:
+          type: string
+        inputTypeName:
+          type: string
+        extensionCount:
+          type: integer
+        warnings:
+          type: array
+          items:
+            type: string
+        monthlyMmTotal:
+          type: number
+        historyCount:
+          type: integer
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        months:
+          type: array
+          description: 상세·저장 응답만. 투입 기간의 달마다 그 달에 적용되는 계약 월 MM·청구 단가
+          items:
+            type: object
+            required:
+            - month
+            - monthlyMm
+            - billingPrice
+            properties:
+              month:
+                type: string
+                pattern: ^[0-9]{6}$
+              monthlyMm:
+                type: number
+              billingPrice:
+                type: number
+                nullable: true
+                description: 단가를 볼 수 없는 역할이면 null
+            additionalProperties: false
+      additionalProperties: false
+    CommonAssignmentCandidate:
+      type: object
+      required:
+      - candidateId
+      - projectId
+      - projectName
+      - developerId
+      - name
+      - managementNumber
+      - jobCode
+      - jobName
+      - startDate
+      - endDate
+      - modifiedAt
+      properties:
+        candidateId:
+          type: string
+        projectId:
+          type: string
+        projectName:
+          type: string
+        developerId:
+          type: string
+        name:
+          type: string
+        managementNumber:
+          type: string
+          description: 개발자 관리번호(TB_HR_DEV.MNG_NO)
+        jobCode:
+          type: string
+        jobName:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 가배정 줄 수정 시각(TB_SL_TENT_ASGN.MOD_DTTM, 없으면 REG_DTTM). [빼기] 때 그대로 보냄
+      additionalProperties: false
+    CommonAssignmentCandidateList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAssignmentCandidate'
+      additionalProperties: false
+    CommonAssignmentCandidateRemoved:
+      type: object
+      required:
+      - candidateId
+      properties:
+        candidateId:
+          type: string
+      additionalProperties: false
+    CommonAssignmentCandidateRemoveInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 후보 목록의 modifiedAt. 보내면 TB_SL_TENT_ASGN 수정 시각과 다를 때 409(공통 동시 수정 문구)
+      additionalProperties: false
+    CommonAssignmentContractDeveloper:
+      type: object
+      required:
+      - developerId
+      - name
+      - jobName
+      - endDate
+      - billingPrice
+      - overlappingAssignments
+      properties:
+        developerId:
+          type: string
+        name:
+          type: string
+        jobName:
+          type: string
+          description: 그 사람의 이 프로젝트 마지막 배정 직무 이름
+        endDate:
+          type: string
+          format: date
+        billingPrice:
+          type: number
+          nullable: true
+        overlappingAssignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAssignment'
+      additionalProperties: false
+    CommonAssignmentContractDeveloperList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAssignmentContractDeveloper'
+      additionalProperties: false
+    CommonAssignmentInput:
+      type: object
+      required:
+      - projectId
+      - developerId
+      - jobCode
+      - startDate
+      - endDate
+      - monthlyMm
+      - inputTypeCode
+      properties:
+        projectId:
+          type: string
+        developerId:
+          type: string
+        jobCode:
+          type: string
+          description: JOB 실제 코드
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        monthlyMm:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          maximum: 1
+          default: 1
+        inputTypeCode:
+          type: string
+          description: INPUT_TYPE/ASGN_CHG_TYPE 실제 DML 코드; 이관 없음
+        billingPrice:
+          type: number
+          minimum: 0
+          description: 유상 월단위·파견 >0, 무상지원 0, PM 입력값 신뢰 금지
+        contractDeveloperId:
+          type: string
+          description: 대체투입만·CTRT_DEV_ID
+        replacementAction:
+          type: string
+          enum:
+          - together
+          - assignment-only
+          description: UI 결정 전달용 논리값; DB enum/공통코드 아님
+        earlyWithdrawalAssignmentIds:
+          type: array
+          items:
+            type: string
+        reasonCode:
+          type: string
+          description: 같이 처리일 때 ASGN_CHG_RSN 필수
+        memo:
+          type: string
+          maxLength: 200
+        candidateId:
+          type: string
+          pattern: '^[0-9]{1,12}$'
+          description: 배정 후보 [확정]으로 연 경우만. 같은 저장 안에서 TB_SL_TENT_ASGN 줄을 DONE(배정 확정)으로 바꿈. 이미 처리된 후보면 409
+      additionalProperties: false
+    CommonDeveloper:
+      type: object
+      properties:
+        managementNumber:
+          type: string
+          description: 관리번호; 등록 후 변경 금지
+          maxLength: 20
+          pattern: ^[A-Za-z0-9-]{1,20}$
+        name:
+          type: string
+          description: 이름
+          minLength: 1
+          maxLength: 50
+        employeeTypeCode:
+          type: string
+          description: EMP_TYPE 코드
+        organizationId:
+          type: string
+          description: 자사 또는 사용 중 협력사 식별자
+        gradeCode:
+          type: string
+          description: GRADE 코드
+          nullable: true
+        primaryJobCode:
+          type: string
+          description: JOB 주 직무 코드
+        secondaryJobCode:
+          type: string
+          description: JOB 보조 직무 코드
+          nullable: true
+        positionCode:
+          type: string
+          description: JBPS 코드; 기본 팀원 코드는 DB 원천
+        directClassCode:
+          type: string
+          description: DRCT_CLS 코드; 기본 직접·관리직만 간접
+        salesPartId:
+          type: string
+          description: 사용 중 파트 또는 본사(직접 영업)의 기존 식별값; 기본값 없음
+        hireDate:
+          type: string
+          description: 입사일
+          format: date
+          nullable: true
+        monthlyRate:
+          type: number
+          description: 월 단가 선택; 빈값 허용
+          nullable: true
+        monthlyPay:
+          type: number
+          description: 월 급여·지급액 선택; 원가는 월 급여 업로드 원천
+          nullable: true
+        skillCodes:
+          type: array
+          items:
+            type: string
+            description: 스킬 공통코드
+        homeAreaCode:
+          type: string
+          description: HOME_AREA_CD; 선택 단계까지 코드
+          nullable: true
+        homeAddress:
+          type: string
+          description: HOME_ADDR; 시·도/시·군·구/동 조합. 번지 없음
+          nullable: true
+        developerId:
+          type: string
+          description: TB_HR_DEV 기존 PK 식별자; SQL 원문 대조
+        organizationName:
+          type: string
+          description: 소속 표시명
+        employeeTypeName:
+          type: string
+          description: 직원구분 표시명
+        gradeName:
+          type: string
+          description: 등급 표시명
+          nullable: true
+        primaryJobName:
+          type: string
+          description: 주 직무 표시명
+        workStatusName:
+          type: string
+          description: 상태
+          enum:
+          - 투입중
+          - 철수예정
+          - 대기
+          - 휴직
+          - 퇴사
+        retirementScheduled:
+          type: boolean
+          description: 퇴사일이 아직 안 지난 경우
+        retirementDate:
+          type: string
+          description: 퇴사 이력 원본의 복사값
+          format: date
+          nullable: true
+        useYn:
+          type: string
+          description: 사용 여부; 기존 코드 원천
+        secondaryJobName:
+          type: string
+          nullable: true
+          description: 보조 직무 표시명
+        positionName:
+          type: string
+          nullable: true
+          description: 직위 표시명(JBPS)
+        directClassName:
+          type: string
+          nullable: true
+          description: 직접/간접 표시명(DRCT_CLS)
+        salesPartName:
+          type: string
+          nullable: true
+          description: 영업 파트 표시명. HQ는 본사(직접 영업)
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: '동시 수정 막기: 수정할 때 그대로 돌려보내고 다르면 409'
+        skillNames:
+          type: array
+          items:
+            type: string
+          description: 보유 스킬 이름(TB_HR_DEV_SKILL.SKILL_NM)
+      required:
+      - developerId
+      - managementNumber
+      - name
+      - workStatusName
+      - retirementScheduled
+      - useYn
+      additionalProperties: false
+    CommonDeveloperAssignment:
+      type: object
+      properties:
+        projectId:
+          type: string
+          description: 투입 프로젝트 이동에 사용하는 기존 프로젝트 식별자
+        projectName:
+          type: string
+          description: 프로젝트
+        jobName:
+          type: string
+          description: 직무
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        mm:
+          type: number
+          description: 해당 투입 MM
+      required:
+      - projectName
+      - jobName
+      - startDate
+      - endDate
+      - mm
+      additionalProperties: false
+    CommonDeveloperAssignmentList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonDeveloperAssignment'
+      required:
+      - items
+      additionalProperties: false
+    CommonDeveloperEndDateInput:
+      type: object
+      properties:
+        endDate:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - endDate
+      additionalProperties: false
+    CommonDeveloperInput:
+      type: object
+      properties:
+        managementNumber:
+          type: string
+          description: 관리번호; 등록 후 변경 금지
+          maxLength: 20
+          pattern: ^[A-Za-z0-9-]{1,20}$
+        name:
+          type: string
+          description: 이름
+          minLength: 1
+          maxLength: 50
+        employeeTypeCode:
+          type: string
+          description: EMP_TYPE 코드
+        organizationId:
+          type: string
+          description: 자사 또는 사용 중 협력사 식별자
+        gradeCode:
+          type: string
+          description: GRADE 코드
+          nullable: true
+        primaryJobCode:
+          type: string
+          description: JOB 주 직무 코드
+        secondaryJobCode:
+          type: string
+          description: JOB 보조 직무 코드
+          nullable: true
+        positionCode:
+          type: string
+          description: JBPS 코드; 기본 팀원 코드는 DB 원천
+        directClassCode:
+          type: string
+          description: DRCT_CLS 코드; 기본 직접·관리직만 간접
+        salesPartId:
+          type: string
+          description: 사용 중 파트 또는 본사(직접 영업)의 기존 식별값; 기본값 없음
+        hireDate:
+          type: string
+          description: 입사일
+          format: date
+          nullable: true
+        monthlyRate:
+          type: number
+          description: 월 단가 선택; 빈값 허용
+          nullable: true
+        monthlyPay:
+          type: number
+          description: 월 급여·지급액 선택; 원가는 월 급여 업로드 원천
+          nullable: true
+        skillCodes:
+          type: array
+          items:
+            type: string
+            description: 스킬 공통코드
+        homeAreaCode:
+          type: string
+          description: HOME_AREA_CD; 선택 단계까지 코드
+          nullable: true
+        homeAddress:
+          type: string
+          description: HOME_ADDR; 시·도/시·군·구/동 조합. 번지 없음
+          nullable: true
+      required:
+      - name
+      - employeeTypeCode
+      - organizationId
+      - primaryJobCode
+      - salesPartId
+      - directClassCode
+      additionalProperties: false
+    CommonDeveloperList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonDeveloperListRow'
+      required:
+      - items
+      additionalProperties: false
+    CommonDeveloperListRow:
+      type: object
+      properties:
+        managementNumber:
+          type: string
+          description: 관리번호; 등록 후 변경 금지
+          maxLength: 20
+          pattern: ^[A-Za-z0-9-]{1,20}$
+        name:
+          type: string
+          description: 이름
+          minLength: 1
+          maxLength: 50
+        employeeTypeCode:
+          type: string
+          description: EMP_TYPE 코드
+        organizationId:
+          type: string
+          description: 자사 또는 사용 중 협력사 식별자
+        gradeCode:
+          type: string
+          description: GRADE 코드
+          nullable: true
+        primaryJobCode:
+          type: string
+          description: JOB 주 직무 코드
+        secondaryJobCode:
+          type: string
+          description: JOB 보조 직무 코드
+          nullable: true
+        positionCode:
+          type: string
+          description: JBPS 코드; 기본 팀원 코드는 DB 원천
+        directClassCode:
+          type: string
+          description: DRCT_CLS 코드; 기본 직접·관리직만 간접
+        salesPartId:
+          type: string
+          description: 사용 중 파트 또는 본사(직접 영업)의 기존 식별값; 기본값 없음
+        hireDate:
+          type: string
+          description: 입사일
+          format: date
+          nullable: true
+        monthlyRate:
+          type: number
+          description: 월 단가 선택; 빈값 허용
+          nullable: true
+        developerId:
+          type: string
+          description: TB_HR_DEV 기존 PK 식별자; SQL 원문 대조
+        organizationName:
+          type: string
+          description: 소속 표시명
+        employeeTypeName:
+          type: string
+          description: 직원구분 표시명
+        gradeName:
+          type: string
+          description: 등급 표시명
+          nullable: true
+        primaryJobName:
+          type: string
+          description: 주 직무 표시명
+        workStatusName:
+          type: string
+          description: 상태
+          enum:
+          - 투입중
+          - 철수예정
+          - 대기
+          - 휴직
+          - 퇴사
+        retirementScheduled:
+          type: boolean
+          description: 퇴사일이 아직 안 지난 경우
+        retirementDate:
+          type: string
+          description: 퇴사 이력 원본의 복사값
+          format: date
+          nullable: true
+        useYn:
+          type: string
+          description: 사용 여부; 기존 코드 원천
+        currentProjectName:
+          type: string
+          description: 대표 프로젝트 표시명
+          nullable: true
+        currentProjectId:
+          type: string
+          description: 대표 프로젝트 이동에 사용하는 기존 프로젝트 식별자
+          nullable: true
+        additionalProjectCount:
+          type: integer
+          minimum: 0
+        currentMonthMm:
+          type: number
+          description: 식-01/95 DB 정의 결과
+        overOneMm:
+          type: boolean
+        withdrawalDate:
+          type: string
+          description: 철수 예정일
+          format: date
+          nullable: true
+      required:
+      - developerId
+      - managementNumber
+      - name
+      - workStatusName
+      additionalProperties: false
+    CommonDeveloperRetirementCancelInput:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: 취소 사유 필수
+          minLength: 1
+      required:
+      - reason
+      additionalProperties: false
+    CommonDeveloperStatus:
+      type: object
+      properties:
+        statusId:
+          type: string
+          description: 상태 줄 식별자
+        statusName:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+        registeredBy:
+          type: string
+          nullable: true
+        ongoing:
+          type: boolean
+        retirementScheduled:
+          type: boolean
+        closedByReturn:
+          type: boolean
+          description: 휴직 줄이 재직(복귀)으로 닫혔는지(시안 「재직으로 닫힘」)
+        monthClosed:
+          type: boolean
+          description: 재직·퇴사 줄의 달이 마감됐는지(시안 「마감됨」)
+        restoreEndDate:
+          type: string
+          format: date
+          description: 재직 줄을 취소하면 돌아갈 휴직 종료일(없으면 복직일 미정)
+      required:
+      - statusName
+      - startDate
+      - endDate
+      - reason
+      - registeredBy
+      additionalProperties: false
+    CommonDeveloperStatusInput:
+      type: object
+      properties:
+        statusName:
+          type: string
+          description: 저장 상태
+          enum:
+          - 휴직
+          - 퇴사
+          - 재직
+        date:
+          type: string
+          description: 휴직 시작일/퇴사일/복귀일
+          format: date
+        endDate:
+          type: string
+          description: 휴직만. 비우면 미정
+          format: date
+          nullable: true
+        reason:
+          type: string
+          description: 사유
+          nullable: true
+      required:
+      - statusName
+      - date
+      additionalProperties: false
+    CommonDeveloperStatusList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonDeveloperStatus'
+        canManageStatuses:
+          type: boolean
+          description: 근무 상태 등록·수정·취소 가능(관리자·재무)
+        canCancelPastRetirement:
+          type: boolean
+          description: 퇴사일이 지난 퇴사 취소 가능(시스템 관리자)
+      required:
+      - items
+      - canManageStatuses
+      - canCancelPastRetirement
+      additionalProperties: false
+    CommonDeveloperUpdateInput:
+      type: object
+      properties:
+        name:
+          type: string
+          description: 이름
+          minLength: 1
+          maxLength: 50
+        employeeTypeCode:
+          type: string
+          description: EMP_TYPE 코드
+        organizationId:
+          type: string
+          description: 자사 또는 사용 중 협력사 식별자
+        gradeCode:
+          type: string
+          description: GRADE 코드
+          nullable: true
+        primaryJobCode:
+          type: string
+          description: JOB 주 직무 코드
+        secondaryJobCode:
+          type: string
+          description: JOB 보조 직무 코드
+          nullable: true
+        positionCode:
+          type: string
+          description: JBPS 코드; 기본 팀원 코드는 DB 원천
+        directClassCode:
+          type: string
+          description: DRCT_CLS 코드; 기본 직접·관리직만 간접
+        salesPartId:
+          type: string
+          description: 사용 중 파트 또는 본사(직접 영업)의 기존 식별값; 기본값 없음
+        hireDate:
+          type: string
+          description: 입사일
+          format: date
+          nullable: true
+        monthlyRate:
+          type: number
+          description: 월 단가 선택; 빈값 허용
+          nullable: true
+        monthlyPay:
+          type: number
+          description: 월 급여·지급액 선택; 원가는 월 급여 업로드 원천
+          nullable: true
+        skillCodes:
+          type: array
+          items:
+            type: string
+            description: 스킬 공통코드
+        homeAreaCode:
+          type: string
+          description: HOME_AREA_CD; 선택 단계까지 코드
+          nullable: true
+        homeAddress:
+          type: string
+          description: HOME_ADDR; 시·도/시·군·구/동 조합. 번지 없음
+          nullable: true
+      required:
+      - name
+      - employeeTypeCode
+      - organizationId
+      - primaryJobCode
+      - salesPartId
+      - directClassCode
+      additionalProperties: false
+    CommonProject:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          description: 마지막 수정 시각(없으면 등록 시각, UTC). 수정·예산 저장 때 그대로 돌려보내 동시 수정을 확인한다
+        projectId:
+          type: string
+          description: PROJ_ID 자동 발급; 등록 입력 아님
+        projectName:
+          type: string
+          maxLength: 100
+        customerId:
+          type: string
+          nullable: true
+        customerName:
+          type: string
+          description: 내부는 (자체)
+        contractTypeCode:
+          type: string
+          description: CTRT_TYPE 실제 DB 코드
+        contractTypeName:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        salesPartId:
+          type: string
+          nullable: true
+        salesPartName:
+          type: string
+        workplace:
+          type: string
+          maxLength: 200
+          nullable: true
+        statusCode:
+          type: string
+          description: PROJ_STAT 실제 DB코드; 값은 DML 원천
+        statusName:
+          type: string
+        estimateAmount:
+          type: number
+          nullable: true
+        originalContractAmount:
+          type: number
+          nullable: true
+          readOnly: true
+        contractAmount:
+          type: number
+        budgetAmount:
+          type: number
+          nullable: true
+        budgetManualYn:
+          type: string
+          enum:
+          - Y
+          - N
+          readOnly: true
+        teamExpenseAmount:
+          type: number
+        projectExpenseAmount:
+          type: number
+        feature:
+          type: string
+          maxLength: 500
+          nullable: true
+        canEdit:
+          type: boolean
+        canChangeBudget:
+          type: boolean
+        canChangeSalesPart:
+          type: boolean
+        canSaveManpowerPlan:
+          type: boolean
+        canLose:
+          type: boolean
+        canStart:
+          type: boolean
+        pmName:
+          type: string
+          nullable: true
+        trafficLight:
+          type: string
+          description: 식-76 DB 정의의 표시 결과; enum 원문 확보
+        preContractPeopleCount:
+          type: integer
+        loseDate:
+          type: string
+          format: date
+          nullable: true
+        loseReasonName:
+          type: string
+          nullable: true
+        loseMemo:
+          type: string
+          maxLength: 500
+          nullable: true
+        assignedPeopleCount:
+          type: integer
+        distributionStepName:
+          type: string
+          nullable: true
+        distributionTotalWarning:
+          type: boolean
+        distributionMismatchCount:
+          type: integer
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProjectAssignment'
+        closedMonth:
+          type: string
+          nullable: true
+          description: 상세에서만. 마지막 마감월(YYYY-MM). 영업 파트 변경·직접 경비 창 안내와 마감 표시에 쓴다
+        memos:
+          type: array
+          description: 상세에서만. 주간 메모(진행 현황 탭 보기용, 최근 순)
+          items:
+            type: object
+            properties:
+              writtenDate:
+                type: string
+                format: date
+              thisWeek:
+                type: string
+                nullable: true
+              nextWeek:
+                type: string
+                nullable: true
+              request:
+                type: string
+                nullable: true
+              actualProgressRate:
+                type: integer
+                nullable: true
+        issues:
+          type: array
+          description: 상세에서만. 이슈(열린 것 먼저, 중요도·기한 순)
+          items:
+            type: object
+            properties:
+              issueTitle:
+                type: string
+              importanceCode:
+                type: string
+              importanceName:
+                type: string
+              statusCode:
+                type: string
+              statusName:
+                type: string
+              action:
+                type: string
+                nullable: true
+              dueDate:
+                type: string
+                format: date
+                nullable: true
+      required:
+      - projectId
+      - projectName
+      - contractTypeCode
+      - statusName
+      - contractAmount
+      - canEdit
+      - canSaveManpowerPlan
+      description: 진행현황·신호등 식-67/76 세부 결과는 DB정의 확보 OQ-CALC-001; 이슈 SFR-131의 공개필드/연결은 OQ-ISSUE-001로 국소 보류. 빈 object를 완료된 이슈 계약으로 내보내지 않음.
+    CommonProjectAssignment:
+      type: object
+      properties:
+        name:
+          type: string
+        managementNumber:
+          type: string
+          description: 개발자 관리번호(이름 아래 작은 글자)
+        jobName:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        mm:
+          type: number
+      required:
+      - name
+      - jobName
+      - startDate
+      - endDate
+      - mm
+    CommonProjectBudgetInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 있으면 읽은 프로젝트의 modifiedAt과 지금 값을 비교해 다르면 409
+        budgetAmount:
+          type: number
+      required:
+      - budgetAmount
+    CommonProjectDistribution:
+      type: object
+      properties:
+        project:
+          $ref: '#/components/schemas/CommonProject'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProjectDistributionRow'
+        uploads:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProjectDistributionUpload'
+        mismatches:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProjectDistributionMismatch'
+        totalAmountWarning:
+          type: boolean
+      required:
+      - project
+      - items
+      - uploads
+      - mismatches
+      - totalAmountWarning
+    CommonProjectDistributionMismatch:
+      type: object
+      properties:
+        name:
+          type: string
+        kind:
+          type: string
+          enum:
+          - 배정 없음
+          - 배분표 없음
+        months:
+          type: array
+          items:
+            type: string
+      required:
+      - name
+      - kind
+      - months
+    CommonProjectDistributionRow:
+      type: object
+      properties:
+        rowTypeCode:
+          type: string
+          description: ROW_TYPE 실제 코드
+        managementNumber:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        jobNames:
+          type: array
+          items:
+            type: string
+        itemName:
+          type: string
+          maxLength: 50
+          nullable: true
+        monthlyAmounts:
+          type: object
+          additionalProperties:
+            type: number
+          description: YYYY-MM별 원 금액; 빈칸0
+        totalAmount:
+          type: number
+      required:
+      - rowTypeCode
+      - monthlyAmounts
+      - totalAmount
+    CommonProjectDistributionUpload:
+      type: object
+      properties:
+        uploadedAt:
+          type: string
+        stepCode:
+          type: string
+        stepName:
+          type: string
+        fileName:
+          type: string
+        uploadedBy:
+          type: string
+      required:
+      - uploadedAt
+      - stepCode
+      - stepName
+      - fileName
+      - uploadedBy
+    CommonProjectInput:
+      type: object
+      properties:
+        projectName:
+          type: string
+          maxLength: 100
+        customerId:
+          type: string
+          nullable: true
+        contractTypeCode:
+          type: string
+          description: CTRT_TYPE 실제 DB 코드
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        salesPartId:
+          type: string
+          nullable: true
+        workplace:
+          type: string
+          maxLength: 200
+          nullable: true
+        statusCode:
+          type: string
+          description: PROJ_STAT 실제 DB코드; 값은 DML 원천
+        estimateAmount:
+          type: number
+          nullable: true
+        contractAmount:
+          type: number
+        budgetAmount:
+          type: number
+          nullable: true
+        teamExpenseAmount:
+          type: number
+        projectExpenseAmount:
+          type: number
+        feature:
+          type: string
+          maxLength: 500
+          nullable: true
+      required:
+      - projectName
+      - contractTypeCode
+      - startDate
+      - endDate
+      - statusCode
+      description: 비내부 customerId/salesPartId/contractAmount 필수. 내부는 세 비해당 칸 제외·빈 계약금액0. 등록 상태는 DB의 진행/수주예정 코드만. 근무지는 텍스트이며 주소코드 사용 금지.
+    CommonProjectList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProject'
+        unassignedCount:
+          type: integer
+      required:
+      - items
+      - unassignedCount
+    CommonProjectLoseInput:
+      type: object
+      properties:
+        reasonCode:
+          type: string
+          minLength: 1
+          description: LOSE_RSN 실제 코드
+        memo:
+          type: string
+          maxLength: 500
+          nullable: true
+      required:
+      - reasonCode
+    CommonProjectUpdateInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 읽은 프로젝트의 modifiedAt. 지금 값과 다르면 409
+        projectName:
+          type: string
+          maxLength: 100
+        customerId:
+          type: string
+          nullable: true
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        workplace:
+          type: string
+          maxLength: 200
+          nullable: true
+        estimateAmount:
+          type: number
+          nullable: true
+        contractAmount:
+          type: number
+        budgetAmount:
+          type: number
+          nullable: true
+        teamExpenseAmount:
+          type: number
+        projectExpenseAmount:
+          type: number
+        feature:
+          type: string
+          maxLength: 500
+          nullable: true
+      required:
+      - modifiedAt
+      - projectName
+      - startDate
+      - endDate

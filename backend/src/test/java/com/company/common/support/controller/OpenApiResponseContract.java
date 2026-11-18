@@ -11,20 +11,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Focused response shape assertions from the durable OpenAPI fixture, not example payloads. */
 public final class OpenApiResponseContract {
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final JsonNode CONTRACT = load();
+    private static final JsonNode CONTRACT = load("contracts/openapi.yaml");
 
     private OpenApiResponseContract() {}
 
-    private static JsonNode load() {
+    private static JsonNode load(String resource) {
         var yaml = new YamlMapFactoryBean();
-        yaml.setResources(new ClassPathResource("contracts/openapi.yaml"));
+        yaml.setResources(new ClassPathResource(resource));
         var document = yaml.getObject();
         assertThat(document).as("durable OpenAPI fixture").isNotNull();
         return JSON.valueToTree(document);
     }
 
     public static ResultMatcher response(String method, String path) {
-        JsonNode operation = CONTRACT.path("paths").path(path).path(method.toLowerCase(Locale.ROOT));
+        return response(method, path, CONTRACT);
+    }
+
+    /** Feature-owned fixtures keep parallel contract additions independent. */
+    public static ResultMatcher response(String method, String path, String resource) {
+        return response(method, path, load(resource));
+    }
+
+    private static ResultMatcher response(String method, String path, JsonNode contract) {
+        JsonNode operation = contract.path("paths").path(path).path(method.toLowerCase(Locale.ROOT));
         assertThat(operation.isObject()).as("OpenAPI operation %s %s", method, path).isTrue();
         return result -> {
             var response = result.getResponse();
@@ -33,21 +42,21 @@ public final class OpenApiResponseContract {
             assertThat(schema.isObject()).as("declared JSON response %s %s: %s", method, path, response.getStatus()).isTrue();
             JsonNode body = JSON.readTree(response.getContentAsByteArray());
             assertThat(body).as("JSON response body").isNotNull();
-            shape(body, schema, "$");
+            shape(body, schema, "$", contract);
         };
     }
 
-    private static void shape(JsonNode value, JsonNode schema, String location) {
+    private static void shape(JsonNode value, JsonNode schema, String location, JsonNode contract) {
         if (schema.has("$ref")) {
             String reference = schema.path("$ref").asText();
             assertThat(reference).startsWith("#/");
-            JsonNode target = CONTRACT.at(reference.substring(1));
+            JsonNode target = contract.at(reference.substring(1));
             assertThat(target.isObject()).as("resolved schema %s", reference).isTrue();
-            shape(value, target, location);
+            shape(value, target, location, contract);
             return;
         }
         if (value.isNull() && schema.path("nullable").asBoolean(false)) return;
-        for (JsonNode part : schema.path("allOf")) shape(value, part, location);
+        for (JsonNode part : schema.path("allOf")) shape(value, part, location, contract);
         String type = schema.path("type").asText();
         boolean matches = switch (type) {
             case "object" -> value.isObject();
@@ -70,12 +79,12 @@ public final class OpenApiResponseContract {
                 if (schema.has("additionalProperties") && schema.path("additionalProperties").isBoolean()
                     && !schema.path("additionalProperties").asBoolean())
                     assertThat(property.isMissingNode()).as("%s.%s is a declared field", location, field.getKey()).isFalse();
-                if (property.isObject()) shape(field.getValue(), property, location + "." + field.getKey());
+                if (property.isObject()) shape(field.getValue(), property, location + "." + field.getKey(), contract);
             }
         }
         if (value.isArray() && schema.path("items").isObject()) {
             for (int index = 0; index < value.size(); index++)
-                shape(value.get(index), schema.path("items"), location + "[" + index + "]");
+                shape(value.get(index), schema.path("items"), location + "[" + index + "]", contract);
         }
     }
 }

@@ -309,7 +309,7 @@ export function ProjectPage() {
     </ListFilter>
   );
   return (
-    <section className="project-page" data-testid="project-page" data-screen-id="UI-01">
+    <section className="screen-body project-page" data-testid="project-page" data-screen-id="UI-01">
       {titleActions(actions)}
       <YearBar
         year={year}

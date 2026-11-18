@@ -107,7 +107,7 @@ class MenuRegistrationControllerTest {
         mvc.perform(get("/api/common/menu-options").param("menuLvl", "2"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.upperMenus[0].menuId").value("G007"))
             .andExpect(jsonPath("$.data.screens[*].scrnId")
-                .value(org.hamcrest.Matchers.contains("UI-23", "UI-24", "UI-25", "UI-27", "UI-15", "UI-02", "UI-01")))
+                .value(org.hamcrest.Matchers.contains("UI-23", "UI-24", "UI-25", "UI-27", "UI-15", "UI-02", "UI-01", "UI-12")))
             .andExpect(jsonPath("$.data.screens[?(@.scrnId == 'UI-02')].menuNm")
                 .value(org.hamcrest.Matchers.contains("개발자 풀")));
         noWrites();
@@ -186,6 +186,12 @@ class MenuRegistrationControllerTest {
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.scrnId").value("UI-01"));
         verify(mapper).screenExists("UI-01");
         verify(mapper).insertMenu(org.mockito.ArgumentMatchers.argThat(item -> "UI-01".equals(item.scrnId())));
+    }
+    @Test void assignmentScreenIsSelectableForAnonymousMenuRegistration() throws Exception {
+        create(child().put("scrnId", "UI-12"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.scrnId").value("UI-12"));
+        verify(mapper).screenExists("UI-12");
+        verify(mapper).insertMenu(org.mockito.ArgumentMatchers.argThat(item -> "UI-12".equals(item.scrnId())));
     }
     @ParameterizedTest @ValueSource(strings = {"UI-26", "UI-16", "ui-25", " UI-25"})
     void placeholderAndNormalizedScreenIdsAreNotDeveloped(String id) throws Exception {

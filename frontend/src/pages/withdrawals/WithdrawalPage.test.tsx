@@ -358,7 +358,7 @@ it("banner is info with zero counts when nobody lacks a next seat or nothing is 
   expect(screen.getAllByTestId("banner-info")).toHaveLength(2);
   expect(await screen.findByTestId("list-empty")).toBeVisible();
   expect(screen.getByTestId("withdrawal-filters")).toBeInTheDocument();
-  expect(screen.getByTestId("withdrawal-download")).toBeEnabled();
+  expect(screen.getByTestId("list-download")).toBeEnabled();
 });
 it("past-year list has no next-seat banner but keeps the info banner and editable possibility", async () => {
   page();
@@ -498,7 +498,7 @@ it("download uses the complete filtered binary and shows its count only after tr
         }
       : original(url, init),
   );
-  fireEvent.click(screen.getByTestId("withdrawal-download"));
+  fireEvent.click(screen.getByTestId("list-download"));
   expect(await screen.findByTestId("withdrawal-toast")).toHaveTextContent(
     "엑셀 파일을 만들었습니다 (조회 결과 35건)",
   );
@@ -518,7 +518,7 @@ it("failed download never displays a completion toast", async () => {
         }
       : original(url, init),
   );
-  fireEvent.click(screen.getByTestId("withdrawal-download"));
+  fireEvent.click(screen.getByTestId("list-download"));
   expect(await screen.findByTestId("withdrawal-toast")).toHaveTextContent(
     "다운로드 실패",
   );

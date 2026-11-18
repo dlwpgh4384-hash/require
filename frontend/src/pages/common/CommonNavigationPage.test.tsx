@@ -210,9 +210,8 @@ const deepChecks: Record<string, (content: Content) => Promise<void>> = {
   "UI-05": async (content) => {
     expect(await content.findByTestId("list-empty")).toBeVisible();
     expect(content.getByLabelText("기간")).toBeVisible();
-    expect(
-      screen.getByTestId("withdrawal-download").closest(".screen-actions"),
-    ).not.toBeNull();
+    // 엑셀 다운로드는 목록 도구줄 한 곳(사용자 결정 2026-11-18)
+    expect(content.getByTestId("list-download")).toBeVisible();
   },
   "UI-12": async (content) => {
     expect(await content.findByTestId("assignment-empty")).toBeVisible();

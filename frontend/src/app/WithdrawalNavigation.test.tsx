@@ -131,9 +131,11 @@ describe.each(["파트장", "관리자", "PM"])("UI-05 handover for %s", () => {
       "data-screen-id",
       "UI-05",
     );
+    // 엑셀 다운로드는 목록 도구줄에만 있고 제목줄에는 없다(같은 기능 두 개를 하나로, 사용자 결정 2026-11-18).
     expect(
-      screen.getByTestId("withdrawal-download").closest(".screen-actions"),
+      screen.getByTestId("list-download").closest("[data-testid=withdrawal-list]"),
     ).not.toBeNull();
+    expect(document.querySelector(".screen-actions [data-testid=list-download]")).toBeNull();
     expect(request).toHaveBeenCalledWith(
       expect.stringMatching(/^\/api\/common\/withdrawals\?year=\d{4}$/),
       { signal: expect.any(AbortSignal) },
@@ -216,7 +218,7 @@ describe("withdrawal route composition", () => {
       name: "UI-28 본문",
     });
     expect(placeholder).toHaveTextContent("준비 중");
-    expect(screen.getByTestId("withdrawal-download")).not.toBeVisible();
+    expect(screen.getByTestId("list-download")).not.toBeVisible();
     await act(async () => {
       await router!.navigate("/screens/UI-05");
     });
@@ -225,7 +227,7 @@ describe("withdrawal route composition", () => {
     );
     expect(screen.getByTestId("user-preferences")).toBe(preferences);
     expect(
-      screen.getByTestId("withdrawal-download").closest(".screen-actions"),
+      screen.getByTestId("list-download").closest("[data-testid=withdrawal-list]"),
     ).not.toBeNull();
     expectShell();
   });

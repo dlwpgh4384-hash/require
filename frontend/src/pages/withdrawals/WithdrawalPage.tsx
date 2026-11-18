@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
@@ -17,7 +16,6 @@ import { AssignmentRequestError } from "../assignments/assignments";
 import { getCommonCodes } from "../codegroups/codeGroups";
 import { ProjectLink } from "../projects/ProjectLink";
 import { projectFailure } from "../projects/projects";
-import { useWithdrawalTitleHost } from "./WithdrawalWorkspace";
 import { WithdrawalRecommendations } from "./WithdrawalRecommendations";
 import {
   getCommonWithdrawals,
@@ -44,7 +42,6 @@ const svg = (d: string, size: number) => (
 const sparkle = (size: number) =>
   svg("M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4zM19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z", size);
 const infoIcon = svg("M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01", 16);
-const downIcon = svg("M12 4v12M6 10l6 6 6-6M4 20h16", 16);
 const lockIcon = svg("M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4", 12);
 const PERIODS = ["3개월 안", "3개월 뒤", "이미 철수"];
 /** 시안 다음 배정 정렬 값: 가배정 2, 추천 있음 1, 그 밖 0. */
@@ -93,7 +90,6 @@ export function WithdrawalPage({ roles = [] }: { roles?: readonly string[] }) {
   const [noticeKind, setNoticeKind] = useState<ToastKind>("ok");
   const [downloading, setDownloading] = useState(false);
   const presentation = useListPresentation();
-  const host = useWithdrawalTitleHost();
   const refresh = () => setRevision((n) => n + 1);
   const toast = (message: string, kind: ToastKind = "ok") => {
     setNoticeKind(kind);
@@ -370,17 +366,6 @@ export function WithdrawalPage({ roles = [] }: { roles?: readonly string[] }) {
       setDownloading(false);
     }
   };
-  const downloadButton = (
-    <button
-      type="button"
-      className="ls-btn"
-      data-testid="withdrawal-download"
-      disabled={downloading}
-      onClick={() => void download()}
-    >
-      {downIcon} 엑셀 다운로드
-    </button>
-  );
   const select = (
     key: "period" | "jobCode" | "extensionPossibilityCode",
     label: string,
@@ -420,7 +405,6 @@ export function WithdrawalPage({ roles = [] }: { roles?: readonly string[] }) {
       data-testid="withdrawal-page"
       data-screen-id="UI-05"
     >
-      {host ? createPortal(downloadButton, host) : downloadButton}
       <YearBar
         year={year}
         currentYear={currentYear}
@@ -482,6 +466,9 @@ export function WithdrawalPage({ roles = [] }: { roles?: readonly string[] }) {
         onToggleColumn={() => undefined}
         onResetColumns={() => undefined}
         columnSettings={false}
+        // 엑셀 다운로드는 목록 도구줄(좁게 보기 옆) 한 곳에만 둔다(제목줄 단추는 같은 기능이라 뺌, 2026-11-18 사용자 결정).
+        onDownload={() => void download()}
+        downloading={downloading}
         rows={
           !data && !error
             ? null

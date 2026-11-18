@@ -54,4 +54,10 @@
     WHERE m.code_grp_id = #{groupId} AND m.src_text = #{text}
       AND c.use_yn = 'Y' AND c.del_yn = 'N' AND g.use_yn = 'Y'
   </select>
+  <select id="selectLabelText" resultMap="codeText">
+    SELECT c.code_grp_id, c.code, c.code_nm
+    <include refid="validCode"/>
+    AND regexp_replace(c.code_nm, '\s*\([^()]*\)\s*$', '') = #{text}
+    ORDER BY c.code
+  </select>
 </mapper>

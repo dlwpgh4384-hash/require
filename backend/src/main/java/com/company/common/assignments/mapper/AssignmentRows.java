@@ -20,13 +20,16 @@ public final class AssignmentRows {
         String partName, LocalDate retirementDate, BigDecimal defaultPrice, boolean onLeave) {}
     public record CandidateRow(String candidateId, String projectId, String projectName, String developerId,
         String name, String jobCode, String jobName, String month, int months,
-        LocalDate projectStart, LocalDate projectEnd, String statusCode) {}
+        LocalDate projectStart, LocalDate projectEnd, String statusCode, String managementNumber, Instant modifiedAt) {}
+    /** 엑셀 업로드 관리번호 조회: 사용 여부·직간접 구분까지 본다. */
+    public record UploadDeveloper(String id, String name, String useYn, String directClassCode) {}
     public record Write(Row row, String actor, Instant token) {}
     public record OpenRange(String id,String from) {}
     public record HistoryWrite(HistoryRow row, String actor) {}
     public record Correction(String assignmentId, int sequence, Instant token) {}
     public record MonthWrite(String assignmentId, String month, String developerId, String projectId,
         int days, BigDecimal mm, BigDecimal price, BigDecimal sales, String actor) {}
-    public record CostWrite(MonthWrite month, BigDecimal labor, BigDecimal team, BigDecimal expense,
-        String classification, String contractType, String partId) {}
+    public record ListFilter(int year, String projectId, String jobCode, String keyword) {}
+    public record Amount(String assignmentId, BigDecimal value) {}
+    public record Count(String assignmentId, int value) {}
 }

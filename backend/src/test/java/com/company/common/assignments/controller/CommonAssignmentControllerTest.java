@@ -5,7 +5,7 @@ import com.company.common.assignments.mapper.AssignmentRows.*;
 import com.company.common.assignments.service.*;
 import com.company.common.projects.dto.ProjectContracts.Project;
 import com.company.common.projects.mapper.ProjectMapper;
-import com.company.common.projects.service.ProjectAmountRules;
+
 import com.company.common.support.controller.ApiExceptionHandler;
 import com.company.common.support.controller.CodeExceptionHandler;
 import com.company.common.support.service.*;
@@ -36,9 +36,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CommonAssignmentControllerTest {
     @Autowired MockMvc mvc; @Autowired ObjectMapper json;
     @MockBean AssignmentMapper mapper; @MockBean ProjectMapper projects; @MockBean BusinessCalendar calendar;
-    @MockBean AssignmentMonthRules rules; @MockBean ProjectAmountRules amounts;
+    @MockBean AssignmentMonthRules rules;
     @MockBean PlatformTransactionManager transactions;
-    Map<String,Row> rows; List<HistoryRow> histories; List<MonthWrite> months; Project project;
+    Map<String,Row> rows; List<HistoryRow> histories; List<MonthWrite> months; Project project; BigDecimal overload;
     final LocalDate today=LocalDate.of(2026,11,15);
     final Instant now=Instant.parse("2026-11-15T00:00:00Z");
     @BeforeEach void setup() {
@@ -51,7 +51,14 @@ class CommonAssignmentControllerTest {
         project.teamExpenseAmount=BigDecimal.ZERO;project.projectExpenseAmount=BigDecimal.ZERO;
         when(projects.lockProject(anyString())).thenReturn("P-0001");when(projects.selectProject(anyString(),any(),anyString())).thenReturn(project);
         when(projects.codeName(anyString(),anyString())).thenAnswer(c -> switch((String)c.getArgument(1)) { case "NEW" -> "신규";case "ADD" -> "추가투입";case "SUB" -> "대체투입";case "FREE" -> "무상지원";case "H" -> "높음";case "L" -> "낮음";default -> c.getArgument(1); });
-        when(mapper.rows()).thenAnswer(c -> new ArrayList<>(rows.values()));when(mapper.ids()).thenAnswer(c -> new ArrayList<>(rows.keySet()));
+        overload=BigDecimal.ONE;
+        when(mapper.rows()).thenAnswer(c -> new ArrayList<>(rows.values()));
+        when(mapper.listRows(any())).thenAnswer(c -> {ListFilter f=c.getArgument(0);return rows.values().stream().filter(r -> "ACT".equals(r.statusCode()))
+            .filter(r -> !r.startDate().isAfter(LocalDate.of(f.year(),12,31)) && !r.endDate().isBefore(LocalDate.of(f.year(),1,1)))
+            .filter(r -> f.projectId()==null || f.projectId().equals(r.projectId())).filter(r -> f.jobCode()==null || f.jobCode().equals(r.jobCode()))
+            .filter(r -> f.keyword()==null || (r.name()+" "+r.managementNumber()).toLowerCase(Locale.ROOT).contains(f.keyword()))
+            .sorted(Comparator.comparing(Row::startDate).thenComparing(Row::assignmentId)).toList();});
+        when(mapper.projectRows(anyString())).thenAnswer(c -> rows.values().stream().filter(r -> r.projectId().equals(c.getArgument(0)) && !"CNCL".equals(r.statusCode())).toList());when(mapper.ids()).thenAnswer(c -> new ArrayList<>(rows.keySet()));
         when(mapper.row(anyString())).thenAnswer(c -> rows.get(c.getArgument(0)));when(mapper.lockRow(anyString())).thenAnswer(c -> rows.get(c.getArgument(0)));
         when(mapper.person(anyString(),anyString(),any(),any())).thenAnswer(c -> person(c.getArgument(0),null));
         when(mapper.history(anyString())).thenAnswer(c -> histories.stream().filter(h -> h.assignmentId().equals(c.getArgument(0))).sorted(Comparator.comparingInt(HistoryRow::sequence).reversed()).toList());
@@ -59,8 +66,10 @@ class CommonAssignmentControllerTest {
         when(mapper.insert(any())).thenAnswer(c -> {Write w=c.getArgument(0);rows.put(w.row().assignmentId(),w.row());return 1;});
         when(mapper.update(any())).thenAnswer(c -> {Write w=c.getArgument(0);rows.put(w.row().assignmentId(),w.row());return 1;});
         doAnswer(c -> {HistoryWrite w=c.getArgument(0);HistoryRow h=w.row();histories.add(new HistoryRow(h.sequence(),h.assignmentId(),h.type(),h.effectiveDate(),h.beforeValue(),h.afterValue(),h.reasonCode(),h.memo(),h.price(),h.mm(),h.retroactiveYn(),h.closedYn(),h.correctedYn(),h.target(),w.actor(),now));return 1;}).when(mapper).insertHistory(any());
-        when(mapper.closedMonths()).thenReturn(List.of());when(mapper.yearMm(anyString(),anyInt())).thenReturn(BigDecimal.ONE);when(mapper.overload(anyString(),anyInt())).thenReturn(BigDecimal.ONE);
-        when(mapper.labor(anyString(),anyString())).thenReturn(new BigDecimal("5000000"));
+        when(mapper.closedMonths()).thenReturn(List.of());
+        when(mapper.yearMms(anyList(),anyInt())).thenAnswer(c -> ((List<String>)c.getArgument(0)).stream().map(id -> new Amount(id,BigDecimal.ONE)).toList());
+        when(mapper.overloads(anyList(),anyInt())).thenAnswer(c -> ((List<String>)c.getArgument(0)).stream().map(id -> new Amount(id,overload)).toList());
+        when(mapper.historyCounts(anyList())).thenAnswer(c -> ((List<String>)c.getArgument(0)).stream().map(id -> new Count(id,(int)histories.stream().filter(h -> h.assignmentId().equals(id)).count())).toList());
         when(mapper.saveMonth(any())).thenAnswer(c -> {months.add(c.getArgument(0));return 1;});
         when(rules.effective(anyList(),anyString(),any(),any())).thenAnswer(c -> {
             List<HistoryRow> h=c.getArgument(0);String command=c.getArgument(1);YearMonth month=c.getArgument(2);
@@ -72,7 +81,6 @@ class CommonAssignmentControllerTest {
         when(rules.mm(any(),any(),any(),any())).thenAnswer(c -> c.getArgument(0));when(rules.days(any(),any(),any())).thenReturn(30);
         when(rules.sales(any(),any(),anyBoolean())).thenAnswer(c -> (boolean)c.getArgument(2)?((BigDecimal)c.getArgument(0)).multiply(c.getArgument(1)):BigDecimal.ZERO);
         when(rules.over(any())).thenAnswer(c -> ((BigDecimal)c.getArgument(0)).compareTo(BigDecimal.ONE)>0);
-        when(amounts.personnelDirectCost(anyString(),any(),any(),any())).thenReturn(new ProjectAmountRules.PersonnelDirectCost(BigDecimal.ZERO,BigDecimal.ZERO));
         rows.put("A-0001",row("A-0001","developer",null,"NEW","MO"));
     }
     Person person(String id,LocalDate retirement) { return new Person(id,"개발자","FT","part","영업파트",retirement,new BigDecimal("8000000"),false); }
@@ -83,7 +91,12 @@ class CommonAssignmentControllerTest {
     void postInput(ObjectNode b,int expected) throws Exception {mvc.perform(post("/api/common/assignments").contentType("application/json").content(b.toString())).andExpect(status().is(expected));}
     void change(ObjectNode b,int expected) throws Exception {mvc.perform(post("/api/common/assignments/A-0001/changes").contentType("application/json").content(b.toString())).andExpect(status().is(expected));}
     void noWrites() {verify(mapper,never()).insert(any());verify(mapper,never()).update(any());verify(mapper,never()).insertHistory(any());}
+    /** 사람이 더한 칸(candidateId·managementNumber·jobName·후보 modifiedAt)이 있는 경로는 openapi-manual.yaml로 본다(도구가 openapi.yaml을 다시 만들면 빠짐). */
+    private static final Set<String> MANUAL_PATHS=Set.of("/api/common/assignments","/api/common/assignments/candidates",
+        "/api/common/assignments/candidates/{candidateId}/remove","/api/common/assignments/contract-developers");
     private static org.springframework.test.web.servlet.ResultMatcher response(String method,String path) {
+        if (MANUAL_PATHS.contains(path) && !("GET".equals(method) && "/api/common/assignments".equals(path)))
+            return com.company.common.support.controller.OpenApiResponseContract.response(method,path,"contracts/openapi-manual.yaml");
         return com.company.common.support.controller.OpenApiResponseContract.response(method,path,"contracts/assignments-openapi.yaml");
     }
     @Test void anonymousRegistrationAndDetailUseRealServiceAndApprovedShapes() throws Exception {
@@ -101,24 +114,92 @@ class CommonAssignmentControllerTest {
     @Test void missingMonthlyMmIsRejectedInsteadOfDefaultingTheHttpContract() throws Exception {var b=input();b.remove("monthlyMm");mvc.perform(post("/api/common/assignments").contentType("application/json").content(b.toString())).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("monthlyMm"));noWrites();}
     @Test void missingInputTypeIsRejectedInsteadOfDefaultingTheHttpContract() throws Exception {var b=input();b.remove("inputTypeCode");mvc.perform(post("/api/common/assignments").contentType("application/json").content(b.toString())).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("inputTypeCode"));noWrites();}
     @Test void freeSupportNeedsNoPriceAndStoresZero() throws Exception {var b=input();b.put("inputTypeCode","FREE");b.remove("billingPrice");postInput(b,200);assertThat(rows.get("A-0002").billingPrice()).isZero();}
-    @Test void createDoesNotAcceptCandidateLinkOrExtensionInput() throws Exception {var b=input();b.put("candidateId","1");postInput(b,400);noWrites();}
+    @Test void createDoesNotAcceptExtensionInput() throws Exception {var b=input();b.put("extensionPossibilityCode","H");postInput(b,400);noWrites();}
+    @Test void confirmedCandidateIsMarkedDoneInTheSameSave() throws Exception {
+        when(mapper.lockCandidate("12")).thenReturn(new CandidateRow("12","P-0001","개발 프로젝트","new-developer","사람","DEV","개발","202611",2,today,today,"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z")));
+        when(mapper.confirmCandidate("12","admin")).thenReturn(1);
+        var b=input();b.put("candidateId","12");
+        mvc.perform(post("/api/common/assignments").contentType("application/json").content(b.toString())).andExpect(status().isOk()).andExpect(response("POST","/api/common/assignments"));
+        var order=inOrder(mapper);order.verify(mapper).lockCandidate("12");order.verify(mapper).insert(any());order.verify(mapper).confirmCandidate("12","admin");
+        verify(mapper,never()).removeCandidate(anyString(),anyString());
+    }
+    @Test void alreadyHandledCandidateIs409WithoutWrites() throws Exception {
+        when(mapper.lockCandidate("12")).thenReturn(new CandidateRow("12","P-0001","개발 프로젝트","new-developer","사람","DEV","개발","202611",2,today,today,"DROP","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z")));
+        var b=input();b.put("candidateId","12");postInput(b,409);noWrites();verify(mapper,never()).confirmCandidate(anyString(),anyString());
+    }
+    @Test void unknownOrMalformedCandidateIsRejectedWithoutWrites() throws Exception {
+        var b=input();b.put("candidateId","999");postInput(b,400);
+        b.put("candidateId","abc");postInput(b,400);noWrites();verify(mapper,never()).confirmCandidate(anyString(),anyString());
+    }
+    @Test void candidateConfirmRaceRollsBackAs409() throws Exception {
+        when(mapper.lockCandidate("12")).thenReturn(new CandidateRow("12","P-0001","개발 프로젝트","new-developer","사람","DEV","개발","202611",2,today,today,"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z")));
+        when(mapper.confirmCandidate("12","admin")).thenReturn(0);
+        var b=input();b.put("candidateId","12");postInput(b,409);
+    }
+    @Test void listRowsShowOnlyTheTwoListWarnings() throws Exception {
+        project.salesPartId="another";project.contractTypeCode="DP";overload=new BigDecimal("1.2");
+        when(mapper.person(anyString(),anyString(),any(),any())).thenReturn(new Person("developer","개발자","FL","part","파트",null,new BigDecimal("8000000"),true));
+        when(mapper.closedMonths()).thenReturn(List.of("202611"));
+        rows.put("A-0001",new Row("A-0001","P-0001","developer","DEV",LocalDate.of(2026,10,16),LocalDate.of(2026,12,31),BigDecimal.ONE,new BigDecimal("8000000"),"NEW",null,null,0,"N","ACT",null,"개발 프로젝트","developer","M-developer","개발","DP","PRE"));
+        mvc.perform(get("/api/common/assignments")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].warnings.length()").value(2))
+            .andExpect(jsonPath("$.data.items[0].warnings[0]").value("MM 1.0 초과"))
+            .andExpect(jsonPath("$.data.items[0].warnings[1]").value("미계약 선투입"));
+        verify(mapper,never()).person(anyString(),anyString(),any(),any());
+        verify(mapper,never()).history(anyString());
+    }
+    @Test void cancelledAssignmentsAreNotContractPeople() throws Exception {
+        rows.put("A-0001",new Row("A-0001","P-0001","developer","DEV",LocalDate.of(2026,10,16),LocalDate.of(2026,12,31),BigDecimal.ONE,new BigDecimal("8000000"),"NEW",null,null,0,"N","CNCL",null,"개발 프로젝트","developer","M-developer","개발","MO","ING"));
+        mvc.perform(get("/api/common/assignments/contract-developers").param("projectId","P-0001").param("developerId","new-developer"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.items").isEmpty());
+        var b=input();b.put("inputTypeCode","SUB");b.put("contractDeveloperId","developer");b.put("replacementAction","assignment-only");postInput(b,400);noWrites();
+    }
     @Test void differentSalesPartOnlyWarns() throws Exception {project.salesPartId="another";postInput(input(),200);mvc.perform(get("/api/common/assignments/A-0002")).andExpect(jsonPath("$.data.warnings[0]").value(org.hamcrest.Matchers.containsString("영업 파트")));}
     @Test void onLeaveOnlyWarns() throws Exception {when(mapper.person(anyString(),anyString(),any(),any())).thenReturn(new Person("new-developer","개발자","FT","part","파트",null,new BigDecimal("8000000"),true));postInput(input(),200);assertThat(rows).containsKey("A-0002");}
     @Test void togetherRequiresReasonBeforeAnyMutation() throws Exception {var b=input();b.put("inputTypeCode","SUB");b.put("contractDeveloperId","developer");b.put("replacementAction","together");b.putArray("earlyWithdrawalAssignmentIds").add("A-0001");postInput(b,400);noWrites();}
     @Test void togetherWithdrawsOnlySelectedSourceAndWritesBothHistories() throws Exception {var b=input();b.put("inputTypeCode","SUB");b.put("contractDeveloperId","developer");b.put("replacementAction","together");b.put("reasonCode","PERSON");b.putArray("earlyWithdrawalAssignmentIds").add("A-0001");postInput(b,200);assertThat(rows.get("A-0001").endDate()).isEqualTo(today.minusDays(1));assertThat(histories).extracting(HistoryRow::type).containsExactly("INPUT","EARLY");assertThat(histories.get(1).reasonCode()).isEqualTo("PERSON");}
     @Test void replacementOnlyLeavesSourcePeriodAlone() throws Exception {var b=input();b.put("inputTypeCode","SUB");b.put("contractDeveloperId","developer");b.put("replacementAction","assignment-only");postInput(b,200);assertThat(rows.get("A-0001").endDate()).isEqualTo(LocalDate.of(2026,12,31));}
     @Test void selectionMustStillBeMatchingProjectAndPerson() throws Exception {var b=input();b.put("inputTypeCode","SUB");b.put("contractDeveloperId","developer");b.put("replacementAction","together");b.put("reasonCode","PERSON");b.putArray("earlyWithdrawalAssignmentIds").add("unknown");postInput(b,400);noWrites();}
-    @Test void listYearFiltersOutNonoverlappingRowsAndUsesAllPersonMonths() throws Exception {mvc.perform(get("/api/common/assignments").param("year","2025")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items").isEmpty());when(mapper.overload(anyString(),anyInt())).thenReturn(new BigDecimal("1.01"));mvc.perform(get("/api/common/assignments").param("year","2026").param("warning","MM 1.0 초과").param("projectId","P-0001")).andExpect(status().isOk()).andExpect(response("GET","/api/common/assignments")).andExpect(jsonPath("$.data.items[0].monthlyMmTotal").value(1.01));}
+    @Test void listYearFiltersOutNonoverlappingRowsAndUsesAllPersonMonths() throws Exception {mvc.perform(get("/api/common/assignments").param("year","2025")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items").isEmpty());overload=new BigDecimal("1.01");mvc.perform(get("/api/common/assignments").param("year","2026").param("warning","MM 1.0 초과").param("projectId","P-0001")).andExpect(status().isOk()).andExpect(response("GET","/api/common/assignments")).andExpect(jsonPath("$.data.items[0].monthlyMmTotal").value(1.01));}
     @Test void exactlyOneMmIsNotAnOverload() throws Exception {mvc.perform(get("/api/common/assignments").param("warning","MM 1.0 초과")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items").isEmpty());}
     @Test void unknownWarningIsRejected() throws Exception {mvc.perform(get("/api/common/assignments").param("warning","unknown")).andExpect(status().isBadRequest());}
     @Test void detailNotFound() throws Exception {mvc.perform(get("/api/common/assignments/missing")).andExpect(status().isNotFound());}
-    @Test void candidatesAreClippedWithoutAssignmentInsert() throws Exception {when(mapper.candidates()).thenReturn(List.of(new CandidateRow("12","P-0001","개발 프로젝트","developer","사람","DEV","개발","202610",2,today,LocalDate.of(2026,11,20),"CNVT")));mvc.perform(get("/api/common/assignments/candidates")).andExpect(status().isOk()).andExpect(response("GET","/api/common/assignments/candidates")).andExpect(jsonPath("$.data.items[0].startDate").value("2026-11-15")).andExpect(jsonPath("$.data.items[0].endDate").value("2026-11-20"));noWrites();}
-    @Test void emptyClippedCandidatePeriodIsAnErrorNotInventedDates() throws Exception {when(mapper.candidates()).thenReturn(List.of(new CandidateRow("12","P-0001","개발 프로젝트","developer","사람","DEV","개발","202610",1,today,LocalDate.of(2026,11,20),"CNVT")));mvc.perform(get("/api/common/assignments/candidates")).andExpect(status().isBadRequest());noWrites();}
-    @Test void anonymousCandidateRemovalOnlyUpdatesSource() throws Exception {when(mapper.lockCandidate("12")).thenReturn(new CandidateRow("12","P-0001","프로젝트","developer","사람","DEV","개발","202610",1,today,today,"CNVT"));mvc.perform(post("/api/common/assignments/candidates/12/remove")).andExpect(status().isOk()).andExpect(response("POST","/api/common/assignments/candidates/{candidateId}/remove"));verify(mapper).removeCandidate("12","admin");noWrites();}
-    @Test void alreadyDroppedCandidateIsIdempotent() throws Exception {when(mapper.lockCandidate("12")).thenReturn(new CandidateRow("12","P-0001","프로젝트","developer","사람","DEV","개발","202610",1,today,today,"DROP"));mvc.perform(post("/api/common/assignments/candidates/12/remove")).andExpect(status().isOk());verify(mapper,never()).removeCandidate(anyString(),anyString());}
+    @Test void candidatesAreClippedWithoutAssignmentInsert() throws Exception {when(mapper.candidates()).thenReturn(List.of(new CandidateRow("12","P-0001","개발 프로젝트","developer","사람","DEV","개발","202610",2,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z"))));mvc.perform(get("/api/common/assignments/candidates")).andExpect(status().isOk()).andExpect(response("GET","/api/common/assignments/candidates")).andExpect(jsonPath("$.data.items[0].startDate").value("2026-11-15")).andExpect(jsonPath("$.data.items[0].endDate").value("2026-11-20")).andExpect(jsonPath("$.data.items[0].managementNumber").value("K-0001"));noWrites();}
+    @Test void badCandidateRowIsSkippedWithoutFailingTheList() throws Exception {when(mapper.candidates()).thenReturn(List.of(new CandidateRow("12","P-0001","개발 프로젝트","developer","사람","DEV","개발","202610",1,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z")),new CandidateRow("13","P-0001","개발 프로젝트","developer","사람","DEV","개발","202611",0,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z")),new CandidateRow("14","P-0001","개발 프로젝트","other","다른 사람","DEV","개발","202611",1,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z"))));mvc.perform(get("/api/common/assignments/candidates")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items.length()").value(1)).andExpect(jsonPath("$.data.items[0].candidateId").value("14")).andExpect(jsonPath("$.data.items[0].endDate").value("2026-11-20")).andExpect(jsonPath("$.data.items[0].managementNumber").value("K-0001"));noWrites();}
+    @Test void anonymousCandidateRemovalOnlyUpdatesSource() throws Exception {when(mapper.lockCandidate("12")).thenReturn(new CandidateRow("12","P-0001","프로젝트","developer","사람","DEV","개발","202610",1,today,today,"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z")));when(mapper.removeCandidate("12","admin")).thenReturn(1);mvc.perform(post("/api/common/assignments/candidates/12/remove")).andExpect(status().isOk()).andExpect(response("POST","/api/common/assignments/candidates/{candidateId}/remove"));verify(mapper).removeCandidate("12","admin");noWrites();}
+    CandidateRow candidate(String status) {return new CandidateRow("12","P-0001","프로젝트","developer","사람","DEV","개발","202611",1,today,LocalDate.of(2026,12,31),status,"K-0001",Instant.parse("2026-11-10T01:02:03.456789Z"));}
+    /** 이미 확정·뺀 후보를 다시 빼면 조용히 성공하지 않고 409(공통 동시 수정 문구). */
+    @ParameterizedTest @ValueSource(strings={"DROP","DONE"})
+    void alreadyHandledCandidateRemovalIs409(String status) throws Exception {when(mapper.lockCandidate("12")).thenReturn(candidate(status));mvc.perform(post("/api/common/assignments/candidates/12/remove")).andExpect(status().isConflict());verify(mapper,never()).removeCandidate(anyString(),anyString());}
+    @Test void staleCandidateModifiedAtIs409AndMatchingOneRemoves() throws Exception {
+        when(mapper.lockCandidate("12")).thenReturn(candidate("CNVT"));when(mapper.removeCandidate("12","admin")).thenReturn(1);
+        mvc.perform(post("/api/common/assignments/candidates/12/remove").contentType("application/json").content("{\"modifiedAt\":\"2026-11-10T01:02:04Z\"}")).andExpect(status().isConflict());
+        verify(mapper,never()).removeCandidate(anyString(),anyString());
+        mvc.perform(post("/api/common/assignments/candidates/12/remove").contentType("application/json").content("{\"modifiedAt\":\"2026-11-10T01:02:03.456789Z\"}")).andExpect(status().isOk());
+        verify(mapper).removeCandidate("12","admin");
+    }
+    @Test void candidateRemovalRaceIs409() throws Exception {when(mapper.lockCandidate("12")).thenReturn(candidate("CNVT"));when(mapper.removeCandidate("12","admin")).thenReturn(0);mvc.perform(post("/api/common/assignments/candidates/12/remove")).andExpect(status().isConflict());}
+    @Test void candidateListGivesModifiedAtForRemoval() throws Exception {when(mapper.candidates()).thenReturn(List.of(candidate("CNVT")));mvc.perform(get("/api/common/assignments/candidates")).andExpect(status().isOk()).andExpect(response("GET","/api/common/assignments/candidates")).andExpect(jsonPath("$.data.items[0].modifiedAt").value("2026-11-10T01:02:03.456789Z"));}
+    /** 시안대로 [확정] 창에서 개발자를 바꿔 저장해도 막지 않고, 그 후보는 확정되어 빠진다(사용자 결정 2026-11-18). */
+    @Test void confirmedCandidateMaySaveAnotherDeveloperAndIsStillConfirmed() throws Exception {
+        when(mapper.lockCandidate("12")).thenReturn(new CandidateRow("12","P-0001","개발 프로젝트","original-developer","사람","DEV","개발","202611",2,today,today,"CNVT","K-0001",null));
+        when(mapper.confirmCandidate("12","admin")).thenReturn(1);
+        var b=input();b.put("candidateId","12");
+        mvc.perform(post("/api/common/assignments").contentType("application/json").content(b.toString())).andExpect(status().isOk());
+        verify(mapper).insert(any());verify(mapper).confirmCandidate("12","admin");
+    }
+    /** 간접 인력(SFR-102-10)은 서버에서도 배정을 막는다. */
+    @Test void indirectDeveloperCannotBeAssigned() throws Exception {
+        when(mapper.indirect("new-developer")).thenReturn(true);
+        mvc.perform(post("/api/common/assignments").contentType("application/json").content(input().toString())).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("developerId")).andExpect(jsonPath("$.errors[0].message").value("간접 인력은 투입 배정 대상이 아닙니다."));
+        noWrites();
+    }
+    @Test void priceChangeHistoryKeepsScreenTextWithCommas() throws Exception {var b=change("UPRC");b.put("effectiveDate","2026-12-15");b.put("newBillingPrice",8500000);change(b,200);assertThat(histories.get(0).beforeValue()).isEqualTo("8,000,000");assertThat(histories.get(0).afterValue()).isEqualTo("8,500,000");}
+    @Test void samePriceIsStillRejected() throws Exception {var b=change("UPRC");b.put("effectiveDate","2026-12-15");b.put("newBillingPrice",8000000);change(b,400);noWrites();}
     @Test void unknownCandidateIsNotSilentlySuccessful() throws Exception {mvc.perform(post("/api/common/assignments/candidates/999/remove")).andExpect(status().isBadRequest());noWrites();}
     @Test void malformedCandidateIdIsRejected() throws Exception {mvc.perform(post("/api/common/assignments/candidates/abc/remove")).andExpect(status().isBadRequest());noWrites();}
-    @Test void contractDevelopersDeduplicateExcludeSelfAndIncludeEndedPeople() throws Exception {rows.put("A-0002",row("A-0002","developer",null,"NEW","MO"));mvc.perform(get("/api/common/assignments/contract-developers").param("projectId","P-0001").param("developerId","new-developer").param("startDate","2026-11-15")).andExpect(status().isOk()).andExpect(response("GET","/api/common/assignments/contract-developers")).andExpect(jsonPath("$.data.items.length()").value(1)).andExpect(jsonPath("$.data.items[0].overlappingAssignments.length()").value(2));}
+    @Test void contractDevelopersDeduplicateExcludeSelfAndIncludeEndedPeople() throws Exception {rows.put("A-0002",row("A-0002","developer",null,"NEW","MO"));mvc.perform(get("/api/common/assignments/contract-developers").param("projectId","P-0001").param("developerId","new-developer").param("startDate","2026-11-15")).andExpect(status().isOk()).andExpect(response("GET","/api/common/assignments/contract-developers")).andExpect(jsonPath("$.data.items.length()").value(1)).andExpect(jsonPath("$.data.items[0].overlappingAssignments.length()").value(2)).andExpect(jsonPath("$.data.items[0].jobName").value("개발"));}
     @Test void futurePriceChangesOnlyFutureMonthsAndCurrentCacheStays() throws Exception {var b=change("UPRC");b.put("effectiveDate","2026-12-15");b.put("newBillingPrice",8500000);change(b,200);assertThat(rows.get("A-0001").billingPrice()).isEqualByComparingTo("8000000");assertThat(months).allSatisfy(m -> {assertThat(m.month()).isEqualTo("202612");assertThat(m.price()).isEqualByComparingTo("8500000");});assertThat(histories.get(0).effectiveDate()).isEqualTo(LocalDate.of(2026,12,1));}
     @Test void dateBeforeStartIsRejected() throws Exception {var b=change("EXT");b.put("effectiveDate","2026-09-30");b.put("newEndDate","2027-01-31");change(b,400);noWrites();}
     @Test void memo201IsRejected() throws Exception {var b=change("EXTP");b.put("newExtensionPossibilityCode","H");b.put("memo","가".repeat(201));change(b,400);noWrites();}
@@ -186,7 +267,7 @@ class CommonAssignmentControllerTest {
     }
     @Test void pmUsesOnlyServerStandardAndCannotWritePriceChanges() {
         var pm=mock(CurrentBusinessActor.class);when(pm.roles()).thenReturn(Set.of("PM"));when(pm.userId()).thenReturn("admin");
-        var service=new CommonAssignmentService(mapper,projects,calendar,pm,rules,amounts);
+        var service=new CommonAssignmentService(mapper,projects,calendar,pm,rules);
         var b=input().put("billingPrice",99999999);
         service.postCommonAssignment(b);
         assertThat(rows.get("A-0002").billingPrice()).isEqualByComparingTo("8000000");
@@ -198,7 +279,7 @@ class CommonAssignmentControllerTest {
     }
     @Test void pmMissingStandardHasExactMessageButFreeSupportBypassesIt() {
         var pm=mock(CurrentBusinessActor.class);when(pm.roles()).thenReturn(Set.of("PM"));when(pm.userId()).thenReturn("admin");
-        var service=new CommonAssignmentService(mapper,projects,calendar,pm,rules,amounts);
+        var service=new CommonAssignmentService(mapper,projects,calendar,pm,rules);
         when(mapper.person(anyString(),anyString(),any(),any())).thenReturn(new Person("new-developer","개발자","FT","part","영업파트",null,null,false));
         assertThatThrownBy(() -> service.postCommonAssignment(input()))
             .isInstanceOf(com.company.common.support.service.CodeFailure.class)

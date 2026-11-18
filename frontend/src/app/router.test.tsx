@@ -1180,7 +1180,7 @@ describe("assignment route composition", () => {
       target: { files: [new File(["workbook"], "assignments.xlsx")] },
     });
     fireEvent.click(screen.getByTestId("upload-check"));
-    await screen.findByRole("dialog", { name: "엑셀 업로드 결과 · 투입 배정" });
+    await screen.findByRole("dialog", { name: "엑셀 업로드 결과 · 투입 목록" });
     await waitFor(() =>
       expect(screen.queryByText("검사 결과 조회 중…")).not.toBeInTheDocument(),
     );
@@ -1258,7 +1258,7 @@ describe("assignment route composition", () => {
       });
       fireEvent.click(screen.getByTestId("upload-check"));
       await screen.findByRole("dialog", {
-        name: "엑셀 업로드 결과 · 투입 배정",
+        name: "엑셀 업로드 결과 · 투입 목록",
       });
       await waitFor(() =>
         expect(screen.getByTestId("upload-apply")).toBeEnabled(),
@@ -1306,13 +1306,17 @@ describe("assignment route composition", () => {
     mount("/screens/UI-12");
     await screen.findByTestId("assignment-empty");
     fireEvent.click(screen.getByTestId("assignment-year-prev"));
-    await screen.findByText("지난해에는 읽기만 할 수 있습니다");
+    expect(await screen.findByTestId("assignment-lock-banner")).toHaveTextContent(
+      /^\d{4}년은 지난 해라 읽기만 할 수 있습니다\.$/,
+    );
     expect(screen.queryByTestId("assignment-create")).not.toBeInTheDocument();
     expect(screen.queryByTestId("upload-open")).not.toBeInTheDocument();
     expect(screen.queryByTestId("upload-template")).not.toBeInTheDocument();
+    // 시안: 엑셀 다운로드는 지난 해에도 목록 도구 줄에 남는다(제목줄이 아님).
+    expect(screen.getByTestId("list-download")).toHaveTextContent("엑셀 다운로드");
     expect(
-      screen.getByTestId("assignment-excel").closest(".screen-actions"),
-    ).not.toBeNull();
+      screen.getByTestId("list-download").closest(".screen-actions"),
+    ).toBeNull();
     expectSingleShell();
   });
 
@@ -1320,8 +1324,12 @@ describe("assignment route composition", () => {
     const { list } = respondWithAssignments();
     list.mockRejectedValueOnce(new Error("배정 목록을 불러오지 못했습니다."));
     mount("/screens/UI-12");
-    const retry = await screen.findByTestId("assignment-retry");
-    expect(screen.getByTestId("assignment-create")).toBeDisabled();
+    const retry = await screen.findByTestId("list-retry");
+    expect(screen.getByTestId("list-error")).toHaveTextContent(
+      "배정 목록을 불러오지 못했습니다.",
+    );
+    // 시안: 목록을 못 불러와도 제목줄 [배정]은 막지 않는다.
+    expect(screen.getByTestId("assignment-create")).toBeEnabled();
     fireEvent.click(retry);
     expect(await screen.findByTestId("assignment-empty")).toBeVisible();
     expect(list).toHaveBeenCalledTimes(2);

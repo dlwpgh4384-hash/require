@@ -26,7 +26,6 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-import static com.company.common.support.controller.OpenApiResponseContract.response;
 
 @WebMvcTest(CommonDeveloperController.class)
 @ContextConfiguration(classes={CommonDeveloperController.class,CommonDeveloperService.class,CodeExceptionHandler.class,
@@ -349,5 +348,12 @@ class CommonDeveloperControllerTest {
             assertThat(sheet.getRow(3).getCell(0).getStringCellValue()).isEqualTo("개발자");
         }
         verify(mapper).insertAccess("admin",1);
+    }
+    /** Hand-added fields and paths live in openapi-manual.yaml because regenerating openapi.yaml drops them. */
+    private static final java.util.Set<String> MANUAL_PATHS = java.util.Set.of("/api/common/developers", "/api/common/developers/{developerId}", "/api/common/developers/{developerId}/assignments", "/api/common/developers/{developerId}/statuses", "/api/common/developers/{developerId}/statuses/{statusId}/end-date", "/api/common/developers/{developerId}/statuses/{statusId}/return-cancel", "/api/common/developers/{developerId}/statuses/{statusId}/retirement-cancel");
+    private static org.springframework.test.web.servlet.ResultMatcher response(String method, String path) {
+        return MANUAL_PATHS.contains(path)
+            ? com.company.common.support.controller.OpenApiResponseContract.response(method, path, "contracts/openapi-manual.yaml")
+            : com.company.common.support.controller.OpenApiResponseContract.response(method, path);
     }
 }

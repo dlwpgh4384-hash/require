@@ -59,7 +59,11 @@ class PostgreSqlPreparationTest {
     @Test
     void createsPreparedTablesAndOnlyBaseSeedRowsWithoutPhysicalForeignKeys() throws Exception {
         preparation.prepare();
-        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'")).isEqualTo(44);
+        assertThat(number("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'"))
+            .isEqualTo(MigrationResources.tableCount());
+        assertThat(names("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'"))
+            .isEqualTo(sorted(MigrationResources.tableNames()))
+            .contains("TB_SL_OPP", "TB_SL_OPP_NEED", "TB_SL_TENT_ASGN", "TB_PJ_ASGN", "TB_PJ_ASGN_HIST", "TB_PJ_ASGN_MON");
         assertThat(number("SELECT count(*) FROM tb_sy_menu")).isEqualTo(40);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NULL")).isEqualTo(10);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NOT NULL")).isEqualTo(30);
@@ -68,7 +72,8 @@ class PostgreSqlPreparationTest {
         assertThat(number("SELECT count(*) FROM tb_sy_code WHERE code_grp_id='PREF_TYPE'")).isEqualTo(8);
         assertThat(number("SELECT count(*) FROM tb_sy_oper_std")).isEqualTo(43);
         assertThat(text("SELECT std_val::bigint::text FROM tb_sy_oper_std WHERE std_cd='CASH_BASE_YM'")).isEqualTo("202601");
-        assertThat(number("SELECT count(*) FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f'")).isEqualTo(29);
+        assertThat(names("SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f'"))
+            .isEqualTo(sorted(MigrationResources.foreignKeyNames()));
         assertThat(number("SELECT nextval('sq_tb_sy_noti')")).isEqualTo(1);
         assertThat(number("SELECT count(*) FROM tb_sy_role")).isEqualTo(5);
         assertThat(number("SELECT count(*) FROM tb_sy_user_role WHERE user_id='admin' AND role_id='ADMIN'")).isEqualTo(1);
@@ -213,7 +218,7 @@ class PostgreSqlPreparationTest {
         assertThat(number("SELECT nextval('sq_tb_sy_accs_log')")).isEqualTo(2);
         assertThat(number("SELECT nextval('sq_tb_sy_chg_hist')")).isEqualTo(2);
         assertThat(number("SELECT count(*) FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f'"))
-            .isEqualTo(29);
+            .isEqualTo(MigrationResources.foreignKeyCount());
     }
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -389,6 +394,18 @@ class PostgreSqlPreparationTest {
         try (var statement = database.createStatement(); var rows = statement.executeQuery(sql)) {
             rows.next(); return rows.getString(1);
         }
+    }
+    /** 한 열 결과를 대문자로 바꿔 정렬한 목록(DB 정렬 규칙에 기대지 않음). */
+    private java.util.List<String> names(String sql) throws Exception {
+        var names = new java.util.ArrayList<String>();
+        try (var statement = database.createStatement(); var rows = statement.executeQuery(sql)) {
+            while (rows.next()) names.add(rows.getString(1).toUpperCase(java.util.Locale.ROOT));
+        }
+        java.util.Collections.sort(names);
+        return names;
+    }
+    private static java.util.List<String> sorted(java.util.List<String> names) {
+        return names.stream().sorted().toList();
     }
     private String resource(String name) throws Exception {
         return new ClassPathResource("db/migration/" + name).getContentAsString(StandardCharsets.UTF_8);

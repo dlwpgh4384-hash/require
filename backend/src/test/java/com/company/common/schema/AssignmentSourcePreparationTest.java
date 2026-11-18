@@ -97,7 +97,8 @@ class AssignmentSourcePreparationTest {
     void incompatibleForeignKeyIsRejectedWithoutReplacingIt() throws Exception {
         execute("ALTER TABLE tb_sl_opp DROP CONSTRAINT fk_tb_sl_opp_03");
         execute("ALTER TABLE tb_sl_opp ADD CONSTRAINT fk_tb_sl_opp_03 FOREIGN KEY (proj_id) REFERENCES tb_pj_proj(proj_id) ON DELETE CASCADE");
-        assertThatThrownBy(() -> execute(resource())).hasMessageContaining("fk_tb_sl_opp_03");
+        // V10·V12와 같이 「표.제약 이름」을 원본 대문자로 알린다(ClientPartSchemaPreparationTest의 FK_TB_HR_DEV_01 검사와 같은 규칙).
+        assertThatThrownBy(() -> execute(resource())).hasMessageContaining("TB_SL_OPP.FK_TB_SL_OPP_03");
         assertThat(text("SELECT confdeltype::text FROM pg_constraint WHERE conrelid='tb_sl_opp'::regclass AND conname='fk_tb_sl_opp_03'"))
             .isEqualTo("c");
     }

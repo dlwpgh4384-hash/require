@@ -25,7 +25,7 @@ class AssignmentProjectionTest {
     @Test void everyInterfaceOperationHasAMappedStatement() throws Exception {var c=config();for(var method:AssignmentMapper.class.getDeclaredMethods())assertThat(c.hasStatement(AssignmentMapper.class.getName()+"."+method.getName())).as(method.getName()).isTrue();}
     @Test void eachProjectionHasExplicitConstructorMappingAndEverySelectedLabelMatches() throws Exception {
         var c=config();var aliases=Pattern.compile("(?i)\\bAS\\s+\"([a-zA-Z][a-zA-Z0-9]*)\"");
-        for(String statement:List.of("rows","history","candidates","person")) {
+        for(String statement:List.of("rows","history","candidates","person","uploadDeveloper")) {
             var mapped=c.getMappedStatement(AssignmentMapper.class.getName()+"."+statement);var mapping=mapped.getResultMaps().get(0);
             var components=mapping.getType().getRecordComponents();var args=mapping.getConstructorResultMappings();
             assertThat(args).hasSize(components.length);var selected=new LinkedHashSet<String>();var matcher=aliases.matcher(mapped.getBoundSql(Map.of()).getSql());while(matcher.find())selected.add(matcher.group(1));
@@ -41,7 +41,25 @@ class AssignmentProjectionTest {
     }
     String sql(String name,Object p) throws Exception {return config().getMappedStatement(AssignmentMapper.class.getName()+"."+name).getBoundSql(p).getSql();}
     @Test void candidateSourceAndRemovalNeverWriteAssignmentOrOpportunity() throws Exception {assertThat(sql("candidates",Map.of())).contains("OPP_STAT_CD='WIN'","TENT_STAT_CD='CNVT'","n.NEED_SN=t.NEED_SN");assertThat(sql("removeCandidate",Map.of("id","12","actor","admin"))).contains("TENT_STAT_CD='DROP'","PROC_DTTM=clock_timestamp()").doesNotContain("DELETE","TB_PJ_ASGN","UPDATE TB_SL_OPP ");}
-    @Test void openMonthDeletionIsBoundedAndFixedSnapshotsNeverChanged() throws Exception {assertThat(sql("deleteOpenMonths",new AssignmentRows.OpenRange("A-0001","202611"))).contains("INPUT_YM >=","FIX_YN='N'","CLOSE_STAT_CD='CLOSE'");assertThat(sql("deleteOpenCosts",new AssignmentRows.OpenRange("A-0001","202611"))).contains("COST_YM >=","FIX_YN='N'","CLOSE_STAT_CD='CLOSE'");}
+    @Test void openMonthDeletionIsBoundedAndFixedSnapshotsNeverChanged() throws Exception {assertThat(sql("deleteOpenMonths",new AssignmentRows.OpenRange("A-0001","202611"))).contains("INPUT_YM >=","FIX_YN='N'","CLOSE_STAT_CD='CLOSE'");}
+    @Test void assignmentScreenNeverWritesPersonalCost() throws Exception {
+        String xml=new ClassPathResource("mapper/assignments/AssignmentMapper.xml").getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(xml).doesNotContain("TB_CO_MON_COST","TB_HR_MON_PAY WHERE DEV_ID=#{id} AND PAY_YM");
+    }
+    @Test void listFiltersRunInSqlAndCandidatesSkipEndedProjects() throws Exception {
+        assertThat(sql("listRows",new AssignmentRows.ListFilter(2026,"P-0001","DEV","kim"))).contains("a.ASGN_STAT_CD='ACT'","make_date(","a.PROJ_ID=?","a.JOB_CD=?","strpos(lower(","ORDER BY a.INPUT_BGN_DT ASC,a.ASGN_ID ASC");
+        assertThat(sql("listRows",new AssignmentRows.ListFilter(2026,null,null,null))).doesNotContain("a.PROJ_ID=?","a.JOB_CD=?","strpos(");
+        assertThat(sql("projectRows",Map.of("projectId","P-0001"))).contains("a.ASGN_STAT_CD<>'CNCL'");
+        assertThat(sql("candidates",Map.of())).contains("p.PROJ_STAT_CD IN ('ING','PRE')","d.DRCT_CLS_CD<>'INDRCT'");
+        assertThat(sql("lockCandidate",Map.of("id","12"))).contains("'CNVT','DONE','DROP'","FOR UPDATE OF t");
+        assertThat(sql("indirect",Map.of("id","D-1"))).contains("DRCT_CLS_CD='INDRCT'");
+        assertThat(sql("confirmCandidate",Map.of("id","12","actor","admin"))).contains("TENT_STAT_CD='DONE'","PROC_DTTM=clock_timestamp()","TENT_STAT_CD='CNVT'");
+    }
+    @Test void overloadOnlyLooksAtMonthsTheAssignmentCovers() throws Exception {
+        String overload=sql("overloads",Map.of("ids",List.of("A-0001","A-0002"),"year",2026));
+        assertThat(overload).contains("GROUP BY m.DEV_ID,m.INPUT_YM","BETWEEN to_char(a.INPUT_BGN_DT,'YYYYMM') AND to_char(a.INPUT_END_DT,'YYYYMM')","s.ASGN_STAT_CD='ACT'","GROUP BY a.ASGN_ID");
+        assertThat(sql("historyCounts",Map.of("ids",List.of("A-0001")))).contains("GROUP BY ASGN_ID");
+    }
     @Test void assignmentVersionAndHistoryCorrectionUseRealSourceTokens() throws Exception {var p=new HashMap<String,Object>();p.put("row",null);p.put("token",null);assertThat(sql("update",p)).contains("COALESCE(MOD_DTTM,REG_DTTM) IS NOT DISTINCT FROM");assertThat(sql("correct",new AssignmentRows.Correction("A-0001",1,null))).contains("CRCT_YN='N'","REG_DTTM IS NOT DISTINCT FROM").doesNotContain("MOD_DTTM","SET REG_DTTM");}
     @Test void effectiveHistoryIncludesCorrectedOriginalsAndOrderingIsStable() throws Exception {assertThat(sql("history",Map.of("id","A-0001"))).contains("ORDER BY REG_DTTM DESC,HIST_SN DESC").doesNotContain("CRCT_YN='N'");assertThat(sql("rows",Map.of())).contains("ORDER BY a.INPUT_BGN_DT ASC,a.ASGN_ID ASC");}
 }

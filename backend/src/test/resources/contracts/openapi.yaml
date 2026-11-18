@@ -5769,7 +5769,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-      x-no-request-body-reason: 후보 제외 대상은 path candidateId로 완전히 지정하며 추가 입력을 원문이 요구하지 않는다.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonAssignmentCandidateRemoveInput'
       x-business-rules:
       - 후보 빼기는 해당 인력을 후보에서 제외한다.
       x-side-effects:
@@ -9720,10 +9725,12 @@ components:
       - projectName
       - developerId
       - name
+      - managementNumber
       - jobCode
       - jobName
       - startDate
       - endDate
+      - modifiedAt
       properties:
         candidateId:
           type: string
@@ -9735,6 +9742,9 @@ components:
           type: string
         name:
           type: string
+        managementNumber:
+          type: string
+          description: 개발자 관리번호(TB_HR_DEV.MNG_NO)
         jobCode:
           type: string
         jobName:
@@ -9745,6 +9755,11 @@ components:
         endDate:
           type: string
           format: date
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 가배정 줄 수정 시각(TB_SL_TENT_ASGN.MOD_DTTM, 없으면 REG_DTTM). [빼기] 때 그대로 보냄
       additionalProperties: false
     CommonAssignmentCandidateList:
       type: object
@@ -9763,6 +9778,15 @@ components:
       properties:
         candidateId:
           type: string
+      additionalProperties: false
+    CommonAssignmentCandidateRemoveInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 후보 목록의 modifiedAt. 보내면 TB_SL_TENT_ASGN 수정 시각과 다를 때 409(공통 동시 수정 문구)
       additionalProperties: false
     CommonAssignmentHistory:
       type: object
@@ -9833,6 +9857,7 @@ components:
       required:
       - developerId
       - name
+      - jobName
       - endDate
       - billingPrice
       - overlappingAssignments
@@ -9841,6 +9866,9 @@ components:
           type: string
         name:
           type: string
+        jobName:
+          type: string
+          description: 그 사람의 이 프로젝트 마지막 배정 직무 이름
         endDate:
           type: string
           format: date
@@ -9918,6 +9946,10 @@ components:
         memo:
           type: string
           maxLength: 200
+        candidateId:
+          type: string
+          pattern: '^[0-9]{1,12}$'
+          description: 배정 후보 [확정]으로 연 경우만. 같은 저장 안에서 TB_SL_TENT_ASGN 줄을 DONE(배정 확정)으로 바꿈. 이미 처리된 후보면 409
       additionalProperties: false
     CommonAssignmentChangeInput:
       type: object

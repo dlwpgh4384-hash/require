@@ -64,7 +64,10 @@ class DeveloperSchemaPreparationTest {
         String part = rows("tb_bs_part");
         preparation.prepare();
         assertThat(text("SELECT count(*)::text FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'"))
-            .isEqualTo("44");
+            .isEqualTo(Integer.toString(com.company.common.schema.MigrationResources.tableCount()));
+        for (String table : new String[]{"tb_hr_dev_prc", "tb_hr_dev_skill", "tb_hr_dev_stat", "tb_hr_mon_pay", "tb_sy_adm_hdong"}) {
+            assertThat(text("SELECT to_regclass('" + table + "')::text")).as(table).isEqualTo(table);
+        }
         for (var entry : before.entrySet()) assertThat(definition(entry.getKey())).isEqualTo(entry.getValue());
         assertThat(rows("tb_hr_dev")).isEqualTo(developer);
         assertThat(rows("tb_bs_clnt")).isEqualTo(client);

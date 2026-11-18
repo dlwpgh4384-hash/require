@@ -18,6 +18,26 @@ class SchemaPreparationTest {
     private final Statement statement = mock(Statement.class);
     private final SchemaPreparation preparation = new SchemaPreparation(factory);
 
+    /** Migration scripts packaged under db/migration (V{n}__*.sql), read at test time so a new migration needs no count edit here. */
+    private static java.util.List<String> migrationScripts() throws Exception {
+        var resources = new org.springframework.core.io.support.PathMatchingResourcePatternResolver()
+            .getResources("classpath*:db/migration/V*__*.sql");
+        var scripts = new java.util.ArrayList<String>();
+        for (var resource : resources) scripts.add(resource.getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+        assertThat(scripts).isNotEmpty();
+        return scripts;
+    }
+
+    private static int migrationCount() throws Exception {
+        return migrationScripts().size();
+    }
+
+    private static int tableDefinitionCount(java.util.regex.Pattern tablePattern) throws Exception {
+        int count = 0;
+        for (String sql : migrationScripts()) count += (int) tablePattern.matcher(sql).results().count();
+        return count;
+    }
+
     @BeforeEach
     void connect() throws Exception {
         when(factory.openSession(false)).thenReturn(session);
@@ -105,7 +125,7 @@ class SchemaPreparationTest {
     void migrationResourcesContainOnlyModelTablesAndBaseSeeds() throws Exception {
         preparation.prepare();
         var resources = ArgumentCaptor.forClass(String.class);
-        verify(statement, times(13)).execute(resources.capture());
+        verify(statement, times(migrationCount())).execute(resources.capture());
         String schema = resources.getAllValues().get(0);
         var tables = java.util.regex.Pattern.compile("CREATE TABLE IF NOT EXISTS (TB_[A-Z_]+)").matcher(schema);
         var names = new java.util.ArrayList<String>();
@@ -140,7 +160,7 @@ class SchemaPreparationTest {
     void everyPreparedTableIsPhysicalAndScreenSectionNamesCannotBecomeTables() throws Exception {
         preparation.prepare();
         var resources = ArgumentCaptor.forClass(String.class);
-        verify(statement, times(13)).execute(resources.capture());
+        verify(statement, times(migrationCount())).execute(resources.capture());
         var tablePattern = java.util.regex.Pattern.compile(
             "(?i)CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?([a-z_][a-z0-9_]*)\\s*\\(");
         // V12's regexp_replace search pattern is not a physical table definition.
@@ -148,7 +168,21 @@ class SchemaPreparationTest {
         var tables = resources.getAllValues().stream()
             .flatMap(sql -> tablePattern.matcher(sql).results().map(match -> match.group(1).toUpperCase(java.util.Locale.ROOT)))
             .toList();
-        assertThat(tables).hasSize(47).doesNotHaveDuplicates();
+        assertThat(tables).hasSize(tableDefinitionCount(tablePattern)).doesNotHaveDuplicates();
+        // 개수는 파일에서 읽지만, 표 이름은 여기 그대로 적어 두어 표 하나가 빠지거나 바뀌면 바로 실패한다.
+        assertThat(tables).containsExactly(
+            "TB_SY_USER_SCOPE", "TB_SY_MENU", "TB_SY_USER_PREF", "TB_SY_NOTI", "TB_BS_PART_STD", "TB_PJ_PROJ",
+            "TB_BL_BILL", "TB_BL_DUN_HIST", "TB_CL_CLOSE", "TB_SY_USER", "TB_SY_CODE_GRP", "TB_SY_CODE",
+            "TB_SY_OPER_STD", "TB_SY_ROLE", "TB_SY_USER_ROLE", "TB_BS_PART", "TB_SY_ACCS_LOG", "TB_SY_CHG_HIST",
+            "TB_SY_ROLE_MENU_AUTH",
+            "TB_SY_CODE_MAP", "TB_SY_CALC_RULE",
+            "TB_BS_CLNT", "TB_SY_UPLD", "TB_SY_UPLD_ERR", "TB_SY_ADM_AREA", "TB_HR_DEV", "TB_PJ_ASGN",
+            "TB_PJ_PROJ_PART", "TB_CO_PART_SETL",
+            "TB_HR_DEV_PRC", "TB_HR_DEV_SKILL", "TB_HR_DEV_STAT", "TB_HR_MON_PAY", "TB_SY_ADM_HDONG",
+            "TB_PJ_PROJ_CHG", "TB_PJ_MNPW_PLAN", "TB_PJ_STEP", "TB_PJ_WEEK_MEMO", "TB_PJ_ISSUE", "TB_PJ_TK_DSTRB",
+            "TB_PJ_DRCT_EXPS", "TB_PJ_ASGN_HIST", "TB_PJ_ASGN_MON", "TB_CO_MON_COST",
+            "TB_SL_OPP", "TB_SL_OPP_NEED", "TB_SL_TENT_ASGN");
+        assertThat(tables).isEqualTo(MigrationResources.tableNames());
         assertThat(tables).allMatch(name -> name.startsWith("TB_"));
         assertThat(tables).contains("TB_SY_CALC_RULE", "TB_SY_CHG_HIST", "TB_SY_CODE", "TB_SY_CODE_GRP",
             "TB_SY_CODE_MAP", "TB_SY_MENU", "TB_SY_OPER_STD", "TB_SY_ROLE_MENU_AUTH");

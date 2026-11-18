@@ -34,6 +34,23 @@ public class CodeTextResolver {
         return result(mapped, "‘" + text + "’을 ‘" + mapped.codeName + "’으로 바꿈");
     }
 
+    /**
+     * 명세가 이름 앞부분으로 적게 한 칸(예: 연장 가능성 「높음·보통·낮음」, 코드 이름은 「높음 (80%)」)을 읽는다.
+     * 이름 뒤 괄호 설명을 뺀 표기가 꼭 하나와 같으면 그 코드, 아니면 보통 규칙(코드·이름·엑셀 표기 대응표)으로 읽는다.
+     */
+    public TextResolution resolveLabel(String groupId, String text) {
+        if (groupId == null || !groupId.matches("[A-Z][A-Z0-9_]{0,29}")) {
+            throw CodeFailure.invalid("groupId", "코드 그룹을 확인해 주세요.");
+        }
+        if (text == null || text.isBlank() || text.codePointCount(0, text.length()) > 100) {
+            throw CodeFailure.invalid("excelText", "엑셀 표기는 1~100자로 입력해 주세요.");
+        }
+        var labels = mapper.selectLabelText(groupId, text);
+        if (labels.size() == 1) return result(labels.get(0), null);
+        if (labels.size() > 1) throw CodeFailure.invalid("excelText", "이름이 같은 코드가 있습니다. 코드로 입력해 주세요.");
+        return resolve(groupId, text);
+    }
+
     /** 시안 업로드 결과 문구: 「'정규직'으로 바꿔 읽었습니다.」(받침 없거나 ㄹ이면 「로」). */
     public static String readAs(String name) {
         char last = name.isEmpty() ? ' ' : name.charAt(name.length() - 1);

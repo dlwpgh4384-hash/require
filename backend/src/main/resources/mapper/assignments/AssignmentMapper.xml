@@ -20,6 +20,13 @@
   <sql id="joins">FROM TB_PJ_ASGN a JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID JOIN TB_HR_DEV d ON d.DEV_ID=a.DEV_ID
     LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=a.JOB_CD</sql>
   <select id="rows" resultMap="row">SELECT <include refid="columns"/> <include refid="joins"/> ORDER BY a.INPUT_BGN_DT ASC,a.ASGN_ID ASC</select>
+  <select id="listRows" resultMap="row">SELECT <include refid="columns"/> <include refid="joins"/>
+    WHERE a.ASGN_STAT_CD='ACT' AND a.INPUT_BGN_DT &lt;= make_date(#{year},12,31) AND a.INPUT_END_DT &gt;= make_date(#{year},1,1)
+    <if test="projectId != null and projectId != ''">AND a.PROJ_ID=#{projectId}</if>
+    <if test="jobCode != null and jobCode != ''">AND a.JOB_CD=#{jobCode}</if>
+    <if test="keyword != null and keyword != ''">AND strpos(lower(d.DEV_NM||' '||d.MNG_NO),#{keyword})&gt;0</if>
+    ORDER BY a.INPUT_BGN_DT ASC,a.ASGN_ID ASC</select>
+  <select id="projectRows" resultMap="row">SELECT <include refid="columns"/> <include refid="joins"/> WHERE a.PROJ_ID=#{projectId} AND a.ASGN_STAT_CD&lt;&gt;'CNCL' ORDER BY a.INPUT_BGN_DT ASC,a.ASGN_ID ASC</select>
   <select id="row" resultMap="row">SELECT <include refid="columns"/> <include refid="joins"/> WHERE a.ASGN_ID=#{id}</select>
   <select id="lockRow" resultMap="row">SELECT <include refid="columns"/> <include refid="joins"/> WHERE a.ASGN_ID=#{id} FOR UPDATE OF a</select>
   <select id="ids" resultType="string">SELECT ASGN_ID FROM TB_PJ_ASGN ORDER BY ASGN_ID</select>
@@ -47,14 +54,21 @@
   <resultMap id="candidateRow" type="com.company.common.assignments.mapper.AssignmentRows$CandidateRow"><constructor>
     <idArg column="candidateId" javaType="string"/><arg column="projectId" javaType="string"/><arg column="projectName" javaType="string"/><arg column="developerId" javaType="string"/><arg column="name" javaType="string"/>
     <arg column="jobCode" javaType="string"/><arg column="jobName" javaType="string"/><arg column="month" javaType="string"/><arg column="months" javaType="_int"/>
-    <arg column="projectStart" javaType="java.time.LocalDate"/><arg column="projectEnd" javaType="java.time.LocalDate"/><arg column="statusCode" javaType="string"/>
+    <arg column="projectStart" javaType="java.time.LocalDate"/><arg column="projectEnd" javaType="java.time.LocalDate"/><arg column="statusCode" javaType="string"/><arg column="managementNumber" javaType="string"/>
+    <arg column="modifiedAt" javaType="java.time.Instant"/>
   </constructor></resultMap>
-  <sql id="candidateSelect">SELECT t.TENT_ID::text AS "candidateId",p.PROJ_ID AS "projectId",p.PROJ_NM AS "projectName",t.DEV_ID AS "developerId",d.DEV_NM AS "name",n.JOB_CD AS "jobCode",COALESCE(c.CODE_NM,n.JOB_CD) AS "jobName",t.BGN_YM AS "month",n.PRD_MCNT AS "months",p.CTRT_BGN_DT AS "projectStart",p.CTRT_END_DT AS "projectEnd",t.TENT_STAT_CD AS "statusCode"
+  <sql id="candidateSelect">SELECT t.TENT_ID::text AS "candidateId",p.PROJ_ID AS "projectId",p.PROJ_NM AS "projectName",t.DEV_ID AS "developerId",d.DEV_NM AS "name",n.JOB_CD AS "jobCode",COALESCE(c.CODE_NM,n.JOB_CD) AS "jobName",t.BGN_YM AS "month",n.PRD_MCNT AS "months",p.CTRT_BGN_DT AS "projectStart",p.CTRT_END_DT AS "projectEnd",t.TENT_STAT_CD AS "statusCode",d.MNG_NO AS "managementNumber",COALESCE(t.MOD_DTTM,t.REG_DTTM) AS "modifiedAt"
     FROM TB_SL_TENT_ASGN t JOIN TB_SL_OPP o ON o.OPP_ID=t.OPP_ID AND o.OPP_STAT_CD='WIN'
     JOIN TB_SL_OPP_NEED n ON n.OPP_ID=t.OPP_ID AND n.NEED_SN=t.NEED_SN JOIN TB_PJ_PROJ p ON p.PROJ_ID=o.PROJ_ID
     JOIN TB_HR_DEV d ON d.DEV_ID=t.DEV_ID LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='JOB' AND c.CODE=n.JOB_CD</sql>
-  <select id="candidates" resultMap="candidateRow"><include refid="candidateSelect"/> WHERE t.TENT_STAT_CD='CNVT' ORDER BY t.TENT_ID</select>
-  <select id="lockCandidate" resultMap="candidateRow"><include refid="candidateSelect"/> WHERE t.TENT_ID=CAST(#{id} AS numeric) AND t.TENT_STAT_CD IN ('CNVT','DROP') FOR UPDATE OF t</select>
+  <select id="candidates" resultMap="candidateRow"><include refid="candidateSelect"/> WHERE t.TENT_STAT_CD='CNVT' AND p.PROJ_STAT_CD IN ('ING','PRE') AND d.DRCT_CLS_CD&lt;&gt;'INDRCT' ORDER BY t.TENT_ID</select>
+  <select id="lockCandidate" resultMap="candidateRow"><include refid="candidateSelect"/> WHERE t.TENT_ID=CAST(#{id} AS numeric) AND t.TENT_STAT_CD IN ('CNVT','DONE','DROP') FOR UPDATE OF t</select>
+  <select id="indirect" resultType="boolean">SELECT EXISTS(SELECT 1 FROM TB_HR_DEV WHERE DEV_ID=#{id} AND DRCT_CLS_CD='INDRCT')</select>
+  <resultMap id="uploadDeveloper" type="com.company.common.assignments.mapper.AssignmentRows$UploadDeveloper"><constructor>
+    <idArg column="id" javaType="string"/><arg column="name" javaType="string"/><arg column="useYn" javaType="string"/><arg column="directClassCode" javaType="string"/>
+  </constructor></resultMap>
+  <select id="uploadDeveloper" resultMap="uploadDeveloper">SELECT DEV_ID AS "id",DEV_NM AS "name",USE_YN AS "useYn",DRCT_CLS_CD AS "directClassCode" FROM TB_HR_DEV WHERE MNG_NO=#{managementNumber}</select>
+  <update id="confirmCandidate">UPDATE TB_SL_TENT_ASGN SET TENT_STAT_CD='DONE',PROC_DTTM=clock_timestamp(),MOD_DTTM=clock_timestamp(),MOD_USER_ID=#{actor} WHERE TENT_ID=CAST(#{id} AS numeric) AND TENT_STAT_CD='CNVT'</update>
   <update id="removeCandidate">UPDATE TB_SL_TENT_ASGN SET TENT_STAT_CD='DROP',PROC_DTTM=clock_timestamp(),MOD_DTTM=clock_timestamp(),MOD_USER_ID=#{actor} WHERE TENT_ID=CAST(#{id} AS numeric) AND TENT_STAT_CD='CNVT'</update>
   <resultMap id="person" type="com.company.common.assignments.mapper.AssignmentRows$Person"><constructor>
     <idArg column="developerId" javaType="string"/><arg column="name" javaType="string"/><arg column="employeeTypeCode" javaType="string"/><arg column="partId" javaType="string"/><arg column="partName" javaType="string"/>
@@ -65,17 +79,27 @@
     EXISTS (SELECT 1 FROM TB_HR_DEV_STAT s WHERE s.DEV_ID=d.DEV_ID AND s.WORK_STAT_CD='LEAVE' AND s.BGN_DT &lt;= #{end} AND (s.END_DT IS NULL OR s.END_DT &gt;= #{start})) AS "onLeave"
     FROM TB_HR_DEV d LEFT JOIN TB_BS_PART p ON p.PART_ID=d.PART_ID WHERE d.DEV_ID=#{id} AND d.USE_YN='Y'</select>
   <select id="closedMonths" resultType="string">SELECT CLOSE_YM FROM TB_CL_CLOSE WHERE CLOSE_STAT_CD='CLOSE' ORDER BY CLOSE_YM</select>
-  <select id="yearMm" resultType="java.math.BigDecimal">SELECT COALESCE(SUM(MON_MM),0) FROM TB_PJ_ASGN_MON WHERE ASGN_ID=#{id} AND substring(INPUT_YM,1,4)=CAST(#{year} AS text)</select>
-  <select id="overload" resultType="java.math.BigDecimal">SELECT COALESCE(MAX(total),0) FROM (SELECT SUM(m.MON_MM) AS total FROM TB_PJ_ASGN_MON m JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID WHERE a.ASGN_STAT_CD='ACT' AND m.DEV_ID=#{developerId} AND substring(m.INPUT_YM,1,4)=CAST(#{year} AS text) GROUP BY m.INPUT_YM) x</select>
+  <resultMap id="amount" type="com.company.common.assignments.mapper.AssignmentRows$Amount"><constructor>
+    <idArg column="assignmentId" javaType="string"/><arg column="value" javaType="java.math.BigDecimal"/>
+  </constructor></resultMap>
+  <resultMap id="count" type="com.company.common.assignments.mapper.AssignmentRows$Count"><constructor>
+    <idArg column="assignmentId" javaType="string"/><arg column="value" javaType="_int"/>
+  </constructor></resultMap>
+  <sql id="idList"><foreach collection="ids" item="item" open="(" separator="," close=")">#{item}</foreach></sql>
+  <select id="yearMms" resultMap="amount">SELECT ASGN_ID AS "assignmentId",COALESCE(SUM(MON_MM),0) AS "value" FROM TB_PJ_ASGN_MON
+    WHERE ASGN_ID IN <include refid="idList"/> AND substring(INPUT_YM,1,4)=CAST(#{year} AS text) GROUP BY ASGN_ID</select>
+  <select id="overloads" resultMap="amount">SELECT a.ASGN_ID AS "assignmentId",COALESCE(MAX(x.total),0) AS "value" FROM TB_PJ_ASGN a
+    JOIN (SELECT m.DEV_ID,m.INPUT_YM,SUM(m.MON_MM) AS total FROM TB_PJ_ASGN_MON m JOIN TB_PJ_ASGN s ON s.ASGN_ID=m.ASGN_ID AND s.ASGN_STAT_CD='ACT'
+      WHERE substring(m.INPUT_YM,1,4)=CAST(#{year} AS text) AND m.DEV_ID IN (SELECT DEV_ID FROM TB_PJ_ASGN WHERE ASGN_ID IN <include refid="idList"/>)
+      GROUP BY m.DEV_ID,m.INPUT_YM) x
+      ON x.DEV_ID=a.DEV_ID AND x.INPUT_YM BETWEEN to_char(a.INPUT_BGN_DT,'YYYYMM') AND to_char(a.INPUT_END_DT,'YYYYMM')
+    WHERE a.ASGN_ID IN <include refid="idList"/> GROUP BY a.ASGN_ID</select>
+  <select id="historyCounts" resultMap="count">SELECT ASGN_ID AS "assignmentId",COUNT(*)::int AS "value" FROM TB_PJ_ASGN_HIST WHERE ASGN_ID IN <include refid="idList"/> GROUP BY ASGN_ID</select>
   <select id="distribution" resultType="boolean">SELECT EXISTS(SELECT 1 FROM TB_PJ_TK_DSTRB WHERE PROJ_ID=#{projectId} AND DEV_ID=#{developerId} AND DSTRB_STEP_CD='PLAN')</select>
   <sql id="openMonth">FIX_YN='N' AND NOT EXISTS (SELECT 1 FROM TB_CL_CLOSE c WHERE c.CLOSE_YM=INPUT_YM AND c.CLOSE_STAT_CD='CLOSE')</sql>
   <delete id="deleteOpenMonths">DELETE FROM TB_PJ_ASGN_MON WHERE ASGN_ID=#{id} AND INPUT_YM &gt;= #{from} AND <include refid="openMonth"/></delete>
-  <delete id="deleteOpenCosts">DELETE FROM TB_CO_MON_COST WHERE ASGN_ID=#{id} AND COST_YM &gt;= #{from} AND FIX_YN='N' AND NOT EXISTS (SELECT 1 FROM TB_CL_CLOSE c WHERE c.CLOSE_YM=COST_YM AND c.CLOSE_STAT_CD='CLOSE')</delete>
   <insert id="saveMonth">INSERT INTO TB_PJ_ASGN_MON (ASGN_ID,INPUT_YM,DEV_ID,PROJ_ID,INPUT_DAY_CNT,MON_MM,APLY_UPRC,SALES_AMT,FIX_YN,REG_USER_ID,REG_DTTM)
     VALUES(#{assignmentId},#{month},#{developerId},#{projectId},#{days},#{mm},#{price},#{sales},'N',#{actor},clock_timestamp()) ON CONFLICT (ASGN_ID,INPUT_YM) DO NOTHING</insert>
-  <select id="labor" resultType="java.math.BigDecimal">SELECT COALESCE((SELECT CASE EMP_TYPE_CD WHEN 'OS' THEN VNDR_SPLY_AMT WHEN 'FL' THEN PAY_AMT WHEN 'CT' THEN PAY_AMT+ALWNC_AMT+INSR_CMPNY_AMT WHEN 'FT' THEN PAY_AMT+ALWNC_AMT+INSR_CMPNY_AMT+RETIRE_RSV_AMT END FROM TB_HR_MON_PAY WHERE DEV_ID=#{id} AND PAY_YM=#{month}),0)</select>
   <select id="latestPrice" resultType="java.math.BigDecimal">SELECT APLY_UPRC FROM TB_PJ_ASGN_MON WHERE ASGN_ID=#{id} ORDER BY INPUT_YM DESC LIMIT 1</select>
-  <insert id="saveCost">INSERT INTO TB_CO_MON_COST (COST_YM,DEV_ID,PROJ_ID,ASGN_ID,ASGN_MM,FREE_MM,SALES_AMT,LABOR_ALLOC_AMT,TEAM_EXPS_AMT,PROJ_EXPS_AMT,DRCT_EXPS_AMT,COST_CLS_CD,CTRT_TYPE_CD,PART_ID,FIX_YN,REG_USER_ID,REG_DTTM)
-    VALUES(#{month.month},#{month.developerId},#{month.projectId},#{month.assignmentId},#{month.mm},0,#{month.sales},#{labor},#{team},#{expense},#{team}+#{expense},#{classification},#{contractType},#{partId},'N',#{month.actor},clock_timestamp()) ON CONFLICT (COST_YM,DEV_ID,PROJ_ID,ASGN_ID) DO NOTHING</insert>
   <insert id="insertAccess">INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM) VALUES (#{userId},'DNLD','UI-12',#{target},clock_timestamp(),#{userId},clock_timestamp())</insert>
 </mapper>

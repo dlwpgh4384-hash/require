@@ -32,7 +32,7 @@ public class CommonAssignmentController {
     @PostMapping("/api/common/assignments")
     public Response<Assignment> postCommonAssignment(@RequestBody JsonNode body) { return Response.of(service.postCommonAssignment(body)); }
     @PostMapping("/api/common/assignments/candidates/{candidateId}/remove")
-    public Response<Removed> postCommonAssignmentCandidateRemove(@PathVariable String candidateId) { return Response.of(service.postCommonAssignmentCandidateRemove(candidateId)); }
+    public Response<Removed> postCommonAssignmentCandidateRemove(@PathVariable String candidateId,@RequestBody(required=false) JsonNode body) { return Response.of(service.postCommonAssignmentCandidateRemove(candidateId,body)); }
     @PostMapping("/api/common/assignments/{assignmentId}/changes")
     public Response<Assignment> postCommonAssignmentChange(@PathVariable String assignmentId,@RequestBody JsonNode body) { return Response.of(service.postCommonAssignmentChange(assignmentId,body)); }
     @PostMapping("/api/common/assignments/{assignmentId}/history/{historyId}/corrections")

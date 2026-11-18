@@ -6,7 +6,6 @@ import com.company.common.assignments.mapper.AssignmentRows.*;
 import com.company.common.clients.service.ClientRules;
 import com.company.common.projects.mapper.ProjectMapper;
 import com.company.common.projects.service.ProjectRules;
-import com.company.common.projects.service.ProjectAmountRules;
 import com.company.common.support.service.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
@@ -23,12 +22,13 @@ public class CommonAssignmentService {
     private final BusinessCalendar calendar;
     private final CurrentBusinessActor actor;
     private final AssignmentMonthRules rules;
-    private final ProjectAmountRules projectAmounts;
     public CommonAssignmentService(AssignmentMapper mapper, ProjectMapper projects, BusinessCalendar calendar,
-            CurrentBusinessActor actor, AssignmentMonthRules rules, ProjectAmountRules projectAmounts) {
+            CurrentBusinessActor actor, AssignmentMonthRules rules) {
         this.mapper=mapper; this.projects=projects; this.calendar=calendar; this.actor=actor;
-        this.rules=rules; this.projectAmounts=projectAmounts;
+        this.rules=rules;
     }
+    private static final String OVER="MM 1.0 초과",PRE="미계약 선투입";
+    private static final int CHUNK=500;
     public Instant now() { return calendar.now(); }
     public String userId() { return actor.userId(); }
     public List<String> roles() { return new ArrayList<>(actor.roles()); }
@@ -41,14 +41,14 @@ public class CommonAssignmentService {
     }
     public Items<Assignment> getCommonAssignments(Filter f) {
         int y=year(f.year());
-        if (!blank(f.warning()) && !Set.of("MM 1.0 초과","미계약 선투입").contains(f.warning())) throw CodeFailure.invalid("warning","경고 조건을 확인해 주세요.");
-        String q=blank(f.keyword())?"":f.keyword().trim().toLowerCase(Locale.ROOT);
-        return new Items<>(mapper.rows().stream().filter(r -> "ACT".equals(r.statusCode()))
-            .filter(r -> r.startDate().getYear()<=y && r.endDate().getYear()>=y)
-            .filter(r -> blank(f.projectId()) || f.projectId().equals(r.projectId()))
-            .filter(r -> blank(f.jobCode()) || f.jobCode().equals(r.jobCode()))
-            .filter(r -> q.isEmpty() || (r.name()+" "+r.managementNumber()).toLowerCase(Locale.ROOT).contains(q))
-            .map(r -> view(r,y)).filter(r -> blank(f.warning()) || r.warnings().contains(f.warning())).toList());
+        if (!blank(f.warning()) && !Set.of(OVER,PRE).contains(f.warning())) throw CodeFailure.invalid("warning","경고 조건을 확인해 주세요.");
+        String q=blank(f.keyword())?null:f.keyword().trim().toLowerCase(Locale.ROOT);
+        var rows=mapper.listRows(new ListFilter(y,blank(f.projectId())?null:f.projectId(),blank(f.jobCode())?null:f.jobCode(),blank(q)?null:q));
+        var figures=figures(rows,y); var names=new HashMap<String,String>(); boolean direct=AssignmentPricePolicy.direct(roles());
+        return new Items<>(rows.stream().map(r -> {
+            Figures fig=figures.get(r.assignmentId());
+            return assemble(r,fig,listWarnings(r,fig.total()),names,direct);
+        }).filter(r -> blank(f.warning()) || r.warnings().contains(f.warning())).toList());
     }
     public Assignment getCommonAssignment(String id) { return view(required(id),calendar.today().getYear()); }
     private Row required(String id) {
@@ -64,11 +64,39 @@ public class CommonAssignmentService {
     public static void identifier(String id,String field) {
         if (blank(id) || id.length()>20 || id.chars().anyMatch(Character::isISOControl)) throw CodeFailure.invalid(field,"식별자를 확인해 주세요.");
     }
-    private Assignment view(Row r,int year) {
+    private record Figures(BigDecimal yearMm,BigDecimal total,int historyCount) {}
+    private Map<String,Figures> figures(List<Row> rows,int year) {
+        var ids=rows.stream().map(Row::assignmentId).distinct().toList();
+        var yearMm=new HashMap<String,BigDecimal>(); var total=new HashMap<String,BigDecimal>(); var counts=new HashMap<String,Integer>();
+        for (int i=0;i<ids.size();i+=CHUNK) {
+            var part=ids.subList(i,Math.min(ids.size(),i+CHUNK));
+            mapper.yearMms(part,year).forEach(a -> { if (a.value()!=null) yearMm.put(a.assignmentId(),a.value()); });
+            mapper.overloads(part,year).forEach(a -> { if (a.value()!=null) total.put(a.assignmentId(),a.value()); });
+            mapper.historyCounts(part).forEach(c -> counts.put(c.assignmentId(),c.value()));
+        }
+        var result=new HashMap<String,Figures>();
+        for (String id:ids) result.put(id,new Figures(yearMm.getOrDefault(id,BigDecimal.ZERO),total.getOrDefault(id,BigDecimal.ZERO),counts.getOrDefault(id,0)));
+        return result;
+    }
+    /** 목록 경고(SFR-112-02): MM 1.0 초과·미계약 선투입만. */
+    private List<String> listWarnings(Row r,BigDecimal total) {
         var warnings=new ArrayList<String>();
-        BigDecimal total=Objects.requireNonNullElse(mapper.overload(r.developerId(),year),BigDecimal.ZERO);
-        if (rules.over(total)) warnings.add("MM 1.0 초과");
-        if ("PRE".equals(r.projectStatusCode())) warnings.add("미계약 선투입");
+        if (rules.over(total)) warnings.add(OVER);
+        if ("PRE".equals(r.projectStatusCode())) warnings.add(PRE);
+        return warnings;
+    }
+    private Assignment assemble(Row r,Figures fig,List<String> warnings,Map<String,String> names,boolean direct) {
+        return new Assignment(r.assignmentId(),r.projectId(),r.projectName(),r.developerId(),r.name(),r.managementNumber(),r.jobCode(),r.jobName(),r.startDate(),r.endDate(),
+            direct?r.billingPrice():null,r.monthlyMm(),fig.yearMm(),
+            r.extensionPossibilityCode(),code("EXT_PSBL",r.extensionPossibilityCode(),"미정",names),r.inputTypeCode(),code("INPUT_TYPE",r.inputTypeCode(),"",names),r.extensionCount(),warnings,fig.total(),fig.historyCount(),r.modifiedAt());
+    }
+    private String code(String group,String value,String fallback,Map<String,String> names) {
+        return value==null?fallback:names.computeIfAbsent(group+"|"+value,k -> Objects.requireNonNullElse(projects.codeName(group,value),value));
+    }
+    /** 상세·저장 응답: 목록 경고 + 배정 창 경고(휴직·파견·마감·파트·턴키). */
+    private Assignment view(Row r,int year) {
+        Figures fig=figures(List.of(r),year).get(r.assignmentId());
+        var warnings=new ArrayList<>(listWarnings(r,fig.total()));
         Person p=mapper.person(r.developerId(),db(YearMonth.from(r.startDate())),r.startDate(),r.endDate());
         if (p!=null && p.onLeave()) warnings.add("휴직 기간에 배정됩니다.");
         if (p!=null && "DP".equals(r.contractTypeCode()) && Set.of("FL","OS").contains(p.employeeTypeCode())) warnings.add("파견 프로젝트에 프리랜서/외주 인력을 배정합니다.");
@@ -77,9 +105,7 @@ public class CommonAssignmentService {
         if (p!=null && project!=null && !"IN".equals(r.contractTypeCode()) && !Objects.equals(p.partId(),project.salesPartId))
             warnings.add("영업 파트가 다릅니다: "+p.name()+"님은 "+p.partName()+" 소속, 프로젝트는 "+project.salesPartName+"입니다. 매출은 프로젝트 파트로, 이 사람 이익금은 소속 파트(본사면 파트 정산 제외)로 잡힙니다. 파트를 잘못 골랐다면 개발자 풀에서 고쳐 주세요.");
         if ("SUB".equals(r.inputTypeCode()) && "TK".equals(r.contractTypeCode()) && r.contractDeveloperId()!=null && mapper.distribution(r.projectId(),r.contractDeveloperId())) warnings.add("턴키 배분표는 다시 옮겨 올려 주셔야 합니다. 그 전까지는 배분 불일치 경고가 뜹니다.");
-        return new Assignment(r.assignmentId(),r.projectId(),r.projectName(),r.developerId(),r.name(),r.managementNumber(),r.jobCode(),r.jobName(),r.startDate(),r.endDate(),
-            AssignmentPricePolicy.direct(roles())?r.billingPrice():null,r.monthlyMm(),Objects.requireNonNullElse(mapper.yearMm(r.assignmentId(),year),BigDecimal.ZERO),
-            r.extensionPossibilityCode(),code("EXT_PSBL",r.extensionPossibilityCode(),"미정"),r.inputTypeCode(),code("INPUT_TYPE",r.inputTypeCode(),""),r.extensionCount(),warnings,total,mapper.history(r.assignmentId()).size(),r.modifiedAt());
+        return assemble(r,fig,warnings,new HashMap<>(),AssignmentPricePolicy.direct(roles()));
     }
     private String code(String group,String value,String fallback) {
         return value==null?fallback:Objects.requireNonNullElse(projects.codeName(group,value),value);
@@ -92,33 +118,46 @@ public class CommonAssignmentService {
         return mapper.closedMonths().stream().anyMatch(m -> m.compareTo(db(YearMonth.from(start)))>=0 && m.compareTo(db(YearMonth.from(end)))<=0);
     }
     public Items<Candidate> getCommonAssignmentCandidates() {
-        return new Items<>(mapper.candidates().stream().map(r -> {
-            YearMonth month=calendar.fromDatabaseMonth(r.month());
-            if (r.months()<1) throw CodeFailure.invalid("candidateId","후보 원천 예정 기간을 확인해 주세요.");
-            LocalDate start=month.atDay(1),end=month.plusMonths(r.months()-1).atEndOfMonth();
-            if (r.projectStart()!=null && start.isBefore(r.projectStart())) start=r.projectStart();
-            if (r.projectEnd()!=null && end.isAfter(r.projectEnd())) end=r.projectEnd();
-            if (start.isAfter(end)) throw CodeFailure.invalid("candidateId","후보 원천 예정 기간이 프로젝트 계약 기간과 겹치지 않습니다.");
-            return new Candidate(r.candidateId(),r.projectId(),r.projectName(),r.developerId(),r.name(),r.jobCode(),r.jobName(),start,end);
-        }).toList());
+        return new Items<>(mapper.candidates().stream().map(this::candidate).flatMap(Optional::stream).toList());
     }
+    /** 예정 기간이 잘못된 후보 한 줄은 목록 전체를 막지 않고 뺀다. */
+    private Optional<Candidate> candidate(CandidateRow r) {
+        YearMonth month;
+        try { month=calendar.fromDatabaseMonth(r.month()); } catch (RuntimeException e) { return Optional.empty(); }
+        if (month==null || r.months()<1) return Optional.empty();
+        LocalDate start=month.atDay(1),end=month.plusMonths(r.months()-1L).atEndOfMonth();
+        if (r.projectStart()!=null && start.isBefore(r.projectStart())) start=r.projectStart();
+        if (r.projectEnd()!=null && end.isAfter(r.projectEnd())) end=r.projectEnd();
+        if (start.isAfter(end)) return Optional.empty();
+        return Optional.of(new Candidate(r.candidateId(),r.projectId(),r.projectName(),r.developerId(),r.name(),r.managementNumber(),r.jobCode(),r.jobName(),start,end,r.modifiedAt()));
+    }
+    /** [빼기]: 이미 확정(DONE)·빼기(DROP)된 후보이거나, 보낸 modifiedAt이 지금 값과 다르면 409(공통 동시 수정 문구). */
     @Transactional
-    public Removed postCommonAssignmentCandidateRemove(String id) {
+    public Removed postCommonAssignmentCandidateRemove(String id,JsonNode body) {
         if (id==null || !id.matches("[0-9]{1,12}")) throw CodeFailure.invalid("candidateId","후보 식별자를 확인해 주세요.");
+        boolean checked=body!=null && !body.isNull() && !body.isMissingNode();
+        if (checked) ClientRules.object(body,Set.of("modifiedAt"));
+        Instant version=checked && body.has("modifiedAt")?token(body):null;
         CandidateRow row=mapper.lockCandidate(id);
         if (row==null) throw CodeFailure.invalid("candidateId","배정 후보를 찾을 수 없습니다.");
-        if ("CNVT".equals(row.statusCode())) mapper.removeCandidate(id,userId());
+        if (!"CNVT".equals(row.statusCode())) throw CodeFailure.conflict();
+        if (checked && body.has("modifiedAt") && !Objects.equals(row.modifiedAt(),version)) throw CodeFailure.conflict();
+        if (mapper.removeCandidate(id,userId())!=1) throw CodeFailure.conflict();
         return new Removed(id);
+    }
+    /** 간접 인력(DRCT_CLS INDRCT)은 투입 배정 대상이 아니다(SFR-102-10). */
+    private void direct(String developerId) {
+        if (mapper.indirect(developerId)) throw CodeFailure.invalid("developerId","간접 인력은 투입 배정 대상이 아닙니다.");
     }
     public Items<ContractDeveloper> getCommonAssignmentContractDevelopers(String projectId,String developerId,LocalDate start) {
         if (blank(projectId)) return new Items<>(new ArrayList<>());
         identifier(projectId,"projectId");
         var groups=new TreeMap<String,List<Row>>();
-        mapper.rows().stream().filter(r -> projectId.equals(r.projectId()) && !Objects.equals(developerId,r.developerId()))
+        mapper.projectRows(projectId).stream().filter(r -> !Objects.equals(developerId,r.developerId()))
             .forEach(r -> groups.computeIfAbsent(r.developerId(),k -> new ArrayList<>()).add(r));
         return new Items<>(groups.values().stream().map(rows -> {
             var latest=rows.stream().max(Comparator.comparing(Row::endDate).thenComparing(Row::startDate).thenComparing(Row::assignmentId)).orElseThrow();
-            return new ContractDeveloper(latest.developerId(),latest.name(),latest.endDate(),AssignmentPricePolicy.direct(roles()) && Set.of("MO","DP").contains(latest.contractTypeCode())?Objects.requireNonNullElse(mapper.latestPrice(latest.assignmentId()),latest.billingPrice()):null,
+            return new ContractDeveloper(latest.developerId(),latest.name(),latest.jobName(),latest.endDate(),AssignmentPricePolicy.direct(roles()) && Set.of("MO","DP").contains(latest.contractTypeCode())?Objects.requireNonNullElse(mapper.latestPrice(latest.assignmentId()),latest.billingPrice()):null,
                 start==null?new ArrayList<>():rows.stream().filter(r -> "ACT".equals(r.statusCode()) && r.startDate().isBefore(start) && !r.endDate().isBefore(start))
                     .map(r -> view(r,start.getYear())).toList());
         }).sorted(Comparator.comparing(ContractDeveloper::name).thenComparing(ContractDeveloper::developerId)).toList());
@@ -141,12 +180,13 @@ public class CommonAssignmentService {
         if (p==null || !Set.of("ING","PRE").contains(p.statusCode)) throw CodeFailure.invalid("projectId","종료·실주 또는 없는 프로젝트입니다.");
         Person person=mapper.person(developerId,db(YearMonth.from(start)),start,end);
         if(person==null) throw CodeFailure.invalid("developerId","개발자를 골라 주세요.");
+        direct(developerId);
         period(start,end,p.endDate,person,"endDate");
         validCode("JOB",ProjectRules.text(b,"jobCode",10,true),"jobCode");monthly(b,"monthlyMm",null);
         String type=ProjectRules.text(b,"inputTypeCode",10,true);
         if(!Set.of("NEW","ADD","SUB","FREE").contains(type)) throw CodeFailure.invalid("inputTypeCode","투입 구분을 골라 주세요.");
         String contract=ProjectRules.text(b,"contractDeveloperId",20,false);
-        if("SUB".equals(type) && (blank(contract) || contract.equals(developerId) || mapper.rows().stream().noneMatch(r -> projectId.equals(r.projectId()) && contract.equals(r.developerId())))) throw CodeFailure.invalid("contractDeveloperId","계약상 인력을 골라 주세요.");
+        if("SUB".equals(type) && (blank(contract) || contract.equals(developerId) || mapper.projectRows(projectId).stream().noneMatch(r -> contract.equals(r.developerId())))) throw CodeFailure.invalid("contractDeveloperId","계약상 인력을 골라 주세요.");
         if(!"SUB".equals(type) && contract!=null) throw CodeFailure.invalid("contractDeveloperId","대체투입에서만 계약상 인력을 선택합니다.");
         AssignmentPricePolicy.registration(roles(),p.contractTypeCode,type,ProjectRules.money(b,"billingPrice",false),person.defaultPrice());
         var warnings=new ArrayList<String>();
@@ -162,29 +202,41 @@ public class CommonAssignmentService {
     public Assignment postCommonAssignment(JsonNode body) { return create(body,null); }
     @Transactional
     public Assignment create(JsonNode b,String uploadExtension) {
-        ClientRules.object(b,Set.of("projectId","developerId","jobCode","startDate","endDate","monthlyMm","inputTypeCode","billingPrice","contractDeveloperId","replacementAction","earlyWithdrawalAssignmentIds","reasonCode","memo"));
+        ClientRules.object(b,Set.of("projectId","developerId","jobCode","startDate","endDate","monthlyMm","inputTypeCode","billingPrice","contractDeveloperId","replacementAction","earlyWithdrawalAssignmentIds","reasonCode","memo","candidateId"));
         String developer=ProjectRules.text(b,"developerId",20,false);
         if (blank(developer)) throw CodeFailure.invalid("developerId","개발자를 골라 주세요.");
         String projectId=ProjectRules.text(b,"projectId",20,true);
+        String candidate=ProjectRules.text(b,"candidateId",12,false);
+        if (blank(candidate)) candidate=null;
+        else if (!candidate.matches("[0-9]{1,12}")) throw CodeFailure.invalid("candidateId","후보 식별자를 확인해 주세요.");
         lockSources(); lockProject(projectId);
+        if (candidate!=null) {
+            CandidateRow source=mapper.lockCandidate(candidate);
+            if (source==null) throw CodeFailure.invalid("candidateId","배정 후보를 찾을 수 없습니다.");
+            if (!"CNVT".equals(source.statusCode())) throw CodeFailure.conflict();
+            // 시안대로 [확정] 창에서 프로젝트·개발자를 바꿔 저장해도 막지 않는다. 그 후보는 확정 처리되어 목록에서 빠진다(사용자 결정 2026-11-18).
+        }
         LocalDate start=ProjectRules.date(b,"startDate"),end=ProjectRules.date(b,"endDate");
         var project=projects.selectProject(projectId,calendar.today(),db(calendar.currentMonth()));
         if (project==null || !Set.of("ING","PRE").contains(project.statusCode)) throw CodeFailure.invalid("projectId","종료·실주 프로젝트에는 배정할 수 없습니다.");
         Person person=mapper.person(developer,db(YearMonth.from(start)),start,end);
         if (person==null) throw CodeFailure.invalid("developerId","개발자를 골라 주세요.");
+        direct(developer);
         period(start,end,project.endDate,person,"endDate");
         String job=validCode("JOB",ProjectRules.text(b,"jobCode",10,true),"jobCode");
         String input=ProjectRules.text(b,"inputTypeCode",10,true);
         if (!Set.of("NEW","ADD","SUB","FREE").contains(input)) throw CodeFailure.invalid("inputTypeCode","투입 구분을 골라 주세요.");
         BigDecimal mm=monthly(b,"monthlyMm",null);
         String contract=ProjectRules.text(b,"contractDeveloperId",20,false);
+        var contractRows=new ArrayList<Row>();
         if ("SUB".equals(input)) {
-            if (blank(contract) || contract.equals(developer) || mapper.rows().stream().noneMatch(r -> r.projectId().equals(projectId) && r.developerId().equals(contract))) throw CodeFailure.invalid("contractDeveloperId","계약상 인력을 골라 주세요.");
+            if (!blank(contract) && !contract.equals(developer)) mapper.projectRows(projectId).stream().filter(r -> contract.equals(r.developerId())).forEach(contractRows::add);
+            if (contractRows.isEmpty()) throw CodeFailure.invalid("contractDeveloperId","계약상 인력을 골라 주세요.");
         } else if (contract!=null) throw CodeFailure.invalid("contractDeveloperId","대체투입에서만 계약상 인력을 선택합니다.");
         BigDecimal requested=ProjectRules.money(b,"billingPrice",false);
         BigDecimal standard=person.defaultPrice();
         if ("SUB".equals(input)) {
-            var previous=mapper.rows().stream().filter(r -> r.projectId().equals(projectId) && r.developerId().equals(contract))
+            var previous=contractRows.stream()
                 .max(Comparator.comparing(Row::endDate).thenComparing(Row::startDate).thenComparing(Row::assignmentId)).orElseThrow();
             standard=Objects.requireNonNullElse(mapper.latestPrice(previous.assignmentId()),previous.billingPrice());
         }
@@ -214,9 +266,9 @@ public class CommonAssignmentService {
         String extension=uploadExtension==null?null:extension(uploadExtension,"extensionPossibilityCode");
         String id=allocate();
         Row row=new Row(id,projectId,developer,job,start,end,mm,price,input,contract,extension,0,"N","ACT",null,project.projectName,person.name(),null,code("JOB",job,""),project.contractTypeCode,project.statusCode);
-        rules.sourceSemantics();
         mapper.insert(new Write(row,userId(),null));
         history(row,new Event("INPUT",start,"","투입",null,memo,price,mm,null));
+        if (candidate!=null && mapper.confirmCandidate(candidate,userId())!=1) throw CodeFailure.conflict();
         for (Row source:originals) {
             Row withdrawn=replace(source,new Values(start.minusDays(1),source.monthlyMm(),source.billingPrice(),source.inputTypeCode(),source.extensionPossibilityCode(),source.extensionCount(),"Y",source.statusCode()));
             update(source,withdrawn);
@@ -265,6 +317,11 @@ public class CommonAssignmentService {
     private void history(Row r,Event e) {
         mapper.insertHistory(new HistoryWrite(new HistoryRow(mapper.nextHistory(r.assignmentId()),r.assignmentId(),e.type(),e.date(),e.before(),e.after(),e.reason(),e.memo(),e.price(),e.mm(),e.date().isBefore(calendar.today())?"Y":"N",crossesClose(e.date(),r.endDate())?"Y":"N","N",e.target(),userId(),null),userId()));
     }
+    /** 금액 화면 글: 천 단위 쉼표(원 단위 정수, 소수가 있으면 그대로 둔다). */
+    static String price(BigDecimal value) {
+        if (value==null) return "";
+        return new java.text.DecimalFormat("#,##0.##",java.text.DecimalFormatSymbols.getInstance(Locale.ROOT)).format(value);
+    }
     private String extension(String text,String field) {
         if (text==null) throw CodeFailure.invalid(field,"연장 가능성을 골라 주세요.");
         return text.isEmpty()?null:validCode("EXT_PSBL",text,field);
@@ -305,11 +362,16 @@ public class CommonAssignmentService {
                 if (!AssignmentPricePolicy.direct(roles()) || !AssignmentPricePolicy.billable(r.contractTypeCode(),r.inputTypeCode())) throw CodeFailure.invalid("newBillingPrice","이 배정은 단가를 직접 변경할 수 없습니다.");
                 newPrice=ProjectRules.money(b,"newBillingPrice",true);
                 if (newPrice.signum()<=0) throw CodeFailure.invalid("newBillingPrice","새 단가는 양수여야 합니다.");
-                before=rules.effective(mapper.history(id),"UPRC",YearMonth.from(effective),r.billingPrice()).toPlainString(); after=newPrice.toPlainString();
+                BigDecimal current=rules.effective(mapper.history(id),"UPRC",YearMonth.from(effective),r.billingPrice());
+                if (current!=null && current.compareTo(newPrice)==0) throw CodeFailure.invalid("changeTypeCode","현재와 다른 값을 입력해 주세요.");
+                // 변경 이력 전·후는 화면 글로 남긴다(천 단위 쉼표, 예: 8,000,000).
+                before=price(current); after=price(newPrice);
             }
             case "RATE" -> {
                 newMm=monthly(b,"newMonthlyMm",null);
-                before=rules.effective(mapper.history(id),"RATE",YearMonth.from(effective),r.monthlyMm()).toPlainString(); after=newMm.toPlainString();
+                BigDecimal current=rules.effective(mapper.history(id),"RATE",YearMonth.from(effective),r.monthlyMm());
+                if (current.compareTo(newMm)==0) throw CodeFailure.invalid("changeTypeCode","현재와 다른 값을 입력해 주세요.");
+                before=current.toPlainString(); after=newMm.toPlainString();
             }
             case "EXTP" -> {
                 extension=extensionInput(b,"newExtensionPossibilityCode");
@@ -322,8 +384,7 @@ public class CommonAssignmentService {
             }
             default -> throw new IllegalStateException();
         }
-        boolean numeric=type.equals("UPRC") || type.equals("RATE");
-        if (numeric?new BigDecimal(before).compareTo(new BigDecimal(after))==0:before.equals(after)) throw CodeFailure.invalid("changeTypeCode","현재와 다른 값을 입력해 주세요.");
+        if (before.equals(after)) throw CodeFailure.invalid("changeTypeCode","현재와 다른 값을 입력해 주세요.");
         Row changed=replace(r,new Values(end,mm,price,input,extension,count,early,r.statusCode()));
         update(r,changed);
         history(r,new Event(type,effective,before,after,reason,memo,newPrice,newMm,null));
@@ -400,12 +461,10 @@ public class CommonAssignmentService {
         recalculate(r,YearMonth.from(r.startDate()));
     }
     private void recalculate(Row r,YearMonth from) {
-        rules.sourceSemantics();
         var range=new OpenRange(r.assignmentId(),db(from));
-        mapper.deleteOpenMonths(range); mapper.deleteOpenCosts(range);
+        mapper.deleteOpenMonths(range);
         if (!"ACT".equals(r.statusCode())) return;
         var closed=new HashSet<>(mapper.closedMonths()); var history=mapper.history(r.assignmentId());
-        var project=projects.selectProject(r.projectId(),calendar.today(),db(calendar.currentMonth()));
         for(YearMonth m=from.isBefore(YearMonth.from(r.startDate()))?YearMonth.from(r.startDate()):from;!m.isAfter(YearMonth.from(r.endDate()));m=m.plusMonths(1)) {
             String month=db(m); if(closed.contains(month)) continue;
             BigDecimal contractual=rules.effective(history,"RATE",m,r.monthlyMm()),price=rules.effective(history,"UPRC",m,Objects.requireNonNullElse(r.billingPrice(),BigDecimal.ZERO));
@@ -413,10 +472,6 @@ public class CommonAssignmentService {
             BigDecimal sales=rules.sales(mm,price,AssignmentPricePolicy.billable(r.contractTypeCode(),r.inputTypeCode()));
             var monthRow=new MonthWrite(r.assignmentId(),month,r.developerId(),r.projectId(),rules.days(r.startDate(),r.endDate(),m),mm,price,sales,userId());
             mapper.saveMonth(monthRow);
-            Person person=mapper.person(r.developerId(),month,r.startDate(),r.endDate());
-            var direct=projectAmounts.personnelDirectCost(person.employeeTypeCode(),Objects.requireNonNullElse(project.teamExpenseAmount,BigDecimal.ZERO),Objects.requireNonNullElse(project.projectExpenseAmount,BigDecimal.ZERO),mm);
-            BigDecimal labor=Objects.requireNonNullElse(mapper.labor(r.developerId(),month),BigDecimal.ZERO).multiply(mm).setScale(0,java.math.RoundingMode.DOWN);
-            mapper.saveCost(new CostWrite(monthRow,labor,direct.teamAmount(),direct.projectAmount(),"PRE".equals(r.projectStatusCode())?"PRE":"ALLOC",r.contractTypeCode(),person.partId()));
         }
     }
     @Transactional

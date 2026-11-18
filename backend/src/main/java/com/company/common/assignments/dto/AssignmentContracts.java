@@ -21,9 +21,10 @@ public final class AssignmentContracts {
         String changeTypeName, String beforeValue, String afterValue, String reason, String memo,
         String changedBy, Instant changedAt, String retroactiveYn, String correctedYn, Instant modifiedAt) {}
     public record Candidate(String candidateId, String projectId, String projectName, String developerId,
-        String name, String jobCode, String jobName, LocalDate startDate, LocalDate endDate) {}
+        String name, String managementNumber, String jobCode, String jobName, LocalDate startDate, LocalDate endDate,
+        @JsonInclude(JsonInclude.Include.ALWAYS) Instant modifiedAt) {}
     public record Removed(String candidateId) {}
-    public record ContractDeveloper(String developerId, String name, LocalDate endDate, BigDecimal billingPrice,
+    public record ContractDeveloper(String developerId, String name, String jobName, LocalDate endDate, BigDecimal billingPrice,
         List<Assignment> overlappingAssignments) {}
     public record Version(String assignmentId, Instant modifiedAt) {}
 }

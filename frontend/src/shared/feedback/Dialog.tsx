@@ -162,7 +162,8 @@ export function ConfirmDialog({
   testId?: string;
 }) {
   return (
-    <Dialog title={title} onClose={onCancel} testId={testId} role="alertdialog">
+    // 시안의 모든 작은 창(openModal) 머리에는 [×] 닫기가 있다 — 확인 창도 같다(사용자 결정 2026-11-18).
+    <Dialog title={title} onClose={onCancel} testId={testId} role="alertdialog" closable>
       <p>{description}</p>
       <ConfirmButtons
         onCancel={onCancel}

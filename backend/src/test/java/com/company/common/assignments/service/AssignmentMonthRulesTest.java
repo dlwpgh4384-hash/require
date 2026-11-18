@@ -39,7 +39,7 @@ class AssignmentMonthRulesTest {
         rules=new AssignmentMonthRules(definitions,new DeveloperManMonthRules(definitions));
     }
     @Test void actualSeedSupportsInclusiveCalendarDaysAndFractionalContractMm() {
-        rules.sourceSemantics();YearMonth m=YearMonth.of(2026,11);
+        YearMonth m=YearMonth.of(2026,11);
         assertThat(rules.mm(BigDecimal.ONE,m.atDay(1),m.atEndOfMonth(),m)).isEqualByComparingTo("1.00");
         assertThat(rules.mm(new BigDecimal("0.6"),m.atDay(1),m.atEndOfMonth(),m)).isEqualByComparingTo("0.60");
         assertThat(rules.mm(new BigDecimal("0.25"),m.atDay(1),m.atEndOfMonth(),m)).isEqualByComparingTo("0.25");
@@ -91,23 +91,24 @@ class AssignmentMonthRulesTest {
             .isInstanceOf(com.company.common.support.service.CodeFailure.class)
             .hasMessageContaining("식-02");
     }
-    @Test void nullSourceFormulaHasAnExplicitCalculationError() {
-        source.put("식-70",new Definition("식-70",null,"독립 계산식"));
-        assertThatThrownBy(() -> rules.sourceSemantics())
-            .isInstanceOf(com.company.common.support.service.CodeFailure.class)
-            .hasMessageContaining("식-70");
+    /** 계산에 쓰지 않는 식(식-07·10·12·16·59·70, 식-00 원칙)의 글을 DB에서 고쳐도 저장 계산은 막히지 않는다. */
+    @Test void changedTextOfFormulasNotUsedForCalculationDoesNotBlockSaving() {
+        for(String id:List.of("식-00","식-07","식-10","식-12","식-16","식-59","식-70"))
+            source.put(id,new Definition(id,"사람이 고친 설명 "+id,"독립 계산식"));
+        var month=YearMonth.of(2026,10);
+        assertThat(rules.mm(BigDecimal.ONE,month.atDay(16),month.atEndOfMonth(),month)).isEqualByComparingTo("0.52");
+        assertThat(rules.sales(new BigDecimal("0.52"),new BigDecimal("7000000"),true)).isEqualByComparingTo("3640000");
+        for(String id:List.of("식-07","식-10","식-12","식-16","식-59","식-70")) verify(mapper,never()).selectDefinition(id);
     }
     @Test void assignmentAndDependentCostDefinitionsAllComeThroughTheExistingService() {
         var snapshot=Map.copyOf(source);
         var month=YearMonth.of(2026,10);
-        rules.sourceSemantics();
         rules.mm(BigDecimal.ONE,month.atDay(1),month.atEndOfMonth(),month);
         rules.sales(BigDecimal.ONE,new BigDecimal("1234567"),true);
         rules.over(BigDecimal.ONE);
         new ProjectAmountRules(definitions).personnelDirectCost(
             "FT",new BigDecimal("50000"),new BigDecimal("40000"),BigDecimal.ONE);
-        for(String id:List.of("식-00","식-01","식-02","식-07","식-10","식-11",
-                "식-12","식-16","식-58","식-59","식-70","식-95")) {
+        for(String id:List.of("식-00","식-01","식-02","식-11","식-58","식-95")) {
             verify(mapper,atLeastOnce()).selectDefinition(id);
         }
         assertThat(source).isEqualTo(snapshot);

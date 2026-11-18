@@ -117,7 +117,7 @@ class DeveloperPersistenceTest {
         mvc.perform(put("/api/common/developers/{developerId}",id).contentType("application/json")
             .content(input().put("modifiedAt",token(id)).put("employeeTypeCode",nextType).put("monthlyRate",200).put("monthlyPay",100).toString()))
             .andExpect(status().isOk())
-            .andExpect(com.company.common.support.controller.OpenApiResponseContract.response("PUT","/api/common/developers/{developerId}"))
+            .andExpect(com.company.common.support.controller.OpenApiResponseContract.response("PUT","/api/common/developers/{developerId}","contracts/openapi-manual.yaml"))
             .andExpect(jsonPath("$.data.employeeTypeCode").value(nextType));
         assertThat(db.queryForObject("SELECT emp_type_cd FROM TB_HR_DEV WHERE dev_id=?",String.class,id)).isEqualTo(nextType);
         assertThat(db.queryForObject("SELECT emp_type_cd FROM TB_HR_MON_PAY WHERE dev_id=? AND pay_ym='"+BEFORE+"'",String.class,id)).isEqualTo("FT");

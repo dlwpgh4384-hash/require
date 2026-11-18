@@ -18,6 +18,7 @@ import type {
 } from "../../app/NavigationRoot";
 import { NavigationMenuIcon } from "../../app/NavigationMenuIcon";
 import { CommonNavigationPage } from "./CommonNavigationPage";
+import { findScreen, screenRegistry } from "./screenRegistry";
 
 const initialScreens = [
   "UI-16",
@@ -188,27 +189,34 @@ function respond(body: ShellMenuResponse) {
   vi.stubGlobal("fetch", request);
   return request;
 }
-async function expectScreenContent(id: string) {
-  const panel = await screen.findByTestId(`screen-panel-${id.toLowerCase()}`);
-  await waitFor(() => expect(panel).toBeVisible());
-  // 비활성 탭도 마운트되어 있으므로 현재 화면 안에서만 내용을 찾는다.
-  const content = within(panel);
-  if (id === "UI-01") {
-    expect(await content.findByTestId("project-page")).toBeVisible();
-  } else if (id === "UI-12") {
-    expect(await content.findByTestId("assignment-page")).toBeVisible();
+type Content = ReturnType<typeof within>;
+/**
+ * 화면별 깊은 확인(만든 화면 목록의 화면 ID로 찾는다). 맨 바깥 시험 ID가 보이는지는
+ * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
+ */
+const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-01": async () => undefined,
+  "UI-12": async (content) => {
     expect(await content.findByTestId("assignment-empty")).toBeVisible();
     expect(
-      content.getByRole("textbox", { name: "이름/관리번호" }),
+      content.getByRole("textbox", { name: "이름" }),
     ).toBeVisible();
+    expect(content.getByRole("textbox", { name: "이름" })).toHaveAttribute(
+      "placeholder",
+      "이름 또는 관리번호",
+    );
     const actions = within(screen.getByTestId("screen-actions"));
     await waitFor(() =>
-      expect(actions.getByRole("button", { name: "+ 배정" })).toBeEnabled(),
+      expect(actions.getByRole("button", { name: "배정" })).toBeEnabled(),
     );
-    expect(
-      actions.getByRole("button", { name: "엑셀 다운로드" }),
-    ).toBeEnabled();
-  } else if (id === "UI-02") {
+    // 시안: 엑셀 다운로드는 제목줄이 아니라 목록 도구 줄에 있다.
+    expect(actions.queryByText("엑셀 다운로드")).not.toBeInTheDocument();
+    expect(content.getByTestId("list-download")).toBeEnabled();
+    expect(content.getByTestId("list-download")).toHaveTextContent(
+      "엑셀 다운로드",
+    );
+  },
+  "UI-02": async (content) => {
     expect(
       await content.findByText("조건에 맞는 결과가 없습니다."),
     ).toBeVisible();
@@ -223,7 +231,8 @@ async function expectScreenContent(id: string) {
         "developer-create",
       ),
     ).toBeVisible();
-  } else if (id === "UI-15") {
+  },
+  "UI-15": async (content) => {
     expect(
       await content.findByText("조건에 맞는 결과가 없습니다."),
     ).toBeVisible();
@@ -239,7 +248,8 @@ async function expectScreenContent(id: string) {
       expect(screen.getByTestId("client-create")).toBeEnabled(),
     );
     expect(screen.getByTestId("client-workspace-parts")).toBeVisible();
-  } else if (id === "UI-23") {
+  },
+  "UI-23": async (content) => {
     expect(
       await content.findByText("조건에 맞는 결과가 없습니다."),
     ).toBeVisible();
@@ -247,17 +257,20 @@ async function expectScreenContent(id: string) {
     expect(screen.getByTestId("user-keyword-filter")).toBeVisible();
     expect(screen.getByTestId("list-search")).toBeVisible();
     expect(screen.getByTestId("user-register-open")).toBeVisible();
-  } else if (id === "UI-24") {
+  },
+  "UI-24": async (content) => {
     expect(await content.findByText("활성 역할이 없습니다.")).toBeVisible();
     expect(screen.getByTestId("role-page")).toBeVisible();
-  } else if (id === "UI-25") {
+  },
+  "UI-25": async (content) => {
     expect(await content.findByText("등록된 메뉴가 없습니다.")).toBeVisible();
     expect(screen.getByTestId("menu-settings-page")).toBeVisible();
     // 데이터를 다 읽은 뒤에 켜진다: 켜질 때까지 기다린다(느린 환경에서 깜빡 실패 방지).
     await waitFor(() =>
       expect(screen.getByTestId("menu-registration-open")).toBeEnabled(),
     );
-  } else if (id === "UI-27") {
+  },
+  "UI-27": async (content) => {
     expect(
       await content.findByText("등록된 코드 그룹이 없습니다."),
     ).toBeVisible();
@@ -270,7 +283,20 @@ async function expectScreenContent(id: string) {
     await waitFor(() =>
       expect(screen.getByTestId("code-group-title-add")).toBeEnabled(),
     );
+  },
+};
+async function expectScreenContent(id: string) {
+  const panel = await screen.findByTestId(`screen-panel-${id.toLowerCase()}`);
+  await waitFor(() => expect(panel).toBeVisible());
+  // 비활성 탭도 마운트되어 있으므로 현재 화면 안에서만 내용을 찾는다.
+  const content = within(panel);
+  const entry = findScreen(id);
+  if (entry) {
+    // 만든 화면(화면 목록에 있음): 맨 바깥 시험 ID가 보이고, 화면별 깊은 확인을 한다.
+    expect(await content.findByTestId(entry.rootTestId)).toBeVisible();
+    await deepChecks[id]?.(content);
   } else {
+    // 화면 목록에 없는 화면은 「준비 중」.
     expect(
       await content.findByRole("region", { name: `${id} 본문` }),
     ).toHaveTextContent("준비 중");
@@ -302,9 +328,16 @@ describe("common placeholder screen contract", () => {
     const request = respond(fixture());
     mount("/screens/UI-12");
     await expectScreenContent("UI-12");
-    fireEvent.change(screen.getByRole("textbox", { name: "이름/관리번호" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "이름" }), {
       target: { value: "D-0001" },
     });
+    // 시안: 조건은 [조회] 또는 Enter로 적용한다(입력만으로는 다시 읽지 않음).
+    expect(
+      request.mock.calls.some(([url]) =>
+        String(url).includes("keyword=D-0001"),
+      ),
+    ).toBe(false);
+    fireEvent.submit(screen.getByTestId("assignment-filters"));
     await waitFor(() =>
       expect(
         request.mock.calls.some(
@@ -315,7 +348,7 @@ describe("common placeholder screen contract", () => {
       ).toBe(true),
     );
     await expectScreenContent("UI-12");
-    expect(screen.getByRole("textbox", { name: "이름/관리번호" })).toHaveValue(
+    expect(screen.getByRole("textbox", { name: "이름" })).toHaveValue(
       "D-0001",
     );
     expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-12");
@@ -474,13 +507,8 @@ describe("common placeholder screen contract", () => {
       expect(screen.getAllByRole("banner")).toHaveLength(1);
       expect(screen.getAllByRole("complementary")).toHaveLength(1);
       expect(screen.getAllByRole("main")).toHaveLength(1);
-      if (
-        id !== "UI-23" &&
-        id !== "UI-15" &&
-        id !== "UI-02" &&
-        id !== "UI-01" &&
-        id !== "UI-12"
-      ) {
+      // 입력 칸이 없는 화면(화면 목록 hasInputs=false, 「준비 중」 화면 포함)은 글 입력 칸·조회/저장 등 단추가 없다.
+      if (!findScreen(id)?.hasInputs) {
         expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
         for (const name of ["조회", "저장", "다운로드", "업로드", "편집"]) {
           if (id === "UI-25" && name === "저장")
@@ -497,6 +525,17 @@ describe("common placeholder screen contract", () => {
       expect(screen.getByLabelText("주소")).toHaveTextContent(`/screens/${id}`);
     },
   );
+
+  it("registered screens are unique, opened by the initial menu fixture, and deep checks only target registered screens", () => {
+    // 화면 목록에 새 화면을 넣으면 위 처음 화면 시험들이 그 화면을 실제로 열어 본다(만든 화면/준비 중 구분은 화면 목록에서).
+    const ids = screenRegistry.map((entry) => entry.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const entry of screenRegistry) {
+      expect(initialScreens).toContain(entry.id);
+      expect(entry.rootTestId).not.toBe("");
+    }
+    for (const id of Object.keys(deepChecks)) expect(ids).toContain(id);
+  });
 
   it("accepts a database-added screen without a static registration list", async () => {
     respond(response([row("new", null, "DB-ADDED", 1)]));

@@ -11,85 +11,24 @@ import {
   useUserPreferences,
 } from "../userpreferences";
 import { PlaceholderScreen } from "./PlaceholderScreen";
-import { ProjectPage } from "../projects/ProjectPage";
-import { AssignmentPage } from "../assignments/AssignmentPage";
-import {
-  ProjectTitleActions,
-  ProjectWorkspaceProvider,
-} from "../projects/ProjectWorkspace";
-import { UserPage } from "../users/UserPage";
-import { RolePage } from "../roles/RolePage";
-import { MenuPage } from "../menusettings/MenuPage";
-import { CodePage } from "../codegroups/CodePage";
-import {
-  CodeTitleActions,
-  CodeWorkspaceProvider,
-} from "../codegroups/CodeWorkspace";
-import { CodeMapsPanel } from "../codemaps/CodeMapsPanel";
-import { OperatingStandardsPanel } from "../operatingstandards/OperatingStandardsPanel";
-import { CodeHistoryPanel } from "../commonops/CodeHistoryPanel";
-import {
-  ClientPartWorkspace,
-  ClientPartWorkspaceProvider,
-  ClientPartTitleActions,
-} from "../clients/ClientPartWorkspace";
-import { PartPage } from "../parts/PartPage";
-import { PartTitleActions } from "../parts/ClientPartWorkspace";
-import {
-  DeveloperWorkspace,
-  DeveloperWorkspaceProvider,
-  DeveloperTitleActions,
-} from "../developers/DeveloperWorkspace";
-import {
-  MenuTitleActions,
-  MenuWorkspaceProvider,
-} from "../menusettings/MenuWorkspace";
-import {
-  RoleTitleActions,
-  RoleWorkspaceProvider,
-} from "../roles/RoleWorkspace";
-import {
-  UserRegistrationButton,
-  UserWorkspaceProvider,
-} from "../users/UserWorkspace";
+import { findScreen } from "./screenRegistry";
+import { ProjectWorkspaceProvider } from "../projects/ProjectWorkspace";
+import { CodeWorkspaceProvider } from "../codegroups/CodeWorkspace";
+import { ClientPartWorkspaceProvider } from "../clients/ClientPartWorkspace";
+import { DeveloperWorkspaceProvider } from "../developers/DeveloperWorkspace";
+import { MenuWorkspaceProvider } from "../menusettings/MenuWorkspace";
+import { RoleWorkspaceProvider } from "../roles/RoleWorkspace";
+import { UserWorkspaceProvider } from "../users/UserWorkspace";
 
-const renderScreen = (scrnId: string) =>
-  scrnId === "UI-01" ? (
-    <ProjectPage />
-  ) : scrnId === "UI-12" ? (
-    <AssignmentPage />
-  ) : scrnId === "UI-02" ? (
-    <DeveloperWorkspace />
-  ) : scrnId === "UI-15" ? (
-    <ClientPartWorkspace partPage={<PartPage />} />
-  ) : scrnId === "UI-23" ? (
-    <UserPage />
-  ) : scrnId === "UI-24" ? (
-    <RolePage />
-  ) : scrnId === "UI-25" ? (
-    <MenuPage />
-  ) : scrnId === "UI-27" ? (
-    <CodePage
-      panels={({ dirty, onDirtyChange, onChanged, historyRevision }) => ({
-        maps: (
-          <CodeMapsPanel
-            dirty={dirty}
-            onDirtyChange={onDirtyChange}
-            onChanged={onChanged}
-          />
-        ),
-        standards: (
-          <OperatingStandardsPanel
-            onDirtyChange={onDirtyChange}
-            onChanged={onChanged}
-          />
-        ),
-        history: <CodeHistoryPanel refreshKey={historyRevision} />,
-      })}
-    />
-  ) : (
-    <PlaceholderScreen scrnId={scrnId} />
-  );
+// 만든 화면은 화면 목록(screenRegistry) 한 곳에서 고른다. 없으면 「준비 중」.
+const renderScreen = (scrnId: string) => {
+  const entry = findScreen(scrnId);
+  return entry ? <entry.Page /> : <PlaceholderScreen scrnId={scrnId} />;
+};
+const screenActions = (scrnId: string | null | undefined) => {
+  const entry = findScreen(scrnId);
+  return entry?.TitleActions ? <entry.TitleActions /> : undefined;
+};
 
 /** 공통 화면 틀(00) + 공통 기능(00-1): 탭, 즐겨찾기·최근, 도구줄, 메뉴 접기 저장. */
 function PreferenceNavigation() {
@@ -123,22 +62,7 @@ function PreferenceNavigation() {
       extensions={(context) => {
         const menus = context.menus as ShellMenuItem[];
         return {
-          screenActions:
-            context.screenId === "UI-01" || context.screenId === "UI-12" ? (
-              <ProjectTitleActions />
-            ) : context.screenId === "UI-02" ? (
-              <DeveloperTitleActions />
-            ) : context.screenId === "UI-15" ? (
-              <ClientPartTitleActions partActions={<PartTitleActions />} />
-            ) : context.screenId === "UI-23" ? (
-              <UserRegistrationButton />
-            ) : context.screenId === "UI-24" ? (
-              <RoleTitleActions />
-            ) : context.screenId === "UI-25" ? (
-              <MenuTitleActions />
-            ) : context.screenId === "UI-27" ? (
-              <CodeTitleActions />
-            ) : undefined,
+          screenActions: screenActions(context.screenId),
           quickAccess: (
             <PersonalScreenLists
               menus={menus}
@@ -190,25 +114,7 @@ export function CommonNavigationPage() {
                       tabs
                       renderScreen={renderScreen}
                       extensions={(context) => ({
-                        screenActions:
-                          context.screenId === "UI-01" ||
-                          context.screenId === "UI-12" ? (
-                            <ProjectTitleActions />
-                          ) : context.screenId === "UI-02" ? (
-                            <DeveloperTitleActions />
-                          ) : context.screenId === "UI-15" ? (
-                            <ClientPartTitleActions
-                              partActions={<PartTitleActions />}
-                            />
-                          ) : context.screenId === "UI-23" ? (
-                            <UserRegistrationButton />
-                          ) : context.screenId === "UI-24" ? (
-                            <RoleTitleActions />
-                          ) : context.screenId === "UI-25" ? (
-                            <MenuTitleActions />
-                          ) : context.screenId === "UI-27" ? (
-                            <CodeTitleActions />
-                          ) : undefined,
+                        screenActions: screenActions(context.screenId),
                       })}
                     />
                   )}

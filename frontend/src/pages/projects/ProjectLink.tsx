@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { ProjectDetail } from "./ProjectDetail";
+import { useOpenProjectEdit } from "./projectEdit";
 import "./projects.css";
 
 export function ProjectLink({
@@ -18,6 +19,7 @@ export function ProjectLink({
   const [open, setOpen] = useState(false);
   // 다른 화면(철수 리스트 상세 등)에서 연 상세에서 저장해도 완료 알림이 보이게 한다(2026-11-19 사용자 발견: 인원 계획 저장 뒤 알림 없음).
   const [notice, setNotice] = useState<{ message: string; kind?: ToastKind } | null>(null);
+  const openEdit = useOpenProjectEdit();
   if (!projectId) return <span>{name}</span>;
   return (
     <>
@@ -42,6 +44,11 @@ export function ProjectLink({
               projectId={projectId}
               readOnly={readOnly}
               onClose={() => setOpen(false)}
+              onEdit={(project) => {
+                // 시안 editform: 상세를 닫고 프로젝트 화면의 수정 폼을 연다.
+                setOpen(false);
+                openEdit(project);
+              }}
               onChanged={(message, kind) => {
                 if (message) setNotice({ message, kind });
               }}

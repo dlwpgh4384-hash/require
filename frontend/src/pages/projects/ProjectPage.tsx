@@ -21,6 +21,7 @@ import { ProjectDetail } from "./ProjectDetail";
 import { ProjectDistribution } from "./ProjectDistribution";
 import { ProjectForm } from "./ProjectForm";
 import { useProjectTitleHost } from "./ProjectWorkspace";
+import { subscribeProjectEdit } from "./projectEdit";
 import {
   HQ_PART,
   getCommonProjects,
@@ -114,6 +115,16 @@ export function ProjectPage() {
     setNoticeKind(kind);
     setNotice(message);
   };
+  // 다른 화면에서 연 프로젝트 상세의 [수정] → 이 화면의 수정 폼(시안 editform).
+  useEffect(
+    () =>
+      subscribeProjectEdit((project) => {
+        setDetail(null);
+        setDistribution(null);
+        setForm({ project });
+      }),
+    [],
+  );
   useEffect(() => {
     const abort = new AbortController();
     setError("");

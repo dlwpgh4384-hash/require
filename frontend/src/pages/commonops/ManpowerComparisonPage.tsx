@@ -12,6 +12,7 @@ import {
 import { YearBar } from "../../shared/period/YearBar";
 import { koreanToday } from "../../shared/time";
 import { ProjectDetail } from "../projects/ProjectDetail";
+import { useOpenProjectEdit } from "../projects/projectEdit";
 import {
   getCommonProjects,
   projectFailure,
@@ -77,6 +78,7 @@ export function ManpowerComparisonPage() {
   }));
   const [applied, setApplied] = useState<ManpowerComparisonFilter>(draft);
   const [revision, setRevision] = useState(0);
+  const openEdit = useOpenProjectEdit();
   const [data, setData] = useState<ManpowerComparisonResult | null>(null);
   const [error, setError] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -422,6 +424,11 @@ export function ManpowerComparisonPage() {
           onClose={() => {
             setDetail(null);
             refresh();
+          }}
+          onEdit={(project) => {
+            // 시안 editform: 상세를 닫고 프로젝트 화면의 수정 폼을 연다.
+            setDetail(null);
+            openEdit(project);
           }}
           onChanged={(message, kind) => {
             // 인원 계획을 저장하면 이 목록에 바로 반영한다.

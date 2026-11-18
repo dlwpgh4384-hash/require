@@ -46,6 +46,18 @@
     COALESCE(BFR_VAL,'') AS "beforeValue",COALESCE(AFT_VAL,'') AS "afterValue",ASGN_CHG_RSN_CD AS "reasonCode",COALESCE(CHG_MEMO,'') AS "memo",
     NEW_UPRC AS "price",NEW_CTRT_MM AS "mm",RTRO_YN AS "retroactiveYn",CLOSE_CROSS_YN AS "closedYn",CRCT_YN AS "correctedYn",CRCT_TRGT_SN AS "target",REG_USER_ID AS "actor",REG_DTTM AS "registeredAt"</sql>
   <select id="history" resultMap="historyRow">SELECT <include refid="historyColumns"/> FROM TB_PJ_ASGN_HIST WHERE ASGN_ID=#{id} ORDER BY REG_DTTM DESC,HIST_SN DESC</select>
+  <resultMap id="monthValue" type="com.company.common.assignments.mapper.AssignmentRows$MonthValue"><constructor>
+    <idArg column="month" javaType="string"/><arg column="monthlyMm" javaType="java.math.BigDecimal"/><arg column="billingPrice" javaType="java.math.BigDecimal"/>
+  </constructor></resultMap>
+  <!-- 투입 기간의 달마다 그 달에 적용되는 계약 월 MM·청구 단가. 저장 때 같은 값 검사(AssignmentMonthRules.effective)와 같은 규칙:
+       월 MM은 투입·월 MM 변경, 단가는 투입·단가 변경 이력 중 적용 달이 그 달 이하인 마지막 줄(같은 달이면 나중 순번), 없으면 배정의 현재 값 -->
+  <select id="monthValues" resultMap="monthValue">SELECT to_char(m.ym,'YYYYMM') AS "month",
+    COALESCE((SELECT h.NEW_CTRT_MM FROM TB_PJ_ASGN_HIST h WHERE h.ASGN_ID=a.ASGN_ID AND h.ASGN_CHG_TYPE_CD IN ('INPUT','RATE') AND h.NEW_CTRT_MM IS NOT NULL
+      AND date_trunc('month',h.APLY_DT::timestamp) &lt;= m.ym ORDER BY date_trunc('month',h.APLY_DT::timestamp) DESC,h.HIST_SN DESC LIMIT 1),a.CTRT_MM) AS "monthlyMm",
+    COALESCE((SELECT h.NEW_UPRC FROM TB_PJ_ASGN_HIST h WHERE h.ASGN_ID=a.ASGN_ID AND h.ASGN_CHG_TYPE_CD IN ('INPUT','UPRC') AND h.NEW_UPRC IS NOT NULL
+      AND date_trunc('month',h.APLY_DT::timestamp) &lt;= m.ym ORDER BY date_trunc('month',h.APLY_DT::timestamp) DESC,h.HIST_SN DESC LIMIT 1),a.BILL_UPRC) AS "billingPrice"
+    FROM TB_PJ_ASGN a CROSS JOIN LATERAL generate_series(date_trunc('month',a.INPUT_BGN_DT::timestamp),date_trunc('month',a.INPUT_END_DT::timestamp),interval '1 month') AS m(ym)
+    WHERE a.ASGN_ID=#{id} ORDER BY m.ym</select>
   <select id="lockHistory" resultMap="historyRow">SELECT <include refid="historyColumns"/> FROM TB_PJ_ASGN_HIST WHERE ASGN_ID=#{id} AND HIST_SN=#{sequence} FOR UPDATE</select>
   <select id="nextHistory" resultType="int">SELECT COALESCE(MAX(HIST_SN),0)+1 FROM TB_PJ_ASGN_HIST WHERE ASGN_ID=#{id}</select>
   <insert id="insertHistory">INSERT INTO TB_PJ_ASGN_HIST (ASGN_ID,HIST_SN,ASGN_CHG_TYPE_CD,APLY_DT,BFR_VAL,AFT_VAL,ASGN_CHG_RSN_CD,CHG_MEMO,NEW_UPRC,NEW_CTRT_MM,RTRO_YN,CLOSE_CROSS_YN,CRCT_YN,CRCT_TRGT_SN,REG_USER_ID,REG_DTTM)

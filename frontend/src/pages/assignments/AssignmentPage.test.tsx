@@ -32,6 +32,8 @@ let request: ReturnType<typeof vi.fn>,
   contracts: unknown[],
   writeFailure: { status: number; message: string; errors?: { field: string; message: string }[] } | null;
 let project: Project;
+/** 개발자 목록에 더 넣을 사람(목록 응답은 directClassCode만 준다). */
+let extraDevelopers: Record<string, unknown>[] = [];
 const ok = (data: unknown) => ({
   ok: true,
   status: 200,
@@ -48,6 +50,7 @@ const codes: Record<string, unknown[]> = {
   ],
 };
 beforeEach(() => {
+  extraDevelopers = [];
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-11-15T00:00:00Z"));
   failure = false;
@@ -149,7 +152,7 @@ beforeEach(() => {
       if (["/direct-expenses", "/sales-parts", "/change-history"].some((s) => path.endsWith(s))) return ok({ items: [] });
       return ok(project);
     }
-    if (path === "/api/common/developers") return ok({ items: [developer] });
+    if (path === "/api/common/developers") return ok({ items: [developer, ...extraDevelopers] });
     if (path.endsWith("/statuses")) return ok({ items: statuses, canManageStatuses: false, canCancelPastRetirement: false });
     if (path.startsWith("/api/common/developers/") && path.endsWith("/assignments")) return ok({ items: booked });
     if (path.endsWith("/change-history")) return ok({ items: [] });
@@ -542,6 +545,18 @@ it("bulk cancel confirms with the mockup text and toasts", async () => {
   expect(await screen.findByTestId("assignment-toast")).toHaveTextContent("1건의 배정을 취소했습니다. 변경 이력에 「취소」로 남겼습니다.");
 });
 
+it("indirect staff given only as a code in the developer list are not offered (SFR-102-10)", async () => {
+  extraDevelopers = [
+    { developerId: "indirect", name: "정관리", managementNumber: "D-0009", workStatusName: "대기", employeeTypeCode: "FT", primaryJobCode: "PM", directClassCode: "INDRCT", useYn: "Y", monthlyRate: null },
+    { developerId: "direct2", name: "이직접", managementNumber: "D-0010", workStatusName: "대기", employeeTypeCode: "FT", primaryJobCode: "PM", directClassCode: "DRCT", useYn: "Y", monthlyRate: 7000000 },
+  ];
+  form();
+  await screen.findByRole("dialog", { name: "투입 배정" });
+  await ready();
+  await waitFor(() => expect(document.querySelector('#assignment-developer-list option[value="이직접 (D-0010)"]')).not.toBeNull());
+  expect(document.querySelector('#assignment-developer-list option[value="정관리 (D-0009)"]')).toBeNull();
+});
+
 it("assign form matches the mockup labels, options, hints and defaults", async () => {
   form();
   const panel = await screen.findByRole("dialog", { name: "투입 배정" });
@@ -852,6 +867,72 @@ it("monthly MM change defaults to the start date when it is after next month", a
   fireEvent.click(await screen.findByTestId("assignment-change-open"));
   fireEvent.change(await screen.findByTestId("assignment-change-type"), { target: { value: "RATE" } });
   expect(screen.getByTestId("assignment-change-date")).toHaveValue("2027-02");
+});
+
+const PRICE_HINT = "적용 시작월부터 청구·매출을 새 단가로 계산하고 앞선 달은 그대로 둡니다.";
+const MM_HINT = "적용 시작월부터 월 MM·원가·매출을 다시 계산하고 앞선 달은 그대로 둡니다.";
+const laterChanges = () => {
+  // 12월부터 단가 850만·월 MM 0.80으로 바꿔 둔 배정(지금 값은 11월 값)
+  row.months = [
+    { month: "202611", monthlyMm: 1, billingPrice: 8000000 },
+    { month: "202612", monthlyMm: 0.8, billingPrice: 8500000 },
+  ];
+};
+
+it("price change hint and same-price check use the price in effect for the chosen month", async () => {
+  laterChanges();
+  detail();
+  await openHistory();
+  fireEvent.click(await screen.findByTestId("assignment-change-open"));
+  const dialog = await screen.findByRole("dialog", { name: "변경 기록" });
+  fireEvent.change(screen.getByTestId("assignment-change-type"), { target: { value: "UPRC" } });
+  expect(dialog).toHaveTextContent(`2026-11 지금 월 8,000,000원. ${PRICE_HINT}`);
+  fireEvent.change(screen.getByTestId("assignment-change-date"), { target: { value: "2026-12" } });
+  expect(dialog).toHaveTextContent(`2026-12 지금 월 8,500,000원. ${PRICE_HINT}`);
+  fireEvent.change(screen.getByTestId("assignment-change-price"), { target: { value: "8500000" } });
+  fireEvent.click(screen.getByTestId("assignment-change-save"));
+  expect(await within(dialog).findByText("2026-12 단가와 같습니다.")).toBeInTheDocument();
+  expect(writes()).toHaveLength(0);
+  // 지금 단가(800만)로 12월을 되돌리는 것은 그 달 값과 다르므로 저장한다.
+  fireEvent.change(screen.getByTestId("assignment-change-price"), { target: { value: "8000000" } });
+  fireEvent.click(screen.getByTestId("assignment-change-save"));
+  await waitFor(() => expect(writes()).toHaveLength(1));
+  expect(body()).toMatchObject({ changeTypeCode: "UPRC", effectiveDate: "2026-12-01", newBillingPrice: 8000000 });
+});
+
+it("monthly MM change hint and same-value check use the contract MM in effect for the chosen month", async () => {
+  laterChanges();
+  detail();
+  await openHistory();
+  fireEvent.click(await screen.findByTestId("assignment-change-open"));
+  const dialog = await screen.findByRole("dialog", { name: "변경 기록" });
+  fireEvent.change(screen.getByTestId("assignment-change-type"), { target: { value: "RATE" } });
+  expect(screen.getByTestId("assignment-change-date")).toHaveValue("2026-12");
+  expect(dialog).toHaveTextContent(`지금 0.80. ${MM_HINT}`);
+  fireEvent.change(screen.getByTestId("assignment-change-mm"), { target: { value: "0.8" } });
+  fireEvent.click(screen.getByTestId("assignment-change-save"));
+  expect(await within(dialog).findByText("현재 월 MM과 같습니다.")).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("assignment-change-mm"), { target: { value: "1" } });
+  fireEvent.click(screen.getByTestId("assignment-change-save"));
+  await waitFor(() => expect(writes()).toHaveLength(1));
+  expect(body()).toMatchObject({ changeTypeCode: "RATE", effectiveDate: "2026-12-01", newMonthlyMm: 1 });
+});
+
+it("a month without its own value falls back to the current price and monthly MM", async () => {
+  row.months = [{ month: "202612", monthlyMm: 0.8, billingPrice: 8500000 }];
+  detail();
+  await openHistory();
+  fireEvent.click(await screen.findByTestId("assignment-change-open"));
+  const dialog = await screen.findByRole("dialog", { name: "변경 기록" });
+  fireEvent.change(screen.getByTestId("assignment-change-type"), { target: { value: "UPRC" } });
+  expect(dialog).toHaveTextContent(`2026-11 지금 월 8,000,000원. ${PRICE_HINT}`);
+  fireEvent.change(screen.getByTestId("assignment-change-type"), { target: { value: "RATE" } });
+  fireEvent.change(screen.getByTestId("assignment-change-date"), { target: { value: "2026-11" } });
+  expect(dialog).toHaveTextContent(`지금 1.00. ${MM_HINT}`);
+  fireEvent.change(screen.getByTestId("assignment-change-mm"), { target: { value: "1" } });
+  fireEvent.click(screen.getByTestId("assignment-change-save"));
+  expect(await within(dialog).findByText("현재 월 MM과 같습니다.")).toBeInTheDocument();
+  expect(writes()).toHaveLength(0);
 });
 
 it("correction modal focuses the first missing field", async () => {

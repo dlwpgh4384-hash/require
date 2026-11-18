@@ -265,6 +265,20 @@ class CommonAssignmentControllerTest {
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].overlappingAssignments[0].assignmentId").value("A-0001"));
         noWrites();
     }
+    @Test void detailListsTheValuesInEffectForEveryMonthAndHidesPricesFromPm() throws Exception {
+        when(mapper.monthValues("A-0001")).thenReturn(List.of(new MonthValue("202610",BigDecimal.ONE,new BigDecimal("8000000")),
+            new MonthValue("202611",BigDecimal.ONE,new BigDecimal("8000000")),new MonthValue("202612",new BigDecimal("0.8"),new BigDecimal("8500000"))));
+        mvc.perform(get("/api/common/assignments/A-0001")).andExpect(status().isOk()).andExpect(response("GET","/api/common/assignments/{assignmentId}"))
+            .andExpect(jsonPath("$.data.months.length()").value(3)).andExpect(jsonPath("$.data.months[0].month").value("202610"))
+            .andExpect(jsonPath("$.data.months[2].monthlyMm").value(0.8)).andExpect(jsonPath("$.data.months[2].billingPrice").value(8500000))
+            .andExpect(jsonPath("$.data.billingPrice").value(8000000)).andExpect(jsonPath("$.data.monthlyMm").value(1));
+        mvc.perform(get("/api/common/assignments").param("year","2026")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].months").doesNotExist());
+        var pm=mock(CurrentBusinessActor.class);when(pm.roles()).thenReturn(Set.of("PM"));when(pm.userId()).thenReturn("admin");
+        var hidden=new CommonAssignmentService(mapper,projects,calendar,pm,rules).getCommonAssignment("A-0001");
+        assertThat(hidden.months()).extracting(m -> m.billingPrice()).containsOnlyNulls();
+        assertThat(hidden.months()).extracting(m -> m.monthlyMm()).containsExactly(BigDecimal.ONE,BigDecimal.ONE,new BigDecimal("0.8"));
+        noWrites();
+    }
     @Test void pmUsesOnlyServerStandardAndCannotWritePriceChanges() {
         var pm=mock(CurrentBusinessActor.class);when(pm.roles()).thenReturn(Set.of("PM"));when(pm.userId()).thenReturn("admin");
         var service=new CommonAssignmentService(mapper,projects,calendar,pm,rules);

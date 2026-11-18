@@ -170,6 +170,10 @@ export function AssignmentDetail({
     if (e instanceof ProjectRequestError) setErrors(Object.fromEntries(e.errors.map((f) => [f.field, f.message])));
   };
   const monthType = (t: string) => MONTH_TYPES.includes(t);
+  /** 시안 U(a,m)·rateAt(a,m): 고른 달(YYYY-MM)에 적용되는 청구 단가·계약 월 MM. 그 달 값이 없으면 지금 값. */
+  const monthAt = (ym: string) => row?.months?.find((m) => m.month === ym.replace("-", ""));
+  const priceAt = (ym: string) => monthAt(ym)?.billingPrice ?? row?.billingPrice;
+  const mmAt = (ym: string) => monthAt(ym)?.monthlyMm ?? row?.monthlyMm;
   const retro = (c: Change) => (monthType(c.type) ? c.date.slice(0, 7) < today.slice(0, 7) : c.date < today);
   const crosses = (c: Change) => !!closedMonth && !!c.date && c.date.slice(0, 7) <= closedMonth;
   const needReason = (c: Change) => c.type === "EARLY" || retro(c) || crosses(c);
@@ -197,14 +201,14 @@ export function AssignmentDetail({
       else {
         const n = Number(digits(c.to));
         if (!(n > 0)) e.to = "단가를 숫자로 넣어 주세요.";
-        else if (n === row.billingPrice) e.to = `${ym} 단가와 같습니다.`;
+        else if (n === priceAt(ym)) e.to = `${ym} 단가와 같습니다.`;
         if (c.date && ym > row.endDate.slice(0, 7)) e.date = `철수일(${row.endDate}) 뒤로는 넣을 수 없습니다.`;
       }
     }
     if (c.type === "RATE") {
       const n = Number(c.to);
       if (!(n > 0 && n <= 1)) e.to = "0보다 크고 1.00 이하로 넣어 주세요.";
-      else if (Math.round(n * 100) / 100 === row.monthlyMm) e.to = "현재 월 MM과 같습니다.";
+      else if (Math.round(n * 100) / 100 === mmAt(ym)) e.to = "현재 월 MM과 같습니다.";
       if (c.date && ym > row.endDate.slice(0, 7)) e.date = `철수일(${row.endDate}) 뒤로는 넣을 수 없습니다.`;
     }
     if (c.type === "EXTP" && c.to === (row.extensionPossibilityCode ?? "")) e.to = "현재 값과 같습니다.";
@@ -593,7 +597,7 @@ export function AssignmentDetail({
                   }}
                   {...invalid("to")}
                 />,
-                `${(change.date || today).slice(0, 7)} 지금 월 ${won(row.billingPrice)}원. 적용 시작월부터 청구·매출을 새 단가로 계산하고 앞선 달은 그대로 둡니다.`,
+                `${(change.date || today).slice(0, 7)} 지금 월 ${won(priceAt((change.date || today).slice(0, 7)))}원. 적용 시작월부터 청구·매출을 새 단가로 계산하고 앞선 달은 그대로 둡니다.`,
               )}
             {change.type === "RATE" &&
               fc(
@@ -613,7 +617,7 @@ export function AssignmentDetail({
                   onChange={(e) => setC({ to: e.target.value.replace(/[^0-9.]/g, "") })}
                   {...invalid("to")}
                 />,
-                `지금 ${mmf(row.monthlyMm)}. 적용 시작월부터 월 MM·원가·매출을 다시 계산하고 앞선 달은 그대로 둡니다.`,
+                `지금 ${mmf(mmAt((change.date || today).slice(0, 7)))}. 적용 시작월부터 월 MM·원가·매출을 다시 계산하고 앞선 달은 그대로 둡니다.`,
               )}
             {change.type === "EXTP" &&
               fc(

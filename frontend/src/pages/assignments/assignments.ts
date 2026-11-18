@@ -24,6 +24,13 @@ export interface Assignment {
   monthlyMmTotal?: number;
   historyCount: number;
   modifiedAt: string | null;
+  /** 상세만: 투입 기간의 달마다 그 달에 적용되는 계약 월 MM·청구 단가(단가를 볼 수 없으면 null). */
+  months?: AssignmentMonth[];
+}
+export interface AssignmentMonth {
+  month: string;
+  monthlyMm: number;
+  billingPrice: number | null;
 }
 export interface AssignmentHistory {
   historyId: string;

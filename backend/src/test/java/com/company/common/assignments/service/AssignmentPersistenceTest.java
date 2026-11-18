@@ -112,6 +112,25 @@ class AssignmentPersistenceTest {
         assignments.refreshCurrentMonth();assertThat(snapshot("TB_PJ_ASGN",id)).isEqualTo(state);assertThat(snapshot("TB_PJ_ASGN_MON",id)).isEqualTo(monthly);
         assertThat(db.queryForObject("SELECT CRCT_YN FROM TB_PJ_ASGN_HIST WHERE ASGN_ID=? AND HIST_SN=?",String.class,id,Integer.parseInt(h.path("historyId").asText()))).isEqualTo("Y");
     }
+    @Test void detailMonthsCarryTheContractValuesInEffectForEachMonthAfterLaterChanges()throws Exception {
+        var row=create("assignment-dev-a");String id=row.path("assignmentId").asText();
+        var months=detail(id).path("months");
+        assertThat(months).hasSize(3);assertThat(months.get(0).path("month").asText()).isEqualTo("202610");
+        // 첫 달은 날짜만큼 MM(0.52)이 아니라 계약 월 MM(1)을 준다.
+        assertThat(months.get(0).path("monthlyMm").decimalValue()).isEqualByComparingTo("1");
+        var price=version(row).put("changeTypeCode","UPRC").put("effectiveDate","2026-12-15").put("newBillingPrice",8500000);
+        var changed=data(mvc.perform(post("/api/common/assignments/"+id+"/changes").contentType("application/json").content(price.toString())).andExpect(status().isOk()));
+        var rate=version(changed).put("changeTypeCode","RATE").put("effectiveDate","2026-12-01").put("newMonthlyMm",0.8);
+        mvc.perform(post("/api/common/assignments/"+id+"/changes").contentType("application/json").content(rate.toString())).andExpect(status().isOk());
+        var d=detail(id);months=d.path("months");
+        assertThat(d.path("billingPrice").decimalValue()).isEqualByComparingTo("8000000");assertThat(d.path("monthlyMm").decimalValue()).isEqualByComparingTo("1");
+        assertThat(months).extracting(m -> m.path("month").asText()).containsExactly("202610","202611","202612");
+        assertThat(months).extracting(m -> m.path("billingPrice").decimalValue()).usingElementComparator(java.math.BigDecimal::compareTo)
+            .containsExactly(new java.math.BigDecimal("8000000"),new java.math.BigDecimal("8000000"),new java.math.BigDecimal("8500000"));
+        assertThat(months).extracting(m -> m.path("monthlyMm").decimalValue()).usingElementComparator(java.math.BigDecimal::compareTo)
+            .containsExactly(java.math.BigDecimal.ONE,java.math.BigDecimal.ONE,new java.math.BigDecimal("0.8"));
+        assertThat(db.queryForObject("SELECT APLY_UPRC FROM TB_PJ_ASGN_MON WHERE ASGN_ID=? AND INPUT_YM='202612'",java.math.BigDecimal.class,id)).isEqualByComparingTo(months.get(2).path("billingPrice").decimalValue());
+    }
     @Test void closedSnapshotsSurviveChangeAndCancellationAndNoAdjustmentIsGenerated()throws Exception {
         var row=create("assignment-dev-a");String id=row.path("assignmentId").asText();
         db.update("UPDATE TB_PJ_ASGN_MON SET FIX_YN='Y' WHERE ASGN_ID=? AND INPUT_YM='202610'",id);

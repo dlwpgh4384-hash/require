@@ -16,7 +16,10 @@ public final class AssignmentContracts {
         LocalDate endDate, BigDecimal billingPrice, BigDecimal monthlyMm, BigDecimal yearMm,
         String extensionPossibilityCode, String extensionPossibilityName, String inputTypeCode,
         String inputTypeName, int extensionCount, List<String> warnings, BigDecimal monthlyMmTotal,
-        int historyCount, @JsonInclude(JsonInclude.Include.ALWAYS) Instant modifiedAt) {}
+        int historyCount, @JsonInclude(JsonInclude.Include.ALWAYS) Instant modifiedAt, List<AssignmentMonth> months) {}
+    /** 상세만: 투입 기간의 달마다 그 달에 적용되는 계약 월 MM·청구 단가(단가를 볼 수 없는 역할이면 null). */
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record AssignmentMonth(String month, BigDecimal monthlyMm, BigDecimal billingPrice) {}
     public record History(String historyId, String assignmentId, LocalDate effectiveDate, String changeTypeCode,
         String changeTypeName, String beforeValue, String afterValue, String reason, String memo,
         String changedBy, Instant changedAt, String retroactiveYn, String correctedYn, Instant modifiedAt) {}

@@ -18,6 +18,7 @@ public interface AssignmentMapper {
     int insert(Write write);
     int update(Write write);
     List<HistoryRow> history(String id);
+    List<MonthValue> monthValues(String id);
     int nextHistory(String id);
     int insertHistory(HistoryWrite write);
     HistoryRow lockHistory(@Param("id") String id, @Param("sequence") int sequence);

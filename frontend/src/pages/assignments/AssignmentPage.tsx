@@ -345,7 +345,7 @@ export function AssignmentPage({ roles = developmentRoles }: { roles?: readonly 
   };
   const showCandidates = !readOnly && candidates.length > 0;
   return (
-    <section className="assignment-page" data-testid="assignment-page" data-screen-id="UI-12">
+    <section className="screen-body assignment-page" data-testid="assignment-page" data-screen-id="UI-12">
       {titleActions(actions)}
       <YearBar
         year={year}

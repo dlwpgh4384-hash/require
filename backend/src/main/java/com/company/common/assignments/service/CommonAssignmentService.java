@@ -86,9 +86,12 @@ public class CommonAssignmentService {
         return warnings;
     }
     private Assignment assemble(Row r,Figures fig,List<String> warnings,Map<String,String> names,boolean direct) {
+        return assemble(r,fig,warnings,names,direct,null);
+    }
+    private Assignment assemble(Row r,Figures fig,List<String> warnings,Map<String,String> names,boolean direct,List<AssignmentMonth> months) {
         return new Assignment(r.assignmentId(),r.projectId(),r.projectName(),r.developerId(),r.name(),r.managementNumber(),r.jobCode(),r.jobName(),r.startDate(),r.endDate(),
             direct?r.billingPrice():null,r.monthlyMm(),fig.yearMm(),
-            r.extensionPossibilityCode(),code("EXT_PSBL",r.extensionPossibilityCode(),"미정",names),r.inputTypeCode(),code("INPUT_TYPE",r.inputTypeCode(),"",names),r.extensionCount(),warnings,fig.total(),fig.historyCount(),r.modifiedAt());
+            r.extensionPossibilityCode(),code("EXT_PSBL",r.extensionPossibilityCode(),"미정",names),r.inputTypeCode(),code("INPUT_TYPE",r.inputTypeCode(),"",names),r.extensionCount(),warnings,fig.total(),fig.historyCount(),r.modifiedAt(),months);
     }
     private String code(String group,String value,String fallback,Map<String,String> names) {
         return value==null?fallback:names.computeIfAbsent(group+"|"+value,k -> Objects.requireNonNullElse(projects.codeName(group,value),value));
@@ -105,7 +108,10 @@ public class CommonAssignmentService {
         if (p!=null && project!=null && !"IN".equals(r.contractTypeCode()) && !Objects.equals(p.partId(),project.salesPartId))
             warnings.add("영업 파트가 다릅니다: "+p.name()+"님은 "+p.partName()+" 소속, 프로젝트는 "+project.salesPartName+"입니다. 매출은 프로젝트 파트로, 이 사람 이익금은 소속 파트(본사면 파트 정산 제외)로 잡힙니다. 파트를 잘못 골랐다면 개발자 풀에서 고쳐 주세요.");
         if ("SUB".equals(r.inputTypeCode()) && "TK".equals(r.contractTypeCode()) && r.contractDeveloperId()!=null && mapper.distribution(r.projectId(),r.contractDeveloperId())) warnings.add("턴키 배분표는 다시 옮겨 올려 주셔야 합니다. 그 전까지는 배분 불일치 경고가 뜹니다.");
-        return assemble(r,fig,warnings,new HashMap<>(),AssignmentPricePolicy.direct(roles()));
+        boolean direct=AssignmentPricePolicy.direct(roles());
+        // [변경 기록] 단가·월 MM 변경의 「지금 …」 안내와 같은 값 검사는 고른 달에 적용되는 값과 비교한다(SFR-112-07).
+        var months=mapper.monthValues(r.assignmentId()).stream().map(m -> new AssignmentMonth(m.month(),m.monthlyMm(),direct?m.billingPrice():null)).toList();
+        return assemble(r,fig,warnings,new HashMap<>(),direct,months);
     }
     private String code(String group,String value,String fallback) {
         return value==null?fallback:Objects.requireNonNullElse(projects.codeName(group,value),value);
@@ -173,6 +179,8 @@ public class CommonAssignmentService {
             Objects.requireNonNullElse(h.memo(),""),h.actor(),h.registeredAt(),h.retroactiveYn(),h.correctedYn(),h.registeredAt());
     }
     public void lockSources() { projects.lockSources(); }
+    /** 업로드 검사는 줄마다 오류를 모아 계속 간다: 검사 오류(CodeFailure)로 업로드 트랜잭션 전체를 롤백 표시하지 않는다(미리보기 500 재현, 2026-11-18). */
+    @Transactional(readOnly=true, noRollbackFor=CodeFailure.class)
     public List<String> inspectRegistration(JsonNode b) {
         String projectId=ProjectRules.text(b,"projectId",20,true),developerId=ProjectRules.text(b,"developerId",20,true);
         LocalDate start=ProjectRules.date(b,"startDate"),end=ProjectRules.date(b,"endDate");

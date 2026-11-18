@@ -1753,6 +1753,26 @@ components:
           type: string
           format: date-time
           nullable: true
+        months:
+          type: array
+          description: 상세·저장 응답만. 투입 기간의 달마다 그 달에 적용되는 계약 월 MM·청구 단가
+          items:
+            type: object
+            required:
+            - month
+            - monthlyMm
+            - billingPrice
+            properties:
+              month:
+                type: string
+                pattern: ^[0-9]{6}$
+              monthlyMm:
+                type: number
+              billingPrice:
+                type: number
+                nullable: true
+                description: 단가를 볼 수 없는 역할이면 null
+            additionalProperties: false
       additionalProperties: false
     CommonAssignmentCandidate:
       type: object

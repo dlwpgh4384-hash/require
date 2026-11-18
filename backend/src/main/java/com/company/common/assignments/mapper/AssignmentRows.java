@@ -32,4 +32,5 @@ public final class AssignmentRows {
     public record ListFilter(int year, String projectId, String jobCode, String keyword) {}
     public record Amount(String assignmentId, BigDecimal value) {}
     public record Count(String assignmentId, int value) {}
+    public record MonthValue(String month, BigDecimal monthlyMm, BigDecimal billingPrice) {}
 }

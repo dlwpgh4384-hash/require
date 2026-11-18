@@ -379,7 +379,11 @@ export function AssignmentForm({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
-  const people2 = useMemo(() => people.filter((p) => directLabel(p.directClassName) !== "간접" && p.useYn !== "N"), [people]);
+  // 목록 응답에는 코드(directClassCode)만 온다: 간접 인력(INDRCT)은 배정 대상이 아니다(SFR-102-10).
+  const people2 = useMemo(
+    () => people.filter((p) => p.directClassCode !== "INDRCT" && directLabel(p.directClassName) !== "간접" && p.useYn !== "N"),
+    [people],
+  );
   const field = (id: string, key: string, label: string, required: boolean, control: ReactNode, help?: ReactNode) => (
     <div className="project-fc" data-testid={`assignment-field-${key}`}>
       <label htmlFor={id}>

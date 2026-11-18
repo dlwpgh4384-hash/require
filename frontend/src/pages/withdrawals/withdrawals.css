@@ -1,0 +1,43 @@
+.withdrawal-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  color: var(--text);
+}
+.withdrawal-days {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.withdrawal-red {
+  color: var(--ls-bad, #dc2626);
+}
+.withdrawal-orange {
+  color: var(--ls-warn, #d97706);
+}
+.withdrawal-gray,
+.withdrawal-complete {
+  color: var(--text-sub);
+}
+.withdrawal-recommendation {
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.withdrawal-recommendation p {
+  margin: 8px 0;
+}
+.withdrawal-shared-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.withdrawal-tentative {
+  border: 1px dashed var(--primary-text);
+  border-radius: 4px;
+  padding: 6px 10px;
+}

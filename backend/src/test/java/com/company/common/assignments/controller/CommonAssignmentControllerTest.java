@@ -5,6 +5,12 @@ import com.company.common.assignments.mapper.AssignmentRows.*;
 import com.company.common.assignments.service.*;
 import com.company.common.projects.dto.ProjectContracts.Project;
 import com.company.common.projects.mapper.ProjectMapper;
+import com.company.common.codegroups.service.CodeTextResolver;
+
+import com.company.common.uploads.controller.CommonUploadController;
+import com.company.common.uploads.service.*;
+import com.company.common.uploads.mapper.UploadMapper;
+import com.company.common.uploads.mapper.UploadRows;
 
 import com.company.common.support.controller.ApiExceptionHandler;
 import com.company.common.support.controller.CodeExceptionHandler;
@@ -20,6 +26,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -30,14 +38,19 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(CommonAssignmentController.class)
+@WebMvcTest({CommonAssignmentController.class,CommonUploadController.class})
 @ContextConfiguration(classes={CommonAssignmentController.class,CommonAssignmentService.class,
+    CommonUploadController.class,CommonUploadService.class,AssignmentUploadForm.class,UploadWorkbookService.class,
     CodeExceptionHandler.class,ApiExceptionHandler.class,CurrentBusinessActor.class,ExcelExportService.class})
 class CommonAssignmentControllerTest {
     @Autowired MockMvc mvc; @Autowired ObjectMapper json;
     @MockBean AssignmentMapper mapper; @MockBean ProjectMapper projects; @MockBean BusinessCalendar calendar;
     @MockBean AssignmentMonthRules rules;
     @MockBean PlatformTransactionManager transactions;
+    @MockBean UploadMapper uploads;
+    @MockBean UploadFileStore files;
+    @MockBean CodeTextResolver codeText;
+    @Autowired UploadWorkbookService workbooks;
     Map<String,Row> rows; List<HistoryRow> histories; List<MonthWrite> months; Project project; BigDecimal overload;
     final LocalDate today=LocalDate.of(2026,11,15);
     final Instant now=Instant.parse("2026-11-15T00:00:00Z");
@@ -97,7 +110,7 @@ class CommonAssignmentControllerTest {
     private static org.springframework.test.web.servlet.ResultMatcher response(String method,String path) {
         if (MANUAL_PATHS.contains(path) && !("GET".equals(method) && "/api/common/assignments".equals(path)))
             return com.company.common.support.controller.OpenApiResponseContract.response(method,path,"contracts/openapi-manual.yaml");
-        return com.company.common.support.controller.OpenApiResponseContract.response(method,path,"contracts/assignments-openapi.yaml");
+        return com.company.common.support.controller.OpenApiResponseContract.response(method,path);
     }
     @Test void anonymousRegistrationAndDetailUseRealServiceAndApprovedShapes() throws Exception {
         mvc.perform(post("/api/common/assignments").contentType("application/json").content(input().toString())).andExpect(status().isOk()).andExpect(response("POST","/api/common/assignments"));
@@ -157,7 +170,22 @@ class CommonAssignmentControllerTest {
     @Test void differentSalesPartOnlyWarns() throws Exception {project.salesPartId="another";postInput(input(),200);mvc.perform(get("/api/common/assignments/A-0002")).andExpect(jsonPath("$.data.warnings[0]").value(org.hamcrest.Matchers.containsString("영업 파트")));}
     @Test void onLeaveOnlyWarns() throws Exception {when(mapper.person(anyString(),anyString(),any(),any())).thenReturn(new Person("new-developer","개발자","FT","part","파트",null,new BigDecimal("8000000"),true));postInput(input(),200);assertThat(rows).containsKey("A-0002");}
     @Test void togetherRequiresReasonBeforeAnyMutation() throws Exception {var b=input();b.put("inputTypeCode","SUB");b.put("contractDeveloperId","developer");b.put("replacementAction","together");b.putArray("earlyWithdrawalAssignmentIds").add("A-0001");postInput(b,400);noWrites();}
-    @Test void togetherWithdrawsOnlySelectedSourceAndWritesBothHistories() throws Exception {var b=input();b.put("inputTypeCode","SUB");b.put("contractDeveloperId","developer");b.put("replacementAction","together");b.put("reasonCode","PERSON");b.putArray("earlyWithdrawalAssignmentIds").add("A-0001");postInput(b,200);assertThat(rows.get("A-0001").endDate()).isEqualTo(today.minusDays(1));assertThat(histories).extracting(HistoryRow::type).containsExactly("INPUT","EARLY");assertThat(histories.get(1).reasonCode()).isEqualTo("PERSON");}
+    @Test
+    @DisplayName("happy auth side-effect: TB_PJ_ASGN_HIST ASGN_CHG_RSN_CD·CHG_MEMO 저장, TB_CO_PREV_ADJ 자동 생성 없음")
+    void togetherWithdrawsOnlySelectedSourceAndWritesBothHistories() throws Exception {
+        var b=input().put("inputTypeCode","SUB").put("contractDeveloperId","developer")
+            .put("replacementAction","together").put("reasonCode","PERSON").put("memo","대체 투입 확인");
+        b.putArray("earlyWithdrawalAssignmentIds").add("A-0001");
+        mvc.perform(post("/api/common/assignments").contentType("application/json").content(b.toString()))
+            .andExpect(status().isOk()).andExpect(response("POST","/api/common/assignments"))
+            .andExpect(jsonPath("$.data.assignmentId").value("A-0002"));
+        assertThat(rows.get("A-0001").endDate()).isEqualTo(today.minusDays(1));
+        assertThat(histories).extracting(HistoryRow::type).containsExactly("INPUT","EARLY");
+        verify(mapper).insertHistory(argThat(w -> "EARLY".equals(w.row().type())
+            && "PERSON".equals(w.row().reasonCode()) && "대체 투입 확인".equals(w.row().memo())
+            && "admin".equals(w.actor())));
+        assertNoPreviousAdjustmentSql();
+    }
     @Test void replacementOnlyLeavesSourcePeriodAlone() throws Exception {var b=input();b.put("inputTypeCode","SUB");b.put("contractDeveloperId","developer");b.put("replacementAction","assignment-only");postInput(b,200);assertThat(rows.get("A-0001").endDate()).isEqualTo(LocalDate.of(2026,12,31));}
     @Test void selectionMustStillBeMatchingProjectAndPerson() throws Exception {var b=input();b.put("inputTypeCode","SUB");b.put("contractDeveloperId","developer");b.put("replacementAction","together");b.put("reasonCode","PERSON");b.putArray("earlyWithdrawalAssignmentIds").add("unknown");postInput(b,400);noWrites();}
     @Test void listYearFiltersOutNonoverlappingRowsAndUsesAllPersonMonths() throws Exception {mvc.perform(get("/api/common/assignments").param("year","2025")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items").isEmpty());overload=new BigDecimal("1.01");mvc.perform(get("/api/common/assignments").param("year","2026").param("warning","MM 1.0 초과").param("projectId","P-0001")).andExpect(status().isOk()).andExpect(response("GET","/api/common/assignments")).andExpect(jsonPath("$.data.items[0].monthlyMmTotal").value(1.01));}
@@ -166,7 +194,17 @@ class CommonAssignmentControllerTest {
     @Test void detailNotFound() throws Exception {mvc.perform(get("/api/common/assignments/missing")).andExpect(status().isNotFound());}
     @Test void candidatesAreClippedWithoutAssignmentInsert() throws Exception {when(mapper.candidates()).thenReturn(List.of(new CandidateRow("12","P-0001","개발 프로젝트","developer","사람","DEV","개발","202610",2,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z"))));mvc.perform(get("/api/common/assignments/candidates")).andExpect(status().isOk()).andExpect(response("GET","/api/common/assignments/candidates")).andExpect(jsonPath("$.data.items[0].startDate").value("2026-11-15")).andExpect(jsonPath("$.data.items[0].endDate").value("2026-11-20")).andExpect(jsonPath("$.data.items[0].managementNumber").value("K-0001"));noWrites();}
     @Test void badCandidateRowIsSkippedWithoutFailingTheList() throws Exception {when(mapper.candidates()).thenReturn(List.of(new CandidateRow("12","P-0001","개발 프로젝트","developer","사람","DEV","개발","202610",1,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z")),new CandidateRow("13","P-0001","개발 프로젝트","developer","사람","DEV","개발","202611",0,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z")),new CandidateRow("14","P-0001","개발 프로젝트","other","다른 사람","DEV","개발","202611",1,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z"))));mvc.perform(get("/api/common/assignments/candidates")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items.length()").value(1)).andExpect(jsonPath("$.data.items[0].candidateId").value("14")).andExpect(jsonPath("$.data.items[0].endDate").value("2026-11-20")).andExpect(jsonPath("$.data.items[0].managementNumber").value("K-0001"));noWrites();}
-    @Test void anonymousCandidateRemovalOnlyUpdatesSource() throws Exception {when(mapper.lockCandidate("12")).thenReturn(new CandidateRow("12","P-0001","프로젝트","developer","사람","DEV","개발","202610",1,today,today,"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z")));when(mapper.removeCandidate("12","admin")).thenReturn(1);mvc.perform(post("/api/common/assignments/candidates/12/remove")).andExpect(status().isOk()).andExpect(response("POST","/api/common/assignments/candidates/{candidateId}/remove"));verify(mapper).removeCandidate("12","admin");noWrites();}
+    @Test
+    @DisplayName("happy auth side-effect: 후보만 제외하고 TB_PJ_ASGN 생성·삭제 없이 원배정 보존")
+    void anonymousCandidateRemovalOnlyUpdatesSource() throws Exception {
+        when(mapper.lockCandidate("12")).thenReturn(candidate("CNVT"));
+        when(mapper.removeCandidate("12","admin")).thenReturn(1);
+        var before=new LinkedHashMap<>(rows);
+        mvc.perform(post("/api/common/assignments/candidates/12/remove"))
+            .andExpect(status().isOk()).andExpect(response("POST","/api/common/assignments/candidates/{candidateId}/remove"))
+            .andExpect(jsonPath("$.data.candidateId").value("12"));
+        verify(mapper).removeCandidate("12","admin");noWrites();assertThat(rows).isEqualTo(before);
+    }
     CandidateRow candidate(String status) {return new CandidateRow("12","P-0001","프로젝트","developer","사람","DEV","개발","202611",1,today,LocalDate.of(2026,12,31),status,"K-0001",Instant.parse("2026-11-10T01:02:03.456789Z"));}
     /** 이미 확정·뺀 후보를 다시 빼면 조용히 성공하지 않고 409(공통 동시 수정 문구). */
     @ParameterizedTest @ValueSource(strings={"DROP","DONE"})
@@ -201,16 +239,44 @@ class CommonAssignmentControllerTest {
     @Test void malformedCandidateIdIsRejected() throws Exception {mvc.perform(post("/api/common/assignments/candidates/abc/remove")).andExpect(status().isBadRequest());noWrites();}
     @Test void contractDevelopersDeduplicateExcludeSelfAndIncludeEndedPeople() throws Exception {rows.put("A-0002",row("A-0002","developer",null,"NEW","MO"));mvc.perform(get("/api/common/assignments/contract-developers").param("projectId","P-0001").param("developerId","new-developer").param("startDate","2026-11-15")).andExpect(status().isOk()).andExpect(response("GET","/api/common/assignments/contract-developers")).andExpect(jsonPath("$.data.items.length()").value(1)).andExpect(jsonPath("$.data.items[0].overlappingAssignments.length()").value(2)).andExpect(jsonPath("$.data.items[0].jobName").value("개발"));}
     @Test void futurePriceChangesOnlyFutureMonthsAndCurrentCacheStays() throws Exception {var b=change("UPRC");b.put("effectiveDate","2026-12-15");b.put("newBillingPrice",8500000);change(b,200);assertThat(rows.get("A-0001").billingPrice()).isEqualByComparingTo("8000000");assertThat(months).allSatisfy(m -> {assertThat(m.month()).isEqualTo("202612");assertThat(m.price()).isEqualByComparingTo("8500000");});assertThat(histories.get(0).effectiveDate()).isEqualTo(LocalDate.of(2026,12,1));}
-    @Test void dateBeforeStartIsRejected() throws Exception {var b=change("EXT");b.put("effectiveDate","2026-09-30");b.put("newEndDate","2027-01-31");change(b,400);noWrites();}
+    @Test
+    @DisplayName("validation: 투입일 이전 적용일은 400 effectiveDate, 배정·이력 쓰기 없음")
+    void dateBeforeStartIsRejected() throws Exception {
+        var b=change("EXT").put("effectiveDate","2026-09-30").put("newEndDate","2027-01-31");
+        mvc.perform(post("/api/common/assignments/A-0001/changes").contentType("application/json").content(b.toString()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].field").value("effectiveDate"));
+        noWrites();
+    }
     @Test void memo201IsRejected() throws Exception {var b=change("EXTP");b.put("newExtensionPossibilityCode","H");b.put("memo","가".repeat(201));change(b,400);noWrites();}
     @Test void historicalChangeRequiresReason() throws Exception {var b=change("RATE");b.put("effectiveDate","2026-10-01");b.put("newMonthlyMm",0.8);change(b,400);noWrites();}
-    @Test void monthFirstAllowsMidMonthStartAndRecordsRetroactive() throws Exception {var b=change("RATE");b.put("effectiveDate","2026-10-16");b.put("newMonthlyMm",0.8);b.put("reasonCode","PERSON");change(b,200);assertThat(histories).singleElement().satisfies(h -> {assertThat(h.effectiveDate()).isEqualTo(LocalDate.of(2026,10,1));assertThat(h.retroactiveYn()).isEqualTo("Y");});}
+    @Test
+    @DisplayName("happy auth side-effect: TB_PJ_ASGN_HIST RTRO_YN=Y, TB_CO_PREV_ADJ 자동 생성 없음")
+    void monthFirstAllowsMidMonthStartAndRecordsRetroactive() throws Exception {
+        var b=change("RATE").put("effectiveDate","2026-10-16").put("newMonthlyMm",0.8).put("reasonCode","PERSON");
+        mvc.perform(post("/api/common/assignments/A-0001/changes").contentType("application/json").content(b.toString()))
+            .andExpect(status().isOk()).andExpect(response("POST","/api/common/assignments/{assignmentId}/changes"))
+            .andExpect(jsonPath("$.data.monthlyMm").value(0.8));
+        assertThat(histories).singleElement().satisfies(h -> {
+            assertThat(h.effectiveDate()).isEqualTo(LocalDate.of(2026,10,1));
+            assertThat(h.retroactiveYn()).isEqualTo("Y");assertThat(h.actor()).isEqualTo("admin");
+        });
+        assertThat(months).isNotEmpty().allSatisfy(m -> assertThat(m.mm()).isEqualByComparingTo("0.8"));
+        assertNoPreviousAdjustmentSql();
+    }
     @ParameterizedTest @ValueSource(doubles={0,1.01}) void invalidMmDoesNotMutate(double value) throws Exception {var b=change("RATE");b.put("newMonthlyMm",value);change(b,400);noWrites();}
     @Test void extensionIncrementsCountWithHistory() throws Exception {var b=change("EXT");b.put("effectiveDate","2027-01-01");b.put("newEndDate","2027-01-31");change(b,200);assertThat(rows.get("A-0001").extensionCount()).isEqualTo(1);assertThat(histories).singleElement().satisfies(h -> assertThat(h.type()).isEqualTo("EXT"));}
     @Test void extensionPastProjectContractIsRejected() throws Exception {var b=change("EXT");b.put("newEndDate","2028-01-01");change(b,400);noWrites();}
     @Test void earlyDateAfterEndIsRejected() throws Exception {var b=change("EARLY");b.put("reasonCode","PERSON");b.put("newEndDate","2027-01-01");change(b,400);noWrites();}
     @Test void earlyWithdrawalSetsEndAndReason() throws Exception {var b=change("EARLY");b.put("reasonCode","PERSON");b.put("newEndDate","2026-11-30");change(b,200);assertThat(rows.get("A-0001").endDate()).isEqualTo(LocalDate.of(2026,11,30));}
-    @Test void unsupportedKindTransitionIsRejected() throws Exception {var b=change("KIND");b.put("newInputTypeCode","FREE");change(b,400);noWrites();}
+    @Test
+    @DisplayName("business validation: 무상지원 전환 거부, 배정·이력 불변")
+    void unsupportedKindTransitionIsRejected() throws Exception {
+        var b=change("KIND").put("newInputTypeCode","FREE");
+        mvc.perform(post("/api/common/assignments/A-0001/changes").contentType("application/json").content(b.toString()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("newInputTypeCode"));
+        noWrites();assertThat(rows.get("A-0001").inputTypeCode()).isEqualTo("NEW");
+    }
     @Test void supportedKindTransitionHasNamesAndKeepsEndDate() throws Exception {var b=change("KIND");b.put("newInputTypeCode","ADD");change(b,200);assertThat(rows.get("A-0001").endDate()).isEqualTo(LocalDate.of(2026,12,31));assertThat(histories.get(0).beforeValue()).isEqualTo("신규");assertThat(histories.get(0).afterValue()).isEqualTo("추가투입");}
     @Test void missingVersionIsNeverAnUnrestrictedUpdate() throws Exception {var b=change("EXTP");b.remove("modifiedAt");b.put("newExtensionPossibilityCode","H");change(b,400);noWrites();}
     @Test void staleVersionIs409WithoutWrites() throws Exception {var b=change("EXTP");b.put("modifiedAt",now.toString());b.put("newExtensionPossibilityCode","H");change(b,409);noWrites();}
@@ -225,10 +291,39 @@ class CommonAssignmentControllerTest {
     HistoryRow history(String type,String corrected) {return new HistoryRow(1,"A-0001",type,today,"이전","이후","PERSON","메모",null,null,"N","N",corrected,null,"admin",now);}
     ObjectNode correction() {var b=json.createObjectNode();b.put("modifiedAt",now.toString());b.put("correctedValue","바른 내용");b.put("reason","정정 사유");return b;}
     void correction(ObjectNode b,int expected) throws Exception {mvc.perform(post("/api/common/assignments/A-0001/history/1/corrections").contentType("application/json").content(b.toString())).andExpect(status().is(expected));}
-    @Test void allowedCorrectionOnlyChangesHistoryAndPreservesNumericState() throws Exception {var h=history("EARLY","N");histories.add(h);when(mapper.lockHistory("A-0001",1)).thenReturn(h);when(mapper.correct(any())).thenReturn(1);Row before=rows.get("A-0001");correction(correction(),200);assertThat(rows.get("A-0001")).isEqualTo(before);verify(mapper,never()).update(any());verify(mapper,never()).saveMonth(any());assertThat(histories).anySatisfy(x -> {if(x.type().equals("CRCT")){assertThat(x.target()).isEqualTo(1);assertThat(x.afterValue()).isEqualTo("바른 내용");}});}
+    @Test
+    @DisplayName("happy auth side-effect: TB_PJ_ASGN_HIST CRCT_YN N→Y·정정 이력 추가, TB_PJ_ASGN 현재값 보존")
+    void allowedCorrectionOnlyChangesHistoryAndPreservesNumericState() throws Exception {
+        var h=history("EARLY","N");histories.add(h);when(mapper.lockHistory("A-0001",1)).thenReturn(h);
+        when(mapper.correct(any())).thenAnswer(call -> {
+            Correction c=call.getArgument(0);
+            assertThat(c).isEqualTo(new Correction("A-0001",1,now));
+            histories.set(0,new HistoryRow(h.sequence(),h.assignmentId(),h.type(),h.effectiveDate(),h.beforeValue(),h.afterValue(),
+                h.reasonCode(),h.memo(),h.price(),h.mm(),h.retroactiveYn(),h.closedYn(),"Y",h.target(),h.actor(),h.registeredAt()));
+            return 1;
+        });
+        Row before=rows.get("A-0001");
+        mvc.perform(post("/api/common/assignments/A-0001/history/1/corrections").contentType("application/json").content(correction().toString()))
+            .andExpect(status().isOk()).andExpect(response("POST","/api/common/assignments/{assignmentId}/history/{historyId}/corrections"))
+            .andExpect(jsonPath("$.data.changeTypeCode").value("CRCT"))
+            .andExpect(jsonPath("$.data.afterValue").value("바른 내용")).andExpect(jsonPath("$.data.changedBy").value("admin"));
+        assertThat(rows.get("A-0001")).isEqualTo(before);
+        verify(mapper,never()).update(any());verify(mapper,never()).saveMonth(any());
+        assertThat(histories).hasSize(2);assertThat(histories.get(0).correctedYn()).isEqualTo("Y");
+        assertThat(histories.get(1).target()).isEqualTo(1);
+        mvc.perform(get("/api/common/assignments/A-0001/history"))
+            .andExpect(jsonPath("$.data.items[1].correctedYn").value("Y"));
+    }
     @Test void missingCorrectionReasonIsRejected() throws Exception {var b=correction();b.remove("reason");correction(b,400);verify(mapper,never()).correct(any());}
     @ParameterizedTest @ValueSource(strings={"INPUT","CRCT"}) void inputAndCorrectionCannotBeCorrected(String type) throws Exception {when(mapper.lockHistory("A-0001",1)).thenReturn(history(type,"N"));correction(correction(),400);verify(mapper,never()).correct(any());}
-    @Test void alreadyCorrectedCannotBeCorrectedAgain() throws Exception {when(mapper.lockHistory("A-0001",1)).thenReturn(history("EARLY","Y"));correction(correction(),400);verify(mapper,never()).correct(any());}
+    @Test
+    @DisplayName("business: 이미 CRCT_YN=Y인 이력 재정정 금지")
+    void alreadyCorrectedCannotBeCorrectedAgain() throws Exception {
+        when(mapper.lockHistory("A-0001",1)).thenReturn(history("EARLY","Y"));
+        mvc.perform(post("/api/common/assignments/A-0001/history/1/corrections").contentType("application/json").content(correction().toString()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("historyId"));
+        verify(mapper,never()).correct(any());noWrites();
+    }
     @Test void lostCorrectionRaceIs409() throws Exception {var h=history("EARLY","N");histories.add(h);when(mapper.lockHistory("A-0001",1)).thenReturn(h);when(mapper.correct(any())).thenReturn(0);correction(correction(),409);verify(mapper,never()).insertHistory(any());}
     @Test void historyFilterIncludesOnlyRequestedType() throws Exception {histories.add(history("CNCL","N"));histories.add(history("EARLY","N"));mvc.perform(get("/api/common/assignments/A-0001/history").param("changeTypeCode","CNCL")).andExpect(status().isOk()).andExpect(response("GET","/api/common/assignments/{assignmentId}/history")).andExpect(jsonPath("$.data.items.length()").value(1));}
     @Test void excelUsesSameFiltersAndWritesDnldAfterRealXlsx() throws Exception {var result=mvc.perform(get("/api/common/assignments/excel").param("year","2026").param("keyword","developer")).andExpect(status().isOk()).andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).andReturn();try(var workbook=new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(result.getResponse().getContentAsByteArray()))){assertThat(workbook.getSheetAt(0).getPhysicalNumberOfRows()).isGreaterThan(1);}verify(mapper).insertAccess("admin","투입 목록 2026년 1건");}
@@ -291,6 +386,98 @@ class CommonAssignmentControllerTest {
             .isInstanceOf(com.company.common.support.service.CodeFailure.class);
         noWrites();
     }
+    private void assertNoPreviousAdjustmentSql() throws Exception {
+        String sql=new ClassPathResource("mapper/assignments/AssignmentMapper.xml")
+            .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(sql.toUpperCase(Locale.ROOT)).doesNotContain("TB_CO_PREV_ADJ");
+    }
+
+    @Test
+    @DisplayName("happy auth side-effect: 무인증 취소는 TB_PJ_ASGN_HIST 한 줄, TB_CO_PREV_ADJ 쓰기 없음")
+    void anonymousCancellationWritesOneHistoryAndPreservesClosedMonthBoundary() throws Exception {
+        when(mapper.closedMonths()).thenReturn(List.of("202610"));
+        mvc.perform(post("/api/common/assignments/cancel").contentType("application/json").content(bulk("A-0001").toString()))
+            .andExpect(status().isOk()).andExpect(response("POST","/api/common/assignments/cancel"))
+            .andExpect(jsonPath("$.data.items[0].assignmentId").value("A-0001"));
+        assertThat(rows.get("A-0001").statusCode()).isEqualTo("CNCL");
+        assertThat(histories).singleElement().satisfies(h -> {
+            assertThat(h.type()).isEqualTo("CNCL");assertThat(h.actor()).isEqualTo("admin");
+        });
+        verify(mapper,never()).saveMonth(any());assertNoPreviousAdjustmentSql();
+    }
+
+    @Test
+    @DisplayName("happy auth side-effect: 연장 가능성은 선택한 배정만 변경하고 동일값 이력 억제")
+    void anonymousBulkExtensionReturnsChangedValueAndPreservesUnselectedAssignment() throws Exception {
+        rows.put("A-0002",row("A-0002","second",null,"NEW","MO"));
+        Row unselected=rows.get("A-0002");var b=bulk("A-0001").put("extensionPossibilityCode","H");
+        mvc.perform(put("/api/common/assignments/extension-possibility").contentType("application/json").content(b.toString()))
+            .andExpect(status().isOk()).andExpect(response("PUT","/api/common/assignments/extension-possibility"))
+            .andExpect(jsonPath("$.data.items[0].extensionPossibilityCode").value("H"));
+        assertThat(rows.get("A-0002")).isEqualTo(unselected);
+        verify(mapper).insertHistory(argThat(w -> "EXTP".equals(w.row().type()) && "admin".equals(w.actor())));
+        mvc.perform(put("/api/common/assignments/extension-possibility").contentType("application/json").content(b.toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].extensionPossibilityCode").value("H"));
+        assertThat(histories).hasSize(1);
+    }
+
+    private byte[] assignmentUpload() {
+        return workbooks.tabularFile(AssignmentUploadForm.HEADERS,List.of(List.of(
+            "P-0001","K-NEW","DEV","2026-11-15","2026-12-31","","8000000","NEW","","")),null);
+    }
+
+    private void prepareAssignmentUpload(byte[] bytes) {
+        when(mapper.uploadDeveloper("K-NEW")).thenReturn(new UploadDeveloper("new-developer","신규 개발자","Y","DRCT"));
+        when(codeText.resolve("JOB","DEV")).thenReturn(new com.company.common.calculation.dto.CalculationRuleContracts.TextResolution("JOB","DEV","개발",null));
+        when(codeText.resolve("INPUT_TYPE","NEW")).thenReturn(new com.company.common.calculation.dto.CalculationRuleContracts.TextResolution("INPUT_TYPE","NEW","신규",null));
+        var stored=new UploadRows.Upload();stored.uploadId=81;stored.fileName="assignments.xlsx";stored.formTypeCode="B5";
+        stored.statusCode="CHECKED";stored.statusName="검사완료";
+        when(uploads.nextUploadId()).thenReturn(81L);
+        when(uploads.insertUpload(any())).thenAnswer(call -> {
+            com.company.common.uploads.dto.UploadContracts.Check check=call.getArgument(0);
+            stored.successCount=check.inspection().successCount();stored.warningCount=check.inspection().warningCount();
+            stored.errorCount=check.inspection().errorCount();return 1;
+        });
+        when(uploads.selectUpload(81)).thenReturn(stored);when(uploads.lockUpload(81)).thenReturn(stored);
+        when(uploads.selectIssues(81)).thenReturn(List.of());when(files.read(81)).thenReturn(bytes);
+        when(uploads.completeUpload(any())).thenAnswer(call -> {
+            com.company.common.uploads.dto.UploadContracts.Completion completion=call.getArgument(0);
+            stored.statusCode=completion.applied()?"APPLIED":"CHECKED";
+            stored.statusName=completion.applied()?"반영완료":"검사완료";return 1;
+        });
+    }
+
+    @Test
+    @DisplayName("happy auth side-effect: B.5 검사만 저장, TB_PJ_ASGN 및 HIST 업무 쓰기 없음")
+    void uploadInspectionDoesNotWriteAssignmentsOrHistory() throws Exception {
+        byte[] bytes=assignmentUpload();prepareAssignmentUpload(bytes);
+        mvc.perform(multipart("/api/common/uploads").file(new MockMultipartFile("file","assignments.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",bytes)).param("formTypeCode","B5"))
+            .andExpect(status().isOk()).andExpect(response("POST","/api/common/uploads"))
+            .andExpect(jsonPath("$.data.uploadId").value("81")).andExpect(jsonPath("$.data.successCount").value(1));
+        verify(uploads).insertUpload(argThat(c -> c.inspection().successCount()==1 && c.formTypeCode().equals("B5")));
+        noWrites();verify(mapper,never()).saveMonth(any());verify(files).retain(eq(81L),any());
+    }
+
+    @Test
+    @DisplayName("happy auth side-effect: B.5 반영은 TB_PJ_ASGN 신규·TB_PJ_ASGN_HIST 투입 한 줄, 원배정 유지")
+    void uploadApplyWritesAssignmentAndInputHistoryThroughRealServices() throws Exception {
+        byte[] bytes=assignmentUpload();prepareAssignmentUpload(bytes);Row original=rows.get("A-0001");
+        mvc.perform(multipart("/api/common/uploads").file(new MockMultipartFile("file","assignments.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",bytes)).param("formTypeCode","B5"))
+            .andExpect(status().isOk());
+        mvc.perform(post("/api/common/uploads/81/apply").contentType("application/json").content("{\"modifiedAt\":null}"))
+            .andExpect(status().isOk()).andExpect(response("POST","/api/common/uploads/{uploadId}/apply"))
+            .andExpect(jsonPath("$.data.statusName").value("반영완료")).andExpect(jsonPath("$.data.successCount").value(1));
+        verify(mapper).insert(argThat(w -> w.row().developerId().equals("new-developer") && w.row().extensionCount()==0));
+        assertThat(histories).singleElement().satisfies(h -> {
+            assertThat(h.assignmentId()).isEqualTo("A-0002");assertThat(h.type()).isEqualTo("INPUT");
+            assertThat(h.mm()).isEqualByComparingTo("1");assertThat(h.actor()).isEqualTo("admin");
+        });
+        assertThat(rows.get("A-0001")).isEqualTo(original);verify(mapper,never()).update(any());
+        assertNoPreviousAdjustmentSql();
+    }
+
     @Test void pmMissingStandardHasExactMessageButFreeSupportBypassesIt() {
         var pm=mock(CurrentBusinessActor.class);when(pm.roles()).thenReturn(Set.of("PM"));when(pm.userId()).thenReturn("admin");
         var service=new CommonAssignmentService(mapper,projects,calendar,pm,rules);

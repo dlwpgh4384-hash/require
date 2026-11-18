@@ -47,6 +47,7 @@ public final class OpenApiResponseContract {
     }
 
     private static void shape(JsonNode value, JsonNode schema, String location, JsonNode contract) {
+        if (value.isNull() && schema.path("nullable").asBoolean(false)) return;
         if (schema.has("$ref")) {
             String reference = schema.path("$ref").asText();
             assertThat(reference).startsWith("#/");
@@ -55,7 +56,6 @@ public final class OpenApiResponseContract {
             shape(value, target, location, contract);
             return;
         }
-        if (value.isNull() && schema.path("nullable").asBoolean(false)) return;
         for (JsonNode part : schema.path("allOf")) shape(value, part, location, contract);
         String type = schema.path("type").asText();
         boolean matches = switch (type) {

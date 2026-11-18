@@ -110,8 +110,8 @@ class WithdrawalPersistenceTest {
     }
     @AfterEach void cleanup()throws Exception {try(var c=source.getConnection();var statement=c.createStatement()){statement.execute("DROP SCHEMA "+owned.name()+" CASCADE");}}
     void need(int sn){db.update("INSERT INTO TB_SL_OPP_NEED(OPP_ID,NEED_SN,JOB_CD,GRADE_CD,NEED_CNT,BGN_YM,PRD_MCNT,MON_MM,REG_USER_ID) VALUES('O-WITHDRAWAL',?,?,'MD',1,'202612',3,1,'admin')",sn,job);}
-    JsonNode getData(String path)throws Exception {return json.readTree(mvc.perform(get(path)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("data");}
-    void save(String assignment,int sn)throws Exception {mvc.perform(put("/api/common/withdrawals/"+assignment+"/tentative-assignment").contentType("application/json").content("{\"needSn\":"+sn+"}")).andExpect(status().isOk());}
+    JsonNode getData(String path)throws Exception {return json.readTree(mvc.perform(get(path)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).get("data");}
+    void save(String assignment,int sn)throws Exception {mvc.perform(put("/api/common/withdrawals/"+assignment+"/tentative-assignment").contentType("application/json").content("{\"opportunityId\":\"O-WITHDRAWAL\",\"needSn\":"+sn+"}")).andExpect(status().isOk());}
     int count(String sql){return db.queryForObject(sql,Integer.class);}
 
     @Test void extensionPersistsHistorySharedSourceAndSameValueIsNoOp()throws Exception {
@@ -135,9 +135,9 @@ class WithdrawalPersistenceTest {
         var confirmed=db.queryForList("SELECT * FROM TB_PJ_ASGN ORDER BY ASGN_ID");
         var months=db.queryForList("SELECT * FROM TB_PJ_ASGN_MON ORDER BY ASGN_ID,INPUT_YM");
         var cost=db.queryForList("SELECT * FROM TB_CO_MON_COST ORDER BY 1,2");
-        mvc.perform(put("/api/common/withdrawals/A-WITHDRAWAL-A/tentative-assignment").contentType("application/json").content("{\"needSn\":1}"))
+        mvc.perform(put("/api/common/withdrawals/A-WITHDRAWAL-A/tentative-assignment").contentType("application/json").content("{\"opportunityId\":\"O-WITHDRAWAL\",\"needSn\":1}"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.assignment.needSn").value(1));
-        mvc.perform(put("/api/common/withdrawals/A-WITHDRAWAL-A/tentative-assignment").contentType("application/json").content("{\"needSn\":2}"))
+        mvc.perform(put("/api/common/withdrawals/A-WITHDRAWAL-A/tentative-assignment").contentType("application/json").content("{\"opportunityId\":\"O-WITHDRAWAL\",\"needSn\":2}"))
             .andExpect(status().isOk()).andExpect(OpenApiResponseContract.response("PUT","/api/common/withdrawals/{assignmentId}/tentative-assignment"))
             .andExpect(jsonPath("$.data.assignment.needSn").value(2));
         var current=getData("/api/common/withdrawals/A-WITHDRAWAL-A/tentative-assignment");
@@ -151,11 +151,27 @@ class WithdrawalPersistenceTest {
         mvc.perform(get("/api/common/withdrawals/tentative-assignments").param("developerId","withdrawal-person-a"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].tentativeAssignment.needSn").value(2));
     }
+    @Test void listUsesSetQueriesForReservationsHistoryAndSeatNames()throws Exception {
+        save("A-WITHDRAWAL-A",1);
+        db.update("INSERT INTO TB_PJ_ASGN_HIST(ASGN_ID,HIST_SN,ASGN_CHG_TYPE_CD,APLY_DT,BFR_VAL,AFT_VAL,RTRO_YN,CLOSE_CROSS_YN,CRCT_YN,REG_USER_ID) VALUES('A-WITHDRAWAL-B',1,'EARLY','2026-10-01','2026-12-31','2026-11-30','N','N','N','admin')");
+        var list=getData("/api/common/withdrawals?year=2026");
+        var byId=new HashMap<String,JsonNode>();
+        list.path("items").forEach(i -> byId.put(i.path("assignmentId").asText(),i));
+        assertThat(byId.get("A-WITHDRAWAL-A").path("nextAssignment").path("hasTentativeAssignment").asBoolean()).isTrue();
+        assertThat(byId.get("A-WITHDRAWAL-B").path("nextAssignment").path("recommendationCount").asInt()).isEqualTo(1);
+        assertThat(byId.get("A-WITHDRAWAL-B").path("earlyWithdrawalHistory").get(0).asText()).isEqualTo("2026-10-01 · 2026-11-30");
+        assertThat(list.path("banner").path("soonCount").asInt()).isEqualTo(2);
+        assertThat(list.path("banner").path("unassignedCount").asInt()).isEqualTo(1);
+        var recommendations=getData("/api/common/withdrawals/A-WITHDRAWAL-B/recommendations");
+        assertThat(recommendations.path("items").get(0).path("needSn").asInt()).isEqualTo(2);
+        assertThat(recommendations.path("items").get(0).path("customerName").asText()).isEqualTo("시험 고객");
+        assertThat(recommendations.path("items").get(0).path("remainingCount").asInt()).isEqualTo(1);
+    }
     @Test void failedInsertRollsBackReleaseOfOldReservation()throws Exception {
         save("A-WITHDRAWAL-A",1);
         db.execute("CREATE FUNCTION reject_withdrawal_reservation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.NEED_SN=2 THEN RAISE EXCEPTION 'reservation rejected'; END IF; RETURN NEW; END $$");
         db.execute("CREATE TRIGGER reject_withdrawal_reservation BEFORE INSERT ON TB_SL_TENT_ASGN FOR EACH ROW EXECUTE FUNCTION reject_withdrawal_reservation()");
-        assertThatThrownBy(() -> tentative.save("A-WITHDRAWAL-A",json.createObjectNode().put("needSn",2))).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> tentative.save("A-WITHDRAWAL-A",json.createObjectNode().put("opportunityId","O-WITHDRAWAL").put("needSn",2))).isInstanceOf(RuntimeException.class);
         assertThat(count("SELECT count(*) FROM TB_SL_TENT_ASGN WHERE TENT_STAT_CD='ACT' AND NEED_SN=1")).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM TB_SL_TENT_ASGN WHERE TENT_STAT_CD='REL'")).isZero();
     }
@@ -165,7 +181,7 @@ class WithdrawalPersistenceTest {
             var calls=new ArrayList<Future<Integer>>();
             for(var entry:List.of(Map.entry(first,firstNeed),Map.entry(second,secondNeed))){calls.add(executor.submit(() -> {
                 ready.countDown();if(!start.await(10,TimeUnit.SECONDS))throw new IllegalStateException("start not released");
-                try{tentative.save(entry.getKey(),json.createObjectNode().put("needSn",entry.getValue()));return 200;}
+                try{tentative.save(entry.getKey(),json.createObjectNode().put("opportunityId","O-WITHDRAWAL").put("needSn",entry.getValue()));return 200;}
                 catch(CodeFailure failure){return failure.getStatus();}
             }));}
             assertThat(ready.await(10,TimeUnit.SECONDS)).isTrue();start.countDown();

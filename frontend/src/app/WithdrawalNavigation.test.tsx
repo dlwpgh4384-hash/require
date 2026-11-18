@@ -6,7 +6,6 @@ import {
   render,
   screen,
   waitFor,
-  within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { RouterProvider } from "react-router-dom";
@@ -22,28 +21,14 @@ const screens = [
     title: "철수 리스트",
     root: "withdrawal-page",
   },
-  {
-    id: "UI-28",
-    menuId: "M009",
-    parent: "G004",
-    title: "인력 운영 보드",
-    root: "staffing-board-page",
-  },
-  {
-    id: "UI-17",
-    menuId: "M010",
-    parent: "G004",
-    title: "인력 수요 예측",
-    root: "workforce-forecast-page",
-  },
-  {
-    id: "UI-29",
-    menuId: "M011",
-    parent: "G004",
-    title: "영업 파이프라인",
-    root: "opportunity-page",
-  },
 ];
+/** 아직 만들지 않은 화면(화면 목록에 없음): 메뉴에는 있고 본문은 공통 「준비 중」. */
+const pending = [
+  { id: "UI-28", menuId: "M009", parent: "G004", title: "인력 운영 보드" },
+  { id: "UI-17", menuId: "M010", parent: "G004", title: "인력 수요 예측" },
+  { id: "UI-29", menuId: "M011", parent: "G004", title: "영업 파이프라인" },
+];
+const menuScreens = [...screens, ...pending];
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -78,7 +63,7 @@ function respond() {
         pcOnlyYn: "N" as const,
         iconNm: null,
       })),
-      ...screens.map((entry, index) => ({
+      ...menuScreens.map((entry, index) => ({
         menuId: entry.menuId,
         upperMenuId: entry.parent,
         menuNm: entry.title,
@@ -90,7 +75,7 @@ function respond() {
       })),
     ],
     meta: {
-      screenAccess: screens.map((entry) => ({
+      screenAccess: menuScreens.map((entry) => ({
         scrnId: entry.id,
         available: true,
         pcOnlyYn: "N",
@@ -105,7 +90,6 @@ function respond() {
   const list = vi.fn(async () =>
     ok({ items: [], totalCount: 0, banner: null }),
   );
-  const shared = vi.fn(async () => ok({ items: [] }));
   const request = vi.fn(async (url: string, _init?: RequestInit) => {
     if (url === "/api/common/menus")
       return { ok: true, status: 200, json: async () => menus };
@@ -118,14 +102,12 @@ function respond() {
         modDttm: null,
       });
     if (url.startsWith("/api/common/withdrawals?")) return list();
-    if (url.startsWith("/api/common/withdrawals/tentative-assignments?"))
-      return shared();
     if (/^\/api\/common\/code-groups\/(JOB|EXT_PSBL)\/codes$/.test(url))
       return ok({ items: [] });
     throw new Error(`예상하지 않은 요청: ${url}`);
   });
   vi.stubGlobal("fetch", request);
-  return { request, list, shared, ok };
+  return { request, list, ok };
 }
 function mount(path: string) {
   window.history.replaceState(null, "", path);
@@ -179,19 +161,7 @@ describe("withdrawal route composition", () => {
       await waitFor(() =>
         expect(router?.state.location.pathname).toBe(`/screens/${entry.id}`),
       );
-      if (entry.id === "UI-05") await screen.findByTestId("list-empty");
-      else {
-        expect(await screen.findByText("해당 원천 자료 없음")).toBeVisible();
-        expect(request).toHaveBeenCalledWith(
-          "/api/common/withdrawals/tentative-assignments?",
-          { signal: expect.any(AbortSignal) },
-        );
-        expect(
-          within(screen.getByTestId(entry.root)).queryByRole("button", {
-            name: /저장|등록|삭제/,
-          }),
-        ).not.toBeInTheDocument();
-      }
+      await screen.findByTestId("list-empty");
       expect(
         request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
       ).toBe(false);
@@ -202,20 +172,31 @@ describe("withdrawal route composition", () => {
   it.each(screens)(
     "$id retries a failed read without leaving its route",
     async (entry) => {
-      const { list, shared } = respond();
-      const reader = entry.id === "UI-05" ? list : shared;
-      reader.mockRejectedValueOnce(new Error("조회 실패"));
+      const { list } = respond();
+      list.mockRejectedValueOnce(new Error("조회 실패"));
       mount(`/screens/${entry.id}`);
-      fireEvent.click(
-        await screen.findByTestId(
-          entry.id === "UI-05" ? "list-retry" : "withdrawal-shared-retry",
-        ),
-      );
-      if (entry.id === "UI-05")
-        expect(await screen.findByTestId("list-empty")).toBeVisible();
-      else expect(await screen.findByText("해당 원천 자료 없음")).toBeVisible();
-      expect(reader).toHaveBeenCalledTimes(2);
+      fireEvent.click(await screen.findByTestId("list-retry"));
+      expect(await screen.findByTestId("list-empty")).toBeVisible();
+      expect(list).toHaveBeenCalledTimes(2);
       expect(router?.state.location.pathname).toBe(`/screens/${entry.id}`);
+      expectShell();
+    },
+  );
+
+  // 인력 운영 보드·인력 수요 예측·영업 파이프라인은 아직 만들지 않았다: 메뉴를 누르면 공통 「준비 중」이 보이고 가배정 자료를 읽지 않는다.
+  it.each(pending)(
+    "$id is not registered yet and shows the common placeholder",
+    async (entry) => {
+      const { request } = respond();
+      mount(`/screens/${entry.id}`);
+      expect(
+        await screen.findByRole("region", { name: `${entry.id} 본문` }),
+      ).toHaveTextContent("준비 중");
+      expect(
+        request.mock.calls.some(([url]) =>
+          url.startsWith("/api/common/withdrawals/tentative-assignments"),
+        ),
+      ).toBe(false);
       expectShell();
     },
   );
@@ -231,10 +212,10 @@ describe("withdrawal route composition", () => {
     await act(async () => {
       await router!.navigate("/screens/UI-28");
     });
-    const sharedPage = await screen.findByTestId("staffing-board-page");
-    expect(
-      await within(sharedPage).findByText("해당 원천 자료 없음"),
-    ).toBeVisible();
+    const placeholder = await screen.findByRole("region", {
+      name: "UI-28 본문",
+    });
+    expect(placeholder).toHaveTextContent("준비 중");
     expect(screen.getByTestId("withdrawal-download")).not.toBeVisible();
     await act(async () => {
       await router!.navigate("/screens/UI-05");

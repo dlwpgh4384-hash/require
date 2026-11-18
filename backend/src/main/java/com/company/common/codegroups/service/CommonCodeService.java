@@ -46,9 +46,10 @@ public class CommonCodeService {
         management.lockManagement();
         object(body, Set.of("groupId", "groupName"));
         String id = groupId(text(body, "groupId", 30, true));
-        String name = text(body, "groupName", 50, true);
+        // 시안 그룹 이름 칸 maxlength 30(입력 규칙, DB 칸 크기는 그대로).
+        String name = text(body, "groupName", 30, true);
         if (mapper.selectGroups().stream().anyMatch(row -> row.groupId.equals(id)))
-            throw new CodeFailure("groupId", "이미 등록된 그룹 ID입니다.");
+            throw new CodeFailure("groupId", "이미 있는 그룹 ID입니다.");
         var row = new CodeRows.Group();
         row.groupId = id;
         row.groupName = name;

@@ -81,4 +81,14 @@ class WithdrawalProjectionTest {
         assertThat(sql("release", Map.of("id", "12", "actor", "admin")))
             .contains("TENT_STAT_CD='REL'", "PROC_DTTM=clock_timestamp()", "TENT_STAT_CD='ACT'").doesNotContain("DELETE");
     }
+
+    @Test void listSetQueriesBindAllIdsInOneStatementAndBannerReadIsYearFree() throws Exception {
+        assertThat(sql("reservationsFor", Map.of("developerIds", List.of("a", "b", "c"))))
+            .contains("t.DEV_ID IN", "'ACT','CNVT'").matches("(?s).*IN\\s*\\(\\s*\\?\\s*,\\s*\\?\\s*,\\s*\\?\\s*\\).*");
+        assertThat(sql("earlyHistory", Map.of("assignmentIds", List.of("A-1", "A-2"))))
+            .matches("(?s).*IN\\s*\\(\\s*\\?\\s*,\\s*\\?\\s*\\).*").contains("ASGN_CHG_TYPE_CD='EARLY'", "ORDER BY h.ASGN_ID,h.REG_DTTM DESC,h.HIST_SN DESC");
+        assertThat(sql("list", new WithdrawalRows.ListFilter(null, LocalDate.of(2026,11,15), LocalDate.of(2027,1,31), null, null)))
+            .doesNotContain("make_date").contains("a.INPUT_END_DT >=", "a.INPUT_END_DT <=");
+        assertThat(sql("needs", Map.of())).contains("TB_BS_CLNT", "'SALES_STEP'");
+    }
 }

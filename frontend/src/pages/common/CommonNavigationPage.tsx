@@ -13,6 +13,8 @@ import {
 import { PlaceholderScreen } from "./PlaceholderScreen";
 import { findScreen } from "./screenRegistry";
 import { ProjectWorkspaceProvider } from "../projects/ProjectWorkspace";
+import { AssignmentWorkspaceProvider } from "../assignments/AssignmentWorkspace";
+import { WithdrawalWorkspaceProvider } from "../withdrawals/WithdrawalWorkspace";
 import { CodeWorkspaceProvider } from "../codegroups/CodeWorkspace";
 import { ClientPartWorkspaceProvider } from "../clients/ClientPartWorkspace";
 import { DeveloperWorkspaceProvider } from "../developers/DeveloperWorkspace";
@@ -107,6 +109,8 @@ export function CommonNavigationPage() {
             <ClientPartWorkspaceProvider>
               <DeveloperWorkspaceProvider>
                 <ProjectWorkspaceProvider>
+                 <AssignmentWorkspaceProvider>
+                 <WithdrawalWorkspaceProvider>
                   {preferences ? (
                     <PreferenceNavigation />
                   ) : (
@@ -118,6 +122,8 @@ export function CommonNavigationPage() {
                       })}
                     />
                   )}
+                 </WithdrawalWorkspaceProvider>
+                 </AssignmentWorkspaceProvider>
                 </ProjectWorkspaceProvider>
               </DeveloperWorkspaceProvider>
             </ClientPartWorkspaceProvider>

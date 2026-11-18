@@ -74,7 +74,8 @@ class CommonWithdrawalControllerTest {
             row.formula = tuple.group(1).replace("''", "'"); row.details = tuple.group(2).replace("''", "'");
             when(definitions.selectDefinition("식-" + id)).thenReturn(row);
         }
-        when(codes.options("JOB")).thenReturn(List.of(code("BE", "백엔드", 1), code("FE", "프론트엔드", 2)));
+        var backend = code("BE", "백엔드", 1); backend.relatedJobs = "FE";
+        when(codes.options("JOB")).thenReturn(List.of(backend, code("FE", "프론트엔드", 2)));
         when(codes.options("GRADE")).thenReturn(List.of(code("MD", "중급", 2), code("HI", "고급", 3)));
         when(codes.relatedJob("BE", "FE")).thenReturn(true);
         when(codes.extensionResponseCode(any())).thenAnswer(c -> Objects.requireNonNullElse(c.getArgument(0), ""));
@@ -93,8 +94,10 @@ class CommonWithdrawalControllerTest {
         when(mapper.lockDeveloper(anyString())).thenAnswer(c -> c.getArgument(0));
         when(mapper.reservations(anyString())).thenAnswer(c -> reservations.stream().filter(r -> r.developerId().equals(c.getArgument(0))).toList());
         when(mapper.needs()).thenAnswer(c -> new ArrayList<>(needs));
+        when(mapper.reservationsFor(anyCollection())).thenAnswer(c -> {Collection<String> ids=c.getArgument(0); return reservations.stream().filter(r -> ids.contains(r.developerId())).toList();});
+        when(mapper.earlyHistory(anyCollection())).thenAnswer(c -> {Collection<String> ids=c.getArgument(0); return history.stream().filter(h -> "EARLY".equals(h.type()) && ids.contains(h.assignmentId())).map(h -> new EarlyRow(h.assignmentId(), h.effectiveDate(), h.afterValue())).toList();});
         when(mapper.list(any())).thenAnswer(c -> {ListFilter f=c.getArgument(0); return sources.values().stream().map(this::source)
-            .filter(s -> s.endDate().getYear()==f.year() && "ACT".equals(s.statusCode()))
+            .filter(s -> (f.year()==null || s.endDate().getYear()==f.year()) && "ACT".equals(s.statusCode()))
             .filter(s -> f.from()==null || !s.endDate().isBefore(f.from()))
             .filter(s -> f.through()==null || !s.endDate().isAfter(f.through()))
             .filter(s -> f.jobCode()==null || f.jobCode().equals(s.jobCode()))
@@ -111,10 +114,10 @@ class CommonWithdrawalControllerTest {
     CodeContracts.Item code(String id, String name, int order) {var item=new CodeContracts.Item();item.code=id;item.codeName=name;item.sortOrd=order;item.useYn="Y";return item;}
     String name(String code) {return code==null || code.isEmpty()?"미정":switch(code){case "H" -> "높음";case "M" -> "보통";case "L" -> "낮음";default -> code;};}
     AssignmentRows.Row assignment(String id,String person,LocalDate end,String extension) {return new AssignmentRows.Row(id,"P-0001",person,"BE",LocalDate.of(2026,1,1),end,BigDecimal.ONE,BigDecimal.TEN,"NEW",null,extension,2,"N","ACT",null,"프로젝트",person,"D-1","백엔드","MO","ING");}
-    Source source(AssignmentRows.Row row) {return row==null?null:new Source(row.assignmentId(),row.developerId(),row.name(),row.projectName(),row.jobCode(),row.jobName(),row.endDate(),row.extensionPossibilityCode(),row.extensionCount(),row.modifiedAt(),row.statusCode(),"BE","MD","client");}
-    Need need(String id,int sn,String start,String job,String status,int occupied) {return new Need(id,sn,"기회 " + id,job,job,"MD","중급",start,3,1,occupied,status,"client",new BigDecimal("60"),BigDecimal.ONE);}
+    Source source(AssignmentRows.Row row) {return row==null?null:new Source(row.assignmentId(),row.developerId(),row.name(),row.projectName(),row.jobCode(),row.jobName(),row.endDate(),row.extensionPossibilityCode(),row.extensionCount(),row.modifiedAt(),row.statusCode(),"BE","MD","client","중급",row.projectId(),row.managementNumber());}
+    Need need(String id,int sn,String start,String job,String status,int occupied) {return new Need(id,sn,"기회 " + id,job,job,"MD","중급",start,3,1,occupied,status,"client",new BigDecimal("60"),BigDecimal.ONE,"고객사","제안");}
     void noTentativeWrites() {verify(mapper,never()).release(anyString(),anyString());verify(mapper,never()).insertReservation(any());}
-    void save(int sn,int status) throws Exception {mvc.perform(put("/api/common/withdrawals/A-0001/tentative-assignment").contentType("application/json").content("{\"needSn\":"+sn+"}")).andExpect(status().is(status));}
+    void save(int sn,int status) throws Exception {mvc.perform(put("/api/common/withdrawals/A-0001/tentative-assignment").contentType("application/json").content("{\"opportunityId\":\"O-0001\",\"needSn\":"+sn+"}")).andExpect(status().is(status));}
     void extension(String body,int status) throws Exception {mvc.perform(put("/api/common/withdrawals/A-0001/extension-possibility").contentType("application/json").content(body)).andExpect(status().is(status));}
     static org.springframework.test.web.servlet.ResultMatcher contract(String method,String path) {return OpenApiResponseContract.response(method,path);}
 
@@ -127,11 +130,59 @@ class CommonWithdrawalControllerTest {
             .andExpect(jsonPath("$.data.shortages[0].shortageCount").value(0.6));
         verify(definitions,atLeastOnce()).selectDefinition("식-80");noTentativeWrites();
     }
+    @Test void recommendationCardCarriesMockupReasonsSeatCustomerStageAndHeader() throws Exception {
+        when(mapper.skills("person")).thenReturn(List.of("Java","Spring"));
+        mvc.perform(get("/api/common/withdrawals/A-0001/recommendations")).andExpect(status().isOk())
+            .andExpect(contract("GET","/api/common/withdrawals/{assignmentId}/recommendations"))
+            .andExpect(jsonPath("$.data.items[0].reasons[0]").value("직무 일치"))
+            .andExpect(jsonPath("$.data.items[0].reasons[1]").value("등급 일치"))
+            .andExpect(jsonPath("$.data.items[0].reasons[2]").value("공백 없음"))
+            .andExpect(jsonPath("$.data.items[0].reasons[3]").value("같은 고객사"))
+            .andExpect(jsonPath("$.data.items[0].reasons[4]").value("수주 확률 60%"))
+            .andExpect(jsonPath("$.data.items[0].remainingCount").value(1))
+            .andExpect(jsonPath("$.data.items[0].customerName").value("고객사"))
+            .andExpect(jsonPath("$.data.items[0].stageName").value("제안"))
+            .andExpect(jsonPath("$.data.items[0].tentative").value(false))
+            .andExpect(jsonPath("$.data.target.name").value("person"))
+            .andExpect(jsonPath("$.data.target.gradeName").value("중급"))
+            .andExpect(jsonPath("$.data.target.skills[1]").value("Spring"))
+            .andExpect(jsonPath("$.data.target.extensionPossibilityName").value("미정"))
+            .andExpect(jsonPath("$.data.target.waitingStartDate").value("2026-12-01"))
+            .andExpect(jsonPath("$.data.target.tentativeOpportunityName").value(org.hamcrest.Matchers.nullValue()));
+    }
+    @Test void emptyRecommendationStillReturnsHeaderAndEmptyLists() throws Exception {
+        needs.clear();
+        mvc.perform(get("/api/common/withdrawals/A-0001/recommendations")).andExpect(status().isOk())
+            .andExpect(contract("GET","/api/common/withdrawals/{assignmentId}/recommendations"))
+            .andExpect(jsonPath("$.data.items").isEmpty()).andExpect(jsonPath("$.data.shortages").isEmpty())
+            .andExpect(jsonPath("$.data.target.name").value("person"));
+    }
+    @Test void smallShortageIsNotAnnouncedAndLargeOneHasOneDecimal() throws Exception {
+        when(mapper.opportunityDemand(any())).thenReturn(List.of(new OpportunityDemandRow(BigDecimal.ONE,new BigDecimal("0.4"),new BigDecimal("100"))));
+        mvc.perform(get("/api/common/withdrawals/A-0001/recommendations")).andExpect(jsonPath("$.data.shortages").isEmpty());
+        when(mapper.opportunityDemand(any())).thenReturn(List.of(new OpportunityDemandRow(BigDecimal.ONE,new BigDecimal("0.46"),new BigDecimal("100"))));
+        mvc.perform(get("/api/common/withdrawals/A-0001/recommendations")).andExpect(jsonPath("$.data.shortages[0].shortageCount").value(0.5));
+    }
     @Test void fullOutsideWindowEndedAndUnrelatedNeedsAreExcludedWithoutReleasingOccupancy() throws Exception {
         needs.clear();needs.add(need("full",1,"202612","BE","ING",1));needs.add(need("late",2,"202704","BE","ING",0));
         needs.add(need("ended",3,"202612","BE","END",0));needs.add(need("other",4,"202612","PM","ING",0));
-        needs.add(need("early",5,"202611","BE","ING",0));
+        needs.add(need("over",5,"202609","BE","ING",0));
         mvc.perform(get("/api/common/withdrawals/A-0001/recommendations")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items").isEmpty());noTentativeWrites();
+    }
+    @Test void alreadyStartedSeatThatHasNotEndedIsRecommendedFromTheMonthAfterWithdrawal() throws Exception {
+        // 식-79 조건 1: 이미 시작했으면 끝나기 전까지 대상. 시작월 = max(철수 다음 달, 자리 시작월).
+        needs.clear();needs.add(need("started",1,"202610","BE","ING",0));
+        mvc.perform(get("/api/common/withdrawals/A-0001/recommendations")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].opportunityId").value("started"))
+            .andExpect(jsonPath("$.data.items[0].startMonth").value("2026-10"))
+            .andExpect(jsonPath("$.data.items[0].reasons[2]").value("공백 없음"))
+            .andExpect(jsonPath("$.data.items[0].waitingLabel").value("바로 이어서 투입"));
+        mvc.perform(get("/api/common/withdrawals").param("year","2026"))
+            .andExpect(jsonPath("$.data.items[0].nextAssignment.recommendationCount").value(1));
+        mvc.perform(put("/api/common/withdrawals/A-0001/tentative-assignment").contentType("application/json")
+            .content("{\"opportunityId\":\"started\",\"needSn\":1}")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.assignment.startMonth").value("2026-12"));
+        verify(mapper).insertReservation(argThat(w -> "started".equals(w.opportunityId()) && "202612".equals(w.startMonth())));
     }
     @Test void relatedJobUsesTwentyInsteadOfFortyAndProbabilitySixtyAddsFive() throws Exception {
         needs.add(need("O-0002",2,"202612","FE","ING",0));
@@ -206,7 +257,7 @@ class CommonWithdrawalControllerTest {
     @DisplayName("happy auth side-effect: TB_SL_TENT_ASGN 저장·getCommonWithdrawalAssignments 재조회, TB_PJ_ASGN·TB_CO_MON_COST·TB_SL_RCMD_LOG 무변경")
     void anonymousTentativeSaveUsesServerIdentityAndNextMonthWithoutConfirmedWrites() throws Exception {
         var before=new LinkedHashMap<>(sources);
-        mvc.perform(put("/api/common/withdrawals/A-0001/tentative-assignment").contentType("application/json").content("{\"needSn\":1}"))
+        mvc.perform(put("/api/common/withdrawals/A-0001/tentative-assignment").contentType("application/json").content("{\"opportunityId\":\"O-0001\",\"needSn\":1}"))
             .andExpect(status().isOk()).andExpect(contract("PUT","/api/common/withdrawals/{assignmentId}/tentative-assignment"))
             .andExpect(jsonPath("$.data.assignment.needSn").value(1))
             .andExpect(jsonPath("$.data.assignment.startMonth").value("2026-12"));
@@ -246,14 +297,46 @@ class CommonWithdrawalControllerTest {
         mvc.perform(get("/api/common/withdrawals/A-0001/recommendations")).andExpect(status().isOk());
         reservations.add(new Reservation("1","person","old","이전",7,"202612","ACT"));
         needs.set(0,need("O-0001",1,"202612","BE","ING",1));
-        mvc.perform(put("/api/common/withdrawals/A-0001/tentative-assignment").contentType("application/json").content("{\"needSn\":1}"))
+        mvc.perform(put("/api/common/withdrawals/A-0001/tentative-assignment").contentType("application/json").content("{\"opportunityId\":\"O-0001\",\"needSn\":1}"))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.errors[0].field").value("needSn"));
         noTentativeWrites();assertThat(reservations).hasSize(1);assertThat(reservations.get(0).opportunityId()).isEqualTo("old");
     }
-    @Test void ambiguousCompositeNeedFailsRatherThanChoosingFirst() throws Exception {
+    @Test void sameNeedNumberInTwoOpportunitiesUsesTheRequestedOpportunity() throws Exception {
+        // 필요 인력 줄의 키는 (OPP_ID, NEED_SN): 같은 NEED_SN이 두 기회에 있어도 보낸 기회의 줄만 차지한다.
         needs.add(need("O-0002",1,"202612","BE","ING",0));
+        mvc.perform(put("/api/common/withdrawals/A-0001/tentative-assignment").contentType("application/json").content("{\"opportunityId\":\"O-0002\",\"needSn\":1}"))
+            .andExpect(status().isOk()).andExpect(contract("PUT","/api/common/withdrawals/{assignmentId}/tentative-assignment"))
+            .andExpect(jsonPath("$.data.assignment.opportunityId").value("O-0002")).andExpect(jsonPath("$.data.assignment.needSn").value(1));
+        verify(mapper).insertReservation(argThat(w -> "O-0002".equals(w.opportunityId()) && w.needSn()==1));
+        assertThat(reservations).singleElement().satisfies(r -> assertThat(r.opportunityId()).isEqualTo("O-0002"));
+    }
+    @Test void missingOrUnknownOpportunityIsFieldValidationWithoutWrites() throws Exception {
         mvc.perform(put("/api/common/withdrawals/A-0001/tentative-assignment").contentType("application/json").content("{\"needSn\":1}"))
-            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("needSn"));noTentativeWrites();
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("opportunityId"));
+        mvc.perform(put("/api/common/withdrawals/A-0001/tentative-assignment").contentType("application/json").content("{\"opportunityId\":\"O-9999\",\"needSn\":1}"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("needSn"));
+        noTentativeWrites();
+    }
+    @Test void otherPersonsSeatCountsButOwnSeatDoesNotWhenCountingRemainingSlots() throws Exception {
+        // 식-79 조건 2: 남은 자리 = 필요 인원 − 그 줄의 ACT·CNVT. 이 사람 자신의 자리는 빼고 센다(시안 nextSlots).
+        reservations.add(new Reservation("1","person","O-0001","기회 O-0001",1,"202612","ACT"));
+        needs.set(0,need("O-0001",1,"202612","BE","ING",1));
+        mvc.perform(get("/api/common/withdrawals/A-0001/recommendations").param("replaceCurrent","true"))
+            .andExpect(jsonPath("$.data.items[0].remainingCount").value(1)).andExpect(jsonPath("$.data.items[0].tentative").value(true));
+        reservations.clear();reservations.add(new Reservation("2","someone","O-0001","기회 O-0001",1,"202612","CNVT"));
+        mvc.perform(get("/api/common/withdrawals/A-0001/recommendations")).andExpect(jsonPath("$.data.items").isEmpty());
+        save(1,409);noTentativeWrites();
+    }
+    @Test void afterTentativeTheReplacementReadShowsTheSameOpportunityAsAlreadyReserved() throws Exception {
+        needs.add(need("O-0002",2,"202612","BE","ING",0));
+        save(1,200);
+        var occupied=needs.get(0);needs.set(0,need(occupied.opportunityId(),occupied.needSn(),occupied.startMonth(),"BE","ING",1));
+        mvc.perform(get("/api/common/withdrawals/A-0001/recommendations").param("replaceCurrent","true")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items.length()").value(2))
+            .andExpect(jsonPath("$.data.items[?(@.opportunityId=='O-0001')].tentative").value(org.hamcrest.Matchers.contains(true)))
+            .andExpect(jsonPath("$.data.items[?(@.opportunityId=='O-0002')].tentative").value(org.hamcrest.Matchers.contains(false)))
+            .andExpect(jsonPath("$.data.target.tentativeOpportunityName").value("기회 O-0001"))
+            .andExpect(jsonPath("$.data.target.tentativeStartMonth").value("2026-12"));
     }
     @Test void sameTargetIsIdempotent() throws Exception {reservations.add(new Reservation("1","person","O-0001","기회",1,"202612","ACT"));save(1,200);noTentativeWrites();}
     @Test void handedOffCandidateCannotBeReplaced() throws Exception {reservations.add(new Reservation("1","person","old","이전",7,"202612","CNVT"));save(1,409);noTentativeWrites();}
@@ -273,12 +356,93 @@ class CommonWithdrawalControllerTest {
         verify(mapper,atLeastOnce()).list(any());noTentativeWrites();
         verify(assignments,never()).update(any());verify(assignments,never()).insertHistory(any());
     }
-    @Test void bannerCountsDistinctPeopleAndDoesNotExistForOtherYears() throws Exception {
+    @Test void bannerCountsAssignmentsLikeTheMockupAndDoesNotExistForOtherYears() throws Exception {
+        // 시안 nextSummary: 배정(ASSIGN) 단위로 센다. 같은 사람의 두 배정은 두 건이다.
         sources.put("A-0002",assignment("A-0002","person",today.plusDays(20),null));
         mvc.perform(get("/api/common/withdrawals").param("year","2026")).andExpect(status().isOk())
             .andExpect(contract("GET","/api/common/withdrawals")).andExpect(jsonPath("$.data.totalCount").value(2))
-            .andExpect(jsonPath("$.data.banner.unassignedCount").value(1)).andExpect(jsonPath("$.data.banner.matchedCount").value(1));
+            .andExpect(jsonPath("$.data.banner.soonCount").value(2))
+            .andExpect(jsonPath("$.data.banner.unassignedCount").value(2)).andExpect(jsonPath("$.data.banner.matchedCount").value(2));
         mvc.perform(get("/api/common/withdrawals").param("year","2025")).andExpect(jsonPath("$.data.banner").value(org.hamcrest.Matchers.nullValue()));
+    }
+    @Test void bannerIgnoresListFiltersAndSeparatesHighTentativeAndNoSeat() throws Exception {
+        sources.put("A-0002",assignment("A-0002","high",today.plusDays(20),"H"));
+        sources.put("A-0003",assignment("A-0003","reserved",today.plusDays(25),"M"));
+        sources.put("A-0004",assignment("A-0004","later",LocalDate.of(2026,12,31),"L"));
+        sources.put("A-0005",assignment("A-0005","gone",today.minusDays(3),null));
+        reservations.add(new Reservation("1","reserved","O-0001","기회 O-0001",1,"202612","ACT"));
+        needs.set(0,need("O-0001",1,"202612","BE","ING",1));
+        // 조건(직무 FE·이미 철수)으로 목록이 비어도 띠 숫자는 그대로다.
+        mvc.perform(get("/api/common/withdrawals").param("year","2026").param("jobCode","FE")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items").isEmpty())
+            .andExpect(jsonPath("$.data.banner.soonCount").value(4))
+            .andExpect(jsonPath("$.data.banner.unassignedCount").value(2))
+            .andExpect(jsonPath("$.data.banner.matchedCount").value(0));
+        mvc.perform(get("/api/common/withdrawals").param("year","2026").param("period","이미 철수"))
+            .andExpect(jsonPath("$.data.totalCount").value(1)).andExpect(jsonPath("$.data.banner.soonCount").value(4));
+    }
+    @Test void bannerIsZeroNotMissingWhenNothingWithdrawsSoon() throws Exception {
+        sources.clear();
+        mvc.perform(get("/api/common/withdrawals").param("year","2026")).andExpect(status().isOk())
+            .andExpect(contract("GET","/api/common/withdrawals"))
+            .andExpect(jsonPath("$.data.banner.soonCount").value(0)).andExpect(jsonPath("$.data.banner.unassignedCount").value(0))
+            .andExpect(jsonPath("$.data.banner.matchedCount").value(0));
+    }
+    @Test void nextAssignmentCellExplainsNonTargetsWithMockupWords() throws Exception {
+        sources.put("A-0002",assignment("A-0002","high",today.plusDays(20),"H"));
+        sources.put("A-0003",assignment("A-0003","later",LocalDate.of(2027,3,31),"M"));
+        sources.put("A-0004",assignment("A-0004","nothing",today.plusDays(25),"L"));
+        sources.put("A-0005",assignment("A-0005","gone",today.minusDays(3),null));
+        sources.put("A-0006",assignment("A-0006","reserved-gone",today.minusDays(2),null));
+        reservations.add(new Reservation("1","reserved-gone","O-0001","기회 O-0001",1,"202612","ACT"));
+        reservations.add(new Reservation("2","nothing","O-0001","기회 O-0001",1,"202612","ACT"));
+        needs.set(0,need("O-0001",1,"202612","BE","ING",1));
+        sources.put("A-0007",assignment("A-0007","free",today.plusDays(26),"M"));
+        var byId=new HashMap<String,com.fasterxml.jackson.databind.JsonNode>();
+        for (String year : List.of("2026","2027")) {
+            String body=mvc.perform(get("/api/common/withdrawals").param("year",year)).andExpect(status().isOk())
+                .andExpect(contract("GET","/api/common/withdrawals")).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+            json.readTree(body).path("data").path("items").forEach(i -> byId.put(i.path("assignmentId").asText(), i.path("nextAssignment")));
+        }
+        assertThat(byId.get("A-0002").path("recommendationTarget").asBoolean()).isFalse();
+        assertThat(byId.get("A-0002").path("note").asText()).isEqualTo("연장 가능성 높음");
+        assertThat(byId.get("A-0003").path("recommendationTarget").asBoolean()).isFalse();
+        assertThat(byId.get("A-0003").path("note").asText()).isEqualTo("3개월 뒤 철수");
+        assertThat(byId.get("A-0004").path("hasTentativeAssignment").asBoolean()).isTrue();
+        assertThat(byId.get("A-0004").path("note").isNull()).isTrue();
+        assertThat(byId.get("A-0005").path("note").isNull()).isTrue();
+        assertThat(byId.get("A-0006").path("hasTentativeAssignment").asBoolean()).isTrue();
+        assertThat(byId.get("A-0006").path("opportunityName").asText()).isEqualTo("기회 O-0001");
+        assertThat(byId.get("A-0007").path("recommendationTarget").asBoolean()).isTrue();
+        assertThat(byId.get("A-0007").path("recommendationCount").asInt()).isZero();
+        assertThat(byId.get("A-0007").path("note").asText()).isEqualTo("맞는 자리 없음");
+        var labels=new ArrayList<String>();
+        for (String year : List.of("2026","2027")) {
+            byte[] bytes=mvc.perform(get("/api/common/withdrawals/excel").param("year",year)).andReturn().getResponse().getContentAsByteArray();
+            try(var book=new XSSFWorkbook(new java.io.ByteArrayInputStream(bytes))){
+                for(var row:book.getSheetAt(0)) if(row.getCell(7)!=null) labels.add(row.getCell(7).toString());
+            }
+        }
+        assertThat(labels).contains("– · 연장 가능성 높음","– · 3개월 뒤 철수","가배정 · 기회 O-0001","없음 · 맞는 자리 없음","–");
+    }
+    @Test void listReadsReservationsHistoryCodesFormulasAndNeedsOncePerRequest() throws Exception {
+        // 줄마다 묻지 않는다: 가배정·조기 철수 이력은 묶음 조회 한 번, 식·공통코드·필요 인력 줄은 요청마다 한 번.
+        for(int i=2;i<=30;i++)sources.put("A-"+i,assignment("A-"+i,"person"+i,today.plusDays(10),i%2==0?"M":null));
+        history.add(new AssignmentRows.HistoryRow(1,"A-2","EARLY",LocalDate.of(2026,10,1),"","2026-11-25",null,"",null,null,"N","N","N",null,"admin",now));
+        mvc.perform(get("/api/common/withdrawals").param("year","2026")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.totalCount").value(30))
+            .andExpect(jsonPath("$.data.items[?(@.assignmentId=='A-2')].earlyWithdrawalHistory[0]").value(org.hamcrest.Matchers.contains("2026-10-01 · 2026-11-25")));
+        verify(mapper,never()).reservations(anyString());
+        verify(mapper,times(1)).reservationsFor(anyCollection());
+        verify(mapper,times(1)).earlyHistory(anyCollection());
+        verify(assignments,never()).history(anyString());
+        verify(mapper,times(1)).needs();
+        verify(codes,atMost(1)).options("JOB");
+        verify(codes,atMost(1)).options("GRADE");
+        verify(codes,atMost(2)).extensionName(any());
+        for (String id : List.of("식-77","식-79","식-82")) verify(definitions,times(1)).selectDefinition(id);
+        verify(definitions,times(1)).selectDefinition("식-00");
+        verify(mapper,times(2)).list(any());
     }
     @Test void periodAndJobFiltersShareTheTotalAndStableOrder() throws Exception {
         sources.put("A-0002",assignment("A-0002","other",today.minusDays(1),null));

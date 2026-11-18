@@ -105,6 +105,7 @@
   </update>
   <update id="rename">UPDATE TB_BS_PART SET part_nm=#{name} WHERE part_id=#{id}</update>
   <update id="stop">UPDATE TB_BS_PART SET use_yn='N' WHERE part_id=#{id}</update>
+  <update id="resume">UPDATE TB_BS_PART SET use_yn='Y' WHERE part_id=#{id}</update>
   <select id="selectLastConfirmed" resultType="java.lang.String">
     SELECT max(s.setl_ym) FROM TB_CO_PART_SETL s
     WHERE s.part_id=#{id} AND s.setl_ym &gt;= #{month} AND s.setl_stat_cd='CNFM'

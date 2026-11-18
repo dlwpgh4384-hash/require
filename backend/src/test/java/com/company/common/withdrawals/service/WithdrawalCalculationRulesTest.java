@@ -69,14 +69,50 @@ class WithdrawalCalculationRulesTest {
         assertThat(row.formula).contains("일치 32", "70% 이상 9");
     }
 
-    @Test void unsupportedUsedSyntaxIsCalculationFieldErrorNotAFabricatedScore() throws Exception {
+    // 식 글자 전체를 비교하지 않는다(2026-11-18 결정, 투입 배정과 같은 방식): 더 붙은 글자가 있어도 화면을 막지 않고
+    // 읽을 수 있는 숫자로 계산한다. 숫자를 못 읽으면 명세 숫자로 계산한다.
+    @Test void extraWordingDoesNotBlockTheScoreAndReadableWeightsStillApply() throws Exception {
         var row = use("식-80");
         row.formula += " + 스킬 30";
-        assertThatThrownBy(() -> rules.aiRecommendScore(score(0)))
-            .isInstanceOfSatisfying(CodeFailure.class, failure -> {
-                assertThat(failure.getStatus()).isEqualTo(400);
-                assertThat(failure.getField()).isEqualTo("calculation");
-            });
+        assertThat(rules.aiRecommendScore(score(0))).isEqualByComparingTo("80");
+        row.formula = row.formula.replace("한 단계 차이 10", "한 단계 차이 12");
+        assertThat(rules.aiRecommendScore(score(0))).isEqualByComparingTo("82");
+    }
+
+    @Test void unreadableDefinitionsFallBackToSpecNumbersInsteadOfFailing() throws Exception {
+        for (String id : List.of("식-77", "식-79", "식-80", "식-81", "식-82", "식-60")) {
+            var row = use(id);
+            row.formula = "외부 AI 추천 Open API 결과를 쓴다";
+        }
+        LocalDate end = LocalDate.of(2026, 11, 20);
+        assertThat(rules.aiRecommendScore(score(0))).isEqualByComparingTo("80");
+        assertThat(rules.nearTermMonthOffset()).isEqualTo(2);
+        assertThat(rules.candidateWindowMonths()).isEqualTo(3);
+        assertThat(rules.waitingDays(end, YearMonth.of(2026, 12))).isEqualTo(10);
+        assertThat(rules.bannerCandidate(end, LocalDate.of(2026, 11, 1), null, false)).isTrue();
+        assertThat(rules.supply(List.of(new SupplyPerson(new BigDecimal("0.25"), List.of())),
+            YearMonth.of(2026, 12))).isEqualByComparingTo("0.8");
+    }
+
+    @Test void oneSettingsReadsEachDefinitionOnceForAWholeList() throws Exception {
+        use("식-77");
+        use("식-79");
+        var settings = rules.settings();
+        LocalDate today = LocalDate.of(2026, 11, 1);
+        for (int day = 1; day <= 30; day++) {
+            settings.nearTerm(LocalDate.of(2026, 11, day), today);
+            settings.candidatePeriod(LocalDate.of(2026, 11, day), YearMonth.of(2026, 12), 3);
+        }
+        verify(mapper, times(1)).selectDefinition("식-00");
+        verify(mapper, times(1)).selectDefinition("식-77");
+        verify(mapper, times(1)).selectDefinition("식-79");
+    }
+
+    @Test void scoreOverHundredIsCappedNotThrown() throws Exception {
+        var row = use("식-80");
+        row.formula = row.formula.replace("일치 40", "일치 90");
+        assertThat(rules.aiRecommendScore(new ScoreInput(true, false, 0, 0, true, new BigDecimal("90"))))
+            .isEqualByComparingTo("100");
     }
 
     @Test void unusedFormulaIsNeverReadWhenComputingWaitingDays() throws Exception {

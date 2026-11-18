@@ -25,7 +25,7 @@ class PartScopeSourceTest {
         data.period("part-a", "202612", null, "leader-a", "37.25", "1600000");
         when(service.getCommonParts()).thenReturn(new PartContracts.Items<>(List.of(new PartContracts.Part(
             "part-a", "미래 파트", "leader-a", "파트장", new java.math.BigDecimal("37.25"),
-            new java.math.BigDecimal("1600000"), "2026-12", null, "Y", null, 0L, 0L, "2026-12월부터 37.25%"))));
+            new java.math.BigDecimal("1600000"), "2026-12", null, "Y", null, 0L, 0L, "2026-12부터 37.25%"))));
         assertThat(source.availableForProject()).extracting(PartContracts.Part::partId).containsExactly("part-a");
         assertThat(source.settlementStandard("part-a", YearMonth.of(2026, 11))).isEmpty();
         assertThat(source.settlementStandard("part-a", YearMonth.of(2026, 12))).isPresent();

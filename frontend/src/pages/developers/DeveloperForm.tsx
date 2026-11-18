@@ -41,11 +41,14 @@ const money = (value: number | null | undefined) => (value == null ? "" : value.
 export function DeveloperForm({
   developer,
   options,
+  managementNumbers = [],
   onCancel,
   onSaved,
 }: {
   developer?: Developer;
   options: DeveloperOptions;
+  /** 시안: 관리번호 중복은 칸을 떠날 때 이미 아는 목록으로 먼저 본다(저장 때 서버가 다시 확인). */
+  managementNumbers?: string[];
   onCancel: () => void;
   onSaved: (developer: Developer) => void;
 }) {
@@ -143,6 +146,11 @@ export function DeveloperForm({
       return next;
     });
   };
+  /** 고르는 칸: 바꾸면 바로 검사(시안 change 이벤트의 validate). */
+  const pick = (key: keyof Draft, value: string) => {
+    change(key, value as never);
+    check(key, { ...draft, [key]: value });
+  };
   const selectArea = async (level: number, value: string) => {
     const request = ++areaRequest.current;
     const next = location.map((v, i) => (i === level ? value : i > level ? "" : v));
@@ -198,7 +206,7 @@ export function DeveloperForm({
         aria-invalid={!!fieldError(key)}
         value={String(draft[key] || "")}
         disabled={busy}
-        onChange={(e) => change(key, e.target.value as never)}
+        onChange={(e) => pick(key, e.target.value)}
       >
         <option value="">선택</option>
         {!!draft[key] && !options.codes[group]?.some((c) => c.code === draft[key]) && (
@@ -214,22 +222,45 @@ export function DeveloperForm({
       </select>,
       help,
     );
+  /** 시안 validate(k): 한 칸의 오류 문구(없으면 ""). */
+  const message = (field: string, d: Draft): string => {
+    if (field === "name") return d.name.trim() ? "" : enter(labels.name);
+    if (field === "managementNumber") {
+      const number = d.managementNumber.trim();
+      if (developer || !number) return "";
+      if (!/^[A-Za-z0-9-]{1,20}$/.test(number)) return "관리번호는 영문·숫자·하이픈으로 20자 이내로 적어 주세요.";
+      return managementNumbers.includes(number) ? "이미 등록된 관리번호입니다." : "";
+    }
+    if (field === "skills") {
+      const unknown = d.skills
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .filter((name) => !options.codes.SKILL?.some((c) => c.codeName === name || c.code === name));
+      return unknown.length ? `공통코드 「스킬」에 없는 이름입니다: ${unknown.join(", ")}` : "";
+    }
+    const key = field === "organization" ? "organizationId" : field;
+    if ((required as readonly string[]).includes(key) && !d[field as keyof Draft]) return enter(labels[field]);
+    return "";
+  };
+  // 시안: 글자 칸은 칸을 떠날 때, 고르는 칸·날짜는 바꿀 때 바로 그 칸 아래에 문구를 보인다.
+  const check = (field: string, d: Draft = draft) => {
+    const found = message(field, d);
+    setErrors((e) => {
+      if ((e[field] || "") === found) return e;
+      const next = { ...e };
+      if (found) next[field] = found;
+      else delete next[field];
+      return next;
+    });
+  };
   const validate = () => {
     const found: Record<string, string> = {};
-    if (!draft.name.trim()) found.name = enter(labels.name);
-    if (!developer && draft.managementNumber.trim() && !/^[A-Za-z0-9-]{1,20}$/.test(draft.managementNumber.trim()))
-      found.managementNumber = "영문·숫자·하이픈 20자 이내로 입력해 주세요.";
-    for (const key of required) {
-      const value = key === "organizationId" ? draft.organization : draft[key];
-      const field = key === "organizationId" ? "organization" : key;
-      if (!value && !found[field]) found[field] = enter(labels[field]);
+    const fields = ["name", "managementNumber", ...required.map((k) => (k === "organizationId" ? "organization" : k)), "skills"];
+    for (const field of fields) {
+      const m = message(field, draft);
+      if (m) found[field] = m;
     }
-    const unknown = draft.skills
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .filter((name) => !options.codes.SKILL?.some((c) => c.codeName === name || c.code === name));
-    if (unknown.length) found.skills = `공통코드 「스킬」에 없는 이름입니다: ${unknown.join(", ")}`;
     setErrors(found);
     if (Object.keys(found).length) {
       // 공통 기능: 첫 오류 칸으로 커서를 옮긴다
@@ -305,6 +336,7 @@ export function DeveloperForm({
       maxLength={max}
       disabled={busy}
       onChange={(e) => change(key, e.target.value)}
+      onBlur={() => check(key)}
       {...extra}
     />
   );
@@ -379,7 +411,7 @@ export function DeveloperForm({
               aria-invalid={!!fieldError("organization")}
               value={draft.organization}
               disabled={busy}
-              onChange={(e) => change("organization", e.target.value)}
+              onChange={(e) => pick("organization", e.target.value)}
             >
               <option value="">선택</option>
               <option value={SELF}>자사</option>
@@ -417,7 +449,7 @@ export function DeveloperForm({
               aria-invalid={!!fieldError("salesPartId")}
               value={draft.salesPartId}
               disabled={busy}
-              onChange={(e) => change("salesPartId", e.target.value)}
+              onChange={(e) => pick("salesPartId", e.target.value)}
             >
               <option value="">선택</option>
               {options.parts

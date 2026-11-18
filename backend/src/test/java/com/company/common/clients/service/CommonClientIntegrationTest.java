@@ -111,7 +111,7 @@ class CommonClientIntegrationTest {
         String id=create("BOTH","123-45-67890");
         assertThat(db.queryForObject("SELECT acct_no_enc FROM TB_BS_CLNT WHERE clnt_id=?",String.class,id)).doesNotContain("12345678");
         mvc.perform(get("/api/common/clients")).andExpect(jsonPath("$.data.items[0].clientId").value(id)).andExpect(jsonPath("$.data.items[0].paymentAccountSummary").value(org.hamcrest.Matchers.endsWith("5678")));
-        mvc.perform(get("/api/common/clients/"+id+"/change-history")).andExpect(jsonPath("$.data.items[0].fieldName").value("신규 등록")).andExpect(jsonPath("$.data.items[0].changedBy").value("admin"));
+        mvc.perform(get("/api/common/clients/"+id+"/change-history")).andExpect(jsonPath("$.data.items[0].fieldName").value("신규 등록")).andExpect(jsonPath("$.data.items[0].changedBy").value("시스템 관리자")); // 처리자는 사람 이름(시안), 첫 관리자 admin=시스템 관리자
         mvc.perform(get("/api/common/clients/"+id+"/payment-account")).andExpect(jsonPath("$.data.accountNumber").value("12345678"));
         var reopened=new JdbcTemplate(source); assertThat(reopened.queryForObject("SELECT use_yn FROM TB_BS_CLNT WHERE clnt_id=?",String.class,id)).isEqualTo("Y");
     }

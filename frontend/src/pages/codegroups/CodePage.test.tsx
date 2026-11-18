@@ -267,15 +267,59 @@ it("삭제 거부는 확인창과 기존 행을 유지한다", async () => {
   ).toBeInTheDocument();
   expect(rows.GENERAL).toHaveLength(2);
 });
-it("빈 이름은 저장 요청 없이 필드 오류를 표시한다", async () => {
+it("빈 이름은 저장 요청 없이 시안 알림을 띄운다", async () => {
   await ready();
+  expect(screen.getByLabelText("ONE 이름")).toHaveAttribute("maxLength", "50");
   fireEvent.change(screen.getByLabelText("ONE 이름"), {
     target: { value: " " },
   });
   fireEvent.click(screen.getByTestId("code-save"));
-  expect(
-    screen.getAllByText("이름을 1~100자로 입력해 주세요.").length,
-  ).toBeGreaterThan(0);
+  expect(await screen.findByTestId("code-toast")).toHaveTextContent(
+    "코드 이름은 비울 수 없습니다.",
+  );
+  expect(writes()).toHaveLength(0);
+});
+it("추가값 오류는 「코드 · 오류」 한 줄 알림으로 막는다(시안)", async () => {
+  rows.RSM_LABEL = [
+    { code: "L001", codeName: "성명", sortOrd: 1, useYn: "Y", targetField: "NAME" },
+  ];
+  await ready();
+  await selectGroup("RSM_LABEL");
+  const cell = await screen.findByLabelText("L001 넣을 칸");
+  // 시안: 넣을 칸은 고르는 칸이 아니라 글자 칸이다.
+  expect(cell.tagName).toBe("INPUT");
+  fireEvent.change(cell, { target: { value: "" } });
+  fireEvent.click(screen.getByTestId("code-save"));
+  expect(await screen.findByTestId("code-toast")).toHaveTextContent(
+    "L001 · 「넣을 칸」 칸을 채워 주세요.",
+  );
+  fireEvent.change(cell, { target: { value: "phone" } });
+  fireEvent.click(screen.getByTestId("code-save"));
+  await waitFor(() =>
+    expect(screen.getByTestId("code-toast")).toHaveTextContent(
+      "L001 · 넣을 칸은 NAME·TEL·MAIL·ADDR·SKILL·WANT·FROM·VNDR 중 하나로 넣어 주세요.",
+    ),
+  );
+  expect(writes()).toHaveLength(0);
+  fireEvent.change(cell, { target: { value: "tel" } });
+  expect(cell).toHaveValue("TEL");
+  fireEvent.click(screen.getByTestId("code-save"));
+  await waitFor(() => expect(rows.RSM_LABEL[0].targetField).toBe("TEL"));
+});
+it("[취소]는 바꾼 것이 있으면 「변경을 취소했습니다.」, 없으면 「바꾼 내용이 없습니다.」", async () => {
+  await ready();
+  fireEvent.click(screen.getByTestId("code-cancel"));
+  expect(screen.getByTestId("code-toast")).toHaveTextContent(
+    "바꾼 내용이 없습니다.",
+  );
+  fireEvent.change(screen.getByLabelText("ONE 이름"), {
+    target: { value: "미저장" },
+  });
+  fireEvent.click(screen.getByTestId("code-cancel"));
+  expect(screen.getByLabelText("ONE 이름")).toHaveValue("첫 이름");
+  expect(screen.getByTestId("code-toast")).toHaveTextContent(
+    "변경을 취소했습니다.",
+  );
   expect(writes()).toHaveLength(0);
 });
 it("서버 필드 오류에서 draft를 유지한다", async () => {
@@ -373,6 +417,63 @@ it("수당은 네 칸이며 비운 값은 0으로 저장한다", async () => {
   });
   fireEvent.click(screen.getByTestId("code-save"));
   await waitFor(() => expect(rows.ALWNC[0].codeVal).toBe(0));
+  expect(await screen.findByTestId("code-toast")).toHaveTextContent(
+    "수당코드를 저장했습니다.",
+  );
+});
+it("수당코드 추가 창은 값 0·단위 원으로 열리고 시안 문구로 검사·알림한다", async () => {
+  await ready();
+  await selectGroup("ALWNC");
+  fireEvent.click(screen.getByTestId("code-add"));
+  const dialog = within(screen.getByRole("dialog"));
+  expect(dialog.getByLabelText("새 수당 값")).toHaveValue(0);
+  expect(dialog.getByLabelText("새 수당 단위")).toHaveValue("원");
+  expect(dialog.getByLabelText("새 코드 이름")).toHaveAttribute(
+    "maxLength",
+    "30",
+  );
+  fireEvent.click(dialog.getByTestId("code-dialog-submit"));
+  expect(dialog.getByText("코드와 이름을 넣어 주세요.")).toBeInTheDocument();
+  fireEvent.change(dialog.getByLabelText("새 코드"), {
+    target: { value: "team_fee" },
+  });
+  fireEvent.change(dialog.getByLabelText("새 코드 이름"), {
+    target: { value: "야근 수당(월)" },
+  });
+  fireEvent.click(dialog.getByTestId("code-dialog-submit"));
+  expect(dialog.getByText("이미 있는 코드입니다.")).toBeInTheDocument();
+  expect(writes()).toHaveLength(0);
+  fireEvent.change(dialog.getByLabelText("새 코드"), {
+    target: { value: "NIGHT_FEE" },
+  });
+  fireEvent.click(dialog.getByTestId("code-dialog-submit"));
+  expect(await screen.findByTestId("code-toast")).toHaveTextContent(
+    "야근 수당(월)을 추가했습니다.",
+  );
+  expect(JSON.parse(String(writes()[0][1].body))).toMatchObject({
+    code: "NIGHT_FEE",
+    codeName: "야근 수당(월)",
+    codeVal: 0,
+    unitNm: "원",
+  });
+});
+it("코드 추가 창은 이름 50자, 시안 문구로 검사한다", async () => {
+  await ready();
+  fireEvent.click(screen.getByTestId("code-add"));
+  const dialog = within(screen.getByRole("dialog"));
+  expect(dialog.getByLabelText("새 코드 이름")).toHaveAttribute(
+    "maxLength",
+    "50",
+  );
+  fireEvent.change(dialog.getByLabelText("새 코드"), {
+    target: { value: "새-코드" },
+  });
+  fireEvent.click(dialog.getByTestId("code-dialog-submit"));
+  expect(
+    dialog.getByText("코드는 영문 대문자·숫자·_ 로 넣어 주세요."),
+  ).toBeInTheDocument();
+  expect(dialog.getByText("이름을 넣어 주세요.")).toBeInTheDocument();
+  expect(writes()).toHaveLength(0);
 });
 it("새 그룹 등록 후 선택과 제목에 ID·이름을 표시한다", async () => {
   await ready();
@@ -401,6 +502,29 @@ it("그룹 형식 검증과 창 취소는 서버에 쓰지 않는다", async () 
     target: { value: "새 그룹" },
   });
   fireEvent.click(screen.getByTestId("code-dialog-submit"));
+  expect(
+    screen.getByText(
+      "그룹 ID는 영문 대문자로 시작하고 영문 대문자·숫자·_ 만 넣어 주세요.",
+    ),
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("그룹 이름")).toHaveAttribute("maxLength", "30");
+  fireEvent.change(screen.getByLabelText("그룹 ID"), {
+    target: { value: "general" },
+  });
+  fireEvent.change(screen.getByLabelText("그룹 이름"), {
+    target: { value: " " },
+  });
+  fireEvent.click(screen.getByTestId("code-dialog-submit"));
+  expect(screen.getByText("이미 있는 그룹 ID입니다.")).toBeInTheDocument();
+  expect(screen.getByText("그룹 이름을 넣어 주세요.")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("그룹 ID"), {
+    target: { value: "NEW_ONE" },
+  });
+  fireEvent.change(screen.getByLabelText("그룹 이름"), {
+    target: { value: "수당코드" },
+  });
+  fireEvent.click(screen.getByTestId("code-dialog-submit"));
+  expect(screen.getByText("이미 있는 그룹입니다.")).toBeInTheDocument();
   expect(writes()).toHaveLength(0);
   fireEvent.click(screen.getByTestId("code-dialog-cancel"));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

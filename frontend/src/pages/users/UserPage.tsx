@@ -246,7 +246,7 @@ export function UserPage() {
       (item) => item.userStatCd === "STOP",
     );
     if (!targets.length) {
-      setNotice("중지된 계정만 다시 사용할 수 있습니다.");
+      setNotice("고른 것 중 사용 중지된 계정이 없습니다.");
       return;
     }
     setResumeTarget(targets);
@@ -270,7 +270,7 @@ export function UserPage() {
     busyRef.current = false;
     setBusy(false);
     refresh(
-      `${done}건의 계정을 다시 사용합니다.${errors.length ? ` ${errors.length}건은 처리하지 못했습니다. ${errors.join(" ")}` : ""}`,
+      `${done}건을 다시 사용합니다.${errors.length ? ` ${errors.length}건은 처리하지 못했습니다. ${errors.join(" ")}` : ""}`,
     );
   };
   const download = async () => {
@@ -497,10 +497,10 @@ export function UserPage() {
       )}
       {resumeTarget && (
         <ConfirmDialog
-          title="다시 사용"
+          title={`${resumeTarget.length}건을 다시 사용할까요?`}
           testId="user-resume-bulk-confirm"
           proceedLabel="다시 사용"
-          description={`선택한 ${resumeTarget.length}건의 계정을 다시 사용합니다. 상태가 「사용」으로 돌아가고 변경 이력에 남습니다.`}
+          description={`${resumeTarget.map((item) => item.name).join(", ")} — 상태가 「사용」으로 돌아가고 변경 이력에 남습니다.`}
           onCancel={() => {
             if (!busyRef.current) setResumeTarget(null);
           }}

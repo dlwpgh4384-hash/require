@@ -2,10 +2,9 @@ import type { ReactElement } from "react";
 import { ProjectPage } from "../projects/ProjectPage";
 import { AssignmentPage } from "../assignments/AssignmentPage";
 import { WithdrawalPage } from "../withdrawals/WithdrawalPage";
-import { StaffingBoardPage } from "../withdrawals/StaffingBoardPage";
-import { WorkforceForecastPage } from "../withdrawals/WorkforceForecastPage";
-import { OpportunityPage } from "../withdrawals/OpportunityPage";
 import { ProjectTitleActions } from "../projects/ProjectWorkspace";
+import { AssignmentTitleActions } from "../assignments/AssignmentWorkspace";
+import { WithdrawalTitleActions } from "../withdrawals/WithdrawalWorkspace";
 import { UserPage } from "../users/UserPage";
 import { RolePage } from "../roles/RolePage";
 import { MenuPage } from "../menusettings/MenuPage";
@@ -61,33 +60,15 @@ export const screenRegistry: readonly ScreenEntry[] = [
   {
     id: "UI-12",
     Page: () => <AssignmentPage />,
-    TitleActions: () => <ProjectTitleActions />,
+    TitleActions: () => <AssignmentTitleActions />,
     rootTestId: "assignment-page",
     hasInputs: true,
   },
   {
     id: "UI-05",
     Page: () => <WithdrawalPage />,
-    TitleActions: () => <ProjectTitleActions />,
+    TitleActions: () => <WithdrawalTitleActions />,
     rootTestId: "withdrawal-page",
-    hasInputs: false,
-  },
-  {
-    id: "UI-28",
-    Page: () => <StaffingBoardPage />,
-    rootTestId: "staffing-board-page",
-    hasInputs: false,
-  },
-  {
-    id: "UI-17",
-    Page: () => <WorkforceForecastPage />,
-    rootTestId: "workforce-forecast-page",
-    hasInputs: false,
-  },
-  {
-    id: "UI-29",
-    Page: () => <OpportunityPage />,
-    rootTestId: "opportunity-page",
     hasInputs: false,
   },
   {

@@ -9,7 +9,8 @@ type Mode = "create" | "standards" | "rename" | "stop";
 export interface PartDialogProps {
   part?: api.Part;
   onClose: () => void;
-  onSaved: (partId?: string) => void;
+  /** message: 시안 저장 알림 문구(작업마다 다르다). */
+  onSaved: (partId?: string, message?: string) => void;
 }
 interface Draft {
   partName: string;
@@ -170,37 +171,61 @@ export function PartEditDialog({
       stale
     )
       return;
+    // 시안 savePart·partRename: 위에서부터 첫 오류 하나를 창 아래 한 줄로 알린다.
     const invalid: Record<string, string> = {};
-    if (
-      (mode === "create" || mode === "rename") &&
-      (!draft.partName.trim() || [...draft.partName.trim()].length > 30)
-    )
-      invalid.partName = "파트명은 1~30자로 입력해 주세요.";
+    if (mode === "create" || mode === "rename") {
+      if (!draft.partName.trim()) invalid.partName = "파트명을 입력해 주세요.";
+      else if ([...draft.partName.trim()].length > 30)
+        invalid.partName = "파트명은 30자 이내로 입력해 주세요.";
+    }
     if (periodMode) {
       if (
         !/^[0-9]{4}-(0[1-9]|1[0-2])$/.test(draft.effectiveMonth) ||
         draft.effectiveMonth.startsWith("0000") ||
         (options && draft.effectiveMonth < options.earliestMonth)
       )
-        invalid.effectiveMonth = `${options?.earliestMonth ?? "허용월"}부터 선택해 주세요.`;
+        invalid.effectiveMonth = options?.closedMonth
+          ? `적용 시작월은 마감된 달(${options.closedMonth}) 다음 달부터 고를 수 있습니다.`
+          : `${options?.earliestMonth ?? "허용월"}부터 선택해 주세요.`;
       if (
         !draft.leaderUserId ||
         !options?.leaders.some((row) => row.userId === draft.leaderUserId)
       )
-        invalid.leaderUserId = "사용 중인 영업 파트장을 선택해 주세요.";
+        invalid.leaderUserId = "파트장을 골라 주세요.";
       if (
-        !/^\d+(\.\d{1,2})?$/.test(draft.distributionRate) ||
+        !/^\d+(\.\d+)?$/.test(draft.distributionRate) ||
         Number(draft.distributionRate) > 100
       )
+        invalid.distributionRate = "이익 배분율은 0~100 사이 숫자로 입력해 주세요.";
+      else if (!/^\d+(\.\d{1,2})?$/.test(draft.distributionRate))
         invalid.distributionRate =
           "배분율은 0~100, 소수 둘째 자리까지 입력해 주세요.";
-      if (!/^\d{1,15}$/.test(draft.salesExpense))
+      if (!draft.salesExpense || !Number(draft.salesExpense))
+        invalid.salesExpense = "공통관리비를 입력해 주세요.";
+      else if (!/^\d{1,15}$/.test(draft.salesExpense))
         invalid.salesExpense =
           "공통관리비는 15자리 이내의 정수로 입력해 주세요.";
     }
+    if (mode === "standards" && !Object.keys(invalid).length) {
+      const current = standards
+        .filter(
+          (row) =>
+            row.effectiveMonth <= draft.effectiveMonth &&
+            (!row.endMonth || row.endMonth >= draft.effectiveMonth),
+        )
+        .at(-1);
+      if (
+        current &&
+        current.leaderUserId === draft.leaderUserId &&
+        Number(current.distributionRate) === Number(draft.distributionRate) &&
+        Number(current.salesExpense) === Number(draft.salesExpense)
+      )
+        invalid.distributionRate = "지금 기준과 같습니다. 바꿀 값을 입력해 주세요.";
+    }
     setFields(invalid);
-    setError("");
-    if (Object.keys(invalid).length) {
+    const first = Object.keys(invalid)[0];
+    setError(first ? invalid[first] : "");
+    if (first) {
       scope.current
         ?.querySelector<HTMLElement>(`[name="${Object.keys(invalid)[0]}"]`)
         ?.focus();
@@ -235,7 +260,17 @@ export function PartEditDialog({
         });
       else if (part) await api.putCommonPartStop(part.partId, token);
       setDirty("UI-15", false);
-      onSaved(savedId);
+      // 시안 알림 문구(조사는 시안 그대로 「을」).
+      onSaved(
+        savedId,
+        mode === "create"
+          ? `${draft.partName.trim()}을 추가했습니다.`
+          : mode === "standards"
+            ? `${part?.partName} 기준을 바꿨습니다. ${draft.effectiveMonth}부터 적용됩니다.`
+            : mode === "rename"
+              ? "파트명을 바꿨습니다."
+              : "사용을 중지했습니다.",
+      );
     } catch (failure) {
       setError(api.partErrorMessage(failure));
       if (failure instanceof api.PartRequestError) {
@@ -271,7 +306,6 @@ export function PartEditDialog({
         {unit && <span className="part-unit">{unit}</span>}
       </span>
       {help && <span className="part-help">{help}</span>}
-      {fields[key] && <small role="alert">{fields[key]}</small>}
     </label>
   );
   const change = (key: keyof Draft, value: string) =>
@@ -303,7 +337,9 @@ export function PartEditDialog({
           ? "사용을 중지할 수 없습니다"
           : mode === "standards" && part
             ? `${part.partName} 기준 변경`
-            : titles[mode]
+            : mode === "stop" && part
+              ? `${part.partName}의 사용을 중지할까요?`
+              : titles[mode]
       }
       onClose={close}
       closable
@@ -314,6 +350,8 @@ export function PartEditDialog({
         className="part-form"
         data-testid={`part-${mode}-form`}
         data-screen-id={screenIds[mode]}
+        // 브라우저 자체 검사(min 등)가 먼저 막으면 시안 문구가 안 나온다 → 화면 검사만 쓴다.
+        noValidate
         onSubmit={(event) => {
           event.preventDefault();
           void save();
@@ -343,6 +381,7 @@ export function PartEditDialog({
                 name="partName"
                 data-testid="part-name-input"
                 placeholder="예: 영업4파트"
+                maxLength={30}
                 value={draft.partName}
                 aria-invalid={!!fields.partName}
                 onChange={(event) => change("partName", event.target.value)}
@@ -436,9 +475,7 @@ export function PartEditDialog({
             </>
           )}
           {mode === "stop" && !blockedStop && (
-            <p>
-              {part?.partName} 사용을 중지할까요? 기존 기준과 기록은 남습니다.
-            </p>
+            <p>중지하면 새 인력·프로젝트에 고를 수 없습니다.</p>
           )}
           {blockedStop && currentPart && (
             <p role="alert">

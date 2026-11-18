@@ -128,7 +128,7 @@ public class CommonRoleService {
         return value == null ? null : "Y".equals(value) ? yes : "N".equals(value) ? no : value;
     }
     private RoleFailure duplicateName() {
-        return RoleFailure.invalid("roleName", "이미 쓰고 있는 역할 이름입니다.");
+        return RoleFailure.invalid("roleName", "이미 있는 역할입니다.");
     }
     @Transactional
     public StopResult postCommonRoleStop(String id) {

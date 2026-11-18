@@ -151,16 +151,53 @@ export function ProjectForm({
       return next;
     });
   };
+  /** 시안 validate(k): 한 칸의 오류 문구(없으면 ""). */
+  const message = (field: string, d: Draft): string => {
+    const inside = d.contractTypeCode === "IN";
+    switch (field) {
+      case "projectName":
+        return d.projectName.trim() ? "" : enter("프로젝트명");
+      case "customerId":
+        return !inside && !d.customerId ? enter("고객사") : "";
+      case "contractTypeCode":
+        return !d.contractTypeCode ? enter("계약유형") : "";
+      case "startDate":
+        return d.startDate ? "" : enter("계약 시작일");
+      case "endDate":
+        if (!d.endDate) return enter("계약 종료일");
+        return d.startDate && d.endDate < d.startDate ? "종료일이 시작일보다 앞입니다. 날짜를 다시 확인해 주세요." : "";
+      case "statusCode":
+        return !project && !d.statusCode ? enter("상태") : "";
+      case "salesPartId":
+        return !project && !inside && !d.salesPartId ? enter("영업 파트") : "";
+      case "contractAmount":
+        return !inside && !digits(d.contractAmount) ? enter("계약금액") : "";
+      default:
+        return "";
+    }
+  };
+  // 시안: 글자·금액 칸은 칸을 떠날 때, 고르는 칸·날짜는 바꿀 때 바로 그 칸 아래에 문구를 보인다.
+  const check = (field: string, d: Draft = draft) => {
+    const found = message(field, d);
+    setErrors((e) => {
+      if ((e[field] || "") === found) return e;
+      const next = { ...e };
+      if (found) next[field] = found;
+      else delete next[field];
+      return next;
+    });
+  };
+  const pick = (key: keyof Draft, value: string) => {
+    change(key, value);
+    check(key, { ...draft, [key]: value });
+  };
   const validate = () => {
     const found: Record<string, string> = {};
-    if (!draft.projectName.trim()) found.projectName = enter("프로젝트명");
-    if (!internal && !draft.customerId) found.customerId = enter("고객사");
-    if (!draft.contractTypeCode) found.contractTypeCode = enter("계약유형");
-    if (!draft.startDate) found.startDate = enter("계약 시작일");
-    if (!draft.endDate) found.endDate = enter("계약 종료일");
-    else if (draft.startDate && draft.endDate < draft.startDate) found.endDate = "종료일이 시작일보다 앞입니다. 날짜를 다시 확인해 주세요.";
-    if (!project && !internal && !draft.salesPartId) found.salesPartId = enter("영업 파트");
-    if (!internal && !digits(draft.contractAmount)) found.contractAmount = enter("계약금액");
+    const fields = ["projectName", "customerId", "contractTypeCode", "startDate", "endDate", "statusCode", "salesPartId", "contractAmount"];
+    for (const field of fields) {
+      const m = message(field, draft);
+      if (m) found[field] = m;
+    }
     setErrors(found);
     const first = Object.keys(found)[0];
     if (first) document.getElementById(`project-${first}`)?.focus();
@@ -250,7 +287,7 @@ export function ProjectForm({
         aria-invalid={!!errors[key]}
         value={draft[key]}
         disabled={busy}
-        onChange={(e) => change(key, e.target.value)}
+        onChange={(e) => pick(key, e.target.value)}
       >
         {placeholder && <option value="">선택</option>}
         {items.map(([value, name]) => (
@@ -275,6 +312,7 @@ export function ProjectForm({
         value={draft[key]}
         disabled={busy}
         onChange={(e) => change(key, e.target.value)}
+        onBlur={() => check(key)}
       />,
       help,
       true,
@@ -292,7 +330,7 @@ export function ProjectForm({
         aria-invalid={!!errors[key]}
         value={draft[key]}
         disabled={busy}
-        onChange={(e) => change(key, e.target.value)}
+        onChange={(e) => pick(key, e.target.value)}
       />,
     );
   const moneyField = (
@@ -318,6 +356,7 @@ export function ProjectForm({
             const plain = digits(e.target.value);
             change(key, plain ? Number(plain).toLocaleString("ko-KR") : "");
           }}
+          onBlur={() => check(key)}
         />
         <span className="project-unit">원</span>
       </span>,
@@ -349,7 +388,6 @@ export function ProjectForm({
                 true,
                 options.states,
                 "계약 전에 사람부터 보내면 「수주예정」. 종료는 계약 종료일이 지나면 자동으로 바뀝니다. 등록한 뒤에는 수주예정일 때만 프로젝트 상세의 [⋯]에서 진행 또는 실주로 바꿉니다.",
-                false,
               )}
           {!internal &&
             (project

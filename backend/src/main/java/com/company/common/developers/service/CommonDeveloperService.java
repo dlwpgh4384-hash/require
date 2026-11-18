@@ -172,7 +172,7 @@ public class CommonDeveloperService {
         String id="D"+UUID.randomUUID().toString().replace("-","").substring(0,19);
         mapper.insertDeveloper(new Write(id,input,actor.userId()));
         saveSkills(id,input); savePrice(id,input);
-        mapper.insertHistory(new Audit(id,"INS","개발자 등록",null,input.name(),null));
+        mapper.insertHistory(new Audit(id,"INS","개발자 등록",null,input.name(),null,actor.userId()));
         Developer created=require(id); refresh(created,false); return detail(created);
     }
     private void saveSkills(String id,Input input) {
@@ -196,7 +196,7 @@ public class CommonDeveloperService {
         mapper.updateDeveloper(new Write(id,input,actor.userId())); saveSkills(id,input);
         if (priceChanged) savePrice(id,input);
         for (String key: before.keySet()) if (!Objects.equals(before.get(key),after.get(key)))
-            mapper.insertHistory(new Audit(id,"UPD",key,before.get(key),after.get(key),null));
+            mapper.insertHistory(new Audit(id,"UPD",key,before.get(key),after.get(key),null,actor.userId()));
         Developer saved=require(id); refresh(saved,false); return detail(saved);
     }
     private Map<String,String> fields(Developer d) {
@@ -272,9 +272,9 @@ public class CommonDeveloperService {
         var next=DeveloperStatusRules.copy(original); State added=DeveloperStatusRules.append(next,input,id,actor.userId(),calendar.today());
         persistEnds(original,next); mapper.insertStatus(added);
         // 시안 변경 이력: 재직 = 근무 상태 휴직 → 재직(복귀일 복귀), 퇴사 = 퇴사일 – → 날짜
-        if ("WORK".equals(added.code)) mapper.insertHistory(new Audit(id,"INS","근무 상태","휴직","재직("+added.startDate+" 복귀)",added.reason));
-        else if ("RETIRE".equals(added.code)) mapper.insertHistory(new Audit(id,"INS","퇴사일",null,text(added.startDate),added.reason));
-        else mapper.insertHistory(new Audit(id,"INS","근무 상태",null,input.statusName(),input.reason()));
+        if ("WORK".equals(added.code)) mapper.insertHistory(new Audit(id,"INS","근무 상태","휴직","재직("+added.startDate+" 복귀)",added.reason,actor.userId()));
+        else if ("RETIRE".equals(added.code)) mapper.insertHistory(new Audit(id,"INS","퇴사일",null,text(added.startDate),added.reason,actor.userId()));
+        else mapper.insertHistory(new Audit(id,"INS","근무 상태",null,input.statusName(),input.reason(),actor.userId()));
         refresh(d,false); return statuses(d);
     }
     private void persistEnds(List<State> before,List<State> next) {
@@ -294,7 +294,7 @@ public class CommonDeveloperService {
         LocalDate retire=DeveloperStatusRules.retirement(next);
         if (retire!=null && !endDate.isBefore(retire)) throw CodeFailure.invalid("endDate","퇴사일("+retire+") 전날까지만 넣을 수 있습니다.");
         leave.endDate=endDate; DeveloperStatusRules.validate(next); persistEnds(before,next);
-        mapper.insertHistory(new Audit(id,"UPD","휴직 종료일",text(DeveloperStatusRules.target(before,statusId).endDate),text(endDate),null));
+        mapper.insertHistory(new Audit(id,"UPD","휴직 종료일",text(DeveloperStatusRules.target(before,statusId).endDate),text(endDate),null,actor.userId()));
         refresh(d,false); return statuses(d);
     }
     public StatusList postCommonDeveloperReturnCancel(String id,String statusId) { return cancel(id,statusId,null,false); }
@@ -312,7 +312,7 @@ public class CommonDeveloperService {
             "퇴사한 달("+YearMonth.from(target.startDate)+")이 마감되어 취소할 수 없습니다. 다시 쓰려면 새로 등록하세요.":"복귀한 달이 마감되어 취소할 수 없습니다.");
         DeveloperStatusRules.cancel(next,target);
         persistEnds(before,next); mapper.deleteStatus(id,target.sequence);
-        mapper.insertHistory(new Audit(id,"UPD",retirement?"퇴사 취소":"재직 취소",text(target.startDate),null,reason));
+        mapper.insertHistory(new Audit(id,"UPD",retirement?"퇴사 취소":"재직 취소",text(target.startDate),null,reason,actor.userId()));
         refresh(d,retirement); return statuses(d);
     }
     public UseResult putCommonDeveloperUseStatus(UseInput input) {
@@ -325,7 +325,7 @@ public class CommonDeveloperService {
                 reason="퇴사한 개발자는 다시 사용할 수 없습니다. 새로 등록하세요.";
             if (reason!=null) { rejected.add(new UseIssue(id,d.name,reason)); continue; }
             mapper.updateUse(id,input.useYn(),actor.userId());
-            mapper.insertHistory(new Audit(id,"UPD","사용 여부",d.useYn,input.useYn(),null)); changed.add(id);
+            mapper.insertHistory(new Audit(id,"UPD","사용 여부",d.useYn,input.useYn(),null,actor.userId())); changed.add(id);
         }
         return new UseResult(changed,rejected);
     }

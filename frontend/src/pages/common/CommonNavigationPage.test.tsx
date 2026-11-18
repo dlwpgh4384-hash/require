@@ -214,15 +214,6 @@ const deepChecks: Record<string, (content: Content) => Promise<void>> = {
       screen.getByTestId("withdrawal-download").closest(".screen-actions"),
     ).not.toBeNull();
   },
-  "UI-28": async (content) => {
-    expect(await content.findByText("해당 원천 자료 없음")).toBeVisible();
-  },
-  "UI-17": async (content) => {
-    expect(await content.findByText("해당 원천 자료 없음")).toBeVisible();
-  },
-  "UI-29": async (content) => {
-    expect(await content.findByText("해당 원천 자료 없음")).toBeVisible();
-  },
   "UI-12": async (content) => {
     expect(await content.findByTestId("assignment-empty")).toBeVisible();
     expect(content.getByRole("textbox", { name: "이름" })).toBeVisible();

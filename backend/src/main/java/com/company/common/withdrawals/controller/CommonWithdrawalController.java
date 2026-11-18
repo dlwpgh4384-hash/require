@@ -76,10 +76,12 @@ public class CommonWithdrawalController {
             .header("X-Total-Count", Integer.toString(items.size())).body(bytes);
     }
 
+    /** 화면 다음 배정 칸과 같은 글자(시안): 가배정 → 철수 완료 → 추천 대상 아님 → 추천 n곳/없음. */
     private static String nextLabel(Row row) {
-        if (row.withdrawalCompleted()) return "–";
         var next = row.nextAssignment();
         if (next.hasTentativeAssignment()) return "가배정 · " + next.opportunityName();
-        return next.recommendationCount() > 0 ? "추천 " + next.recommendationCount() + "곳" : "없음 · 맞는 자리 없음";
+        if (row.withdrawalCompleted()) return "–";
+        if (!next.recommendationTarget()) return next.note() == null ? "–" : "– · " + next.note();
+        return next.recommendationCount() > 0 ? "추천 " + next.recommendationCount() + "곳" : "없음 · " + next.note();
     }
 }

@@ -138,6 +138,14 @@ class CommonDeveloperControllerTest {
     }
     @Test void tooLongNumberWritesNothing() throws Exception {create(input().put("managementNumber","A".repeat(21))).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("managementNumber"));verify(mapper,never()).insertDeveloper(any());}
     @Test
+    @DisplayName("시안: 관리번호 형식이 틀리면 「관리번호는 영문·숫자·하이픈으로 20자 이내로 적어 주세요.」")
+    void badNumberFormatUsesMockupMessage() throws Exception {
+        create(input().put("managementNumber","K_0001")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("managementNumber"))
+            .andExpect(jsonPath("$.errors[0].message").value("관리번호는 영문·숫자·하이픈으로 20자 이내로 적어 주세요."));
+        verify(mapper,never()).insertDeveloper(any());
+    }
+    @Test
     @DisplayName("business: 중복 관리번호는 400이며 기존 TB_HR_DEV·단가·이력 불변")
     void duplicateNumberPreservesExisting() throws Exception {
         mvc.perform(post("/api/common/developers").contentType("application/json").content(input().put("managementNumber","K-0003").toString()))

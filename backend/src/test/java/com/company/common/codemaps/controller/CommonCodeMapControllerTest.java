@@ -136,7 +136,8 @@ class CommonCodeMapControllerTest {
         create(item()).andExpect(status().isOk());
         mvc.perform(post("/api/common/code-maps").contentType("application/json")
             .content(item().put("code", "OTHER").toString())).andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.errors[0].field").value("excelText"));
+            .andExpect(jsonPath("$.errors[0].field").value("excelText"))
+            .andExpect(jsonPath("$.errors[0].message").value("같은 그룹에 이미 있는 표기입니다."));
         assertThat(rows.values()).extracting(row -> row.code).containsExactly("FULL");
         assertThat(histories).hasSize(1);
     }

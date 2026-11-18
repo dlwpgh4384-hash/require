@@ -101,7 +101,7 @@ export function MenuRegistration({
           onSaved={(item) => {
             setOpen(false);
             setSaved(item);
-            setNotice("메뉴를 등록했습니다.");
+            setNotice(`「${item.menuNm}」 메뉴를 등록했습니다.`);
             void refresh(item);
           }}
         />

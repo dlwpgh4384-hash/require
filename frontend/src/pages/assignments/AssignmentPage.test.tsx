@@ -13,7 +13,7 @@ import {
   type AssignmentCandidate,
   type AssignmentHistory,
 } from "./assignments";
-import { ProjectWorkspaceProvider, ProjectTitleActions } from "../projects/ProjectWorkspace";
+import { AssignmentWorkspaceProvider, AssignmentTitleActions } from "./AssignmentWorkspace";
 import type { Project } from "../projects/projects";
 
 const viewport = vi.hoisted(() => ({ mobile: false, width: 1280 }));
@@ -178,12 +178,12 @@ afterEach(() => {
 function page(roles?: string[]) {
   return render(
     <MemoryRouter>
-      <ProjectWorkspaceProvider>
+      <AssignmentWorkspaceProvider>
         <header data-testid="assignment-title">
-          <ProjectTitleActions />
+          <AssignmentTitleActions />
         </header>
         <AssignmentPage roles={roles} />
-      </ProjectWorkspaceProvider>
+      </AssignmentWorkspaceProvider>
     </MemoryRouter>,
   );
 }

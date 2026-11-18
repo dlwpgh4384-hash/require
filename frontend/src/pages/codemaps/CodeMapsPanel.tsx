@@ -35,18 +35,29 @@ export function CodeMapsPanel({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dialogFailure, setDialogFailure] = useState("");
   const [groups, setGroups] = useState<api.CodeMapGroup[] | null>(null);
+  // 목록 표시용 이름(그룹 이름, 그룹별 코드 이름). 못 읽으면 ID를 그대로 보인다.
+  const [names, setNames] = useState<{
+    groups: Record<string, string>;
+    codes: Record<string, Record<string, string>>;
+  }>({ groups: {}, codes: {} });
   const [options, setOptions] = useState<api.CodeMapOption[] | null>(null);
   const [optionFailure, setOptionFailure] = useState("");
   const [optionRevision, setOptionRevision] = useState(0);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [closing, setClosing] = useState(false);
+  /** 시안: 추가 창은 첫 그룹이 골라진 채로 열린다. 그 값은 바꾼 것으로 보지 않는다. */
+  const [presetGroup, setPresetGroup] = useState("");
   const lock = useRef(false);
   const setScreenDirty = useScreenDirty();
   const form = useRef<HTMLFormElement>(null);
   const workspace = useCodeWorkspace();
   const handledSignal = useRef(workspace.signal.revision);
-  const draftDirty = dialog === "add" && Object.values(draft).some(Boolean);
+  const draftDirty =
+    dialog === "add" &&
+    (!!draft.excelText ||
+      !!draft.code ||
+      (draft.groupId !== "" && draft.groupId !== presetGroup));
   useEffect(() => {
     if (onDirtyChange) {
       onDirtyChange(draftDirty);
@@ -73,6 +84,31 @@ export function CodeMapsPanel({
     );
     return () => controller.abort();
   }, [revision]);
+  const usedGroups = [...new Set((rows ?? []).map((row) => row.groupId))].sort().join("\n");
+  useEffect(() => {
+    if (!usedGroups) return;
+    const controller = new AbortController();
+    const ids = usedGroups.split("\n");
+    void Promise.allSettled([
+      api.getCodeMapGroups(controller.signal),
+      ...ids.map((id) => api.getCodeMapOptions(id, controller.signal)),
+    ]).then(([groupResult, ...codeResults]) => {
+      if (controller.signal.aborted) return;
+      const groupNames: Record<string, string> = {};
+      if (groupResult.status === "fulfilled")
+        for (const row of (groupResult.value as { items: api.CodeMapGroup[] }).items)
+          groupNames[row.groupId] = row.groupName;
+      const codeNames: Record<string, Record<string, string>> = {};
+      codeResults.forEach((result, index) => {
+        if (result.status !== "fulfilled") return;
+        codeNames[ids[index]] = Object.fromEntries(
+          (result.value as { items: api.CodeMapOption[] }).items.map((row) => [row.code, row.codeName]),
+        );
+      });
+      setNames({ groups: groupNames, codes: codeNames });
+    });
+    return () => controller.abort();
+  }, [usedGroups]);
   useEffect(() => {
     if (dialog !== "add") return;
     const controller = new AbortController();
@@ -80,7 +116,13 @@ export function CodeMapsPanel({
     setOptionFailure("");
     void api.getCodeMapGroups(controller.signal).then(
       (result) => {
-        if (!controller.signal.aborted) setGroups(result.items);
+        if (controller.signal.aborted) return;
+        setGroups(result.items);
+        const first = result.items[0]?.groupId ?? "";
+        setPresetGroup((current) => current || first);
+        setDraft((current) =>
+          current.groupId ? current : { ...current, groupId: first },
+        );
       },
       (error) => {
         if (!controller.signal.aborted) setOptionFailure(message(error));
@@ -131,8 +173,18 @@ export function CodeMapsPanel({
     if (lock.current || refreshPending) return;
     const invalid: Record<string, string> = {};
     if (dialog === "add") {
-      if (!draft.excelText.trim() || [...draft.excelText].length > 100)
-        invalid.excelText = "엑셀 표기는 1~100자로 입력해 주세요.";
+      // 시안 문구(빈 칸 → 같은 그룹 중복 → 코드 이름과 같음).
+      const text = draft.excelText.trim();
+      if (!text || [...draft.excelText].length > 50)
+        invalid.excelText = "엑셀 표기를 넣어 주세요.";
+      else if (
+        (rows ?? []).some(
+          (row) => row.excelText === text && row.groupId === draft.groupId,
+        )
+      )
+        invalid.excelText = "같은 그룹에 이미 있는 표기입니다.";
+      else if (options?.some((row) => row.codeName === text))
+        invalid.excelText = "코드 이름과 같아서 따로 대응할 필요가 없습니다.";
       if (!groups?.some((row) => row.groupId === draft.groupId))
         invalid.groupId = "코드 그룹을 골라 주세요.";
       if (!options?.some((row) => row.code === draft.code))
@@ -185,6 +237,7 @@ export function CodeMapsPanel({
       return;
     }
     setDraft(empty());
+    setPresetGroup("");
     setErrors({});
     setDialogFailure("");
     setClosing(false);
@@ -301,9 +354,13 @@ export function CodeMapsPanel({
                     }
                   />
                 </td>
-                <td>{row.excelText}</td>
-                <td>{row.groupId}</td>
-                <td>{row.code}</td>
+                <td>
+                  <strong>{row.excelText}</strong>
+                </td>
+                <td>{names.groups[row.groupId] ?? row.groupId}</td>
+                <td>
+                  {row.code} · {names.codes[row.groupId]?.[row.code] ?? "–"}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -353,7 +410,8 @@ export function CodeMapsPanel({
                     <input
                       className="ls-in"
                       data-testid="code-map-text"
-                      maxLength={100}
+                      maxLength={50}
+                      placeholder="예: 정직원"
                       value={draft.excelText}
                       aria-invalid={!!errors.excelText}
                       onChange={(event) =>
@@ -376,6 +434,9 @@ export function CodeMapsPanel({
                       disabled={!groups}
                       aria-invalid={!!errors.groupId}
                       onChange={(event) => {
+                        // 첫 그룹이 미리 골라져 있으므로 같은 그룹을 다시 고르면 아무것도 하지 않는다
+                        // (코드 목록을 비우면 그룹이 그대로라 다시 읽지 않아 빈 채로 남는다).
+                        if (event.target.value === draft.groupId) return;
                         setDraft({
                           ...draft,
                           groupId: event.target.value,
@@ -384,7 +445,9 @@ export function CodeMapsPanel({
                         setOptions(null);
                       }}
                     >
-                      <option value="">선택해 주세요</option>
+                      {!groups?.length && (
+                        <option value="">선택해 주세요</option>
+                      )}
                       {groups?.map((row) => (
                         <option key={row.groupId} value={row.groupId}>
                           {row.groupName}

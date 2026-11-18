@@ -21,7 +21,8 @@ class ManualContractPreservationTest {
         try (var input = new ClassPathResource("contracts/openapi-manual.yaml").getInputStream()) {
             String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                 .digest(input.readAllBytes()));
-            assertThat(digest).isEqualTo("f41c5f7f85cb37951ada97821060478e4f7265c51b436db1a82d42cab0d2e7d9");
+            // 2026-11-18 사람이 manual에 거래처 투입 내역 칸·파트 [다시 사용] 경로를 더해 기준 지문을 새로 맞춤(LF 기준).
+            assertThat(digest).isEqualTo("b591783dfaafadc2921786f7e4c10f9e82d6fbc2459b1f19148d901ce8ca960a");
         }
     }
 

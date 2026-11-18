@@ -356,12 +356,21 @@ class CommonProjectControllerTest {
         mvc.perform(put("/api/common/projects/P-0001/manpower-plan").contentType("application/json").content(body)).andExpect(status().isBadRequest());
         verify(mapper,never()).savePlan(any());
     }
+    @ParameterizedTest @ValueSource(strings={"0.001","-1","\"abc\""})
+    @DisplayName("시안: 계획 MM이 틀리면 「… 계획 MM은 0 이상 숫자(소수 둘째 자리까지)로 넣어 주세요.」")
+    void wrongPlannedMmUsesMockupMessage(String mm) throws Exception {
+        mvc.perform(put("/api/common/projects/P-0001/manpower-plan").contentType("application/json").content("{\"jobs\":[{\"jobCode\":\"DEV\",\"plannedMm\":" + mm + "}]}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].message").value("DEV 계획 MM은 0 이상 숫자(소수 둘째 자리까지)로 넣어 주세요."));
+        verify(mapper,never()).savePlan(any());
+    }
     @Test
     @DisplayName("business: 마감월 영업 파트 변경은 TB_PJ_PROJ_PART 보존")
     void partClosedMonthRejected() throws Exception {
         when(mapper.lastClosedMonth()).thenReturn("202611");
         mvc.perform(put("/api/common/projects/P-0001/sales-part").contentType("application/json").content("{\"salesPartId\":\"second\",\"effectiveMonth\":\"2026-11\"}"))
-            .andExpect(status().isBadRequest()); verify(mapper,never()).deleteOpenParts(anyString(),anyString());
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].message").value("적용 시작 월은 2026-12 이후로 골라 주세요.")); verify(mapper,never()).deleteOpenParts(anyString(),anyString());
     }
     @Test
     @DisplayName("auth happy side-effect: admin TB_PJ_PROJ_PART 변경과 TB_PJ_PROJ_CHG PART 취소 이력")
@@ -450,7 +459,8 @@ class CommonProjectControllerTest {
                 .contentType("application/json")
                 .content("{\"salesPartId\":\"second\",\"effectiveMonth\":\"2026-11\"}"))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.errors[0].field").value("effectiveMonth"));
+            .andExpect(jsonPath("$.errors[0].field").value("effectiveMonth"))
+            .andExpect(jsonPath("$.errors[0].message").value("적용 시작 월은 2026-12 이후로 골라 주세요."));
         verify(mapper, never()).deleteOpenParts(anyString(), anyString());
         verify(mapper, never()).insertPart(any());
         assertThat(parts).hasSize(1);

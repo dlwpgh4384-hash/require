@@ -9,21 +9,25 @@
     <arg column="extensionPossibilityCode" javaType="string"/><arg column="extensionCount" javaType="_int"/>
     <arg column="modifiedAt" javaType="java.time.Instant"/><arg column="statusCode" javaType="string"/>
     <arg column="primaryJobCode" javaType="string"/><arg column="gradeCode" javaType="string"/>
-    <arg column="customerId" javaType="string"/>
+    <arg column="customerId" javaType="string"/><arg column="gradeName" javaType="string"/>
+    <arg column="projectId" javaType="string"/><arg column="managementNumber" javaType="string"/>
   </constructor></resultMap>
   <sql id="sourceSelect">
     SELECT a.ASGN_ID AS "assignmentId",a.DEV_ID AS "developerId",d.DEV_NM AS "name",
       p.PROJ_NM AS "projectName",a.JOB_CD AS "jobCode",COALESCE(j.CODE_NM,a.JOB_CD) AS "jobName",
       a.INPUT_END_DT AS "endDate",a.EXT_PSBL_CD AS "extensionPossibilityCode",a.EXT_CNT AS "extensionCount",
       COALESCE(a.MOD_DTTM,a.REG_DTTM) AS "modifiedAt",a.ASGN_STAT_CD AS "statusCode",
-      d.JOB_CD AS "primaryJobCode",d.GRADE_CD AS "gradeCode",p.CUST_CLNT_ID AS "customerId"
+      d.JOB_CD AS "primaryJobCode",d.GRADE_CD AS "gradeCode",p.CUST_CLNT_ID AS "customerId",
+      COALESCE(g.CODE_NM,d.GRADE_CD) AS "gradeName",a.PROJ_ID AS "projectId",d.MNG_NO AS "managementNumber"
     FROM TB_PJ_ASGN a JOIN TB_HR_DEV d ON d.DEV_ID=a.DEV_ID
     JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID
     LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=a.JOB_CD
+    LEFT JOIN TB_SY_CODE g ON g.CODE_GRP_ID='GRADE' AND g.CODE=d.GRADE_CD
   </sql>
   <select id="list" resultMap="source">
     <include refid="sourceSelect"/>
-    WHERE a.ASGN_STAT_CD='ACT' AND a.INPUT_END_DT BETWEEN make_date(#{year},1,1) AND make_date(#{year},12,31)
+    WHERE a.ASGN_STAT_CD='ACT'
+    <if test="year != null">AND a.INPUT_END_DT BETWEEN make_date(#{year},1,1) AND make_date(#{year},12,31)</if>
     <if test="from != null">AND a.INPUT_END_DT &gt;= #{from}</if>
     <if test="through != null">AND a.INPUT_END_DT &lt;= #{through}</if>
     <if test="jobCode != null">AND a.JOB_CD=#{jobCode}</if>
@@ -53,7 +57,8 @@
     <arg column="durationMonths" javaType="_int"/><arg column="requiredCount" javaType="_int"/>
     <arg column="occupiedCount" javaType="_int"/><arg column="statusCode" javaType="string"/>
     <arg column="customerId" javaType="string"/><arg column="winningProbability" javaType="java.math.BigDecimal"/>
-    <arg column="monthlyMm" javaType="java.math.BigDecimal"/>
+    <arg column="monthlyMm" javaType="java.math.BigDecimal"/><arg column="customerName" javaType="string"/>
+    <arg column="stageName" javaType="string"/>
   </constructor></resultMap>
   <select id="needs" resultMap="need">
     SELECT n.OPP_ID AS "opportunityId",n.NEED_SN::int AS "needSn",o.OPP_NM AS "opportunityName",
@@ -63,8 +68,11 @@
       (SELECT COUNT(*)::int FROM TB_SL_TENT_ASGN t WHERE t.OPP_ID=n.OPP_ID AND t.NEED_SN=n.NEED_SN
         AND t.TENT_STAT_CD IN ('ACT','CNVT')) AS "occupiedCount",
       o.OPP_STAT_CD AS "statusCode",o.CUST_CLNT_ID AS "customerId",o.WIN_PRBL_RT AS "winningProbability",
-      n.MON_MM AS "monthlyMm"
+      n.MON_MM AS "monthlyMm",COALESCE(c.CLNT_NM,o.CUST_CLNT_ID) AS "customerName",
+      COALESCE(s.CODE_NM,o.SALES_STEP_CD) AS "stageName"
     FROM TB_SL_OPP_NEED n JOIN TB_SL_OPP o ON o.OPP_ID=n.OPP_ID
+    LEFT JOIN TB_BS_CLNT c ON c.CLNT_ID=o.CUST_CLNT_ID
+    LEFT JOIN TB_SY_CODE s ON s.CODE_GRP_ID='SALES_STEP' AND s.CODE=o.SALES_STEP_CD
     LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=n.JOB_CD
     LEFT JOIN TB_SY_CODE g ON g.CODE_GRP_ID='GRADE' AND g.CODE=COALESCE(n.GRADE_CD,'MD')
     ORDER BY n.OPP_ID,n.NEED_SN
@@ -84,6 +92,28 @@
       o.OPP_NM AS "opportunityName",t.NEED_SN::int AS "needSn",t.BGN_YM AS "startMonth",t.TENT_STAT_CD AS "statusCode"
     FROM TB_SL_TENT_ASGN t JOIN TB_SL_OPP o ON o.OPP_ID=t.OPP_ID
     WHERE t.DEV_ID=#{developerId} AND t.TENT_STAT_CD IN ('ACT','CNVT') ORDER BY t.TENT_ID
+  </select>
+  <select id="reservationsFor" resultMap="reservation">
+    SELECT t.TENT_ID::text AS "tentativeId",t.DEV_ID AS "developerId",t.OPP_ID AS "opportunityId",
+      o.OPP_NM AS "opportunityName",t.NEED_SN::int AS "needSn",t.BGN_YM AS "startMonth",t.TENT_STAT_CD AS "statusCode"
+    FROM TB_SL_TENT_ASGN t JOIN TB_SL_OPP o ON o.OPP_ID=t.OPP_ID
+    WHERE t.TENT_STAT_CD IN ('ACT','CNVT') AND t.DEV_ID IN
+      <foreach collection="developerIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    ORDER BY t.DEV_ID,t.TENT_ID
+  </select>
+  <resultMap id="early" type="com.company.common.withdrawals.mapper.WithdrawalRows$EarlyRow"><constructor>
+    <arg column="assignmentId" javaType="string"/><arg column="effectiveDate" javaType="java.time.LocalDate"/>
+    <arg column="afterValue" javaType="string"/>
+  </constructor></resultMap>
+  <!-- 투입 배정 변경 이력 조회와 같은 순서(등록 시각·순번 내림차순)로 조기 철수 줄만 한 번에 읽는다 -->
+  <select id="earlyHistory" resultMap="early">
+    SELECT h.ASGN_ID AS "assignmentId",h.APLY_DT AS "effectiveDate",COALESCE(h.AFT_VAL,'') AS "afterValue"
+    FROM TB_PJ_ASGN_HIST h WHERE h.ASGN_CHG_TYPE_CD='EARLY' AND h.ASGN_ID IN
+      <foreach collection="assignmentIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    ORDER BY h.ASGN_ID,h.REG_DTTM DESC,h.HIST_SN DESC
+  </select>
+  <select id="skills" resultType="string">
+    SELECT s.SKILL_NM FROM TB_HR_DEV_SKILL s WHERE s.DEV_ID=#{developerId} ORDER BY s.SORT_ORD,s.SKILL_NM
   </select>
   <update id="release">
     UPDATE TB_SL_TENT_ASGN SET TENT_STAT_CD='REL',PROC_DTTM=clock_timestamp(),

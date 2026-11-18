@@ -190,13 +190,57 @@ it("validates required text without posting", async () => {
   await openAdd();
   await chooseTarget();
   fireEvent.click(screen.getByTestId("code-map-submit"));
-  expect(
-    screen.getByText("엑셀 표기는 1~100자로 입력해 주세요."),
-  ).toBeInTheDocument();
+  expect(screen.getByText("엑셀 표기를 넣어 주세요.")).toBeInTheDocument();
   expect(screen.getByTestId("code-map-text")).toHaveAttribute(
     "aria-invalid",
     "true",
   );
+  expect(writes()).toHaveLength(0);
+});
+it("시안 UI-27: 추가 창은 첫 그룹이 골라져 있고, 표기 칸은 50자·「예: 정직원」", async () => {
+  const dirty = vi.fn();
+  render(<CodeMapsPanel onDirtyChange={dirty} />);
+  await openAdd();
+  expect(screen.getByTestId("code-map-group")).toHaveValue("EMP_TYPE");
+  expect(
+    within(screen.getByTestId("code-map-group")).queryByRole("option", {
+      name: "선택해 주세요",
+    }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByTestId("code-map-text")).toHaveAttribute(
+    "maxLength",
+    "50",
+  );
+  expect(screen.getByTestId("code-map-text")).toHaveAttribute(
+    "placeholder",
+    "예: 정직원",
+  );
+  await screen.findByRole("option", { name: "FULL · 정규직" });
+  // 미리 골라 둔 그룹만으로는 바꾼 것이 아니다.
+  expect(dirty).not.toHaveBeenCalledWith(true);
+  fireEvent.click(screen.getByTestId("code-map-cancel"));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+it("시안 UI-27: 같은 그룹 중복·코드 이름과 같은 표기는 보내지 않는다", async () => {
+  rows = [item()];
+  render(<CodeMapsPanel />);
+  await screen.findByText("정직원");
+  await openAdd();
+  await chooseTarget();
+  fireEvent.change(screen.getByTestId("code-map-text"), {
+    target: { value: " 정직원 " },
+  });
+  fireEvent.click(screen.getByTestId("code-map-submit"));
+  expect(
+    screen.getByText("같은 그룹에 이미 있는 표기입니다."),
+  ).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("code-map-text"), {
+    target: { value: "정규직" },
+  });
+  fireEvent.click(screen.getByTestId("code-map-submit"));
+  expect(
+    screen.getByText("코드 이름과 같아서 따로 대응할 필요가 없습니다."),
+  ).toBeInTheDocument();
   expect(writes()).toHaveLength(0);
 });
 it("validates required code instead of sending a blank selection", async () => {
@@ -338,4 +382,15 @@ it("does not resend committed create when refresh fails", async () => {
   fireEvent.click(screen.getByTestId("code-map-retry"));
   await screen.findByText("정직원");
   expect(writes()).toHaveLength(1);
+});
+it("시안 UI-27: 목록은 표기 굵게, 그룹 이름, 「코드 · 코드 이름」으로 보인다", async () => {
+  rows = [item(), { excelText: "없는 코드", groupId: "EMP_TYPE", code: "GONE" }];
+  render(<CodeMapsPanel />);
+  const first = await screen.findByTestId("code-map-row-0");
+  expect(within(first).getByText("정직원").tagName).toBe("STRONG");
+  await waitFor(() => expect(within(first).getByText("직원 구분")).toBeVisible());
+  expect(within(first).getByText("FULL · 정규직")).toBeVisible();
+  // 공통코드에서 사라진 코드는 이름 대신 「–」
+  expect(within(screen.getByTestId("code-map-row-1")).getByText("GONE · –")).toBeVisible();
+  expect(writes()).toHaveLength(0);
 });

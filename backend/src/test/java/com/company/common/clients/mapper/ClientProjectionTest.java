@@ -53,6 +53,8 @@ class ClientProjectionTest {
         params.put("filter", new Filter(null, "Y", null));
         String empty = sql(config, "selectClients", params);
         assertThat(empty).doesNotContain("IS NULL OR", "strpos", "LIMIT", "OFFSET");
+        // 시안 UI-15: 처음 정렬은 상호 가나다순(등록일 최신순 아님)
+        assertThat(empty).contains("ORDER BY c.clnt_nm, c.clnt_id").doesNotContain("reg_dttm DESC");
         params.put("filter", new Filter("CUST", "Y", "거래처"));
         assertThat(sql(config, "selectClients", params)).contains("c.clnt_type_cd IN ('CUST','BOTH')", "strpos");
         params.put("filter", new Filter("VNDR", "N", null));

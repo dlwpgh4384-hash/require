@@ -8,14 +8,23 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-/** DB 정의의 지원 문법만 해석한다. 정의·원천 자료를 저장하거나 배치를 실행하지 않는다. */
+/**
+ * 식 내용은 DB(TB_SY_CALC_RULE)에서 CALC_ID로 읽어 숫자(기간·가중치·자리수)를 꺼내 쓴다.
+ * 식 글자 전체가 같은지는 비교하지 않는다. 숫자를 못 꺼내면 명세 숫자로 계산하고 로그만 남긴다(화면을 막지 않음).
+ * 정의·원천 자료를 저장하거나 배치를 실행하지 않는다.
+ */
 @Component
 public class WithdrawalCalculationRules {
+    private static final Logger log = LoggerFactory.getLogger(WithdrawalCalculationRules.class);
     private static final String NUMBER = "([0-9]+(?:\\.[0-9]+)?)";
     private final CalculationRuleService definitions;
 
@@ -31,155 +40,230 @@ public class WithdrawalCalculationRules {
     public record OpportunityDemand(BigDecimal requiredCount, BigDecimal monthlyMm,
         BigDecimal winningProbability) {}
     public record ProjectDemand(BigDecimal plannedMm, BigDecimal confirmedMm, int remainingMonths) {}
+    /** 식-80 가중치. gap은 공백 0·1·2·3개월 점수. */
+    record Weights(BigDecimal sameJob, BigDecimal relatedJob, BigDecimal sameGrade, BigDecimal oneGrade,
+        BigDecimal[] gap, BigDecimal sameCustomer, BigDecimal probabilityFrom, BigDecimal probability) {}
+    record SupplyTerms(BigDecimal capacity, BigDecimal idle, int scale) {}
 
-    private String formula(String id) {
-        definitions.definition("식-00");
-        String value = definitions.definition(id).formula();
-        if (value == null) throw unsupported(id);
-        return value.replaceAll("\\s+", "");
+    /** 한 요청 동안 쓰는 식 묶음. 식마다 DB를 한 번만 읽는다(목록 줄마다 다시 읽지 않음). */
+    public Settings settings() {
+        return new Settings();
     }
 
-    private Matcher match(String id, String expression) {
-        Matcher matcher = Pattern.compile(expression).matcher(formula(id));
-        if (!matcher.matches()) throw unsupported(id);
-        return matcher;
+    public final class Settings {
+        private boolean principles;
+        private final Map<String, String> texts = new HashMap<>();
+        private Integer nearTermOffset;
+        private Integer window;
+        private Integer waitingOffset;
+        private Integer minimumSeats;
+        private Weights weights;
+        private SupplyTerms supplyTerms;
+        private boolean demandRead;
+
+        private Settings() {}
+
+        private String text(String id) {
+            if (!principles) {
+                definitions.definition("식-00");
+                principles = true;
+            }
+            return texts.computeIfAbsent(id, key -> {
+                String value = definitions.definition(key).formula();
+                return value == null ? "" : value.replaceAll("\\s+", "");
+            });
+        }
+
+        public int nearTermMonthOffset() {
+            if (nearTermOffset == null) nearTermOffset = whole(text("식-77"), "이번달\\+([0-9]+)개월", "식-77", 2);
+            return nearTermOffset;
+        }
+
+        public int remainingDays(LocalDate endDate, LocalDate today) {
+            nearTermMonthOffset();
+            return Math.toIntExact(ChronoUnit.DAYS.between(today, endDate));
+        }
+
+        public boolean nearTerm(LocalDate endDate, LocalDate today) {
+            int months = nearTermMonthOffset();
+            return !endDate.isBefore(today)
+                && !YearMonth.from(endDate).isAfter(YearMonth.from(today).plusMonths(months));
+        }
+
+        /** 식-79 조건 1의 개월 수(철수 다음 달부터 n개월 안에 시작). */
+        public int candidateWindowMonths() {
+            if (window == null) window = whole(text("식-79"), "([0-9]+)개월안에시작", "식-79", 3);
+            return window;
+        }
+
+        /** 식-79 조건 1: 철수 다음 달부터 n개월 안에 시작하거나, 이미 시작했으면 끝나기 전. */
+        public boolean candidatePeriod(LocalDate endDate, YearMonth needStart, int durationMonths) {
+            int months = candidateWindowMonths();
+            YearMonth available = YearMonth.from(endDate).plusMonths(1);
+            return durationMonths > 0 && !needStart.isAfter(available.plusMonths(months))
+                && !needStart.plusMonths(durationMonths - 1L).isBefore(available);
+        }
+
+        /** 가배정 시작월 = max(철수 다음 달, 자리 시작월). */
+        public YearMonth tentativeStartMonth(LocalDate endDate, YearMonth needStart) {
+            YearMonth available = YearMonth.from(endDate).plusMonths(1);
+            return available.isAfter(needStart) ? available : needStart;
+        }
+
+        public int waitingDays(LocalDate endDate, YearMonth startMonth) {
+            if (waitingOffset == null) waitingOffset = whole(text("식-81"), "철수일[−-]([0-9]+)", "식-81", 1);
+            long days = ChronoUnit.DAYS.between(endDate, startMonth.atDay(1)) - waitingOffset;
+            return Math.toIntExact(Math.max(0, days));
+        }
+
+        private Weights weights() {
+            if (weights == null) {
+                String f = text("식-80");
+                weights = new Weights(
+                    decimal(f, "직무\\(일치" + NUMBER, 1, "식-80", "40"),
+                    decimal(f, "관련직무" + NUMBER, 1, "식-80", "20"),
+                    decimal(f, "등급\\(일치" + NUMBER, 1, "식-80", "20"),
+                    decimal(f, "한단계차이" + NUMBER, 1, "식-80", "10"),
+                    new BigDecimal[] {decimal(f, "없음" + NUMBER, 1, "식-80", "25"),
+                        decimal(f, "1개월" + NUMBER, 1, "식-80", "15"),
+                        decimal(f, "2개월" + NUMBER, 1, "식-80", "8"),
+                        decimal(f, "3개월" + NUMBER, 1, "식-80", "3")},
+                    decimal(f, "같은고객사" + NUMBER, 1, "식-80", "10"),
+                    decimal(f, "수주확률" + NUMBER + "%이상" + NUMBER, 1, "식-80", "60"),
+                    decimal(f, "수주확률" + NUMBER + "%이상" + NUMBER, 2, "식-80", "5"));
+            }
+            return weights;
+        }
+
+        /** 수주 확률 가점 대상인지(식-80 「수주 확률 n% 이상」). */
+        public boolean probabilityBonus(BigDecimal winningProbability) {
+            return winningProbability != null && winningProbability.compareTo(weights().probabilityFrom()) >= 0;
+        }
+
+        public BigDecimal aiRecommendScore(ScoreInput input) {
+            Weights w = weights();
+            BigDecimal score = BigDecimal.ZERO;
+            if (input.sameJob()) score = score.add(w.sameJob());
+            else if (input.relatedJob()) score = score.add(w.relatedJob());
+            if (Integer.valueOf(0).equals(input.gradeDistance())) score = score.add(w.sameGrade());
+            else if (Integer.valueOf(1).equals(input.gradeDistance())) score = score.add(w.oneGrade());
+            if (input.gapMonths() >= 0 && input.gapMonths() < w.gap().length) score = score.add(w.gap()[input.gapMonths()]);
+            if (input.sameCustomer()) score = score.add(w.sameCustomer());
+            if (probabilityBonus(input.winningProbability())) score = score.add(w.probability());
+            if (score.compareTo(BigDecimal.valueOf(100)) > 0) {
+                log.warn("식-80 점수가 100을 넘어 100으로 둡니다: {}", score);
+                score = BigDecimal.valueOf(100);
+            }
+            return score;
+        }
+
+        /** 식-82 C의 「추천 자리가 n곳 이상」. */
+        public int minimumSeats() {
+            if (minimumSeats == null) minimumSeats = whole(text("식-82"), "([0-9]+)곳이상", "식-82", 1);
+            return minimumSeats;
+        }
+
+        /** 식-82 B: 3개월 안 철수 예정이고 가배정이 없고 연장 가능성이 「높음」이 아님. */
+        public boolean bannerCandidate(LocalDate endDate, LocalDate today,
+            String extensionPossibilityCode, boolean hasOutstandingTentative) {
+            minimumSeats();
+            return !hasOutstandingTentative && !"H".equals(extensionPossibilityCode)
+                && nearTerm(endDate, today);
+        }
+
+        private SupplyTerms supplyTerms() {
+            if (supplyTerms == null) {
+                String f = text("식-60");
+                Matcher digits = Pattern.compile("소수(첫째|둘째|셋째)자리").matcher(f);
+                int scale = 1;
+                if (digits.find()) scale = switch (digits.group(1)) { case "첫째" -> 1; case "둘째" -> 2; default -> 3; };
+                else log.warn("식-60 정의에서 반올림 자리를 읽지 못해 명세 값(소수 첫째 자리)을 씁니다.");
+                supplyTerms = new SupplyTerms(decimal(f, "max\\(0," + NUMBER, 1, "식-60", "1"),
+                    decimal(f, "투입이하나도없는사람은" + NUMBER, 1, "식-60", "1"), scale);
+            }
+            return supplyTerms;
+        }
+
+        public BigDecimal supply(List<SupplyPerson> people, YearMonth month) {
+            SupplyTerms terms = supplyTerms();
+            BigDecimal total = BigDecimal.ZERO;
+            for (SupplyPerson person : people) {
+                BigDecimal extended = BigDecimal.ZERO;
+                for (Extension extension : person.extensions()) {
+                    String code = extension.extensionPossibilityCode();
+                    String standard = code == null || code.isEmpty() ? "EXT_PRBL_NULL" : switch (code) {
+                        case "H" -> "EXT_PRBL_H";
+                        case "M" -> "EXT_PRBL_M";
+                        case "L" -> "EXT_PRBL_L";
+                        default -> throw CodeFailure.invalid("extensionPossibilityCode", "등록된 값을 골라 주세요.");
+                    };
+                    BigDecimal probability = definitions.effectiveStandard(standard, month).value();
+                    if (probability.signum() < 0 || probability.compareTo(BigDecimal.valueOf(100)) > 0)
+                        throw CodeFailure.invalid("calculation", "운영 기준값 " + standard + "을(를) 확인해 주세요.");
+                    extended = extended.add(extension.monthlyMm().multiply(probability).movePointLeft(2));
+                }
+                BigDecimal available = person.confirmedMm().signum() == 0 && person.extensions().isEmpty()
+                    ? terms.idle() : terms.capacity().subtract(person.confirmedMm()).subtract(extended).max(BigDecimal.ZERO);
+                total = total.add(available);
+            }
+            return total.setScale(terms.scale(), RoundingMode.HALF_UP);
+        }
+
+        /** 호출자는 대상 월에 유효한 진행 기회와 계획을 가진 진행 프로젝트만 전달한다. */
+        public BigDecimal demand(List<OpportunityDemand> opportunities, List<ProjectDemand> projects) {
+            if (!demandRead) {
+                text("식-61");
+                demandRead = true;
+            }
+            BigDecimal total = BigDecimal.ZERO;
+            for (OpportunityDemand opportunity : opportunities)
+                total = total.add(opportunity.requiredCount().multiply(opportunity.monthlyMm())
+                    .multiply(opportunity.winningProbability()).movePointLeft(2));
+            for (ProjectDemand project : projects) {
+                if (project.remainingMonths() > 0)
+                    total = total.add(project.plannedMm().subtract(project.confirmedMm()).max(BigDecimal.ZERO)
+                        .divide(BigDecimal.valueOf(project.remainingMonths()), MathContext.DECIMAL128));
+            }
+            return total;
+        }
     }
 
-    public int nearTermMonthOffset() {
-        Matcher terms = match("식-77",
-            "남은일수\\(D-n\\)=철수일[−-]오늘\\.철수예정=0≤D-n이고철수일이속한달≤이번달\\+([0-9]+)개월");
-        return integer(terms.group(1), "식-77");
-    }
-
-    public int remainingDays(LocalDate endDate, LocalDate today) {
-        nearTermMonthOffset();
-        return Math.toIntExact(ChronoUnit.DAYS.between(today, endDate));
-    }
-
-    public boolean nearTerm(LocalDate endDate, LocalDate today) {
-        int months = nearTermMonthOffset();
-        return !endDate.isBefore(today)
-            && !YearMonth.from(endDate).isAfter(YearMonth.from(today).plusMonths(months));
-    }
-
-    public int candidateWindowMonths() {
-        Matcher terms = match("식-79", "조건1:철수다음달부터([0-9]+)개월안에시작\\(이미시작했으면끝나기전\\)\\."
-            + "조건2:같은직무\\(또는관련직무\\)의가배정인원<필요인원\\.공백개월=자리시작월[−-]철수다음달,0~([0-9]+)");
-        int months = integer(terms.group(1), "식-79");
-        if (months != integer(terms.group(2), "식-79")) throw unsupported("식-79");
-        return months;
-    }
-
+    // 한 번만 쓰는 곳(시험·단건 호출)은 아래로 부른다. 목록처럼 여러 번 쓰는 곳은 settings() 하나를 돌려쓴다.
+    public int nearTermMonthOffset() { return settings().nearTermMonthOffset(); }
+    public int remainingDays(LocalDate endDate, LocalDate today) { return settings().remainingDays(endDate, today); }
+    public boolean nearTerm(LocalDate endDate, LocalDate today) { return settings().nearTerm(endDate, today); }
+    public int candidateWindowMonths() { return settings().candidateWindowMonths(); }
     public boolean candidatePeriod(LocalDate endDate, YearMonth needStart, int durationMonths) {
-        int window = candidateWindowMonths();
-        YearMonth available = YearMonth.from(endDate).plusMonths(1);
-        return durationMonths > 0 && !needStart.isAfter(available.plusMonths(window))
-            && !needStart.plusMonths(durationMonths - 1L).isBefore(available);
+        return settings().candidatePeriod(endDate, needStart, durationMonths);
     }
-
     public YearMonth tentativeStartMonth(LocalDate endDate, YearMonth needStart) {
-        candidateWindowMonths();
-        YearMonth available = YearMonth.from(endDate).plusMonths(1);
-        return available.isAfter(needStart) ? available : needStart;
+        return settings().tentativeStartMonth(endDate, needStart);
     }
-
-    public int waitingDays(LocalDate endDate, YearMonth startMonth) {
-        Matcher terms = match("식-81", "대기예상일수=자리시작일[−-]철수일[−-]([0-9]+)");
-        long days = ChronoUnit.DAYS.between(endDate, startMonth.atDay(1))
-            - integer(terms.group(1), "식-81");
-        return Math.toIntExact(Math.max(0, days));
-    }
-
-    public BigDecimal aiRecommendScore(ScoreInput input) {
-        Matcher terms = match("식-80", "점수=직무\\(일치" + NUMBER + ",관련직무" + NUMBER
-            + "\\)\\+등급\\(일치" + NUMBER + ",한단계차이" + NUMBER
-            + "\\)\\+공백\\(없음" + NUMBER + ",1개월" + NUMBER + ",2개월" + NUMBER
-            + ",3개월" + NUMBER + "\\)\\+같은고객사" + NUMBER
-            + "\\+수주확률" + NUMBER + "%이상" + NUMBER);
-        if (input.gapMonths() < 0 || input.gapMonths() > 3
-                || input.winningProbability() == null) throw unsupported("식-80");
-        BigDecimal score = BigDecimal.ZERO;
-        if (input.sameJob()) score = score.add(decimal(terms, 1));
-        else if (input.relatedJob()) score = score.add(decimal(terms, 2));
-        if (Integer.valueOf(0).equals(input.gradeDistance())) score = score.add(decimal(terms, 3));
-        else if (Integer.valueOf(1).equals(input.gradeDistance())) score = score.add(decimal(terms, 4));
-        score = score.add(decimal(terms, 5 + input.gapMonths()));
-        if (input.sameCustomer()) score = score.add(decimal(terms, 9));
-        if (input.winningProbability().compareTo(decimal(terms, 10)) >= 0)
-            score = score.add(decimal(terms, 11));
-        if (score.compareTo(BigDecimal.valueOf(100)) > 0) throw unsupported("식-80");
-        return score;
-    }
-
+    public int waitingDays(LocalDate endDate, YearMonth startMonth) { return settings().waitingDays(endDate, startMonth); }
+    public BigDecimal aiRecommendScore(ScoreInput input) { return settings().aiRecommendScore(input); }
     public boolean bannerCandidate(LocalDate endDate, LocalDate today,
         String extensionPossibilityCode, boolean hasOutstandingTentative) {
-        Matcher terms = match("식-82", "A=([0-9]+)개월안철수예정자수\\.B=A중가배정이없고연장가능성이[“\"]높음[”\"]이아닌사람수\\."
-            + "C=B중추천자리가([0-9]+)곳이상있는사람수");
-        int months = integer(terms.group(1), "식-82");
-        if (months != nearTermMonthOffset() + 1 || integer(terms.group(2), "식-82") != 1)
-            throw unsupported("식-82");
-        return !hasOutstandingTentative && !"H".equals(extensionPossibilityCode)
-            && nearTerm(endDate, today);
+        return settings().bannerCandidate(endDate, today, extensionPossibilityCode, hasOutstandingTentative);
     }
-
-    public BigDecimal supply(List<SupplyPerson> people, YearMonth month) {
-        Matcher terms = match("식-60", "사람별공급=max\\(0," + NUMBER
-            + "[−-]확정투입MM[−-]철수한건의MM×연장확률\\)\\.그달투입이하나도없는사람은"
-            + NUMBER + "\\.직무공급=사람별합,소수(첫째|둘째|셋째)자리반올림");
-        BigDecimal capacity = decimal(terms, 1);
-        BigDecimal idle = decimal(terms, 2);
-        int scale = switch (terms.group(3)) { case "첫째" -> 1; case "둘째" -> 2; default -> 3; };
-        BigDecimal total = BigDecimal.ZERO;
-        for (SupplyPerson person : people) {
-            BigDecimal extended = BigDecimal.ZERO;
-            for (Extension extension : person.extensions()) {
-                String code = extension.extensionPossibilityCode();
-                String standard = code == null || code.isEmpty() ? "EXT_PRBL_NULL" : switch (code) {
-                    case "H" -> "EXT_PRBL_H";
-                    case "M" -> "EXT_PRBL_M";
-                    case "L" -> "EXT_PRBL_L";
-                    default -> throw CodeFailure.invalid("extensionPossibilityCode", "등록된 값을 골라 주세요.");
-                };
-                BigDecimal probability = definitions.effectiveStandard(standard, month).value();
-                if (probability.signum() < 0 || probability.compareTo(BigDecimal.valueOf(100)) > 0)
-                    throw unsupported("식-60");
-                extended = extended.add(extension.monthlyMm().multiply(probability).movePointLeft(2));
-            }
-            BigDecimal available = person.confirmedMm().signum() == 0 && person.extensions().isEmpty()
-                ? idle : capacity.subtract(person.confirmedMm()).subtract(extended).max(BigDecimal.ZERO);
-            total = total.add(available);
-        }
-        return total.setScale(scale, RoundingMode.HALF_UP);
-    }
-
-    /** 호출자는 대상 월에 유효한 진행 기회와 계획을 가진 진행 프로젝트만 전달한다. */
+    public BigDecimal supply(List<SupplyPerson> people, YearMonth month) { return settings().supply(people, month); }
     public BigDecimal demand(List<OpportunityDemand> opportunities, List<ProjectDemand> projects) {
-        match("식-61", "수요=Σ\\(필요인원×월MM×수주확률\\)\\+Σ진행프로젝트미충원MM");
-        String details = definitions.definition("식-61").details();
-        if (details == null || !Pattern.compile("미충원\\(프로젝트·직무·달\\)=max\\(0,계획MM[−-]확정배정MM\\)÷남은개월")
-                .matcher(details.replaceAll("\\s+", "")).find()) throw unsupported("식-61");
-        BigDecimal total = BigDecimal.ZERO;
-        for (OpportunityDemand opportunity : opportunities)
-            total = total.add(opportunity.requiredCount().multiply(opportunity.monthlyMm())
-                .multiply(opportunity.winningProbability()).movePointLeft(2));
-        for (ProjectDemand project : projects) {
-            if (project.remainingMonths() > 0)
-                total = total.add(project.plannedMm().subtract(project.confirmedMm()).max(BigDecimal.ZERO)
-                    .divide(BigDecimal.valueOf(project.remainingMonths()), MathContext.DECIMAL128));
+        return settings().demand(opportunities, projects);
+    }
+
+    private static int whole(String text, String regex, String id, int fallback) {
+        Matcher matcher = Pattern.compile(regex).matcher(text);
+        if (matcher.find()) {
+            try { return Integer.parseInt(matcher.group(1)); }
+            catch (NumberFormatException ignored) { /* 아래에서 명세 값을 쓴다 */ }
         }
-        return total;
+        log.warn("{} 정의에서 값을 읽지 못해 명세 값 {}을(를) 씁니다.", id, fallback);
+        return fallback;
     }
 
-    private static int integer(String value, String id) {
-        try { return Integer.parseInt(value); }
-        catch (NumberFormatException failure) { throw unsupported(id); }
-    }
-
-    private static BigDecimal decimal(Matcher matcher, int group) {
-        return new BigDecimal(matcher.group(group));
-    }
-
-    private static CodeFailure unsupported(String id) {
-        return CodeFailure.invalid("calculation", "지원하지 않는 " + id + " 정의입니다. DB 계산식의 지원 연산을 확인해 주세요.");
+    private static BigDecimal decimal(String text, String regex, int group, String id, String fallback) {
+        Matcher matcher = Pattern.compile(regex).matcher(text);
+        if (matcher.find()) return new BigDecimal(matcher.group(group));
+        log.warn("{} 정의에서 값을 읽지 못해 명세 값 {}을(를) 씁니다.", id, fallback);
+        return new BigDecimal(fallback);
     }
 }

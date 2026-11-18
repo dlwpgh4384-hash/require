@@ -1,43 +1,98 @@
+/* 시안 .content: 띠·조건·목록 사이 24px(휴대폰 16px) */
 .withdrawal-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
   min-width: 0;
   color: var(--text);
 }
-.withdrawal-days {
-  font-weight: 600;
-  white-space: nowrap;
+@media (max-width: 767px) {
+  .withdrawal-page {
+    gap: 16px;
+  }
 }
-.withdrawal-red {
-  color: var(--ls-bad, #dc2626);
+/* 시안 pname: 이름 아래 작은 글자 */
+.withdrawal-pname {
+  display: flex;
+  flex-direction: column;
+  line-height: 18px;
 }
-.withdrawal-orange {
-  color: var(--ls-warn, #d97706);
-}
-.withdrawal-gray,
-.withdrawal-complete {
+.withdrawal-pname small {
+  font-size: 12px;
   color: var(--text-sub);
 }
-.withdrawal-recommendation {
-  padding: 16px;
-  margin-bottom: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-.withdrawal-recommendation p {
-  margin: 8px 0;
-}
-.withdrawal-shared-row {
-  display: flex;
+.withdrawal-next {
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
-  padding: 12px;
-  border-bottom: 1px solid var(--border);
+  gap: 6px;
 }
-.withdrawal-tentative {
-  border: 1px dashed var(--primary-text);
-  border-radius: 4px;
-  padding: 6px 10px;
+.withdrawal-next .project-lnk {
+  padding: 0;
+}
+.withdrawal-page .ls-btn svg,
+.withdrawal-page .ls-b svg {
+  vertical-align: -2px;
+}
+/* 다음 자리 추천 창(시안 openNextRec) */
+.withdrawal-h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.withdrawal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+  min-width: 0;
+}
+.withdrawal-card-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.withdrawal-score {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* 시안 .bar .track/.fill: 점수 막대 */
+.withdrawal-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.withdrawal-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--divider);
+  overflow: hidden;
+}
+.withdrawal-fill {
+  height: 100%;
+  background: var(--primary);
+}
+.withdrawal-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.withdrawal-chips .ls-chip {
+  margin: 0;
+}
+.withdrawal-card-f {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.withdrawal-alert {
+  color: var(--ls-bad);
 }

@@ -239,15 +239,19 @@ it("잠금 이름 편집과 3→1 드래그 저장은 영향을 받은 형제까
     window.removeEventListener(MENU_REFRESH_EVENT, refreshed);
   }
 });
-it("이름 필수 검증은 첫 오류에 포커스·PUT 없음", async () => {
+it("이름 필수 검증은 시안 알림을 띄우고 첫 오류에 포커스·PUT 없음", async () => {
   await mount();
   fireEvent.change(screen.getByLabelText("M003 메뉴 이름"), {
     target: { value: " " },
   });
   fireEvent.click(screen.getByTestId("menu-settings-save"));
-  expect(
-    await screen.findByText("메뉴 이름을 1~50자로 입력해 주세요."),
-  ).toBeInTheDocument();
+  expect(await screen.findByTestId("menu-settings-toast")).toHaveTextContent(
+    "메뉴 이름은 비울 수 없고 50자 이내여야 합니다.",
+  );
+  expect(screen.getByLabelText("M003 메뉴 이름")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
   expect(screen.getByLabelText("M003 메뉴 이름")).toHaveFocus();
   expect(writes()).toHaveLength(0);
 });
@@ -257,7 +261,9 @@ it("51 Unicode code points는 저장하지 않는다", async () => {
     target: { value: "😀".repeat(51) },
   });
   fireEvent.click(screen.getByTestId("menu-settings-save"));
-  await screen.findByText("메뉴 이름을 1~50자로 입력해 주세요.");
+  expect(await screen.findByTestId("menu-settings-toast")).toHaveTextContent(
+    "메뉴 이름은 비울 수 없고 50자 이내여야 합니다.",
+  );
   expect(writes()).toHaveLength(0);
 });
 it("50 Unicode code points는 정규화 없이 보낸다", async () => {
@@ -273,6 +279,9 @@ it("50 Unicode code points는 정규화 없이 보낸다", async () => {
 it("일반 메뉴 다른 묶음 이동은 두 묶음 형제 순서를 반영", async () => {
   await mount();
   drag("M003", "G002");
+  expect(screen.getByTestId("menu-settings-toast")).toHaveTextContent(
+    "「직접 메뉴」을 「시스템 묶음」 묶음으로 옮겼습니다. 저장해야 반영됩니다.",
+  );
   await save();
   const body: MenuSettingsInput = JSON.parse(String(writes()[0][1].body));
   expect(body.items.find((row) => row.menuId === "M003")).toMatchObject({
@@ -284,8 +293,8 @@ it("일반 메뉴 다른 묶음 이동은 두 묶음 형제 순서를 반영", a
 it("잠금 메뉴 다른 묶음 drop은 draft에 반영하지 않음", async () => {
   await mount();
   drag("M004", "G001");
-  expect(screen.getByTestId("menu-settings-failure")).toHaveTextContent(
-    "시스템 메뉴는 다른 묶음으로 옮길 수 없습니다.",
+  expect(screen.getByTestId("menu-settings-toast")).toHaveTextContent(
+    "「잠금 메뉴」은 시스템 묶음 메뉴라 다른 묶음으로 옮길 수 없습니다.",
   );
   fireEvent.click(screen.getByTestId("menu-settings-save"));
   expect(writes()).toHaveLength(0);
@@ -322,7 +331,32 @@ it("취소는 서버 스냅샷과 순서를 복원하며 추가 확인이나 PUT
     within(screen.getByTestId("menu-settings-row-m003")).getByText("3"),
   ).toBeInTheDocument();
   expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  expect(screen.getByTestId("menu-settings-toast")).toHaveTextContent(
+    "변경을 취소했습니다.",
+  );
   expect(writes()).toHaveLength(0);
+});
+it("바뀐 것이 없을 때 [취소]는 「바꾼 내용이 없습니다.」", async () => {
+  await mount();
+  fireEvent.click(screen.getByTestId("menu-settings-cancel"));
+  expect(screen.getByTestId("menu-settings-toast")).toHaveTextContent(
+    "바꾼 내용이 없습니다.",
+  );
+  expect(writes()).toHaveLength(0);
+});
+it("시스템 묶음 줄에도 자물쇠를 보인다(시안)", async () => {
+  await mount();
+  expect(
+    within(screen.getByTestId("menu-settings-row-g002")).getByRole("img", {
+      name: "시스템 묶음",
+    }),
+  ).toHaveAttribute(
+    "title",
+    "시스템 묶음: 끌 수 없고, 안의 메뉴를 밖으로 옮길 수 없습니다(LOCK_YN=Y)",
+  );
+  expect(
+    within(screen.getByTestId("menu-settings-row-g001")).queryByRole("img"),
+  ).not.toBeInTheDocument();
 });
 it("dirty 등록 취소는 draft 유지·등록창 미개방·쓰기 없음", async () => {
   await mount();

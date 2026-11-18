@@ -22,11 +22,14 @@ export function ClientForm({
   codes,
   onCancel,
   onSaved,
+  onUnchanged,
 }: {
   client?: Client;
   codes: Record<string, ClientCode[]>;
   onCancel: () => void;
   onSaved: (client: Client, warnings: string[]) => void;
+  /** 수정에서 바뀐 것 없이 저장을 누를 때(시안: 수정을 닫고 안내 알림). */
+  onUnchanged?: () => void;
 }) {
   const [draft, setDraft] = useState<ClientInput>(() => ({
     clientTypeCode: client?.clientTypeCode || "",
@@ -97,46 +100,22 @@ export function ClientForm({
     draft.clientTypeCode === "CUST" || draft.clientTypeCode === "BOTH";
   const set = (field: keyof ClientInput, value: string) =>
     setDraft((current) => ({ ...current, [field]: value }));
+  // 시안: 등록 폼은 글 칸을 벗어날 때, 고르는 칸은 고를 때 그 칸만 검사해 칸 아래에 알린다.
+  const check = (field: keyof ClientInput, value: ClientInput = draft) => {
+    if (client) return;
+    const message = clientErrors(value, true)[field];
+    const rest = (error?.errors ?? []).filter((item) => item.field !== field);
+    const next = message ? [...rest, { field, message }] : rest;
+    if (!next.length && (!error || error.status === 400)) setError(null);
+    else
+      setError(
+        new ClientRequestError(error?.status ?? 400, error?.message ?? "", next),
+      );
+  };
   const validate = () => {
-    const errors: { field: string; message: string }[] = [];
-    const required = [
-      "clientTypeCode",
-      "clientName",
-      ...(!client ? ["businessNumber"] : []),
-      ...(customer ? ["taxEmail"] : []),
-      ...(vendor ? ["bankCode", "accountNumber", "accountHolder"] : []),
-    ];
-    for (const field of required)
-      if (!String(draft[field as keyof ClientInput] || "").trim())
-        errors.push({ field, message: "필수 입력입니다." });
-    for (const [field, max] of Object.entries({
-      clientName: 50,
-      representativeName: 20,
-      contactName: 20,
-      contactPhone: 20,
-      taxEmail: 100,
-      accountHolder: 30,
-    })) {
-      if ([...String(draft[field as keyof ClientInput] || "")].length > max)
-        errors.push({ field, message: `${max}자 이하로 입력해 주세요.` });
-    }
-    if (
-      !client &&
-      !/^[0-9]{3}-[0-9]{2}-[0-9]{5}$/.test(draft.businessNumber || "")
-    )
-      errors.push({
-        field: "businessNumber",
-        message: "000-00-00000 형식으로 입력해 주세요.",
-      });
-    if (vendor && !/^[0-9-]{8,20}$/.test(draft.accountNumber || ""))
-      errors.push({
-        field: "accountNumber",
-        message: "숫자·하이픈 8~20자로 입력해 주세요.",
-      });
-    if (customer && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.taxEmail || ""))
-      errors.push({ field: "taxEmail", message: "이메일을 확인해 주세요." });
-    if (contactPhoneInvalid(draft.contactPhone))
-      errors.push({ field: "contactPhone", message: "연락처는 숫자와 하이픈(-)만 써 주세요." });
+    const errors = Object.entries(clientErrors(draft, !client)).map(
+      ([field, message]) => ({ field, message: message as string }),
+    );
     if (errors.length) {
       setError(new ClientRequestError(400, "입력 값을 확인해 주세요.", errors));
       // FR-0106: 첫 오류 칸으로 커서를 옮긴다.
@@ -172,9 +151,16 @@ export function ClientForm({
   };
   const submit = () => {
     if (busy || loading || accountFailure || confirm || !validate()) return;
+    // 시안: 수정에서 바뀐 것이 없으면 저장하지 않고 「바뀐 내용이 없습니다.」(안내)를 띄운다.
+    if (client && trimmed(draft) === trimmed(JSON.parse(initial.current))) {
+      onUnchanged?.();
+      return;
+    }
     const submitted = clientPayload(draft, !!client);
+    // 시안: 계좌가 이미 있던 거래처만 바꾸기 전에 묻는다.
     if (
       client &&
+      !!original?.accountNumber &&
       ((submitted.bankCode || "") !==
         (original?.bankCode ||
           (client.clientTypeCode !== "CUST" ? client.bankCode : "") ||
@@ -242,6 +228,7 @@ export function ClientForm({
                 : event.target.value,
           )
         }
+        onBlur={() => check(field)}
       />
       {help && <span className="client-help">{help}</span>}
       {message(field)}
@@ -268,7 +255,10 @@ export function ClientForm({
         data-testid={`client-${group.toLowerCase().replace(/_/g, "-")}-select`}
         style={client ? { width: EDIT_WIDTH[field] } : undefined}
         value={draft[field] || ""}
-        onChange={(event) => set(field, event.target.value)}
+        onChange={(event) => {
+          set(field, event.target.value);
+          check(field, { ...draft, [field]: event.target.value });
+        }}
       >
         <option value="">선택</option>
         {(codes[group] || []).map((code) => (
@@ -282,7 +272,9 @@ export function ClientForm({
       </div>
     </div>
   );
-  const errorBox = error && (
+  // 칸 아래 알림만 있을 때(벗어날 때 검사)는 위 알림 상자를 띄우지 않는다.
+  const errorBox = error &&
+    (error.message || error.status === 409 || accountFailure) && (
     <div role="alert" className="client-error">
       {error.message}
       {error.status === 409 && client && (
@@ -357,12 +349,18 @@ export function ClientForm({
       )}
       {confirm && (
         <Dialog
-          title="지급 계좌 변경"
+          title="지급 계좌를 바꿀까요?"
           testId="client-account-confirm"
           closable
           onClose={() => !busy && setConfirm(false)}
         >
-          <p>다음 지급부터 새 계좌로 보냅니다</p>
+          <p>
+            다음 지급부터 새 계좌(
+            {(codes.BANK || []).find((code) => code.code === draft.bankCode)?.codeName ||
+              draft.bankCode}{" "}
+            …{String(draft.accountNumber || "").replace(/\D/g, "").slice(-4)})로 보냅니다. 바꾼
+            기록이 남습니다.
+          </p>
           <footer>
             <button
               data-testid="client-account-cancel"
@@ -376,7 +374,7 @@ export function ClientForm({
               disabled={busy}
               onClick={() => void persist()}
             >
-              확인 저장
+              바꾸기
             </button>
           </footer>
         </Dialog>
@@ -499,6 +497,55 @@ const EDIT_WIDTH: Partial<Record<keyof ClientInput, string>> = {
   accountNumber: "220px",
   accountHolder: "220px",
 };
+
+/** 바뀐 것 비교용: 시안처럼 앞뒤 빈칸은 빼고 본다. */
+function trimmed(value: ClientInput) {
+  return JSON.stringify(
+    Object.fromEntries(
+      Object.entries(value)
+        .map(([key, item]): [string, unknown] => [key, typeof item === "string" ? item.trim() : item])
+        .filter(([, item]) => item !== "" && item !== undefined)
+        .sort(([a], [b]) => String(a).localeCompare(String(b))),
+    ),
+  );
+}
+
+/** 시안 clientErrors 문구 그대로. 칸마다 첫 오류 하나. 등록일 때만 사업자번호를 본다. */
+function clientErrors(draft: ClientInput, isNew: boolean) {
+  const errors: Partial<Record<keyof ClientInput, string>> = {};
+  const text = (field: keyof ClientInput) => String(draft[field] ?? "").trim();
+  const kind = draft.clientTypeCode;
+  if (!kind) errors.clientTypeCode = "구분을 골라 주세요.";
+  if (!text("clientName")) errors.clientName = "상호를 입력해 주세요.";
+  if (isNew && !/^\d{3}-\d{2}-\d{5}$/.test(draft.businessNumber || ""))
+    errors.businessNumber = "사업자번호 10자리를 입력해 주세요. (예: 123-45-67890)";
+  if (kind && kind !== "VNDR") {
+    if (!text("taxEmail")) errors.taxEmail = "고객사는 세금계산서 이메일이 꼭 필요합니다.";
+    else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(text("taxEmail")))
+      errors.taxEmail = "이메일 형식이 맞지 않습니다. (예: tax@company.co.kr)";
+  }
+  if (kind && kind !== "CUST") {
+    if (!draft.bankCode) errors.bankCode = "은행을 골라 주세요.";
+    if (!/^[\d-]{8,20}$/.test(draft.accountNumber || ""))
+      errors.accountNumber = "계좌번호를 숫자와 하이픈(-)으로 입력해 주세요.";
+    if (!text("accountHolder")) errors.accountHolder = "예금주를 입력해 주세요.";
+  }
+  // 시안에 없는 칸 규칙(글자 수·연락처)은 그대로 둔다.
+  for (const [field, max] of Object.entries({
+    clientName: 50,
+    representativeName: 20,
+    contactName: 20,
+    contactPhone: 20,
+    taxEmail: 100,
+    accountHolder: 30,
+  }) as [keyof ClientInput, number][]) {
+    if (!errors[field] && [...String(draft[field] || "")].length > max)
+      errors[field] = `${max}자 이하로 입력해 주세요.`;
+  }
+  if (!errors.contactPhone && contactPhoneInvalid(draft.contactPhone))
+    errors.contactPhone = "연락처는 숫자와 하이픈(-)만 써 주세요.";
+  return errors;
+}
 
 /** 연락처: 숫자와 하이픈만(FR-0106 숫자 칸). 비어 있으면 통과. */
 function contactPhoneInvalid(value: string | null | undefined) {

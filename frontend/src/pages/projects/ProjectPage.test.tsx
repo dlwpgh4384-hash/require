@@ -444,3 +444,124 @@ it("phone width uses the shared cards with the mockup rows", async () => {
   expect(card.getByText("가온은행 · 턴키")).toBeVisible();
   expect(card.getByText("2명")).toBeVisible();
 });
+
+it("시안 UI-01: 등록 폼은 글자 칸을 떠날 때, 고르는 칸·날짜는 바꿀 때 그 칸 아래에 문구를 보인다", async () => {
+  shell();
+  fireEvent.click(await screen.findByTestId("project-register"));
+  const form = within(await screen.findByTestId("project-form"));
+  await waitFor(() => expect(form.getByTestId("project-teamExpenseAmount")).toHaveValue("50,000"));
+  fireEvent.blur(form.getByTestId("project-projectName"));
+  expect(form.getByText("프로젝트명을 입력해 주세요.")).toBeVisible();
+  fireEvent.blur(form.getByTestId("project-contractAmount"));
+  expect(form.getByText("계약금액을 입력해 주세요.")).toBeVisible();
+  // 시안: 상태도 「선택」이 있고 처음 값은 진행
+  const status = form.getByTestId("project-statusCode") as HTMLSelectElement;
+  expect(status).toHaveValue("ING");
+  expect([...status.options].map((o) => o.text)).toEqual(["선택", "진행", "수주예정"]);
+  fireEvent.change(status, { target: { value: "" } });
+  expect(form.getByText("상태를 입력해 주세요.")).toBeVisible();
+  fireEvent.change(form.getByTestId("project-startDate"), { target: { value: "2026-12-01" } });
+  fireEvent.change(form.getByTestId("project-endDate"), { target: { value: "2026-11-01" } });
+  expect(form.getByText("종료일이 시작일보다 앞입니다. 날짜를 다시 확인해 주세요.")).toBeVisible();
+  fireEvent.change(form.getByTestId("project-projectName"), { target: { value: "새 이름" } });
+  fireEvent.blur(form.getByTestId("project-projectName"));
+  expect(form.queryByText("프로젝트명을 입력해 주세요.")).not.toBeInTheDocument();
+  expect(writes()).toHaveLength(0);
+});
+
+it("시안 UI-01: 실주 사유·경비 월·항목·금액에 필수 표시(*)", async () => {
+  shell();
+  const detail = await openDetail();
+  fireEvent.click(await detail.findByTestId("project-expense-add"));
+  let dialog = within(await screen.findByTestId("project-command-dialog"));
+  for (const label of ["경비 월", "항목", "금액"]) expect(dialog.getByText(label).closest("label")).toHaveTextContent(`${label} *`);
+  expect(dialog.getByText("메모").closest("label")).not.toHaveTextContent("*");
+  fireEvent.click(dialog.getByTestId("project-command-cancel"));
+  fireEvent.click(detail.getByTestId("project-more"));
+  fireEvent.click(detail.getByTestId("project-lose"));
+  dialog = within(await screen.findByTestId("project-command-dialog"));
+  expect(dialog.getByText("실주 사유").closest("label")).toHaveTextContent("실주 사유 *");
+});
+
+it("시안 UI-01: 영업 파트 적용 시작 월이 틀리면 창을 두고 info 알림(마감 다음 달 / 지금 파트 다음 달)", async () => {
+  row.closedMonth = "2026-10";
+  const original = request.getMockImplementation()!;
+  let currentFrom = "2026-10";
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    (init?.method ?? "GET") === "GET" && url.endsWith("/sales-parts")
+      ? ok({ items: [{ salesPartId: "part", salesPartName: "영업1파트", effectiveMonth: currentFrom, reason: null, changedBy: "관리자", scheduled: false }] })
+      : original(url, init),
+  );
+  shell();
+  let detail = await openDetail();
+  fireEvent.click(await detail.findByTestId("project-part-change"));
+  let dialog = within(await screen.findByTestId("project-command-dialog"));
+  fireEvent.change(dialog.getByTestId("project-command-effectivemonth"), { target: { value: "2026-10" } });
+  fireEvent.click(dialog.getByTestId("project-command-save"));
+  expect(await screen.findByTestId("project-detail-toast")).toHaveTextContent("적용 시작 월은 2026-11 이후로 골라 주세요.");
+  expect(screen.getByTestId("project-command-dialog")).toBeVisible();
+  expect(writes()).toHaveLength(0);
+  cleanup();
+  currentFrom = "2026-11";
+  shell();
+  detail = await openDetail();
+  fireEvent.click(await detail.findByTestId("project-part-change"));
+  dialog = within(await screen.findByTestId("project-command-dialog"));
+  // 지금 파트와 같은 파트를 고르면 「예약 취소」라 검사하지 않는다 → 다른 파트로 바꾸는 경우를 본다.
+  fireEvent.change(dialog.getByTestId("project-command-part"), { target: { value: "part2" } });
+  fireEvent.change(dialog.getByTestId("project-command-effectivemonth"), { target: { value: "2026-11" } });
+  fireEvent.click(dialog.getByTestId("project-command-save"));
+  expect(await screen.findByTestId("project-detail-toast")).toHaveTextContent("적용 시작 월은 2026-12 이후로 골라 주세요.");
+  expect(writes()).toHaveLength(0);
+});
+
+it("시안 UI-01: 계획 MM이 소수 셋째 자리면 저장하지 않고 직무 이름으로 info 알림", async () => {
+  shell();
+  const detail = await openDetail();
+  fireEvent.click(await detail.findByTestId("project-detail-tab-plan"));
+  fireEvent.change(await detail.findByTestId("project-job-mm-be"), { target: { value: "1.234" } });
+  expect(detail.getByTestId("project-job-mm-be")).toHaveValue("1.234");
+  fireEvent.click(detail.getByTestId("project-plan-save"));
+  expect(await screen.findByTestId("project-detail-toast")).toHaveTextContent(
+    "백엔드 개발 계획 MM은 0 이상 숫자(소수 둘째 자리까지)로 넣어 주세요.",
+  );
+  expect(writes()).toHaveLength(0);
+});
+
+it("시안 UI-01: 진행 현황 마지막 업데이트가 14일을 넘으면 경고 색", async () => {
+  row.memos = [{ writtenDate: "2026-10-01", thisWeek: null, nextWeek: null, request: null, actualProgressRate: null }];
+  shell();
+  const detail = await openDetail();
+  fireEvent.click(await detail.findByTestId("project-detail-tab-progress"));
+  const age = await detail.findByTestId("project-last-update-age");
+  expect(age).toHaveTextContent("(45일 전)");
+  expect(age).toHaveClass("project-warn-text");
+  cleanup();
+  row.memos = [{ writtenDate: "2026-11-10", thisWeek: null, nextWeek: null, request: null, actualProgressRate: null }];
+  shell();
+  const fresh = await openDetail();
+  fireEvent.click(await fresh.findByTestId("project-detail-tab-progress"));
+  expect(await fresh.findByTestId("project-last-update-age")).not.toHaveClass("project-warn-text");
+});
+
+it("시안 UI-01: 배분표 불일치 이유 문구", async () => {
+  const original = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    (init?.method ?? "GET") === "GET" && url.endsWith("/distribution")
+      ? ok({
+          project: row,
+          items: [],
+          uploads: [{ uploadedAt: "2026-11-14T01:00:00Z", stepName: "견적", stepCode: "EST", fileName: "a.xlsx", uploadedBy: "관리자" }],
+          mismatches: [
+            { name: "김개발", kind: "배정 없음", months: ["2026-11"] },
+            { name: "이개발", kind: "배분표 없음", months: ["2026-12"] },
+          ],
+          totalAmountWarning: false,
+        })
+      : original(url, init),
+  );
+  render(<ProjectDistribution projectId="P-0001" onBack={() => undefined} />);
+  const table = within(await screen.findByTestId("project-distribution-mismatches"));
+  expect(table.getByText("배분표에는 금액이 있는데 그 달 투입 배정이 없습니다.")).toBeVisible();
+  expect(table.getByText("투입 배정은 있는데 배분표에 줄이 없어 「그 달 원가 × 계약금액 ÷ 예산」으로 계산합니다.")).toBeVisible();
+});

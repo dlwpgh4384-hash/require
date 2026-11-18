@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.manpowercomparisons.mapper.ManpowerComparisonMapper">
+  <resultMap id="source" type="com.company.common.manpowercomparisons.mapper.ManpowerComparisonRows$Source">
+    <constructor>
+      <arg column="projectId" javaType="java.lang.String"/>
+      <arg column="projectName" javaType="java.lang.String"/>
+      <arg column="jobCode" javaType="java.lang.String"/>
+      <arg column="jobName" javaType="java.lang.String"/>
+      <arg column="startDate" javaType="java.time.LocalDate"/>
+      <arg column="endDate" javaType="java.time.LocalDate"/>
+      <arg column="plannedMm" javaType="java.math.BigDecimal"/>
+      <arg column="actualMm" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <select id="selectSources" resultMap="source">
+    WITH projects AS (
+      SELECT p.PROJ_ID, p.PROJ_NM, p.CTRT_BGN_DT, p.CTRT_END_DT
+      FROM TB_PJ_PROJ p
+      WHERE p.CTRT_BGN_DT &lt;= make_date(#{year},12,31)
+        AND p.CTRT_END_DT &gt;= make_date(#{year},1,1)
+      <if test="projectId != null">AND p.PROJ_ID=#{projectId}</if>
+    ), plans AS (
+      SELECT m.PROJ_ID, m.JOB_CD, SUM(m.PLAN_MM) AS mm
+      FROM TB_PJ_MNPW_PLAN m
+      JOIN projects p ON p.PROJ_ID=m.PROJ_ID
+      GROUP BY m.PROJ_ID, m.JOB_CD
+    ), actual AS (
+      SELECT a.PROJ_ID, a.JOB_CD, SUM(m.MON_MM) AS mm
+      FROM TB_PJ_ASGN a
+      JOIN projects p ON p.PROJ_ID=a.PROJ_ID
+      JOIN TB_PJ_ASGN_MON m ON m.ASGN_ID=a.ASGN_ID
+      WHERE a.ASGN_STAT_CD!='CNCL'
+        AND m.INPUT_YM BETWEEN (CAST(#{year} AS text)||'01') AND (CAST(#{year} AS text)||'12')
+      GROUP BY a.PROJ_ID, a.JOB_CD
+    ), jobs AS (
+      SELECT p.PROJ_ID, p.JOB_CD FROM plans p
+      UNION
+      SELECT a.PROJ_ID, a.JOB_CD FROM actual a
+    )
+    SELECT p.PROJ_ID AS "projectId", p.PROJ_NM AS "projectName",
+      j.JOB_CD AS "jobCode", COALESCE(c.CODE_NM,j.JOB_CD) AS "jobName",
+      p.CTRT_BGN_DT AS "startDate", p.CTRT_END_DT AS "endDate",
+      COALESCE(n.mm,0) AS "plannedMm", COALESCE(a.mm,0) AS "actualMm"
+    FROM jobs j
+    JOIN projects p ON p.PROJ_ID=j.PROJ_ID
+    LEFT JOIN plans n ON n.PROJ_ID=j.PROJ_ID AND n.JOB_CD=j.JOB_CD
+    LEFT JOIN actual a ON a.PROJ_ID=j.PROJ_ID AND a.JOB_CD=j.JOB_CD
+    LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='JOB' AND c.CODE=j.JOB_CD
+    ORDER BY p.PROJ_ID, j.JOB_CD
+  </select>
+</mapper>

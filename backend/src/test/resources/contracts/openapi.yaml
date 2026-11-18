@@ -9,7 +9,6 @@ info:
     해결한 사용자 승인으로 취급하지 않는다. 직접 진입 정보 전달 OQ-005,
     health 결과·오류 OQ-006, 페이지·검색 입력과 호출자 오류 OQ-007은 확인 필요다.
     원장 REQ-044의 출처 불일치 UP-001도 보존한다. 완성된 실행 계약이나 구현 성공을 주장하지 않는다.
-security: []
 x-design-status: clarification_required
 x-test-status: not_run
 x-open-questions:
@@ -3007,59 +3006,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /api/common/parts/{partId}/resume:
-    put:
-      operationId: putCommonPartResume
-      summary: 영업 파트 다시 사용
-      security: []
-      x-related-requirements:
-      - REQ-342
-      - REQ-306
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
-      parameters:
-      - name: partId
-        in: path
-        required: true
-        schema:
-          type: string
-          minLength: 1
-      x-business-rules:
-      - 시안 UI-15 ⋯ [다시 사용]: 중지된 파트만 사용으로 되돌림, 확인 창 없음
-      - 수정버전 불일치409
-      x-side-effects:
-      - TB_BS_PART.useYn=Y; TB_SY_CHG_HIST 사용 여부 N→Y; 기준·소속 관계 불변
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CommonPartStopInput'
-      responses:
-        '200':
-          description: 조회 또는 저장 결과
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/ApiResponse'
-                - type: object
-                  required:
-                  - data
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/CommonPart'
-        '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-        '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 데이터·성공 이력 불변
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
   /api/common/uploads/templates/{formTypeCode}:
     get:
       operationId: getCommonUploadTemplate
@@ -4392,89 +4338,6 @@ paths:
       - 'business: 등록 statusCode가 종료 -> 400·프로젝트 신규0행'
       - 'side-effect: 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력
         없이 (자체)이고 빈 계약금액은 0·매출 제외다. -> 해당 업무 GET/DB에서 위 행·필드 대조'
-  /api/common/projects/excel:
-    get:
-      operationId: getCommonProjectsExcel
-      summary: 프로젝트 목록 엑셀
-      security: []
-      description: UI-22 전 무인증·현재 사용자 admin. 화면 목록과 같은 조건(연도·계약유형·상태·영업 파트·프로젝트명 또는 고객사)과 순서(시작일 늦은 순)로 내려받는다.
-      parameters:
-      - name: year
-        in: query
-        required: false
-        schema:
-          type: integer
-          description: 조회 연도(그 해에 수행 기간이 걸친 프로젝트). 비우면 올해
-      - name: contractTypeCode
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: statusCode
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: salesPartId
-        in: query
-        required: false
-        schema:
-          type: string
-          description: 영업 파트ID. unassigned = 미지정
-      - name: q
-        in: query
-        required: false
-        schema:
-          type: string
-          description: 프로젝트명 또는 고객사
-      responses:
-        '200':
-          description: 프로젝트 목록 엑셀 결과
-          content:
-            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
-              schema:
-                type: string
-                format: binary
-        '400':
-          description: 형식 위반. ApiError.errors에 입력 필드와 한국어 사유.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-  /api/common/projects/budget-rule:
-    get:
-      operationId: getCommonProjectBudgetRule
-      summary: 예산 기본값 규칙(식-19)
-      security: []
-      description: 예산 기본값 = 계약금액 × budgetFactor(원 단위 버림). budgetFactor는 TB_SY_CALC_RULE 식-19와 이번 달 운영 기준값 TGT_MRGN_RT로 서버가 계산한다. 화면은 등록·수정 폼과 예산 변경 창의 기본값·안내 문구에 쓴다.
-      responses:
-        '200':
-          description: 예산 기본값 규칙
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - success
-                - meta
-                - data
-                properties:
-                  success:
-                    type: boolean
-                  meta:
-                    type: object
-                  data:
-                    type: object
-                    required:
-                    - targetMarginRate
-                    - budgetFactor
-                    properties:
-                      targetMarginRate:
-                        type: number
-                        description: 목표 마진율(%)
-                      budgetFactor:
-                        type: number
-                        description: 계약금액에 곱하는 수(예 0.80)
   /api/common/projects/{projectId}:
     get:
       operationId: getCommonProject
@@ -5270,272 +5133,6 @@ paths:
         entity: TB_PJ_PROJ
         result_path:
         - data
-  /api/common/clients/excel:
-    get:
-      operationId: getCommonClientsExcel
-      summary: 거래처 목록 엑셀 다운로드(SFR-011)
-      description: 지금 조건의 전체 결과를 보이는 열·정렬 그대로 xlsx로 내려준다. 파일에 받은 사람·한국 시각(SER-007), 접근 기록 DNLD(SER-006).
-      security: []
-      parameters:
-      - name: clientTypeCode
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: useYn
-        in: query
-        required: false
-        schema:
-          type: string
-          default: Y
-      - name: keyword
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: sort
-        in: query
-        required: false
-        schema:
-          type: string
-          enum: [type, name, businessNumber, representative, industry, contact, phone, taxEmail, account, projects, people, use]
-      - name: dir
-        in: query
-        required: false
-        schema:
-          type: string
-          enum: [asc, desc]
-      - name: columns
-        in: query
-        required: false
-        schema:
-          type: array
-          items:
-            type: string
-        description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
-      responses:
-        '200':
-          description: 엑셀 파일
-          content:
-            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
-              schema:
-                type: string
-                format: binary
-        '400':
-          description: 모르는 열·정렬 값
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-  /api/common/parts/excel:
-    get:
-      operationId: getCommonPartsExcel
-      summary: 영업 파트 목록 엑셀 다운로드(SFR-011)
-      description: 보이는 열·정렬 그대로 xlsx로 내려준다. 파일에 받은 사람·한국 시각(SER-007), 접근 기록 DNLD(SER-006).
-      security: []
-      parameters:
-      - name: sort
-        in: query
-        required: false
-        schema:
-          type: string
-          enum: [partName, leaderName, distributionRate, salesExpense, effectiveMonth, scheduledChange, personCount, projectCount, useYn]
-      - name: dir
-        in: query
-        required: false
-        schema:
-          type: string
-          enum: [asc, desc]
-      - name: columns
-        in: query
-        required: false
-        schema:
-          type: array
-          items:
-            type: string
-        description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
-      responses:
-        '200':
-          description: 엑셀 파일
-          content:
-            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
-              schema:
-                type: string
-                format: binary
-        '400':
-          description: 모르는 열·정렬 값
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-  /api/common/roles/{roleId}/change-history:
-    get:
-      operationId: getCommonRoleChangeHistory
-      summary: 역할 권한 변경 이력 조회(시안 「변경 이력 (n)」)
-      security: []
-      parameters:
-      - name: roleId
-        in: path
-        required: true
-        schema:
-          type: string
-          minLength: 1
-      responses:
-        '200':
-          description: 바뀐 항목마다 1줄, 최근 순
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/ApiResponse'
-                - type: object
-                  required: [data]
-                  properties:
-                    data:
-                      type: object
-                      required: [items]
-                      properties:
-                        items:
-                          type: array
-                          items:
-                            type: object
-                            required: [changedAt, item]
-                            properties:
-                              changedAt:
-                                type: string
-                                format: date-time
-                              item:
-                                type: string
-                              before:
-                                type: string
-                                nullable: true
-                              after:
-                                type: string
-                                nullable: true
-                              changedBy:
-                                type: string
-                                nullable: true
-        '404':
-          description: 역할이 존재하지 않는다.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-  /api/common/users/excel:
-    get:
-      operationId: getCommonUsersExcel
-      summary: 사용자 목록 엑셀 다운로드(SFR-011)
-      description: 지금 조건의 전체 결과를 보이는 열 그대로 xlsx로 내려준다. 1행 「사용자 · 다운로드 admin · 한국 시각」, 3행부터 머리글. 파일 이름은 「화면이름_기간_다운로드일시.xlsx」. 접근 기록(DNLD)을 남긴다.
-      security: []
-      parameters:
-      - name: includeStopped
-        in: query
-        required: false
-        schema:
-          type: boolean
-          default: false
-        description: 시안 [사용 중지 포함]. false면 사용 중지 계정을 숨긴다(상태 조건에서 중지를 고르면 함께 보임).
-      - name: sort
-        in: query
-        required: false
-        schema:
-          type: string
-          enum: [userId, name, role, state, last]
-        description: 정렬 열. 없으면 이름순.
-      - name: dir
-        in: query
-        required: false
-        schema:
-          type: string
-          enum: [asc, desc]
-      - name: roleCd
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: userStatCd
-        in: query
-        required: false
-        schema:
-          type: string
-          enum: [USE, LOCK, STOP]
-      - name: keyword
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: columns
-        in: query
-        required: false
-        schema:
-          type: array
-          items:
-            type: string
-        description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
-      responses:
-        '200':
-          description: 엑셀 파일
-          content:
-            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
-              schema:
-                type: string
-                format: binary
-        '400':
-          description: 모르는 열·정렬 값
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-  /api/common/users/{userId}/change-history:
-    get:
-      operationId: getCommonUserChangeHistory
-      summary: 사용자 변경 이력 조회(상세 패널 「변경 이력」 탭)
-      description: 바뀐 항목마다 1줄(이름·이메일·역할·고른 본사·담당 프로젝트·상태·등록), 최근 순.
-      security: []
-      parameters:
-      - name: userId
-        in: path
-        required: true
-        schema:
-          type: string
-          minLength: 1
-      responses:
-        '200':
-          description: 변경 이력 목록
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/ApiResponse'
-                - type: object
-                  required: [data]
-                  properties:
-                    data:
-                      type: array
-                      items:
-                        type: object
-                        required: [changedAt, item]
-                        properties:
-                          changedAt:
-                            type: string
-                            format: date-time
-                          item:
-                            type: string
-                          before:
-                            type: string
-                            nullable: true
-                          after:
-                            type: string
-                            nullable: true
-                          changedBy:
-                            type: string
-                            nullable: true
-        '400':
-          description: 아이디 형식 오류
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
   /api/common/assignments:
     get:
       operationId: getCommonAssignments
@@ -6733,8 +6330,832 @@ paths:
         - extensionPossibilityCode
         - jobCode
         ordering: 화면 기본 철수일 오름차순; 공통 열/정렬 적용 세부는 기존 다운로드 서비스 관례
+  /api/common/manpower-comparisons:
+    get:
+      operationId: getCommonManpowerComparisons
+      summary: 인원 계획 대비 투입 조회
+      description: >-
+        UI-11의 조회 전용 비교다. 선택 연도에 수행 기간이 걸친 프로젝트마다
+        계획 직무와 투입 직무의 합집합을 만들고 누락 계획/투입은 각각 0으로 본다.
+        실제는 해당 연도 1~12월 월 MM의 실적과 예정 합이다.
+        계획은 UI-01 저장 원계획을 해당 연도 프로젝트 개월 수/전체 개월 수로 안분하고
+        소수 둘째 자리 반올림한다. 차이는 실제-계획이며 정확히0만 맞음이다.
+        프로젝트 기간 일부 월의 개월 수 산정은 DB 식-00/식-67을 따른다(OQ-CALC-011).
+        현재 로그인/메뉴권한 연결은 하지 않는다. GET은 업무 쓰기/DDL/seed를 실행하지 않는다.
+      security: []
+      x-related-requirements:
+      - REQ-578
+      - REQ-587
+      - REQ-589
+      - REQ-590
+      - REQ-591
+      - REQ-592
+      - REQ-593
+      - REQ-596
+      x-aiops-query-role:
+        entity: TB_PJ_MNPW_PLAN
+        result_path: [data, items]
+      x-pagination-filtering:
+        pagination: 조건에 맞는 전체 결과; 서버 페이지 파라미터 없음
+        filtering: year 필수, projectId·differenceStatus 선택; 차이는 계산 후 필터
+        ordering: 차이 오름차순으로 부족 큰 순; 동순위 보조 기준은 OQ-QUERY-011
+        totals: 현재 조회 조건 전체 행의 합계; 필터 전 합계 여부는 OQ-QUERY-011 리뷰 확인
+      x-business-rules:
+      - 'REQ-592: 선택 연도와 프로젝트 수행 기간이 겹친 경우만 비교하며 수행 상태로 추가 제외하지 않는다.'
+      - 'REQ-589: 계획 직무 ∪ 투입 직무를 행으로 만들고 계획 없는 양수투입은 계획0·초과, 투입 없는 양수계획은 실제0·부족이며 합계에 포함한다.'
+      - 'REQ-591: 차이=actualMm-plannedMm; <0 부족, >0 초과, =0 맞음. 허용 오차를 두지 않는다.'
+      - 'REQ-593: 연도 몫은 UI-01 원계획×연도겹침개월/전체개월이며 소수 둘째 자리 반올림, 시안 가짜값 사용 금지다.'
+      x-side-effects:
+      - 'REQ-596: TB_PJ_MNPW_PLAN·TB_PJ_ASGN_MON 업무 쓰기 없음; 조회 결과를 물리 표로 저장하지 않는다.'
+      x-required-tests:
+      - 'happy: 연도겹침 프로젝트의 계획/투입 직무가 다른 fixture로 year=2026 조회 -> 200 data.items에 두 직무 모두 있고 누락 MM은0이며 data.totals는 같은 결과의 합이다.'
+      - 'auth: 인증 헤더 없이 유효 year로 조회 -> 200 success=true·meta·data.items가 반환되고 로그인 이동/401/403은 없다.'
+      - 'validation: year 누락 또는 2025~2027 밖, differenceStatus가 세 상태 밖인 요청 -> 400 ApiError.errors에 year 또는 differenceStatus 필드 오류가 있다.'
+      - 'business: 월 MM의 실제/예정과 다른 연도 자료가 있는 fixture 조회 -> actualMm은 선택 연도 1~12월 합이고 다른 연도는 제외되며 차이0만 맞음이다.'
+      - 'side-effect: 정상/0건 조회 전후 원천 snapshot 비교 -> TB_PJ_MNPW_PLAN·TB_PJ_ASGN_MON 행과 값이 같고 비교결과 저장행이 생성되지 않는다.'
+      - 'scope: 선택 연도와 수행 기간이 겹치지 않는 프로젝트를 가진 fixture 조회 -> 해당 projectId는 items에 없고 합계에도 포함되지 않는다.'
+      - 'annual-plan: UI-01 원계획·여러해 수행기간·확보된 DB식 fixture 조회 -> plannedMm이 그 해 개월비율 안분의 소수 둘째 자리 반올림과 같다; 미제공 절대수치는 OQ-CALC-011이다.'
+      - 'empty: 조건 일치0건 조회 -> 200 data.items=[]이고 세 totals MM이0이다; 오류를 정상 빈 결과로 바꾸지 않는다.'
+      parameters:
+      - name: year
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 2025
+          maximum: 2027
+        description: 조회 연도; 지난 해도 읽기 전용
+      - name: projectId
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 기존 프로젝트 식별자; 생략하면 연도 범위 전체
+      - name: differenceStatus
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [부족, 초과, 맞음]
+        description: 파생 차이 상태; 미등록 상태 없음
+      responses:
+        '200':
+          description: 프로젝트·직무별 연간 비교 행과 현재 조회 결과 합계
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonManpowerComparisonResult'
+        '400':
+          description: year 누락/형식/범위 또는 differenceStatus 허용값 오류; 해당 필드 오류 반환, 업무표 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /api/common/clients/excel:
+    get:
+      operationId: getCommonClientsExcel
+      summary: 거래처 목록 엑셀 다운로드(SFR-011)
+      description: 지금 조건의 전체 결과를 보이는 열·정렬 그대로 xlsx로 내려준다. 파일에 받은 사람·한국 시각(SER-007), 접근 기록 DNLD(SER-006).
+      security: []
+      parameters:
+      - name: clientTypeCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: useYn
+        in: query
+        required: false
+        schema:
+          type: string
+          default: Y
+      - name: keyword
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [type, name, businessNumber, representative, industry, contact, phone, taxEmail, account, projects, people, use]
+      - name: dir
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [asc, desc]
+      - name: columns
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
+      responses:
+        '200':
+          description: 엑셀 파일
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 모르는 열·정렬 값
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/parts/excel:
+    get:
+      operationId: getCommonPartsExcel
+      summary: 영업 파트 목록 엑셀 다운로드(SFR-011)
+      description: 보이는 열·정렬 그대로 xlsx로 내려준다. 파일에 받은 사람·한국 시각(SER-007), 접근 기록 DNLD(SER-006).
+      security: []
+      parameters:
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [partName, leaderName, distributionRate, salesExpense, effectiveMonth, scheduledChange, personCount, projectCount, useYn]
+      - name: dir
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [asc, desc]
+      - name: columns
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
+      responses:
+        '200':
+          description: 엑셀 파일
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 모르는 열·정렬 값
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/parts/{partId}/resume:
+    put:
+      operationId: putCommonPartResume
+      summary: 영업 파트 다시 사용
+      security: []
+      x-related-requirements: [REQ-342, REQ-306]
+      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
+      parameters:
+      - name: partId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-business-rules:
+      - 시안 UI-15 ⋯ [다시 사용]: 중지된 파트만 사용으로 되돌림, 확인 창 없음
+      - 수정버전 불일치409
+      x-side-effects:
+      - TB_BS_PART.useYn=Y; TB_SY_CHG_HIST 사용 여부 N→Y; 기준·소속 관계 불변
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonPartStopInput'
+      responses:
+        '200':
+          description: 조회 또는 저장 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonPart'
+        '400':
+          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 데이터·성공 이력 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/projects/budget-rule:
+    get:
+      operationId: getCommonProjectBudgetRule
+      summary: 예산 기본값 규칙(식-19)
+      security: []
+      description: 예산 기본값 = 계약금액 × budgetFactor(원 단위 버림). budgetFactor는 TB_SY_CALC_RULE 식-19와 이번 달 운영 기준값 TGT_MRGN_RT로 서버가 계산한다. 화면은 등록·수정 폼과 예산 변경 창의 기본값·안내 문구에 쓴다.
+      responses:
+        '200':
+          description: 예산 기본값 규칙
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, meta, data]
+                properties:
+                  success:
+                    type: boolean
+                  meta:
+                    type: object
+                  data:
+                    type: object
+                    required: [targetMarginRate, budgetFactor]
+                    properties:
+                      targetMarginRate:
+                        type: number
+                        description: 목표 마진율(%)
+                      budgetFactor:
+                        type: number
+                        description: 계약금액에 곱하는 수(예 0.80)
+  /api/common/projects/excel:
+    get:
+      operationId: getCommonProjectsExcel
+      summary: 프로젝트 목록 엑셀
+      security: []
+      description: UI-22 전 무인증·현재 사용자 admin. 화면 목록과 같은 조건(연도·계약유형·상태·영업 파트·프로젝트명 또는 고객사)과 순서(시작일 늦은 순)로 내려받는다.
+      parameters:
+      - name: year
+        in: query
+        required: false
+        schema:
+          type: integer
+          description: 조회 연도(그 해에 수행 기간이 걸친 프로젝트). 비우면 올해
+      - name: contractTypeCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: statusCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: salesPartId
+        in: query
+        required: false
+        schema:
+          type: string
+          description: 영업 파트ID. unassigned = 미지정
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          description: 프로젝트명 또는 고객사
+      responses:
+        '200':
+          description: 프로젝트 목록 엑셀 결과
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 형식 위반. ApiError.errors에 입력 필드와 한국어 사유.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/roles/{roleId}/change-history:
+    get:
+      operationId: getCommonRoleChangeHistory
+      summary: 역할 권한 변경 이력 조회(시안 「변경 이력 (n)」)
+      security: []
+      parameters:
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 바뀐 항목마다 1줄, 최근 순
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data:
+                      type: object
+                      required: [items]
+                      properties:
+                        items:
+                          type: array
+                          items:
+                            type: object
+                            required: [changedAt, item]
+                            properties:
+                              changedAt:
+                                type: string
+                                format: date-time
+                              item:
+                                type: string
+                              before:
+                                type: string
+                                nullable: true
+                              after:
+                                type: string
+                                nullable: true
+                              changedBy:
+                                type: string
+                                nullable: true
+        '404':
+          description: 역할이 존재하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/excel:
+    get:
+      operationId: getCommonUsersExcel
+      summary: 사용자 목록 엑셀 다운로드(SFR-011)
+      description: 지금 조건의 전체 결과를 보이는 열 그대로 xlsx로 내려준다. 1행 「사용자 · 다운로드 admin · 한국 시각」, 3행부터 머리글. 파일 이름은 「화면이름_기간_다운로드일시.xlsx」. 접근 기록(DNLD)을 남긴다.
+      security: []
+      parameters:
+      - name: includeStopped
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+        description: 시안 [사용 중지 포함]. false면 사용 중지 계정을 숨긴다(상태 조건에서 중지를 고르면 함께 보임).
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [userId, name, role, state, last]
+        description: 정렬 열. 없으면 이름순.
+      - name: dir
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [asc, desc]
+      - name: roleCd
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: userStatCd
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [USE, LOCK, STOP]
+      - name: keyword
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: columns
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
+      responses:
+        '200':
+          description: 엑셀 파일
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 모르는 열·정렬 값
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/users/{userId}/change-history:
+    get:
+      operationId: getCommonUserChangeHistory
+      summary: 사용자 변경 이력 조회(상세 패널 「변경 이력」 탭)
+      description: 바뀐 항목마다 1줄(이름·이메일·역할·고른 본사·담당 프로젝트·상태·등록), 최근 순.
+      security: []
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 변경 이력 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required: [data]
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        type: object
+                        required: [changedAt, item]
+                        properties:
+                          changedAt:
+                            type: string
+                            format: date-time
+                          item:
+                            type: string
+                          before:
+                            type: string
+                            nullable: true
+                          after:
+                            type: string
+                            nullable: true
+                          changedBy:
+                            type: string
+                            nullable: true
+        '400':
+          description: 아이디 형식 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
+    CommonManpowerComparisonRow:
+      type: object
+      required: [projectId, projectName, jobCode, jobName, plannedMm, actualMm, differenceMm, differenceStatus]
+      properties:
+        projectId:
+          type: string
+          description: 기존 프로젝트 상세 진입 식별자
+        projectName:
+          type: string
+          description: 프로젝트 이름
+        jobCode:
+          type: string
+          description: JOB 직무 코드; API/DB 원천
+        jobName:
+          type: string
+          description: JOB 직무 이름
+        plannedMm:
+          type: number
+          description: 선택 연도 몫 계획 MM; 원계획 안분·소수 둘째 자리 반올림, 계획 없으면0
+        actualMm:
+          type: number
+          description: 선택 연도 1~12월 실제·예정 월 MM 합; 투입 없으면0
+        differenceMm:
+          type: number
+          description: actualMm-plannedMm; 허용 오차 없음
+        differenceStatus:
+          type: string
+          enum: [부족, 초과, 맞음]
+          description: 차이 음수/양수/정확히0의 파생 상태; 새 저장 enum 아님
+    CommonManpowerComparisonTotals:
+      type: object
+      required: [plannedMm, actualMm, differenceMm]
+      properties:
+        plannedMm:
+          type: number
+          description: 조회 결과 전체 plannedMm 합; 빈 결과0
+        actualMm:
+          type: number
+          description: 조회 결과 전체 actualMm 합; 빈 결과0
+        differenceMm:
+          type: number
+          description: 조회 결과 전체 differenceMm 합; 빈 결과0
+    CommonManpowerComparisonResult:
+      type: object
+      required: [items, totals]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonManpowerComparisonRow'
+        totals:
+          $ref: '#/components/schemas/CommonManpowerComparisonTotals'
+
+    CommonWithdrawalNextAssignment:
+      type: object
+      properties:
+        opportunityName:
+          type: string
+          description: 가배정 기회명
+          nullable: true
+        recommendationCount:
+          type: integer
+          description: 맞는 자리 수
+          minimum: 0
+        hasTentativeAssignment:
+          type: boolean
+      required:
+      - opportunityName
+      - recommendationCount
+      - hasTentativeAssignment
+    CommonWithdrawalRow:
+      type: object
+      properties:
+        assignmentId:
+          type: string
+        developerId:
+          type: string
+        name:
+          type: string
+          description: 이름
+        projectName:
+          type: string
+          description: 프로젝트
+        jobName:
+          type: string
+          description: 직무
+        endDate:
+          type: string
+          description: 철수일
+          format: date
+        remainingDays:
+          type: integer
+          description: 식-77 남은 일수
+        withdrawalCompleted:
+          type: boolean
+        extensionCount:
+          type: integer
+          description: 연장 횟수
+          minimum: 0
+        earlyWithdrawalHistory:
+          type: array
+          items:
+            type: string
+            description: 조기 철수 이력 표시
+        extensionPossibilityCode:
+          type: string
+          description: EXT_PSBL 실제 코드; 표시명 높음·보통·낮음·미정
+        extensionPossibilityName:
+          type: string
+        nextAssignment:
+          $ref: '#/components/schemas/CommonWithdrawalNextAssignment'
+        modifiedAt:
+          type: string
+          description: 기존 배정 동시수정 비교값
+          format: date-time
+          nullable: true
+      required:
+      - assignmentId
+      - developerId
+      - name
+      - projectName
+      - jobName
+      - endDate
+      - remainingDays
+      - withdrawalCompleted
+      - extensionCount
+      - earlyWithdrawalHistory
+      - extensionPossibilityCode
+      - extensionPossibilityName
+      - nextAssignment
+      - modifiedAt
+    CommonWithdrawalList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonWithdrawalRow'
+        totalCount:
+          type: integer
+          minimum: 0
+        banner:
+          type: object
+          properties:
+            unassignedCount:
+              type: integer
+              description: 3개월 안·높음 아님·다음 배정 없는 수
+              minimum: 0
+            matchedCount:
+              type: integer
+              description: 그중 맞는 자리 있는 수
+              minimum: 0
+          required:
+          - unassignedCount
+          - matchedCount
+          nullable: true
+      required:
+      - items
+      - totalCount
+      - banner
+    CommonWithdrawalRecommendation:
+      type: object
+      properties:
+        needSn:
+          type: integer
+          description: 누른 필요 인력 줄 NEED_SN
+        opportunityId:
+          type: string
+        opportunityName:
+          type: string
+        jobName:
+          type: string
+        gradeName:
+          type: string
+        startMonth:
+          type: string
+          description: 자리 시작월; 기존 YYYY-MM 표기
+        score:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: 식-80 /100 점수
+        reasons:
+          type: array
+          items:
+            type: string
+            description: 추천 이유
+        waitingDays:
+          type: integer
+          description: 식-81 대기 예상 일수
+        waitingLabel:
+          type: string
+          description: 대기 일수 또는 바로 이어서 투입
+      required:
+      - needSn
+      - opportunityId
+      - opportunityName
+      - jobName
+      - gradeName
+      - startMonth
+      - score
+      - reasons
+      - waitingDays
+      - waitingLabel
+    CommonWithdrawalShortage:
+      type: object
+      properties:
+        month:
+          type: string
+          description: 식-60·61의 전망 월
+        jobName:
+          type: string
+        shortageCount:
+          type: number
+          description: 식-60·61이 산출하는 부족 인원; 반올림 정책 OQ-CALC-005
+      required:
+      - month
+      - jobName
+      - shortageCount
+    CommonWithdrawalRecommendations:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonWithdrawalRecommendation'
+          maxItems: 5
+        shortages:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonWithdrawalShortage'
+      required:
+      - items
+      - shortages
+    CommonWithdrawalExtensionInput:
+      type: object
+      properties:
+        extensionPossibilityCode:
+          type: string
+          description: 필수; 기존 EXT_PSBL 등록 코드만 허용; 변경 사유 없음
+        modifiedAt:
+          type: string
+          description: 조회한 배정 시각; nullable은 기존 배정 계약 준수
+          format: date-time
+          nullable: true
+      required:
+      - extensionPossibilityCode
+      - modifiedAt
+      additionalProperties: false
+    CommonWithdrawalExtensionResult:
+      type: object
+      properties:
+        assignmentId:
+          type: string
+        extensionPossibilityCode:
+          type: string
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - assignmentId
+      - extensionPossibilityCode
+      - modifiedAt
+    CommonWithdrawalTentativeInput:
+      type: object
+      properties:
+        opportunityId:
+          type: string
+          description: 필수; 선택 카드의 영업 기회 ID. 필요 인력 줄의 키는 (OPP_ID, NEED_SN)
+        needSn:
+          type: integer
+          description: 필수; 선택 카드의 NEED_SN. 시작월·인력 ID를 클라이언트 임의 입력으로 받지 않음
+      required:
+      - opportunityId
+      - needSn
+      additionalProperties: false
+    CommonWithdrawalTentativeAssignment:
+      type: object
+      properties:
+        assignmentId:
+          type: string
+        developerId:
+          type: string
+        opportunityId:
+          type: string
+        opportunityName:
+          type: string
+        needSn:
+          type: integer
+          description: 필요 인력 줄 NEED_SN
+        startMonth:
+          type: string
+          description: max(철수 다음 달, 자리 시작월)
+      required:
+      - assignmentId
+      - developerId
+      - opportunityId
+      - opportunityName
+      - needSn
+      - startMonth
+    CommonWithdrawalTentativeResult:
+      type: object
+      properties:
+        assignment:
+          $ref: '#/components/schemas/CommonWithdrawalTentativeAssignment'
+          nullable: true
+      required:
+      - assignment
+    CommonWithdrawalSharedRow:
+      type: object
+      properties:
+        assignmentId:
+          type: string
+        developerId:
+          type: string
+        name:
+          type: string
+        extensionPossibilityCode:
+          type: string
+        extensionPossibilityName:
+          type: string
+        tentativeAssignment:
+          $ref: '#/components/schemas/CommonWithdrawalTentativeAssignment'
+          nullable: true
+      required:
+      - assignmentId
+      - developerId
+      - name
+      - extensionPossibilityCode
+      - extensionPossibilityName
+      - tentativeAssignment
+    CommonWithdrawalSharedList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonWithdrawalSharedRow'
+      required:
+      - items
     CommonCodeGroup:
       type: object
       required:
@@ -10223,10 +10644,7 @@ components:
           description: 상세·저장 응답만. 투입 기간의 달마다 그 달에 적용되는 계약 월 MM·청구 단가
           items:
             type: object
-            required:
-            - month
-            - monthlyMm
-            - billingPrice
+            required: [month, monthlyMm, billingPrice]
             properties:
               month:
                 type: string
@@ -10310,15 +10728,6 @@ components:
       properties:
         candidateId:
           type: string
-      additionalProperties: false
-    CommonAssignmentCandidateRemoveInput:
-      type: object
-      properties:
-        modifiedAt:
-          type: string
-          format: date-time
-          nullable: true
-          description: 후보 목록의 modifiedAt. 보내면 TB_SL_TENT_ASGN 수정 시각과 다를 때 409(공통 동시 수정 문구)
       additionalProperties: false
     CommonAssignmentHistory:
       type: object
@@ -10596,294 +11005,15 @@ components:
                 nullable: true
             additionalProperties: false
       additionalProperties: false
-    CommonWithdrawalNextAssignment:
+    CommonAssignmentCandidateRemoveInput:
       type: object
       properties:
-        opportunityName:
-          type: string
-          description: 가배정 기회명
-          nullable: true
-        recommendationCount:
-          type: integer
-          description: 맞는 자리 수
-          minimum: 0
-        hasTentativeAssignment:
-          type: boolean
-      required:
-      - opportunityName
-      - recommendationCount
-      - hasTentativeAssignment
-    CommonWithdrawalRow:
-      type: object
-      properties:
-        assignmentId:
-          type: string
-        developerId:
-          type: string
-        name:
-          type: string
-          description: 이름
-        projectName:
-          type: string
-          description: 프로젝트
-        jobName:
-          type: string
-          description: 직무
-        endDate:
-          type: string
-          description: 철수일
-          format: date
-        remainingDays:
-          type: integer
-          description: 식-77 남은 일수
-        withdrawalCompleted:
-          type: boolean
-        extensionCount:
-          type: integer
-          description: 연장 횟수
-          minimum: 0
-        earlyWithdrawalHistory:
-          type: array
-          items:
-            type: string
-            description: 조기 철수 이력 표시
-        extensionPossibilityCode:
-          type: string
-          description: EXT_PSBL 실제 코드; 표시명 높음·보통·낮음·미정
-        extensionPossibilityName:
-          type: string
-        nextAssignment:
-          $ref: '#/components/schemas/CommonWithdrawalNextAssignment'
         modifiedAt:
           type: string
-          description: 기존 배정 동시수정 비교값
           format: date-time
           nullable: true
-      required:
-      - assignmentId
-      - developerId
-      - name
-      - projectName
-      - jobName
-      - endDate
-      - remainingDays
-      - withdrawalCompleted
-      - extensionCount
-      - earlyWithdrawalHistory
-      - extensionPossibilityCode
-      - extensionPossibilityName
-      - nextAssignment
-      - modifiedAt
-    CommonWithdrawalList:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/CommonWithdrawalRow'
-        totalCount:
-          type: integer
-          minimum: 0
-        banner:
-          type: object
-          properties:
-            unassignedCount:
-              type: integer
-              description: 3개월 안·높음 아님·다음 배정 없는 수
-              minimum: 0
-            matchedCount:
-              type: integer
-              description: 그중 맞는 자리 있는 수
-              minimum: 0
-          required:
-          - unassignedCount
-          - matchedCount
-          nullable: true
-      required:
-      - items
-      - totalCount
-      - banner
-    CommonWithdrawalRecommendation:
-      type: object
-      properties:
-        needSn:
-          type: integer
-          description: 누른 필요 인력 줄 NEED_SN
-        opportunityId:
-          type: string
-        opportunityName:
-          type: string
-        jobName:
-          type: string
-        gradeName:
-          type: string
-        startMonth:
-          type: string
-          description: 자리 시작월; 기존 YYYY-MM 표기
-        score:
-          type: number
-          minimum: 0
-          maximum: 100
-          description: 식-80 /100 점수
-        reasons:
-          type: array
-          items:
-            type: string
-            description: 추천 이유
-        waitingDays:
-          type: integer
-          description: 식-81 대기 예상 일수
-        waitingLabel:
-          type: string
-          description: 대기 일수 또는 바로 이어서 투입
-      required:
-      - needSn
-      - opportunityId
-      - opportunityName
-      - jobName
-      - gradeName
-      - startMonth
-      - score
-      - reasons
-      - waitingDays
-      - waitingLabel
-    CommonWithdrawalShortage:
-      type: object
-      properties:
-        month:
-          type: string
-          description: 식-60·61의 전망 월
-        jobName:
-          type: string
-        shortageCount:
-          type: number
-          description: 식-60·61이 산출하는 부족 인원; 반올림 정책 OQ-CALC-005
-      required:
-      - month
-      - jobName
-      - shortageCount
-    CommonWithdrawalRecommendations:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/CommonWithdrawalRecommendation'
-          maxItems: 5
-        shortages:
-          type: array
-          items:
-            $ref: '#/components/schemas/CommonWithdrawalShortage'
-      required:
-      - items
-      - shortages
-    CommonWithdrawalExtensionInput:
-      type: object
-      properties:
-        extensionPossibilityCode:
-          type: string
-          description: 필수; 기존 EXT_PSBL 등록 코드만 허용; 변경 사유 없음
-        modifiedAt:
-          type: string
-          description: 조회한 배정 시각; nullable은 기존 배정 계약 준수
-          format: date-time
-          nullable: true
-      required:
-      - extensionPossibilityCode
-      - modifiedAt
+          description: 후보 목록의 modifiedAt. 보내면 TB_SL_TENT_ASGN 수정 시각과 다를 때 409(공통 동시 수정 문구)
       additionalProperties: false
-    CommonWithdrawalExtensionResult:
-      type: object
-      properties:
-        assignmentId:
-          type: string
-        extensionPossibilityCode:
-          type: string
-        modifiedAt:
-          type: string
-          format: date-time
-          nullable: true
-      required:
-      - assignmentId
-      - extensionPossibilityCode
-      - modifiedAt
-    CommonWithdrawalTentativeInput:
-      type: object
-      properties:
-        opportunityId:
-          type: string
-          description: 필수; 선택 카드의 영업 기회 ID. 필요 인력 줄의 키는 (OPP_ID, NEED_SN)
-        needSn:
-          type: integer
-          description: 필수; 선택 카드의 NEED_SN. 시작월·인력 ID를 클라이언트 임의 입력으로 받지 않음
-      required:
-      - opportunityId
-      - needSn
-      additionalProperties: false
-    CommonWithdrawalTentativeAssignment:
-      type: object
-      properties:
-        assignmentId:
-          type: string
-        developerId:
-          type: string
-        opportunityId:
-          type: string
-        opportunityName:
-          type: string
-        needSn:
-          type: integer
-          description: 필요 인력 줄 NEED_SN
-        startMonth:
-          type: string
-          description: max(철수 다음 달, 자리 시작월)
-      required:
-      - assignmentId
-      - developerId
-      - opportunityId
-      - opportunityName
-      - needSn
-      - startMonth
-    CommonWithdrawalTentativeResult:
-      type: object
-      properties:
-        assignment:
-          $ref: '#/components/schemas/CommonWithdrawalTentativeAssignment'
-          nullable: true
-      required:
-      - assignment
-    CommonWithdrawalSharedRow:
-      type: object
-      properties:
-        assignmentId:
-          type: string
-        developerId:
-          type: string
-        name:
-          type: string
-        extensionPossibilityCode:
-          type: string
-        extensionPossibilityName:
-          type: string
-        tentativeAssignment:
-          $ref: '#/components/schemas/CommonWithdrawalTentativeAssignment'
-          nullable: true
-      required:
-      - assignmentId
-      - developerId
-      - name
-      - extensionPossibilityCode
-      - extensionPossibilityName
-      - tentativeAssignment
-    CommonWithdrawalSharedList:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/CommonWithdrawalSharedRow'
-      required:
-      - items
 x-requirement-context:
   description: >-
     아래 항목은 관련 요구별 역할·관찰 증거다. 면제 목록이 아니다.
@@ -10945,6 +11075,45 @@ x-requirement-context:
     REQ-043: '필수 경로 — /api/health 유지. GET·getHealth는 기존 설계 제안. 성공 값·DB 포함·오류·4xx 부재 근거 OQ-006. 제품 검증 화면 추가 금지.'
 
 x-uncovered-requirements:
+- canonical_id: REQ-579
+  status: data-constraint
+  evidence: JOB/SRC DB 코드 재사용은 기존 getCommonCodes의 원천 계약이며 비교 GET에 코드 등록을 추가하지 않는다.
+- canonical_id: REQ-580
+  status: out-of-scope
+  evidence: UI-11 로그인과 메뉴 실행권한은 마지막 UI-22 연결이며 신규 인증 연산을 만들지 않는다.
+- canonical_id: REQ-581
+  status: non-functional
+  evidence: spring.flyway.enabled=false는 일반기동 설정으로 API 연산의 실행 결과가 아니다.
+- canonical_id: REQ-582
+  status: non-functional
+  evidence: aiops.runtime-check.json auth.required=false는 로컬 실행 설정에서 검수한다.
+- canonical_id: REQ-583
+  status: non-functional
+  evidence: 시험용 계약의 securitySchemes·bearerAuth·최상위 security 부재를 구조 검사한다.
+- canonical_id: REQ-584
+  status: non-functional
+  evidence: manual 원문과 기존 개발자/프로젝트/배정/엑셀/이력 경로 및 동명 schema 보존을 대조해야 하며 파일 미제공 OQ-API-011이다.
+- canonical_id: REQ-585
+  status: non-functional
+  evidence: 기존 UI-05 가배정 opportunityId·needSn 동시전송은 수동 계약 회귀이며 원문 미제공으로 기존 PUT을 추정 수정하지 않는다(OQ-API-011).
+- canonical_id: REQ-586
+  status: screen-only
+  evidence: UI-11 작업 공간별 제목줄 소유/해제와 두 탭 단추 중복0은 로컬 UI 수명 시험으로 만족한다.
+- canonical_id: REQ-588
+  status: out-of-scope
+  evidence: UI-11 M008 연결 외 UI-28/29 등의 새 메뉴 활성화를 하지 않는 범위 제외다.
+- canonical_id: REQ-594
+  status: screen-only
+  evidence: UI-11 프로젝트 이름 클릭 M25-187이 기존 getCommonProject로 선택 projectId의 UI-01 상세를 연다; 신규 상세 API는 불필요하다.
+- canonical_id: REQ-595
+  status: out-of-scope
+  evidence: v2 미충원 직무 별도목록/endpoint는 만들지 않고 계획만 있는 직무는 비교 결과 행으로 표시한다.
+- canonical_id: REQ-597
+  status: non-functional
+  evidence: 업무 사용자 PM·파트장·관리자 인계는 역할 코드/접근차단 연산을 추가하지 않는다.
+- canonical_id: REQ-598
+  status: non-functional
+  evidence: 렌더링 v1.8·물리 SQL·DB식 대조 증거는 후속 quickstart 검수에 기록하며 API로 노출하지 않는다.
 - canonical_id: REQ-552
   status: out-of-scope
   evidence: 로그인·메뉴 권한 검사는 후속31번이며 이번 추가 operation은 security=[]로 기존 개발 접근을 유지한다.

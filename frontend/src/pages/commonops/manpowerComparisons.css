@@ -1,0 +1,17 @@
+.manpower-comparison-page .manpower-comparison-table {
+  min-width: 640px;
+}
+.manpower-comparison-page .manpower-comparison-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.manpower-comparison-page tfoot th,
+.manpower-comparison-page tfoot td {
+  position: static;
+  font-weight: 600;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.manpower-comparison-page .field-error {
+  display: block;
+}

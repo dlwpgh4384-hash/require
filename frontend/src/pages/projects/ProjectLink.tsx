@@ -7,10 +7,12 @@ export function ProjectLink({
   projectId,
   name,
   testId,
+  readOnly = false,
 }: {
   projectId?: string | null;
   name: string;
   testId: string;
+  readOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   if (!projectId) return <span>{name}</span>;
@@ -33,7 +35,11 @@ export function ProjectLink({
         createPortal(
           // React 이벤트는 포털을 지나 원래 자리(표 줄)로 올라가므로, 상세 안의 클릭이 줄 클릭이 되지 않게 막는다.
           <div onClick={(event) => event.stopPropagation()}>
-            <ProjectDetail projectId={projectId} onClose={() => setOpen(false)} />
+            <ProjectDetail
+              projectId={projectId}
+              readOnly={readOnly}
+              onClose={() => setOpen(false)}
+            />
           </div>,
           document.body,
         )}

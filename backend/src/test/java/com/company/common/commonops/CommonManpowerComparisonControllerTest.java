@@ -9,6 +9,12 @@ import com.company.common.manpowercomparisons.mapper.ManpowerComparisonRows.Sour
 import com.company.common.manpowercomparisons.service.*;
 import com.company.common.preferences.mapper.UserPreferencePeriodSourceMapper;
 import com.company.common.support.controller.*;
+import com.company.common.support.service.BusinessCalendar;
+import com.company.common.support.service.CurrentBusinessActor;
+import com.company.common.support.service.ExcelExportService;
+import java.util.ArrayList;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import static org.assertj.core.api.Assertions.assertThat;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -28,7 +34,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(CommonManpowerComparisonController.class)
 @ContextConfiguration(classes = {CommonManpowerComparisonController.class, CommonManpowerComparisonService.class,
-    ManpowerComparisonRules.class, CalculationRuleService.class, CodeExceptionHandler.class, ApiExceptionHandler.class})
+    ManpowerComparisonRules.class, CalculationRuleService.class, CodeExceptionHandler.class, ApiExceptionHandler.class,
+    ExcelExportService.class, BusinessCalendar.class, CurrentBusinessActor.class})
 class CommonManpowerComparisonControllerTest {
     @Autowired MockMvc mvc;
     @MockBean ManpowerComparisonMapper mapper;
@@ -157,6 +164,71 @@ class CommonManpowerComparisonControllerTest {
         for (String id : List.of("00", "01", "62", "67"))
             verify(definitions).selectDefinition("식-" + id);
         verifyNoInteractions(mapper);
+    }
+
+    static final String EXCEL = PATH + "/excel";
+
+    List<List<String>> sheet(byte[] bytes) throws Exception {
+        var rows = new ArrayList<List<String>>();
+        try (var book = new XSSFWorkbook(new java.io.ByteArrayInputStream(bytes))) {
+            assertThat(book.getNumberOfSheets()).isEqualTo(1);
+            for (var row : book.getSheetAt(0)) {
+                var cells = new ArrayList<String>();
+                for (var cell : row) cells.add(cell.toString());
+                rows.add(cells);
+            }
+        }
+        return rows;
+    }
+
+    @Test void excelHasEveryFilteredRowInListOrderWithScreenColumnsAndRecordsDownload() throws Exception {
+        byte[] bytes = mvc.perform(get(EXCEL).param("year", "2026")).andExpect(status().isOk())
+            .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            .andExpect(header().string("X-Total-Count", "3"))
+            .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("filename*=UTF-8''")))
+            .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString(
+                java.net.URLEncoder.encode("인원 계획 대비 투입_2026년_", java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20"))))
+            .andReturn().getResponse().getContentAsByteArray();
+        var rows = sheet(bytes);
+        assertThat(rows.get(0).get(0)).startsWith("인원 계획 대비 투입 · 다운로드: admin · ");
+        assertThat(rows.get(1)).isEqualTo(List.of("프로젝트", "직무", "계획 MM", "실제·예정 MM", "차이"));
+        assertThat(rows.subList(2, rows.size())).isEqualTo(List.of(
+            List.of("프로젝트 P-A", "FE", "3.00", "0.00", "부족 3.00"),
+            List.of("프로젝트 P-A", "BE", "0.00", "0.00", "맞음"),
+            List.of("프로젝트 P-B", "BE", "0.00", "2.00", "초과 2.00")));
+        verify(mapper).insertAccess("admin", "인원 계획 대비 투입 2026년 3건");
+    }
+
+    @Test void excelUsesTheSameFiltersAsTheList() throws Exception {
+        byte[] bytes = mvc.perform(get(EXCEL).param("year", "2026").param("differenceStatus", "초과"))
+            .andExpect(status().isOk()).andExpect(header().string("X-Total-Count", "1"))
+            .andReturn().getResponse().getContentAsByteArray();
+        var rows = sheet(bytes);
+        assertThat(rows).hasSize(3);
+        assertThat(rows.get(2)).containsExactly("프로젝트 P-B", "BE", "0.00", "2.00", "초과 2.00");
+    }
+
+    @Test void excelWithNoRowsStillHasTheHeader() throws Exception {
+        when(mapper.selectSources(any())).thenReturn(List.of());
+        byte[] bytes = mvc.perform(get(EXCEL).param("year", "2026")).andExpect(status().isOk())
+            .andExpect(header().string("X-Total-Count", "0")).andReturn().getResponse().getContentAsByteArray();
+        var rows = sheet(bytes);
+        assertThat(rows).hasSize(2);
+        assertThat(rows.get(1)).containsExactly("프로젝트", "직무", "계획 MM", "실제·예정 MM", "차이");
+    }
+
+    @Test void excelInvalidConditionIsJsonFieldErrorWithoutDownloadRecord() throws Exception {
+        mvc.perform(get(EXCEL)).andExpect(status().isBadRequest())
+            .andExpect(content().contentTypeCompatibleWith("application/json"))
+            .andExpect(jsonPath("$.errors[0].field").value("year"));
+        mvc.perform(get(EXCEL).param("year", "2026").param("differenceStatus", "미정")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("differenceStatus"));
+        verify(mapper, never()).insertAccess(anyString(), anyString());
+    }
+
+    @Test void listReadDoesNotRecordDownload() throws Exception {
+        mvc.perform(get(PATH).param("year", "2026")).andExpect(status().isOk());
+        verify(mapper, never()).insertAccess(anyString(), anyString());
     }
 
     @Test void incompatibleDefinitionsAreAnErrorEvenWhenSourcesWouldBeEmpty() throws Exception {

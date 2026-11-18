@@ -1,13 +1,17 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
   ListFilter,
   ListFilters,
-  listMessages,
+  ListView,
+  useListPresentation,
+  type ListColumn,
+  type ListSort,
 } from "../../shared/list";
 import { YearBar } from "../../shared/period/YearBar";
 import { koreanToday } from "../../shared/time";
-import { ProjectLink } from "../projects/ProjectLink";
+import { ProjectDetail } from "../projects/ProjectDetail";
 import {
   getCommonProjects,
   projectFailure,
@@ -16,9 +20,11 @@ import {
 } from "../projects/projects";
 import {
   getCommonManpowerComparisons,
+  getCommonManpowerComparisonsExcel,
   type DifferenceStatus,
   type ManpowerComparisonFilter,
   type ManpowerComparisonResult,
+  type ManpowerComparisonRow,
 } from "./manpowerComparisons";
 import "../projects/projects.css";
 import "./manpowerComparisons.css";
@@ -27,13 +33,43 @@ const overlaps = (
   project: Pick<Project, "startDate" | "endDate">,
   year: number,
 ) => project.startDate <= `${year}-12-31` && project.endDate >= `${year}-01-01`;
-const mm = (value: number) =>
-  value.toLocaleString("ko-KR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 20,
-  });
+/** 시안 mmf: 소수 둘째 자리(천 단위 쉼표 없음), 값이 없으면 「–」. */
+const mmf = (value: number | null | undefined) =>
+  value == null ? "–" : Number(value).toFixed(2);
+// 시안 ic('info'): 안내 띠 아이콘
+const infoIcon = (
+  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" />
+  </svg>
+);
+/** 시안 gapBadge: 부족 1.50(빨강) · 초과 0.40(주황) · 맞음(초록, 숫자 없음). */
+const gapBadge = (row: ManpowerComparisonRow) =>
+  row.differenceStatus === "부족" ? (
+    <Badge kind="bad">부족 {mmf(Math.abs(row.differenceMm))}</Badge>
+  ) : row.differenceStatus === "초과" ? (
+    <Badge kind="warn">초과 {mmf(Math.abs(row.differenceMm))}</Badge>
+  ) : (
+    <Badge kind="ok">맞음</Badge>
+  );
+const rowKey = (row: ManpowerComparisonRow) => `${row.projectId}-${row.jobCode}`;
+const sortValue = (row: ManpowerComparisonRow, key: string): string | number => {
+  switch (key) {
+    case "plannedMm":
+      return row.plannedMm;
+    case "actualMm":
+      return row.actualMm;
+    case "differenceMm":
+      return row.differenceMm ?? -1e9;
+    case "jobName":
+      return row.jobName;
+    default:
+      return row.projectName;
+  }
+};
+const tie = (a: ManpowerComparisonRow, b: ManpowerComparisonRow) =>
+  a.projectId.localeCompare(b.projectId) || a.jobCode.localeCompare(b.jobCode);
 
-/** SCR-UI-11: annual readonly comparison; the existing screen shell owns title and tabs. */
+/** 시안 인원 계획 대비 투입(UI-11): 연도 줄, 안내 띠, 조건, 공통 목록(합계 줄), 줄을 누르면 프로젝트 상세 [인원 계획] 탭. */
 export function ManpowerComparisonPage() {
   const currentYear = Number(koreanToday().slice(0, 4));
   const [draft, setDraft] = useState<ManpowerComparisonFilter>(() => ({
@@ -47,7 +83,19 @@ export function ManpowerComparisonPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [optionError, setOptionError] = useState("");
   const [optionRevision, setOptionRevision] = useState(0);
+  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<ListSort | null>(null);
+  const [detail, setDetail] = useState<{ projectId: string; tab: string } | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [noticeKind, setNoticeKind] = useState<ToastKind>("ok");
+  const presentation = useListPresentation();
   const id = useId();
+  const refresh = () => setRevision((value) => value + 1);
+  const toast = (message: string, kind: ToastKind = "ok") => {
+    setNoticeKind(kind);
+    setNotice(message);
+  };
 
   useEffect(() => {
     const abort = new AbortController();
@@ -62,17 +110,28 @@ export function ManpowerComparisonPage() {
     return () => abort.abort();
   }, [optionRevision]);
 
+  // 다른 조건으로 읽을 때만 목록을 비운다. 같은 조건을 다시 읽을 때(상세 저장·닫기 뒤)는 지금 줄을 둔 채 바꾼다(깜빡임 없음).
+  const loadedKey = useRef("");
   useEffect(() => {
     const abort = new AbortController();
-    setData(null);
+    const key = JSON.stringify(applied);
+    const same = loadedKey.current === key;
+    if (!same) {
+      loadedKey.current = "";
+      setData(null);
+    }
     setError("");
     setFields({});
     getCommonManpowerComparisons(applied, abort.signal)
       .then((result) => {
-        if (!abort.signal.aborted) setData(result);
+        if (abort.signal.aborted) return;
+        loadedKey.current = key;
+        setData(result);
       })
       .catch((reason) => {
-        if (abort.signal.aborted) return;
+        if (abort.signal.aborted || reason?.name === "AbortError") return;
+        loadedKey.current = "";
+        setData(null);
         setError(projectFailure(reason));
         if (reason instanceof ProjectRequestError)
           setFields(
@@ -98,7 +157,29 @@ export function ManpowerComparisonPage() {
     }));
   const search = () => {
     setApplied({ ...draft });
-    setRevision((value) => value + 1);
+    setPage(1);
+    refresh();
+  };
+  // 시안 freset: 조건을 처음 값으로 되돌리고 바로 다시 조회한다(연도는 그대로).
+  const reset = () => {
+    const next = { year: draft.year };
+    setDraft(next);
+    setApplied(next);
+    setPage(1);
+    refresh();
+  };
+  const download = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const count = await getCommonManpowerComparisonsExcel(applied);
+      // 시안 xls: 「엑셀 파일을 만들었습니다 (조회 결과 n건)」, 0건이면 건수 없이
+      toast(`엑셀 파일을 만들었습니다${count ? ` (조회 결과 ${count}건)` : ""}`);
+    } catch (reason) {
+      toast(projectFailure(reason), "warn");
+    } finally {
+      setDownloading(false);
+    }
   };
   const fieldError = (name: string) =>
     fields[name] ? (
@@ -110,9 +191,71 @@ export function ManpowerComparisonPage() {
       </span>
     ) : null;
 
+  const columns: ListColumn<ManpowerComparisonRow>[] = [
+    {
+      key: "projectName",
+      label: "프로젝트",
+      required: true,
+      // 시안 projLink: 이름을 누르면 프로젝트 상세(기본 정보), 줄을 누르면 [인원 계획] 탭
+      render: (row) => (
+        <button
+          type="button"
+          className="link-button"
+          data-testid={`manpower-comparison-project-${rowKey(row)}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            setDetail({ projectId: row.projectId, tab: "basic" });
+          }}
+        >
+          {row.projectName}
+        </button>
+      ),
+    },
+    { key: "jobName", label: "직무" },
+    {
+      key: "plannedMm",
+      label: "계획 MM",
+      align: "right",
+      render: (row) => mmf(row.plannedMm),
+    },
+    {
+      key: "actualMm",
+      label: "실제·예정 MM",
+      align: "right",
+      render: (row) => mmf(row.actualMm),
+    },
+    { key: "differenceMm", label: "차이", align: "right", render: gapBadge },
+  ];
+  const rows = useMemo(() => {
+    const result = [...(data?.items ?? [])];
+    if (sort) {
+      const dir = sort.dir === "asc" ? 1 : -1;
+      result.sort((a, b) => {
+        const x = sortValue(a, sort.key);
+        const y = sortValue(b, sort.key);
+        const compared =
+          typeof x === "number" && typeof y === "number"
+            ? x - y
+            : String(x).localeCompare(String(y), "ko");
+        return compared * dir || tie(a, b);
+      });
+    } else {
+      // 시안 sortDef: 차이 오름차순(부족 큰 순), 값 없는 줄은 맨 뒤
+      result.sort(
+        (a, b) =>
+          Number(a.differenceMm == null) - Number(b.differenceMm == null) ||
+          (a.differenceMm ?? 0) - (b.differenceMm ?? 0) ||
+          tie(a, b),
+      );
+    }
+    return result;
+  }, [data, sort]);
+  const pages = Math.max(1, Math.ceil(rows.length / presentation.pageSize));
+  const current = Math.min(page, pages);
+
   return (
     <section
-      className="project-page manpower-comparison-page"
+      className="screen-body manpower-comparison-page"
       data-testid="manpower-comparison-page"
       data-screen-id="SCR-UI-11"
       data-action-id="M25-183"
@@ -123,23 +266,37 @@ export function ManpowerComparisonPage() {
           currentYear={currentYear}
           min={2025}
           max={2027}
-          caption="인원 계획 대비 투입 · 조회 전용"
+          caption="그 해 1~12월 계획 MM과 실제(예정 포함) MM"
           onChange={changeYear}
           testId="manpower-comparison-year"
         />
         {fieldError("year")}
       </div>
+      {/* 시안 .banner: 아이콘과 글을 나란히 둔다(철수 리스트와 같은 꼴). 자료가 없어도 늘 보인다. */}
+      <div
+        className="ls-banner ls-banner-info"
+        role="status"
+        data-testid="manpower-comparison-banner"
+      >
+        {infoIcon}
+        <span>
+          계획 MM은 프로젝트 상세 [인원 계획] 탭에서 직무별로 입력한 값입니다.{" "}
+          {applied.year}년 몫 = 계획 MM × ({applied.year}년에 걸친 프로젝트 개월 수 ÷ 전체 개월 수). 줄을 누르면 그
+          프로젝트의 인원 계획이 열립니다.
+        </span>
+      </div>
       <ListFilters
         onSearch={search}
-        onReset={() => setDraft({ year: draft.year })}
+        onReset={reset}
         testId="manpower-comparison-filters"
         activeCount={
-          Number(!!draft.projectId) + Number(!!draft.differenceStatus)
+          Number(!!applied.projectId) + Number(!!applied.differenceStatus)
         }
       >
         <ListFilter label="프로젝트" htmlFor={`${id}-project`}>
           <select
             id={`${id}-project`}
+            className="ls-in"
             data-testid="manpower-comparison-project"
             value={draft.projectId ?? ""}
             onChange={(event) =>
@@ -160,6 +317,7 @@ export function ManpowerComparisonPage() {
         <ListFilter label="차이" htmlFor={`${id}-difference`}>
           <select
             id={`${id}-difference`}
+            className="ls-in"
             data-testid="manpower-comparison-difference"
             value={draft.differenceStatus ?? ""}
             onChange={(event) =>
@@ -192,132 +350,94 @@ export function ManpowerComparisonPage() {
           </button>
         </div>
       )}
-      <div className="ls-root">
-        <div className="ls-twrap" aria-busy={!data && !error}>
-          <table
-            className="ls-t manpower-comparison-table"
-            aria-label="인원 계획 대비 투입"
-          >
-            <thead>
-              <tr>
-                <th scope="col">프로젝트</th>
-                <th scope="col">직무</th>
-                <th scope="col" className="manpower-comparison-number">
-                  계획 MM
-                </th>
-                <th scope="col" className="manpower-comparison-number">
-                  실제·예정 MM
-                </th>
-                <th scope="col" className="manpower-comparison-number">
-                  차이
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {error ? (
-                <tr>
-                  <td colSpan={5}>
-                    <div
-                      role="alert"
-                      className="ls-empty"
-                      data-testid="manpower-comparison-error"
-                    >
-                      <p>{error}</p>
-                      <button
-                        type="button"
-                        className="ls-btn"
-                        data-action-id="M25-186"
-                        data-testid="manpower-comparison-retry"
-                        onClick={() => setRevision((value) => value + 1)}
-                      >
-                        다시 시도
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ) : data === null ? (
-                <tr>
-                  <td colSpan={5}>
-                    <p
-                      role="status"
-                      className="ls-empty"
-                      data-testid="manpower-comparison-loading"
-                    >
-                      {listMessages.loading}
-                    </p>
-                  </td>
-                </tr>
-              ) : data.items.length === 0 ? (
-                <tr>
-                  <td colSpan={5}>
-                    <p
-                      className="ls-empty"
-                      data-testid="manpower-comparison-empty"
-                    >
-                      {listMessages.empty}
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                data.items.map((row) => {
-                  const key = `${row.projectId}-${row.jobCode}`;
-                  return (
-                    <tr
-                      key={key}
-                      data-testid={`manpower-comparison-row-${key}`}
-                    >
-                      <td>
-                        <ProjectLink
-                          projectId={row.projectId}
-                          name={row.projectName}
-                          testId={`manpower-comparison-project-${key}`}
-                          readOnly
-                        />
-                      </td>
-                      <td>{row.jobName}</td>
-                      <td className="manpower-comparison-number">
-                        {mm(row.plannedMm)}
-                      </td>
-                      <td className="manpower-comparison-number">
-                        {mm(row.actualMm)}
-                      </td>
-                      <td className="manpower-comparison-number">
-                        <Badge
-                          kind={
-                            row.differenceStatus === "부족"
-                              ? "bad"
-                              : row.differenceStatus === "초과"
-                                ? "warn"
-                                : "ok"
-                          }
-                        >
-                          {row.differenceStatus} {mm(row.differenceMm)}
-                        </Badge>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-            <tfoot data-testid="manpower-comparison-totals">
-              <tr>
-                <th scope="row" colSpan={2}>
-                  합계
-                </th>
-                <td className="manpower-comparison-number">
-                  {data ? mm(data.totals.plannedMm) : "–"}
-                </td>
-                <td className="manpower-comparison-number">
-                  {data ? mm(data.totals.actualMm) : "–"}
-                </td>
-                <td className="manpower-comparison-number">
-                  {data ? mm(data.totals.differenceMm) : "–"}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
+      <ListView
+        screenId="UI-11"
+        testId="manpower-comparison-list"
+        columns={columns}
+        visibleColumns={columns}
+        hiddenColumns={[]}
+        onToggleColumn={() => undefined}
+        onResetColumns={() => undefined}
+        columnSettings={false}
+        onDownload={() => void download()}
+        downloading={downloading}
+        rows={
+          error
+            ? []
+            : data
+              ? rows.slice(
+                  (current - 1) * presentation.pageSize,
+                  current * presentation.pageSize,
+                )
+              : null
+        }
+        rowKey={rowKey}
+        total={rows.length}
+        page={current}
+        pageSize={presentation.pageSize}
+        onPage={setPage}
+        onPageSize={(size) => {
+          presentation.setPageSize(size);
+          setPage(1);
+        }}
+        dense={presentation.dense}
+        onDense={presentation.setDense}
+        sort={sort}
+        onSort={(value) => {
+          setSort(value);
+          setPage(1);
+        }}
+        onRowClick={(row) => setDetail({ projectId: row.projectId, tab: "plan" })}
+        onResetFilters={reset}
+        // 시안 foot: 계획 MM·실제·예정 MM 합계(지금 조건의 전체 결과). 0건이면 0.00, 읽는 중에는 「–」.
+        footer={{
+          plannedMm: mmf(data ? (data.totals?.plannedMm ?? 0) : null),
+          actualMm: mmf(data ? (data.totals?.actualMm ?? 0) : null),
+        }}
+        mobileRows={data && !error ? rows : null}
+        renderCard={(row) => (
+          // 시안 휴대폰 카드: 프로젝트 + 차이 배지 / 직무 · 「계획 x / 실제 y」
+          <>
+            <div className="ls-r1">
+              <strong>{row.projectName}</strong>
+              {gapBadge(row)}
+            </div>
+            <div className="ls-r2">
+              <span>{row.jobName}</span>
+              <b>
+                계획 {mmf(row.plannedMm)} / 실제 {mmf(row.actualMm)}
+              </b>
+            </div>
+          </>
+        )}
+        error={error || undefined}
+        onRetry={refresh}
+      />
+      {detail && (
+        <ProjectDetail
+          key={`${detail.projectId}-${detail.tab}`}
+          dirtyScreenId="UI-11"
+          projectId={detail.projectId}
+          initialTab={detail.tab}
+          onClose={() => {
+            setDetail(null);
+            refresh();
+          }}
+          onChanged={(message, kind) => {
+            // 인원 계획을 저장하면 이 목록에 바로 반영한다.
+            refresh();
+            if (message) toast(message, kind);
+          }}
+        />
+      )}
+      {notice && (
+        <Toast
+          message={notice}
+          kind={noticeKind}
+          testId="manpower-comparison-toast"
+          onDismiss={() => setNotice("")}
+        />
+      )}
     </section>
   );
 }

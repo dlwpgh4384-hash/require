@@ -282,6 +282,16 @@ table.ls-t {
 .ls-t tbody tr[tabindex]:hover td {
   background: var(--hover);
 }
+/* 시안 합계 줄(.t tfoot td): 표 아래에 붙고 굵게, 위 선 2px(공통 목록에 footer를 준 화면만) */
+.ls-t tfoot.ls-foot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--ls-head-bg);
+  font-weight: 700;
+  border-top: 2px solid var(--border);
+  border-bottom: 0;
+}
 .ls-t tr.ls-sel td {
   background: var(--primary-bg);
 }

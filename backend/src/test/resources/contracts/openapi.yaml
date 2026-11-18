@@ -3567,8 +3567,7 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonDeveloperInput'
       x-business-rules:
-      - 전체 화면에서 이름·직원구분·소속·주 직무·영업 파트·직접/간접 필수 및 등급·보조 직무·직위·입사일·월 단가·월 급여·스킬·거주지를 저장한다. 직위 기본 팀원·직접/간접 기본 직접,
-        영업 파트 기본값 없음. 연락처·번지는 받지 않는다.
+      - 전체 화면에서 이름·직원구분·소속·주 직무·영업 파트·직접/간접 필수 및 등급·보조 직무·직위·입사일·월 단가·월 급여·스킬·거주지를 저장한다. 직위 기본 팀원·직접/간접 기본 직접, 영업 파트 기본값 없음. 연락처·번지는 받지 않는다.
       x-side-effects:
       - TB_HR_DEV·스킬 연결·월 단가/급여 이력 저장. 자동번호 발급은 동시 유일성 보장.
       x-state-transitions:
@@ -3825,8 +3824,7 @@ paths:
       - 퇴사일만 등록하고 상태 이력 퇴사 줄을 원본으로 기본정보 퇴사일 복사값을 함께 갱신한다. 진행 휴직은 퇴사 전날로 닫는다.
       - 기존 퇴사·마감월·퇴사일 뒤 남은 투입 배정은 거부하며 배정 건수와 프로젝트·투입 › 투입 배정 조기 철수를 안내한다. 퇴사 뒤 날짜 상태 등록은 불가다.
       - 퇴사일이 지나면 퇴사·자동 사용 중지하고 더 이상 상태 등록을 허용하지 않는다.
-      - 등록·종료일 수정·재직 취소·퇴사 취소 저장 전 휴직 비중첩·종료≥시작·퇴사전날 상한/종료필수·복귀=다음날/휴직당1개·새휴직은 복귀다음날부터·퇴사1개를 전체 검사한다. 어긋나면 이유
-        표시·저장0, 저장 뒤 이력으로 상태 재판정한다.
+      - 등록·종료일 수정·재직 취소·퇴사 취소 저장 전 휴직 비중첩·종료≥시작·퇴사전날 상한/종료필수·복귀=다음날/휴직당1개·새휴직은 복귀다음날부터·퇴사1개를 전체 검사한다. 어긋나면 이유 표시·저장0, 저장 뒤 이력으로 상태 재판정한다.
       - 근무 상태 업무는 관리자·재무만 허용하고 퇴사일 경과 취소는 시스템 관리자만 허용한다. 현재 HTTP는 admin 고정이다.
       - 재직·퇴사 줄마다 닫은 휴직 줄 번호와 원래 휴직 종료일을 보관한다.
       x-side-effects:
@@ -4313,15 +4311,13 @@ paths:
                 $ref: '#/components/schemas/ApiError'
       parameters: []
       x-business-rules:
-      - 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력 없이 (자체)이고 빈 계약금액은
-        0·매출 제외다.
+      - 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력 없이 (자체)이고 빈 계약금액은 0·매출 제외다.
       - 프로젝트명100자·근무지200자·특징500자와 유형별 필수, 종료일≥시작일을 검증하고 등록 상태는 진행/수주예정만 허용한다.
       - 등록 시 계약 시작월 파트 첫 이력과 계약 변경 이력 계약 한 줄을 함께 저장한다.
       - 계약금액 입력 시 DB 식-19의 계약금액×(1−목표 마진율)을 채운다.
       - TEAM_FEE·PEXP_FEE 각각 기본50000원을 읽고 프로젝트별로 수정 가능하다.
       x-side-effects:
-      - 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력 없이 (자체)이고 빈 계약금액은
-        0·매출 제외다.
+      - 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력 없이 (자체)이고 빈 계약금액은 0·매출 제외다.
       - 등록 시 계약 시작월 파트 첫 이력과 계약 변경 이력 계약 한 줄을 함께 저장한다.
       x-state-transitions:
       - 검증 통과한 해당 프로젝트 업무값만 저장; 실패하면 기존 상태와 이력 불변
@@ -4336,8 +4332,7 @@ paths:
       - 'auth: 무인증 프로젝트 등록 -> 200·실행자 admin, 현재 인증 401/403 추가0'
       - 'validation: projectName101자 -> 400 errors.projectName·TB_PJ_PROJ 추가0'
       - 'business: 등록 statusCode가 종료 -> 400·프로젝트 신규0행'
-      - 'side-effect: 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력
-        없이 (자체)이고 빈 계약금액은 0·매출 제외다. -> 해당 업무 GET/DB에서 위 행·필드 대조'
+      - 'side-effect: 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력 없이 (자체)이고 빈 계약금액은 0·매출 제외다. -> 해당 업무 GET/DB에서 위 행·필드 대조'
   /api/common/projects/{projectId}:
     get:
       operationId: getCommonProject
@@ -4429,8 +4424,7 @@ paths:
       - 등록/수주 시 ORGNL_CTRT_AMT에 계약금액을 복사한다. 수정 시 CNCL_YN=N 청구가 없으면 원금액도 수정하고 있으면 현재 금액만 수정한다. 입력칸·안내는 추가하지 않는다.
       - 기존값을 등록폼에 복원하여 변경값을 저장하고 견적금액 EST_AMT도 등록·수정에서 보존한다.
       - 수정폼의 영업 파트·계약유형·상태는 회색 readonly와 원문 안내를 보여 준다. 유형 변경·진행→수주예정은 허용하지 않고 실주에 수정 버튼이 없다.
-      - 명확화122행에 따라 새 기간 밖 투입건수·금액있는 배분월수·추가경비건수를 안내하고 저장을 거부한다. 자동 절단·삭제하지 않고 셋을 정리한 뒤만 변경한다. 마감월과 이미 시작한 배정 시작일을
-        침범할 수 없다.
+      - 명확화122행에 따라 새 기간 밖 투입건수·금액있는 배분월수·추가경비건수를 안내하고 저장을 거부한다. 자동 절단·삭제하지 않고 셋을 정리한 뒤만 변경한다. 마감월과 이미 시작한 배정 시작일을 침범할 수 없다.
       - 종료일 경과 시 자동 종료하고 종료도 진행과 같은 수정범위를 갖되 지난 해/마감 보호를 적용한다. 종료일을 오늘 이후로 연장하면 진행으로 자동복귀하며 ⋯는 종료에 없다.
       x-side-effects:
       - TB_PJ_PROJ_CHG 변경 항목별 전후 표시명 기록
@@ -6419,6 +6413,59 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+  /api/common/manpower-comparisons/excel:
+    get:
+      operationId: getCommonManpowerComparisonsExcel
+      summary: 인원 계획 대비 투입 엑셀 다운로드(SFR-011)
+      description: 목록과 같은 조건(year·projectId·differenceStatus)의 전체 결과를 목록 순서(차이 오름차순, 부족 큰 순) 그대로 xlsx로 내려준다. 열은 프로젝트·직무·계획 MM·실제·예정 MM·차이(부족 n.nn·초과 n.nn·맞음). 파일 1행에 받은 사람·한국 시각, 파일 이름 「인원 계획 대비 투입_{year}년_다운로드일시.xlsx」, 접근 기록 DNLD.
+      security: []
+      parameters:
+      - name: year
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 2025
+          maximum: 2027
+        description: 조회 연도
+      - name: projectId
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 기존 프로젝트 식별자; 생략하면 연도 범위 전체
+      - name: differenceStatus
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [부족, 초과, 맞음]
+        description: 파생 차이 상태
+      responses:
+        '200':
+          description: 인원 계획 대비 투입 엑셀 파일(0건이면 머리글만)
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: 기존 ExcelExportService 파일 이름·인코딩 관례(filename*=UTF-8'')
+            X-Total-Count:
+              schema:
+                type: integer
+              description: 파일에 담은 조회 결과 건수
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: year 누락/형식/범위 또는 differenceStatus 허용값 오류; 해당 필드 오류 반환, 파일·접근 기록 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
   /api/common/clients/excel:
     get:
       operationId: getCommonClientsExcel
@@ -6447,13 +6494,27 @@ paths:
         required: false
         schema:
           type: string
-          enum: [type, name, businessNumber, representative, industry, contact, phone, taxEmail, account, projects, people, use]
+          enum:
+          - type
+          - name
+          - businessNumber
+          - representative
+          - industry
+          - contact
+          - phone
+          - taxEmail
+          - account
+          - projects
+          - people
+          - use
       - name: dir
         in: query
         required: false
         schema:
           type: string
-          enum: [asc, desc]
+          enum:
+          - asc
+          - desc
       - name: columns
         in: query
         required: false
@@ -6488,13 +6549,24 @@ paths:
         required: false
         schema:
           type: string
-          enum: [partName, leaderName, distributionRate, salesExpense, effectiveMonth, scheduledChange, personCount, projectCount, useYn]
+          enum:
+          - partName
+          - leaderName
+          - distributionRate
+          - salesExpense
+          - effectiveMonth
+          - scheduledChange
+          - personCount
+          - projectCount
+          - useYn
       - name: dir
         in: query
         required: false
         schema:
           type: string
-          enum: [asc, desc]
+          enum:
+          - asc
+          - desc
       - name: columns
         in: query
         required: false
@@ -6522,7 +6594,9 @@ paths:
       operationId: putCommonPartResume
       summary: 영업 파트 다시 사용
       security: []
-      x-related-requirements: [REQ-342, REQ-306]
+      x-related-requirements:
+      - REQ-342
+      - REQ-306
       description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       parameters:
       - name: partId
@@ -6551,7 +6625,8 @@ paths:
                 allOf:
                 - $ref: '#/components/schemas/ApiResponse'
                 - type: object
-                  required: [data]
+                  required:
+                  - data
                   properties:
                     data:
                       $ref: '#/components/schemas/CommonPart'
@@ -6580,7 +6655,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [success, meta, data]
+                required:
+                - success
+                - meta
+                - data
                 properties:
                   success:
                     type: boolean
@@ -6588,7 +6666,9 @@ paths:
                     type: object
                   data:
                     type: object
-                    required: [targetMarginRate, budgetFactor]
+                    required:
+                    - targetMarginRate
+                    - budgetFactor
                     properties:
                       targetMarginRate:
                         type: number
@@ -6666,17 +6746,21 @@ paths:
                 allOf:
                 - $ref: '#/components/schemas/ApiResponse'
                 - type: object
-                  required: [data]
+                  required:
+                  - data
                   properties:
                     data:
                       type: object
-                      required: [items]
+                      required:
+                      - items
                       properties:
                         items:
                           type: array
                           items:
                             type: object
-                            required: [changedAt, item]
+                            required:
+                            - changedAt
+                            - item
                             properties:
                               changedAt:
                                 type: string
@@ -6717,14 +6801,21 @@ paths:
         required: false
         schema:
           type: string
-          enum: [userId, name, role, state, last]
+          enum:
+          - userId
+          - name
+          - role
+          - state
+          - last
         description: 정렬 열. 없으면 이름순.
       - name: dir
         in: query
         required: false
         schema:
           type: string
-          enum: [asc, desc]
+          enum:
+          - asc
+          - desc
       - name: roleCd
         in: query
         required: false
@@ -6735,7 +6826,10 @@ paths:
         required: false
         schema:
           type: string
-          enum: [USE, LOCK, STOP]
+          enum:
+          - USE
+          - LOCK
+          - STOP
       - name: keyword
         in: query
         required: false
@@ -6785,13 +6879,16 @@ paths:
                 allOf:
                 - $ref: '#/components/schemas/ApiResponse'
                 - type: object
-                  required: [data]
+                  required:
+                  - data
                   properties:
                     data:
                       type: array
                       items:
                         type: object
-                        required: [changedAt, item]
+                        required:
+                        - changedAt
+                        - item
                         properties:
                           changedAt:
                             type: string
@@ -10103,8 +10200,7 @@ components:
       - contractAmount
       - canEdit
       - canSaveManpowerPlan
-      description: 진행현황·신호등 식-67/76 세부 결과는 DB정의 확보 OQ-CALC-001; 이슈 SFR-131의 공개필드/연결은 OQ-ISSUE-001로 국소 보류. 빈 object를
-        완료된 이슈 계약으로 내보내지 않음.
+      description: 진행현황·신호등 식-67/76 세부 결과는 DB정의 확보 OQ-CALC-001; 이슈 SFR-131의 공개필드/연결은 OQ-ISSUE-001로 국소 보류. 빈 object를 완료된 이슈 계약으로 내보내지 않음.
     CommonProjectList:
       type: object
       properties:
@@ -10407,8 +10503,7 @@ components:
       - startDate
       - endDate
       - statusCode
-      description: 비내부 customerId/salesPartId/contractAmount 필수. 내부는 세 비해당 칸 제외·빈 계약금액0. 등록 상태는 DB의 진행/수주예정 코드만. 근무지는
-        텍스트이며 주소코드 사용 금지.
+      description: 비내부 customerId/salesPartId/contractAmount 필수. 내부는 세 비해당 칸 제외·빈 계약금액0. 등록 상태는 DB의 진행/수주예정 코드만. 근무지는 텍스트이며 주소코드 사용 금지.
     CommonProjectUpdateInput:
       type: object
       properties:
@@ -10454,6 +10549,7 @@ components:
       - projectName
       - startDate
       - endDate
+
     CommonProjectBudgetInput:
       type: object
       properties:
@@ -10644,7 +10740,10 @@ components:
           description: 상세·저장 응답만. 투입 기간의 달마다 그 달에 적용되는 계약 월 MM·청구 단가
           items:
             type: object
-            required: [month, monthlyMm, billingPrice]
+            required:
+            - month
+            - monthlyMm
+            - billingPrice
             properties:
               month:
                 type: string

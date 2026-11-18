@@ -42,7 +42,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(CommonManpowerComparisonController.class)
 @ContextConfiguration(classes={CommonManpowerComparisonController.class, CommonManpowerComparisonService.class,
     ManpowerComparisonRules.class, CalculationRuleService.class, CodeExceptionHandler.class,
-    ApiExceptionHandler.class, ManpowerComparisonPersistenceTest.Persistence.class})
+    ApiExceptionHandler.class, ManpowerComparisonPersistenceTest.Persistence.class,
+    com.company.common.support.service.ExcelExportService.class,
+    com.company.common.support.service.BusinessCalendar.class,
+    com.company.common.support.service.CurrentBusinessActor.class})
 @DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class ManpowerComparisonPersistenceTest {
     @Autowired MockMvc mvc;
@@ -156,10 +159,13 @@ class ManpowerComparisonPersistenceTest {
 
     @Test void happyUnionHasBothSidesAndStoredZeroWithoutPlanMultiplication() throws Exception {
         var result=data("P-COMPARE",null);
-        assertThat(result.path("items").size()).isEqualTo(3);
+        // 계획 0이고 실제도 없는 직무(jobs[2])는 줄이 나오지 않는다(식-67).
+        assertThat(result.path("items").size()).isEqualTo(2);
         assertThat(job(result,jobs.get(0)).path("actualMm").decimalValue()).isEqualByComparingTo("0");
+        assertThat(job(result,jobs.get(0)).path("differenceStatus").asText()).isEqualTo("부족");
         assertThat(job(result,jobs.get(1)).path("plannedMm").decimalValue()).isEqualByComparingTo("0");
-        assertThat(job(result,jobs.get(2)).path("differenceStatus").asText()).isEqualTo("맞음");
+        assertThat(job(result,jobs.get(1)).path("differenceStatus").asText()).isEqualTo("초과");
+        for (var row:result.path("items")) assertThat(row.path("jobCode").asText()).isNotEqualTo(jobs.get(2));
         for (String field:List.of("plannedMm","actualMm","differenceMm")) {
             BigDecimal sum=BigDecimal.ZERO;
             for (var row:result.path("items")) sum=sum.add(row.path(field).decimalValue());
@@ -251,16 +257,43 @@ class ManpowerComparisonPersistenceTest {
         assertThat(writes.count.get()).isZero();
     }
 
-    @Test void assignmentOnlyZeroKeyRemainsButUnusedCatalogJobsAreNotExpanded() throws Exception {
+    @Test void planZeroAndActualZeroMakeNoRowAndUnusedCatalogJobsAreNotExpanded() throws Exception {
+        // 식-67: 계획 0(빈 값)·실제 0이면 UI-11에 줄이 나오지 않는다. 투입 줄만 있고 월 MM이 0이어도 같다.
         project("P-ZERO","2026-06-01","2026-06-30","END");
+        plan("P-ZERO",jobs.get(1),"0");
         assignment("A-ONLY-ZERO","P-ZERO",jobs.get(0),"ACT");
         month("A-ONLY-ZERO","P-ZERO","202606","0");
+        assignment("A-ZERO-BOTH","P-ZERO",jobs.get(1),"ACT");
+        month("A-ZERO-BOTH","P-ZERO","202606","0");
         var result=data("P-ZERO",null);
-        assertThat(result.path("items").size()).isEqualTo(1);
-        var row=job(result,jobs.get(0));
-        assertThat(row.path("plannedMm").decimalValue()).isEqualByComparingTo("0");
-        assertThat(row.path("actualMm").decimalValue()).isEqualByComparingTo("0");
-        assertThat(row.path("differenceStatus").asText()).isEqualTo("맞음");
+        assertThat(result.path("items").size()).isZero();
+        for (String field:List.of("plannedMm","actualMm","differenceMm"))
+            assertThat(result.path("totals").path(field).decimalValue()).isEqualByComparingTo("0");
+    }
+
+    @Test void planWithoutActualIsShortAndActualWithoutPlanIsExcessInTheSameProject() throws Exception {
+        project("P-SIDES","2026-01-01","2026-12-31","ING");
+        plan("P-SIDES",jobs.get(0),"1.50");
+        assignment("A-SIDES","P-SIDES",jobs.get(1),"ACT");
+        month("A-SIDES","P-SIDES","202603","0.40");
+        var result=data("P-SIDES",null);
+        assertThat(result.path("items").size()).isEqualTo(2);
+        assertThat(result.path("items").get(0).path("jobCode").asText()).isEqualTo(jobs.get(0));
+        assertThat(result.path("items").get(0).path("differenceStatus").asText()).isEqualTo("부족");
+        assertThat(result.path("items").get(0).path("differenceMm").decimalValue()).isEqualByComparingTo("-1.50");
+        assertThat(result.path("items").get(1).path("differenceStatus").asText()).isEqualTo("초과");
+        assertThat(result.path("items").get(1).path("plannedMm").decimalValue()).isEqualByComparingTo("0");
+    }
+
+    @Test void emptyDatabaseYearReturnsZeroRowsAndZeroTotals() throws Exception {
+        db.update("DELETE FROM TB_PJ_ASGN_MON");
+        db.update("DELETE FROM TB_PJ_ASGN");
+        db.update("DELETE FROM TB_PJ_MNPW_PLAN");
+        var result=data(null,null);
+        assertThat(result.path("items").isArray()).isTrue();
+        assertThat(result.path("items").size()).isZero();
+        for (String field:List.of("plannedMm","actualMm","differenceMm"))
+            assertThat(result.path("totals").path(field).decimalValue()).isEqualByComparingTo("0");
     }
 
     @Test void projectsTouchingEitherYearBoundaryRemainEligible() throws Exception {

@@ -107,7 +107,7 @@ function mount(available = true) {
 
 it("registers only the comparison body without borrowed title actions and isolates two kept-mounted tabs", async () => {
   mount();
-  await screen.findByTestId("manpower-comparison-empty");
+  await screen.findByTestId("list-empty");
   expect(findScreen("UI-11")?.TitleActions).toBeUndefined();
   expect(findScreen("UI-17")).toBeUndefined();
   expect(findScreen("UI-28")).toBeUndefined();

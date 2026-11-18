@@ -61,8 +61,15 @@ class ManpowerComparisonProjectionTest {
             .doesNotContain("? IS NULL", "FIX_YN", "PROJ_STAT_CD", "INSERT", "UPDATE", "DELETE");
         assertThat(statement.getBoundSql(new Filter(2026,"P",null)).getParameterMappings())
             .anyMatch(p -> p.getProperty().equals("projectId"));
+        // 조회 문장은 SELECT만. 쓰기는 엑셀 다운로드 접근 기록(DNLD) 한 개뿐이고 업무 표는 건드리지 않는다.
+        String access = ManpowerComparisonMapper.class.getName() + ".insertAccess";
         assertThat(config().getMappedStatements().stream().filter(s -> s instanceof org.apache.ibatis.mapping.MappedStatement)
-            .map(s -> (org.apache.ibatis.mapping.MappedStatement)s))
+            .map(s -> (org.apache.ibatis.mapping.MappedStatement)s).filter(s -> !s.getId().equals(access)))
             .allMatch(s -> s.getSqlCommandType() == org.apache.ibatis.mapping.SqlCommandType.SELECT);
+        var insert = config().getMappedStatement(access);
+        assertThat(insert.getSqlCommandType()).isEqualTo(org.apache.ibatis.mapping.SqlCommandType.INSERT);
+        assertThat(insert.getBoundSql(Map.of("userId", "admin", "target", "t")).getSql())
+            .contains("INSERT INTO TB_SY_ACCS_LOG", "'DNLD'", "'UI-11'", "clock_timestamp()")
+            .doesNotContain("TB_PJ_MNPW_PLAN", "TB_PJ_ASGN");
     }
 }

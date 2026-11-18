@@ -1091,9 +1091,7 @@ describe("manpower comparison route composition", () => {
       const { request, list, row } = respondWithManpowerComparisons();
       mount(path);
       expect(
-        await screen.findByTestId(
-          `manpower-comparison-row-${row.projectId}-${row.jobCode}`,
-        ),
+        await screen.findByTestId(`list-row-${row.projectId}-${row.jobCode}`),
       ).toBeVisible();
       expectSingleShell();
       expect(screen.getAllByTestId("manpower-comparison-page")).toHaveLength(1);
@@ -1115,9 +1113,10 @@ describe("manpower comparison route composition", () => {
         ),
       ).toBe(false);
       expect(screen.getByTestId("screen-actions")).toBeEmptyDOMElement();
-      expect(
-        screen.getByTestId("manpower-comparison-totals"),
-      ).toHaveTextContent("합계3.001.00-2.00");
+      // 시안 합계 줄: 계획 MM·실제·예정 MM만(차이 합계 없음)
+      expect(screen.getByTestId("list-footer")).toHaveTextContent(
+        /^합계3\.001\.00$/,
+      );
     },
   );
 
@@ -1158,31 +1157,27 @@ describe("manpower comparison route composition", () => {
   });
 
   it.each(["P-comparison", "P-selected-other"])(
-    "FIX-COMPARE-011 opens response projectId %s in readonly project detail",
+    "FIX-COMPARE-011 opens response projectId %s in project detail on the [인원 계획] tab (editable, mockup openProject)",
     async (projectId) => {
       const { request, row } = respondWithManpowerComparisons(true, projectId);
       mount("/screens/UI-11");
       fireEvent.click(
-        await screen.findByTestId(
-          `manpower-comparison-project-${row.projectId}-${row.jobCode}`,
-        ),
+        await screen.findByTestId(`list-row-${row.projectId}-${row.jobCode}`),
       );
       const detail = within(await screen.findByTestId("project-detail"));
-      fireEvent.click(await detail.findByRole("tab", { name: "인원 계획" }));
+      expect(
+        await detail.findByRole("tab", { name: "인원 계획", selected: true }),
+      ).toBeInTheDocument();
       expect(await detail.findByTestId("project-job-be")).toBeVisible();
       expect(screen.getByTestId("project-detail")).toHaveTextContent(
         row.projectId,
       );
-      expect(detail.queryByTestId("project-edit")).not.toBeInTheDocument();
       expect(request).toHaveBeenCalledWith(
         `/api/common/projects/${row.projectId}`,
         { signal: undefined },
       );
-      expect(detail.queryByTestId("project-job-mm-be")).not.toBeInTheDocument();
-      expect(detail.queryByTestId("project-job-add")).not.toBeInTheDocument();
-      expect(
-        detail.queryByRole("button", { name: "저장" }),
-      ).not.toBeInTheDocument();
+      expect(detail.getByTestId("project-job-mm-be")).toBeInTheDocument();
+      // 바꾼 것이 없으면 Ctrl+S도 저장하지 않는다.
       fireEvent.keyDown(window, { key: "s", ctrlKey: true });
       expect(
         request.mock.calls.some(
@@ -1195,9 +1190,7 @@ describe("manpower comparison route composition", () => {
       fireEvent.click(detail.getByRole("button", { name: "닫기" }));
       expect(screen.queryByTestId("project-detail")).not.toBeInTheDocument();
       expect(
-        screen.getByTestId(
-          `manpower-comparison-row-${row.projectId}-${row.jobCode}`,
-        ),
+        screen.getByTestId(`list-row-${row.projectId}-${row.jobCode}`),
       ).toBeVisible();
       expectSingleShell();
     },
@@ -1225,9 +1218,7 @@ describe("manpower comparison route composition", () => {
       "선택 프로젝트를 불러오지 못했습니다.",
     );
     expect(screen.getByTestId("manpower-comparison-page")).toBeVisible();
-    expect(
-      screen.queryByTestId("manpower-comparison-empty"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("list-empty")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("project-detail-retry"));
     const detail = within(screen.getByTestId("project-detail"));
     await detail.findByRole("tab", { name: "인원 계획" });
@@ -1240,7 +1231,6 @@ describe("manpower comparison route composition", () => {
         url.startsWith("/api/common/manpower-comparisons?"),
       ),
     ).toHaveLength(1);
-    expect(detail.queryByTestId("project-edit")).not.toBeInTheDocument();
     expect(router?.state.location.pathname).toBe("/screens/UI-11");
     expectSingleShell();
   });
@@ -1254,14 +1244,16 @@ describe("manpower comparison route composition", () => {
       }),
     );
     mount("/screens/UI-11");
-    expect(
-      await screen.findByTestId("manpower-comparison-empty"),
-    ).toHaveTextContent("조건에 맞는 결과가 없습니다.");
+    expect(await screen.findByTestId("list-empty")).toHaveTextContent(
+      "조건에 맞는 결과가 없습니다.",
+    );
     expect(screen.getByTestId("manpower-comparison-year")).toBeVisible();
+    expect(screen.getByTestId("manpower-comparison-banner")).toBeVisible();
     expect(screen.getByTestId("manpower-comparison-filters")).toBeVisible();
+    expect(screen.getByTestId("list-download")).toBeVisible();
     expect(screen.getAllByRole("columnheader")).toHaveLength(5);
-    expect(screen.getByTestId("manpower-comparison-totals")).toHaveTextContent(
-      "합계0.000.000.00",
+    expect(screen.getByTestId("list-footer")).toHaveTextContent(
+      /^합계0\.000\.00$/,
     );
     expectSingleShell();
   });
@@ -1270,7 +1262,7 @@ describe("manpower comparison route composition", () => {
     const { request, list } = respondWithManpowerComparisons();
     list.mockRejectedValueOnce(new Error("비교 조회 연결 실패"));
     mount("/screens/UI-11");
-    const retry = await screen.findByTestId("manpower-comparison-retry");
+    const retry = await screen.findByTestId("list-retry");
     const first = request.mock.calls.find(([url]) =>
       url.startsWith("/api/common/manpower-comparisons?"),
     )![0];
@@ -1278,16 +1270,14 @@ describe("manpower comparison route composition", () => {
       target: { value: "초과" },
     });
     fireEvent.click(retry);
-    await screen.findByTestId("manpower-comparison-row-P-comparison-BE");
+    await screen.findByTestId("list-row-P-comparison-BE");
     expect(list).toHaveBeenCalledTimes(2);
     expect(
       request.mock.calls
         .filter(([url]) => url.startsWith("/api/common/manpower-comparisons?"))
         .map(([url]) => url),
     ).toEqual([first, first]);
-    expect(
-      screen.queryByTestId("manpower-comparison-error"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("list-error")).not.toBeInTheDocument();
     expect(router?.state.location.pathname).toBe("/screens/UI-11");
     expectSingleShell();
   });

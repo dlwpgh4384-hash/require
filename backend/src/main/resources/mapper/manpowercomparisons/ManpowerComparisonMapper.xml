@@ -25,6 +25,7 @@
       FROM TB_PJ_MNPW_PLAN m
       JOIN projects p ON p.PROJ_ID=m.PROJ_ID
       GROUP BY m.PROJ_ID, m.JOB_CD
+      HAVING SUM(m.PLAN_MM) &gt; 0
     ), actual AS (
       SELECT a.PROJ_ID, a.JOB_CD, SUM(m.MON_MM) AS mm
       FROM TB_PJ_ASGN a
@@ -33,7 +34,9 @@
       WHERE a.ASGN_STAT_CD!='CNCL'
         AND m.INPUT_YM BETWEEN (CAST(#{year} AS text)||'01') AND (CAST(#{year} AS text)||'12')
       GROUP BY a.PROJ_ID, a.JOB_CD
+      HAVING SUM(m.MON_MM) &gt; 0
     ), jobs AS (
+      <!-- 식-67: 계획이 0(빈 값)인 직무는 계획 쪽 줄을, 실제 0인 직무는 투입 쪽 줄을 만들지 않는다. 둘 다 0이면 UI-11에 줄이 나오지 않는다. -->
       SELECT p.PROJ_ID, p.JOB_CD FROM plans p
       UNION
       SELECT a.PROJ_ID, a.JOB_CD FROM actual a
@@ -49,4 +52,9 @@
     LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='JOB' AND c.CODE=j.JOB_CD
     ORDER BY p.PROJ_ID, j.JOB_CD
   </select>
+  <!-- SFR-011 엑셀 다운로드 접근 기록(DNLD). -->
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES (#{userId},'DNLD','UI-11',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
 </mapper>

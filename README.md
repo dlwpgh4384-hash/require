@@ -16,7 +16,7 @@ frontend/package-lock.json이 포함되어 있다. Node 20과 npm 10으로
 frontend 디렉터리에서 npm ci를 사용한다.
 
 저장소 루트에서 docker compose -f infra/docker-compose.yml up --build를 실행한다.
-UI는 http://127.0.0.1:3000, API는 http://127.0.0.1:8080에만 공개된다.
+UI는 http://127.0.0.1:3000, API는 http://127.0.0.1:8080 으로 연다(포트는 모든 주소에 열리며, 미리보기 검사기가 "포트:포트" 모양만 읽기 때문이다).
 DB는 호스트 포트를 공개하지 않으며 Compose 내부 database 서비스로 통신한다.
 Compose의 개발 DB 기본값은 로컬 시험 전용이다. 운영 배포를 별도로 결정할 때
 DB_USER·DB_PASSWORD·POSTGRES_DB를 반드시 운영 설정으로 교체한다.

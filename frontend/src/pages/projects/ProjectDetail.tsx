@@ -40,6 +40,7 @@ export function ProjectDetail({
   onDistribution,
   onEdit,
   dirtyScreenId,
+  initialTab = "basic",
 }: {
   /** 이 패널을 연 화면 번호. 저장 안 한 인원 계획이 있으면 그 화면 탭에 「●」를 보인다. */
   dirtyScreenId?: string;
@@ -49,9 +50,11 @@ export function ProjectDetail({
   onChanged?: (message?: string, kind?: ToastKind) => void;
   onDistribution?: (id: string) => void;
   onEdit?: (project: api.Project) => void;
+  /** 처음 열 탭(시안 openProject(id, tab)). 기본은 기본 정보. 인원 계획 대비 투입(UI-11)은 "plan". */
+  initialTab?: string;
 }) {
   const [p, setP] = useState<api.Project | null>(null);
-  const [tab, setTab] = useState("basic");
+  const [tab, setTab] = useState(initialTab);
   const [expenses, setExpenses] = useState<api.ProjectExpense[]>([]);
   const [parts, setParts] = useState<api.ProjectPart[]>([]);
   const [history, setHistory] = useState<api.ProjectHistory[]>([]);

@@ -1,0 +1,178 @@
+.project-board-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  color: var(--text);
+}
+/* 시안 .kpis/.kpi: 요약 칸 */
+.project-board-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 16px;
+}
+.project-board-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 16px 20px;
+  border: 1px solid var(--divider, var(--border));
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+.project-board-kpi .l {
+  font-size: 13px;
+  color: var(--text-sub);
+}
+.project-board-kpi .v {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.project-board-kpi .d {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+  overflow-wrap: anywhere;
+}
+/* 시안 .tabs .tb */
+.project-board-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--divider, var(--border));
+  overflow-x: auto;
+}
+.project-board-tab {
+  height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-sub);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.project-board-tab.on {
+  color: var(--primary-text);
+  border-bottom-color: var(--primary-text);
+  font-weight: 600;
+}
+.project-board-panel:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+/* 시안 .pname: 프로젝트 이름 + 작은 글씨 두 줄 */
+.project-board-pname {
+  display: flex;
+  flex-direction: column;
+  line-height: 18px;
+  min-width: 180px;
+}
+.project-board-pname small {
+  font-size: 12px;
+  color: var(--text-sub);
+}
+.project-board-pname small.project-board-reasons {
+  white-space: normal;
+  max-width: 260px;
+}
+.project-board-pname small.project-bad {
+  color: var(--ls-bad);
+}
+.project-board-pname small.project-warn-text {
+  color: var(--ls-warn);
+}
+.project-board-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 150px;
+}
+.project-board-bar-value {
+  width: 42px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.project-board-fill-bad {
+  background: var(--ls-bad);
+}
+.project-board-option-error {
+  font-size: 13px;
+}
+/* 시안 fxBox: 계산 방법 */
+.project-board-fx {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 24px;
+  border: 1px solid var(--divider, var(--border));
+  border-radius: 8px;
+  background: var(--surface);
+}
+.project-board-fx summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.project-board-fx-sub {
+  font-weight: 400;
+}
+.project-board-fx[open] > .ls-twrap {
+  margin-top: 8px;
+}
+.project-board-fx-table {
+  table-layout: fixed;
+  width: 100%;
+}
+.project-board-fx-table th,
+.project-board-fx-table td {
+  white-space: normal;
+  word-break: keep-all;
+  vertical-align: middle;
+  line-height: 20px;
+}
+.project-board-fx-table td:first-child {
+  font-weight: 600;
+}
+.project-board-fx-name {
+  width: 190px;
+}
+.project-board-fx-ref {
+  width: 32%;
+}
+@media (max-width: 767px) {
+  .project-board-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .project-board-fx-table,
+  .project-board-fx-table tbody,
+  .project-board-fx-table tr,
+  .project-board-fx-table td {
+    display: block;
+    width: auto !important;
+  }
+  .project-board-fx-table thead {
+    display: none;
+  }
+  .project-board-fx-table tr {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .project-board-fx-table td {
+    border: 0 !important;
+    padding: 2px 0 !important;
+    height: auto;
+  }
+}

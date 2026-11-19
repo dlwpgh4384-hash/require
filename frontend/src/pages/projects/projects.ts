@@ -25,6 +25,17 @@ export interface Project {
   feature: string | null;
   pmName: string | null;
   trafficLight: string | null;
+  /** 신호등 이유(현황판과 같은 판정·문구). 종료·실주는 없음. */
+  signalReasons?: string[];
+  signalReasonLevels?: string[];
+  /** 마지막 업데이트(메모 작성일, 없으면 단계를 처음 만든 날)와 지난 날 수, 14일 초과 여부. */
+  lastUpdateDate?: string | null;
+  daysWithoutUpdate?: number | null;
+  staleUpdate?: boolean | null;
+  /** 턴키만: 원가 사용률(%)·진척 대비 원가(%p). */
+  costUsageRate?: number | null;
+  costProgressGap?: number | null;
+
   canEdit: boolean;
   canChangeBudget: boolean;
   canChangeSalesPart: boolean;

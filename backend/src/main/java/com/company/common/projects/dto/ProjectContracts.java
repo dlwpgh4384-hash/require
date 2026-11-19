@@ -32,6 +32,14 @@ public final class ProjectContracts {
         /** 동시 수정 확인용: 마지막 수정 시각(없으면 등록 시각). 수정·예산 저장 때 그대로 돌려보낸다. */
         public java.time.Instant modifiedAt;
         public List<Memo> memos;
+        /** 신호등 이유(식-76, 현황판과 같은 판정). 이유마다 등급(위험·주의)이 같은 순서로 온다. 종료·실주는 없음. */
+        public List<String> signalReasons, signalReasonLevels;
+        /** 마지막 업데이트: 가장 최근에 새로 쓴 주간 메모 작성일(없으면 단계를 처음 만든 날)과 그 뒤 지난 날 수. */
+        public LocalDate lastUpdateDate;
+        public Long daysWithoutUpdate;
+        public Boolean staleUpdate;
+        /** 턴키만: 원가 사용률(%)과 진척 대비 원가(%p, 원가 사용률 − 실적 진척률). 예산이 없으면 없음. */
+        public BigDecimal costUsageRate, costProgressGap;
     }
     public static class Memo {
         public LocalDate writtenDate;

@@ -48,7 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnabledIfEnvironmentVariable(named="NAVIGATION_TEST_DB_URL",matches="jdbc:postgresql:.*")
 @WebMvcTest({CommonProjectController.class,CommonUploadController.class})
 @ContextConfiguration(classes={CommonProjectController.class,CommonUploadController.class,CommonProjectService.class,
-    CommonUploadService.class,ProjectUploadForm.class,ProjectDistributionUploadForm.class,ProjectProgressRules.class,
+    CommonUploadService.class,ProjectUploadForm.class,ProjectDistributionUploadForm.class,ProjectProgressRules.class,com.company.common.common.ProjectBoardSignalRules.class,
     ProjectAmountRules.class,CalculationRuleService.class,CodeTextResolver.class,CurrentBusinessActor.class,
     UploadWorkbookService.class,ExcelExportService.class,CodeExceptionHandler.class,ApiExceptionHandler.class,
     ProjectPersistenceTest.Persistence.class})

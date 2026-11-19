@@ -15,6 +15,7 @@ import { findScreen } from "./screenRegistry";
 import { ProjectWorkspaceProvider } from "../projects/ProjectWorkspace";
 import { AssignmentWorkspaceProvider } from "../assignments/AssignmentWorkspace";
 import { WithdrawalWorkspaceProvider } from "../withdrawals/WithdrawalWorkspace";
+import { ProjectBoardWorkspaceProvider } from "../projectboard/ProjectBoardWorkspace";
 import { CodeWorkspaceProvider } from "../codegroups/CodeWorkspace";
 import { ClientPartWorkspaceProvider } from "../clients/ClientPartWorkspace";
 import { DeveloperWorkspaceProvider } from "../developers/DeveloperWorkspace";
@@ -111,6 +112,7 @@ export function CommonNavigationPage() {
                 <ProjectWorkspaceProvider>
                  <AssignmentWorkspaceProvider>
                  <WithdrawalWorkspaceProvider>
+                 <ProjectBoardWorkspaceProvider>
                   {preferences ? (
                     <PreferenceNavigation />
                   ) : (
@@ -122,7 +124,9 @@ export function CommonNavigationPage() {
                       })}
                     />
                   )}
+                 </ProjectBoardWorkspaceProvider>
                  </WithdrawalWorkspaceProvider>
+
                  </AssignmentWorkspaceProvider>
                 </ProjectWorkspaceProvider>
               </DeveloperWorkspaceProvider>

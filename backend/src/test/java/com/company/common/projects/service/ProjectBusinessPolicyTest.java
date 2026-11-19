@@ -15,6 +15,13 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ProjectBusinessPolicyTest {
+    @Test void futureProgressPolicyIsSeparateFromPublicHttpAndUsesAssignedProjectUnion() {
+        var grants=List.of(new Grant("PROJ",Set.of(),Set.of("one")),new Grant("PROJ",Set.of(),Set.of("two")));
+        assertThat(ProjectBusinessPolicy.canManageProgress(Set.of("ADMIN"),List.of(),"any")).isTrue();
+        assertThat(ProjectBusinessPolicy.canManageProgress(Set.of("PM"),grants,"two")).isTrue();
+        assertThat(ProjectBusinessPolicy.canManageProgress(Set.of("PM"),grants,"other")).isFalse();
+        assertThat(ProjectBusinessPolicy.canManageProgress(Set.of("FIN"),grants,"two")).isFalse();
+    }
     @ParameterizedTest @ValueSource(strings={"ADMIN","PM"}) void administratorOrResponsiblePmMaySave(String role) {
         assertThat(ProjectBusinessPolicy.canSaveManpower(Set.of(role),List.of(new Grant("PROJ",Set.of(),Set.of("P-owned"))),"P-owned")).isTrue();
     }
@@ -31,4 +38,15 @@ class ProjectBusinessPolicyTest {
         assertThatThrownBy(()->service.putCommonProjectManpowerPlan("P-owned",new ManpowerInput(List.of(new JobInput("BE",BigDecimal.ONE))))).isInstanceOfSatisfying(CodeFailure.class,e->assertThat(e.getStatus()).isEqualTo(403));
         verify(mapper,never()).savePlan(any());
     }
+    @Test void stageCreationFailureDoesNotBlockStartingTheProject() {
+        var mapper=mock(ProjectMapper.class);var calendar=new BusinessCalendar(Clock.fixed(Instant.parse("2026-11-15T00:00:00Z"),ZoneOffset.UTC));
+        var p=new Project();p.projectId="P-pre";p.startDate=LocalDate.of(2026,11,1);p.endDate=LocalDate.of(2026,12,31);p.statusCode="PRE";p.contractTypeCode="MO";
+        when(mapper.lockProject("P-pre")).thenReturn("P-pre");
+        when(mapper.selectProject(eq("P-pre"),any(),anyString())).thenReturn(p);
+        var service=new CommonProjectService(mapper,calendar,new CurrentBusinessActor(),mock(ProjectAmountRules.class),new ExcelExportService(),mock(ProjectProgressRules.class));
+        service.setApplicationEventPublisher(event -> { throw new IllegalStateException("PROJ_STEP 공통코드 정의를 확인해 주세요."); });
+        assertThat(service.postCommonProjectStart("P-pre").projectId).isEqualTo("P-pre");
+        verify(mapper).start("P-pre");
+    }
 }
+

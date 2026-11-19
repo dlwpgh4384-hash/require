@@ -1,6 +1,8 @@
 package com.company.common.projects.service;
 
 import com.company.common.calculation.service.CalculationRuleService;
+import com.company.common.common.ProjectBoardLifecycle;
+import com.company.common.common.ProjectBoardSignalRules;
 import com.company.common.projects.dto.ProjectContracts.*;
 import com.company.common.projects.mapper.ProjectRows.Cost;
 import com.company.common.projects.mapper.ProjectRows.HealthSource;
@@ -9,16 +11,17 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ProjectProgressRules {
     private final CalculationRuleService definitions;
-    public ProjectProgressRules(CalculationRuleService definitions) { this.definitions = definitions; }
-    private static final Pattern TRAFFIC = Pattern.compile(
-        "일정늦음=실적진척률−계획진척률\\(음수\\).위험:일정([0-9]+)%p이상늦음/진척대비원가([0-9]+)%p이상/기한지난“높음”이슈."
-        + "주의:일정([0-9]+)%p이상늦음/진척대비원가([0-9]+)%p이상/기한지난이슈/마지막주간메모가([0-9]+)일넘음.그밖은정상");
+    private final ProjectBoardSignalRules signals;
+
+    public ProjectProgressRules(CalculationRuleService definitions, ProjectBoardSignalRules signals) {
+        this.definitions = definitions;
+        this.signals = signals;
+    }
 
     public List<Cost> classifyCosts(List<Cost> sources, String status) {
         if ("LOSE".equals(status) && sources.stream().anyMatch(c -> "PRE".equals(c.costClassCode))) {
@@ -35,35 +38,39 @@ public class ProjectProgressRules {
         }).toList();
     }
 
-    public String trafficLight(Project project, HealthSource source, List<Cost> costs, LocalDate today) {
-        var expression = TRAFFIC.matcher(definitions.definition("식-76").formula().replaceAll("\\s+", ""));
-        if (!expression.matches()) throw new IllegalStateException("지원하지 않는 계산식입니다: 식-76");
+    /**
+     * 프로젝트 목록·상세의 신호등(식-76): 현황판(UI-31)과 같은 판정 부품(ProjectBoardSignalRules)을 쓴다.
+     * 메모·원가가 없어도 판정한다(메모가 없으면 단계를 처음 만든 날부터 센다). 종료·실주 프로젝트는 판정하지 않는다(null).
+     */
+    public Health signal(Project project, HealthSource source, List<Cost> costs, LocalDate today) {
+        if (!ProjectBoardLifecycle.visible(ProjectBoardLifecycle.effectiveStatus(project.statusCode, project.endDate, today)))
+            return null;
+        HealthSource health = source == null ? new HealthSource() : source;
         Progress progress = project.progress;
-        if (progress == null || progress.plannedProgressRate() == null || progress.actualProgressRate() == null
-                || source == null || source.latestMemoDate == null) return null;
-        BigDecimal lag = progress.plannedProgressRate().subtract(progress.actualProgressRate());
-        BigDecimal costOver = null;
-        if ("TK".equals(project.contractTypeCode)) {
-            if (costs.isEmpty() || project.budgetAmount == null || project.budgetAmount.signum() <= 0) return null;
-            definitions.definition("식-75");
-            BigDecimal total = costs.stream().map(c -> c.totalAmount).reduce(source.additionalExpenseAmount, BigDecimal::add);
-            costOver = total.multiply(BigDecimal.valueOf(100)).divide(project.budgetAmount, 1, RoundingMode.HALF_UP)
-                .subtract(progress.actualProgressRate());
+        BigDecimal planned = progress == null ? null : progress.plannedProgressRate();
+        BigDecimal actual = progress == null ? null : progress.actualProgressRate();
+        if (actual == null && measured(project.contractTypeCode)) actual = BigDecimal.ZERO;
+        BigDecimal usage = null, costGap = null;
+        if ("TK".equals(project.contractTypeCode) && project.budgetAmount != null && project.budgetAmount.signum() > 0) {
+            BigDecimal start = health.additionalExpenseAmount == null ? BigDecimal.ZERO : health.additionalExpenseAmount;
+            BigDecimal total = (costs == null ? List.<Cost>of() : costs).stream()
+                .map(c -> c.totalAmount == null ? BigDecimal.ZERO : c.totalAmount).reduce(start, BigDecimal::add);
+            usage = total.multiply(BigDecimal.valueOf(100)).divide(project.budgetAmount, 1, RoundingMode.HALF_UP);
+            if (actual != null) costGap = usage.subtract(actual).setScale(1, RoundingMode.HALF_UP);
         }
-        if (lag.compareTo(new BigDecimal(expression.group(1))) >= 0 || source.overdueHighIssue
-                || costOver != null && costOver.compareTo(new BigDecimal(expression.group(2))) >= 0) return "위험";
-        if (lag.compareTo(new BigDecimal(expression.group(3))) >= 0 || source.overdueIssue
-                || costOver != null && costOver.compareTo(new BigDecimal(expression.group(4))) >= 0
-                || ChronoUnit.DAYS.between(source.latestMemoDate, today) > Long.parseLong(expression.group(5))) return "주의";
-        return "정상";
+        var result = signals.evaluate(new ProjectBoardSignalRules.Source(project.contractTypeCode, planned, actual,
+            costGap, health.latestMemoDate, health.stagesCreatedDate, health.overdueHighCount, health.overdueCount), today);
+        return new Health(result, usage, costGap);
     }
+    /** 신호등 판정 결과와 턴키 원가 사용률·진척 대비 원가(%, %p). */
+    public record Health(ProjectBoardSignalRules.Result result, BigDecimal costUsageRate, BigDecimal costProgressGap) {}
+
+    /** 실적 진척률을 PM이 적는 유형(턴키·내부). 안 적었으면 0%로 본다(식-74, Q-식-73). */
+    public static boolean measured(String type) { return "TK".equals(type) || "IN".equals(type); }
+
+    /** 식-73 계획 진척률. 식 글은 화면이 TB_SY_CALC_RULE에서 읽어 보여 주고, 계산은 이 코드대로 한다(글이 조금 달라도 멈추지 않음). */
     public Progress progress(String type, List<Step> steps, BigDecimal actual, LocalDate today) {
         if (steps.isEmpty()) return new Progress(null, actual, steps);
-        definitions.definition("식-00"); definitions.definition("식-72");
-        String expression = definitions.definition("식-73").formula().replaceAll("\\s+", "");
-        if (!expression.equals("계획진척률=오늘까지끝났어야할단계비중의합+진행중인단계비중×(지난날÷그단계날수)"))
-            throw new IllegalStateException("지원하지 않는 계산식입니다: 식-73");
-        definitions.definition("식-74");
         BigDecimal planned = BigDecimal.ZERO;
         for (Step step : steps) {
             if (step.weightRate == null || step.plannedStartDate == null || step.plannedEndDate == null) return new Progress(null, actual, steps);

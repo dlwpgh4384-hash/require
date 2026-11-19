@@ -1901,6 +1901,69 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/project-issues/excel:
+    get:
+      operationId: getCommonProjectBoardIssuesExcel
+      summary: 이슈 모아 보기 엑셀 다운로드(SFR-011)
+      description: 이슈 모아 보기와 같은 조건(statusCode·overdue·importanceCode·projectId·all)의 전체 결과를 목록 순서 그대로 xlsx로 내려준다. 열은 중요도·제목·프로젝트·담당자·기한(지나면 「N일 지남」)·상태·조치 내용·등록일(한국 날짜). 파일 1행에 받은 사람·한국 시각, 파일 이름 「프로젝트 이슈_다운로드일시.xlsx」, 접근 기록 DNLD(화면 UI-31).
+      security: []
+      parameters:
+      - name: statusCode
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: ISSUE_STAT 원천; 생략 시 열림·조치 중
+      - name: overdue
+        in: query
+        required: false
+        schema:
+          type: boolean
+        description: true면 기한 지난 것만
+      - name: importanceCode
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: IMPR 원천
+      - name: projectId
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 기존 프로젝트 식별자
+      - name: all
+        in: query
+        required: false
+        schema:
+          type: boolean
+        description: true면 상태 상관없이 전부
+      responses:
+        '200':
+          description: 이슈 모아 보기 엑셀 파일(0건이면 머리글만)
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: 기존 ExcelExportService 파일 이름·인코딩 관례(filename*=UTF-8'')
+            X-Total-Count:
+              schema:
+                type: integer
+              description: 파일에 담은 조회 결과 건수
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: statusCode·importanceCode 코드 오류 또는 projectId 형식 오류; 해당 필드 오류 반환, 파일·접근 기록 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
     ApiError:
@@ -2946,7 +3009,33 @@ components:
           nullable: true
         trafficLight:
           type: string
-          description: 식-76 DB 정의의 표시 결과; enum 원문 확보
+          description: 식-76 신호등(현황판과 같은 판정). 종료·실주는 없음
+        signalReasons:
+          type: array
+          description: 신호등 이유(현황판과 같은 문구·순서). 종료·실주는 없음
+          items:
+            type: string
+        signalReasonLevels:
+          type: array
+          description: signalReasons와 같은 순서의 등급(위험·주의)
+          items:
+            type: string
+        lastUpdateDate:
+          type: string
+          format: date
+          description: 마지막 업데이트(마지막 주간 메모 작성일, 없으면 단계를 처음 만든 날)
+        daysWithoutUpdate:
+          type: integer
+          description: 마지막 업데이트 뒤 지난 날 수
+        staleUpdate:
+          type: boolean
+          description: 14일 넘게 업데이트 없음
+        costUsageRate:
+          type: number
+          description: 턴키만 원가 사용률(%), 예산이 없으면 없음
+        costProgressGap:
+          type: number
+          description: 턴키만 진척 대비 원가(%p) = 원가 사용률 − 실적 진척률
         preContractPeopleCount:
           type: integer
         loseDate:
@@ -3029,7 +3118,8 @@ components:
       - contractAmount
       - canEdit
       - canSaveManpowerPlan
-      description: 진행현황·신호등 식-67/76 세부 결과는 DB정의 확보 OQ-CALC-001; 이슈 SFR-131의 공개필드/연결은 OQ-ISSUE-001로 국소 보류. 빈 object를 완료된 이슈 계약으로 내보내지 않음.
+      description: 진행현황·신호등 식-67/76 세부 결과는 DB정의 확보 OQ-CALC-001; 이슈 SFR-131의 공개필드/연결은 OQ-ISSUE-001로 국소 보류. 빈 object를
+        완료된 이슈 계약으로 내보내지 않음.
     CommonProjectAssignment:
       type: object
       properties:

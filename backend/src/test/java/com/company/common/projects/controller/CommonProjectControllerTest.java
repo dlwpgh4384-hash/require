@@ -30,12 +30,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(CommonProjectController.class)
 @ContextConfiguration(classes = {CommonProjectController.class, CommonProjectService.class,
-    CodeExceptionHandler.class, ApiExceptionHandler.class, CurrentBusinessActor.class, ExcelExportService.class})
+    CodeExceptionHandler.class, ApiExceptionHandler.class, CurrentBusinessActor.class, ExcelExportService.class,
+    com.company.common.projects.service.ProjectStageService.class})
 class CommonProjectControllerTest {
     @org.springframework.boot.test.mock.mockito.MockBean com.company.common.projects.service.ProjectProgressRules progressRules;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @MockBean ProjectMapper mapper;
+    @MockBean com.company.common.projects.mapper.ProjectProgressMapper progressMapper;
     @MockBean BusinessCalendar calendar;
     @MockBean ProjectAmountRules amounts;
     @MockBean PlatformTransactionManager transactions;
@@ -99,6 +101,17 @@ class CommonProjectControllerTest {
         p.budgetAmount=new BigDecimal("800000"); p.budgetManualYn="N";
         p.teamExpenseAmount=new BigDecimal("50000"); p.projectExpenseAmount=p.teamExpenseAmount;
         projects.put(p.projectId,p);
+        when(progressMapper.lockOwner(anyString())).thenAnswer(call -> {
+            Project stored = projects.get(call.getArgument(0));
+            return stored == null ? null : new com.company.common.projects.mapper.ProjectProgressMapper.Owner(
+                stored.projectId, stored.contractTypeCode, stored.statusCode, stored.startDate, stored.endDate);
+        });
+        var stageDefinitions = new ArrayList<com.company.common.common.ProjectBoardStageCalendar.Definition>();
+        for (int i = 1; i <= 7; i++) stageDefinitions.add(new com.company.common.common.ProjectBoardStageCalendar.Definition(
+            "T" + i, "단계" + i, BigDecimal.valueOf(i == 7 ? 40 : 10), "TK,IN", i));
+        for (int i = 1; i <= 5; i++) stageDefinitions.add(new com.company.common.common.ProjectBoardStageCalendar.Definition(
+            "M" + i, "단계" + i, BigDecimal.valueOf(20), "MO,DP", i));
+        when(progressMapper.stageDefinitions()).thenReturn(stageDefinitions);
         var first=new SalesPart(); first.salesPartId="first"; first.salesPartName="원래 파트"; first.effectiveMonth="2025-01"; first.changedBy="admin"; parts.add(first);
     }
     ObjectNode createInput() {
@@ -112,7 +125,7 @@ class CommonProjectControllerTest {
         var b=createInput(); b.remove(List.of("contractTypeCode","statusCode","salesPartId")); b.putNull("modifiedAt"); return b;
     }
     @Test
-    @DisplayName("auth happy side-effect: 무인증 admin 프로젝트 등록과 최초 계약·파트 이력")
+    @DisplayName("auth happy side-effect: 무인증 admin 프로젝트 등록과 최초 계약·파트 이력 및 TB_PJ_STEP")
     void anonymousCreatePersistsAutoIdOriginalDefaultsAndInitialHistories() throws Exception {
         mvc.perform(post("/api/common/projects").contentType("application/json").content(createInput().toString()))
             .andExpect(status().isOk()).andExpect(response("POST", "/api/common/projects"))
@@ -125,6 +138,7 @@ class CommonProjectControllerTest {
         assertThat(history).anySatisfy(h -> { assertThat(h.code()).isEqualTo("CTRT"); assertThat(h.actor()).isEqualTo("admin"); });
         assertThat(parts).anySatisfy(p -> assertThat(p.effectiveMonth).isEqualTo("2026-11"));
         assertThat(projects.get("P-0002").originalContractAmount).isEqualByComparingTo("1000000");
+        verify(progressMapper, times(5)).insertStage(argThat(w -> w.projectId().equals("P-0002") && w.actor().equals("admin")));
     }
     @Test void internalBlankContractIsZeroAndHasNoCustomerBudgetOrWorkplace() throws Exception {
         var b=createInput(); b.put("contractTypeCode","IN"); b.remove(List.of("customerId","salesPartId","contractAmount"));
@@ -389,13 +403,14 @@ class CommonProjectControllerTest {
             .andExpect(status().isBadRequest());
     }
     @Test
-    @DisplayName("auth happy side-effect: 무인증 TB_PJ_PROJ PROJ_STAT_CD만 진행 변경, 추가 audit 없음")
+    @DisplayName("auth happy side-effect: 무인증 TB_PJ_PROJ 진행 변경 및 누락 TB_PJ_STEP 생성, 추가 audit 없음")
     void startChangesOnlyStateAndCreatesNoDuplicateContract() throws Exception {
         mvc.perform(post("/api/common/projects/P-0001/start")).andExpect(status().isOk())
             .andExpect(response("POST", "/api/common/projects/{projectId}/start"))
             .andExpect(jsonPath("$.data.statusCode").value("ING"));
         verify(mapper).start("P-0001"); verify(mapper,never()).insertHistory(any());
         assertThat(history).isEmpty(); verify(mapper,never()).insertPart(any());
+        verify(progressMapper, times(5)).insertStage(argThat(w -> w.projectId().equals("P-0001") && w.actor().equals("admin")));
     }
     @ParameterizedTest @ValueSource(strings={"ING","END","LOSE"})
     @DisplayName("business: 진행·종료·실주는 진행전환 거부, PROJ_STAT_CD 보존")

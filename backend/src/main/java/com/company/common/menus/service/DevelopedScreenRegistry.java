@@ -11,7 +11,7 @@ public class DevelopedScreenRegistry {
             new Screen("UI-25", "메뉴"), new Screen("UI-27", "공통코드"),
             new Screen("UI-15", "거래처·영업 파트"), new Screen("UI-02", "개발자 풀"),
             new Screen("UI-01", "프로젝트"), new Screen("UI-12", "투입 배정"),
-            new Screen("UI-11", "인원 계획 대비 투입"));
+            new Screen("UI-11", "인원 계획 대비 투입"), new Screen("UI-31", "프로젝트 현황판"));
     }
 
     public boolean contains(String scrnId) {

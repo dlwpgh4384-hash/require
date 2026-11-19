@@ -35,7 +35,7 @@ class ProjectProgressRulesTest {
             assertThat(row.find()).as(id).isTrue();
             when(metadata.definition(id)).thenReturn(new Definition(id, row.group(1), ""));
         }
-        rules = new ProjectProgressRules(metadata);
+        rules = new ProjectProgressRules(metadata, new com.company.common.common.ProjectBoardSignalRules());
         project = new Project(); project.projectId = "P-0001"; project.contractTypeCode = "IN";
         project.statusCode = "ING"; project.budgetAmount = new BigDecimal("1000");
         progress("50", "50");
@@ -47,7 +47,10 @@ class ProjectProgressRulesTest {
     Cost cost(String category, String amount) {
         var c = new Cost(); c.yearMonth = "202611"; c.costClassCode = category; c.totalAmount = new BigDecimal(amount); return c;
     }
-    String light(List<Cost> costs) { return rules.trafficLight(project, source, costs, today); }
+    String light(List<Cost> costs) {
+        var health = rules.signal(project, source, costs, today);
+        return health == null ? null : health.result().signal();
+    }
 
     @ParameterizedTest @CsvSource({"40,위험", "40.1,주의", "45,주의", "45.1,정상"})
     void scheduleThresholdsAreInclusiveAndUseDisplayedPrecision(String actual, String expected) {
@@ -70,11 +73,11 @@ class ProjectProgressRulesTest {
         assertThat(light(List.of(cost("ALLOC", "500")))).isEqualTo("위험");
     }
     @Test void overdueHighIssueWinsOverLesserWarnings() {
-        source.overdueHighIssue = true; source.overdueIssue = true; source.latestMemoDate = today.minusDays(15);
+        source.overdueHighCount = 1; source.overdueCount = 1; source.latestMemoDate = today.minusDays(15);
         assertThat(light(List.of())).isEqualTo("위험");
     }
     @Test void overdueNonclosedIssueWarns() {
-        source.overdueIssue = true;
+        source.overdueCount = 2;
         assertThat(light(List.of())).isEqualTo("주의");
     }
     @Test void memoFreshnessUsesWrittenDateWithStrictFourteenDayBoundary() {
@@ -83,21 +86,39 @@ class ProjectProgressRulesTest {
         source.latestMemoDate = today.minusDays(15);
         assertThat(light(List.of())).isEqualTo("주의");
     }
-    @Test void missingProgressDoesNotBecomeZeroOrNormal() {
+    @Test void missingProgressStillJudgesOtherSignalsSoTheBannerStays() {
         project.progress = new Progress(null, BigDecimal.TEN, List.of());
-        assertThat(light(List.of())).isNull();
+        assertThat(light(List.of())).isEqualTo("정상");
+        source.overdueCount = 1;
+        assertThat(light(List.of())).isEqualTo("주의");
     }
-    @Test void missingMemoRemainsUnavailable() {
+    @Test void missingMemoCountsFromStageCreationDate() {
         source.latestMemoDate = null;
-        assertThat(light(List.of())).isNull();
+        assertThat(light(List.of())).isEqualTo("정상");
+        source.stagesCreatedDate = today.minusDays(15);
+        var health = rules.signal(project, source, List.of(), today);
+        assertThat(health.result().signal()).isEqualTo("주의");
+        assertThat(health.result().signalReasons()).containsExactly("15일째 상태 업데이트 없음");
+        assertThat(health.result().lastUpdateDate()).isEqualTo(today.minusDays(15));
     }
-    @Test void turnkeyWithoutCostSourcesRemainsUnavailable() {
+    @Test void turnkeyWithoutCostSourcesIsZeroUsage() {
         project.contractTypeCode = "TK";
-        assertThat(light(List.of())).isNull();
+        var health = rules.signal(project, source, List.of(), today);
+        assertThat(health.result().signal()).isEqualTo("정상");
+        assertThat(health.costUsageRate()).isEqualByComparingTo("0");
     }
     @Test void zeroBudgetIsNotAnInventedCostRate() {
         project.contractTypeCode = "TK"; project.budgetAmount = BigDecimal.ZERO;
-        assertThat(light(List.of(cost("ALLOC", "1")))).isNull();
+        var health = rules.signal(project, source, List.of(cost("ALLOC", "1")), today);
+        assertThat(health.result().signal()).isEqualTo("정상");
+        assertThat(health.costUsageRate()).isNull();
+        assertThat(health.costProgressGap()).isNull();
+    }
+    @Test void endedAndLostProjectsAreNotJudged() {
+        project.statusCode = "LOSE";
+        assertThat(light(List.of())).isNull();
+        project.statusCode = "ING"; project.endDate = today.minusDays(1);
+        assertThat(light(List.of())).isNull();
     }
     @Test void lostPreCostsAreReadAsIdleWithoutChangingAmountsOrSourceObjects() {
         var before = cost("PRE", "123456");
@@ -107,9 +128,10 @@ class ProjectProgressRulesTest {
         assertThat(before.costClassCode).isEqualTo("PRE");
         assertThat(rules.classifyCosts(List.of(before), "PRE").get(0).costClassCode).isEqualTo("PRE");
     }
-    @Test void unknownTrafficDefinitionIsRejectedInsteadOfEvaluated() {
-        when(metadata.definition("식-76")).thenReturn(new Definition("식-76", "Runtime.exec()", ""));
-        assertThatThrownBy(() -> light(List.of())).isInstanceOf(IllegalStateException.class).hasMessageContaining("식-76");
+    @Test void slightlyDifferentDefinitionTextDoesNotStopTheJudgment() {
+        when(metadata.definition("식-76")).thenReturn(new Definition("식-76", "문구가 조금 다른 식", ""));
+        when(metadata.definition("식-73")).thenReturn(new Definition("식-73", "문구가 조금 다른 식", ""));
+        assertThat(light(List.of())).isEqualTo("정상");
     }
     @Test void listAndDetailUseTheSamePersistedHealthInputsAndLossCostAdapter() {
         var mapper = mock(ProjectMapper.class); var calendar = mock(BusinessCalendar.class);
@@ -125,12 +147,14 @@ class ProjectProgressRulesTest {
         when(mapper.selectProjects(today, "202611")).thenReturn(List.of(project));
         var service = new CommonProjectService(mapper, calendar, new CurrentBusinessActor(),
             mock(ProjectAmountRules.class), new ExcelExportService(), rules);
-        source.overdueHighIssue = true;
+        source.overdueHighCount = 1; source.overdueCount = 1;
         assertThat(service.getCommonProjects().items().get(0).trafficLight).isEqualTo("위험");
+        assertThat(service.getCommonProject(project.projectId).signalReasons).containsExactly("기한 지난 중요(높음) 이슈 1건");
+
         assertThat(service.getCommonProject(project.projectId).trafficLight).isEqualTo("위험");
         project.statusCode = "LOSE";
         assertThat(service.getProjectCosts(project.projectId).get(0).costClassCode).isEqualTo("IDLE");
         verify(mapper, never()).updateProject(any());
-        verify(mapper, times(2)).healthSource(project.projectId, today);
+        verify(mapper, times(3)).healthSource(project.projectId, today);
     }
 }

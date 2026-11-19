@@ -144,7 +144,7 @@ function SessionTimer({ onExtend }: { onExtend: () => void }) {
 }
 
 /** 로그인(UI-22) 전까지 서버 사용자는 admin으로 고정한다. 헤더 이름 자리에 그대로 보인다. */
-const CURRENT_USER = { name: "시스템 관리자", role: "관리자" };
+export const CURRENT_USER = { name: "시스템 관리자", role: "관리자" };
 
 export function UserPreferenceTools({
   menus,

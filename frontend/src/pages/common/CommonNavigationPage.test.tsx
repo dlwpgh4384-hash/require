@@ -526,8 +526,11 @@ describe("common placeholder screen contract", () => {
         for (const name of ["조회", "저장", "다운로드", "업로드", "편집"]) {
           if (id === "UI-25" && name === "저장")
             expect(screen.getByRole("button", { name })).toBeEnabled();
-          // 철수 리스트·인원 계획 대비 투입: 글 칸은 없지만 시안 조건 줄의 [조회]가 있다.
-          else if ((id === "UI-05" || id === "UI-11") && name === "조회")
+          // 철수 리스트·인원 계획 대비 투입·프로젝트 현황판: 글 칸은 없지만 시안 조건 줄의 [조회]가 있다.
+          else if (
+            (id === "UI-05" || id === "UI-11" || id === "UI-31") &&
+            name === "조회"
+          )
             expect(screen.getByRole("button", { name })).toBeEnabled();
           else
             expect(

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Banner, DetailPanel, KeyValues } from "../../shared/list";
+import { DetailPanel, KeyValues } from "../../shared/list";
 import { projectFailure } from "../projects/projects";
 import {
   getCommonWithdrawalRecommendations,
@@ -115,12 +115,13 @@ export function WithdrawalRecommendations({
       {data && (
         <>
           {target?.tentativeOpportunityName && (
-            <Banner kind="info">
+            // 아이콘과 글을 띠 안에 나란히 둔다(공통 Banner는 둘을 한 칸에 묶어 줄이 어긋남, 2026-11-19 사용자 발견).
+            <div className="ls-banner ls-banner-info" role="status" data-testid="banner-info">
               {infoIcon}
               <span data-testid="withdrawal-current-tentative">
                 지금 가배정: {target.tentativeOpportunityName} ({target.tentativeStartMonth}부터)
               </span>
-            </Banner>
+            </div>
           )}
           <KeyValues
             items={[

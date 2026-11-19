@@ -1,0 +1,100 @@
+.personal-cost-profit-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.personal-cost-profit-period {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.personal-cost-profit-period .year-bar {
+  flex: 1;
+}
+.personal-cost-profit-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.personal-cost-profit-summary section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.personal-cost-profit-summary strong {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.personal-cost-profit-summary small {
+  color: var(--muted);
+}
+.personal-cost-profit-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.personal-cost-profit-over {
+  display: inline-block;
+  margin-left: 6px;
+  color: var(--danger);
+  font-size: 11px;
+}
+.personal-cost-profit-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.personal-cost-profit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.personal-cost-profit-table th,
+.personal-cost-profit-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  text-align: right;
+}
+.personal-cost-profit-table th:first-child,
+.personal-cost-profit-table td:first-child {
+  text-align: left;
+}
+.personal-cost-profit-advanced {
+  display: flex;
+  gap: 12px;
+}
+.personal-cost-profit-advanced label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 12px;
+}
+.personal-cost-profit-note p {
+  line-height: 1.7;
+  color: var(--muted);
+}
+.personal-cost-profit-page summary {
+  cursor: pointer;
+  padding: 8px 0;
+}
+@media (max-width: 1100px) {
+  .personal-cost-profit-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .personal-cost-profit-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .personal-cost-profit-period {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

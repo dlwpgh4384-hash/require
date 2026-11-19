@@ -8646,6 +8646,340 @@ paths:
       - 최근행·적격 -> 다음달 신규미수
       - 중복·마감·공급가0·턴키·계약밖 -> 거부·무변경
 
+  /api/common/personal-cost-profits:
+    get:
+      operationId: getCommonPersonalCostProfits
+      summary: 개인 원가·수익 조회
+      security: []
+      description: UI-03 readonly 집계. 마감월은 TB_CO_MON_COST 저장값, 미마감월은 현재 투입·급여자료와 DB 식으로 계산해 포함한다. 사람당 한 줄·투입별 펼침·요약5칸·직무등급표·합계를
+        같은 응답으로 반환한다. 목록의 프로젝트/계약유형/가득률 열은 없고 프로젝트는 펼침에서 읽는다. 현재 개발 admin이며 로그인/메뉴검사는 UI-22 후속. 분모0/정확 금액/필터집계범위는
+        OQ-CALC/QUERY-003 국소 검토다.
+      x-related-requirements:
+      - REQ-722
+      - REQ-771
+      - REQ-750
+      - REQ-751
+      - REQ-752
+      - REQ-754
+      - REQ-755
+      - REQ-756
+      - REQ-757
+      - REQ-758
+      - REQ-759
+      - REQ-760
+      - REQ-761
+      - REQ-762
+      - REQ-764
+      - REQ-765
+      - REQ-769
+      - REQ-770
+      - REQ-772
+      x-aiops-query-role:
+        entity: TB_CO_MON_COST
+        result_path:
+        - data
+        - items
+      x-pagination-filtering:
+        pagination: 조건에 맞는 전체 사람 결과를 반환·서버 페이지 파라미터 없음. ListView 기존 로컬 페이지 사용
+        filtering: year/baseMonth/displayMode 필수; 이름 일부·직원구분·소속·영업파트·직무·상세보기·턴키 포함 선택. 계약유형 필터 없음
+        ordering: 열 순서는 B.4/요청57행. 행 정렬/요약 필터 범위는 OQ-QUERY-003으로 확정 전 임의 규칙 금지
+      x-business-rules:
+      - 누계는 올해1월~기준월·지난해12월까지 합, 월 평균은 일한 달만 분모로 쓰며 급여/원가는 근무월·프리랜서/외주는 투입월을 따른다. 보기만 바뀐다.
+      - 개별 ▸ 또는 프로젝트 모두 펼치기로 프로젝트별 줄과 MM·단가·배분 원가·이익·남는 몫(대기 원가)을 읽는다. 마감월은 투입ID별 TB_CO_MON_COST 한 줄을 그대로 펼친다.
+      - 마감월의 팀비·프로젝트경비는 TB_CO_MON_COST.TEAM_EXPS_AMT·PROJ_EXPS_AMT를 읽고 추가 직접 경비는 사람에게 배분하지 않는다.
+      - 월 MM 합1.0 초과는 「1.0 초과」로 표시한다.
+      - 단가0이면 이익률을 「–」로 표시한다.
+      - 내부·대기 인력의 영업이익은 −원가합계로 계산한다.
+      - 휴직자는 사람 표에서 제외하지만 총 인원에는 포함하며 업로드된 휴직자 비용은 대기 원가에 포함한다.
+      - 마감하지 않은 달도 현재 투입·급여 업로드 자료로 계산해 누계에 포함하며 마감한 달만 TB_CO_MON_COST 저장값을 읽는다.
+      x-side-effects:
+      - 원가·급여·투입·마감 원자료 쓰기0, 계산결과 저장표/새 배치0. 읽기 GET에서 DNLD를 만들지 않는다.
+      x-required-tests:
+      - 'happy: 같은 사람의 복수 투입/마감·미마감 원천으로 유효 조회 -> 200 data.items는 사람당1줄이며 summary·totals·contributions와 투입별 allocations가
+        반환된다.'
+      - 'auth: 인증 헤더 없이 기존 개발 admin 조회 -> 200이며 monthlySalary/personalCost 허용, 새 로그인 이동/401/403 없음.'
+      - 'validation: baseMonth=0 또는13·displayMode 미등록값으로 조회 -> 400 ApiError.success=false/meta 및 errors[].field에
+        baseMonth/displayMode 오류, 원천 무변경.'
+      - 'business: 같은 프로젝트에 유상/무상지원2투입이 있는 마감월 조회 -> allocations에2줄·금액은 저장값이며 추가 직접 경비가 개인에게 배분되지 않는다.'
+      - 'side-effect: 연누계/월평균 왕복 후 DB snapshot 조회 -> TB_CO_MON_COST·TB_HR_MON_PAY·TB_PJ_ASGN_MON 행/값 불변·새 DNLD0행.'
+      - 'boundary: MM합1.0과1.0초과·단가0 fixture 조회 -> 첫 행 mmOverOne=false·초과 true·단가0 profitRate=null이고 UI는 –로 표시한다.'
+      - 'live-month: 미마감 급여 업로드 변경 뒤 같은 기간 재조회 -> 미마감 산출은 새 원천 반영·마감월 원가/TEAM_EXPS_AMT/PROJ_EXPS_AMT는 snapshot 그대로.'
+      - 'leave: 휴직자 급여 있는 fixture 조회 -> 그 사람은 items에 없고 totalPeople에 포함·업로드 비용은 대기 집계에 남는다.'
+      - 'sensitive-policy: 기존 정책의 비민감 역할을 독립 함수에 전달 -> monthlySalary/personalCost 비노출; 현재 HTTP 역할 전환/임의403은 추가하지
+        않는다.'
+      parameters:
+      - name: year
+        in: query
+        required: true
+        description: 선택 연도·기존 YearBar 허용 범위. 지난해는12월까지 합산
+        schema:
+          type: integer
+      - name: baseMonth
+        in: query
+        required: true
+        description: 기준월; 올해는1월~기준월, 지난해는12월까지. 공통 기간 선택값 사용
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
+      - name: displayMode
+        in: query
+        required: true
+        description: 연 누계/월 평균 표시 전환·저장 없음
+        schema:
+          type: string
+          enum:
+          - 연누계
+          - 월평균
+      - name: name
+        in: query
+        required: false
+        description: 이름 일부 일치·한 명 찾기
+        schema:
+          type: string
+      - name: employeeTypeCode
+        in: query
+        required: false
+        description: EMP_TYPE 코드
+        schema:
+          type: string
+      - name: affiliationId
+        in: query
+        required: false
+        description: 기존 소속 식별자
+        schema:
+          type: string
+      - name: salesPartId
+        in: query
+        required: false
+        description: 기존 영업 파트 식별자
+        schema:
+          type: string
+      - name: jobCode
+        in: query
+        required: false
+        description: JOB 코드
+        schema:
+          type: string
+      - name: view
+        in: query
+        required: false
+        description: 상세 조건 보기·초기값은 OQ-UI-003
+        schema:
+          type: string
+          enum:
+          - 전체
+          - 적자만
+          - 동시 투입·1.0 초과만
+      - name: includeTurnkey
+        in: query
+        required: false
+        description: 턴키 단가 포함/미포함·초기값은 OQ-UI-003
+        schema:
+          type: boolean
+      - name: columns
+        in: query
+        required: false
+        description: 보이는 열 키·기본은 요청57행 공개 기본열. 민감정책 우회 불가·B.4 순서는 서버가 유지
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - developerName
+            - affiliationName
+            - positionName
+            - employeeTypeName
+            - joinDate
+            - operatingRate
+            - mm
+            - unitPrice
+            - monthlySalary
+            - allowance
+            - companyInsurance
+            - retirementReserve
+            - personalCost
+            - teamExpenses
+            - projectExpenses
+            - totalCost
+            - operatingProfit
+            - profitRate
+            - personalInsurance
+            - withholdingTax
+            - incomeTax
+            - netPay
+      responses:
+        '200':
+          description: 개인별 행·요약·합계·직무등급 공헌이익. 민감필드는 기존정책으로 투영한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonPersonalCostProfitResult'
+        '400':
+          description: year/baseMonth/displayMode 누락·월1~12 밖·허용되지 않은 view/columns 등 형식 오류. ApiError.errors[].field에
+            해당 query 칸을 반환한다. 코드값의 실제 유효성은 기존 코드 원천을 따른다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/personal-cost-profits/excel:
+    get:
+      operationId: getCommonPersonalCostProfitsExcel
+      summary: 개인 원가·수익 엑셀
+      security: []
+      description: 화면과 동일 조건·보기·보이는 열 및 영업이익현황 B.4 순서의 xlsx. 다운로드 때 기존 접근기록 helper로 DNLD를 남긴다. 펼침행 포함·실패기록시점은 OQ-QUERY/DATA-003으로
+        남기며 임의 부가열을 만들지 않는다.
+      x-related-requirements:
+      - REQ-767
+      - REQ-737
+      - REQ-738
+      - REQ-765
+      - REQ-764
+      - REQ-757
+      - REQ-769
+      x-pagination-filtering:
+        pagination: 동일 조건의 전체 조회 인력·페이지 한정 아님
+        filtering: 개인조회와 같은 year/baseMonth/displayMode·선택필터·columns
+        ordering: 보이는 열을 B.4 순서로 출력하며 화면의 정책 적용 결과와 동일
+      parameters:
+      - name: year
+        in: query
+        required: true
+        description: 선택 연도·기존 YearBar 허용 범위. 지난해는12월까지 합산
+        schema:
+          type: integer
+      - name: baseMonth
+        in: query
+        required: true
+        description: 기준월; 올해는1월~기준월, 지난해는12월까지. 공통 기간 선택값 사용
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
+      - name: displayMode
+        in: query
+        required: true
+        description: 연 누계/월 평균 표시 전환·저장 없음
+        schema:
+          type: string
+          enum:
+          - 연누계
+          - 월평균
+      - name: name
+        in: query
+        required: false
+        description: 이름 일부 일치·한 명 찾기
+        schema:
+          type: string
+      - name: employeeTypeCode
+        in: query
+        required: false
+        description: EMP_TYPE 코드
+        schema:
+          type: string
+      - name: affiliationId
+        in: query
+        required: false
+        description: 기존 소속 식별자
+        schema:
+          type: string
+      - name: salesPartId
+        in: query
+        required: false
+        description: 기존 영업 파트 식별자
+        schema:
+          type: string
+      - name: jobCode
+        in: query
+        required: false
+        description: JOB 코드
+        schema:
+          type: string
+      - name: view
+        in: query
+        required: false
+        description: 상세 조건 보기·초기값은 OQ-UI-003
+        schema:
+          type: string
+          enum:
+          - 전체
+          - 적자만
+          - 동시 투입·1.0 초과만
+      - name: includeTurnkey
+        in: query
+        required: false
+        description: 턴키 단가 포함/미포함·초기값은 OQ-UI-003
+        schema:
+          type: boolean
+      - name: columns
+        in: query
+        required: false
+        description: 보이는 열 키·기본은 요청57행 공개 기본열. 민감정책 우회 불가·B.4 순서는 서버가 유지
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - developerName
+            - affiliationName
+            - positionName
+            - employeeTypeName
+            - joinDate
+            - operatingRate
+            - mm
+            - unitPrice
+            - monthlySalary
+            - allowance
+            - companyInsurance
+            - retirementReserve
+            - personalCost
+            - teamExpenses
+            - projectExpenses
+            - totalCost
+            - operatingProfit
+            - profitRate
+            - personalInsurance
+            - withholdingTax
+            - incomeTax
+            - netPay
+      x-business-rules:
+      - 민감열은 기존 허용정책과 현재 보이는 columns 교집합만 파일에 포함한다.
+      - 턴키 단가 미포함 파일은 동일 조건의 턴키단가미포함 결과와 일치한다.
+      x-side-effects:
+      - 기존 TB_SY_ACCS_LOG에 DNLD 기록; 저장 시각은 clock_timestamp(). 업무 원가/급여/투입 쓰기0.
+      x-required-tests:
+      - 'happy: 유효 조건과 보이는 열로 파일 GET -> 200 실제 xlsx이며 B.4 순서의 해당 사람/열이 있고 조회와 값이 같다.'
+      - 'auth: 무인증 현재 admin으로 다운로드 -> 200 파일 반환·로그인/새 메뉴검사 없음; 독립 비민감 정책 시험은 두 민감 열 제외.'
+      - 'validation: columns에 미등록 키 요청 -> 400 ApiError.errors[].field=columns이며 성공 파일로 위장하지 않는다.'
+      - 'business: 참고열을 끄고 턴키 미포함으로 다운로드 -> 파일에 숨긴 참고열 없고 턴키단가미포함 시트와 동일한 원천 결과다.'
+      - 'side-effect: 파일 성공 후 검수 DB TB_SY_ACCS_LOG 재조회 -> 해당 다운로드 DNLD와 저장 시각 존재·TB_CO_MON_COST 행/값 불변.'
+      responses:
+        '200':
+          description: 현재 보이는 열의 개인 원가·수익 xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: year/baseMonth/displayMode 누락·월1~12 밖·허용되지 않은 view/columns 등 형식 오류. ApiError.errors[].field에
+            해당 query 칸을 반환한다. 코드값의 실제 유효성은 기존 코드 원천을 따른다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
 components:
   schemas:
     CommonBillingRow:
@@ -10569,6 +10903,303 @@ components:
           items:
             $ref: '#/components/schemas/CommonCodeChangeHistory'
       additionalProperties: false
+    CommonPersonalCostProfitRow:
+      type: object
+      required:
+      - developerId
+      - developerName
+      - affiliationName
+      - positionName
+      - employeeTypeName
+      - joinDate
+      - operatingRate
+      - mm
+      - unitPrice
+      - allowance
+      - companyInsurance
+      - retirementReserve
+      - teamExpenses
+      - projectExpenses
+      - totalCost
+      - operatingProfit
+      - profitRate
+      - mmOverOne
+      - allocations
+      properties:
+        developerId:
+          type: string
+          description: 기존 개발자 식별자; 행 클릭 상세 연결
+        developerName:
+          type: string
+          description: 이름
+        affiliationName:
+          type: string
+          description: 소속
+        positionName:
+          type: string
+          description: 직위
+        employeeTypeName:
+          type: string
+          description: 직원구분
+        joinDate:
+          type: string
+          format: date
+          nullable: true
+          description: 입사일; 기존 원천의 빈 값 보존
+        operatingRate:
+          type: number
+          description: 가동률·식-96
+        mm:
+          type: number
+          description: MM
+        unitPrice:
+          type: number
+          description: 단가(매출)
+        monthlySalary:
+          type: number
+          description: 월 급여
+        allowance:
+          type: number
+          description: 수당
+        companyInsurance:
+          type: number
+          description: 4대보험(회사)
+        retirementReserve:
+          type: number
+          description: 퇴직금 적립
+        personalCost:
+          type: number
+          description: 개인별 원가
+        teamExpenses:
+          type: number
+          description: 팀비·마감월 TEAM_EXPS_AMT
+        projectExpenses:
+          type: number
+          description: 프로젝트경비·마감월 PROJ_EXPS_AMT
+        totalCost:
+          type: number
+          description: 원가합계
+        operatingProfit:
+          type: number
+          description: 영업이익
+        profitRate:
+          type: number
+          description: 이익률·단가0은null을 UI에서 –로 표시
+          nullable: true
+        personalInsurance:
+          type: number
+          description: 숨긴 참고 열·4대보험(본인)
+        withholdingTax:
+          type: number
+          description: 숨긴 참고 열·3.3% 원천세
+        incomeTax:
+          type: number
+          description: 숨긴 참고 열·근로소득세·급여 업로드 값
+        netPay:
+          type: number
+          description: 숨긴 참고 열·실지급액
+        mmOverOne:
+          type: boolean
+          description: 월 MM 합1.0 초과 표시
+        allocations:
+          type: array
+          description: 프로젝트/대기 펼침행. 마감월은 투입ID별 저장행 그대로, 같은 프로젝트 복수 투입은 병합하지 않음
+          items:
+            $ref: '#/components/schemas/CommonPersonalCostProfitAllocation'
+      description: 사람별 한 줄. 민감 필드는 기존 정책이 허용할 때만 제공; 참고열은 선택 columns에 있을 때 제공. 공개 DTO이지 물리 컬럼 정의가 아님.
+    CommonPersonalCostProfitAllocation:
+      type: object
+      required:
+      - yearMonth
+      - projectId
+      - assignmentId
+      - projectName
+      - jobName
+      - mm
+      - unitPrice
+      - allocatedCost
+      - operatingProfit
+      properties:
+        yearMonth:
+          type: string
+          description: 원천 연월
+        projectId:
+          type: string
+          nullable: true
+          description: 프로젝트 식별자·대기인 경우 기존 IDLE 의미 보존
+        assignmentId:
+          type: string
+          description: 투입ID·IDLE 대기 구분
+        projectName:
+          type: string
+          description: 프로젝트명 또는 남는 몫(대기 원가)
+        jobName:
+          type: string
+          nullable: true
+          description: 직무·대기는 원천 빈값 보존
+        mm:
+          type: number
+          description: MM
+        unitPrice:
+          type: number
+          description: 단가
+        allocatedCost:
+          type: number
+          description: 배분 원가
+        operatingProfit:
+          type: number
+          description: 이익
+    CommonPersonalCostProfitSummary:
+      type: object
+      required:
+      - totalPeople
+      - averageOperatingPeople
+      - averageEarningPeople
+      - averageUnitPrice
+      - averageCost
+      - averageOperatingProfit
+      - lossPeople
+      - operatingRate
+      - earningRate
+      properties:
+        totalPeople:
+          type: integer
+          description: 휴직 포함 총 인원
+        averageOperatingPeople:
+          type: number
+          description: 월평균 가동 인원·소수 첫째 자리
+        averageEarningPeople:
+          type: number
+          description: 월평균 가득 인원·소수 첫째 자리
+        averageUnitPrice:
+          type: number
+          description: 평균 단가
+        averageCost:
+          type: number
+          description: 평균 원가
+        averageOperatingProfit:
+          type: number
+          description: 평균 영업이익
+        lossPeople:
+          type: integer
+          description: 적자 인원 수
+        operatingRate:
+          type: number
+          description: 가동률·표시된 인원으로 계산
+        earningRate:
+          type: number
+          description: 가득률·표시된 인원으로 계산
+    CommonPersonalCostProfitTotals:
+      type: object
+      required:
+      - mm
+      - unitPrice
+      - allowance
+      - companyInsurance
+      - retirementReserve
+      - teamExpenses
+      - projectExpenses
+      - totalCost
+      - operatingProfit
+      properties:
+        mm:
+          type: number
+          description: MM
+        unitPrice:
+          type: number
+          description: 단가(매출)
+        monthlySalary:
+          type: number
+          description: 월 급여
+        allowance:
+          type: number
+          description: 수당
+        companyInsurance:
+          type: number
+          description: 4대보험(회사)
+        retirementReserve:
+          type: number
+          description: 퇴직금 적립
+        personalCost:
+          type: number
+          description: 개인별 원가
+        teamExpenses:
+          type: number
+          description: 팀비·마감월 TEAM_EXPS_AMT
+        projectExpenses:
+          type: number
+          description: 프로젝트경비·마감월 PROJ_EXPS_AMT
+        totalCost:
+          type: number
+          description: 원가합계
+        operatingProfit:
+          type: number
+          description: 영업이익
+        personalInsurance:
+          type: number
+          description: 숨긴 참고 열·4대보험(본인)
+        withholdingTax:
+          type: number
+          description: 숨긴 참고 열·3.3% 원천세
+        incomeTax:
+          type: number
+          description: 숨긴 참고 열·근로소득세·급여 업로드 값
+        netPay:
+          type: number
+          description: 숨긴 참고 열·실지급액
+    CommonPersonalCostProfitContribution:
+      type: object
+      required:
+      - jobCode
+      - jobName
+      - gradeCode
+      - gradeName
+      - people
+      - contributionPerPerson
+      properties:
+        jobCode:
+          type: string
+          description: JOB 코드
+        jobName:
+          type: string
+          description: 직무명
+        gradeCode:
+          type: string
+          description: GRADE 코드
+        gradeName:
+          type: string
+          enum:
+          - 초급
+          - 중급
+          - 고급
+          - 특급
+          description: 기존 등급의 표시명·물리 코드가 아님
+        people:
+          type: number
+          description: 괄호 인원
+        contributionPerPerson:
+          type: number
+          description: 식-66 인당 공헌이익
+    CommonPersonalCostProfitResult:
+      type: object
+      required:
+      - items
+      - summary
+      - totals
+      - contributions
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonPersonalCostProfitRow'
+        summary:
+          $ref: '#/components/schemas/CommonPersonalCostProfitSummary'
+        totals:
+          $ref: '#/components/schemas/CommonPersonalCostProfitTotals'
+        contributions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonPersonalCostProfitContribution'
     ApiResponse:
       type: object
       required: [success, meta]
@@ -14940,6 +15571,103 @@ x-uncovered-requirements:
 - canonical_id: REQ-714
   status: data-constraint
   evidence: '월투입 읽기 경계 — data-contract 소유: 누락점검·추정·빠른청구 전후 TB_PJ_ASGN_MON의 행과 금액/MM이 동일하다.'
+
+- canonical_id: REQ-721
+  status: screen-only
+  evidence: 기존 M014/UI-03 router·DevelopedScreenRegistry 본문 연결로 검증한다. 새 HTTP 업무가 아니다.
+- canonical_id: REQ-723
+  status: data-constraint
+  evidence: 공통코드 원천 — 선택지·표시명은 기존 코드 조회와 같고 시안의 예시를 새 코드 seed로 만들지 않는다.
+- canonical_id: REQ-724
+  status: out-of-scope
+  evidence: 로그인·메뉴 검사 제외 — UI-03 진입과 조회에 새 로그인 이동·메뉴 실행권한 검사가 없으며 후속 역할 정책과 현재 개발 모드를 구분한다.
+- canonical_id: REQ-725
+  status: non-functional
+  evidence: 자동 Flyway 설정 보존 — 일반 기동 설정 비교에서 spring.flyway.enabled=false이고 자동 Flyway 실행이 없다.
+- canonical_id: REQ-726
+  status: non-functional
+  evidence: 개발 인증 설정 보존 — 유효 runtime-check 설정에서 auth.required=false이며 기존 무인증 개발 조회를 보존한다.
+- canonical_id: REQ-727
+  status: non-functional
+  evidence: 시험용 인증 정의 미추가 — 유효 OpenAPI에서 세 선언이 없고 신규 GET의 security=[]가 유지된다.
+- canonical_id: REQ-728
+  status: non-functional
+  evidence: 기존 수동 API 보존 — 요청25~29행의 경로와 모든 기존 메서드를 유효 계약과 구조 비교한다. manual 원문 부재는 OQ-API-003에 한정한다.
+- canonical_id: REQ-729
+  status: data-constraint
+  evidence: 연장 결과 nullable 보존 — 신규 계약 병합 전후 CommonWithdrawalExtensionResult.properties.modifiedAt.nullable이 true다.
+- canonical_id: REQ-730
+  status: non-functional
+  evidence: 개발 화면 목록·시험 동기화 — 메뉴 선택 원천과 두 시험 목록에 UI-03이 있고 글 칸 없는 조회 예외는 실제 화면 조건에만 적용된다.
+- canonical_id: REQ-731
+  status: non-functional
+  evidence: 공통 화면 부품 재사용 — UI-03/다른 화면 두 탭 회귀에서 제목이 한 번이며 연도·목록·상세·알림은 기존 공통 부품이다.
+- canonical_id: REQ-732
+  status: non-functional
+  evidence: 시안 표시 보존 — 실제 렌더링을 시안과 비교한다. 미제공 정확 문구/단위 배치는 OQ-UI-003으로 남기고 예시금액을 seed로 쓰지 않는다.
+- canonical_id: REQ-733
+  status: non-functional
+  evidence: 엑셀 단일 배치 — UI-03에서 엑셀 CTA가 목록 도구줄에 한 개이며 제목줄·본문에 중복되지 않는다.
+- canonical_id: REQ-734
+  status: non-functional
+  evidence: 빈 선택지 안전 처리 — 공통코드/파트 옵션이 null 또는 누락인 fixture에서도 조건 줄이 렌더링되고 오류로 화면이 멈추지 않는다.
+- canonical_id: REQ-735
+  status: screen-only
+  evidence: UI-03 ListView의 정상0건 렌더링·조건/표머리 보존을 브라우저로 검증한다.
+- canonical_id: REQ-736
+  status: non-functional
+  evidence: 기존행 변경 동시성 규약 — 다른 화면의 기존 수정·취소·삭제 회귀에서 오래된 modifiedAt은409·행 불변이며 UI-03에 쓰기 API를 새로 만들지 않는다.
+- canonical_id: REQ-739
+  status: non-functional
+  evidence: 입력칸 오류 연결 — 잘못된 조회 조건의 서버 field 오류가 해당 입력 아래에 보이고 첫 오류 입력으로 focus가 이동한다.
+- canonical_id: REQ-740
+  status: non-functional
+  evidence: 미저장 이탈 공통 규약 — 편집 가능한 재사용 상세에서 「저장하지 않은 내용이 있습니다」/「나가면 입력한 내용이 사라집니다.」를 화면 전체에서 찾고 취소하면 입력이 유지된다. readonly
+    UI-03에 가짜 저장 폼을 만들지 않는다.
+- canonical_id: REQ-741
+  status: non-functional
+  evidence: 기능별 파일 분리 — UI-03 작업 공간·목록/요약·API 연결이 한 거대 파일에 집중되지 않고 기존 공통 부품을 복제하지 않는다.
+- canonical_id: REQ-742
+  status: non-functional
+  evidence: 기존 프로젝트 상세 연결 규약 — 기존 프로젝트 상세 교차 화면 회귀에서 지정 탭/동일 projectId 수정 폼을 유지한다. UI-03에 요구되지 않은 프로젝트 수정 CTA를 추가하지
+    않는다.
+- canonical_id: REQ-743
+  status: non-functional
+  evidence: 준비 시험 목록 동기화 — 새 SQL이 필요한 경우에만 SchemaPreparation 자원과 시험 목록에 함께 반영되고 표 개수 하드코딩은 없다.
+- canonical_id: REQ-744
+  status: non-functional
+  evidence: 미리보기 포트 보존 — Compose ports 파싱에서 8080:8080·3000:8080에 127.0.0.1 등의 주소 접두사가 없다.
+- canonical_id: REQ-745
+  status: non-functional
+  evidence: Maven 수동 설정 보존 — 기존 중앙/구글 공식 복사본 순서와 Dockerfile COPY가 바이트 비교 및 빌드 회귀에서 유지된다.
+- canonical_id: REQ-746
+  status: non-functional
+  evidence: schema 이름 유일성 — CommonPersonalCostProfit 계열이 기존 schemas와 중복되지 않고 기존 정의가 그대로다.
+- canonical_id: REQ-747
+  status: non-functional
+  evidence: 기존 시험 경로 보존 — 기존 메뉴·공통화면·업무 시험 파일 경로 비교에서 이동/삭제가 없고 회귀를 실행한다.
+- canonical_id: REQ-748
+  status: non-functional
+  evidence: 공통 부품 기본 호환 — UI-03용 옵션을 주지 않은 기존 ListView·YearBar·DetailPanel 회귀의 결과가 변경 전과 같다.
+- canonical_id: REQ-749
+  status: out-of-scope
+  evidence: UI-03만 메뉴 연결 — 메뉴 전후 비교에서 기존 M014/G006·/screens/UI-03만 본문이 바뀌고 다른 새 leaf는 없다.
+- canonical_id: REQ-753
+  status: screen-only
+  evidence: UI-03 조건 상태의 초기화 버튼은 브라우저 로컬 동작이며 업무 저장 API가 없다.
+- canonical_id: REQ-763
+  status: screen-only
+  evidence: UI-03 표 아래 계산 방법의 확정 원문 설명은 정적 표시이며 별도 HTTP 동작이 없다.
+- canonical_id: REQ-766
+  status: screen-only
+  evidence: UI-24의 기존 역할 메뉴 정책/초기 부여 함수에서 파트장·PM 미부여와 관리자 설정을 검증한다. 현재 메뉴 실행검사는 후속 UI-22다.
+- canonical_id: REQ-768
+  status: screen-only
+  evidence: UI-03 행 클릭의 기존 getCommonDeveloper /api/common/developers/{developerId} 상세 연결로 만족한다. 기존 연산 수정 없이 UI-03
+    연결만 검수한다.
+- canonical_id: REQ-773
+  status: screen-only
+  evidence: UI-03 YearBar의 안내 문구와 배지/잠정 띠 부재는 로컬 표시 계약이다.
 
 x-change-supersession:
   description: 기존 operation과 기준선 시험은 원형 보존한다. 이번 공통 기능 인수에는 다음 예외가 우선하며 기존 메뉴 조회 자체를 상태 저장 API로 바꾸지 않는다.

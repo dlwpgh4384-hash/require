@@ -138,6 +138,27 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (url.startsWith("/api/common/personal-cost-profits?"))
+      return {
+        success: true,
+        meta: {},
+        data: {
+          items: [],
+          totals: {},
+          contributions: [],
+          summary: {
+            totalPeople: 0,
+            averageOperatingPeople: 0,
+            averageEarningPeople: 0,
+            averageUnitPrice: 0,
+            averageCost: 0,
+            averageOperatingProfit: 0,
+            lossPeople: 0,
+            operatingRate: 0,
+            earningRate: 0,
+          },
+        },
+      };
     if (url.startsWith("/api/common/bills?"))
       return {
         success: true,
@@ -185,7 +206,15 @@ function respond(body: ShellMenuResponse) {
       url.startsWith("/api/common/user-preferences/")
         ? {
             success: true,
-            meta: {},
+            meta: url.endsWith("/UI-03")
+              ? {
+                  periodBasis: {
+                    latestYm: "202602",
+                    cashBaseYm: "202601",
+                    closedMonths: ["202601"],
+                  },
+                }
+              : {},
             data: {
               prefTypeCd: url.split("/").at(-2),
               prefKey: url.split("/").at(-1),
@@ -236,6 +265,12 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-03": async (content) => {
+    expect(await content.findByTestId("list-empty")).toBeVisible();
+    expect(content.getByRole("textbox", { name: "이름" })).toBeVisible();
+    expect(content.getByText("그 해 1월부터 지금까지 누계")).toBeVisible();
+    expect(content.getByTestId("list-download")).toBeVisible();
+  },
   "UI-01": async () => undefined,
   "UI-05": async (content) => {
     expect(await content.findByTestId("list-empty")).toBeVisible();

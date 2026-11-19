@@ -39,6 +39,26 @@ const statusKind = (name: string) =>
             ? "bad"
             : "lock";
 
+type DeveloperDetailProps = {
+  developerId: string;
+  onClose: () => void;
+} & (
+  | {
+      readOnly: true;
+      onEdit?: never;
+      onStop?: never;
+      onNotice?: never;
+      onChanged?: never;
+    }
+  | {
+      readOnly?: false;
+      onEdit: (developer: Developer) => void;
+      onStop: (developer: Developer) => void;
+      onNotice: (message: string) => void;
+      onChanged: (message?: string) => void;
+    }
+);
+
 /** 시안 개발자 상세: 제목=이름, 작은 제목 「관리번호 · 소속 · 직원구분」, [수정] [사용 중지] [×], 탭 4개. */
 export function DeveloperDetail({
   developerId,
@@ -47,16 +67,8 @@ export function DeveloperDetail({
   onStop,
   onNotice,
   onChanged,
-}: {
-  developerId: string;
-  onClose: () => void;
-  onEdit: (developer: Developer) => void;
-  onStop: (developer: Developer) => void;
-  /** 저장 없이 안내만 띄운다(시안 toast warn). */
-  onNotice: (message: string) => void;
-  /** 바뀐 뒤 목록을 다시 읽고 안내(message)를 띄운다. */
-  onChanged: (message?: string) => void;
-}) {
+  readOnly = false,
+}: DeveloperDetailProps) {
   const [developer, setDeveloper] = useState<Developer | null>(null);
   const [assignments, setAssignments] = useState<DeveloperAssignment[]>([]);
   const [statuses, setStatuses] = useState<DeveloperStatus[]>([]);
@@ -113,7 +125,7 @@ export function DeveloperDetail({
   const cap = (text: string) => <span className="ls-cap">{text}</span>;
   /** 시안 statHtml act: 줄마다 할 수 있는 일 또는 안내 */
   const act = (s: DeveloperStatus) => {
-    if (!s.statusId || !permission.canManageStatuses) return null;
+    if (readOnly || !s.statusId || !permission.canManageStatuses) return null;
     if (s.statusName === "퇴사") {
       if (s.startDate < today && !permission.canCancelPastRetirement)
         return cap("관리자만 취소");
@@ -123,7 +135,7 @@ export function DeveloperDetail({
           data-testid={`developer-retire-${s.statusId}`}
           onClick={() =>
             s.startDate < today && s.monthClosed
-              ? onNotice(
+              ? onNotice?.(
                   `퇴사한 달(${s.startDate.slice(0, 7)})이 마감되어 취소할 수 없습니다. 다시 쓰려면 새로 등록하세요.`,
                 )
               : setAction({ kind: "retire", row: s })
@@ -187,32 +199,34 @@ export function DeveloperDetail({
         testId="developer-detail"
         onClose={onClose}
         actions={
-          <>
-            <button
-              type="button"
-              className="ls-btn ls-btn-sm"
-              data-testid="developer-edit"
-              disabled={!d || loading || !!error}
-              onClick={() => d && onEdit(d)}
-            >
-              수정
-            </button>
-            {d && (
+          readOnly ? undefined : (
+            <>
               <button
                 type="button"
-                className={
-                  d.useYn === "Y"
-                    ? "ls-btn ls-btn-sm ls-btn-dt"
-                    : "ls-btn ls-btn-sm"
-                }
-                data-testid="developer-stop"
-                disabled={loading || !!error}
-                onClick={() => onStop(d)}
+                className="ls-btn ls-btn-sm"
+                data-testid="developer-edit"
+                disabled={!d || loading || !!error}
+                onClick={() => d && onEdit?.(d)}
               >
-                {d.useYn === "Y" ? "사용 중지" : "다시 사용"}
+                수정
               </button>
-            )}
-          </>
+              {d && (
+                <button
+                  type="button"
+                  className={
+                    d.useYn === "Y"
+                      ? "ls-btn ls-btn-sm ls-btn-dt"
+                      : "ls-btn ls-btn-sm"
+                  }
+                  data-testid="developer-stop"
+                  disabled={loading || !!error}
+                  onClick={() => onStop?.(d)}
+                >
+                  {d.useYn === "Y" ? "사용 중지" : "다시 사용"}
+                </button>
+              )}
+            </>
+          )
         }
         activeTab={tab}
         onTab={setTab}
@@ -342,7 +356,7 @@ export function DeveloperDetail({
                       ? "퇴사한 개발자입니다. 상태를 더 등록할 수 없습니다. 다시 쓰려면 개발자 풀에서 새로 등록하세요."
                       : "근무 상태는 투입·휴직 기록으로 매일 자동으로 정합니다. 여기서는 휴직·퇴사·재직(휴직 복귀)을 등록합니다(관리자·재무)."}
                   </span>
-                  {!gone && permission.canManageStatuses && (
+                  {!readOnly && !gone && permission.canManageStatuses && (
                     <button
                       type="button"
                       className="ls-btn ls-btn-sm ls-btn-p"
@@ -450,7 +464,7 @@ export function DeveloperDetail({
           ),
         }))}
       />
-      {action && (
+      {!readOnly && action && (
         <DeveloperStatusDialog
           action={action}
           developerId={developerId}
@@ -461,7 +475,7 @@ export function DeveloperDetail({
           onSaved={(message) => {
             setAction(null);
             setRevision((v) => v + 1);
-            onChanged(message);
+            onChanged?.(message);
           }}
         />
       )}

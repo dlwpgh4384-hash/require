@@ -30,6 +30,7 @@ export function YearBar({
   onChange,
   pastReadOnly = true,
   testId = "year-bar",
+  showBadge = true,
 }: {
   year: number;
   currentYear: number;
@@ -39,6 +40,7 @@ export function YearBar({
   onChange: (year: number) => void;
   pastReadOnly?: boolean;
   testId?: string;
+  showBadge?: boolean;
 }) {
   return (
     <div
@@ -70,15 +72,16 @@ export function YearBar({
           {chevron("M9 18l6-6-6-6")}
         </button>
       </div>
-      {year < currentYear ? (
-        <Badge kind={pastReadOnly ? "lock" : "info"}>
-          {pastReadOnly ? "지난 해 · 읽기 전용" : "지난 해"}
-        </Badge>
-      ) : year > currentYear ? (
-        <Badge kind="warn">내년 · 계획</Badge>
-      ) : (
-        <Badge kind="info">올해</Badge>
-      )}
+      {showBadge &&
+        (year < currentYear ? (
+          <Badge kind={pastReadOnly ? "lock" : "info"}>
+            {pastReadOnly ? "지난 해 · 읽기 전용" : "지난 해"}
+          </Badge>
+        ) : year > currentYear ? (
+          <Badge kind="warn">내년 · 계획</Badge>
+        ) : (
+          <Badge kind="info">올해</Badge>
+        ))}
       <span className="year-bar-cap">{caption}</span>
     </div>
   );

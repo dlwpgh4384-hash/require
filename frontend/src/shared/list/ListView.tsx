@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import {
   LIST_PAGE_SIZES,
   listMessages,
@@ -27,48 +34,58 @@ export function ListFilters({
   const [open, setOpen] = useState(false);
   return (
     <>
-    {mobile && (
-      <button
-        type="button"
-        className="ls-btn ls-fl-toggle"
-        data-testid="list-filter-toggle"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M3 5h18l-7 8v6l-4 2v-8z" />
-        </svg>{" "}
-        {activeCount > 0 ? `조건 (${activeCount})` : "조건"}
-      </button>
-    )}
-    <form
-      className="ls-filters"
-      hidden={mobile && !open}
-      data-testid={testId}
-      onSubmit={(event: FormEvent) => {
-        event.preventDefault();
-        onSearch();
-      }}
-    >
-      <div className="ls-filter-fields">{children}</div>
-      <div className="ls-filter-acts">
+      {mobile && (
         <button
           type="button"
-          className="ls-btn"
-          data-testid="list-reset"
-          onClick={onReset}
+          className="ls-btn ls-fl-toggle"
+          data-testid="list-filter-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
         >
-          초기화
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 5h18l-7 8v6l-4 2v-8z" />
+          </svg>{" "}
+          {activeCount > 0 ? `조건 (${activeCount})` : "조건"}
         </button>
-        <button
-          type="submit"
-          className="ls-btn ls-btn-p"
-          data-testid="list-search"
-        >
-          조회
-        </button>
-      </div>
-    </form>
+      )}
+      <form
+        className="ls-filters"
+        hidden={mobile && !open}
+        data-testid={testId}
+        onSubmit={(event: FormEvent) => {
+          event.preventDefault();
+          onSearch();
+        }}
+      >
+        <div className="ls-filter-fields">{children}</div>
+        <div className="ls-filter-acts">
+          <button
+            type="button"
+            className="ls-btn"
+            data-testid="list-reset"
+            onClick={onReset}
+          >
+            초기화
+          </button>
+          <button
+            type="submit"
+            className="ls-btn ls-btn-p"
+            data-testid="list-search"
+          >
+            조회
+          </button>
+        </div>
+      </form>
     </>
   );
 }
@@ -141,6 +158,7 @@ interface ListViewProps<T> {
   mobileRows?: T[] | null;
   /** 시안 합계 줄(cfg.foot): 열 키별 값. 주면 표 맨 아래에 첫 칸 「합계」와 값을 보인다(0건이어도 보임). */
   footer?: Partial<Record<string, ReactNode>>;
+  renderExpandedRow?: (row: T) => ReactNode;
 }
 
 /** SFR-010 목록 공통: 도구 줄, 열 설정, 좁게 보기, 엑셀, 정렬, 선택, 페이지. */
@@ -207,7 +225,12 @@ export function ListView<T>(props: ListViewProps<T>) {
           <div className="ls-empty" role="alert" data-testid="list-error">
             <p>{props.error}</p>
             {props.onRetry && (
-              <button type="button" className="ls-btn" data-testid="list-retry" onClick={props.onRetry}>
+              <button
+                type="button"
+                className="ls-btn"
+                data-testid="list-retry"
+                onClick={props.onRetry}
+              >
                 다시 시도
               </button>
             )}
@@ -237,7 +260,12 @@ export function ListView<T>(props: ListViewProps<T>) {
         )}
         {all.length > shown && (
           <div className="ls-more">
-            <button type="button" className="ls-btn" data-testid="list-more" onClick={() => setShown((v) => v + props.pageSize)}>
+            <button
+              type="button"
+              className="ls-btn"
+              data-testid="list-more"
+              onClick={() => setShown((v) => v + props.pageSize)}
+            >
               더 보기 ({shown}/{all.length})
             </button>
           </div>
@@ -293,55 +321,55 @@ export function ListView<T>(props: ListViewProps<T>) {
         </div>
         <div className="ls-tr">
           {props.columnSettings !== false && (
-          <div className="ls-pop-anchor" ref={columnAnchor}>
-            <button
-              type="button"
-              className="ls-btn ls-btn-sm"
-              data-testid="list-columns"
-              aria-expanded={columnsOpen}
-              onClick={() => setColumnsOpen(!columnsOpen)}
-            >
-              <ColumnsIcon /> 열 설정
-            </button>
-            {columnsOpen && (
-              <div
-                className="ls-pop"
-                role="dialog"
-                aria-label="열 설정"
-                data-testid="list-columns-pop"
+            <div className="ls-pop-anchor" ref={columnAnchor}>
+              <button
+                type="button"
+                className="ls-btn ls-btn-sm"
+                data-testid="list-columns"
+                aria-expanded={columnsOpen}
+                onClick={() => setColumnsOpen(!columnsOpen)}
               >
-                <div className="ls-pop-h">보일 열</div>
-                <div className="ls-pop-b">
-                  {columns.map((column) => (
-                    <label
-                      key={column.key}
-                      data-testid={`list-column-label-${column.key}`}
+                <ColumnsIcon /> 열 설정
+              </button>
+              {columnsOpen && (
+                <div
+                  className="ls-pop"
+                  role="dialog"
+                  aria-label="열 설정"
+                  data-testid="list-columns-pop"
+                >
+                  <div className="ls-pop-h">보일 열</div>
+                  <div className="ls-pop-b">
+                    {columns.map((column) => (
+                      <label
+                        key={column.key}
+                        data-testid={`list-column-label-${column.key}`}
+                      >
+                        <input
+                          type="checkbox"
+                          data-testid={`list-column-${column.key}`}
+                          checked={!hiddenColumns.includes(column.key)}
+                          disabled={column.required}
+                          onChange={() => props.onToggleColumn(column.key)}
+                        />
+                        {column.label}
+                        {column.required && (
+                          <span className="ls-cap"> (필수)</span>
+                        )}
+                      </label>
+                    ))}
+                    <button
+                      type="button"
+                      className="ls-btn ls-btn-sm"
+                      data-testid="list-columns-default"
+                      onClick={props.onResetColumns}
                     >
-                      <input
-                        type="checkbox"
-                        data-testid={`list-column-${column.key}`}
-                        checked={!hiddenColumns.includes(column.key)}
-                        disabled={column.required}
-                        onChange={() => props.onToggleColumn(column.key)}
-                      />
-                      {column.label}
-                      {column.required && (
-                        <span className="ls-cap"> (필수)</span>
-                      )}
-                    </label>
-                  ))}
-                  <button
-                    type="button"
-                    className="ls-btn ls-btn-sm"
-                    data-testid="list-columns-default"
-                    onClick={props.onResetColumns}
-                  >
-                    기본값으로
-                  </button>
+                      기본값으로
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
           )}
           <button
             type="button"
@@ -472,57 +500,72 @@ export function ListView<T>(props: ListViewProps<T>) {
                 rows.map((row) => {
                   const key = rowKey(row);
                   const on = props.allResultsSelected || selected.includes(key);
+                  const expanded = props.renderExpandedRow?.(row);
                   return (
-                    <tr
-                      key={key}
-                      data-testid={`list-row-${key}`}
-                      className={`${on ? "ls-sel" : ""}${props.highlightKey === key ? " ls-hl" : ""}`}
-                      tabIndex={props.onRowClick ? 0 : undefined}
-                      onClick={() => props.onRowClick?.(row)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" && props.onRowClick) {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          props.onRowClick(row);
-                        }
-                      }}
-                    >
-                      {selectable && (
-                        <td
-                          className="ls-chk"
-                          data-testid={`list-row-check-cell-${key}`}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <input
-                            type="checkbox"
-                            aria-label="선택"
-                            data-testid={`list-select-${key}`}
-                            checked={on}
-                            onChange={() =>
-                              onSelect(
-                                selected.includes(key)
-                                  ? selected.filter((item) => item !== key)
-                                  : [...selected, key],
-                              )
+                    <Fragment key={key}>
+                      <tr
+                        key={key}
+                        data-testid={`list-row-${key}`}
+                        className={`${on ? "ls-sel" : ""}${props.highlightKey === key ? " ls-hl" : ""}`}
+                        tabIndex={props.onRowClick ? 0 : undefined}
+                        onClick={() => props.onRowClick?.(row)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && props.onRowClick) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            props.onRowClick(row);
+                          }
+                        }}
+                      >
+                        {selectable && (
+                          <td
+                            className="ls-chk"
+                            data-testid={`list-row-check-cell-${key}`}
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              aria-label="선택"
+                              data-testid={`list-select-${key}`}
+                              checked={on}
+                              onChange={() =>
+                                onSelect(
+                                  selected.includes(key)
+                                    ? selected.filter((item) => item !== key)
+                                    : [...selected, key],
+                                )
+                              }
+                            />
+                          </td>
+                        )}
+                        {visibleColumns.map((column) => (
+                          <td
+                            key={column.key}
+                            className={`ls-${column.align ?? "left"}`}
+                            data-testid={`list-cell-${key}-${column.key}`}
+                          >
+                            {column.render
+                              ? column.render(row)
+                              : String(
+                                  (row as Record<string, unknown>)[
+                                    column.key
+                                  ] ?? "–",
+                                )}
+                          </td>
+                        ))}
+                      </tr>
+                      {expanded && (
+                        <tr data-testid={`list-expanded-${key}`}>
+                          <td
+                            colSpan={
+                              visibleColumns.length + (selectable ? 1 : 0)
                             }
-                          />
-                        </td>
+                          >
+                            {expanded}
+                          </td>
+                        </tr>
                       )}
-                      {visibleColumns.map((column) => (
-                        <td
-                          key={column.key}
-                          className={`ls-${column.align ?? "left"}`}
-                          data-testid={`list-cell-${key}-${column.key}`}
-                        >
-                          {column.render
-                            ? column.render(row)
-                            : String(
-                                (row as Record<string, unknown>)[column.key] ??
-                                  "–",
-                              )}
-                        </td>
-                      ))}
-                    </tr>
+                    </Fragment>
                   );
                 })
               )}
@@ -537,7 +580,7 @@ export function ListView<T>(props: ListViewProps<T>) {
                       className={`ls-${column.align ?? "left"}`}
                       data-testid={`list-footer-${column.key}`}
                     >
-                      {index === 0 ? "합계" : props.footer![column.key] ?? ""}
+                      {index === 0 ? "합계" : (props.footer![column.key] ?? "")}
                     </td>
                   ))}
                 </tr>
@@ -578,7 +621,12 @@ export function ListPager({
   const end = Math.min(pages, start + 9);
   const numbers = [];
   for (let value = start; value <= end; value++) numbers.push(value);
-  const nav = (target: number, label: string, text: string, disabled: boolean) => (
+  const nav = (
+    target: number,
+    label: string,
+    text: string,
+    disabled: boolean,
+  ) => (
     <button
       type="button"
       className="ls-pg"

@@ -13,4 +13,6 @@ public interface ProjectBoardMapper {
             @Param("today") LocalDate today, @Param("month") String month);
     List<Issue> issues(String projectId);
     boolean partExists(String partId);
+    /** 엑셀 다운로드 접근 기록(DNLD, SFR-011-03·SER-006). */
+    int insertAccess(@Param("userId") String userId, @Param("target") String target);
 }

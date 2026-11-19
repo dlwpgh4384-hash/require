@@ -47,6 +47,7 @@ public class CommonProjectBoardController {
             value(row.costProgressGap()), value(row.openIssueCount()), value(row.overdueIssueCount()),
             value(row.latestMemoDate()), value(row.daysWithoutMemo()))).toList();
         var now = calendar.now();
+        service.recordExcelDownload(actor.userId(), result.items().size());
         var bytes = excel.write("프로젝트 현황판", List.of("신호등", "프로젝트ID", "프로젝트명", "계약유형",
             "이유 요약", "PM", "현재 단계", "단계 지연", "계획 진척률(%)", "실적 진척률(%)",
             "원가 사용률(%)", "진척 대비 원가(%p)", "열린 이슈", "기한 지난 이슈", "마지막 업데이트",

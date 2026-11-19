@@ -5,6 +5,8 @@ import { addDays, formatMonthDay, koreanToday } from "../../shared/time";
 import type { CodeItem } from "../codegroups/codeGroups";
 import type { Project } from "../projects/projects";
 import * as api from "./projectIssues";
+// 로그인(UI-22) 전: 헤더와 같은 현재 사용자 이름을 담당자 자리에 보인다(새 이슈 담당자 = 등록한 사람).
+import { CURRENT_USER } from "../userpreferences/UserPreferenceTools";
 import "../projects/projects.css";
 import "./projectIssues.css";
 
@@ -190,7 +192,7 @@ export function ProjectIssueDialog({
               <span>
                 {issue
                   ? issue.assigneeName || issue.assigneeId
-                  : "지금 로그인한 사람"}
+                  : CURRENT_USER.name}
               </span>
               <span
                 className="project-cap"

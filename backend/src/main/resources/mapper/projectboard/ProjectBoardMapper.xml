@@ -67,4 +67,8 @@
   <select id="partExists" resultType="boolean">
     SELECT EXISTS (SELECT 1 FROM TB_BS_PART p WHERE p.PART_ID=#{partId})
   </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES (#{userId},'DNLD','UI-31',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
 </mapper>

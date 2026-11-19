@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { ReceiptHistoryPanel } from "./ReceiptHistoryPanel";
 import { ReceiptCancelDialog } from "./ReceiptCancelDialog";
@@ -80,7 +80,7 @@ it("사유 없이는 보내지 않고, 사유와 수정 시각을 보내 취소�
   render(<ReceiptCancelDialog receipt={receipt()} onClose={vi.fn()} onSaved={onSaved} />);
   expect(screen.getByText("2026-10-20 · 400,000원 입금을 취소합니다. 미수금이 그만큼 다시 늘어납니다.")).toBeVisible();
   fireEvent.click(screen.getByTestId("receipt-cancel-confirm"));
-  expect(screen.getByTestId("receipt-cancel-error")).toHaveTextContent("취소 사유를 적어 주세요.");
+  expect(screen.getByTestId("receipt-cancel-error")).toHaveTextContent("취소 사유를 입력해 주세요.");
   expect(request).not.toHaveBeenCalled();
   fireEvent.change(screen.getByTestId("receipt-cancel-reason"), { target: { value: "  금액 정정 " } });
   fireEvent.click(screen.getByTestId("receipt-cancel-confirm"));
@@ -107,4 +107,23 @@ it("서버가 막으면 창에 이유를 보인다", async () => {
   await waitFor(() =>
     expect(screen.getByTestId("receipt-cancel-error")).toHaveTextContent("2026-10는 마감한 달이라 이 입금은 취소할 수 없습니다."),
   );
+});
+
+it("사유를 적은 채 닫으면 청구 취소와 같은 공통 문구로 묻고, 비었으면 바로 닫는다", () => {
+  const onClose = vi.fn();
+  const { unmount } = render(<ReceiptCancelDialog receipt={receipt()} onClose={onClose} onSaved={vi.fn()} />);
+  fireEvent.click(screen.getByTestId("receipt-cancel-close"));
+  expect(onClose).toHaveBeenCalledOnce();
+  unmount();
+  onClose.mockClear();
+  render(<ReceiptCancelDialog receipt={receipt()} onClose={onClose} onSaved={vi.fn()} />);
+  fireEvent.change(screen.getByTestId("receipt-cancel-reason"), { target: { value: "정정" } });
+  fireEvent.click(screen.getByTestId("receipt-cancel-close"));
+  expect(onClose).not.toHaveBeenCalled();
+  const confirm = screen.getByTestId("receipt-cancel-dirty");
+  expect(confirm).toHaveTextContent("저장하지 않은 내용이 있습니다");
+  expect(confirm).toHaveTextContent("나가면 입력한 내용이 사라집니다.");
+  fireEvent.click(within(confirm).getByRole("button", { name: "나가기" }));
+  expect(onClose).toHaveBeenCalledOnce();
+  expect(request).not.toHaveBeenCalled();
 });

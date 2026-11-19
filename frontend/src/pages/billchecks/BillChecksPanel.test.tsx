@@ -28,6 +28,8 @@ let request: ReturnType<typeof vi.fn>;
 let result: BillCheckResult;
 let detail: BillCheckDetail;
 let commandFailure: boolean;
+let commandConflict: boolean;
+const CONFLICT = "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.";
 const row = (overrides: Partial<BillCheckRow> = {}): BillCheckRow => ({
   projectId: "selected-project",
   projectName: "점검 프로젝트",
@@ -57,6 +59,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-11-15T01:00:00Z"));
   commandFailure = false;
+  commandConflict = false;
   onNotice.mockReset();
   onOpenBill.mockReset();
   result = {
@@ -93,6 +96,7 @@ beforeEach(() => {
       cancelReason: null,
       cancelledBy: null,
       cancelledAt: null,
+      modifiedAt: "2026-11-15T01:00:00.123456Z",
     },
     receipts: [],
     missingTaxInvoiceNumber: true,
@@ -100,6 +104,16 @@ beforeEach(() => {
   request = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input);
     if (init?.method === "POST") {
+      if (commandConflict)
+        return {
+          ok: false,
+          status: 409,
+          json: async () => ({
+            success: false,
+            message: CONFLICT,
+            errors: [{ field: "modifiedAt", message: CONFLICT }],
+          }),
+        };
       if (commandFailure)
         return {
           ok: false,
@@ -194,7 +208,34 @@ it("마감 전 달 금액 차이는 그 달 최근 청구를 맞춘 값으로 �
   expect(screen.getByRole("dialog", { name: "청구 수정 · selected-bill" })).toBeVisible();
   fireEvent.click(screen.getByTestId("bill-check-save"));
   await waitFor(() => expect(posts()[0][0]).toBe("/api/common/bill-checks/correction"));
+  // 00-1 동시 수정: 읽은 청구의 수정 시각을 함께 보낸다
+  expect(JSON.parse(String(posts()[0][1].body))).toMatchObject({ modifiedAt: "2026-11-15T01:00:00.123456Z", supplyAmount: 8000000 });
   await waitFor(() => expect(onNotice).toHaveBeenCalledWith("청구를 고쳤습니다."));
+});
+
+it("[청구 고치기] 중 다른 사람이 먼저 바꿨으면(409) 공통 알림을 띄우고 다시 불러온다", async () => {
+  result.items = [row({ judgement: "적게 청구", billedSupplyAmount: 2000000, difference: 6000000, latestBillId: "selected-bill", allowedAction: "CORRECTION" })];
+  commandConflict = true;
+  renderPanel();
+  fireEvent.click(await screen.findByTestId("bill-check-action-selected-project"));
+  await screen.findByTestId("bill-check-message");
+  const loads = () => request.mock.calls.filter(([url, init]) => !init?.method && String(url).startsWith("/api/common/bill-checks")).length;
+  const before = loads();
+  fireEvent.click(screen.getByTestId("bill-check-save"));
+  await waitFor(() => expect(onNotice).toHaveBeenCalledWith(CONFLICT, "warn"));
+  expect(screen.queryByTestId("bill-check-form")).not.toBeInTheDocument();
+  await waitFor(() => expect(loads()).toBeGreaterThan(before));
+});
+
+it("[청구 등록] 창을 고친 채 닫으면 공통 문구로 묻는다", async () => {
+  renderPanel();
+  fireEvent.click(await screen.findByTestId("bill-check-action-selected-project"));
+  await screen.findByTestId("bill-check-message");
+  fireEvent.change(screen.getByTestId("bill-check-tax-number"), { target: { value: "1" } });
+  fireEvent.click(screen.getByTestId("bill-check-form-cancel"));
+  const confirm = screen.getByRole("alertdialog");
+  expect(confirm).toHaveTextContent("저장하지 않은 내용이 있습니다");
+  expect(confirm).toHaveTextContent("나가면 입력한 내용이 사라집니다.");
 });
 
 it("마감한 달 적게 청구는 추가 청구(차액) 창, 많이 청구는 안내 후 청구 상세", async () => {

@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Dialog } from "../../shared/feedback/Dialog";
+import { Dialog, InlineConfirmation } from "../../shared/feedback/Dialog";
 import { failureMessage, isConflict } from "../bills/bills";
 import { postCommonReceiptCancel, type Receipt } from "./receipts";
 import "../commonops/billingLookup.css";
@@ -19,16 +19,23 @@ export function ReceiptCancelDialog({
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  // 사유를 적은 채 닫으면 저장하지 않은 내용 확인(00-1 FR-0106, 청구 취소 창과 같다)
+  const [leaving, setLeaving] = useState(false);
   const pending = useRef(false);
+  const close = () => {
+    if (pending.current) return;
+    if (reason.trim()) setLeaving(true);
+    else onClose();
+  };
   async function save() {
     if (pending.current) return;
     const value = reason.trim();
     if (!value) {
-      setError("취소 사유를 적어 주세요.");
+      setError("취소 사유를 입력해 주세요.");
       return;
     }
     if ([...value].length > 500) {
-      setError("취소 사유는 500자 이내로 입력해 주세요.");
+      setError("취소 사유는 500자까지 입력해 주세요.");
       return;
     }
     pending.current = true;
@@ -50,9 +57,7 @@ export function ReceiptCancelDialog({
       title="입금 취소"
       closable
       testId="receipt-cancel-dialog"
-      onClose={() => {
-        if (!pending.current) onClose();
-      }}
+      onClose={close}
     >
       <form
         className="billing-receipt-form"
@@ -79,7 +84,10 @@ export function ReceiptCancelDialog({
           value={reason}
           disabled={saving}
           aria-invalid={!!error}
-          onChange={(event) => setReason(event.target.value)}
+          onChange={(event) => {
+            setReason(event.target.value);
+            setError("");
+          }}
         />
         <p role="alert" className="field-error" data-testid="receipt-cancel-error">
           {error}
@@ -90,7 +98,7 @@ export function ReceiptCancelDialog({
             className="ls-btn"
             data-testid="receipt-cancel-close"
             disabled={saving}
-            onClick={onClose}
+            onClick={close}
           >
             닫기
           </button>
@@ -104,6 +112,15 @@ export function ReceiptCancelDialog({
           </button>
         </div>
       </form>
+      {leaving && (
+        <InlineConfirmation
+          title="저장하지 않은 내용이 있습니다"
+          description="나가면 입력한 내용이 사라집니다."
+          onCancel={() => setLeaving(false)}
+          onProceed={onClose}
+          testId="receipt-cancel-dirty"
+        />
+      )}
     </Dialog>
   );
 }

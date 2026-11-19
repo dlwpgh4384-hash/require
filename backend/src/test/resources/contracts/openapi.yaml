@@ -8190,12 +8190,13 @@ paths:
       - 공통 입금일·청구별 양수금액. 잔액0 제외·잔액초과 거부·선수금없음.
       - 현재월 마감 등록차단. 지난해 청구 미수도 올해 입금가능. 동시입금은 같은청구 잔액 검증/합산을 직렬화한다.
       - 다건 일부실패의 원자성/응답 정책은 OQ-RCPT-013 확인 필요이며 전체/부분 성공을 승인으로 간주하지 않는다.
+      - 청구별 오류의 errors.field에는 요청 줄 번호를 붙인다(예: items[2].amount, items[0].billId). 화면은 그 줄에만 보인다.
       x-side-effects:
       - TB_BL_RCPT 입금1건당1행. TB_BL_BILL 정상입금합계 증가·잔액감소·상태계산·전액시 알림중지.
       x-required-tests:
       - 'happy: 양수 분할입금 저장 -> 상세 입금1줄과 RCPT_SUM_AMT 증가·UNPAID_AMT 감소를 재조회한다.'
       - 'auth: 무인증 admin 지난해 미수 입금 -> 200·처리자 admin·원청구 내용 불변이다.'
-      - 'validation: amount=0 -> 400 errors.items.amount·입금액을 입력해 주세요·TB_BL_RCPT 신규0행.'
+      - 'validation: amount=0 -> 400 errors.items[0].amount·입금액을 입력해 주세요.·TB_BL_RCPT 신규0행.'
       - 'business: amount>미수금 또는 현재월마감 -> 400·입금/청구 합계 무변경·초과시 입금액이 미수금보다 큽니다.'
       - 'side-effect: 잔액전액 입금 -> GET bills 상태 입금 완료·GET bill-dunning 대상에서 빠지고 정상입금행은 남는다.'
       x-state-transitions:
@@ -8460,8 +8461,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿈(고칠 청구의 modifiedAt 불일치). 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」 업무행은 그대로다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
       x-business-rules:
       - 미마감 금액차·그달 최근청구을 쓰기시 재조회하며 클라이언트에서 예외 허용 boolean을 받지 않는다.
+      - 화면이 읽은 고칠 청구의 modifiedAt(필수)이 지금 값과 다르면 409.
       - 최근청구 공급가=투입기준에맞춘값; 등록은 번호/차수 공통발급·중복경고제외. 턴키/무상지원 제외.
       - 마감월 많이청구는 안내후 상세만·감액저장없음. 수정합계는 정상입금합계이상.
       x-side-effects:
@@ -9166,6 +9174,10 @@ components:
           type: number
           nullable: true
           description: 창에서 고친 공급가(원 단위 양수). 비우면 투입 기준 금액·차액·맞춘 값으로 채운다.
+        modifiedAt:
+          type: string
+          format: date-time
+          description: correction에서만 받고 꼭 보낸다. 화면이 읽은 고칠 청구의 modifiedAt. 지금 값과 다르면 409. missing·additional에 보내면 400.
     CommonBillingDunningHistory:
       type: object
       required:

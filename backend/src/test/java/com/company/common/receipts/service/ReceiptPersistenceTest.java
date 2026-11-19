@@ -160,15 +160,15 @@ class ReceiptPersistenceTest {
     @Test void zeroPreservesEveryRowAndExactFieldMessage()throws Exception {
         Object before=bills();
         postReceipt(input(0)).andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.errors[0].field").value("items.amount"))
-            .andExpect(jsonPath("$.errors[0].message").value("입금액을 입력해 주세요"));
+            .andExpect(jsonPath("$.errors[0].field").value("items[0].amount"))
+            .andExpect(jsonPath("$.errors[0].message").value("입금액을 입력해 주세요."));
         assertThat(receipts()).isEqualTo(List.of());
         assertThat(bills()).isEqualTo(before);
     }
     @Test void overpaymentPreservesEveryRow()throws Exception {
         Object before=bills();
         postReceipt(input(1001)).andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.errors[0].message").value("입금액이 미수금보다 큽니다"));
+            .andExpect(jsonPath("$.errors[0].message").value("입금액이 미수금보다 큽니다."));
         assertThat(receipts()).isEqualTo(List.of());
         assertThat(bills()).isEqualTo(before);
     }

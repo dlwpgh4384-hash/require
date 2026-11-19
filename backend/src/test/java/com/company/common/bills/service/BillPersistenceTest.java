@@ -161,6 +161,29 @@ class BillPersistenceTest {
         mvc.perform(get("/api/common/bills/excel").param("year","2026")).andExpect(status().isOk()).andExpect(header().string("X-Total-Count","1"));
         assertThat(db.queryForObject("SELECT COUNT(*) FROM TB_SY_ACCS_LOG WHERE ACT_TYPE_CD='DNLD' AND SCRN_ID='UI-13'",Long.class)).isEqualTo(1);
     }
+    void bill(String id,String month,String date) {
+        db.update("INSERT INTO TB_BL_BILL(BILL_ID,PROJ_ID,BILL_ORD,BILL_YM,BILL_DT,SPLY_AMT,VAT_RT,VAT_AMT,TOT_AMT,RCPT_SUM_AMT,UNPAID_AMT,PAY_DUE_DT,REG_USER_ID) VALUES(?,'bill-project',?,?,CAST(? AS date),1000,10,100,1100,0,1100,'2027-01-25','admin')",
+            id,Integer.parseInt(id.substring(id.length()-3))+Integer.parseInt(month.substring(4))*10,month,date);
+    }
+    @Test void listAndExcelKeepBillDateDescendingThenBillNumberAscendingWithinTheYear() throws Exception {
+        // 시안 sortDef: 청구일 내림차순, 같은 날은 청구번호 오름차순. 다른 해 청구는 빠진다.
+        bill("B-202610-001","202610","2026-11-05");bill("B-202611-002","202611","2026-11-01");
+        bill("B-202611-001","202611","2026-11-20");bill("B-202512-001","202512","2025-12-31");bill("B-202701-001","202701","2027-01-02");
+        var items=data(mvc.perform(get("/api/common/bills").param("year","2026")).andExpect(status().isOk())).path("items");
+        var ids=new ArrayList<String>();items.forEach(item -> ids.add(item.path("billId").asText()));
+        assertThat(ids).containsExactly("B-202611-001","B-202610-001","B-202611-002");
+        byte[] file=mvc.perform(get("/api/common/bills/excel").param("year","2026")).andExpect(status().isOk())
+            .andExpect(header().string("X-Total-Count","3")).andReturn().getResponse().getContentAsByteArray();
+        var excelIds=new ArrayList<String>();
+        try(var book=new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(file))) {
+            for(var row:book.getSheetAt(0)) {
+                var cell=row.getCell(0);
+                if(cell!=null && cell.getCellType()==org.apache.poi.ss.usermodel.CellType.STRING && cell.getStringCellValue().startsWith("B-"))
+                    excelIds.add(cell.getStringCellValue());
+            }
+        }
+        assertThat(excelIds).isEqualTo(ids);
+    }
     @Test void nextMonthReadsMonthlyInputWithoutChangingIt() throws Exception {
         String id=create();
         db.update("INSERT INTO TB_BS_PART(PART_ID,PART_NM,HQ_YN,USE_YN,REG_USER_ID) VALUES('bill-part','청구 파트','N','Y','admin')");

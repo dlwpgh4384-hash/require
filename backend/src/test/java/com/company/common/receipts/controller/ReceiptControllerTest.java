@@ -72,20 +72,20 @@ class ReceiptControllerTest {
         verify(mapper).updateBalance(new BalanceWrite("old-bill",new BigDecimal("400"),new BigDecimal("600"),"admin"));
     }
     @Test void zeroHasRequiredExactMessageAndNoWrites()throws Exception {
-        reject(input("0"),"items.amount");
+        reject(input("0"),"items[0].amount");
         mvc.perform(post("/api/common/receipts").contentType("application/json").content(input("0")))
-            .andExpect(jsonPath("$.errors[0].message").value("입금액을 입력해 주세요"));
+            .andExpect(jsonPath("$.errors[0].message").value("입금액을 입력해 주세요."));
     }
     @ParameterizedTest @ValueSource(strings={"-1","0.5","999999999999999.01","1000000000000000","null","\"400\""})
-    void invalidCurrencyIsRejected(String amount)throws Exception { reject(input(amount),"items.amount"); }
+    void invalidCurrencyIsRejected(String amount)throws Exception { reject(input(amount),"items[0].amount"); }
     @Test void overpaymentHasExactMessageAndNoWrites()throws Exception {
-        reject(input("1001"),"items.amount");
+        reject(input("1001"),"items[0].amount");
         mvc.perform(post("/api/common/receipts").contentType("application/json").content(input("1001")))
-            .andExpect(jsonPath("$.errors[0].message").value("입금액이 미수금보다 큽니다"));
+            .andExpect(jsonPath("$.errors[0].message").value("입금액이 미수금보다 큽니다."));
     }
     @Test void zeroBalanceCannotReceive()throws Exception {
         when(mapper.normalSum("old-bill")).thenReturn(total);
-        reject(input("1"),"items.amount");
+        reject(input("1"),"items[0].amount");
     }
     @Test void currentMonthClosedBlocksEvenEarlierOpenReceiptMonth()throws Exception {
         when(mapper.closed("202611")).thenReturn(true);
@@ -101,20 +101,20 @@ class ReceiptControllerTest {
     }
     @Test void cancelledBillCannotReceive()throws Exception {
         when(mapper.lockBill("old-bill")).thenReturn(new Bill("old-bill",total,true));
-        reject(input("400"),"items.billId");
+        reject(input("400"),"items[0].billId");
     }
     @Test void missingBillIsRegistrationFieldError()throws Exception {
         when(mapper.lockBill("old-bill")).thenReturn(null);
-        reject(input("400"),"items.billId");
+        reject(input("400"),"items[0].billId");
     }
     @Test void emptyItemsAreRejected()throws Exception {
         reject("{\"receiptDate\":\"2026-10-20\",\"items\":[]}","items");
     }
     @Test void duplicateBillIdsAreRejectedBeforeWrites()throws Exception {
-        reject("{\"receiptDate\":\"2026-10-20\",\"items\":[{\"billId\":\"b\",\"amount\":1},{\"billId\":\"b\",\"amount\":2}]}","items.billId");
+        reject("{\"receiptDate\":\"2026-10-20\",\"items\":[{\"billId\":\"b\",\"amount\":1},{\"billId\":\"b\",\"amount\":2}]}","items[1].billId");
     }
     @Test void wholeBatchValidatedAndLocksSortedBeforeAnyInsert()throws Exception {
-        reject("{\"receiptDate\":\"2026-10-20\",\"items\":[{\"billId\":\"z\",\"amount\":1},{\"billId\":\"a\",\"amount\":1001}]}","items.amount");
+        reject("{\"receiptDate\":\"2026-10-20\",\"items\":[{\"billId\":\"z\",\"amount\":1},{\"billId\":\"a\",\"amount\":1001}]}","items[1].amount");
         var order=inOrder(projects,mapper);
         order.verify(projects).lockSources();
         order.verify(mapper).lockBill("a");
@@ -144,14 +144,16 @@ class ReceiptControllerTest {
     @ParameterizedTest @ValueSource(strings={"{}","{\"reason\":\" \"}","{\"reason\":null}"})
     void missingReasonLeavesRowsUnchanged(String body)throws Exception {
         mvc.perform(post("/api/common/receipts/101/cancel").contentType("application/json").content(body))
-            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("reason"));
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("reason"))
+            .andExpect(jsonPath("$.errors[0].message").value("취소 사유를 입력해 주세요."));
         verify(mapper,never()).cancel(anyString(),anyString(),anyString(),any());
         verify(mapper,never()).updateBalance(any());
     }
     @Test void reasonLengthIsBounded()throws Exception {
         mvc.perform(post("/api/common/receipts/101/cancel").contentType("application/json")
             .content("{\"reason\":\""+"가".repeat(501)+"\"}"))
-            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("reason"));
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("reason"))
+            .andExpect(jsonPath("$.errors[0].message").value("취소 사유는 500자까지 입력해 주세요."));
         verify(mapper,never()).cancel(anyString(),anyString(),anyString(),any());
     }
     @Test void closedReceiptMonthCannotCancel()throws Exception {

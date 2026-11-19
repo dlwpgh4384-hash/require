@@ -61,8 +61,13 @@ class BillProjectionTest {
     @Test void listOrderAndLatestUseOrderRatherThanMonth() throws Exception {
         String sql=config().getMappedStatement(BillMapper.class.getName()+".yearRows").getBoundSql(Map.of("year",2026)).getSql();
         // 가장 최근 청구 = 청구월이 가장 늦은 청구(시안 qbLatest), 차수 최대가 아님
-        assertThat(sql).contains("ORDER BY b.BILL_DT DESC,b.BILL_ORD DESC,b.BILL_ID DESC","ORDER BY x.BILL_YM DESC,x.BILL_ID DESC LIMIT 1","x.CNCL_YN='N'")
-            .doesNotContain("MAX(x.BILL_ORD)");
+        // 목록 기본 순서: 청구일 내림차순, 같은 날은 청구번호 오름차순(시안 sortDef). 엑셀도 같은 순서.
+        assertThat(sql.strip()).endsWith("ORDER BY b.BILL_DT DESC,b.BILL_ID");
+        assertThat(sql).contains("ORDER BY x.BILL_YM DESC,x.BILL_ID DESC LIMIT 1","x.CNCL_YN='N'")
+            .doesNotContain("MAX(x.BILL_ORD)","x.BILL_DT DESC");
+        // IX_TB_BL_BILL_02(BILL_YM)를 쓸 수 있게 substring 대신 범위로 거른다.
+        assertThat(sql).contains("b.BILL_YM BETWEEN CAST(CAST(? AS text)||'01' AS CHAR(6)) AND CAST(CAST(? AS text)||'12' AS CHAR(6))")
+            .doesNotContain("substring(b.BILL_YM");
     }
     @Test void updateDoesNotChangeIdentityOrReceiptRows() throws Exception {
         String sql=config().getMappedStatement(BillMapper.class.getName()+".update").getBoundSql(Map.of()).getSql();

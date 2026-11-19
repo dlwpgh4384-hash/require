@@ -3,7 +3,7 @@ import { Dialog, InlineConfirmation } from "../../shared/feedback/Dialog";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { Banner } from "../../shared/list";
 import { ProjectRequestError } from "../projects/projects";
-import { billMonthLabel } from "../bills/bills";
+import { billMonthLabel, failureMessage, isConflict } from "../bills/bills";
 import {
   getBillCheckDetail,
   getBillCheckOptions,
@@ -33,11 +33,14 @@ export function BillCheckForm({
   checkMonth,
   onClose,
   onSaved,
+  onConflict,
 }: {
   row: BillCheckRow;
   checkMonth: string;
   onClose: () => void;
   onSaved: (detail: BillCheckDetail, message: string) => void;
+  /** 다른 사람이 먼저 바꿨을 때(409): 화면이 공통 알림을 띄우고 다시 불러온다. */
+  onConflict?: (message: string) => void;
 }) {
   const [initial, setInitial] = useState<{
     supply: string;
@@ -60,6 +63,8 @@ export function BillCheckForm({
   const [saving, setSaving] = useState(false);
   const [discard, setDiscard] = useState(false);
   const [revision, setRevision] = useState(0);
+  // [청구 고치기]: 고칠 청구를 읽었을 때의 수정 시각(00-1 동시 수정)
+  const [modifiedAt, setModifiedAt] = useState<string | null>(null);
   const setDirty = useScreenDirty();
   const dirty =
     initial !== null && JSON.stringify(values) !== JSON.stringify(initial);
@@ -72,6 +77,7 @@ export function BillCheckForm({
     const controller = new AbortController();
     setError("");
     setInitial(null);
+    setModifiedAt(null);
     void (async () => {
       const options = await getBillCheckOptions(checkMonth, controller.signal);
       let supply =
@@ -84,6 +90,7 @@ export function BillCheckForm({
       };
       let text = `${M} 투입 기준 금액 ${won(row.referenceAmount)}원으로 채웠습니다. 고쳐서 등록할 수 있습니다.`;
       let heading = "청구 등록";
+      let read: string | null = null;
       if (row.allowedAction === "ADDITIONAL") {
         heading = "추가 청구 (차액)";
         text = `${M}은 마감한 달이라 기존 청구는 고칠 수 없습니다. 모자란 ${won(row.difference)}원을 같은 달 추가 청구로 등록합니다.`;
@@ -91,6 +98,7 @@ export function BillCheckForm({
       if (row.allowedAction === "CORRECTION" && row.latestBillId) {
         const detail = await getBillCheckDetail(row.latestBillId, controller.signal);
         const last = detail.bill.supplyAmount;
+        read = detail.bill.modifiedAt;
         supply = last + row.difference;
         heading = `청구 수정 · ${detail.bill.billId}`;
         text = `투입 기준에 맞추려면 공급가를 ${won(last)}원에서 ${won(supply)}원으로 고칩니다(차이 ${row.difference > 0 ? "+" : ""}${won(row.difference)}원).`;
@@ -107,6 +115,7 @@ export function BillCheckForm({
           ?.customerName ?? "",
       );
       const start = { supply: supply > 0 ? won(supply) : "", ...defaults };
+      setModifiedAt(read);
       setTitle(heading);
       setMessage(text);
       setValues(start);
@@ -151,6 +160,7 @@ export function BillCheckForm({
         payDueDate: values.payDueDate,
         taxInvoiceNo: values.taxInvoiceNo.trim() || null,
         supplyAmount: Number(supply),
+        ...(row.allowedAction === "CORRECTION" && modifiedAt ? { modifiedAt } : {}),
       };
       const submit =
         row.allowedAction === "MISSING"
@@ -166,11 +176,13 @@ export function BillCheckForm({
           : `${row.projectName} ${billMonthLabel(checkMonth)} 청구를 등록했습니다.`,
       );
     } catch (failure) {
-      setError(
-        failure instanceof ProjectRequestError || failure instanceof Error
-          ? failure.message
-          : "청구를 저장하지 못했습니다.",
-      );
+      if (isConflict(failure) && onConflict) onConflict(failureMessage(failure, ""));
+      else
+        setError(
+          failure instanceof ProjectRequestError || failure instanceof Error
+            ? failure.message
+            : "청구를 저장하지 못했습니다.",
+        );
     } finally {
       setSaving(false);
     }
@@ -179,8 +191,8 @@ export function BillCheckForm({
     <Dialog title={title} onClose={close} testId="bill-check-form" closable>
       {discard ? (
         <InlineConfirmation
-          title="저장하지 않고 닫을까요?"
-          description="입력한 내용은 저장되지 않습니다."
+          title="저장하지 않은 내용이 있습니다"
+          description="나가면 입력한 내용이 사라집니다."
           onCancel={() => setDiscard(false)}
           onProceed={onClose}
         />

@@ -111,7 +111,8 @@
   </select>
   <select id="billMonths" resultType="string">
     SELECT DISTINCT b.BILL_YM FROM TB_BL_BILL b
-    WHERE b.CNCL_YN='N' AND substring(b.BILL_YM,1,4)=#{year} AND b.BILL_YM&lt;=#{until}
+    WHERE b.CNCL_YN='N' AND b.BILL_YM BETWEEN CAST(CAST(#{year} AS text)||'01' AS CHAR(6)) AND CAST(CAST(#{year} AS text)||'12' AS CHAR(6))
+      AND b.BILL_YM&lt;=#{until}
     ORDER BY b.BILL_YM
   </select>
   <!-- ProjectMapper.lockSources is always acquired first, matching existing project/assignment writers. -->
@@ -132,5 +133,6 @@
       PAY_DUE_DT=#{input.payDueDate},TAX_INVC_NO=#{input.taxInvoiceNo,jdbcType=VARCHAR},
       MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp()
     WHERE BILL_ID=#{billId} AND CNCL_YN='N'
+      AND COALESCE(MOD_DTTM,REG_DTTM) IS NOT DISTINCT FROM #{input.modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
   </update>
 </mapper>

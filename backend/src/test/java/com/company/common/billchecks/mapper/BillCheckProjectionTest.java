@@ -98,4 +98,15 @@ class BillCheckProjectionTest {
         assertThat(sql).contains("r.RCPT_ID::text AS \"receiptId\"","to_char(r.RCPT_DT,'YYYYMM')","ORDER BY r.RCPT_DT,r.RCPT_ID")
             .doesNotContain("RECEIPT_ID");
     }
+    @Test void checkMonthsUseAnIndexableMonthRange()throws Exception {
+        // IX_TB_BL_BILL_02(BILL_YM)를 쓸 수 있게 substring 대신 범위로 거른다.
+        String sql=config().getMappedStatement(BillCheckMapper.class.getName()+".billMonths")
+            .getBoundSql(Map.of("year","2026","until","202611")).getSql();
+        assertThat(sql).contains("b.BILL_YM BETWEEN CAST(CAST(? AS text)||'01' AS CHAR(6)) AND CAST(CAST(? AS text)||'12' AS CHAR(6))")
+            .doesNotContain("substring(b.BILL_YM");
+    }
+    @Test void correctionOverwritesOnlyTheVersionTheScreenRead()throws Exception {
+        String sql=config().getMappedStatement(BillCheckMapper.class.getName()+".correct").getBoundSql(Map.of()).getSql();
+        assertThat(sql).contains("COALESCE(MOD_DTTM,REG_DTTM) IS NOT DISTINCT FROM ?");
+    }
 }

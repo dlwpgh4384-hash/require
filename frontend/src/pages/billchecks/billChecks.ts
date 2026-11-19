@@ -46,6 +46,8 @@ export interface BillCheckInput {
   taxInvoiceNo: string | null;
   /** 창에서 고친 공급가. */
   supplyAmount?: number;
+  /** [청구 고치기]만: 화면이 읽은 고칠 청구의 수정 시각(00-1 동시 수정, 다르면 409). */
+  modifiedAt?: string;
 }
 export interface BillCheckDetail {
   bill: {
@@ -69,6 +71,8 @@ export interface BillCheckDetail {
     cancelReason: string | null;
     cancelledBy: string | null;
     cancelledAt: string | null;
+    /** 마지막 수정 시각(없으면 등록 시각). [청구 고치기] 때 그대로 보낸다. */
+    modifiedAt: string;
   };
   receipts: {
     receiptId: string;
@@ -106,6 +110,7 @@ const command = (action: string, input: BillCheckInput) =>
       payDueDate: input.payDueDate,
       taxInvoiceNo: input.taxInvoiceNo,
       ...(input.supplyAmount != null ? { supplyAmount: input.supplyAmount } : {}),
+      ...(input.modifiedAt ? { modifiedAt: input.modifiedAt } : {}),
     }),
   });
 export const postCommonBillCheckMissing = (input: BillCheckInput) =>

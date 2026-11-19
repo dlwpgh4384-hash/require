@@ -1,7 +1,7 @@
 package com.company.common.receipts.service;
 
-import com.company.common.clients.service.ClientRules;
 import com.company.common.common.BillingCalculationRules;
+import com.company.common.common.BillingInputRules;
 import com.company.common.projects.mapper.ProjectMapper;
 import com.company.common.receipts.dto.ReceiptContracts.*;
 import com.company.common.receipts.mapper.ReceiptMapper;
@@ -38,40 +38,47 @@ public class ReceiptService {
 
     @Transactional
     public Result postCommonReceipt(JsonNode body) {
-        ClientRules.object(body,Set.of("receiptDate","items"));
+        BillingInputRules.object(body,Set.of("receiptDate","items"));
         LocalDate date=date(body.path("receiptDate"));
         JsonNode rows=body.path("items");
         if (!rows.isArray() || rows.isEmpty())
             throw CodeFailure.invalid("items","입금할 청구를 선택해 주세요.");
         var items=new ArrayList<Item>();
         var ids=new TreeSet<String>();
-        for (JsonNode row:rows) {
-            ClientRules.object(row,Set.of("billId","amount"));
+        // 여러 청구를 한 번에 받을 때 오류가 그 줄에만 보이도록 칸 이름에 줄 번호를 붙인다(예: items[2].amount).
+        var rowOf=new HashMap<String,Integer>();
+        for (int index=0;index<rows.size();index++) {
+            JsonNode row=rows.get(index);
+            String prefix="items["+index+"].";
+            BillingInputRules.object(row,Set.of("billId","amount"));
             JsonNode id=row.path("billId");
             if (!id.isTextual() || id.asText().isBlank() || id.asText().length()>20
                 || id.asText().chars().anyMatch(Character::isISOControl))
-                throw CodeFailure.invalid("items.billId","청구를 확인해 주세요.");
+                throw CodeFailure.invalid(prefix+"billId","청구를 확인해 주세요.");
             if (!ids.add(id.asText()))
-                throw CodeFailure.invalid("items.billId","같은 청구는 한 번만 선택해 주세요.");
+                throw CodeFailure.invalid(prefix+"billId","같은 청구는 한 번만 선택해 주세요.");
             JsonNode raw=row.path("amount");
             if (!raw.isNumber() || raw.decimalValue().signum()==0)
-                throw CodeFailure.invalid("items.amount","입금액을 입력해 주세요");
+                throw CodeFailure.invalid(prefix+"amount","입금액을 입력해 주세요.");
             BigDecimal amount=raw.decimalValue();
-            BillingCalculationRules.positiveMoney(amount,"items.amount");
+            if (amount.signum()<0 || amount.stripTrailingZeros().scale()>0 || amount.compareTo(BigDecimal.TEN.pow(15))>=0)
+                throw CodeFailure.invalid(prefix+"amount","입금액은 15자리 이내의 원 단위 양수로 입력해 주세요.");
+            rowOf.put(id.asText(),index);
             items.add(new Item(id.asText(),amount));
         }
         // Same source/table boundary as the existing billing creators; closure cannot change mid-write.
         projects.lockSources();
         var bills=new HashMap<String,Bill>();
-        for (String id:ids) bills.put(id,requiredBill(id,400));
+        for (String id:ids) bills.put(id,requiredBill(id,400,"items["+rowOf.get(id)+"].billId"));
         open(YearMonth.from(calendar.today()),"receiptDate");
         open(YearMonth.from(date),"receiptDate");
-        for (Item item:items) {
+        for (int index=0;index<items.size();index++) {
+            Item item=items.get(index);
             Bill bill=bills.get(item.billId());
-            if (bill.cancelled()) throw CodeFailure.invalid("items.billId","취소된 청구에는 입금할 수 없습니다.");
+            if (bill.cancelled()) throw CodeFailure.invalid("items["+index+"].billId","취소된 청구에는 입금할 수 없습니다.");
             BigDecimal balance=rules.balance(bill.totalAmount(),mapper.normalSum(bill.billId()));
             if (item.amount().compareTo(balance)>0)
-                throw CodeFailure.invalid("items.amount","입금액이 미수금보다 큽니다");
+                throw CodeFailure.invalid("items["+index+"].amount","입금액이 미수금보다 큽니다.");
         }
         var receipts=new ArrayList<Receipt>();
         for (Item item:items) {
@@ -84,20 +91,16 @@ public class ReceiptService {
 
     @Transactional
     public Result postCommonReceiptCancel(String id, JsonNode body) {
-        ClientRules.object(body,Set.of("reason","modifiedAt"));
-        JsonNode raw=body.path("reason");
-        if (!raw.isTextual() || raw.asText().strip().isBlank())
-            throw CodeFailure.invalid("reason","취소 사유를 입력해 주세요.");
-        String reason=raw.asText().strip();
-        if (reason.codePointCount(0,reason.length())>500)
-            throw CodeFailure.invalid("reason","취소 사유는 500자 이내로 입력해 주세요.");
+        BillingInputRules.object(body,Set.of("reason","modifiedAt"));
+        // 청구 취소와 같은 문구(「취소 사유를 입력해 주세요.」·「취소 사유는 500자까지 입력해 주세요.」).
+        String reason=BillingInputRules.text(body,"reason","취소 사유",500,true);
         Instant token=token(body);
         if (id==null || !id.matches("[0-9]{1,12}"))
             throw new CodeFailure(404,"receiptId","입금을 찾을 수 없습니다.");
         projects.lockSources();
         ReceiptRow found=mapper.receipt(id);
         if (found==null) throw new CodeFailure(404,"receiptId","입금을 찾을 수 없습니다.");
-        Bill bill=requiredBill(found.billId(),404);
+        Bill bill=requiredBill(found.billId(),404,"receiptId");
         ReceiptRow receipt=mapper.lockReceipt(id);
         if (receipt==null) throw new CodeFailure(404,"receiptId","입금을 찾을 수 없습니다.");
         if (receipt.cancelled()) throw CodeFailure.invalid("receiptId","이미 취소된 입금입니다.");
@@ -120,9 +123,9 @@ public class ReceiptService {
         } catch (RuntimeException exception) { throw CodeFailure.invalid("modifiedAt","수정 시각을 확인해 주세요."); }
     }
 
-    private Bill requiredBill(String id,int status) {
+    private Bill requiredBill(String id,int status,String field) {
         Bill bill=mapper.lockBill(id);
-        if (bill==null) throw new CodeFailure(status,"items.billId","청구를 찾을 수 없습니다.");
+        if (bill==null) throw new CodeFailure(status,field,"청구를 찾을 수 없습니다.");
         return bill;
     }
 

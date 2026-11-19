@@ -290,6 +290,13 @@ export function BillChecksPanel({
             void load(result.checkMonth);
             onChanged?.();
           }}
+          onConflict={(message) => {
+            // 00-1 동시 수정: 공통 문구를 알리고 점검 결과를 다시 불러온다.
+            setSelected(null);
+            onNotice?.(message, "warn");
+            void load(result.checkMonth);
+            onChanged?.();
+          }}
         />
       )}
     </section>

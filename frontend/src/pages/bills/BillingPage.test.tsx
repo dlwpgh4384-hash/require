@@ -22,6 +22,7 @@ let duplicate: boolean;
 let nextMonthClosed: boolean;
 let conflict: boolean;
 let nextFailure: string | null;
+let createFailure: { field: string; message: string } | null;
 const ok = (data: unknown) => ({
   ok: true,
   status: 200,
@@ -100,6 +101,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-11-15T01:00:00Z"));
   duplicate = nextMonthClosed = conflict = false;
   nextFailure = null;
+  createFailure = null;
   bills = [
     make(),
     make({ billId: "B-202610-001", billMonth: "202610", billDate: "2026-10-15", billOrder: 2, status: "LATE", payDueDate: "2026-11-05", daysOverdue: 10, dunningStep: 1, canCopy: false, canNextMonth: false, canEdit: false, canCancel: false }),
@@ -144,6 +146,7 @@ beforeEach(() => {
     }
     if (path === "/api/common/bills" && method === "POST") {
       const body = JSON.parse(String(init?.body));
+      if (createFailure) return fail(400, createFailure.message, createFailure.field);
       if (duplicate && !body.duplicateConfirmed)
         return {
           ok: true,
@@ -222,9 +225,22 @@ it("시안 틀: 제목줄 [+ 청구 등록], 연도 줄 설명, 건수 탭, 요�
   expect(screen.getByTestId("list-footer-totalAmount")).toHaveTextContent("2,200,000");
   expect(screen.queryByText("조회 결과가 없습니다")).not.toBeInTheDocument();
   expect(screen.queryByTestId("bill-totals")).not.toBeInTheDocument();
-  // 빠른 청구는 가장 최근 청구 줄에만
+  // 빠른 청구는 가장 최근 청구 줄에만. 가장 최근이 아닌 줄은 빈칸(시안 quickBillBtns)
   expect(screen.getByTestId("bill-copy-B-202611-001")).toBeVisible();
   expect(screen.queryByTestId("bill-copy-B-202610-001")).not.toBeInTheDocument();
+  expect(screen.getByTestId("list-cell-B-202610-001-actions")).toBeEmptyDOMElement();
+  expect(screen.getByTestId("list-cell-B-202609-001-actions")).toBeEmptyDOMElement();
+});
+
+it("빠른 청구: 프로젝트의 가장 최근 청구인데 쓸 수 없으면 「–」, 아니면 빈칸", async () => {
+  bills = [
+    make({ billId: "B-202611-007", projectId: "P-0002", projectName: "끝나는 프로젝트", canCopy: false, canNextMonth: false }),
+    make({ billId: "B-202610-007", projectId: "P-0002", projectName: "끝나는 프로젝트", billMonth: "202610", canCopy: false, canNextMonth: false }),
+  ];
+  mount();
+  await screen.findByTestId("list-row-B-202611-007");
+  expect(screen.getByTestId("list-cell-B-202611-007-actions")).toHaveTextContent("–");
+  expect(screen.getByTestId("list-cell-B-202610-007-actions")).toBeEmptyDOMElement();
 });
 
 it("청구월 조건은 청구가 있는 달만 고르고 [조회]·[초기화]로 화면에서 거른다", async () => {
@@ -348,7 +364,7 @@ it("[청구 취소]는 사유와 수정 시각을 보내고 시안 알림을 띄
   const dialog = await screen.findByTestId("bill-cancel-dialog");
   expect(dialog).toHaveTextContent("시험 프로젝트 · B-202611-001 (3차, 2026-11, 합계 1,100,000원)을 취소합니다.");
   fireEvent.click(within(dialog).getByTestId("bill-cancel-confirm"));
-  expect(within(dialog).getByTestId("bill-cancel-error")).toHaveTextContent("취소 사유를 적어 주세요.");
+  expect(within(dialog).getByTestId("bill-cancel-error")).toHaveTextContent("취소 사유를 입력해 주세요.");
   fireEvent.change(within(dialog).getByTestId("bill-cancel-reason"), { target: { value: "두 번 등록" } });
   fireEvent.click(within(dialog).getByTestId("bill-cancel-confirm"));
   expect(await screen.findByTestId("bill-toast")).toHaveTextContent("B-202611-001 청구를 취소했습니다. 기록은 남습니다.");
@@ -361,19 +377,73 @@ it("새 청구 등록 창: 프로젝트를 고르면 추정 공급가를 채우�
   fireEvent.click(screen.getByTestId("bill-register"));
   const dialog = await screen.findByRole("dialog", { name: "청구 등록" });
   fireEvent.click(within(dialog).getByTestId("bill-form-save"));
-  expect(within(dialog).getByTestId("bill-form-error")).toHaveTextContent("프로젝트를 골라 주세요.");
+  // 틀린 칸 밑에 이유를 보이고 첫 오류 칸으로 간다(00-1 FR-0106)
+  expect(within(dialog).getByTestId("bill-form-error-projectId")).toHaveTextContent("프로젝트를 골라 주세요.");
+  expect(within(dialog).getByTestId("bill-form-project")).toHaveAttribute("aria-invalid", "true");
+  await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByTestId("bill-form-project")));
+  expect(within(dialog).getByTestId("bill-form-error")).toBeEmptyDOMElement();
   await waitFor(() => expect(within(dialog).getByTestId("bill-form-project").querySelectorAll("option").length).toBe(2));
   fireEvent.change(within(dialog).getByTestId("bill-form-project"), { target: { value: "P-0001" } });
   await waitFor(() => expect(within(dialog).getByTestId("bill-form-supplyAmount")).toHaveValue("1,200,000"));
   expect(within(dialog).getByTestId("bill-form-vatRate")).toHaveValue("10");
   fireEvent.change(within(dialog).getByTestId("bill-form-vatRate"), { target: { value: "101" } });
+  expect(within(dialog).queryByTestId("bill-form-error-projectId")).not.toBeInTheDocument();
   fireEvent.click(within(dialog).getByTestId("bill-form-save"));
-  expect(within(dialog).getByTestId("bill-form-error")).toHaveTextContent("부가세율을 0~100 사이로 입력해 주세요.");
+  expect(within(dialog).getByTestId("bill-form-error-vatRate")).toHaveTextContent("부가세율을 0~100 사이로 입력해 주세요.");
   fireEvent.change(within(dialog).getByTestId("bill-form-vatRate"), { target: { value: "10" } });
   fireEvent.change(within(dialog).getByTestId("bill-form-payDueDate"), { target: { value: "2026-11-01" } });
   fireEvent.click(within(dialog).getByTestId("bill-form-save"));
-  expect(within(dialog).getByTestId("bill-form-error")).toHaveTextContent("입금 예정일이 청구일보다 빠릅니다.");
+  expect(within(dialog).getByTestId("bill-form-error-payDueDate")).toHaveTextContent("입금 예정일이 청구일보다 빠릅니다.");
+  fireEvent.change(within(dialog).getByTestId("bill-form-billDate"), { target: { value: "" } });
+  fireEvent.click(within(dialog).getByTestId("bill-form-save"));
+  expect(within(dialog).getByTestId("bill-form-error-billDate")).toHaveTextContent("청구일을 입력해 주세요.");
+  await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByTestId("bill-form-billDate")));
   expect(calls("POST", "/api/common/bills")).toHaveLength(0);
+});
+
+it("서버 칸 오류(errors[].field)는 그 칸 밑에 붙인다", async () => {
+  createFailure = { field: "taxInvoiceNo", message: "세금계산서 번호는 30자까지 입력해 주세요." };
+  mount();
+  fireEvent.click(await screen.findByTestId("bill-copy-B-202611-001"));
+  const dialog = await screen.findByRole("dialog", { name: "청구 등록 · 지난 청구 복사" });
+  fireEvent.click(within(dialog).getByTestId("bill-form-save"));
+  expect(await within(dialog).findByTestId("bill-form-error-taxInvoiceNo")).toHaveTextContent(
+    "세금계산서 번호는 30자까지 입력해 주세요.",
+  );
+  expect(within(dialog).getByTestId("bill-form-taxInvoiceNo")).toHaveAttribute("aria-invalid", "true");
+  await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByTestId("bill-form-taxInvoiceNo")));
+  expect(within(dialog).getByTestId("bill-form-error")).toBeEmptyDOMElement();
+});
+
+it("등록 창을 고친 채 닫으면 공통 문구로 묻는다", async () => {
+  mount();
+  fireEvent.click(await screen.findByTestId("bill-copy-B-202611-001"));
+  const dialog = await screen.findByRole("dialog", { name: "청구 등록 · 지난 청구 복사" });
+  fireEvent.change(within(dialog).getByTestId("bill-form-taxInvoiceNo"), { target: { value: "1" } });
+  fireEvent.click(within(dialog).getByTestId("bill-form-cancel"));
+  const confirm = within(dialog).getByTestId("bill-form-dirty");
+  expect(confirm).toHaveTextContent("저장하지 않은 내용이 있습니다");
+  expect(confirm).toHaveTextContent("나가면 입력한 내용이 사라집니다.");
+  fireEvent.click(within(confirm).getByRole("button", { name: "나가기" }));
+  await waitFor(() => expect(screen.queryByTestId("bill-form")).not.toBeInTheDocument());
+});
+
+it("[청구 취소] 창은 사유를 적은 채 닫으면 공통 문구로 묻는다", async () => {
+  mount();
+  fireEvent.click(await screen.findByTestId("list-row-B-202611-001"));
+  fireEvent.click(await screen.findByTestId("bill-detail-cancel"));
+  const dialog = await screen.findByTestId("bill-cancel-dialog");
+  fireEvent.change(within(dialog).getByTestId("bill-cancel-reason"), { target: { value: "잘못 등록" } });
+  fireEvent.click(within(dialog).getByTestId("bill-cancel-back"));
+  const confirm = within(dialog).getByTestId("bill-cancel-dirty");
+  expect(confirm).toHaveTextContent("저장하지 않은 내용이 있습니다");
+  expect(confirm).toHaveTextContent("나가면 입력한 내용이 사라집니다.");
+  fireEvent.click(within(confirm).getByRole("button", { name: "취소" }));
+  expect(within(dialog).getByTestId("bill-cancel-reason")).toHaveValue("잘못 등록");
+  fireEvent.click(within(dialog).getByTestId("bill-cancel-back"));
+  fireEvent.click(within(within(dialog).getByTestId("bill-cancel-dirty")).getByRole("button", { name: "나가기" }));
+  await waitFor(() => expect(screen.queryByTestId("bill-cancel-dialog")).not.toBeInTheDocument());
+  expect(calls("POST", "/cancel")).toHaveLength(0);
 });
 
 it("지난 해는 탭 없이 읽기 전용 띠를 보이고 등록·빠른 청구를 숨긴다", async () => {

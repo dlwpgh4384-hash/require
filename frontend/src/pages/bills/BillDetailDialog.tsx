@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Dialog, type ToastKind } from "../../shared/feedback/Dialog";
+import { Dialog, InlineConfirmation, type ToastKind } from "../../shared/feedback/Dialog";
 import { Badge, Banner, DetailPanel, KeyValues } from "../../shared/list";
 import { formatDateTime } from "../../shared/time";
 import { ReceiptCancelDialog } from "../receipts/ReceiptCancelDialog";
@@ -48,6 +48,8 @@ export function BillDetailDialog({
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState("");
+  // 사유를 적은 채 닫으면 저장하지 않은 내용 확인(00-1 FR-0106)
+  const [leaving, setLeaving] = useState(false);
   const [saving, setSaving] = useState(false);
   const pending = useRef(false);
   useEffect(() => {
@@ -65,8 +67,14 @@ export function BillDetailDialog({
     return () => controller.abort();
   }, [billId, revision]);
   const reload = () => setRevision((value) => value + 1);
+  const closeCancel = () => {
+    if (pending.current) return;
+    if (reason.trim()) setLeaving(true);
+    else setCancelling(false);
+  };
   const conflict = (message: string) => {
     setCancelling(false);
+    setLeaving(false);
     setReceipt(null);
     reload();
     onChanged(message, "warn");
@@ -75,7 +83,7 @@ export function BillDetailDialog({
     if (pending.current) return;
     const value = reason.trim();
     if (!value) {
-      setReasonError("취소 사유를 적어 주세요.");
+      setReasonError("취소 사유를 입력해 주세요.");
       return;
     }
     pending.current = true;
@@ -117,6 +125,7 @@ export function BillDetailDialog({
             onClick={() => {
               setReason("");
               setReasonError("");
+              setLeaving(false);
               setCancelling(true);
             }}
           >
@@ -240,9 +249,7 @@ export function BillDetailDialog({
           title="청구 취소"
           testId="bill-cancel-dialog"
           closable
-          onClose={() => {
-            if (!pending.current) setCancelling(false);
-          }}
+          onClose={closeCancel}
         >
           <form
             className="billing-receipt-form"
@@ -267,7 +274,10 @@ export function BillDetailDialog({
               value={reason}
               disabled={saving}
               aria-invalid={!!reasonError}
-              onChange={(event) => setReason(event.target.value)}
+              onChange={(event) => {
+                setReason(event.target.value);
+                setReasonError("");
+              }}
             />
             <p role="alert" className="field-error" data-testid="bill-cancel-error">
               {reasonError}
@@ -278,7 +288,7 @@ export function BillDetailDialog({
                 className="ls-btn"
                 data-testid="bill-cancel-back"
                 disabled={saving}
-                onClick={() => setCancelling(false)}
+                onClick={closeCancel}
               >
                 닫기
               </button>
@@ -292,6 +302,18 @@ export function BillDetailDialog({
               </button>
             </div>
           </form>
+          {leaving && (
+            <InlineConfirmation
+              title="저장하지 않은 내용이 있습니다"
+              description="나가면 입력한 내용이 사라집니다."
+              onCancel={() => setLeaving(false)}
+              onProceed={() => {
+                setLeaving(false);
+                setCancelling(false);
+              }}
+              testId="bill-cancel-dirty"
+            />
+          )}
         </Dialog>
       )}
       {receipt && (

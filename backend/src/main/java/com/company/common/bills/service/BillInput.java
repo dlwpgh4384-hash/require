@@ -1,9 +1,8 @@
 package com.company.common.bills.service;
 
 import com.company.common.bills.dto.BillContracts.*;
-import com.company.common.clients.service.ClientRules;
 import com.company.common.common.BillingCalculationRules;
-import com.company.common.projects.service.ProjectRules;
+import com.company.common.common.BillingInputRules;
 import com.company.common.support.service.BusinessCalendar;
 import com.company.common.support.service.CodeFailure;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,22 +21,22 @@ final class BillInput {
     static EditInput edit(JsonNode body, Supplier<BigDecimal> defaultRate) {
         var fields=new HashSet<>(FIELDS);
         fields.add("modifiedAt");
-        ClientRules.object(body,fields);
+        BillingInputRules.object(body,fields);
         return new EditInput(values(body,defaultRate),token(body));
     }
 
     static CreateInput create(JsonNode body, BusinessCalendar calendar, BillingCalculationRules rules) {
         var fields=new HashSet<>(FIELDS);
         fields.addAll(Set.of("projectId","billMonth","sourceBillId","duplicateConfirmed"));
-        ClientRules.object(body,fields);
-        String project=ProjectRules.text(body,"projectId",20,true);
-        String month=ProjectRules.text(body,"billMonth",6,true);
+        BillingInputRules.object(body,fields);
+        String project=BillingInputRules.text(body,"projectId","프로젝트",20,true);
+        String month=BillingInputRules.text(body,"billMonth","청구월",6,true);
         month(month,calendar);
         var confirmed=body.get("duplicateConfirmed");
         if (confirmed!=null && !confirmed.isBoolean())
             throw CodeFailure.invalid("duplicateConfirmed","중복 청구 확인 값을 확인해 주세요.");
         return new CreateInput(project,month,values(body,() -> rules.defaultVatRate(calendar.fromDatabaseMonth(month))),
-            ProjectRules.text(body,"sourceBillId",20,false),confirmed!=null && confirmed.booleanValue());
+            BillingInputRules.text(body,"sourceBillId","원청구 번호",20,false),confirmed!=null && confirmed.booleanValue());
     }
 
     static void month(String value, BusinessCalendar calendar) {
@@ -46,7 +45,8 @@ final class BillInput {
     }
 
     private static Values values(JsonNode body, Supplier<BigDecimal> defaultRate) {
-        var supply=ProjectRules.money(body,"supplyAmount",true);
+        var supply=BillingInputRules.money(body,"supplyAmount","공급가",true);
+        if (supply.signum()==0) throw CodeFailure.invalid("supplyAmount",BillingInputRules.required("공급가"));
         BillingCalculationRules.positiveMoney(supply,"supplyAmount");
         var raw=body.get("vatRate");
         BigDecimal rate;
@@ -55,25 +55,21 @@ final class BillInput {
             rate=raw.decimalValue();
         } else rate=defaultRate.get();
         BillingCalculationRules.rate(rate,"vatRate");
-        LocalDate date=ProjectRules.date(body,"billDate"),due=ProjectRules.date(body,"payDueDate");
+        LocalDate date=BillingInputRules.date(body,"billDate","청구일");
+        LocalDate due=BillingInputRules.date(body,"payDueDate","입금 예정일");
         if (due.isBefore(date)) throw CodeFailure.invalid("payDueDate","입금 예정일이 청구일보다 빠릅니다.");
-        return new Values(supply,rate,date,due,ProjectRules.text(body,"taxInvoiceNo",30,false));
+        return new Values(supply,rate,date,due,BillingInputRules.text(body,"taxInvoiceNo","세금계산서 번호",30,false));
     }
 
-    /** [청구 취소]: 사유와 화면이 읽은 수정 시각(modifiedAt). */
+    /** [청구 취소]: 사유와 화면이 읽은 수정 시각(modifiedAt). 문구는 입금 취소와 같다. */
     static CancelInput cancel(JsonNode body) {
-        ClientRules.object(body,Set.of("reason","modifiedAt"));
-        String reason=ProjectRules.text(body,"reason",500,true);
+        BillingInputRules.object(body,Set.of("reason","modifiedAt"));
+        String reason=BillingInputRules.text(body,"reason","취소 사유",500,true);
         return new CancelInput(reason,token(body));
     }
 
     /** 화면이 읽은 수정 시각. 없거나 형식이 틀리면 400, 값이 지금과 다르면 서비스가 409. */
     static Instant token(JsonNode body) {
-        var node=body.get("modifiedAt");
-        if (node==null || node.isNull()) throw CodeFailure.invalid("modifiedAt","수정 시각을 제출해 주세요.");
-        try {
-            if (!node.isTextual()) throw new IllegalArgumentException();
-            return Instant.parse(node.textValue());
-        } catch (RuntimeException e) { throw CodeFailure.invalid("modifiedAt","수정 시각을 확인해 주세요."); }
+        return BillingInputRules.token(body);
     }
 }

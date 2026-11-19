@@ -160,6 +160,21 @@ export function BillingPage() {
     return () => controller.abort();
   }, [current, revision]);
   const all = data?.items ?? [];
+  /** 프로젝트마다 가장 최근 청구(취소 제외, 청구월·청구번호가 가장 늦은 것, 시안 qbLatest·서버와 같은 기준). */
+  const latestIds = useMemo(() => {
+    const latest = new Map<string, Bill>();
+    for (const bill of all) {
+      if (bill.cancelled) continue;
+      const seen = latest.get(bill.projectId);
+      if (
+        !seen ||
+        bill.billMonth > seen.billMonth ||
+        (bill.billMonth === seen.billMonth && bill.billId > seen.billId)
+      )
+        latest.set(bill.projectId, bill);
+    }
+    return new Set([...latest.values()].map((bill) => bill.billId));
+  }, [all]);
   const months = useMemo(
     () => [...new Set(all.filter((b) => !b.cancelled).map((b) => b.billMonth))].sort(),
     [all],
@@ -264,7 +279,9 @@ export function BillingPage() {
     }
   };
   const quick = (row: Bill) => {
-    if (readOnly || (!row.canCopy && !row.canNextMonth))
+    // 시안 quickBillBtns: 지난 해이거나 프로젝트의 가장 최근 청구가 아니면 빈칸, 가장 최근인데 못 쓰면 「–」.
+    if (readOnly || !latestIds.has(row.billId)) return null;
+    if (!row.canCopy && !row.canNextMonth)
       return <span className="bill-sub">–</span>;
     return (
       <div className="bill-actions bill-nowrap">

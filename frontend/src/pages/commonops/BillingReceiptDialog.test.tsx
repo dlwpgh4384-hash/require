@@ -68,9 +68,11 @@ const amount = (id = "prior-year") =>
 
 it("uses Korean today for old bills, defaults each balance, excludes zero balance and sends one atomic batch", async () => {
   const { onSaved } = open();
-  expect(screen.getByLabelText("입금일")).toHaveValue("2026-11-15");
-  expect(amount()).toHaveValue("15000");
-  expect(amount("current-year")).toHaveValue("30000");
+  expect(screen.getByTestId("billing-receipt-date")).toHaveValue("2026-11-15");
+  // 여러 청구를 골랐을 때만 표, 입금액은 천 단위 쉼표
+  expect(screen.getByRole("table", { name: "청구별 입금액" })).toBeVisible();
+  expect(amount()).toHaveValue("15,000");
+  expect(amount("current-year")).toHaveValue("30,000");
   expect(screen.queryByText("잔액 없는 청구")).not.toBeInTheDocument();
   fireEvent.change(amount(), { target: { value: "5000" } });
   fireEvent.click(screen.getByRole("button", { name: /^저장$/ }));
@@ -87,6 +89,26 @@ it("uses Korean today for old bills, defaults each balance, excludes zero balanc
     ],
   });
 });
+it("one bill uses the mockup receipt window: subtitle, fields, won suffix, comma default and help", () => {
+  open([{ ...bills()[0], unpaidAmount: 36410000 }]);
+  const dialog = screen.getByRole("dialog", { name: "입금 등록" });
+  expect(within(dialog).queryByRole("table")).not.toBeInTheDocument();
+  expect(within(dialog).getByTestId("billing-receipt-subtitle")).toHaveTextContent("지난해 미수 · prior-year");
+  expect(within(dialog).getByLabelText(/입금일/)).toHaveValue("2026-11-15");
+  const field = within(dialog).getByLabelText(/입금액/);
+  expect(field).toHaveValue("36,410,000");
+  expect(field.parentElement).toHaveTextContent("원");
+  expect(within(dialog).getByTestId("billing-receipt-help")).toHaveTextContent(
+    "미수금 36,410,000원. 나눠 받으면 받은 금액만 적으세요. 더 많이 들어온 돈은 다른 청구를 골라 따로 등록합니다.",
+  );
+  expect(within(dialog).getByRole("button", { name: "취소" })).toBeVisible();
+  expect(within(dialog).getByRole("button", { name: "저장" })).toBeVisible();
+  fireEvent.change(field, { target: { value: "36410001" } });
+  expect(field).toHaveValue("36,410,001");
+  fireEvent.click(within(dialog).getByRole("button", { name: "저장" }));
+  expect(within(dialog).getByText("입금액이 미수금보다 큽니다.")).toBeVisible();
+  expect(request).not.toHaveBeenCalled();
+});
 it("submits full payment directly without a generic confirmation", async () => {
   const { onSaved } = open([bills()[0]]);
   fireEvent.click(screen.getByRole("button", { name: /^저장$/ }));
@@ -100,34 +122,41 @@ it("rejects zero with the exact message and writes nothing", () => {
   open();
   fireEvent.change(amount(), { target: { value: "0" } });
   fireEvent.click(screen.getByRole("button", { name: /^저장$/ }));
-  expect(screen.getByText("입금액을 입력해 주세요")).toBeVisible();
+  expect(screen.getByText("입금액을 입력해 주세요.")).toBeVisible();
   expect(request).not.toHaveBeenCalled();
 });
 it("rejects overpayment without automatically allocating it to another bill", () => {
   open();
   fireEvent.change(amount(), { target: { value: "15001" } });
   fireEvent.click(screen.getByRole("button", { name: /^저장$/ }));
-  expect(screen.getByText("입금액이 미수금보다 큽니다")).toBeVisible();
-  expect(amount("current-year")).toHaveValue("30000");
+  expect(screen.getByText("입금액이 미수금보다 큽니다.")).toBeVisible();
+  expect(amount("current-year")).toHaveValue("30,000");
   expect(request).not.toHaveBeenCalled();
 });
-it.each(["-1", "0.5", "1e3", "1000000000000000"])(
-  "rejects non-whole or out-of-range currency %s",
-  (value) => {
-    open();
-    fireEvent.change(amount(), { target: { value } });
-    fireEvent.click(screen.getByRole("button", { name: /^저장$/ }));
-    expect(
-      screen.getByText("입금액은 15자리 이내의 원 단위 양수로 입력해 주세요"),
-    ).toBeVisible();
-    expect(request).not.toHaveBeenCalled();
-  },
-);
+it.each([
+  ["-1", "1"],
+  ["0.5", "5"],
+  ["1e3", "13"],
+  ["12,3a4", "1,234"],
+])("number field drops non-digits at once (%s -> %s)", (value, shown) => {
+  open();
+  fireEvent.change(amount(), { target: { value } });
+  expect(amount()).toHaveValue(shown);
+});
+it("rejects an out-of-range currency", () => {
+  open();
+  fireEvent.change(amount(), { target: { value: "1000000000000000" } });
+  fireEvent.click(screen.getByRole("button", { name: /^저장$/ }));
+  expect(
+    screen.getByText("입금액은 15자리 이내의 원 단위 양수로 입력해 주세요."),
+  ).toBeVisible();
+  expect(request).not.toHaveBeenCalled();
+});
 it("requires the common receipt date", () => {
   open();
-  fireEvent.change(screen.getByLabelText("입금일"), { target: { value: "" } });
+  fireEvent.change(screen.getByTestId("billing-receipt-date"), { target: { value: "" } });
   fireEvent.click(screen.getByRole("button", { name: /^저장$/ }));
-  expect(screen.getByText("입금일을 입력해 주세요")).toBeVisible();
+  expect(screen.getByText("입금일을 입력해 주세요.")).toBeVisible();
   expect(request).not.toHaveBeenCalled();
 });
 it("cannot save rows locked by current-month closure even when invoked directly", () => {
@@ -139,7 +168,7 @@ it("cannot save rows locked by current-month closure even when invoked directly"
 it("rejects duplicate bill ids before sending a batch", () => {
   open([bills()[0], bills()[0]]);
   fireEvent.click(screen.getByRole("button", { name: /^저장$/ }));
-  expect(screen.getByText("같은 청구는 한 번만 선택해 주세요")).toBeVisible();
+  expect(screen.getByText("같은 청구는 한 번만 선택해 주세요.")).toBeVisible();
   expect(request).not.toHaveBeenCalled();
 });
 it("keeps every input on atomic server rejection, shows row errors, and never signals success", async () => {
@@ -156,8 +185,11 @@ it("keeps every input on atomic server rejection, shows row errors, and never si
   fireEvent.change(amount(), { target: { value: "5000" } });
   fireEvent.click(screen.getByRole("button", { name: /^저장$/ }));
   expect(await screen.findByText("잔액이 변경되었습니다")).toBeVisible();
-  expect(amount()).toHaveValue("5000");
-  expect(amount("current-year")).toHaveValue("30000");
+  // 서버가 준 줄 번호(items[1])의 줄에만 보인다
+  expect(screen.getByTestId("billing-receipt-error-1")).toHaveTextContent("잔액이 변경되었습니다");
+  expect(screen.queryByTestId("billing-receipt-error-0")).not.toBeInTheDocument();
+  expect(amount()).toHaveValue("5,000");
+  expect(amount("current-year")).toHaveValue("30,000");
   expect(onSaved).not.toHaveBeenCalled();
 });
 it("dirty close asks before discarding and cancellation writes nothing", () => {

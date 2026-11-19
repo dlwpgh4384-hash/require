@@ -55,8 +55,8 @@
   </sql>
   <select id="yearRows" resultMap="invoice">
     <include refid="invoiceSelect"/>
-    WHERE substring(b.BILL_YM,1,4)=CAST(#{year} AS text)
-    ORDER BY b.BILL_DT DESC,b.BILL_ORD DESC,b.BILL_ID DESC
+    WHERE b.BILL_YM BETWEEN CAST(CAST(#{year} AS text)||'01' AS CHAR(6)) AND CAST(CAST(#{year} AS text)||'12' AS CHAR(6))
+    ORDER BY b.BILL_DT DESC,b.BILL_ID
   </select>
   <select id="invoice" resultMap="invoice">
     <include refid="invoiceSelect"/> WHERE b.BILL_ID=#{id}

@@ -90,8 +90,11 @@ class BillCheckControllerTest {
         b.supplyAmount=new BigDecimal(supply);b.vatRate=BigDecimal.TEN;
         b.vatAmount=b.supplyAmount.movePointLeft(1);b.totalAmount=b.supplyAmount.add(b.vatAmount);
         b.receiptSumAmount=BigDecimal.ZERO;b.unpaidAmount=b.totalAmount;
+        b.modifiedAt=READ;
         invoices.put(id,b);return b;
     }
+    /** 화면이 고칠 청구를 읽었을 때의 수정 시각. [청구 고치기]는 이 값을 함께 보낸다. */
+    static final Instant READ=Instant.parse("2026-11-15T00:30:00.123456Z");
     void apply(Write w) {
         var b=bill(w.billId(),w.billOrder(),w.amounts().supplyAmount().toPlainString());
         b.billMonth=w.input().checkMonth();b.billDate=w.input().billDate();b.payDueDate=w.input().payDueDate();
@@ -104,6 +107,7 @@ class BillCheckControllerTest {
             .put("vatRate",10).put("billDate","2026-11-15").put("payDueDate","2026-12-25");
     }
     ResultActions command(String action,ObjectNode body)throws Exception {
+        if (action.equals("correction") && !body.has("modifiedAt")) body.put("modifiedAt",READ.toString());
         return mvc.perform(post("/api/common/bill-checks/"+action).contentType("application/json").content(body.toString()));
     }
     JsonNode data(ResultActions result)throws Exception {
@@ -286,6 +290,60 @@ class BillCheckControllerTest {
         bill("latest",1,"10000");
         assertThat(checks().path("items").get(0).path("explanation").asText())
             .isEqualTo("이 달 새로 투입한 김투입(1.00 MM)이 청구에서 빠진 것으로 보입니다");
+    }
+    @Test void newcomerExplanationUsesTheSameOperatingThresholdAsJudgement()throws Exception {
+        // 투입 기준 20,000 · 청구 10,500 → 차이 9,500. 판정 기준 max(BILL_MISS_MIN 100, 20,000 × BILL_MISS_RT 1%)=200.
+        // 새로 투입한 사람 금액 10,000과 차이 9,500은 500 다르므로 그 사람 탓으로 보지 않는다(예전 고정 1만 원이면 맞다고 봄).
+        monthly.add(new Monthly("project","점검 프로젝트","MO","old","기존인",LocalDate.of(2026,1,1),"NEW",
+            BigDecimal.ONE,new BigDecimal("10000"),new BigDecimal("10000")));
+        bill("latest",1,"10500");
+        assertThat(checks().path("items").get(0).path("explanation").asText()).isEqualTo("투입 기준보다 적게 청구했습니다");
+        bill("latest",1,"10150");
+        assertThat(checks().path("items").get(0).path("explanation").asText())
+            .isEqualTo("이 달 새로 투입한 김투입(1.00 MM)이 청구에서 빠진 것으로 보입니다");
+    }
+    @Test void correctionRequiresTheReadModificationTime()throws Exception {
+        eligible("correction");
+        command("correction",input().putNull("modifiedAt")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("modifiedAt"));
+        verify(mapper,never()).correct(any());
+    }
+    @ParameterizedTest @ValueSource(strings={"missing","additional"})
+    void onlyCorrectionAcceptsModificationTime(String action)throws Exception {
+        eligible(action);
+        command(action,input().put("modifiedAt",READ.toString())).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("modifiedAt"));
+        verify(mapper,never()).insert(any());
+    }
+    @Test void staleCorrectionReturnsCommonConflictWithoutWriting()throws Exception {
+        eligible("correction");
+        var before=invoices.get("latest").supplyAmount;
+        command("correction",input().put("modifiedAt","2026-11-15T00:00:00Z")).andExpect(status().isConflict())
+            .andExpect(jsonPath("$.errors[0].field").value("modifiedAt"))
+            .andExpect(jsonPath("$.errors[0].message").value("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요."));
+        verify(mapper,never()).correct(any());
+        assertThat(invoices.get("latest").supplyAmount).isEqualByComparingTo(before);
+    }
+    @Test void correctionSendsTheReadTimeToTheGuardedUpdateAndZeroRowsIsConflict()throws Exception {
+        eligible("correction");
+        doReturn(0).when(mapper).correct(any());
+        command("correction",input()).andExpect(status().isConflict());
+        var captor=org.mockito.ArgumentCaptor.forClass(Write.class);
+        verify(mapper).correct(captor.capture());
+        assertThat(captor.getValue().input().modifiedAt()).isEqualTo(READ);
+    }
+    @Test void fieldMessagesFollowCommonWording()throws Exception {
+        command("missing",input().put("billDate","")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("billDate"))
+            .andExpect(jsonPath("$.errors[0].message").value("청구일을 입력해 주세요."));
+        command("missing",input().putNull("payDueDate")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].message").value("입금 예정일을 입력해 주세요."));
+        command("missing",input().put("supplyAmount",0)).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].message").value("공급가를 입력해 주세요."));
+        command("missing",input().put("taxInvoiceNo","1".repeat(31))).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("taxInvoiceNo"))
+            .andExpect(jsonPath("$.errors[0].message").value("세금계산서 번호는 30자까지 입력해 주세요."));
+        verify(mapper,never()).insert(any());
     }
     @ParameterizedTest @ValueSource(strings={"202600","202613","000001","20261","bad"})
     void invalidCalendarMonthHasFieldError(String month)throws Exception {

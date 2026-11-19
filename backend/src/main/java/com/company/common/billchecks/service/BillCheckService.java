@@ -4,11 +4,10 @@ import com.company.common.billchecks.dto.BillCheckContracts.*;
 import com.company.common.billchecks.mapper.BillCheckMapper;
 import com.company.common.billchecks.mapper.BillCheckSources.*;
 import com.company.common.common.BillingNumberAllocator;
-import com.company.common.clients.service.ClientRules;
 import com.company.common.common.BillingCalculationRules;
 import com.company.common.common.BillingCalculationRules.MonthlyInput;
+import com.company.common.common.BillingInputRules;
 import com.company.common.projects.mapper.ProjectMapper;
-import com.company.common.projects.service.ProjectRules;
 import com.company.common.support.service.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
@@ -101,7 +100,7 @@ public class BillCheckService {
             result.add(new CheckRow(first.projectId(),first.projectName(),first.projectType(),judgement,
                 (int)inputs.stream().map(Monthly::developerId).distinct().count(),
                 inputs.stream().map(Monthly::monthlyMm).reduce(BigDecimal.ZERO,BigDecimal::add),
-                reference,billed,check.difference(),explanation(judgement,inputs,month,reference,check.difference()),
+                reference,billed,check.difference(),explanation(judgement,inputs,month,check),
                 latest==null?null:latest.billId,action));
         }
         result.sort(Comparator.comparing(CheckRow::projectName).thenComparing(CheckRow::projectId));
@@ -110,12 +109,14 @@ public class BillCheckService {
 
     /**
      * 시안 billCheck 설명: 청구 없음 「투입은 있는데 이 달 청구가 없습니다」, 금액 차이는 이 달 새로 투입한 사람의
-     * 금액이 차이와 max(1만 원, 투입 기준 금액의 1%) 안으로 같으면 그 사람들(이름(n.nn MM))을, 아니면 적게/많이 청구 안내.
+     * 금액이 차이와 판정 기준 안으로 같으면 그 사람들(이름(n.nn MM))을, 아니면 적게/많이 청구 안내.
+     * 판정 기준은 판정(식-88)과 같은 값: max(운영 기준값 BILL_MISS_MIN, 투입 기준 금액 × BILL_MISS_RT%), 그 달 적용분.
      */
-    private String explanation(String judgement,List<Monthly> inputs,String month,BigDecimal reference,BigDecimal difference) {
+    private String explanation(String judgement,List<Monthly> inputs,String month,BillingCalculationRules.CheckResult check) {
         if ("청구 없음".equals(judgement)) return "투입은 있는데 이 달 청구가 없습니다";
         if ("맞음".equals(judgement)) return "";
-        BigDecimal tolerance=new BigDecimal("10000").max(reference.multiply(new BigDecimal("0.01")));
+        BigDecimal difference=check.difference();
+        BigDecimal tolerance=check.threshold();
         var hits=inputs.stream().filter(input -> calendar.toDatabaseMonth(YearMonth.from(input.inputStart())).equals(month))
             .filter(input -> input.monthlyMm().multiply(input.billingPrice()).setScale(0,RoundingMode.DOWN)
                 .subtract(difference).abs().compareTo(tolerance)<=0)
@@ -125,23 +126,29 @@ public class BillCheckService {
         return difference.signum()>0?"투입 기준보다 적게 청구했습니다":"투입 기준보다 많이 청구했습니다";
     }
 
-    public Input parse(JsonNode body) {
-        ClientRules.object(body,Set.of("projectId","checkMonth","vatRate","billDate","payDueDate","taxInvoiceNo","supplyAmount"));
-        String project=ProjectRules.text(body,"projectId",20,true);
-        String selected=ProjectRules.text(body,"checkMonth",6,true);
+    /** correction=[청구 고치기]: 화면이 읽은 고칠 청구의 수정 시각(modifiedAt)이 꼭 있어야 한다. */
+    public Input parse(JsonNode body, boolean correction) {
+        var fields=new HashSet<>(Set.of("projectId","checkMonth","vatRate","billDate","payDueDate","taxInvoiceNo","supplyAmount"));
+        if (correction) fields.add("modifiedAt");
+        BillingInputRules.object(body,fields);
+        String project=BillingInputRules.text(body,"projectId","프로젝트",20,true);
+        String selected=BillingInputRules.text(body,"checkMonth","점검 월",6,true);
         month(selected);
         var rate=body.get("vatRate");
         if (rate==null || !rate.isNumber()) throw CodeFailure.invalid("vatRate","부가세율을 입력해 주세요.");
         BillingCalculationRules.rate(rate.decimalValue(),"vatRate");
-        LocalDate date=ProjectRules.date(body,"billDate"),due=ProjectRules.date(body,"payDueDate");
+        LocalDate date=BillingInputRules.date(body,"billDate","청구일");
+        LocalDate due=BillingInputRules.date(body,"payDueDate","입금 예정일");
         if (due.isBefore(date)) throw CodeFailure.invalid("payDueDate","입금 예정일이 청구일보다 빠릅니다.");
         BigDecimal supply=null;
         if (body.hasNonNull("supplyAmount")) {
-            supply=ProjectRules.money(body,"supplyAmount",true);
+            supply=BillingInputRules.money(body,"supplyAmount","공급가",true);
+            if (supply.signum()==0) throw CodeFailure.invalid("supplyAmount",BillingInputRules.required("공급가"));
             BillingCalculationRules.positiveMoney(supply,"supplyAmount");
         }
         return new Input(project,selected,rate.decimalValue(),date,due,
-            ProjectRules.text(body,"taxInvoiceNo",30,false),supply);
+            BillingInputRules.text(body,"taxInvoiceNo","세금계산서 번호",30,false),supply,
+            correction?BillingInputRules.token(body):null);
     }
 
     private YearMonth month(String value) {
@@ -150,11 +157,11 @@ public class BillCheckService {
     }
 
     @Transactional
-    public Detail postCommonBillCheckMissing(JsonNode body) { return execute(parse(body),"MISSING"); }
+    public Detail postCommonBillCheckMissing(JsonNode body) { return execute(parse(body,false),"MISSING"); }
     @Transactional
-    public Detail postCommonBillCheckAdditional(JsonNode body) { return execute(parse(body),"ADDITIONAL"); }
+    public Detail postCommonBillCheckAdditional(JsonNode body) { return execute(parse(body,false),"ADDITIONAL"); }
     @Transactional
-    public Detail postCommonBillCheckCorrection(JsonNode body) { return execute(parse(body),"CORRECTION"); }
+    public Detail postCommonBillCheckCorrection(JsonNode body) { return execute(parse(body,true),"CORRECTION"); }
 
     private Detail execute(Input input,String action) {
         // Same first lock as assignment/project writes; table locks cover an empty month/project too.
@@ -165,6 +172,11 @@ public class BillCheckService {
         var checked=rows(input.checkMonth(),closed).stream()
             .filter(row -> row.projectId().equals(input.projectId())).findFirst()
             .orElseThrow(() -> CodeFailure.invalid("projectId","월단위·파견의 유상 투입 점검행을 다시 조회해 주세요."));
+        if ("CORRECTION".equals(action) && checked.latestBillId()!=null) {
+            // 00-1 동시 수정: 화면이 읽은 뒤 고칠 청구가 바뀌었으면(다른 청구가 최근이 된 경우 포함) 덮어쓰지 않는다.
+            var current=mapper.invoice(checked.latestBillId());
+            if (current==null || !Objects.equals(current.modifiedAt,input.modifiedAt())) throw CodeFailure.conflict();
+        }
         if (!action.equals(checked.allowedAction()))
             throw CodeFailure.invalid("checkMonth","점검 조건이 변경되었습니다. 다시 조회해 주세요.");
         if ("ADDITIONAL".equals(action) && (!closed || checked.difference().signum()<=0))

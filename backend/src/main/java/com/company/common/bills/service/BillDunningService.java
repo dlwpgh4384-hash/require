@@ -54,7 +54,7 @@ public class BillDunningService {
             if (!resend) return null;
             throw CodeFailure.invalid("billId","미수 알림 1~3단계 청구만 다시 알릴 수 있습니다.");
         }
-        if (resend && mapper.resent(id,step)) throw CodeFailure.invalid("billId","이 단계 다시 알림 보냄");
+        if (resend && mapper.resent(id,step)) throw CodeFailure.invalid("billId","이 단계의 다시 알림은 이미 보냈습니다.");
         if (!resend && mapper.automaticallySent(id,step)) return null;
         String month=calendar.toDatabaseMonth(calendar.currentMonth());
         var recipients=mapper.recipients(new RecipientFilter(bill.projectId(),month,step));

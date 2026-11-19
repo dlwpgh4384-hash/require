@@ -124,7 +124,13 @@ class BillCheckPersistenceTest {
         if (action.equals("additional")) { closeMonth();invoice("B-202611-001",1,3000000); }
         if (action.equals("correction")) { invoice("B-202611-001",1,1000000);invoice("B-202611-002",2,2000000); }
     }
+    /** [청구 고치기] 화면처럼 고칠 청구(그 달 청구일·차수가 가장 늦은 것)의 수정 시각을 읽어 보낸다. */
+    String readModifiedAt() {
+        var ids=db.queryForList("SELECT BILL_ID FROM TB_BL_BILL WHERE BILL_YM='202611' AND CNCL_YN='N' ORDER BY BILL_DT DESC,BILL_ORD DESC,BILL_ID DESC LIMIT 1",String.class);
+        return ids.isEmpty()?null:mapper.invoice(ids.get(0)).modifiedAt.toString();
+    }
     ResultActions command(String action,ObjectNode body)throws Exception {
+        if (action.equals("correction") && !body.has("modifiedAt")) body.put("modifiedAt",readModifiedAt());
         return mvc.perform(post("/api/common/bill-checks/"+action).contentType("application/json").content(body.toString()));
     }
     JsonNode data(ResultActions result)throws Exception {
@@ -200,6 +206,34 @@ class BillCheckPersistenceTest {
         Object before=bills(),monthly=months();
         command("additional",input()).andExpect(status().is5xxServerError());
         assertThat(bills()).isEqualTo(before);assertThat(months()).isEqualTo(monthly);
+    }
+    @Test void correctionAfterSomeoneElseChangedTheBillIsCommonConflictAndWritesNothing()throws Exception {
+        eligible("correction");
+        String read=readModifiedAt();
+        db.update("UPDATE TB_BL_BILL SET TAX_INVC_NO='OTHER',MOD_USER_ID='other',MOD_DTTM=clock_timestamp() WHERE BILL_ID='B-202611-002'");
+        Object before=bills();
+        command("correction",input().put("modifiedAt",read)).andExpect(status().isConflict())
+            .andExpect(jsonPath("$.errors[0].field").value("modifiedAt"))
+            .andExpect(jsonPath("$.errors[0].message").value("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요."));
+        assertThat(bills()).isEqualTo(before);
+    }
+    @Test void guardedCorrectUpdateChangesNoRowForAStaleTime()throws Exception {
+        eligible("correction");
+        var latest=mapper.invoice("B-202611-002");
+        var stale=new com.company.common.billchecks.dto.BillCheckContracts.Input("check-project","202611",BigDecimal.TEN,
+            LocalDate.of(2026,11,15),LocalDate.of(2026,12,25),null,new BigDecimal("7000000"),latest.modifiedAt.minusSeconds(1));
+        var amounts=new BillingCalculationRules.Amounts(new BigDecimal("7000000"),BigDecimal.TEN,new BigDecimal("700000"),new BigDecimal("7700000"));
+        Object before=bills();
+        assertThat(mapper.correct(new com.company.common.billchecks.mapper.BillCheckSources.Write("B-202611-002",2,stale,amounts,BigDecimal.ZERO,"admin"))).isZero();
+        assertThat(bills()).isEqualTo(before);
+        var current=new com.company.common.billchecks.dto.BillCheckContracts.Input("check-project","202611",BigDecimal.TEN,
+            LocalDate.of(2026,11,15),LocalDate.of(2026,12,25),null,new BigDecimal("7000000"),latest.modifiedAt);
+        assertThat(mapper.correct(new com.company.common.billchecks.mapper.BillCheckSources.Write("B-202611-002",2,current,amounts,BigDecimal.ZERO,"admin"))).isEqualTo(1);
+    }
+    @Test void checkMonthButtonsUseTheYearRangeOfBillMonths()throws Exception {
+        invoice("B-202611-001",1,1000000);
+        db.update("INSERT INTO TB_BL_BILL(BILL_ID,PROJ_ID,BILL_ORD,BILL_YM,BILL_DT,SPLY_AMT,VAT_RT,VAT_AMT,TOT_AMT,RCPT_SUM_AMT,UNPAID_AMT,PAY_DUE_DT,REG_USER_ID) VALUES('B-202512-001','check-project',2,'202512','2025-12-15',1,10,0,1,0,1,'2026-01-25','admin'),('B-202601-001','check-project',3,'202601','2026-01-15',1,10,0,1,0,1,'2026-02-25','admin')");
+        assertThat(mapper.billMonths("2026","202611")).containsExactly("202601","202611");
     }
     @Test void cancelledAssignmentIsLeftOutEvenInClosedMonth()throws Exception {
         // 사용자 결정(2026-11-19): 투입 기준 금액은 취소 안 된 배정(ASGN_STAT_CD='ACT')만, 마감한 달도 같다.

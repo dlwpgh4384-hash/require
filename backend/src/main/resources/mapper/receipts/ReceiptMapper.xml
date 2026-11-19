@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.receipts.mapper.ReceiptMapper">
+  <resultMap id="bill" type="com.company.common.receipts.mapper.ReceiptMapper$Bill">
+    <constructor>
+      <idArg column="billId" javaType="string"/>
+      <arg column="totalAmount" javaType="java.math.BigDecimal"/>
+      <arg column="cancelled" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+  <select id="lockBill" resultMap="bill">
+    SELECT b.BILL_ID AS "billId", b.TOT_AMT AS "totalAmount", b.CNCL_YN='Y' AS "cancelled"
+    FROM TB_BL_BILL b WHERE b.BILL_ID=#{billId} FOR UPDATE OF b
+  </select>
+  <select id="closed" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_CL_CLOSE c
+      WHERE c.CLOSE_YM=#{month} AND c.CLOSE_STAT_CD='CLOSE')
+  </select>
+  <select id="normalSum" resultType="java.math.BigDecimal">
+    SELECT COALESCE(SUM(r.RCPT_AMT),0) FROM TB_BL_RCPT r
+    WHERE r.BILL_ID=#{billId} AND r.CNCL_YN='N'
+  </select>
+  <resultMap id="receiptRow" type="com.company.common.receipts.mapper.ReceiptMapper$ReceiptRow">
+    <constructor>
+      <idArg column="receiptId" javaType="string"/>
+      <arg column="billId" javaType="string"/>
+      <arg column="receiptDate" javaType="java.time.LocalDate"/>
+      <arg column="amount" javaType="java.math.BigDecimal"/>
+      <arg column="cancelled" javaType="_boolean"/>
+      <arg column="cancelReason" javaType="string"/>
+      <arg column="cancelledBy" javaType="string"/>
+      <arg column="cancelledAt" javaType="java.time.Instant"/>
+      <arg column="canCancel" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+  <sql id="receiptColumns">
+    r.RCPT_ID::text AS "receiptId", r.BILL_ID AS "billId", r.RCPT_DT AS "receiptDate",
+    r.RCPT_AMT AS "amount", r.CNCL_YN='Y' AS "cancelled", r.CNCL_RSN AS "cancelReason",
+    r.CNCL_USER_ID AS "cancelledBy", r.CNCL_DTTM AS "cancelledAt",
+    (r.CNCL_YN='N' AND NOT EXISTS(SELECT 1 FROM TB_CL_CLOSE c
+      WHERE c.CLOSE_YM=to_char(r.RCPT_DT,'YYYYMM') AND c.CLOSE_STAT_CD='CLOSE')) AS "canCancel"
+  </sql>
+  <select id="receipt" resultMap="receiptRow">
+    SELECT <include refid="receiptColumns"/> FROM TB_BL_RCPT r
+    WHERE r.RCPT_ID=CAST(#{receiptId} AS numeric)
+  </select>
+  <select id="lockReceipt" resultMap="receiptRow">
+    SELECT <include refid="receiptColumns"/> FROM TB_BL_RCPT r
+    WHERE r.RCPT_ID=CAST(#{receiptId} AS numeric) FOR UPDATE OF r
+  </select>
+  <select id="insertReceipt" resultType="string" affectData="true" flushCache="true">
+    INSERT INTO TB_BL_RCPT (BILL_ID,RCPT_DT,RCPT_AMT,REG_USER_ID)
+    VALUES (#{billId},#{receiptDate},#{amount},#{actor}) RETURNING RCPT_ID::text
+  </select>
+  <update id="cancel">
+    UPDATE TB_BL_RCPT SET CNCL_YN='Y', CNCL_RSN=#{reason}, CNCL_USER_ID=#{actor},
+      CNCL_DTTM=clock_timestamp(), MOD_USER_ID=#{actor}, MOD_DTTM=clock_timestamp()
+    WHERE RCPT_ID=CAST(#{receiptId} AS numeric) AND CNCL_YN='N'
+  </update>
+  <update id="updateBalance">
+    UPDATE TB_BL_BILL SET RCPT_SUM_AMT=#{receiptSumAmount}, UNPAID_AMT=#{unpaidAmount},
+      MOD_USER_ID=#{actor}, MOD_DTTM=clock_timestamp() WHERE BILL_ID=#{billId}
+  </update>
+</mapper>

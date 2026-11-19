@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.bills.mapper.BillMapper">
+  <resultMap id="invoice" type="com.company.common.bills.mapper.BillRows$Invoice">
+    <constructor>
+      <idArg column="billId" javaType="string"/>
+      <arg column="projectId" javaType="string"/>
+      <arg column="billOrder" javaType="_int"/>
+      <arg column="billMonth" javaType="string"/>
+      <arg column="billDate" javaType="java.time.LocalDate"/>
+      <arg column="supplyAmount" javaType="java.math.BigDecimal"/>
+      <arg column="vatRate" javaType="java.math.BigDecimal"/>
+      <arg column="vatAmount" javaType="java.math.BigDecimal"/>
+      <arg column="totalAmount" javaType="java.math.BigDecimal"/>
+      <arg column="receiptSumAmount" javaType="java.math.BigDecimal"/>
+      <arg column="unpaidAmount" javaType="java.math.BigDecimal"/>
+      <arg column="payDueDate" javaType="java.time.LocalDate"/>
+      <arg column="taxInvoiceNo" javaType="string"/>
+      <arg column="cancelled" javaType="_boolean"/>
+      <arg column="cancelReason" javaType="string"/>
+      <arg column="cancelledBy" javaType="string"/>
+      <arg column="cancelledAt" javaType="java.time.Instant"/>
+      <arg column="projectName" javaType="string"/>
+      <arg column="customerName" javaType="string"/>
+      <arg column="projectType" javaType="string"/>
+      <arg column="projectStatus" javaType="string"/>
+      <arg column="projectStart" javaType="java.time.LocalDate"/>
+      <arg column="projectEnd" javaType="java.time.LocalDate"/>
+      <arg column="latest" javaType="_boolean"/>
+      <arg column="closed" javaType="_boolean"/>
+      <arg column="normalReceiptCount" javaType="_int"/>
+    </constructor>
+  </resultMap>
+  <sql id="invoiceSelect">
+    SELECT b.BILL_ID AS "billId",b.PROJ_ID AS "projectId",b.BILL_ORD AS "billOrder",
+      b.BILL_YM AS "billMonth",b.BILL_DT AS "billDate",b.SPLY_AMT AS "supplyAmount",
+      b.VAT_RT AS "vatRate",b.VAT_AMT AS "vatAmount",b.TOT_AMT AS "totalAmount",
+      b.RCPT_SUM_AMT AS "receiptSumAmount",b.UNPAID_AMT AS "unpaidAmount",
+      b.PAY_DUE_DT AS "payDueDate",b.TAX_INVC_NO AS "taxInvoiceNo",(b.CNCL_YN='Y') AS "cancelled",
+      b.CNCL_RSN AS "cancelReason",b.CNCL_USER_ID AS "cancelledBy",b.CNCL_DTTM AS "cancelledAt",
+      p.PROJ_NM AS "projectName",COALESCE(c.CLNT_NM,'') AS "customerName",
+      p.CTRT_TYPE_CD AS "projectType",p.PROJ_STAT_CD AS "projectStatus",
+      p.CTRT_BGN_DT AS "projectStart",p.CTRT_END_DT AS "projectEnd",
+      (b.CNCL_YN='N' AND b.BILL_ORD=(SELECT MAX(x.BILL_ORD) FROM TB_BL_BILL x
+        WHERE x.PROJ_ID=b.PROJ_ID AND x.CNCL_YN='N')) AS "latest",
+      EXISTS(SELECT 1 FROM TB_CL_CLOSE cl WHERE cl.CLOSE_YM=b.BILL_YM
+        AND cl.CLOSE_STAT_CD='CLOSE') AS "closed",
+      (SELECT COUNT(*)::integer FROM TB_BL_RCPT r WHERE r.BILL_ID=b.BILL_ID
+        AND r.CNCL_YN='N') AS "normalReceiptCount"
+    FROM TB_BL_BILL b JOIN TB_PJ_PROJ p ON p.PROJ_ID=b.PROJ_ID
+    LEFT JOIN TB_BS_CLNT c ON c.CLNT_ID=p.CUST_CLNT_ID
+  </sql>
+  <select id="yearRows" resultMap="invoice">
+    <include refid="invoiceSelect"/>
+    WHERE substring(b.BILL_YM,1,4)=CAST(#{year} AS text)
+    ORDER BY b.BILL_DT DESC,b.BILL_ORD DESC,b.BILL_ID DESC
+  </select>
+  <select id="invoice" resultMap="invoice">
+    <include refid="invoiceSelect"/> WHERE b.BILL_ID=#{id}
+  </select>
+  <select id="lockInvoice" resultMap="invoice">
+    <include refid="invoiceSelect"/> WHERE b.BILL_ID=#{id} FOR UPDATE OF b
+  </select>
+  <resultMap id="project" type="com.company.common.bills.mapper.BillRows$Project">
+    <constructor>
+      <arg column="projectId" javaType="string"/>
+      <arg column="projectType" javaType="string"/>
+      <arg column="projectStatus" javaType="string"/>
+      <arg column="startDate" javaType="java.time.LocalDate"/>
+      <arg column="endDate" javaType="java.time.LocalDate"/>
+    </constructor>
+  </resultMap>
+  <select id="project" resultMap="project">
+    SELECT p.PROJ_ID AS "projectId",p.CTRT_TYPE_CD AS "projectType",p.PROJ_STAT_CD AS "projectStatus",
+      p.CTRT_BGN_DT AS "startDate",p.CTRT_END_DT AS "endDate"
+    FROM TB_PJ_PROJ p WHERE p.PROJ_ID=#{id}
+  </select>
+  <resultMap id="receipt" type="com.company.common.bills.dto.BillContracts$Receipt">
+    <constructor>
+      <idArg column="receiptId" javaType="string"/>
+      <arg column="receiptDate" javaType="java.time.LocalDate"/>
+      <arg column="amount" javaType="java.math.BigDecimal"/>
+      <arg column="cancelled" javaType="_boolean"/>
+      <arg column="cancelReason" javaType="string"/>
+      <arg column="cancelledBy" javaType="string"/>
+      <arg column="cancelledAt" javaType="java.time.Instant"/>
+      <arg column="canCancel" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+  <select id="receipts" resultMap="receipt">
+    SELECT r.RCPT_ID::text AS "receiptId",r.RCPT_DT AS "receiptDate",r.RCPT_AMT AS "amount",
+      (r.CNCL_YN='Y') AS "cancelled",r.CNCL_RSN AS "cancelReason",r.CNCL_USER_ID AS "cancelledBy",
+      r.CNCL_DTTM AS "cancelledAt",(r.CNCL_YN='N' AND NOT EXISTS(SELECT 1 FROM TB_CL_CLOSE c
+        WHERE c.CLOSE_YM=to_char(r.RCPT_DT,'YYYYMM') AND c.CLOSE_STAT_CD='CLOSE')) AS "canCancel"
+    FROM TB_BL_RCPT r WHERE r.BILL_ID=#{id} ORDER BY r.RCPT_DT,r.RCPT_ID
+  </select>
+  <select id="normalReceipts" resultType="java.math.BigDecimal">
+    SELECT COALESCE(SUM(r.RCPT_AMT),0) FROM TB_BL_RCPT r WHERE r.BILL_ID=#{id} AND r.CNCL_YN='N'
+  </select>
+  <select id="closed" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_CL_CLOSE c WHERE c.CLOSE_YM=#{month} AND c.CLOSE_STAT_CD='CLOSE')
+  </select>
+  <select id="exists" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_BL_BILL b WHERE b.PROJ_ID=#{projectId}
+      AND b.BILL_YM=#{month} AND b.CNCL_YN='N')
+  </select>
+  <update id="lockMonthlySources">LOCK TABLE TB_PJ_ASGN_MON IN SHARE ROW EXCLUSIVE MODE</update>
+  <resultMap id="monthly" type="com.company.common.common.BillingCalculationRules$MonthlyInput">
+    <constructor>
+      <arg column="contractTypeCode" javaType="string"/>
+      <arg column="inputTypeCode" javaType="string"/>
+      <arg column="monthlyMm" javaType="java.math.BigDecimal"/>
+      <arg column="billingPrice" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <select id="monthly" resultMap="monthly">
+    SELECT p.CTRT_TYPE_CD AS "contractTypeCode",a.INPUT_TYPE_CD AS "inputTypeCode",
+      m.MON_MM AS "monthlyMm",COALESCE(m.APLY_UPRC,0) AS "billingPrice"
+    FROM TB_PJ_ASGN_MON m JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID
+    JOIN TB_PJ_PROJ p ON p.PROJ_ID=m.PROJ_ID
+    WHERE m.PROJ_ID=#{projectId} AND m.INPUT_YM=#{month} AND a.ASGN_STAT_CD='ACT'
+      AND a.INPUT_TYPE_CD&lt;&gt;'FREE' AND p.CTRT_TYPE_CD IN ('MO','DP')
+    ORDER BY m.ASGN_ID
+  </select>
+  <insert id="insert">
+    INSERT INTO TB_BL_BILL(BILL_ID,PROJ_ID,BILL_ORD,BILL_YM,BILL_DT,SPLY_AMT,VAT_RT,VAT_AMT,
+      TOT_AMT,RCPT_SUM_AMT,UNPAID_AMT,PAY_DUE_DT,TAX_INVC_NO,CNCL_YN,REG_USER_ID)
+    VALUES(#{billId},#{projectId},#{billOrder},#{billMonth},#{values.billDate},#{amounts.supplyAmount},
+      #{amounts.vatRate},#{amounts.vatAmount},#{amounts.totalAmount},0,#{amounts.totalAmount},
+      #{values.payDueDate},#{values.taxInvoiceNo,jdbcType=VARCHAR},'N',#{actor})
+  </insert>
+  <update id="update">
+    UPDATE TB_BL_BILL SET BILL_DT=#{values.billDate},SPLY_AMT=#{amounts.supplyAmount},
+      VAT_RT=#{amounts.vatRate},VAT_AMT=#{amounts.vatAmount},TOT_AMT=#{amounts.totalAmount},
+      RCPT_SUM_AMT=#{receipts},UNPAID_AMT=#{amounts.totalAmount}-#{receipts},
+      PAY_DUE_DT=#{values.payDueDate},TAX_INVC_NO=#{values.taxInvoiceNo,jdbcType=VARCHAR},
+      MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp() WHERE BILL_ID=#{billId} AND CNCL_YN='N'
+  </update>
+  <update id="cancel">
+    UPDATE TB_BL_BILL SET CNCL_YN='Y',CNCL_RSN=#{reason},CNCL_USER_ID=#{actor},
+      CNCL_DTTM=clock_timestamp(),MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp()
+    WHERE BILL_ID=#{billId} AND CNCL_YN='N'
+  </update>
+  <resultMap id="recipient" type="com.company.common.bills.mapper.BillRows$Recipient">
+    <constructor>
+      <idArg column="userId" javaType="string"/>
+      <arg column="name" javaType="string"/>
+      <arg column="email" javaType="string"/>
+    </constructor>
+  </resultMap>
+  <select id="recipients" resultMap="recipient">
+    WITH project_part AS (
+      SELECT h.PART_ID FROM TB_PJ_PROJ_PART h WHERE h.PROJ_ID=#{projectId}
+        AND h.APLY_BGN_YM&lt;=#{month} ORDER BY h.APLY_BGN_YM DESC LIMIT 1
+    ), leaders AS (
+      SELECT s.PART_LDR_USER_ID AS user_id FROM TB_BS_PART_STD s
+      JOIN TB_SY_USER leader ON leader.USER_ID=s.PART_LDR_USER_ID AND leader.USER_STAT_CD='USE'
+      JOIN project_part pp ON pp.PART_ID=s.PART_ID
+      JOIN TB_BS_PART p ON p.PART_ID=pp.PART_ID AND p.HQ_YN='N'
+      WHERE s.APLY_BGN_YM&lt;=#{month} AND (s.APLY_END_YM IS NULL OR s.APLY_END_YM&gt;=#{month})
+      UNION
+      SELECT sc.USER_ID FROM TB_SY_USER_SCOPE sc JOIN project_part pp ON pp.PART_ID=sc.PART_ID
+      JOIN TB_SY_USER leader ON leader.USER_ID=sc.USER_ID AND leader.USER_STAT_CD='USE'
+      JOIN TB_BS_PART p ON p.PART_ID=pp.PART_ID AND p.HQ_YN='Y'
+      JOIN TB_SY_USER_ROLE ur ON ur.USER_ID=sc.USER_ID AND ur.ROLE_ID='SALES_LDR'
+    )
+    SELECT DISTINCT u.USER_ID AS "userId",u.USER_NM AS "name",u.EMAIL_ADDR AS "email"
+    FROM TB_SY_USER u WHERE u.USER_STAT_CD='USE' AND (
+      EXISTS(SELECT 1 FROM TB_SY_USER_ROLE ur JOIN TB_SY_USER_SCOPE sc ON sc.USER_ID=ur.USER_ID
+        WHERE ur.USER_ID=u.USER_ID AND ur.ROLE_ID='PM' AND sc.PROJ_ID=#{projectId})
+      <if test="step &gt;= 2">
+        OR u.USER_ID IN (SELECT l.user_id FROM leaders l)
+        OR (NOT EXISTS(SELECT 1 FROM leaders) AND EXISTS(SELECT 1 FROM TB_SY_USER_ROLE ur
+          WHERE ur.USER_ID=u.USER_ID AND ur.ROLE_ID='EXEC'))
+      </if>
+      <if test="step == 3">
+        OR EXISTS(SELECT 1 FROM TB_SY_USER_ROLE ur WHERE ur.USER_ID=u.USER_ID AND ur.ROLE_ID IN ('EXEC','FIN'))
+      </if>
+    ) ORDER BY u.USER_ID
+  </select>
+  <select id="resent" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_BL_DUN_HIST h WHERE h.BILL_ID=#{id}
+      AND h.DUN_STEP=#{step} AND h.RESEND_YN='Y')
+  </select>
+  <select id="automaticallySent" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_BL_DUN_HIST h WHERE h.BILL_ID=#{id}
+      AND h.DUN_STEP=#{step} AND h.RESEND_YN='N')
+  </select>
+  <select id="outstandingIds" resultType="string">
+    SELECT BILL_ID FROM TB_BL_BILL WHERE CNCL_YN='N' AND UNPAID_AMT&gt;0 ORDER BY BILL_ID
+  </select>
+  <insert id="notification">
+    INSERT INTO TB_SY_NOTI(RCVR_USER_ID,NOTI_TYPE_CD,NOTI_CN,LINK_SCRN_ID,LINK_KEY,
+      SEND_MTHD_CD,NOTI_DTTM,REG_USER_ID)
+    VALUES(#{userId},'DUN',#{content},'UI-13',#{billId},'SYS',clock_timestamp(),#{actor})
+  </insert>
+  <insert id="history">
+    INSERT INTO TB_BL_DUN_HIST(BILL_ID,DUN_SN,DUN_STEP,SEND_DT,RCVR_DESC,SEND_MTHD_CD,RESEND_YN,REG_USER_ID)
+    SELECT #{billId},COALESCE(MAX(h.DUN_SN),0)+1,#{step},#{date},#{recipients},'BOTH',
+      CASE WHEN #{resend} THEN 'Y' ELSE 'N' END,#{actor}
+    FROM TB_BL_DUN_HIST h WHERE h.BILL_ID=#{billId}
+  </insert>
+</mapper>

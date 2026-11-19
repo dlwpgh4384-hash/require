@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.common.BillingNumberMapper">
+  <update id="lockBills">LOCK TABLE TB_BL_BILL IN SHARE ROW EXCLUSIVE MODE</update>
+  <select id="nextMonthNumber" resultType="int">
+    SELECT COALESCE(MAX(substring(b.BILL_ID FROM 10 FOR 3)::integer),0)+1 FROM TB_BL_BILL b
+    WHERE b.BILL_ID ~ ('^B-' || #{month} || '-[0-9]{3}$')
+  </select>
+  <select id="nextProjectOrder" resultType="int">
+    SELECT COALESCE(MAX(b.BILL_ORD),0)+1 FROM TB_BL_BILL b WHERE b.PROJ_ID=#{projectId}
+  </select>
+</mapper>

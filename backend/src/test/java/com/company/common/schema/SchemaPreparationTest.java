@@ -106,6 +106,10 @@ class SchemaPreparationTest {
         ordered.verify(connection).createStatement();
         ordered.verify(statement).execute(contains("DO $recommendation_log$"));
         ordered.verify(statement).close();
+        ordered.verify(session).getConnection();
+        ordered.verify(connection).createStatement();
+        ordered.verify(statement).execute(contains("DO $billing_receipt$"));
+        ordered.verify(statement).close();
         ordered.verify(session).commit(true);
         ordered.verify(session).close();
         verify(session, never()).rollback(anyBoolean());
@@ -189,7 +193,7 @@ class SchemaPreparationTest {
             "TB_HR_DEV_PRC", "TB_HR_DEV_SKILL", "TB_HR_DEV_STAT", "TB_HR_MON_PAY", "TB_SY_ADM_HDONG",
             "TB_PJ_PROJ_CHG", "TB_PJ_MNPW_PLAN", "TB_PJ_STEP", "TB_PJ_WEEK_MEMO", "TB_PJ_ISSUE", "TB_PJ_TK_DSTRB",
             "TB_PJ_DRCT_EXPS", "TB_PJ_ASGN_HIST", "TB_PJ_ASGN_MON", "TB_CO_MON_COST",
-            "TB_SL_OPP", "TB_SL_OPP_NEED", "TB_SL_TENT_ASGN", "TB_SL_RCMD_LOG");
+            "TB_SL_OPP", "TB_SL_OPP_NEED", "TB_SL_TENT_ASGN", "TB_SL_RCMD_LOG", "TB_BL_RCPT");
         assertThat(tables).isEqualTo(MigrationResources.tableNames());
         assertThat(tables).allMatch(name -> name.startsWith("TB_"));
         assertThat(tables).contains("TB_SY_CALC_RULE", "TB_SY_CHG_HIST", "TB_SY_CODE", "TB_SY_CODE_GRP",

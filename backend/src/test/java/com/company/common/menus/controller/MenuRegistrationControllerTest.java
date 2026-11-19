@@ -107,7 +107,7 @@ class MenuRegistrationControllerTest {
         mvc.perform(get("/api/common/menu-options").param("menuLvl", "2"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.upperMenus[0].menuId").value("G007"))
             .andExpect(jsonPath("$.data.screens[*].scrnId")
-                .value(org.hamcrest.Matchers.contains("UI-23", "UI-24", "UI-25", "UI-27", "UI-15", "UI-02", "UI-01", "UI-12", "UI-11", "UI-31")))
+                .value(org.hamcrest.Matchers.contains("UI-23", "UI-24", "UI-25", "UI-27", "UI-15", "UI-02", "UI-01", "UI-12", "UI-11", "UI-31", "UI-13")))
             .andExpect(jsonPath("$.data.screens[?(@.scrnId == 'UI-02')].menuNm")
                 .value(org.hamcrest.Matchers.contains("개발자 풀")));
         noWrites();

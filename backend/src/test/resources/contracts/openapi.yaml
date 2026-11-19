@@ -7722,8 +7722,1427 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+  /api/common/bills:
+    get:
+      operationId: getCommonBills
+      summary: 청구 목록과 요약 조회
+      security: []
+      x-related-requirements:
+      - REQ-675
+      - REQ-676
+      - REQ-677
+      - REQ-678
+      - REQ-683
+      - REQ-652
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      parameters:
+      - name: year
+        in: query
+        required: true
+        schema:
+          type: integer
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: billMonth
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: projectId
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillingList'
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_BL_BILL
+        result_path:
+        - data
+        - items
+      x-pagination-filtering:
+        pagination: 서버는 조건 전체를 반환한다. 목록은 기존 ListView 공통 페이지 설정을 적용하고 프로젝트 선택지는 전체 옵션을 사용한다. 별도 page/size API 파라미터를
+          신설하지 않는다.
+        filtering:
+        - year
+        - status
+        - billMonth
+        - projectId
+        ordering: 청구 목록은 청구일 최신순; 발송 이력은 날짜순; 그 밖 동순위는 OQ-QUERY-013.
+    post:
+      operationId: postCommonBill
+      summary: 청구 등록
+      security: []
+      x-related-requirements:
+      - REQ-684
+      - REQ-685
+      - REQ-686
+      - REQ-687
+      - REQ-711
+      - REQ-688
+      - REQ-689
+      - REQ-720
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonBillingInput'
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      nullable: true
+                      allOf:
+                      - $ref: '#/components/schemas/CommonBillingDetail'
+                    warning:
+                      type: string
+                      nullable: true
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-business-rules:
+      - 진행중·비내부·비수주예정 프로젝트만 등록. 지난해·마감월 일반 등록 불가. sourceBillId가 있으면 원청구 프로젝트·월 고정이며 원행은 수정하지 않는다.
+      - 세율 기본10·0~100, 세액은 공급가×세율 원단위 버림. 예정일은 청구일 이후 또는 같은날. 번호는 선택.
+      - 동월 미취소 청구 첫 제출은 경고만 반환하고 신규0행. duplicateConfirmed=true 재제출만 추가등록. 이 정상 경고 응답은200 data=null·warning이며 성공 저장과
+        구분한다.
+      - 번호는 B-YYYYMM-월순번3자리 비재사용, 차수는 취소포함 프로젝트 최대+1이며 발급은 동시성 보호.
+      x-side-effects:
+      - TB_BL_BILL 신규1행·BILL_ORD 고정·초기 RCPT_SUM_AMT=0; VAT_AMT/TOT_AMT/UNPAID_AMT 저장. 원청구 sourceBillId는 불변.
+      x-required-tests:
+      - 'happy: 미마감 진행 월단위 청구 저장 -> GET 상세에서 새 BILL_ID·입력 공급가·세율·입금예정일과 TB_BL_BILL 신규1행을 읽는다.'
+      - 'auth: 인증 헤더 없는 현재 admin 등록 -> 200·REG_USER_ID=admin, 임의401/403을 만들지 않는다.'
+      - 'validation: vatRate가100 초과 또는 예정일<청구일 -> 400 errors.vatRate/payDueDate·신규0행.'
+      - 'business: 마감월 일반등록 -> 400·해당월 마감 안내·TB_BL_BILL 행수 불변; 동월 첫 제출은 경고·두번째는 신규1행.'
+      - 'side-effect: 취소된 번호/차수가 있는 프로젝트에 등록 -> 신규 BILL_ID는 비재사용·BILL_ORD는 취소포함 최대+1, 원청구 불변.'
+      x-state-transitions:
+      - 미등록 -> 미수(계산 상태); 새 CNCL_YN=N
+      - 동월미취소존재 첫제출 -> 경고·저장없음; 재확인 -> 새 청구
+  /api/common/bill-options:
+    get:
+      operationId: getCommonBillOptions
+      summary: 청구 등록 선택지와 추정값
+      security: []
+      x-related-requirements:
+      - REQ-684
+      - REQ-685
+      - REQ-686
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      parameters:
+      - name: projectId
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: billMonth
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillingOptions'
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_PJ_PROJ
+        result_path:
+        - data
+        - projects
+      x-pagination-filtering:
+        pagination: 서버는 조건 전체를 반환한다. 목록은 기존 ListView 공통 페이지 설정을 적용하고 프로젝트 선택지는 전체 옵션을 사용한다. 별도 page/size API 파라미터를
+          신설하지 않는다.
+        filtering:
+        - projectId
+        - billMonth
+        ordering: 청구 목록은 청구일 최신순; 발송 이력은 날짜순; 그 밖 동순위는 OQ-QUERY-013.
+  /api/common/bills/{billId}:
+    get:
+      operationId: getCommonBill
+      summary: 청구 상세와 입금 내역
+      security: []
+      x-related-requirements:
+      - REQ-679
+      - REQ-715
+      - REQ-717
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      parameters:
+      - name: billId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillingDetail'
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 청구 또는 입금이 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_BL_BILL
+        result_path:
+        - data
+    put:
+      operationId: putCommonBill
+      summary: 청구 정보 수정
+      security: []
+      x-related-requirements:
+      - REQ-680
+      - REQ-681
+      - REQ-685
+      - REQ-686
+      - REQ-720
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      parameters:
+      - name: billId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonBillingEditInput'
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillingDetail'
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 청구 또는 입금이 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-business-rules:
+      - 올해·미마감·미취소 청구만 수정. 프로젝트·청구월·BILL_ORD 불변.
+      - 재계산 합계는 정상 입금합계 이상. 세율·예정일 검증은 등록과 동일.
+      x-side-effects:
+      - TB_BL_BILL 공급가/세율/세액/합계/예정일/번호 및 미수금 갱신; TB_BL_RCPT 원행 불변.
+      x-required-tests:
+      - 'happy: 미마감 청구 공급가 수정 -> GET 상세 SPLY_AMT·VAT_AMT·TOT_AMT가 새값이다.'
+      - 'auth: 무인증 admin 수정 -> 200·MOD_USER_ID=admin이며 로그인 이동이 없다.'
+      - 'validation: 예정일이 청구일보다 이전 -> 400 errors.payDueDate·기존 날짜 불변.'
+      - 'business: 새합계<정상입금합계 또는 청구월마감 -> 400·기존 TB_BL_BILL 금액 불변.'
+      - 'side-effect: 정상 수정 커밋 -> UNPAID_AMT가 새합계-정상입금합계이며 PROJ_ID·BILL_YM·BILL_ORD와 입금행은 그대로다.'
+      x-state-transitions:
+      - 미마감 미취소청구 -> 같은행 금액/날짜 갱신·계산상태 재판정
+      - 마감·지난해·취소 -> 수정거부·무변경
+  /api/common/bills/{billId}/cancel:
+    post:
+      operationId: postCommonBillCancel
+      summary: 청구 취소
+      security: []
+      x-related-requirements:
+      - REQ-682
+      - REQ-715
+      - REQ-683
+      - REQ-720
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      parameters:
+      - name: billId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonBillingCancelInput'
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillingDetail'
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 청구 또는 입금이 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-business-rules:
+      - 올해·청구월미마감·정상입금0건만 취소. 사유 필수. 입금 있으면 먼저 입금취소.
+      - 원행·번호·차수는 보존하고 집계/미수/누락/알림에서 제외.
+      x-side-effects:
+      - TB_BL_BILL CNCL_YN=Y·CNCL_RSN·CNCL_USER_ID·CNCL_DTTM 저장. 삭제없음.
+      x-required-tests:
+      - 'happy: 정상입금0건 미마감 청구 사유취소 -> 상세 cancelled=true·목록 취소됨 행이 남는다.'
+      - 'auth: 무인증 admin 청구취소 -> 200·CNCL_USER_ID=admin으로 조회된다.'
+      - 'validation: reason 공백 -> 400 errors.reason·CNCL_YN=N 그대로다.'
+      - 'business: 정상입금1건 또는 마감청구 취소 -> 400·청구 및 입금 원행 그대로다.'
+      - 'side-effect: 취소성공 -> 상세에 취소사유/시각 있고 요약·턴키매출·미수·누락·알림에서 대상 청구가 제외된다.'
+      x-state-transitions:
+      - CNCL_YN=N·정상입금0·미마감 -> CNCL_YN=Y
+      - 취소됨 -> 원번호/차수 유지·재사용불가
+  /api/common/receipts:
+    post:
+      operationId: postCommonReceipt
+      summary: 청구별 입금 등록
+      security: []
+      x-related-requirements:
+      - REQ-690
+      - REQ-691
+      - REQ-692
+      - REQ-716
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonBillingReceiptInput'
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillingReceiptResult'
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-business-rules:
+      - 공통 입금일·청구별 양수금액. 잔액0 제외·잔액초과 거부·선수금없음.
+      - 현재월 마감 등록차단. 지난해 청구 미수도 올해 입금가능. 동시입금은 같은청구 잔액 검증/합산을 직렬화한다.
+      - 다건 일부실패의 원자성/응답 정책은 OQ-RCPT-013 확인 필요이며 전체/부분 성공을 승인으로 간주하지 않는다.
+      x-side-effects:
+      - TB_BL_RCPT 입금1건당1행. TB_BL_BILL 정상입금합계 증가·잔액감소·상태계산·전액시 알림중지.
+      x-required-tests:
+      - 'happy: 양수 분할입금 저장 -> 상세 입금1줄과 RCPT_SUM_AMT 증가·UNPAID_AMT 감소를 재조회한다.'
+      - 'auth: 무인증 admin 지난해 미수 입금 -> 200·처리자 admin·원청구 내용 불변이다.'
+      - 'validation: amount=0 -> 400 errors.items.amount·입금액을 입력해 주세요·TB_BL_RCPT 신규0행.'
+      - 'business: amount>미수금 또는 현재월마감 -> 400·입금/청구 합계 무변경·초과시 입금액이 미수금보다 큽니다.'
+      - 'side-effect: 잔액전액 입금 -> GET bills 상태 입금 완료·GET bill-dunning 대상에서 빠지고 정상입금행은 남는다.'
+      x-state-transitions:
+      - 미수/연체 -> 분할입금 후 잔액감소·미수/연체 재판정
+      - 잔액0 -> 입금 완료·미수알림 중지
+  /api/common/receipts/{receiptId}/cancel:
+    post:
+      operationId: postCommonReceiptCancel
+      summary: 입금 취소
+      security: []
+      x-related-requirements:
+      - REQ-707
+      - REQ-708
+      - REQ-717
+      - REQ-718
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      parameters:
+      - name: receiptId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonBillingReceiptCancelInput'
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillingReceiptResult'
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 청구 또는 입금이 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-business-rules:
+      - 입금일이 속한달 미마감만 취소. 청구월 마감은 무관. 사유필수·삭제없음.
+      - 정상입금만 한번 취소하고 동일 취소로 잔액을 두번 늘리지 않는다. 재요청 응답세부는 OQ-RETRY-013.
+      x-side-effects:
+      - TB_BL_RCPT 취소사유/처리자/시각 보존·TB_BL_BILL 정상입금합계 감소/미수증가/상태재판정.
+      x-required-tests:
+      - 'happy: 9월마감청구의10월미마감입금 취소 -> 상세 해당줄 취소됨·미수금 증가다.'
+      - 'auth: 무인증 admin 입금취소 -> 200·취소자 admin·원청구 공급가와 차수 그대로다.'
+      - 'validation: 취소사유 누락 -> 400 errors.reason·입금행과 미수금 불변.'
+      - 'business: 입금월마감 취소 -> 400·입금 정상상태/합계 보존; 청구월마감만이면 허용된다.'
+      - 'side-effect: 취소성공 -> 입금원행/사유/시각을 GET 상세에서 조회하고 UNPAID_AMT 증가·예정일기준 상태가 재판정된다.'
+      x-state-transitions:
+      - 정상입금·입금월미마감 -> 취소됨
+      - 취소됨 -> 원행보존·정상합계제외
+  /api/common/bill-checks:
+    get:
+      operationId: getCommonBillChecks
+      summary: 월별 청구 누락 점검
+      security: []
+      x-related-requirements:
+      - REQ-693
+      - REQ-694
+      - REQ-698
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      parameters:
+      - name: checkMonth
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^[0-9]{6}$
+        description: 미지정은 기존 마감 서비스가 반환한 마지막 마감월. 마감없음 초기선택은 OQ-UI-013.
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillingCheckResult'
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_PJ_ASGN_MON
+        result_path:
+        - data
+        - items
+      x-pagination-filtering:
+        pagination: 서버는 조건 전체를 반환한다. 목록은 기존 ListView 공통 페이지 설정을 적용하고 프로젝트 선택지는 전체 옵션을 사용한다. 별도 page/size API 파라미터를
+          신설하지 않는다.
+        filtering:
+        - checkMonth
+        ordering: 청구 목록은 청구일 최신순; 발송 이력은 날짜순; 그 밖 동순위는 OQ-QUERY-013.
+  /api/common/bill-checks/missing:
+    post:
+      operationId: postCommonBillCheckMissing
+      summary: 누락 청구 등록
+      security: []
+      x-related-requirements:
+      - REQ-695
+      - REQ-720
+      - REQ-688
+      - REQ-689
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonBillingCheckInput'
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillingDetail'
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-business-rules:
+      - 청구0건·월단위/파견을 쓰기시 재조회하며 클라이언트에서 예외 허용 boolean을 받지 않는다.
+      - 신규 공급가=투입기준금액; 등록은 번호/차수 공통발급·중복경고제외. 턴키/무상지원 제외.
+      - 마감월 많이청구는 안내후 상세만·감액저장없음. 수정합계는 정상입금합계이상.
+      x-side-effects:
+      - TB_BL_BILL 신규 공급가=투입기준금액; TB_PJ_ASGN_MON·마감원천 무변경.
+      x-required-tests:
+      - 'happy: 청구0건·월단위/파견 점검행에서 실행 -> 상세 TB_BL_BILL에 신규 공급가=투입기준금액가 조회된다.'
+      - 'auth: 무인증 admin 누락 청구 등록 -> 200·등록/수정 처리자 admin이다.'
+      - 'validation: missing 요청 checkMonth가YYYYMM아님 -> 400 errors.checkMonth·청구행 무변경.'
+      - 'business: 청구0건·월단위/파견 조건이 쓰기직전 해소됨 -> 400·missing 청구 추가/수정0행.'
+      - 'side-effect: 누락 청구 등록 성공 -> 누락 GET 차이가 재계산되고 월투입 원행/MM·마감상태는 그대로다.'
+      x-state-transitions:
+      - 청구0건·월단위/파견 -> 신규 공급가=투입기준금액
+      - 점검조건불충족 -> 거부·원행보존
+  /api/common/bill-checks/additional:
+    post:
+      operationId: postCommonBillCheckAdditional
+      summary: 부족 차액 추가 청구
+      security: []
+      x-related-requirements:
+      - REQ-697
+      - REQ-720
+      - REQ-688
+      - REQ-689
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonBillingCheckInput'
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillingDetail'
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-business-rules:
+      - 마감월 부족액양수·월단위/파견을 쓰기시 재조회하며 클라이언트에서 예외 허용 boolean을 받지 않는다.
+      - 원청구보존·신규 공급가=부족차액; 등록은 번호/차수 공통발급·중복경고제외. 턴키/무상지원 제외.
+      - 마감월 많이청구는 안내후 상세만·감액저장없음. 수정합계는 정상입금합계이상.
+      x-side-effects:
+      - TB_BL_BILL 원청구보존·신규 공급가=부족차액; TB_PJ_ASGN_MON·마감원천 무변경.
+      x-required-tests:
+      - 'happy: 마감월 부족액양수·월단위/파견 점검행에서 실행 -> 상세 TB_BL_BILL에 원청구보존·신규 공급가=부족차액가 조회된다.'
+      - 'auth: 무인증 admin 부족 차액 추가 청구 -> 200·등록/수정 처리자 admin이다.'
+      - 'validation: additional 요청 checkMonth가YYYYMM아님 -> 400 errors.checkMonth·청구행 무변경.'
+      - 'business: 마감월 부족액양수·월단위/파견 조건이 쓰기직전 해소됨 -> 400·additional 청구 추가/수정0행.'
+      - 'side-effect: 부족 차액 추가 청구 성공 -> 누락 GET 차이가 재계산되고 월투입 원행/MM·마감상태는 그대로다.'
+      x-state-transitions:
+      - 마감월 부족액양수·월단위/파견 -> 원청구보존·신규 공급가=부족차액
+      - 점검조건불충족 -> 거부·원행보존
+  /api/common/bill-checks/correction:
+    post:
+      operationId: postCommonBillCheckCorrection
+      summary: 미마감 차이 청구 수정
+      security: []
+      x-related-requirements:
+      - REQ-696
+      - REQ-720
+      - REQ-681
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonBillingCheckInput'
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillingDetail'
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-business-rules:
+      - 미마감 금액차·그달 최근청구을 쓰기시 재조회하며 클라이언트에서 예외 허용 boolean을 받지 않는다.
+      - 최근청구 공급가=투입기준에맞춘값; 등록은 번호/차수 공통발급·중복경고제외. 턴키/무상지원 제외.
+      - 마감월 많이청구는 안내후 상세만·감액저장없음. 수정합계는 정상입금합계이상.
+      x-side-effects:
+      - TB_BL_BILL 최근청구 공급가=투입기준에맞춘값; TB_PJ_ASGN_MON·마감원천 무변경.
+      x-required-tests:
+      - 'happy: 미마감 금액차·그달 최근청구 점검행에서 실행 -> 상세 TB_BL_BILL에 최근청구 공급가=투입기준에맞춘값가 조회된다.'
+      - 'auth: 무인증 admin 미마감 차이 청구 수정 -> 200·등록/수정 처리자 admin이다.'
+      - 'validation: correction 요청 checkMonth가YYYYMM아님 -> 400 errors.checkMonth·청구행 무변경.'
+      - 'business: 미마감 금액차·그달 최근청구 조건이 쓰기직전 해소됨 -> 400·correction 청구 추가/수정0행.'
+      - 'side-effect: 미마감 차이 청구 수정 성공 -> 누락 GET 차이가 재계산되고 월투입 원행/MM·마감상태는 그대로다.'
+      x-state-transitions:
+      - 미마감 금액차·그달 최근청구 -> 최근청구 공급가=투입기준에맞춘값
+      - 점검조건불충족 -> 거부·원행보존
+  /api/common/bill-dunning:
+    get:
+      operationId: getCommonBillDunning
+      summary: 미수 알림 대상과 이력
+      security: []
+      x-related-requirements:
+      - REQ-699
+      - REQ-700
+      - REQ-701
+      - REQ-704
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillingDunningResult'
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_BL_DUN_HIST
+        result_path:
+        - data
+        - items
+      x-pagination-filtering:
+        pagination: 서버는 조건 전체를 반환한다. 목록은 기존 ListView 공통 페이지 설정을 적용하고 프로젝트 선택지는 전체 옵션을 사용한다. 별도 page/size API 파라미터를
+          신설하지 않는다.
+        filtering:
+        - 예정일 경과·연도무관 잔액존재·미취소 고정조건
+        ordering: 청구 목록은 청구일 최신순; 발송 이력은 날짜순; 그 밖 동순위는 OQ-QUERY-013.
+  /api/common/bills/{billId}/dunning-resend:
+    post:
+      operationId: postCommonBillDunningResend
+      summary: 현재 단계 미수 재알림
+      security: []
+      x-related-requirements:
+      - REQ-703
+      - REQ-700
+      - REQ-704
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      parameters:
+      - name: billId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-no-request-body-reason: billId와 현재일·DB 잔액/이력에서 현재단계와 수신자를 서버가 읽는다. 사용자에게 단계/수신자/토큰 입력을 요구하지 않는다.
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillingDunningSendResult'
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 청구 또는 입금이 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-business-rules:
+      - 미취소·잔액양수·현재1~3단계만. 해당단계 RESEND_YN=Y 성공이력이 없을때1회추가.
+      - 발송실패는 성공이력없음·다음 재시도 가능. 두채널 부분성공은 OQ-SEND-013·완료로 위장하지 않는다.
+      x-side-effects:
+      - 메일+시스템 성공 뒤 TB_BL_DUN_HIST RESEND_YN=Y와 TB_SY_NOTI 결과를 읽을수있게 기록.
+      x-required-tests:
+      - 'happy: 현재2단계·재알림성공이력없음에서 실행 -> 알림 GET 해당청구 2단계(다시)·받는사람이 보인다.'
+      - 'auth: 무인증 admin 재알림 -> 200·서버의 현재단계 수신자로만 발송되며 사용자전환이 없다.'
+      - 'validation: 존재하지 않는 billId -> 404 ApiError·발송/성공이력0행.'
+      - 'business: 같은단계 재알림성공이력있음 -> 400·추가 TB_BL_DUN_HIST0행·기존 기록 보존.'
+      - 'side-effect: 발송성공 -> TB_BL_DUN_HIST에 RESEND_YN=Y·수신자·일자와 TB_SY_NOTI가 있고 버튼 대신 이 단계 다시 알림 보냄이다.'
+      x-state-transitions:
+      - 현재단계 재알림미발송 -> 성공이력1회
+      - 발송실패 -> 성공이력없음·재시도가능
+  /api/common/bills/{billId}/next-month:
+    post:
+      operationId: postCommonBillNextMonth
+      summary: 다음 달 청구 즉시 등록
+      security: []
+      x-related-requirements:
+      - REQ-710
+      - REQ-719
+      - REQ-709
+      - REQ-688
+      - REQ-689
+      - REQ-720
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
+      parameters:
+      - name: billId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-no-request-body-reason: 원 billId에서 프로젝트·세율을 읽고 다음달 월투입·DB식을 사용한다. 창없이 즉시 생성하므로 임의 공급가/날짜를 body로 받지 않는다.
+      responses:
+        '200':
+          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillingDetail'
+        '400':
+          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 청구 또는 입금이 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-business-rules:
+      - 프로젝트최근행·진행중·월단위/파견·다음달이계약종료이내만. 턴키불가.
+      - 다음달 미취소청구존재·마감·공급가0이면 안내·신규없음. 지난해 화면에서 빠른청구불가.
+      - 공급가는 다음달투입기준·세율복사·청구일오늘·예정일청구월다음달25일·번호빈값.
+      x-side-effects:
+      - TB_BL_BILL 다음달 신규1행·번호비재사용·차수취소포함최대+1; 원청구/월투입불변.
+      x-required-tests:
+      - 'happy: 진행월단위 최근행 다음달청구 -> 상세 다음달 BILL_YM·복사VAT_RT·오늘 BILL_DT·빈번호가 조회된다.'
+      - 'auth: 무인증 admin 다음달청구 -> 200·REG_USER_ID=admin·창없이 목록갱신이다.'
+      - 'validation: 없는 billId -> 404 ApiError·신규 BILL_ID0개.'
+      - 'business: 다음달청구존재/마감/공급가0 또는 턴키 -> 400 안내·TB_BL_BILL 행수/원행보존.'
+      - 'side-effect: 생성성공 -> 새 BILL_ID·최대+1 BILL_ORD로 재조회되고 원청구·월투입은 그대로다.'
+      x-state-transitions:
+      - 최근행·적격 -> 다음달 신규미수
+      - 중복·마감·공급가0·턴키·계약밖 -> 거부·무변경
+
 components:
   schemas:
+    CommonBillingRow:
+      type: object
+      required:
+      - billId
+      - projectId
+      - projectName
+      - customerName
+      - billOrder
+      - billMonth
+      - billDate
+      - supplyAmount
+      - vatRate
+      - vatAmount
+      - totalAmount
+      - receiptSumAmount
+      - unpaidAmount
+      - payDueDate
+      - taxInvoiceNo
+      - status
+      - cancelled
+      - cancelReason
+      - cancelledBy
+      - cancelledAt
+      - dunningStep
+      - daysOverdue
+      - canEdit
+      - canCancel
+      - canReceive
+      - canCopy
+      - canNextMonth
+      properties:
+        billId:
+          type: string
+        projectId:
+          type: string
+        projectName:
+          type: string
+        customerName:
+          type: string
+        billOrder:
+          type: integer
+        billMonth:
+          type: string
+          pattern: ^[0-9]{6}$
+        billDate:
+          type: string
+          format: date
+        supplyAmount:
+          type: number
+        vatRate:
+          type: number
+        vatAmount:
+          type: number
+        totalAmount:
+          type: number
+        receiptSumAmount:
+          type: number
+        unpaidAmount:
+          type: number
+        payDueDate:
+          type: string
+          format: date
+        taxInvoiceNo:
+          type: string
+          nullable: true
+        status:
+          type: string
+        cancelled:
+          type: boolean
+        cancelReason:
+          type: string
+          nullable: true
+        cancelledBy:
+          type: string
+          nullable: true
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        dunningStep:
+          type: integer
+          nullable: true
+        daysOverdue:
+          type: integer
+        canEdit:
+          type: boolean
+        canCancel:
+          type: boolean
+        canReceive:
+          type: boolean
+        canCopy:
+          type: boolean
+        canNextMonth:
+          type: boolean
+    CommonBillingReceipt:
+      type: object
+      required:
+      - receiptId
+      - receiptDate
+      - amount
+      - cancelled
+      - cancelReason
+      - cancelledBy
+      - cancelledAt
+      - canCancel
+      properties:
+        receiptId:
+          type: string
+        receiptDate:
+          type: string
+          format: date
+        amount:
+          type: number
+        cancelled:
+          type: boolean
+        cancelReason:
+          type: string
+          nullable: true
+        cancelledBy:
+          type: string
+          nullable: true
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        canCancel:
+          type: boolean
+    CommonBillingDetail:
+      type: object
+      required:
+      - bill
+      - receipts
+      - missingTaxInvoiceNumber
+      properties:
+        bill:
+          $ref: '#/components/schemas/CommonBillingRow'
+        receipts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonBillingReceipt'
+        missingTaxInvoiceNumber:
+          type: boolean
+    CommonBillingList:
+      type: object
+      required:
+      - items
+      - summary
+      - totals
+      - readOnly
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonBillingRow'
+        summary:
+          type: object
+          required:
+          - yearBillCount
+          - yearBillTotal
+          - currentMonthBillTotal
+          - unpaidCount
+          - unpaidTotal
+          - overdueCount
+          properties:
+            yearBillCount:
+              type: integer
+            yearBillTotal:
+              type: number
+            currentMonthBillTotal:
+              type: number
+            unpaidCount:
+              type: integer
+            unpaidTotal:
+              type: number
+            overdueCount:
+              type: integer
+        totals:
+          type: object
+          required:
+          - supplyAmount
+          - vatAmount
+          - totalAmount
+          - receiptSumAmount
+          - unpaidAmount
+          properties:
+            supplyAmount:
+              type: number
+            vatAmount:
+              type: number
+            totalAmount:
+              type: number
+            receiptSumAmount:
+              type: number
+            unpaidAmount:
+              type: number
+        readOnly:
+          type: boolean
+    CommonBillingInput:
+      type: object
+      required:
+      - projectId
+      - billMonth
+      - supplyAmount
+      - vatRate
+      - billDate
+      - payDueDate
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+        billMonth:
+          type: string
+          pattern: ^[0-9]{6}$
+        supplyAmount:
+          type: number
+          description: 월단위·파견의 DB식 추정값은 사람이 수정 가능; 턴키는 직접 입력. 절대 수치 검수는 OQ-CALC-013.
+        vatRate:
+          type: number
+          minimum: 0
+          maximum: 100
+          default: 10
+        billDate:
+          type: string
+          format: date
+        payDueDate:
+          type: string
+          format: date
+        taxInvoiceNo:
+          type: string
+          maxLength: 30
+          nullable: true
+        duplicateConfirmed:
+          type: boolean
+          default: false
+        sourceBillId:
+          type: string
+          nullable: true
+    CommonBillingEditInput:
+      type: object
+      required:
+      - supplyAmount
+      - vatRate
+      - billDate
+      - payDueDate
+      properties:
+        supplyAmount:
+          type: number
+          description: 월단위·파견의 DB식 추정값은 사람이 수정 가능; 턴키는 직접 입력. 절대 수치 검수는 OQ-CALC-013.
+        vatRate:
+          type: number
+          minimum: 0
+          maximum: 100
+          default: 10
+        billDate:
+          type: string
+          format: date
+        payDueDate:
+          type: string
+          format: date
+        taxInvoiceNo:
+          type: string
+          maxLength: 30
+          nullable: true
+    CommonBillingCancelInput:
+      type: object
+      required:
+      - reason
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    CommonBillingReceiptInput:
+      type: object
+      required:
+      - receiptDate
+      - items
+      properties:
+        receiptDate:
+          type: string
+          format: date
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+            - billId
+            - amount
+            properties:
+              billId:
+                type: string
+              amount:
+                type: number
+                exclusiveMinimum: true
+                minimum: 0
+    CommonBillingReceiptCancelInput:
+      type: object
+      required:
+      - reason
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          description: 입금 취소 사유. 물리 최대길이는 OQ-DATA-013에서 DDL 대조.
+    CommonBillingReceiptResult:
+      type: object
+      required:
+      - billIds
+      - receipts
+      properties:
+        billIds:
+          type: array
+          items:
+            type: string
+        receipts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonBillingReceipt'
+    CommonBillingOptions:
+      type: object
+      required:
+      - projects
+      - statusOptions
+      - defaultBillMonth
+      - defaultBillDate
+      - defaultPayDueDate
+      - estimatedSupplyAmount
+      - vatRate
+      properties:
+        projects:
+          type: array
+          items:
+            type: object
+            required:
+            - projectId
+            - projectName
+            - customerName
+            - projectType
+            properties:
+              projectId:
+                type: string
+              projectName:
+                type: string
+              customerName:
+                type: string
+              projectType:
+                type: string
+        statusOptions:
+          type: array
+          items:
+            type: object
+            required:
+            - code
+            - name
+            properties:
+              code:
+                type: string
+              name:
+                type: string
+        defaultBillMonth:
+          type: string
+        defaultBillDate:
+          type: string
+          format: date
+        defaultPayDueDate:
+          type: string
+          format: date
+        estimatedSupplyAmount:
+          type: number
+          nullable: true
+        vatRate:
+          type: number
+    CommonBillingCheckRow:
+      type: object
+      required:
+      - projectId
+      - projectName
+      - projectType
+      - judgement
+      - headcount
+      - monthlyMm
+      - referenceAmount
+      - billedSupplyAmount
+      - difference
+      - explanation
+      - latestBillId
+      - allowedAction
+      properties:
+        projectId:
+          type: string
+        projectName:
+          type: string
+        projectType:
+          type: string
+        judgement:
+          type: string
+        headcount:
+          type: integer
+        monthlyMm:
+          type: number
+        referenceAmount:
+          type: number
+        billedSupplyAmount:
+          type: number
+        difference:
+          type: number
+        explanation:
+          type: string
+        latestBillId:
+          type: string
+          nullable: true
+        allowedAction:
+          type: string
+    CommonBillingCheckResult:
+      type: object
+      required:
+      - checkMonth
+      - summary
+      - items
+      - calculationMethod
+      - plannedBasis
+      properties:
+        checkMonth:
+          type: string
+        summary:
+          type: object
+          required:
+          - totalCount
+          - missingCount
+          - underCount
+          - overCount
+          - matchedCount
+          properties:
+            totalCount:
+              type: integer
+            missingCount:
+              type: integer
+            underCount:
+              type: integer
+            overCount:
+              type: integer
+            matchedCount:
+              type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonBillingCheckRow'
+        calculationMethod:
+          type: string
+        plannedBasis:
+          type: boolean
+    CommonBillingCheckInput:
+      type: object
+      required:
+      - projectId
+      - checkMonth
+      - vatRate
+      - billDate
+      - payDueDate
+      properties:
+        projectId:
+          type: string
+        checkMonth:
+          type: string
+          pattern: ^[0-9]{6}$
+        vatRate:
+          type: number
+          minimum: 0
+          maximum: 100
+          default: 10
+        billDate:
+          type: string
+          format: date
+        payDueDate:
+          type: string
+          format: date
+        taxInvoiceNo:
+          type: string
+          maxLength: 30
+          nullable: true
+    CommonBillingDunningHistory:
+      type: object
+      required:
+      - step
+      - sentDate
+      - recipientDescription
+      - sendMethodCode
+      - resend
+      properties:
+        step:
+          type: integer
+        sentDate:
+          type: string
+          format: date
+        recipientDescription:
+          type: string
+        sendMethodCode:
+          type: string
+        resend:
+          type: boolean
+    CommonBillingDunningRow:
+      type: object
+      required:
+      - billId
+      - projectId
+      - projectName
+      - unpaidAmount
+      - payDueDate
+      - daysOverdue
+      - currentStep
+      - history
+      - nextNotification
+      - canResend
+      - resendMessage
+      properties:
+        billId:
+          type: string
+        projectId:
+          type: string
+        projectName:
+          type: string
+        unpaidAmount:
+          type: number
+        payDueDate:
+          type: string
+          format: date
+        daysOverdue:
+          type: integer
+        currentStep:
+          type: integer
+          nullable: true
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonBillingDunningHistory'
+        nextNotification:
+          type: string
+          nullable: true
+        canResend:
+          type: boolean
+        resendMessage:
+          type: string
+          nullable: true
+    CommonBillingDunningResult:
+      type: object
+      required:
+      - cards
+      - items
+      properties:
+        cards:
+          type: array
+          items:
+            type: object
+            required:
+            - step
+            - recipients
+            properties:
+              step:
+                type: integer
+              recipients:
+                type: array
+                items:
+                  type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonBillingDunningRow'
+    CommonBillingDunningSendResult:
+      type: object
+      required:
+      - billId
+      - history
+      properties:
+        billId:
+          type: string
+        history:
+          $ref: '#/components/schemas/CommonBillingDunningHistory'
     CommonProjectBoardRow:
       type: object
       required:
@@ -13296,6 +14715,92 @@ x-uncovered-requirements:
 - canonical_id: REQ-540
   status: screen-only
   evidence: '지난해 이력 수정 금지: UI-12 로컬 동작; 지난해 이력은 조회되나 변경 기록과 정정 단추가 보이지 않는다.'
+- canonical_id: REQ-653
+  status: data-constraint
+  evidence: 'DB 식 정의 소비 — data-contract 소유: 검수 DB의 CALC_ID 정의 읽기와 실제 사용 계산 호출을 대조하고 식을 상수로 복제하지 않는다.'
+- canonical_id: REQ-654
+  status: data-constraint
+  evidence: '공통코드 원천 — data-contract 소유: 선택지/발송 코드가 sql/DML_BaseData.sql과 같고 새 enum seed를 임의 추가하지 않는다.'
+- canonical_id: REQ-655
+  status: out-of-scope
+  evidence: '로그인·메뉴 권한 제외 — out-of-scope 소유: UI-13 무인증 진입과 호출에 로그인 이동이나 신규 메뉴 권한 검사가 없다.'
+- canonical_id: REQ-656
+  status: non-functional
+  evidence: '시안·SQL 대조 — non-functional 소유: 물리 매핑과 렌더링을 실제 자료로 대조하며 자료 부재를 완료로 보고하지 않는다.'
+- canonical_id: REQ-657
+  status: non-functional
+  evidence: '자동 Flyway 비활성 — architecture-runtime 소유: 일반 기동에서 자동 migration 호출이 없고 설정 false가 보존된다.'
+- canonical_id: REQ-658
+  status: non-functional
+  evidence: '개발 인증 설정 유지 — architecture-runtime 소유: 설정 비교에서 auth.required=false이며 무인증 청구 조회가 성공한다.'
+- canonical_id: REQ-659
+  status: non-functional
+  evidence: '시험 계약 인증 정의 금지 — architecture-runtime 소유: 유효 OpenAPI에 세 선언이 없고 신규 operation은 security=[]이다.'
+- canonical_id: REQ-660
+  status: non-functional
+  evidence: '수동 API 보존 — non-functional 소유: manual과 유효 계약의 개발자·프로젝트·엑셀/이력·배정·거래처투입·파트재개 메서드를 구조 비교한다.'
+- canonical_id: REQ-661
+  status: non-functional
+  evidence: '연장 결과 nullable 보존 — api-contract 소유: 유효 schema의 modifiedAt nullable이 true다.'
+- canonical_id: REQ-662
+  status: non-functional
+  evidence: '화면 등록 공동 회귀 — seed-test-fixture 소유: 메뉴 선택지와 MenuRegistrationControllerTest·CommonNavigationPage.test.tsx가
+    UI-13을 포함해 통과한다.'
+- canonical_id: REQ-663
+  status: non-functional
+  evidence: 'ListView 재사용 — ui-supporting 소유: UI-13 표의 ListView 사용과 기존 페이지/밀도 회귀를 확인한다.'
+- canonical_id: REQ-664
+  status: non-functional
+  evidence: '다운로드 중복 배치 금지 — ui-supporting 소유: UI-13에 요구되지 않은 엑셀 API/CTA가 없고 공통 도구줄을 이중 렌더링하지 않는다.'
+- canonical_id: REQ-665
+  status: non-functional
+  evidence: '빈 옵션 방어 — ui-supporting 소유: 공통코드·파트 선택지 누락 응답에서도 조건 영역이 렌더링되고 예외가 없다.'
+- canonical_id: REQ-666
+  status: non-functional
+  evidence: '0건 화면 골격 보존 — ui-supporting 소유: 청구 목록0건에서 연도·조건·등록 단추·표 머리와 요약 영역이 남는다.'
+- canonical_id: REQ-667
+  status: non-functional
+  evidence: '기존 프로젝트 상세 연결 보존 — ui-supporting 소유: 기존 상세의 탭 지정·수정 진입 회귀가 유지되고 새 상세 엔진을 만들지 않는다.'
+- canonical_id: REQ-668
+  status: non-functional
+  evidence: '준비 파일 시험 동기화 — seed-test-fixture 소유: 새 준비 자원이 있을 때 SchemaPreparation 실행 목록과 시험 파일·표 목록이 일치한다.'
+- canonical_id: REQ-669
+  status: non-functional
+  evidence: '미리보기 포트 형식 — architecture-runtime 소유: infra/docker-compose.yml 포트 파싱에서 두 매핑에 호스트 주소가 없다.'
+- canonical_id: REQ-670
+  status: non-functional
+  evidence: 'Maven 수동 설정 보존 — architecture-runtime 소유: 두 파일의 기존 저장소/설정 복사 지점이 변경 전과 동일하다.'
+- canonical_id: REQ-671
+  status: non-functional
+  evidence: 'schema 이름 유일성 — api-contract 소유: 유효 components.schemas 키가 유일하고 기존 schema가 덮어써지지 않는다.'
+- canonical_id: REQ-672
+  status: non-functional
+  evidence: '앞 화면 시험 보존 — seed-test-fixture 소유: 변경 전후 시험 경로가 유지되고 기존 시험을 함께 실행한다.'
+- canonical_id: REQ-673
+  status: non-functional
+  evidence: '공통 부품 기본값 호환 — ui-supporting 소유: 새 옵션 미지정 회귀에서 기존 화면의 목록/상세 동작이 바뀌지 않는다.'
+- canonical_id: REQ-674
+  status: out-of-scope
+  evidence: '다른 메뉴 활성화 제외 — out-of-scope 소유: 메뉴 비교에서 다른 화면이 새로 개발 화면으로 활성화되지 않는다.'
+- canonical_id: REQ-702
+  status: batch-only
+  evidence: architecture.md UI-13 스케줄러와 TB_BL_DUN_HIST 현재단계 성공1회 검증이 소유하며 HTTP로 수동 배치 실행을 노출하지 않는다.
+- canonical_id: REQ-705
+  status: out-of-scope
+  evidence: '근태 업로드 제외 — out-of-scope 소유: UI-13에 근태 업로드 CTA/API가 없고 주3일0.6MM은 기존 월배정 원천에서 읽는다.'
+- canonical_id: REQ-706
+  status: out-of-scope
+  evidence: 'v2 청구 기능 제외 — out-of-scope 소유: 청구확정/마이너스청구/고객사미수 새 화면과 API가 없고 UI-10·환불 기능을 이번에 확장하지 않는다.'
+- canonical_id: REQ-712
+  status: non-functional
+  evidence: '업무 사용자 범위 — non-functional 소유: 화면 인계에 재무·관리자를 기록하고 새 역할코드/임의403을 추가하지 않는다.'
+- canonical_id: REQ-713
+  status: data-constraint
+  evidence: '청구·입금 저장 경계 — data-contract 소유: 청구/입금/발송 후 해당표만 변하고 조회 전용 월투입과 마감 원천은 불변이다.'
+- canonical_id: REQ-714
+  status: data-constraint
+  evidence: '월투입 읽기 경계 — data-contract 소유: 누락점검·추정·빠른청구 전후 TB_PJ_ASGN_MON의 행과 금액/MM이 동일하다.'
+
 x-change-supersession:
   description: 기존 operation과 기준선 시험은 원형 보존한다. 이번 공통 기능 인수에는 다음 예외가 우선하며 기존 메뉴 조회 자체를 상태 저장 API로 바꾸지 않는다.
   ui-header: 'REQ-071·REQ-086: 제목줄 정보와 시스템 관리자 이름은 이번 원문으로 허용한다.'

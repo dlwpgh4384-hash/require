@@ -503,8 +503,8 @@ export function PartEditDialog({
         )}
         {closing ? (
           <InlineConfirmation
-            title="나가시겠습니까?"
-            description="저장하지 않은 내용이 사라집니다."
+            title="저장하지 않은 내용이 있습니다"
+            description="나가면 입력한 내용이 사라집니다."
             onCancel={() => setClosing(false)}
             onProceed={onClose}
           />

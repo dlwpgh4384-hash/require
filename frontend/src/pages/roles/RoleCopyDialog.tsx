@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog, InlineConfirmation } from "../../shared/feedback/Dialog";
-import { feedbackMessages } from "../../shared/feedback/messages";
 import * as api from "./roles";
 
 /**
@@ -127,8 +126,8 @@ export function RoleCopyDialog({
     >
       {closing ? (
         <InlineConfirmation
-          title="나가시겠습니까?"
-          description={feedbackMessages.unsaved}
+          title="저장하지 않은 내용이 있습니다"
+          description="나가면 입력한 내용이 사라집니다."
           onCancel={() => setClosing(false)}
           onProceed={onClose}
         />

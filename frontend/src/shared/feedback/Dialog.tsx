@@ -1,5 +1,9 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import "./feedback.css";
+
+// 열린 창 쌓임: Esc·Tab은 맨 위 창만 받는다(창 위에 확인 창이 뜨면 아래 창은 키를 받지 않음).
+const openDialogs: object[] = [];
 
 /** FR-0106 공통 창: Esc로 닫고, 포커스를 창 안에 가두고, 닫으면 부른 버튼으로 포커스를 돌려준다. */
 export function Dialog({
@@ -22,12 +26,15 @@ export function Dialog({
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
+    const me = {};
+    openDialogs.push(me);
     const caller = document.activeElement as HTMLElement | null;
     const first =
       panel.current?.querySelector<HTMLElement>("input,select") ??
       panel.current?.querySelector<HTMLElement>("button,[tabindex='0']");
     (first ?? panel.current)?.focus();
     const keydown = (event: KeyboardEvent) => {
+      if (openDialogs[openDialogs.length - 1] !== me) return;
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -58,6 +65,8 @@ export function Dialog({
     window.addEventListener("keydown", keydown, true);
     return () => {
       window.removeEventListener("keydown", keydown, true);
+      const at = openDialogs.indexOf(me);
+      if (at >= 0) openDialogs.splice(at, 1);
       caller?.focus();
     };
   }, []);
@@ -175,7 +184,10 @@ export function ConfirmDialog({
   );
 }
 
-/** 이미 열린 창 안에서 묻는 확인(예: 미저장 상태로 닫기). */
+/**
+ * 이미 열린 창 위에 따로 띄우는 확인(예: 저장하지 않고 닫기). 시안 confirmBox처럼 원래 창 위에 새 작은 창이 뜬다.
+ * (전에는 원래 창 안 아래쪽에 끼워 넣어 창이 깨져 보였다 — 2026-11-19 사용자 발견)
+ */
 export function InlineConfirmation({
   title,
   description,
@@ -193,26 +205,19 @@ export function InlineConfirmation({
   destructive?: boolean;
   testId?: string;
 }) {
-  const section = useRef<HTMLElement>(null);
-  useEffect(() => {
-    section.current?.querySelector<HTMLButtonElement>("button")?.focus();
-  }, []);
-  return (
-    <section
-      ref={section}
-      role="alertdialog"
-      aria-label={title}
-      data-testid={testId}
-    >
-      <h3>{title}</h3>
-      <p>{description}</p>
-      <ConfirmButtons
+  return createPortal(
+    <div className="app-confirm-layer">
+      <ConfirmDialog
+        title={title}
+        description={description}
         onCancel={onCancel}
         onProceed={onProceed}
         proceedLabel={proceedLabel}
         destructive={destructive}
+        testId={testId}
       />
-    </section>
+    </div>,
+    document.body,
   );
 }
 

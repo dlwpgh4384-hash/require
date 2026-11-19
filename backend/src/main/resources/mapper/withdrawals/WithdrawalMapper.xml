@@ -180,4 +180,8 @@
     WHERE p.JOB_CD=#{jobCode} AND j.PROJ_STAT_CD='ING' AND j.CTRT_BGN_DT &lt;= #{lastDay}
       AND j.CTRT_END_DT &gt;= #{firstDay} ORDER BY p.PROJ_ID,p.JOB_CD
   </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES (#{userId},'DNLD','UI-05',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
 </mapper>

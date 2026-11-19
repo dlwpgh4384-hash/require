@@ -275,7 +275,10 @@ class CommonWithdrawalControllerTest {
         var writes=Pattern.compile("(?is)<(?:insert|update|delete)\\b[^>]*>(.*?)</(?:insert|update|delete)>").matcher(sql);
         int statements=0;
         while(writes.find()) {
-            assertThat(writes.group(1).toUpperCase(Locale.ROOT)).contains("TB_SL_TENT_ASGN")
+            String write=writes.group(1).toUpperCase(Locale.ROOT);
+            // 엑셀 다운로드 접근 기록(DNLD)은 업무 자료가 아니라서 따로 센다(2026-11-19).
+            if (write.contains("TB_SY_ACCS_LOG")) { assertThat(write).contains("'DNLD'").doesNotContain("TB_PJ_ASGN","TB_SL_TENT_ASGN"); continue; }
+            assertThat(write).contains("TB_SL_TENT_ASGN")
                 .doesNotContain("TB_PJ_ASGN","TB_CO_MON_COST","TB_SL_RCMD_LOG");statements++;
         }
         assertThat(statements).isEqualTo(2);

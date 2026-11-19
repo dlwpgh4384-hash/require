@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { BillingPage } from "../bills/BillingPage";
+import { BillingTitleActions } from "../bills/BillingWorkspace";
 import { ProjectPage } from "../projects/ProjectPage";
 import { AssignmentPage } from "../assignments/AssignmentPage";
 import { WithdrawalPage } from "../withdrawals/WithdrawalPage";
@@ -50,6 +51,7 @@ export const screenRegistry: readonly ScreenEntry[] = [
   {
     id: "UI-13",
     Page: () => <BillingPage />,
+    TitleActions: () => <BillingTitleActions />,
     rootTestId: "billing-page",
     hasInputs: false,
   },

@@ -42,9 +42,10 @@ public class BillCheckService {
     }
 
     public CheckResult getCommonBillChecks(String requestedMonth) {
+        String lastClosed=mapper.lastClosedMonth();
         String month=requestedMonth;
         if (month==null) {
-            month=mapper.lastClosedMonth();
+            month=lastClosed;
             if (month==null) month=calendar.toDatabaseMonth(calendar.currentMonth());
         }
         month(month);
@@ -53,7 +54,14 @@ public class BillCheckService {
         var summary=new Summary(items.size(),count(items,"청구 없음"),count(items,"적게 청구"),
             count(items,"많이 청구"),count(items,"맞음"));
         var formula=rules.definitions().stream().filter(d -> "식-88".equals(d.calcId())).findFirst().orElseThrow();
-        return new CheckResult(month,summary,items,formula.formula()+"\n"+formula.details(),!closed);
+        // 시안 점검 월 단추: 올해 청구가 있는 달 중 이번 달까지(+ 지금 고른 달)
+        String current=calendar.toDatabaseMonth(calendar.currentMonth());
+        var months=new TreeSet<String>();
+        var found=mapper.billMonths(current.substring(0,4),current);
+        if (found!=null) months.addAll(found);
+        months.add(month);
+        return new CheckResult(month,summary,items,formula.formula()+"\n"+formula.details(),!closed,
+            List.copyOf(months),lastClosed);
     }
 
     private static int count(List<CheckRow> rows,String judgement) {
@@ -67,6 +75,7 @@ public class BillCheckService {
                 sources.computeIfAbsent(source.projectId(),key -> new ArrayList<>()).add(source);
         }
         var invoices=mapper.invoices(month);
+        boolean thisYear=month(month).getYear()==calendar.today().getYear();
         var result=new ArrayList<CheckRow>();
         for (var entry:sources.entrySet()) {
             var inputs=entry.getValue();
@@ -76,44 +85,48 @@ public class BillCheckService {
                 m.projectType(),m.inputType(),m.monthlyMm(),m.billingPrice())).toList());
             BigDecimal billed=bills.stream().map(b -> b.supplyAmount).reduce(BigDecimal.ZERO,BigDecimal::add);
             var check=rules.check(reference,billed,month(month));
-            var latest=bills.stream().max(Comparator.comparingInt((Invoice b) -> b.billOrder)
-                .thenComparing(b -> b.billId)).orElse(null);
+            // 시안 bchkFix: 고칠 청구는 그 달 청구 중 청구일이 가장 늦은 것
+            var latest=bills.stream().max(Comparator.comparing((Invoice b) -> b.billDate)
+                .thenComparingInt(b -> b.billOrder).thenComparing(b -> b.billId)).orElse(null);
             String judgement=bills.isEmpty()?"청구 없음":check.judgement();
             String action="NONE";
-            if (reference.signum()>0 && bills.isEmpty()) {
-                if (closed || month(month).getYear()==calendar.today().getYear()) action="MISSING";
-            } else if (latest!=null && !"맞음".equals(judgement)) {
-                if (closed) action=check.difference().signum()>0?"ADDITIONAL":"DETAIL";
-                else if (month(month).getYear()==calendar.today().getYear()) action="CORRECTION";
+            // 마감한 달의 예외 처리(추가 청구·상세 안내)를 포함해 [청구 등록]·[청구 고치기]는 올해 달만
+            if (thisYear) {
+                if (reference.signum()>0 && bills.isEmpty()) action="MISSING";
+                else if (latest!=null && !"맞음".equals(judgement)) {
+                    if (closed) action=check.difference().signum()>0?"ADDITIONAL":"DETAIL";
+                    else action="CORRECTION";
+                }
             }
-            String explanation=explanation(inputs,month,check.difference());
-            if (closed && "많이 청구".equals(judgement))
-                explanation="마감한 달은 감액할 수 없습니다. 청구 상세를 확인해 주세요.";
             result.add(new CheckRow(first.projectId(),first.projectName(),first.projectType(),judgement,
                 (int)inputs.stream().map(Monthly::developerId).distinct().count(),
                 inputs.stream().map(Monthly::monthlyMm).reduce(BigDecimal.ZERO,BigDecimal::add),
-                reference,billed,check.difference(),explanation,latest==null?null:latest.billId,action));
+                reference,billed,check.difference(),explanation(judgement,inputs,month,reference,check.difference()),
+                latest==null?null:latest.billId,action));
         }
         result.sort(Comparator.comparing(CheckRow::projectName).thenComparing(CheckRow::projectId));
         return result;
     }
 
-    private String explanation(List<Monthly> inputs,String month,BigDecimal difference) {
-        var newcomers=new LinkedHashMap<String,BigDecimal>();
-        var names=new HashMap<String,String>();
-        for (var input:inputs) {
-            if (!calendar.toDatabaseMonth(YearMonth.from(input.inputStart())).equals(month)) continue;
-            BigDecimal amount=input.monthlyMm().multiply(input.billingPrice()).setScale(0,RoundingMode.DOWN);
-            newcomers.merge(input.developerId(),amount,BigDecimal::add);
-            names.put(input.developerId(),input.developerName());
-        }
-        return newcomers.entrySet().stream().filter(e -> difference.signum()>0 && e.getValue().compareTo(difference)==0)
-            .map(e -> "새 투입자 "+names.get(e.getKey())+"의 투입 금액과 차이가 같습니다.")
-            .findFirst().orElse("");
+    /**
+     * 시안 billCheck 설명: 청구 없음 「투입은 있는데 이 달 청구가 없습니다」, 금액 차이는 이 달 새로 투입한 사람의
+     * 금액이 차이와 max(1만 원, 투입 기준 금액의 1%) 안으로 같으면 그 사람들(이름(n.nn MM))을, 아니면 적게/많이 청구 안내.
+     */
+    private String explanation(String judgement,List<Monthly> inputs,String month,BigDecimal reference,BigDecimal difference) {
+        if ("청구 없음".equals(judgement)) return "투입은 있는데 이 달 청구가 없습니다";
+        if ("맞음".equals(judgement)) return "";
+        BigDecimal tolerance=new BigDecimal("10000").max(reference.multiply(new BigDecimal("0.01")));
+        var hits=inputs.stream().filter(input -> calendar.toDatabaseMonth(YearMonth.from(input.inputStart())).equals(month))
+            .filter(input -> input.monthlyMm().multiply(input.billingPrice()).setScale(0,RoundingMode.DOWN)
+                .subtract(difference).abs().compareTo(tolerance)<=0)
+            .map(input -> input.developerName()+"("+input.monthlyMm().setScale(2,RoundingMode.HALF_UP).toPlainString()+" MM)")
+            .toList();
+        if (!hits.isEmpty()) return "이 달 새로 투입한 "+String.join(", ",hits)+"이 청구에서 빠진 것으로 보입니다";
+        return difference.signum()>0?"투입 기준보다 적게 청구했습니다":"투입 기준보다 많이 청구했습니다";
     }
 
     public Input parse(JsonNode body) {
-        ClientRules.object(body,Set.of("projectId","checkMonth","vatRate","billDate","payDueDate","taxInvoiceNo"));
+        ClientRules.object(body,Set.of("projectId","checkMonth","vatRate","billDate","payDueDate","taxInvoiceNo","supplyAmount"));
         String project=ProjectRules.text(body,"projectId",20,true);
         String selected=ProjectRules.text(body,"checkMonth",6,true);
         month(selected);
@@ -121,9 +134,14 @@ public class BillCheckService {
         if (rate==null || !rate.isNumber()) throw CodeFailure.invalid("vatRate","부가세율을 입력해 주세요.");
         BillingCalculationRules.rate(rate.decimalValue(),"vatRate");
         LocalDate date=ProjectRules.date(body,"billDate"),due=ProjectRules.date(body,"payDueDate");
-        if (due.isBefore(date)) throw CodeFailure.invalid("payDueDate","입금 예정일은 청구일 이후여야 합니다.");
+        if (due.isBefore(date)) throw CodeFailure.invalid("payDueDate","입금 예정일이 청구일보다 빠릅니다.");
+        BigDecimal supply=null;
+        if (body.hasNonNull("supplyAmount")) {
+            supply=ProjectRules.money(body,"supplyAmount",true);
+            BillingCalculationRules.positiveMoney(supply,"supplyAmount");
+        }
         return new Input(project,selected,rate.decimalValue(),date,due,
-            ProjectRules.text(body,"taxInvoiceNo",30,false));
+            ProjectRules.text(body,"taxInvoiceNo",30,false),supply);
     }
 
     private YearMonth month(String value) {
@@ -162,15 +180,19 @@ public class BillCheckService {
                 throw CodeFailure.invalid("checkMonth","최근 청구가 변경되었습니다. 다시 조회해 주세요.");
             id=latest.billId;
             order=latest.billOrder;
-            supply=latest.supplyAmount.add(checked.difference());
+            supply=input.supplyAmount()!=null?input.supplyAmount():latest.supplyAmount.add(checked.difference());
             receipts=mapper.normalReceipts(id);
         } else {
-            supply="MISSING".equals(action)?checked.referenceAmount():checked.difference();
+            // 창에서 고친 공급가를 받는다(시안 「…고쳐서 등록할 수 있습니다」). 비우면 투입 기준 금액·차액.
+            supply=input.supplyAmount()!=null?input.supplyAmount()
+                :"MISSING".equals(action)?checked.referenceAmount():checked.difference();
             var identity=numbers.allocate(input.projectId(),input.checkMonth());
             order=identity.billOrder();
             id=identity.billId();
         }
         var amounts=rules.amounts(supply,input.vatRate());
+        if (amounts.totalAmount().compareTo(receipts)<0)
+            throw CodeFailure.invalid("supplyAmount","합계가 이미 받은 금액("+receipts.toPlainString()+"원)보다 작습니다.");
         rules.balance(amounts.totalAmount(),receipts);
         var write=new Write(id,order,input,amounts,receipts,actor.userId());
         int changed="CORRECTION".equals(action)?mapper.correct(write):mapper.insert(write);
@@ -182,14 +204,15 @@ public class BillCheckService {
         var b=mapper.invoice(id);
         if (b==null) throw new IllegalStateException("저장한 청구를 조회하지 못했습니다.");
         LocalDate today=calendar.today();
-        boolean editable=!b.cancelled && month(b.billMonth).getYear()==today.getYear() && !mapper.closed(b.billMonth);
+        boolean thisYear=month(b.billMonth).getYear()==today.getYear();
+        boolean editable=!b.cancelled && thisYear && !mapper.closed(b.billMonth);
         boolean receive=!b.cancelled && b.unpaidAmount.signum()>0
             && !mapper.closed(calendar.toDatabaseMonth(calendar.currentMonth()));
         boolean latest=id.equals(mapper.latestProjectBill(b.projectId));
-        boolean quick=editable && latest && "ING".equals(b.projectStatus)
-            && Set.of("MO","DP","TK").contains(b.projectType);
-        boolean nextAllowed=quick && Set.of("MO","DP").contains(b.projectType)
+        boolean quick=!b.cancelled && thisYear && latest && "ING".equals(b.projectStatus)
+            && Set.of("MO","DP","TK").contains(b.projectType) && b.projectEnd!=null
             && !month(b.billMonth).plusMonths(1).isAfter(YearMonth.from(b.projectEnd));
+        boolean nextAllowed=quick && Set.of("MO","DP").contains(b.projectType);
         var receipts=mapper.receipts(id);
         boolean canCancel=editable && receipts.stream().noneMatch(r -> !r.cancelled());
         var bill=new Bill(b.billId,b.projectId,b.projectName,b.customerName,b.billOrder,b.billMonth,
@@ -198,7 +221,7 @@ public class BillCheckService {
             b.cancelled,b.cancelReason,b.cancelledBy,b.cancelledAt,
             rules.dunningStep(b.cancelled,b.unpaidAmount,b.payDueDate,today),
             (int)Math.max(0,ChronoUnit.DAYS.between(b.payDueDate,today)),editable,canCancel,receive,
-            quick,nextAllowed);
+            quick,nextAllowed,b.modifiedAt);
         return new Detail(bill,receipts,b.taxInvoiceNo==null || b.taxInvoiceNo.isBlank());
     }
 }

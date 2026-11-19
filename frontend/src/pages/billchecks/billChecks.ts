@@ -32,6 +32,10 @@ export interface BillCheckResult {
   items: BillCheckRow[];
   calculationMethod: string;
   plannedBasis: boolean;
+  /** 점검 월 단추(YYYYMM, 오름차순): 올해 청구가 있는 달 중 이번 달까지 + 고른 달. */
+  months: string[];
+  /** 마지막 마감 월. 이보다 뒤 달은 「(진행 중)」. */
+  lastClosedMonth: string | null;
 }
 export interface BillCheckInput {
   projectId: string;
@@ -40,6 +44,8 @@ export interface BillCheckInput {
   billDate: string;
   payDueDate: string;
   taxInvoiceNo: string | null;
+  /** 창에서 고친 공급가. */
+  supplyAmount?: number;
 }
 export interface BillCheckDetail {
   bill: {
@@ -99,6 +105,7 @@ const command = (action: string, input: BillCheckInput) =>
       billDate: input.billDate,
       payDueDate: input.payDueDate,
       taxInvoiceNo: input.taxInvoiceNo,
+      ...(input.supplyAmount != null ? { supplyAmount: input.supplyAmount } : {}),
     }),
   });
 export const postCommonBillCheckMissing = (input: BillCheckInput) =>

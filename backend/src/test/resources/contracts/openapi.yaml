@@ -7852,6 +7852,63 @@ paths:
       x-state-transitions:
       - 미등록 -> 미수(계산 상태); 새 CNCL_YN=N
       - 동월미취소존재 첫제출 -> 경고·저장없음; 재확인 -> 새 청구
+  /api/common/bills/excel:
+    get:
+      operationId: getCommonBillsExcel
+      summary: 청구 목록 엑셀 다운로드(SFR-011)
+      description: 청구 목록과 같은 조건(year·status·billMonth·projectId)의 전체 결과를 목록 순서(청구일 최신순) 그대로 xlsx로 내려준다. 열은 목록 열(청구번호·프로젝트·차수·청구일·공급가·부가세·합계·입금액·미수금·입금 예정일·상태·미수 알림). 파일 1행에 받은 사람·한국 시각, 파일 이름 「청구·입금_{year}년_다운로드일시.xlsx」, 접근 기록 DNLD(화면 UI-13).
+      security: []
+      parameters:
+      - name: year
+        in: query
+        required: true
+        schema:
+          type: integer
+        description: 조회 연도
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [PAID, UNPAID, LATE, CNCL]
+        description: BILL_STAT 계산 상태
+      - name: billMonth
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^[0-9]{6}$
+        description: 청구월(YYYYMM)
+      - name: projectId
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 기존 프로젝트 식별자
+      responses:
+        '200':
+          description: 청구 목록 엑셀 파일(0건이면 머리글만)
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: 기존 ExcelExportService 파일 이름·인코딩 관례(filename*=UTF-8'')
+            X-Total-Count:
+              schema:
+                type: integer
+              description: 파일에 담은 조회 결과 건수
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: year 누락/형식 또는 status·billMonth·projectId 형식 오류; 해당 필드 오류 반환, 파일·접근 기록 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/common/bill-options:
     get:
       operationId: getCommonBillOptions
@@ -8002,8 +8059,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿈(modifiedAt 불일치). 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」 업무행은 그대로다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
       x-business-rules:
-      - 올해·미마감·미취소 청구만 수정. 프로젝트·청구월·BILL_ORD 불변.
+      - 올해·미마감·미취소 청구만 수정. 프로젝트·청구월·BILL_ORD 불변. modifiedAt이 지금 값과 다르면 409.
       - 재계산 합계는 정상 입금합계 이상. 세율·예정일 검증은 등록과 동일.
       x-side-effects:
       - TB_BL_BILL 공급가/세율/세액/합계/예정일/번호 및 미수금 갱신; TB_BL_RCPT 원행 불변.
@@ -8066,8 +8129,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿈(modifiedAt 불일치). 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」 업무행은 그대로다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
       x-business-rules:
-      - 올해·청구월미마감·정상입금0건만 취소. 사유 필수. 입금 있으면 먼저 입금취소.
+      - 올해·청구월미마감·정상입금0건만 취소. 사유 필수. 입금 있으면 먼저 입금취소. modifiedAt이 지금 값과 다르면 409.
       - 원행·번호·차수는 보존하고 집계/미수/누락/알림에서 제외.
       x-side-effects:
       - TB_BL_BILL CNCL_YN=Y·CNCL_RSN·CNCL_USER_ID·CNCL_DTTM 저장. 삭제없음.
@@ -8182,8 +8251,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿈(modifiedAt 불일치). 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」 업무행은 그대로다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
       x-business-rules:
-      - 입금일이 속한달 미마감만 취소. 청구월 마감은 무관. 사유필수·삭제없음.
+      - 입금일이 속한달 미마감만 취소. 청구월 마감은 무관. 사유필수·삭제없음. modifiedAt이 지금 값과 다르면 409.
       - 정상입금만 한번 취소하고 동일 취소로 잔액을 두번 늘리지 않는다. 재요청 응답세부는 OQ-RETRY-013.
       x-side-effects:
       - TB_BL_RCPT 취소사유/처리자/시각 보존·TB_BL_BILL 정상입금합계 감소/미수증가/상태재판정.
@@ -8595,6 +8670,7 @@ components:
       - canReceive
       - canCopy
       - canNextMonth
+      - modifiedAt
       properties:
         billId:
           type: string
@@ -8659,6 +8735,10 @@ components:
           type: boolean
         canNextMonth:
           type: boolean
+        modifiedAt:
+          type: string
+          format: date-time
+          description: 마지막 수정 시각(없으면 등록 시각). 수정·취소 요청에 그대로 보낸다(00-1 동시 수정).
     CommonBillingReceipt:
       type: object
       required:
@@ -8670,6 +8750,7 @@ components:
       - cancelledBy
       - cancelledAt
       - canCancel
+      - modifiedAt
       properties:
         receiptId:
           type: string
@@ -8692,6 +8773,10 @@ components:
           nullable: true
         canCancel:
           type: boolean
+        modifiedAt:
+          type: string
+          format: date-time
+          description: 마지막 수정 시각(없으면 등록 시각). 수정·취소 요청에 그대로 보낸다(00-1 동시 수정).
     CommonBillingDetail:
       type: object
       required:
@@ -8809,6 +8894,7 @@ components:
       - vatRate
       - billDate
       - payDueDate
+      - modifiedAt
       properties:
         supplyAmount:
           type: number
@@ -8828,15 +8914,24 @@ components:
           type: string
           maxLength: 30
           nullable: true
+        modifiedAt:
+          type: string
+          format: date-time
+          description: 화면이 읽은 modifiedAt. 지금 값과 다르면 409.
     CommonBillingCancelInput:
       type: object
       required:
       - reason
+      - modifiedAt
       properties:
         reason:
           type: string
           minLength: 1
           maxLength: 500
+        modifiedAt:
+          type: string
+          format: date-time
+          description: 화면이 읽은 modifiedAt. 지금 값과 다르면 409.
     CommonBillingReceiptInput:
       type: object
       required:
@@ -8865,11 +8960,16 @@ components:
       type: object
       required:
       - reason
+      - modifiedAt
       properties:
         reason:
           type: string
           minLength: 1
           description: 입금 취소 사유. 물리 최대길이는 OQ-DATA-013에서 DDL 대조.
+        modifiedAt:
+          type: string
+          format: date-time
+          description: 화면이 읽은 modifiedAt. 지금 값과 다르면 409.
     CommonBillingReceiptResult:
       type: object
       required:
@@ -8894,6 +8994,7 @@ components:
       - defaultPayDueDate
       - estimatedSupplyAmount
       - vatRate
+      - monthClosed
       properties:
         projects:
           type: array
@@ -8938,6 +9039,10 @@ components:
           nullable: true
         vatRate:
           type: number
+          description: 운영 기준값 VAT_RT(그 달 적용분), 없으면 10
+        monthClosed:
+          type: boolean
+          description: billMonth(없으면 이번 달)가 마감한 달인지. 마감한 달에는 새 청구를 만들 수 없다.
     CommonBillingCheckRow:
       type: object
       required:
@@ -8987,6 +9092,8 @@ components:
       - items
       - calculationMethod
       - plannedBasis
+      - months
+      - lastClosedMonth
       properties:
         checkMonth:
           type: string
@@ -9017,6 +9124,15 @@ components:
           type: string
         plannedBasis:
           type: boolean
+        months:
+          type: array
+          description: 점검 월 단추(올해 청구가 있는 달 중 이번 달까지와 지금 고른 달, 오름차순 YYYYMM)
+          items:
+            type: string
+        lastClosedMonth:
+          type: string
+          nullable: true
+          description: 마지막으로 마감한 달(YYYYMM). 이보다 뒤 달은 「진행 중」
     CommonBillingCheckInput:
       type: object
       required:
@@ -9046,6 +9162,10 @@ components:
           type: string
           maxLength: 30
           nullable: true
+        supplyAmount:
+          type: number
+          nullable: true
+          description: 창에서 고친 공급가(원 단위 양수). 비우면 투입 기준 금액·차액·맞춘 값으로 채운다.
     CommonBillingDunningHistory:
       type: object
       required:
@@ -9080,6 +9200,7 @@ components:
       - nextNotification
       - canResend
       - resendMessage
+      - canReceive
       properties:
         billId:
           type: string
@@ -9109,6 +9230,9 @@ components:
         resendMessage:
           type: string
           nullable: true
+        canReceive:
+          type: boolean
+          description: 이번 달이 마감 전이라 입금을 등록할 수 있는지(줄마다 상세를 다시 읽지 않는다)
     CommonBillingDunningResult:
       type: object
       required:
@@ -9122,6 +9246,7 @@ components:
             required:
             - step
             - recipients
+            - offsetDays
             properties:
               step:
                 type: integer
@@ -9129,6 +9254,9 @@ components:
                 type: array
                 items:
                   type: string
+              offsetDays:
+                type: integer
+                description: 입금 예정일 + n일(운영 기준값 DUN_D1~3)
         items:
           type: array
           items:

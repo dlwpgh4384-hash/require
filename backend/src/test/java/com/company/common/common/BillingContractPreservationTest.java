@@ -48,7 +48,9 @@ class BillingContractPreservationTest {
     @Test
     void excludedBillingExportAttendanceAndConfirmationPathsAreAbsent() {
         var paths = resource("contracts/openapi.yaml").path("paths");
-        for (String path : List.of("/api/common/bills/excel", "/api/common/bills/attendance",
+        // 2026-11-19 청구 목록 엑셀(SFR-011)은 사용자 결정으로 더함: 목록 도구줄 [엑셀 다운로드]
+        assertThat(paths.path("/api/common/bills/excel").has("get")).isTrue();
+        for (String path : List.of("/api/common/bills/attendance",
                 "/api/common/bills/{billId}/confirm", "/api/common/customer-receivables")) {
             assertThat(paths.has(path)).as(path).isFalse();
         }

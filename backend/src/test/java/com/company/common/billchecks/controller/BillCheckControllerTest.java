@@ -131,8 +131,9 @@ class BillCheckControllerTest {
             invoices.get(write.billId()).projectEnd=LocalDate.of(2026,11,30);
             return 1;
         }).when(mapper).correct(any());
+        // 명세 SFR-113-12: 다음 달이 계약 종료월을 넘으면 빠른 청구 단추 둘 다 「–」
         command("correction",input()).andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.bill.canCopy").value(true))
+            .andExpect(jsonPath("$.data.bill.canCopy").value(false))
             .andExpect(jsonPath("$.data.bill.canNextMonth").value(false));
     }
     @Test void correctionResponseUsesProjectStatusNotTodayForQuickActions()throws Exception {
@@ -156,12 +157,24 @@ class BillCheckControllerTest {
     }
     @Test void correctionAddsTotalDifferenceToMaximumOrderNotWholeReference()throws Exception {
         eligible("correction");var older=invoices.get("older");
-        invoices.get("older").billDate=LocalDate.of(2026,11,30);
         var result=data(command("correction",input()).andExpect(status().isOk()));
         assertThat(result.path("bill").path("billId").asText()).isEqualTo("latest");
         assertThat(result.path("bill").path("supplyAmount").decimalValue()).isEqualByComparingTo("7000");
         assertThat(invoices.get("older")).isSameAs(older);
         verify(mapper,never()).insert(any());
+    }
+    @Test void correctionTargetsNewestBillDateInTheMonth()throws Exception {
+        // 시안 bchkFix: 그 달 청구 중 청구일이 가장 늦은 청구를 고친다(차수 최대가 아님)
+        eligible("correction");var latest=invoices.get("latest");
+        invoices.get("older").billDate=LocalDate.of(2026,11,30);
+        var result=data(command("correction",input()).andExpect(status().isOk()));
+        assertThat(result.path("bill").path("billId").asText()).isEqualTo("older");
+        assertThat(result.path("bill").path("supplyAmount").decimalValue()).isEqualByComparingTo("8000");
+        assertThat(invoices.get("latest")).isSameAs(latest);
+    }
+    @Test void editedSupplyFromFormIsAccepted()throws Exception {
+        var result=data(command("missing",input().put("supplyAmount",9500)).andExpect(status().isOk()));
+        assertThat(result.path("bill").path("supplyAmount").decimalValue()).isEqualByComparingTo("9500");
     }
     @ParameterizedTest @ValueSource(strings={"missing","additional","correction"})
     void publicCommandsUseDevelopmentAdmin(String action)throws Exception {
@@ -219,6 +232,7 @@ class BillCheckControllerTest {
         command("missing",input()).andExpect(status().isBadRequest());verify(mapper,never()).insert(any());
     }
     @ParameterizedTest @ValueSource(strings={"supplyAmount","billId","allowClosedMonth","duplicateConfirmed"})
+    // supplyAmount는 창에서 고친 공급가(숫자)만 받는다. true 같은 값은 그 칸 오류.
     void inputCannotOverrideServerIdentityOrEligibility(String field)throws Exception {
         command("missing",input().put(field,true)).andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value(field));verify(mapper,never()).insert(any());
@@ -232,15 +246,14 @@ class BillCheckControllerTest {
         command("missing",input()).andExpect(status().isBadRequest());verify(mapper,never()).insert(any());
     }
     @ParameterizedTest @ValueSource(strings={"missing","additional"})
-    void explicitlySelectedPriorYearClosedMonthCanCreateWithoutEditingOldContent(String action)throws Exception {
+    void priorYearClosedMonthOffersNoActionAndCannotCreate(String action)throws Exception {
+        // 사용자 결정(2026-11-19): 마감한 달의 예외(청구 등록·추가 청구)는 올해 달만
         closed.add("202511");
         if (action.equals("additional")) bill("prior-original",1,"5000").billMonth="202511";
-        when(numbers.nextMonthNumber("202511")).thenReturn(2);
-        var result=data(command(action,input().put("checkMonth","202511")).andExpect(status().isOk()));
-        assertThat(result.path("bill").path("billMonth").asText()).isEqualTo("202511");
-        assertThat(result.path("bill").path("canEdit").asBoolean()).isFalse();
-        if (action.equals("additional")) assertThat(invoices.get("prior-original").supplyAmount).isEqualByComparingTo("5000");
-        verify(mapper,never()).correct(any());
+        var rows=data(mvc.perform(get("/api/common/bill-checks").param("checkMonth","202511")).andExpect(status().isOk())).path("items");
+        assertThat(rows.get(0).path("allowedAction").asText()).isEqualTo("NONE");
+        command(action,input().put("checkMonth","202511")).andExpect(status().isBadRequest());
+        verify(mapper,never()).insert(any());verify(mapper,never()).correct(any());
     }
     @Test void priorYearOpenMonthCannotCorrect()throws Exception {
         bill("prior-original",1,"5000").billMonth="202511";
@@ -267,7 +280,12 @@ class BillCheckControllerTest {
     }
     @Test void thresholdEqualityIsMatchedAndNewcomerExplanationUsesRealName()throws Exception {
         bill("latest",1,"9900");assertThat(checks().path("items").get(0).path("judgement").asText()).isEqualTo("맞음");
-        invoices.clear();assertThat(checks().path("items").get(0).path("explanation").asText()).contains("김투입");
+        invoices.clear();assertThat(checks().path("items").get(0).path("explanation").asText()).isEqualTo("투입은 있는데 이 달 청구가 없습니다");
+        monthly.add(new Monthly("project","점검 프로젝트","MO","old","기존인",LocalDate.of(2026,1,1),"NEW",
+            BigDecimal.ONE,new BigDecimal("10000"),new BigDecimal("10000")));
+        bill("latest",1,"10000");
+        assertThat(checks().path("items").get(0).path("explanation").asText())
+            .isEqualTo("이 달 새로 투입한 김투입(1.00 MM)이 청구에서 빠진 것으로 보입니다");
     }
     @ParameterizedTest @ValueSource(strings={"202600","202613","000001","20261","bad"})
     void invalidCalendarMonthHasFieldError(String month)throws Exception {

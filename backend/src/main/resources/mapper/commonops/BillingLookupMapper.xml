@@ -34,8 +34,11 @@
     FROM TB_PJ_ASGN_MON m JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID
     JOIN TB_PJ_PROJ p ON p.PROJ_ID=m.PROJ_ID
     WHERE m.INPUT_YM=#{month} AND m.PROJ_ID=#{projectId}
-      AND p.CTRT_TYPE_CD IN ('MO','DP') AND a.INPUT_TYPE_CD&lt;&gt;'FREE'
+      AND p.CTRT_TYPE_CD IN ('MO','DP') AND a.INPUT_TYPE_CD&lt;&gt;'FREE' AND a.ASGN_STAT_CD='ACT'
     ORDER BY m.ASGN_ID
+  </select>
+  <select id="closed" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_CL_CLOSE c WHERE c.CLOSE_YM=#{month} AND c.CLOSE_STAT_CD='CLOSE')
   </select>
   <resultMap id="unpaid" type="com.company.common.commonops.mapper.BillingLookupMapper$UnpaidBill"><constructor>
     <idArg column="billId" javaType="string"/><arg column="projectId" javaType="string"/>

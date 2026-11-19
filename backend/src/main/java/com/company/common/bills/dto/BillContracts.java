@@ -15,10 +15,10 @@ public final class BillContracts {
         BigDecimal unpaidAmount, LocalDate payDueDate, String taxInvoiceNo, String status,
         boolean cancelled, String cancelReason, String cancelledBy, Instant cancelledAt,
         Integer dunningStep, int daysOverdue, boolean canEdit, boolean canCancel,
-        boolean canReceive, boolean canCopy, boolean canNextMonth) {}
+        boolean canReceive, boolean canCopy, boolean canNextMonth, Instant modifiedAt) {}
     public record Receipt(String receiptId, LocalDate receiptDate, BigDecimal amount,
         boolean cancelled, String cancelReason, String cancelledBy, Instant cancelledAt,
-        boolean canCancel) {}
+        boolean canCancel, Instant modifiedAt) {}
     public record Detail(Bill bill, List<Receipt> receipts, boolean missingTaxInvoiceNumber) {}
     public record Summary(int yearBillCount, BigDecimal yearBillTotal, BigDecimal currentMonthBillTotal,
         int unpaidCount, BigDecimal unpaidTotal, int overdueCount) {}
@@ -31,6 +31,10 @@ public final class BillContracts {
     }
     public record Values(BigDecimal supplyAmount, BigDecimal vatRate, LocalDate billDate,
         LocalDate payDueDate, String taxInvoiceNo) {}
+    /** 수정·취소 요청: 화면이 읽은 수정 시각(modifiedAt)이 지금 값과 다르면 409. */
+    public record EditInput(Values values, Instant modifiedAt) {}
+    public record CancelInput(String reason, Instant modifiedAt) {}
+    public record ExcelFile(byte[] bytes, String fileName, int count) {}
     public record CreateInput(String projectId, String billMonth, Values values,
         String sourceBillId, boolean duplicateConfirmed) {}
     public record DunningHistory(int step, LocalDate sentDate, String recipientDescription,

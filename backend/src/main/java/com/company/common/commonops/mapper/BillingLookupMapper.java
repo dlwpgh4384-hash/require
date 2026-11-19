@@ -23,4 +23,5 @@ public interface BillingLookupMapper {
     List<UnpaidBill> overdue(@Param("today") LocalDate today);
     List<HistoryRow> history(@Param("today") LocalDate today);
     List<StatusOption> recipientRoles();
+    boolean closed(@Param("month") String month);
 }

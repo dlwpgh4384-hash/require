@@ -76,7 +76,7 @@ class BillCheckPersistenceTest {
             var factory=new SqlSessionFactoryBean();factory.setDataSource(source);
             factory.setMapperLocations(new ClassPathResource("mapper/projects/ProjectMapper.xml"),
                 new ClassPathResource("mapper/billchecks/BillCheckMapper.xml"),new ClassPathResource("mapper/CalculationRuleMapper.xml"),
-                new ClassPathResource("mapper/common/BillingNumberMapper.xml"));
+                new ClassPathResource("mapper/common/BillingNumberMapper.xml"),new ClassPathResource("mapper/UserPreferencePeriodSourceMapper.xml"));
             var config=new org.apache.ibatis.session.Configuration();config.setMapUnderscoreToCamelCase(false);
             config.setAutoMappingUnknownColumnBehavior(org.apache.ibatis.session.AutoMappingUnknownColumnBehavior.FAILING);
             factory.setConfiguration(config);return factory.getObject();
@@ -86,6 +86,9 @@ class BillCheckPersistenceTest {
         @Bean BillCheckMapper billCheckMapper(SqlSessionTemplate session) { return session.getMapper(BillCheckMapper.class); }
         @Bean BillingNumberMapper billingNumberMapper(SqlSessionTemplate session) { return session.getMapper(BillingNumberMapper.class); }
         @Bean CalculationRuleMapper calculationRuleMapper(SqlSessionTemplate session) { return session.getMapper(CalculationRuleMapper.class); }
+        @Bean com.company.common.preferences.mapper.UserPreferencePeriodSourceMapper userPreferencePeriodSourceMapper(SqlSessionTemplate session) {
+            return session.getMapper(com.company.common.preferences.mapper.UserPreferencePeriodSourceMapper.class);
+        }
         @Bean DataSourceTransactionManager transactionManager(DataSource source) { return new DataSourceTransactionManager(source); }
         @Bean BusinessCalendar businessCalendar() {
             return new BusinessCalendar(Clock.fixed(Instant.parse("2026-11-15T01:00:00Z"),ZoneOffset.UTC));
@@ -197,5 +200,14 @@ class BillCheckPersistenceTest {
         Object before=bills(),monthly=months();
         command("additional",input()).andExpect(status().is5xxServerError());
         assertThat(bills()).isEqualTo(before);assertThat(months()).isEqualTo(monthly);
+    }
+    @Test void cancelledAssignmentIsLeftOutEvenInClosedMonth()throws Exception {
+        // 사용자 결정(2026-11-19): 투입 기준 금액은 취소 안 된 배정(ASGN_STAT_CD='ACT')만, 마감한 달도 같다.
+        String job=db.queryForObject("SELECT min(CODE) FROM TB_SY_CODE WHERE CODE_GRP_ID='JOB' AND USE_YN='Y'",String.class);
+        db.update("INSERT INTO TB_PJ_ASGN(ASGN_ID,PROJ_ID,DEV_ID,JOB_CD,INPUT_BGN_DT,INPUT_END_DT,CTRT_MM,BILL_UPRC,INPUT_TYPE_CD,EXT_CNT,EARLY_WTHDR_YN,ASGN_STAT_CD,REG_USER_ID) VALUES('check-cancelled','check-project','check-person',?,'2025-01-01','2027-12-31',1,5000000,'NEW',0,'N','CNCL','admin')",job);
+        db.update("INSERT INTO TB_PJ_ASGN_MON(ASGN_ID,INPUT_YM,DEV_ID,PROJ_ID,INPUT_DAY_CNT,MON_MM,APLY_UPRC,SALES_AMT,FIX_YN,REG_USER_ID) VALUES('check-cancelled','202611','check-person','check-project',30,1,5000000,5000000,'N','admin')");
+        closeMonth();
+        var rows=data(mvc.perform(get("/api/common/bill-checks").param("checkMonth","202611")).andExpect(status().isOk())).path("items");
+        assertThat(rows.get(0).path("referenceAmount").decimalValue()).isEqualByComparingTo("8000000");
     }
 }

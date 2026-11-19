@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ToastKind } from "../../shared/feedback/Dialog";
 import {
+  Badge,
   ListView,
-  useListColumns,
   useListPresentation,
   type ListColumn,
   type ListSort,
@@ -9,32 +10,58 @@ import {
 import { BillingReceiptDialog } from "./BillingReceiptDialog";
 import {
   getCommonBillDunning,
-  getBillingReceivable,
   postBillingDunningResend,
   type BillingDunningResult,
   type BillingDunningRow,
   type BillingReceivable,
 } from "./billingLookups";
 import "./billingLookup.css";
+import "../bills/bills.css";
 
-/** UI-13 / SCR-UI-13: mounted only on the current-year 미수 알림 tab by BillingPage. */
+/** 시안 DUN: 단계별 받는 사람(이름은 시안 글자 그대로). */
+const RECEIVERS: Record<number, string> = {
+  1: "영업 담당자(PM)",
+  2: "영업 파트장",
+  3: "경영진·재무",
+};
+
+/** 시안 dunBadge: 1단계 전(1~6일)은 「n일 지남」, 단계가 있으면 「n단계 · n일」. */
+export function DunningBadge({
+  step,
+  days,
+}: {
+  step: number | null;
+  days: number;
+}) {
+  if (days <= 0) return <span className="bill-sub">–</span>;
+  if (step == null) return <Badge kind="neutral">{days}일 지남</Badge>;
+  return (
+    <Badge kind={step >= 2 ? "bad" : "warn"}>
+      {step}단계 · {days}일
+    </Badge>
+  );
+}
+
+/** UI-13 미수 알림 탭(시안 dunView, SFR-113-07). 목록은 요청 한 번으로 읽는다. */
 export function BillingDunningPanel({
   refreshKey = 0,
+  soonCount = 0,
   onOpenBill,
   onChanged,
+  onNotice,
 }: {
   refreshKey?: number;
+  /** 곧 예정일(7일 안) 건수: 화면이 청구 목록에서 센다. */
+  soonCount?: number;
   onOpenBill: (billId: string) => void;
   onChanged?: () => void;
+  onNotice?: (message: string, kind?: ToastKind) => void;
 }) {
   const [data, setData] = useState<BillingDunningResult | null>(null);
   const [failure, setFailure] = useState("");
-  const [actionFailure, setActionFailure] = useState("");
-  const [notice, setNotice] = useState("");
   const [revision, setRevision] = useState(0);
   const [pending, setPending] = useState<string | null>(null);
   const sending = useRef(false);
-  const [receivable, setReceivable] = useState<BillingReceivable[]>([]);
   const [receipts, setReceipts] = useState<BillingReceivable[] | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [page, setPage] = useState(1);
@@ -42,32 +69,13 @@ export function BillingDunningPanel({
   const presentation = useListPresentation();
   useEffect(() => {
     const controller = new AbortController();
-    setData(null);
     setFailure("");
-    setActionFailure("");
-    setReceivable([]);
     setSelected([]);
-    setPage(1);
     void getCommonBillDunning(controller.signal).then(
-      async (result) => {
-        if (controller.signal.aborted) return;
-        setData(result);
-        // Dunning's wire contract has no receipt permission flag: use the approved detail response.
-        try {
-          const details = await Promise.all(
-            result.items.map((row) =>
-              getBillingReceivable(row.billId, controller.signal),
-            ),
-          );
-          if (!controller.signal.aborted)
-            setReceivable(details.map((detail) => detail.bill));
-        } catch (error) {
-          if (!controller.signal.aborted)
-            setActionFailure(
-              error instanceof Error
-                ? error.message
-                : "입금 가능 여부를 불러오지 못했습니다.",
-            );
+      (result) => {
+        if (!controller.signal.aborted) {
+          setData(result);
+          setPage(1);
         }
       },
       (error) => {
@@ -85,34 +93,41 @@ export function BillingDunningPanel({
     if (sending.current) return;
     sending.current = true;
     setPending(row.billId);
-    setActionFailure("");
-    setNotice("");
     try {
-      await postBillingDunningResend(row.billId);
-      setNotice(
-        "다시 알림을 보냈습니다. 개발 환경의 메일은 로컬 보관함 배달입니다.",
+      const sent = await postBillingDunningResend(row.billId);
+      onNotice?.(
+        `${sent.history.recipientDescription}에게 미수 알림을 다시 보냈습니다. 보낸 알림에 「${sent.history.step}단계(다시)」로 남았습니다.`,
       );
       setRevision((value) => value + 1);
       onChanged?.();
     } catch (error) {
-      setActionFailure(
-        error instanceof Error
-          ? error.message
-          : "다시 알림을 보내지 못했습니다.",
+      onNotice?.(
+        error instanceof Error ? error.message : "다시 알림을 보내지 못했습니다.",
+        "warn",
       );
     } finally {
       sending.current = false;
       setPending(null);
     }
   }
+  const receivable = (row: BillingDunningRow): BillingReceivable => ({
+    billId: row.billId,
+    projectName: row.projectName,
+    unpaidAmount: row.unpaidAmount,
+    canReceive: row.canReceive,
+  });
   const receive = (ids: string[]) => {
-    const bills = receivable.filter(
-      (bill) =>
-        ids.includes(bill.billId) && bill.canReceive && bill.unpaidAmount > 0,
-    );
+    const bills = (data?.items ?? [])
+      .filter((row) => ids.includes(row.billId) && row.canReceive && row.unpaidAmount > 0)
+      .map(receivable);
     if (bills.length) setReceipts(bills);
   };
   const columns: ListColumn<BillingDunningRow>[] = [
+    {
+      key: "projectName",
+      label: "프로젝트",
+      required: true,
+    },
     {
       key: "billId",
       label: "청구번호",
@@ -122,54 +137,64 @@ export function BillingDunningPanel({
           type="button"
           className="ls-link"
           data-testid={`billing-dunning-detail-${row.billId}`}
-          onClick={() => onOpenBill(row.billId)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenBill(row.billId);
+          }}
         >
           {row.billId}
         </button>
       ),
     },
-    { key: "projectName", label: "프로젝트" },
     {
       key: "unpaidAmount",
       label: "미수금",
       align: "right",
-      render: (row) => row.unpaidAmount.toLocaleString("ko-KR"),
+      render: (row) => (
+        <span className="bill-overdue">{row.unpaidAmount.toLocaleString("ko-KR")}</span>
+      ),
     },
     { key: "payDueDate", label: "입금 예정일" },
     {
       key: "daysOverdue",
       label: "지난 일수",
+      align: "right",
       render: (row) => `${row.daysOverdue}일`,
     },
     {
       key: "currentStep",
       label: "지금 단계",
-      render: (row) =>
-        row.currentStep == null ? "–" : `${row.currentStep}단계`,
+      render: (row) => <DunningBadge step={row.currentStep} days={row.daysOverdue} />,
     },
     {
       key: "history",
       label: "보낸 알림",
       sortable: false,
-      render: (row) => (
-        <div>
-          {row.history.map((entry, index) => (
-            <div key={`${entry.sentDate}-${index}`}>
-              {entry.sentDate} {entry.step}단계{entry.resend ? "(다시)" : ""} →{" "}
-              {entry.recipientDescription} · {entry.sendMethodCode}
-            </div>
-          ))}
-        </div>
-      ),
+      render: (row) =>
+        row.history?.length ? (
+          <div className="bill-sub bill-wrap">
+            {(row.history ?? []).map((entry, index) => (
+              <div key={`${entry.sentDate}-${index}`}>
+                {entry.sentDate.slice(5)} {entry.step}단계{entry.resend ? "(다시)" : ""} →{" "}
+                {entry.recipientDescription}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span className="bill-sub">아직 없음</span>
+        ),
     },
     {
       key: "nextNotification",
       label: "다음 알림",
-      render: (row) => row.nextNotification ?? "–",
+      sortable: false,
+      render: (row) => (
+        <span className="bill-sub bill-wrap">{row.nextNotification ?? "마지막 단계"}</span>
+      ),
     },
     {
       key: "actions",
-      label: "처리",
+      label: "",
       sortable: false,
       render: (row) => (
         <div className="billing-row-actions">
@@ -179,24 +204,25 @@ export function BillingDunningPanel({
               className="ls-btn ls-btn-sm"
               data-testid={`billing-dunning-resend-${row.billId}`}
               disabled={pending !== null}
-              onClick={() => void resend(row)}
+              onClick={(event) => {
+                event.stopPropagation();
+                void resend(row);
+              }}
             >
-              {pending === row.billId ? "전송 중…" : "다시 알림"}
+              다시 알림
             </button>
           ) : (
-            row.resendMessage
+            row.resendMessage && <span className="bill-sub">{row.resendMessage}</span>
           )}
-          {receivable.some(
-            (bill) =>
-              bill.billId === row.billId &&
-              bill.canReceive &&
-              bill.unpaidAmount > 0,
-          ) && (
+          {row.canReceive && row.unpaidAmount > 0 && (
             <button
               type="button"
               className="ls-btn ls-btn-sm"
               data-testid={`billing-dunning-receive-${row.billId}`}
-              onClick={() => receive([row.billId])}
+              onClick={(event) => {
+                event.stopPropagation();
+                receive([row.billId]);
+              }}
             >
               입금 등록
             </button>
@@ -205,9 +231,8 @@ export function BillingDunningPanel({
       ),
     },
   ];
-  const settings = useListColumns("UI-13-dunning", columns);
   const rows = useMemo(() => {
-    const items = [...(data?.items ?? [])];
+    const items = [...(data?.items ?? [])].sort((a, b) => b.daysOverdue - a.daysOverdue);
     if (sort)
       items.sort((a, b) => {
         const left = a[sort.key as keyof BillingDunningRow];
@@ -223,41 +248,47 @@ export function BillingDunningPanel({
       });
     return items;
   }, [data, sort]);
+  const cards = [...(data?.cards ?? [])].sort((a, b) => a.step - b.step);
   return (
     <section
-      className="billing-dunning-panel ls-root"
+      className="billing-dunning-panel"
       role="tabpanel"
       aria-label="미수 알림"
       data-testid="billing-dunning-panel"
       data-screen-id="SCR-UI-13"
     >
       <div className="billing-dunning-cards">
-        {(data?.cards ?? []).map((card) => (
-          <article
-            key={card.step}
-            data-testid={`billing-dunning-card-${card.step}`}
-          >
-            <h3>{card.step}단계</h3>
-            <p>
-              {card.recipients.join(" + ") || "등록된 수신 역할이 없습니다"}
-            </p>
-          </article>
-        ))}
+        {cards.map((card) => {
+          const count = rows.filter((row) => row.currentStep === card.step).length;
+          return (
+            <article
+              key={card.step}
+              className="bill-card"
+              data-testid={`billing-dunning-card-${card.step}`}
+            >
+              <div className="bill-card-h">
+                <h2>
+                  {card.step}단계{" "}
+                  <span className="bill-sub bill-normal">예정일 + {card.offsetDays}일</span>
+                </h2>
+                <Badge kind={count ? (card.step >= 2 ? "bad" : "warn") : "neutral"}>
+                  {count}건
+                </Badge>
+              </div>
+              <p className="bill-sub">
+                받는 사람: <strong>{RECEIVERS[card.step] ?? card.recipients.join("·")}</strong>
+                {card.step > 1 ? " (앞 단계 사람도 함께)" : ""}
+              </p>
+            </article>
+          );
+        })}
       </div>
-      <p>
-        지난해 청구도 미수금이 있으면 표시합니다. 파트 미지정 시 경영진, 본사
-        직접 영업은 본사 영업 책임자(없으면 경영진)에게 알립니다.
-      </p>
-      {notice && (
-        <p role="status" data-testid="billing-dunning-success">
-          {notice}
-        </p>
-      )}
       {failure && (
         <p role="alert" className="field-error">
           {failure}{" "}
           <button
             type="button"
+            className="ls-btn ls-btn-sm"
             data-testid="billing-dunning-retry"
             onClick={() => setRevision((value) => value + 1)}
           >
@@ -265,80 +296,74 @@ export function BillingDunningPanel({
           </button>
         </p>
       )}
-      {actionFailure && (
-        <p role="alert" className="field-error">
-          {actionFailure}{" "}
-          <button
-            type="button"
-            data-testid="billing-dunning-action-retry"
-            onClick={() => setRevision((value) => value + 1)}
-          >
-            다시 조회
-          </button>
+      <section className="bill-card">
+        <div className="bill-card-h">
+          <h2>입금 예정일이 지난 청구 {rows.length}건</h2>
+          <span className="bill-sub">곧 예정일(7일 안) {soonCount}건</span>
+        </div>
+        <ListView
+          screenId="UI-13-dunning"
+          columns={columns}
+          visibleColumns={columns}
+          hiddenColumns={[]}
+          onToggleColumn={() => undefined}
+          onResetColumns={() => undefined}
+          columnSettings={false}
+          rows={
+            data
+              ? rows.slice(
+                  (page - 1) * presentation.pageSize,
+                  page * presentation.pageSize,
+                )
+              : failure
+                ? []
+                : null
+          }
+          rowKey={(row) => row.billId}
+          total={rows.length}
+          page={page}
+          pageSize={presentation.pageSize}
+          onPage={setPage}
+          onPageSize={(size) => {
+            presentation.setPageSize(size);
+            setPage(1);
+          }}
+          dense={presentation.dense}
+          onDense={presentation.setDense}
+          sort={sort}
+          onSort={(value) => {
+            setSort(value);
+            setPage(1);
+          }}
+          selectable
+          selected={selected}
+          onSelect={setSelected}
+          bulkActions={
+            rows.some(
+              (row) => selected.includes(row.billId) && row.canReceive && row.unpaidAmount > 0,
+            )
+              ? [
+                  {
+                    key: "billing-receive",
+                    label: "입금 등록",
+                    onClick: () => receive(selected),
+                  },
+                ]
+              : []
+          }
+          testId="billing-dunning-list"
+        />
+        <p className="bill-sub bill-note">
+          입금을 등록하면 알림이 멈춥니다. 알림은 메일과 시스템 알림으로 함께 보냅니다.
         </p>
-      )}
-      {!failure && data && !rows.length && <p>조회 결과가 없습니다</p>}
-      <ListView
-        screenId="UI-13-dunning"
-        columns={columns}
-        visibleColumns={settings.visible}
-        hiddenColumns={settings.hidden}
-        onToggleColumn={settings.toggle}
-        onResetColumns={settings.reset}
-        rows={
-          data
-            ? rows.slice(
-                (page - 1) * presentation.pageSize,
-                page * presentation.pageSize,
-              )
-            : failure
-              ? []
-              : null
-        }
-        rowKey={(row) => row.billId}
-        total={rows.length}
-        page={page}
-        pageSize={presentation.pageSize}
-        onPage={setPage}
-        onPageSize={(size) => {
-          presentation.setPageSize(size);
-          setPage(1);
-        }}
-        dense={presentation.dense}
-        onDense={presentation.setDense}
-        sort={sort}
-        onSort={(value) => {
-          setSort(value);
-          setPage(1);
-        }}
-        selectable
-        selected={selected}
-        onSelect={setSelected}
-        bulkActions={
-          receivable.some(
-            (bill) =>
-              selected.includes(bill.billId) &&
-              bill.canReceive &&
-              bill.unpaidAmount > 0,
-          )
-            ? [
-                {
-                  key: "billing-receive",
-                  label: "입금 등록",
-                  onClick: () => receive(selected),
-                },
-              ]
-            : []
-        }
-        testId="billing-dunning-list"
-      />
+      </section>
       {receipts && (
         <BillingReceiptDialog
           bills={receipts}
           onClose={() => setReceipts(null)}
           onSaved={() => {
             setReceipts(null);
-            setNotice("입금을 저장했습니다.");
+            onNotice?.("입금을 등록했습니다.");
             setRevision((value) => value + 1);
             onChanged?.();
           }}

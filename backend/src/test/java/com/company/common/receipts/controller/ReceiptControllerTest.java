@@ -32,6 +32,7 @@ class ReceiptControllerTest {
     @MockBean ProjectMapper projects;
     @MockBean CalculationRuleService definitions;
     @MockBean BusinessCalendar calendar;
+    static final Instant MOD=Instant.parse("2026-10-20T01:00:00Z");
     final BusinessCalendar real=new BusinessCalendar(Clock.fixed(Instant.parse("2026-11-14T16:00:00Z"),ZoneOffset.UTC));
     final BigDecimal total=new BigDecimal("1000");
 
@@ -44,11 +45,11 @@ class ReceiptControllerTest {
         when(mapper.insertReceipt(any())).thenReturn("101");
         when(mapper.receipt("101")).thenReturn(receipt(false));
         when(mapper.lockReceipt("101")).thenReturn(receipt(false));
-        when(mapper.cancel(anyString(),anyString(),anyString())).thenReturn(1);
+        when(mapper.cancel(anyString(),anyString(),anyString(),any())).thenReturn(1);
     }
     ReceiptRow receipt(boolean cancelled) {
         return new ReceiptRow("101","old-bill",LocalDate.of(2026,10,20),new BigDecimal("400"),cancelled,
-            cancelled?"정정":null,cancelled?"admin":null,cancelled?real.now():null,!cancelled);
+            cancelled?"정정":null,cancelled?"admin":null,cancelled?real.now():null,!cancelled,MOD);
     }
     String input(String amount) {
         return "{\"receiptDate\":\"2026-10-20\",\"items\":[{\"billId\":\"old-bill\",\"amount\":"+amount+"}]}";
@@ -128,13 +129,13 @@ class ReceiptControllerTest {
         when(mapper.closed("202609")).thenReturn(true);
         when(mapper.closed("202611")).thenReturn(true);
         when(mapper.receipt("101")).thenReturn(receipt(false),receipt(true));
-        mvc.perform(post("/api/common/receipts/101/cancel").contentType("application/json").content("{\"reason\":\"  정정  \"}"))
+        mvc.perform(post("/api/common/receipts/101/cancel").contentType("application/json").content("{\"modifiedAt\":\"2026-10-20T01:00:00Z\",\"reason\":\"  정정  \"}"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.receipts[0].cancelled").value(true))
             .andExpect(jsonPath("$.data.receipts[0].cancelReason").value("정정"))
             .andExpect(jsonPath("$.data.receipts[0].cancelledBy").value("admin"))
             .andExpect(jsonPath("$.data.receipts[0].cancelledAt").isString())
             .andExpect(jsonPath("$.data.receipts[0].canCancel").value(false));
-        verify(mapper).cancel("101","정정","admin");
+        verify(mapper).cancel("101","정정","admin",MOD);
         verify(mapper).closed("202610");
         verify(mapper,never()).closed("202609");
         verify(mapper,never()).closed("202611");
@@ -144,32 +145,43 @@ class ReceiptControllerTest {
     void missingReasonLeavesRowsUnchanged(String body)throws Exception {
         mvc.perform(post("/api/common/receipts/101/cancel").contentType("application/json").content(body))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("reason"));
-        verify(mapper,never()).cancel(anyString(),anyString(),anyString());
+        verify(mapper,never()).cancel(anyString(),anyString(),anyString(),any());
         verify(mapper,never()).updateBalance(any());
     }
     @Test void reasonLengthIsBounded()throws Exception {
         mvc.perform(post("/api/common/receipts/101/cancel").contentType("application/json")
             .content("{\"reason\":\""+"가".repeat(501)+"\"}"))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("reason"));
-        verify(mapper,never()).cancel(anyString(),anyString(),anyString());
+        verify(mapper,never()).cancel(anyString(),anyString(),anyString(),any());
     }
     @Test void closedReceiptMonthCannotCancel()throws Exception {
         when(mapper.closed("202610")).thenReturn(true);
-        mvc.perform(post("/api/common/receipts/101/cancel").contentType("application/json").content("{\"reason\":\"정정\"}"))
+        mvc.perform(post("/api/common/receipts/101/cancel").contentType("application/json").content("{\"modifiedAt\":\"2026-10-20T01:00:00Z\",\"reason\":\"정정\"}"))
             .andExpect(status().isBadRequest());
-        verify(mapper,never()).cancel(anyString(),anyString(),anyString());
+        verify(mapper,never()).cancel(anyString(),anyString(),anyString(),any());
         verify(mapper,never()).updateBalance(any());
     }
     @Test void repeatCancellationCannotReverseBalanceTwice()throws Exception {
         when(mapper.lockReceipt("101")).thenReturn(receipt(true));
-        mvc.perform(post("/api/common/receipts/101/cancel").contentType("application/json").content("{\"reason\":\"다른 사유\"}"))
+        mvc.perform(post("/api/common/receipts/101/cancel").contentType("application/json").content("{\"modifiedAt\":\"2026-10-20T01:00:00Z\",\"reason\":\"다른 사유\"}"))
             .andExpect(status().isBadRequest());
-        verify(mapper,never()).cancel(anyString(),anyString(),anyString());
+        verify(mapper,never()).cancel(anyString(),anyString(),anyString(),any());
         verify(mapper,never()).updateBalance(any());
     }
+    @Test void staleReceiptCancelIs409WithoutBalanceChange()throws Exception {
+        mvc.perform(post("/api/common/receipts/101/cancel").contentType("application/json").content("{\"modifiedAt\":\"2026-10-01T00:00:00Z\",\"reason\":\"정정\"}"))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요."));
+        verify(mapper,never()).cancel(anyString(),anyString(),anyString(),any());
+        verify(mapper,never()).updateBalance(any());
+    }
+    @Test void receiptCancelRequiresModifiedAt()throws Exception {
+        mvc.perform(post("/api/common/receipts/101/cancel").contentType("application/json").content("{\"reason\":\"정정\"}"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("modifiedAt"));
+        verify(mapper,never()).cancel(anyString(),anyString(),anyString(),any());
+    }
     @Test void unknownReceiptIs404()throws Exception {
-        mvc.perform(post("/api/common/receipts/102/cancel").contentType("application/json").content("{\"reason\":\"정정\"}"))
+        mvc.perform(post("/api/common/receipts/102/cancel").contentType("application/json").content("{\"modifiedAt\":\"2026-10-20T01:00:00Z\",\"reason\":\"정정\"}"))
             .andExpect(status().isNotFound());
-        verify(mapper,never()).cancel(anyString(),anyString(),anyString());
+        verify(mapper,never()).cancel(anyString(),anyString(),anyString(),any());
     }
 }

@@ -29,6 +29,7 @@
       <arg column="latest" javaType="_boolean"/>
       <arg column="closed" javaType="_boolean"/>
       <arg column="normalReceiptCount" javaType="_int"/>
+      <arg column="modifiedAt" javaType="java.time.Instant"/>
     </constructor>
   </resultMap>
   <sql id="invoiceSelect">
@@ -41,12 +42,14 @@
       p.PROJ_NM AS "projectName",COALESCE(c.CLNT_NM,'') AS "customerName",
       p.CTRT_TYPE_CD AS "projectType",p.PROJ_STAT_CD AS "projectStatus",
       p.CTRT_BGN_DT AS "projectStart",p.CTRT_END_DT AS "projectEnd",
-      (b.CNCL_YN='N' AND b.BILL_ORD=(SELECT MAX(x.BILL_ORD) FROM TB_BL_BILL x
-        WHERE x.PROJ_ID=b.PROJ_ID AND x.CNCL_YN='N')) AS "latest",
+      (b.CNCL_YN='N' AND b.BILL_ID=(SELECT x.BILL_ID FROM TB_BL_BILL x
+        WHERE x.PROJ_ID=b.PROJ_ID AND x.CNCL_YN='N'
+        ORDER BY x.BILL_YM DESC,x.BILL_ID DESC LIMIT 1)) AS "latest",
       EXISTS(SELECT 1 FROM TB_CL_CLOSE cl WHERE cl.CLOSE_YM=b.BILL_YM
         AND cl.CLOSE_STAT_CD='CLOSE') AS "closed",
       (SELECT COUNT(*)::integer FROM TB_BL_RCPT r WHERE r.BILL_ID=b.BILL_ID
-        AND r.CNCL_YN='N') AS "normalReceiptCount"
+        AND r.CNCL_YN='N') AS "normalReceiptCount",
+      COALESCE(b.MOD_DTTM,b.REG_DTTM) AS "modifiedAt"
     FROM TB_BL_BILL b JOIN TB_PJ_PROJ p ON p.PROJ_ID=b.PROJ_ID
     LEFT JOIN TB_BS_CLNT c ON c.CLNT_ID=p.CUST_CLNT_ID
   </sql>
@@ -85,13 +88,15 @@
       <arg column="cancelledBy" javaType="string"/>
       <arg column="cancelledAt" javaType="java.time.Instant"/>
       <arg column="canCancel" javaType="_boolean"/>
+      <arg column="modifiedAt" javaType="java.time.Instant"/>
     </constructor>
   </resultMap>
   <select id="receipts" resultMap="receipt">
     SELECT r.RCPT_ID::text AS "receiptId",r.RCPT_DT AS "receiptDate",r.RCPT_AMT AS "amount",
       (r.CNCL_YN='Y') AS "cancelled",r.CNCL_RSN AS "cancelReason",r.CNCL_USER_ID AS "cancelledBy",
       r.CNCL_DTTM AS "cancelledAt",(r.CNCL_YN='N' AND NOT EXISTS(SELECT 1 FROM TB_CL_CLOSE c
-        WHERE c.CLOSE_YM=to_char(r.RCPT_DT,'YYYYMM') AND c.CLOSE_STAT_CD='CLOSE')) AS "canCancel"
+        WHERE c.CLOSE_YM=to_char(r.RCPT_DT,'YYYYMM') AND c.CLOSE_STAT_CD='CLOSE')) AS "canCancel",
+      COALESCE(r.MOD_DTTM,r.REG_DTTM) AS "modifiedAt"
     FROM TB_BL_RCPT r WHERE r.BILL_ID=#{id} ORDER BY r.RCPT_DT,r.RCPT_ID
   </select>
   <select id="normalReceipts" resultType="java.math.BigDecimal">
@@ -104,6 +109,15 @@
     SELECT EXISTS(SELECT 1 FROM TB_BL_BILL b WHERE b.PROJ_ID=#{projectId}
       AND b.BILL_YM=#{month} AND b.CNCL_YN='N')
   </select>
+  <select id="sameMonth" resultMap="invoice">
+    <include refid="invoiceSelect"/> WHERE b.PROJ_ID=#{projectId} AND b.BILL_YM=#{month} AND b.CNCL_YN='N'
+    ORDER BY b.BILL_ID
+  </select>
+  <!-- SFR-011 엑셀 다운로드 접근 기록(DNLD). -->
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES (#{userId},'DNLD','UI-13',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
   <update id="lockMonthlySources">LOCK TABLE TB_PJ_ASGN_MON IN SHARE ROW EXCLUSIVE MODE</update>
   <resultMap id="monthly" type="com.company.common.common.BillingCalculationRules$MonthlyInput">
     <constructor>
@@ -124,10 +138,10 @@
   </select>
   <insert id="insert">
     INSERT INTO TB_BL_BILL(BILL_ID,PROJ_ID,BILL_ORD,BILL_YM,BILL_DT,SPLY_AMT,VAT_RT,VAT_AMT,
-      TOT_AMT,RCPT_SUM_AMT,UNPAID_AMT,PAY_DUE_DT,TAX_INVC_NO,CNCL_YN,REG_USER_ID)
+      TOT_AMT,RCPT_SUM_AMT,UNPAID_AMT,PAY_DUE_DT,TAX_INVC_NO,CNCL_YN,REG_USER_ID,REG_DTTM)
     VALUES(#{billId},#{projectId},#{billOrder},#{billMonth},#{values.billDate},#{amounts.supplyAmount},
       #{amounts.vatRate},#{amounts.vatAmount},#{amounts.totalAmount},0,#{amounts.totalAmount},
-      #{values.payDueDate},#{values.taxInvoiceNo,jdbcType=VARCHAR},'N',#{actor})
+      #{values.payDueDate},#{values.taxInvoiceNo,jdbcType=VARCHAR},'N',#{actor},clock_timestamp())
   </insert>
   <update id="update">
     UPDATE TB_BL_BILL SET BILL_DT=#{values.billDate},SPLY_AMT=#{amounts.supplyAmount},
@@ -135,11 +149,13 @@
       RCPT_SUM_AMT=#{receipts},UNPAID_AMT=#{amounts.totalAmount}-#{receipts},
       PAY_DUE_DT=#{values.payDueDate},TAX_INVC_NO=#{values.taxInvoiceNo,jdbcType=VARCHAR},
       MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp() WHERE BILL_ID=#{billId} AND CNCL_YN='N'
+      AND COALESCE(MOD_DTTM,REG_DTTM) IS NOT DISTINCT FROM #{modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
   </update>
   <update id="cancel">
     UPDATE TB_BL_BILL SET CNCL_YN='Y',CNCL_RSN=#{reason},CNCL_USER_ID=#{actor},
       CNCL_DTTM=clock_timestamp(),MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp()
     WHERE BILL_ID=#{billId} AND CNCL_YN='N'
+      AND COALESCE(MOD_DTTM,REG_DTTM) IS NOT DISTINCT FROM #{modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
   </update>
   <resultMap id="recipient" type="com.company.common.bills.mapper.BillRows$Recipient">
     <constructor>
@@ -191,13 +207,13 @@
   </select>
   <insert id="notification">
     INSERT INTO TB_SY_NOTI(RCVR_USER_ID,NOTI_TYPE_CD,NOTI_CN,LINK_SCRN_ID,LINK_KEY,
-      SEND_MTHD_CD,NOTI_DTTM,REG_USER_ID)
-    VALUES(#{userId},'DUN',#{content},'UI-13',#{billId},'SYS',clock_timestamp(),#{actor})
+      SEND_MTHD_CD,NOTI_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES(#{userId},'DUN',#{content},'UI-13',#{billId},'SYS',clock_timestamp(),#{actor},clock_timestamp())
   </insert>
   <insert id="history">
-    INSERT INTO TB_BL_DUN_HIST(BILL_ID,DUN_SN,DUN_STEP,SEND_DT,RCVR_DESC,SEND_MTHD_CD,RESEND_YN,REG_USER_ID)
+    INSERT INTO TB_BL_DUN_HIST(BILL_ID,DUN_SN,DUN_STEP,SEND_DT,RCVR_DESC,SEND_MTHD_CD,RESEND_YN,REG_USER_ID,REG_DTTM)
     SELECT #{billId},COALESCE(MAX(h.DUN_SN),0)+1,#{step},#{date},#{recipients},'BOTH',
-      CASE WHEN #{resend} THEN 'Y' ELSE 'N' END,#{actor}
+      CASE WHEN #{resend} THEN 'Y' ELSE 'N' END,#{actor},clock_timestamp()
     FROM TB_BL_DUN_HIST h WHERE h.BILL_ID=#{billId}
   </insert>
 </mapper>

@@ -98,6 +98,7 @@ function respond(available = true) {
     defaultPayDueDate: "2026-12-25",
     estimatedSupplyAmount: null,
     vatRate: 10,
+    monthClosed: false,
   };
   const checks: BillCheckResult = {
     checkMonth: "202611",
@@ -111,6 +112,8 @@ function respond(available = true) {
       matchedCount: 0,
     },
     calculationMethod: "점검 API에서 읽은 계산 방법",
+    months: ["202611"],
+    lastClosedMonth: "202610",
   };
   const list = vi.fn(async () => ok(result));
   const checkList = vi.fn(async () => ok(checks));
@@ -152,7 +155,7 @@ it.each(["/screens/UI-13", "/#UI-13"])(
   async (path) => {
     const { request, checkList, dunning } = respond();
     mount(path);
-    await screen.findByTestId("bill-totals");
+    await screen.findByTestId("list-empty");
     expect(screen.getAllByTestId("billing-page")).toHaveLength(1);
     expect(screen.getByTestId("billing-page")).toHaveAttribute(
       "data-menu-id",
@@ -171,16 +174,21 @@ it.each(["/screens/UI-13", "/#UI-13"])(
     expect(request).toHaveBeenCalledWith("/api/common/bill-options", {
       signal: expect.any(AbortSignal),
     });
-    expect(checkList).not.toHaveBeenCalled();
-    expect(dunning).not.toHaveBeenCalled();
+    // 탭 이름의 건수(청구 누락 점검 n · 미수 알림 (n))를 처음에 한 번 읽는다(시안 billTabs).
+    await waitFor(() => expect(checkList).toHaveBeenCalledTimes(1));
+    expect(dunning).toHaveBeenCalledTimes(1);
     expect(
       request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
     ).toBe(false);
     expect(
       screen.getByRole("columnheader", { name: /청구번호/ }),
     ).toBeVisible();
-    expect(screen.getByTestId("bill-register")).toBeVisible();
-    expect(screen.getByText("조회 결과가 없습니다")).toBeVisible();
+    expect(await screen.findByTestId("bill-register")).toBeVisible();
+    expect(screen.getByTestId("billing-title-actions")).toContainElement(
+      screen.getByTestId("bill-register"),
+    );
+    expect(screen.getByText("조건에 맞는 결과가 없습니다.")).toBeVisible();
+    expect(screen.getByTestId("bill-tab-dunning")).toHaveTextContent("미수 알림 (0)");
     expectSingleShell();
   },
 );
@@ -190,11 +198,13 @@ it("M013 under G005 opens UI-13 through the existing router and preference provi
   mount("/");
   const preferences = await screen.findByTestId("user-preferences");
   const group = await screen.findByTestId("menu-toggle-g005");
+  // 첫 화면이 다 열린 뒤에 메뉴 묶음 상태를 본다(탭 건수를 읽는 요청이 더 있어 열리는 때가 늦을 수 있음).
+  await screen.findByTestId("list-empty");
   // The first available screen opens automatically, expanding its menu group.
   if (group.getAttribute("aria-expanded") === "false") fireEvent.click(group);
   expect(group).toHaveAttribute("aria-expanded", "true");
   fireEvent.click(screen.getByRole("link", { name: "청구·입금" }));
-  await screen.findByTestId("bill-totals");
+  await screen.findByTestId("list-empty");
   expect(router?.state.location.pathname).toBe("/screens/UI-13");
   expect(screen.getByTestId("user-preferences")).toBe(preferences);
   expect(screen.getAllByTestId("billing-page")).toHaveLength(1);
@@ -204,20 +214,21 @@ it("M013 under G005 opens UI-13 through the existing router and preference provi
 it("workflow tabs call their feature-local clients within UI-13 without another route", async () => {
   const { request, checkList, dunning } = respond();
   mount();
-  await screen.findByTestId("bill-totals");
+  await screen.findByTestId("list-empty");
+  await waitFor(() => expect(checkList).toHaveBeenCalledTimes(1));
   fireEvent.click(screen.getByTestId("bill-tab-checks"));
   expect(
-    await screen.findByText("진행 중인 달은 예정 기준입니다."),
+    await screen.findByText("이번 달은 아직 끝나지 않아 투입 예정 기준으로 봅니다."),
   ).toBeVisible();
   expect(screen.getByTestId("bill-checks-panel")).toBeVisible();
-  expect(checkList).toHaveBeenCalledTimes(1);
+  expect(checkList).toHaveBeenCalledTimes(2);
   expect(request).toHaveBeenCalledWith("/api/common/bill-checks", {
     signal: expect.any(AbortSignal),
   });
   fireEvent.click(screen.getByTestId("bill-tab-dunning"));
   const panel = await screen.findByTestId("billing-dunning-panel");
-  expect(await within(panel).findByText("조회 결과가 없습니다")).toBeVisible();
-  expect(dunning).toHaveBeenCalledTimes(1);
+  expect(await within(panel).findByText("조건에 맞는 결과가 없습니다.")).toBeVisible();
+  expect(dunning).toHaveBeenCalledTimes(2);
   expect(request).toHaveBeenCalledWith("/api/common/bill-dunning", {
     signal: expect.any(AbortSignal),
   });
@@ -228,15 +239,22 @@ it("workflow tabs call their feature-local clients within UI-13 without another 
 it("prior-year navigation retains the billing list but removes workflow tabs and registration", async () => {
   const { request, checkList, dunning } = respond();
   mount();
-  await screen.findByTestId("bill-totals");
+  await screen.findByTestId("list-empty");
+  await waitFor(() => expect(checkList).toHaveBeenCalledTimes(1));
+  checkList.mockClear();
+  dunning.mockClear();
   fireEvent.click(screen.getByTestId("bill-year-prev"));
   await waitFor(() =>
     expect(request).toHaveBeenCalledWith("/api/common/bills?year=2025", {
       signal: expect.any(AbortSignal),
     }),
   );
-  await screen.findByTestId("bill-totals");
-  expect(screen.getByTestId("bill-tab-list")).toBeVisible();
+  await screen.findByTestId("list-empty");
+  // 시안: 지난 해는 탭 없이 청구 목록만, 읽기 전용 띠
+  expect(screen.queryByTestId("bill-tab-list")).not.toBeInTheDocument();
+  expect(await screen.findByTestId("bill-lock-banner")).toHaveTextContent(
+    "2025년은 지난 해라 읽기만 할 수 있습니다.",
+  );
   expect(screen.queryByTestId("bill-tab-checks")).not.toBeInTheDocument();
   expect(screen.queryByTestId("bill-tab-dunning")).not.toBeInTheDocument();
   expect(screen.queryByTestId("bill-register")).not.toBeInTheDocument();
@@ -250,7 +268,7 @@ it("billing failure retries the real list client inside the same shell", async (
   list.mockRejectedValueOnce(new Error("청구 조회 연결 실패"));
   mount();
   fireEvent.click(await screen.findByTestId("list-retry"));
-  expect(await screen.findByTestId("bill-totals")).toBeVisible();
+  expect(await screen.findByTestId("list-empty")).toBeVisible();
   expect(list).toHaveBeenCalledTimes(2);
   expect(router?.state.location.pathname).toBe("/screens/UI-13");
   expectSingleShell();

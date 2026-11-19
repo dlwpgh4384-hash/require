@@ -5,6 +5,11 @@ import com.company.common.bills.service.BillDunningService;
 import com.company.common.bills.service.CommonBillService;
 import com.company.common.users.dto.UserContracts.Response;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.nio.charset.StandardCharsets;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -19,6 +24,17 @@ public class CommonBillController {
     @GetMapping
     public Response<BillList> getCommonBills(@ModelAttribute Filter filter) {
         return Response.of(service.getCommonBills(filter));
+    }
+    private static final String XLSX="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    /** SFR-011 엑셀 다운로드: 목록과 같은 조건의 전체 결과. 오류는 목록과 같은 JSON(400). */
+    @GetMapping(value="/excel",produces={XLSX,"application/json"})
+    public ResponseEntity<byte[]> getCommonBillsExcel(@ModelAttribute Filter filter) {
+        var file=service.getCommonBillsExcel(filter);
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(XLSX))
+            .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment()
+                .filename(file.fileName(),StandardCharsets.UTF_8).build().toString())
+            .header("X-Total-Count",Integer.toString(file.count())).body(file.bytes());
     }
     @GetMapping("/{billId}")
     public Response<Detail> getCommonBill(@PathVariable String billId) {

@@ -16,12 +16,16 @@ export const getReceiptBillDetail = (billId: string, signal?: AbortSignal) =>
     { signal },
   );
 
-export const postCommonReceiptCancel = (receiptId: string, reason: string) =>
+export const postCommonReceiptCancel = (
+  receiptId: string,
+  reason: string,
+  modifiedAt: string,
+) =>
   projectRequest<BillingReceiptResult>(
     `/api/common/receipts/${encodeURIComponent(receiptId)}/cancel`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify({ reason, modifiedAt }),
     },
   );

@@ -60,7 +60,9 @@ class BillProjectionTest {
     }
     @Test void listOrderAndLatestUseOrderRatherThanMonth() throws Exception {
         String sql=config().getMappedStatement(BillMapper.class.getName()+".yearRows").getBoundSql(Map.of("year",2026)).getSql();
-        assertThat(sql).contains("ORDER BY b.BILL_DT DESC,b.BILL_ORD DESC,b.BILL_ID DESC","MAX(x.BILL_ORD)","x.CNCL_YN='N'");
+        // 가장 최근 청구 = 청구월이 가장 늦은 청구(시안 qbLatest), 차수 최대가 아님
+        assertThat(sql).contains("ORDER BY b.BILL_DT DESC,b.BILL_ORD DESC,b.BILL_ID DESC","ORDER BY x.BILL_YM DESC,x.BILL_ID DESC LIMIT 1","x.CNCL_YN='N'")
+            .doesNotContain("MAX(x.BILL_ORD)");
     }
     @Test void updateDoesNotChangeIdentityOrReceiptRows() throws Exception {
         String sql=config().getMappedStatement(BillMapper.class.getName()+".update").getBoundSql(Map.of()).getSql();

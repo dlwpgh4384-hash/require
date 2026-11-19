@@ -14,12 +14,19 @@ public final class BillRows {
         LocalDate payDueDate, String taxInvoiceNo, boolean cancelled, String cancelReason,
         String cancelledBy, Instant cancelledAt, String projectName, String customerName,
         String projectType, String projectStatus, LocalDate projectStart, LocalDate projectEnd,
-        boolean latest, boolean closed, int normalReceiptCount) {}
+        boolean latest, boolean closed, int normalReceiptCount, Instant modifiedAt) {}
     public record Project(String projectId, String projectType, String projectStatus,
         LocalDate startDate, LocalDate endDate) {}
     public record Write(String billId, String projectId, int billOrder, String billMonth,
-        Values values, Amounts amounts, BigDecimal receipts, String actor) {}
-    public record Cancellation(String billId, String reason, String actor) {}
+        Values values, Amounts amounts, BigDecimal receipts, String actor, Instant modifiedAt) {
+        public Write(String billId, String projectId, int billOrder, String billMonth,
+            Values values, Amounts amounts, BigDecimal receipts, String actor) {
+            this(billId,projectId,billOrder,billMonth,values,amounts,receipts,actor,null);
+        }
+    }
+    public record Cancellation(String billId, String reason, String actor, Instant modifiedAt) {
+        public Cancellation(String billId, String reason, String actor) { this(billId,reason,actor,null); }
+    }
     public record Recipient(String userId, String name, String email) {}
     public record RecipientFilter(String projectId, String month, int step) {}
     public record Notice(String billId, String userId, String content, String actor) {}

@@ -46,6 +46,18 @@ public class BillingCalculationRules {
         return amount;
     }
 
+    /** 부가세율 기본값: 운영 기준값 VAT_RT(그 달 적용분). 기준값이 없을 때만 10. */
+    public BigDecimal defaultVatRate(YearMonth month) {
+        try {
+            BigDecimal value = metadata.effectiveStandard("VAT_RT", month).value();
+            if (value == null) return BigDecimal.TEN;
+            rate(value, "vatRate");
+            return value;
+        } catch (CodeFailure missing) {
+            return BigDecimal.TEN;
+        }
+    }
+
     public Amounts amounts(BigDecimal supplyAmount, BigDecimal vatRate) {
         definition("식-05");
         positiveMoney(supplyAmount, "supplyAmount");

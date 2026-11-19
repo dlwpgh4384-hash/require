@@ -27,7 +27,7 @@ class BillDunningScheduleTest {
         var service=new BillDunningService(mapper,projects,rules,calendar,new CurrentBusinessActor(),mailbox);
         var today=LocalDate.of(2026,11,15);
         when(calendar.today()).thenReturn(today);when(calendar.currentMonth()).thenReturn(YearMonth.of(2026,11));when(calendar.toDatabaseMonth(any())).thenReturn("202611");
-        var invoice=new Invoice("bill","project",1,"202611",today,BigDecimal.TEN,BigDecimal.TEN,BigDecimal.ONE,new BigDecimal("11"),BigDecimal.ZERO,new BigDecimal("11"),today.minusDays(15),null,false,null,null,null,"project","customer","MO","ING",today.minusYears(1),today.plusYears(1),true,false,0);
+        var invoice=new Invoice("bill","project",1,"202611",today,BigDecimal.TEN,BigDecimal.TEN,BigDecimal.ONE,new BigDecimal("11"),BigDecimal.ZERO,new BigDecimal("11"),today.minusDays(15),null,false,null,null,null,"project","customer","MO","ING",today.minusYears(1),today.plusYears(1),true,false,0,null);
         when(mapper.lockInvoice("bill")).thenReturn(invoice);when(mapper.normalReceipts("bill")).thenReturn(BigDecimal.ZERO);
         when(rules.balance(any(),any())).thenReturn(new BigDecimal("11"));when(rules.dunningStep(anyBoolean(),any(),any(),any())).thenReturn(2);
         when(mapper.recipients(any())).thenReturn(List.of(new Recipient("admin","관리자","admin@example.test")));

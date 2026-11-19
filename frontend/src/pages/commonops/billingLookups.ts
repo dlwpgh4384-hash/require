@@ -14,6 +14,8 @@ export interface BillingOptions {
   defaultPayDueDate: string;
   estimatedSupplyAmount: number | null;
   vatRate: number;
+  /** billMonth(없으면 이번 달)가 마감한 달인지. 마감한 달에는 새 청구를 만들 수 없다. */
+  monthClosed: boolean;
 }
 export interface BillingDunningHistory {
   step: number;
@@ -34,9 +36,11 @@ export interface BillingDunningRow {
   nextNotification: string | null;
   canResend: boolean;
   resendMessage: string | null;
+  /** 이번 달이 마감 전이라 입금을 등록할 수 있는지(줄마다 상세를 다시 읽지 않는다). */
+  canReceive: boolean;
 }
 export interface BillingDunningResult {
-  cards: { step: number; recipients: string[] }[];
+  cards: { step: number; recipients: string[]; offsetDays: number }[];
   items: BillingDunningRow[];
 }
 export interface BillingReceivable {
@@ -56,6 +60,7 @@ export interface BillingReceiptResult {
     cancelledBy: string | null;
     cancelledAt: string | null;
     canCancel: boolean;
+    modifiedAt: string;
   }[];
 }
 export function getCommonBillOptions(

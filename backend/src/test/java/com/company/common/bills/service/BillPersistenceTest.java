@@ -41,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnabledIfEnvironmentVariable(named="NAVIGATION_TEST_DB_URL",matches="jdbc:postgresql:.*")
 @WebMvcTest(CommonBillController.class)
 @ContextConfiguration(classes={CommonBillController.class,CommonBillService.class,BillDunningService.class,
-    BillLocalMailbox.class,BillingCalculationRules.class,BillingNumberAllocator.class,CalculationRuleService.class,
+    BillLocalMailbox.class,BillingCalculationRules.class,BillingNumberAllocator.class,CalculationRuleService.class,ExcelExportService.class,
     CurrentBusinessActor.class,CodeExceptionHandler.class,ApiExceptionHandler.class,BillPersistenceTest.Persistence.class})
 @DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class BillPersistenceTest {
@@ -84,6 +84,9 @@ class BillPersistenceTest {
     ObjectNode input(){return values().put("projectId","bill-project").put("billMonth","202611");}
     JsonNode data(ResultActions result) throws Exception {return json.readTree(result.andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).path("data");}
     String create() throws Exception {return data(mvc.perform(post("/api/common/bills").contentType("application/json").content(input().toString())).andExpect(status().isOk())).path("bill").path("billId").asText();}
+    String mod(String id) throws Exception {return data(mvc.perform(get("/api/common/bills/"+id)).andExpect(status().isOk())).path("bill").path("modifiedAt").asText();}
+    ObjectNode edit(String id) throws Exception {return values().put("modifiedAt",mod(id));}
+    String cancelBody(String id,String reason) throws Exception {return json.createObjectNode().put("modifiedAt",mod(id)).put("reason",reason).toString();}
     Object snapshot(){return db.queryForList("SELECT * FROM TB_BL_BILL ORDER BY BILL_ID");}
     @Test void publicCreateCommitsOneRowAndNewSessionReadsExactAmounts() throws Exception {
         long before=db.queryForObject("SELECT COUNT(*) FROM TB_BL_BILL",Long.class);String id=create();
@@ -97,36 +100,36 @@ class BillPersistenceTest {
         assertThat(saved.path("bill").path("billOrder").asInt()).isEqualTo(2);
     }
     @Test void cancelledNumberAndOrderRemainReserved() throws Exception {
-        String id=create();mvc.perform(post("/api/common/bills/"+id+"/cancel").contentType("application/json").content("{\"reason\":\"등록 정정\"}")).andExpect(status().isOk());
+        String id=create();mvc.perform(post("/api/common/bills/"+id+"/cancel").contentType("application/json").content(cancelBody(id,"등록 정정"))).andExpect(status().isOk());
         Object original=db.queryForList("SELECT * FROM TB_BL_BILL WHERE BILL_ID=?",id);String next=create();assertThat(next).isNotEqualTo(id);
         assertThat(mapper.invoice(next).billOrder()).isEqualTo(2);assertThat(db.queryForList("SELECT * FROM TB_BL_BILL WHERE BILL_ID=?",id)).isEqualTo(original);
     }
     @Test void updateRecomputesBalanceWithoutChangingReceiptOrIdentity() throws Exception {
         String id=create();db.update("INSERT INTO TB_BL_RCPT(BILL_ID,RCPT_DT,RCPT_AMT,REG_USER_ID) VALUES(?,'2026-11-15',500,'admin')",id);
         Object receipts=db.queryForList("SELECT * FROM TB_BL_RCPT");
-        mvc.perform(put("/api/common/bills/"+id).contentType("application/json").content(values().put("supplyAmount",3000).toString())).andExpect(status().isOk()).andExpect(jsonPath("$.data.bill.unpaidAmount").value(2800));
+        mvc.perform(put("/api/common/bills/"+id).contentType("application/json").content(edit(id).put("supplyAmount",3000).toString())).andExpect(status().isOk()).andExpect(jsonPath("$.data.bill.unpaidAmount").value(2800));
         assertThat(mapper.invoice(id).vatAmount()).isEqualByComparingTo("300");assertThat(mapper.invoice(id).billOrder()).isEqualTo(1);assertThat(mapper.invoice(id).billMonth()).isEqualTo("202611");assertThat(mapper.invoice(id).projectId()).isEqualTo("bill-project");
         assertThat(db.queryForObject("SELECT MOD_USER_ID FROM TB_BL_BILL WHERE BILL_ID=?",String.class,id)).isEqualTo("admin");assertThat(db.queryForList("SELECT * FROM TB_BL_RCPT")).isEqualTo(receipts);
         assertThat(mapper.receipts(id).get(0).receiptId()).matches("[0-9]+");
     }
     @Test void belowReceiptFloorRollsBackBill() throws Exception {
         String id=create();db.update("INSERT INTO TB_BL_RCPT(BILL_ID,RCPT_DT,RCPT_AMT,REG_USER_ID) VALUES(?,'2026-11-15',2000,'admin')",id);Object before=snapshot();
-        mvc.perform(put("/api/common/bills/"+id).contentType("application/json").content(values().put("supplyAmount",1000).toString())).andExpect(status().isBadRequest());assertThat(snapshot()).isEqualTo(before);
+        mvc.perform(put("/api/common/bills/"+id).contentType("application/json").content(edit(id).put("supplyAmount",1000).toString())).andExpect(status().isBadRequest());assertThat(snapshot()).isEqualTo(before);
     }
     @Test void closedMonthRefusesCreateUpdateAndCancelWithoutMutation() throws Exception {
         String id=create();db.update("INSERT INTO TB_CL_CLOSE(CLOSE_YM,CLOSE_STAT_CD,REG_USER_ID) VALUES('202611','CLOSE','admin')");Object before=snapshot();
         mvc.perform(post("/api/common/bills").contentType("application/json").content(input().toString())).andExpect(status().isBadRequest());
-        mvc.perform(put("/api/common/bills/"+id).contentType("application/json").content(values().toString())).andExpect(status().isBadRequest());
-        mvc.perform(post("/api/common/bills/"+id+"/cancel").contentType("application/json").content("{\"reason\":\"사유\"}")).andExpect(status().isBadRequest());assertThat(snapshot()).isEqualTo(before);
+        mvc.perform(put("/api/common/bills/"+id).contentType("application/json").content(edit(id).toString())).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/common/bills/"+id+"/cancel").contentType("application/json").content(cancelBody(id,"사유"))).andExpect(status().isBadRequest());assertThat(snapshot()).isEqualTo(before);
     }
     @Test void activeReceiptPreventsBillCancellationAndPreservesBothRows() throws Exception {
         String id=create();db.update("INSERT INTO TB_BL_RCPT(BILL_ID,RCPT_DT,RCPT_AMT,REG_USER_ID) VALUES(?,'2026-11-15',100,'admin')",id);Object before=snapshot(),receipts=db.queryForList("SELECT * FROM TB_BL_RCPT");
-        mvc.perform(post("/api/common/bills/"+id+"/cancel").contentType("application/json").content("{\"reason\":\"사유\"}")).andExpect(status().isBadRequest());assertThat(snapshot()).isEqualTo(before);assertThat(db.queryForList("SELECT * FROM TB_BL_RCPT")).isEqualTo(receipts);
+        mvc.perform(post("/api/common/bills/"+id+"/cancel").contentType("application/json").content(cancelBody(id,"사유"))).andExpect(status().isBadRequest());assertThat(snapshot()).isEqualTo(before);assertThat(db.queryForList("SELECT * FROM TB_BL_RCPT")).isEqualTo(receipts);
     }
     @Test void cancellationIsPreservedInListButExcludedFromSummary() throws Exception {
-        String id=create();mvc.perform(post("/api/common/bills/"+id+"/cancel").contentType("application/json").content("{\"reason\":\"시험 취소\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.data.bill.cancelledBy").value("admin"));
+        String id=create();mvc.perform(post("/api/common/bills/"+id+"/cancel").contentType("application/json").content(cancelBody(id,"시험 취소"))).andExpect(status().isOk()).andExpect(jsonPath("$.data.bill.cancelledBy").value("admin"));
         mvc.perform(get("/api/common/bills").param("year","2026").param("status","CNCL")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].billId").value(id)).andExpect(jsonPath("$.data.summary.yearBillCount").value(0)).andExpect(jsonPath("$.data.totals.totalAmount").value(0));
-        Object before=snapshot();mvc.perform(post("/api/common/bills/"+id+"/cancel").contentType("application/json").content("{\"reason\":\"재취소\"}")).andExpect(status().isBadRequest());assertThat(snapshot()).isEqualTo(before);
+        Object before=snapshot();mvc.perform(post("/api/common/bills/"+id+"/cancel").contentType("application/json").content(cancelBody(id,"재취소"))).andExpect(status().isBadRequest());assertThat(snapshot()).isEqualTo(before);
     }
     @Test void resendCommitsNotificationAndHistoryAndSecondAttemptPreservesBoth() throws Exception {
         String id=create();
@@ -135,12 +138,28 @@ class BillPersistenceTest {
         db.update("INSERT INTO TB_SY_USER(USER_ID,USER_NM,EMAIL_ADDR,PWD_HASH,TEMP_PWD_YN,PWD_ERR_CNT,USER_STAT_CD,MFA_USE_YN,MFA_ERR_CNT,REG_USER_ID) VALUES('bill-pm','청구 담당','billing@example.test',?,'N',0,'USE','N',0,'admin')",hash);
         db.update("INSERT INTO TB_SY_USER_ROLE(USER_ID,ROLE_ID,REG_USER_ID) VALUES('bill-pm','PM','admin')");
         db.update("INSERT INTO TB_SY_USER_SCOPE(USER_ID,SCOPE_SN,SCOPE_TYPE_CD,PROJ_ID,REG_USER_ID) VALUES('bill-pm',1,'PROJ','bill-project','admin')");
-        mvc.perform(post("/api/common/bills/"+id+"/dunning-resend")).andExpect(status().isOk()).andExpect(jsonPath("$.data.history.step").value(2));
-        assertThat(db.queryForObject("SELECT COUNT(*) FROM TB_BL_DUN_HIST WHERE BILL_ID=? AND DUN_STEP=2 AND RESEND_YN='Y'",Long.class,id)).isEqualTo(1);
+        // 예정일 10-31, 오늘 11-15 → 15일 지남: 기준값 DUN_D1=7·DUN_D2=30이라 1단계(PM)
+        mvc.perform(post("/api/common/bills/"+id+"/dunning-resend")).andExpect(status().isOk()).andExpect(jsonPath("$.data.history.step").value(1));
+        assertThat(db.queryForObject("SELECT COUNT(*) FROM TB_BL_DUN_HIST WHERE BILL_ID=? AND DUN_STEP=1 AND RESEND_YN='Y'",Long.class,id)).isEqualTo(1);
+        assertThat(db.queryForObject("SELECT NOTI_CN FROM TB_SY_NOTI WHERE LINK_KEY=?",String.class,id)).startsWith("미수 1단계 알림(다시): 청구 프로젝트 11월분 (15일 지남)");
         assertThat(db.queryForObject("SELECT COUNT(*) FROM TB_SY_NOTI WHERE LINK_KEY=? AND RCVR_USER_ID='bill-pm'",Long.class,id)).isEqualTo(1);
         Object histories=db.queryForList("SELECT * FROM TB_BL_DUN_HIST"),notices=db.queryForList("SELECT * FROM TB_SY_NOTI");
         mvc.perform(post("/api/common/bills/"+id+"/dunning-resend")).andExpect(status().isBadRequest());
         assertThat(db.queryForList("SELECT * FROM TB_BL_DUN_HIST")).isEqualTo(histories);assertThat(db.queryForList("SELECT * FROM TB_SY_NOTI")).isEqualTo(notices);
+    }
+    @Test void staleEditAndCancelAre409WithoutChange() throws Exception {
+        String id=create();String token=mod(id);
+        mvc.perform(put("/api/common/bills/"+id).contentType("application/json").content(values().put("modifiedAt",token).put("supplyAmount",2500).toString())).andExpect(status().isOk());
+        Object before=snapshot();
+        mvc.perform(put("/api/common/bills/"+id).contentType("application/json").content(values().put("modifiedAt",token).toString())).andExpect(status().isConflict());
+        mvc.perform(post("/api/common/bills/"+id+"/cancel").contentType("application/json").content(json.createObjectNode().put("modifiedAt",token).put("reason","사유").toString())).andExpect(status().isConflict());
+        assertThat(snapshot()).isEqualTo(before);
+        assertThat(db.queryForObject("SELECT REG_DTTM IS NOT NULL AND MOD_DTTM>=REG_DTTM FROM TB_BL_BILL WHERE BILL_ID=?",Boolean.class,id)).isTrue();
+    }
+    @Test void excelWritesDownloadAccessLog() throws Exception {
+        create();
+        mvc.perform(get("/api/common/bills/excel").param("year","2026")).andExpect(status().isOk()).andExpect(header().string("X-Total-Count","1"));
+        assertThat(db.queryForObject("SELECT COUNT(*) FROM TB_SY_ACCS_LOG WHERE ACT_TYPE_CD='DNLD' AND SCRN_ID='UI-13'",Long.class)).isEqualTo(1);
     }
     @Test void nextMonthReadsMonthlyInputWithoutChangingIt() throws Exception {
         String id=create();

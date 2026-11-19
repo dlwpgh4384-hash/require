@@ -29,6 +29,7 @@ const value = (over: Partial<BillingOptions> = {}): BillingOptions => ({
   defaultPayDueDate: "2026-12-25",
   estimatedSupplyAmount: null,
   vatRate: 10,
+  monthClosed: false,
   ...over,
 });
 const ok = (data: unknown) => ({

@@ -41,5 +41,6 @@ public final class BillCheckSources {
         public String cancelReason;
         public String cancelledBy;
         public Instant cancelledAt;
+        public Instant modifiedAt;
     }
 }

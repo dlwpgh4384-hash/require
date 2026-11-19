@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { Dialog, InlineConfirmation } from "../../shared/feedback/Dialog";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
+import { Banner } from "../../shared/list";
 import { ProjectRequestError } from "../projects/projects";
+import { billMonthLabel } from "../bills/bills";
 import {
   getBillCheckDetail,
   getBillCheckOptions,
@@ -14,13 +16,18 @@ import {
 
 const actionLabels: Record<string, string> = {
   MISSING: "청구 등록",
-  ADDITIONAL: "추가 청구",
+  ADDITIONAL: "청구 고치기",
   CORRECTION: "청구 고치기",
-  DETAIL: "상세 확인",
+  DETAIL: "청구 고치기",
 };
+/** 시안 bchkfix 단추: 청구 없음 → [청구 등록], 금액 차이 → [청구 고치기]. */
 export const billCheckActionLabel = (action: string) =>
   actionLabels[action] ?? "";
 
+const won = (value: number) => value.toLocaleString("ko-KR");
+const digits = (value: string) => value.replace(/[^\d]/g, "");
+
+/** UI-13 청구 누락 점검 [청구 등록]·[청구 고치기] 창(시안 bchkFix → billNew): 공급가를 채워 열고 고칠 수 있다. */
 export function BillCheckForm({
   row,
   checkMonth,
@@ -30,30 +37,33 @@ export function BillCheckForm({
   row: BillCheckRow;
   checkMonth: string;
   onClose: () => void;
-  onSaved: (detail: BillCheckDetail) => void;
+  onSaved: (detail: BillCheckDetail, message: string) => void;
 }) {
   const [initial, setInitial] = useState<{
+    supply: string;
     vatRate: string;
     billDate: string;
     payDueDate: string;
     taxInvoiceNo: string;
   } | null>(null);
   const [values, setValues] = useState({
+    supply: "",
     vatRate: "",
     billDate: "",
     payDueDate: "",
     taxInvoiceNo: "",
   });
-  const [supply, setSupply] = useState<number | null>(null);
+  const [message, setMessage] = useState("");
+  const [title, setTitle] = useState(billCheckActionLabel(row.allowedAction));
   const [customer, setCustomer] = useState("");
   const [error, setError] = useState("");
-  const [fields, setFields] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [discard, setDiscard] = useState(false);
   const [revision, setRevision] = useState(0);
   const setDirty = useScreenDirty();
   const dirty =
     initial !== null && JSON.stringify(values) !== JSON.stringify(initial);
+  const M = `${Number(checkMonth.slice(4))}월`;
   useEffect(() => {
     setDirty("UI-13", dirty);
     return () => setDirty("UI-13", false);
@@ -64,23 +74,26 @@ export function BillCheckForm({
     setInitial(null);
     void (async () => {
       const options = await getBillCheckOptions(checkMonth, controller.signal);
-      let selectedSupply =
-        row.allowedAction === "ADDITIONAL"
-          ? row.difference
-          : row.referenceAmount;
-      let taxInvoiceNo = "";
+      let supply =
+        row.allowedAction === "ADDITIONAL" ? row.difference : row.referenceAmount;
       let defaults = {
         vatRate: String(options.vatRate),
         billDate: options.defaultBillDate,
         payDueDate: options.defaultPayDueDate,
-        taxInvoiceNo,
+        taxInvoiceNo: "",
       };
+      let text = `${M} 투입 기준 금액 ${won(row.referenceAmount)}원으로 채웠습니다. 고쳐서 등록할 수 있습니다.`;
+      let heading = "청구 등록";
+      if (row.allowedAction === "ADDITIONAL") {
+        heading = "추가 청구 (차액)";
+        text = `${M}은 마감한 달이라 기존 청구는 고칠 수 없습니다. 모자란 ${won(row.difference)}원을 같은 달 추가 청구로 등록합니다.`;
+      }
       if (row.allowedAction === "CORRECTION" && row.latestBillId) {
-        const detail = await getBillCheckDetail(
-          row.latestBillId,
-          controller.signal,
-        );
-        selectedSupply = detail.bill.supplyAmount + row.difference;
+        const detail = await getBillCheckDetail(row.latestBillId, controller.signal);
+        const last = detail.bill.supplyAmount;
+        supply = last + row.difference;
+        heading = `청구 수정 · ${detail.bill.billId}`;
+        text = `투입 기준에 맞추려면 공급가를 ${won(last)}원에서 ${won(supply)}원으로 고칩니다(차이 ${row.difference > 0 ? "+" : ""}${won(row.difference)}원).`;
         defaults = {
           vatRate: String(detail.bill.vatRate),
           billDate: detail.bill.billDate,
@@ -89,13 +102,15 @@ export function BillCheckForm({
         };
       }
       if (controller.signal.aborted) return;
-      setSupply(selectedSupply);
       setCustomer(
         (options.projects ?? []).find((p) => p.projectId === row.projectId)
           ?.customerName ?? "",
       );
-      setValues(defaults);
-      setInitial(defaults);
+      const start = { supply: supply > 0 ? won(supply) : "", ...defaults };
+      setTitle(heading);
+      setMessage(text);
+      setValues(start);
+      setInitial(start);
     })().catch((failure: unknown) => {
       if (!controller.signal.aborted)
         setError(
@@ -105,46 +120,37 @@ export function BillCheckForm({
         );
     });
     return () => controller.abort();
-  }, [row, checkMonth, revision]);
+  }, [row, checkMonth, revision, M]);
   const close = () => {
-    if (!saving) {
-      if (dirty) setDiscard(true);
-      else onClose();
-    }
+    if (saving) return;
+    if (dirty) setDiscard(true);
+    else onClose();
   };
   const change = (field: keyof typeof values, value: string) => {
     setValues((previous) => ({ ...previous, [field]: value }));
-    setFields((previous) => ({ ...previous, [field]: "" }));
+    setError("");
   };
   const save = async () => {
     if (!initial || saving) return;
-    const next: Record<string, string> = {};
-    const rate = Number(values.vatRate);
-    if (
-      values.vatRate.trim() === "" ||
-      !Number.isFinite(rate) ||
-      rate < 0 ||
-      rate > 100 ||
-      !/^\d+(\.\d{1,2})?$/.test(values.vatRate)
-    )
-      next.vatRate = "부가세율은 0~100, 소수 둘째 자리까지 입력해 주세요.";
-    if (!values.billDate) next.billDate = "청구일을 입력해 주세요.";
-    if (!values.payDueDate || values.payDueDate < values.billDate)
-      next.payDueDate = "입금 예정일은 청구일 이후여야 합니다.";
-    if (values.taxInvoiceNo.length > 30)
-      next.taxInvoiceNo = "세금계산서 번호는 30자까지 입력해 주세요.";
-    setFields(next);
-    if (Object.keys(next).length) return;
+    const supply = digits(values.supply);
+    const rate = values.vatRate.trim();
+    if (!supply || Number(supply) <= 0) return setError("공급가를 입력해 주세요.");
+    if (rate === "" || !/^\d+(\.\d{1,2})?$/.test(rate) || Number(rate) > 100)
+      return setError("부가세율을 0~100 사이로 입력해 주세요.");
+    if (!values.payDueDate) return setError("입금 예정일을 입력해 주세요.");
+    if (values.payDueDate < values.billDate)
+      return setError("입금 예정일이 청구일보다 빠릅니다.");
     setSaving(true);
     setError("");
     try {
       const input = {
         projectId: row.projectId,
         checkMonth,
-        vatRate: rate,
+        vatRate: Number(rate),
         billDate: values.billDate,
         payDueDate: values.payDueDate,
         taxInvoiceNo: values.taxInvoiceNo.trim() || null,
+        supplyAmount: Number(supply),
       };
       const submit =
         row.allowedAction === "MISSING"
@@ -153,14 +159,15 @@ export function BillCheckForm({
             ? postCommonBillCheckAdditional
             : postCommonBillCheckCorrection;
       const result = await submit(input);
-      onSaved(result);
+      onSaved(
+        result,
+        row.allowedAction === "CORRECTION"
+          ? "청구를 고쳤습니다."
+          : `${row.projectName} ${billMonthLabel(checkMonth)} 청구를 등록했습니다.`,
+      );
     } catch (failure) {
-      if (failure instanceof ProjectRequestError)
-        setFields(
-          Object.fromEntries(failure.errors.map((f) => [f.field, f.message])),
-        );
       setError(
-        failure instanceof Error
+        failure instanceof ProjectRequestError || failure instanceof Error
           ? failure.message
           : "청구를 저장하지 못했습니다.",
       );
@@ -169,12 +176,7 @@ export function BillCheckForm({
     }
   };
   return (
-    <Dialog
-      title={billCheckActionLabel(row.allowedAction)}
-      onClose={close}
-      testId="bill-check-form"
-      closable
-    >
+    <Dialog title={title} onClose={close} testId="bill-check-form" closable>
       {discard ? (
         <InlineConfirmation
           title="저장하지 않고 닫을까요?"
@@ -184,110 +186,119 @@ export function BillCheckForm({
         />
       ) : (
         <form
+          className="bill-form"
+          noValidate
           onSubmit={(event) => {
             event.preventDefault();
             void save();
           }}
         >
-          <div className="bill-check-fields">
-            <label>
-              프로젝트
-              <input
-                data-testid="bill-check-project"
-                readOnly
-                value={[row.projectName, customer].filter(Boolean).join(" · ")}
-              />
+          {message && (
+            <Banner kind="info">
+              <span data-testid="bill-check-message">{message}</span>
+            </Banner>
+          )}
+          <div className="bill-fc">
+            <label>프로젝트</label>
+            <span data-testid="bill-check-project">
+              {[row.projectName, customer].filter(Boolean).join(" · ")}
+            </span>
+          </div>
+          <div className="bill-fc">
+            <label htmlFor="bill-check-month-fixed">청구월</label>
+            <input
+              id="bill-check-month-fixed"
+              type="month"
+              data-testid="bill-check-month-fixed"
+              disabled
+              value={billMonthLabel(checkMonth)}
+            />
+          </div>
+          <div className="bill-fc">
+            <label htmlFor="bill-check-supply">
+              공급가 <span className="field-required">*</span>
             </label>
-            <label>
-              청구월
+            <div className="bill-row">
               <input
-                data-testid="bill-check-month-fixed"
-                readOnly
-                value={`${checkMonth.slice(0, 4)}-${checkMonth.slice(4)}`}
-              />
-            </label>
-            <label>
-              공급가
-              <input
+                id="bill-check-supply"
                 data-testid="bill-check-supply"
-                readOnly
-                value={supply ?? ""}
+                inputMode="numeric"
+                className="bill-money"
+                value={values.supply}
+                disabled={!initial || saving}
+                onChange={(e) => {
+                  const raw = digits(e.target.value);
+                  change("supply", raw === "" ? "" : Number(raw).toLocaleString("ko-KR"));
+                }}
               />
+              <span className="bill-sub">원</span>
+            </div>
+          </div>
+          <div className="bill-fc">
+            <label htmlFor="bill-check-vat-rate">
+              부가세율 <span className="field-required">*</span>
             </label>
-            <p className="project-cap">
-              공급가는 저장 직전 서버에서 다시 계산합니다. 번호와 차수는 자동
-              발급됩니다.
-            </p>
-            <label>
-              부가세율
+            <div className="bill-row">
               <input
+                id="bill-check-vat-rate"
                 data-testid="bill-check-vat-rate"
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
+                inputMode="decimal"
+                className="bill-rate"
                 value={values.vatRate}
                 disabled={!initial || saving}
                 onChange={(e) => change("vatRate", e.target.value)}
-                aria-invalid={!!fields.vatRate}
               />
-              {fields.vatRate && <span role="alert">{fields.vatRate}</span>}
+              <span className="bill-sub">%</span>
+            </div>
+          </div>
+          <div className="bill-fc">
+            <label htmlFor="bill-check-bill-date">
+              청구일 <span className="field-required">*</span>
             </label>
-            <label>
-              청구일
-              <input
-                data-testid="bill-check-bill-date"
-                type="date"
-                value={values.billDate}
-                disabled={!initial || saving}
-                onChange={(e) => change("billDate", e.target.value)}
-                aria-invalid={!!fields.billDate}
-              />
-              {fields.billDate && <span role="alert">{fields.billDate}</span>}
+            <input
+              id="bill-check-bill-date"
+              data-testid="bill-check-bill-date"
+              type="date"
+              value={values.billDate}
+              disabled={!initial || saving}
+              onChange={(e) => change("billDate", e.target.value)}
+            />
+          </div>
+          <div className="bill-fc">
+            <label htmlFor="bill-check-due-date">
+              입금 예정일 <span className="field-required">*</span>
             </label>
-            <label>
-              입금 예정일
-              <input
-                data-testid="bill-check-due-date"
-                type="date"
-                value={values.payDueDate}
-                disabled={!initial || saving}
-                onChange={(e) => change("payDueDate", e.target.value)}
-                aria-invalid={!!fields.payDueDate}
-              />
-              {fields.payDueDate && (
-                <span role="alert">{fields.payDueDate}</span>
-              )}
-            </label>
-            <label>
-              세금계산서 번호
-              <input
-                data-testid="bill-check-tax-number"
-                maxLength={30}
-                value={values.taxInvoiceNo}
-                disabled={!initial || saving}
-                onChange={(e) => change("taxInvoiceNo", e.target.value)}
-                aria-invalid={!!fields.taxInvoiceNo}
-              />
-              {fields.taxInvoiceNo && (
-                <span role="alert">{fields.taxInvoiceNo}</span>
-              )}
-            </label>
-            {!values.taxInvoiceNo.trim() && (
-              <p className="project-warn">
-                번호 미입력: 저장할 수 있지만 세금계산서 번호를 확인해 주세요.
-              </p>
-            )}
+            <input
+              id="bill-check-due-date"
+              data-testid="bill-check-due-date"
+              type="date"
+              value={values.payDueDate}
+              disabled={!initial || saving}
+              onChange={(e) => change("payDueDate", e.target.value)}
+            />
+          </div>
+          <div className="bill-fc">
+            <label htmlFor="bill-check-tax-number">세금계산서 번호</label>
+            <input
+              id="bill-check-tax-number"
+              data-testid="bill-check-tax-number"
+              maxLength={30}
+              placeholder="예: 20261025-41000012-01"
+              value={values.taxInvoiceNo}
+              disabled={!initial || saving}
+              onChange={(e) => change("taxInvoiceNo", e.target.value)}
+            />
           </div>
           {!initial && !error && (
             <p role="status">등록 정보를 불러오는 중입니다.</p>
           )}
-          {error && <p role="alert">{error}</p>}
-          {fields.checkMonth && <p role="alert">{fields.checkMonth}</p>}
-          {fields.projectId && <p role="alert">{fields.projectId}</p>}
+          <p role="alert" className="field-error" data-testid="bill-check-error">
+            {error}
+          </p>
           {!initial && error && (
             <button
               type="button"
+              className="ls-btn ls-btn-sm"
               data-testid="bill-check-options-retry"
               onClick={() => setRevision((v) => v + 1)}
             >
@@ -297,6 +308,7 @@ export function BillCheckForm({
           <div className="app-actions">
             <button
               type="button"
+              className="ls-btn"
               data-testid="bill-check-form-cancel"
               onClick={close}
               disabled={saving}
@@ -305,15 +317,11 @@ export function BillCheckForm({
             </button>
             <button
               type="submit"
-              className="primary-button"
+              className="ls-btn ls-btn-p"
               data-testid="bill-check-save"
               disabled={!initial || saving}
             >
-              {saving
-                ? "저장 중"
-                : row.allowedAction === "CORRECTION"
-                  ? "저장"
-                  : "등록"}
+              {row.allowedAction === "CORRECTION" ? "저장" : "등록"}
             </button>
           </div>
         </form>

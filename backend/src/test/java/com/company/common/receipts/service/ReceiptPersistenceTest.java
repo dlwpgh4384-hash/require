@@ -128,7 +128,12 @@ class ReceiptPersistenceTest {
     }
     ResultActions cancel(String id,String reason)throws Exception {
         return mvc.perform(post("/api/common/receipts/"+id+"/cancel").contentType("application/json")
-            .content(json.createObjectNode().put("reason",reason).toString()));
+            .content(json.createObjectNode().put("reason",reason).put("modifiedAt",receiptToken(id)).toString()));
+    }
+    /** 화면이 읽은 입금 수정 시각(없으면 등록 시각). */
+    String receiptToken(String id) {
+        var found=db.queryForList("SELECT COALESCE(MOD_DTTM,REG_DTTM) AS t FROM TB_BL_RCPT WHERE RCPT_ID=CAST(? AS numeric)",id);
+        return found.isEmpty()?"2026-01-01T00:00:00Z":((java.sql.Timestamp)found.get(0).get("t")).toInstant().toString();
     }
     Object bills() { return db.queryForList("SELECT * FROM TB_BL_BILL ORDER BY BILL_ID"); }
     Object receipts() { return db.queryForList("SELECT * FROM TB_BL_RCPT ORDER BY RCPT_ID"); }

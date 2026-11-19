@@ -56,16 +56,26 @@ public class BillDunningService {
         }
         if (resend && mapper.resent(id,step)) throw CodeFailure.invalid("billId","이 단계 다시 알림 보냄");
         if (!resend && mapper.automaticallySent(id,step)) return null;
-        var recipients=mapper.recipients(new RecipientFilter(bill.projectId(),
-            calendar.toDatabaseMonth(calendar.currentMonth()),step));
+        String month=calendar.toDatabaseMonth(calendar.currentMonth());
+        var recipients=mapper.recipients(new RecipientFilter(bill.projectId(),month,step));
+        String memo=null;
+        if (recipients.isEmpty() && step==1) {
+            // 사용자 결정(2026-11-19): 1단계 받을 PM이 없으면 2단계 받는 사람(그 달 파트장, 본사 직접 영업은 본사 영업
+            // 책임자, 없으면 경영진)에게 한 번 대신 보내고 이력에 남긴다(명세 「파트 없으면 경영진」과 같은 방식).
+            recipients=mapper.recipients(new RecipientFilter(bill.projectId(),month,2));
+            memo="PM 없음, 대신 보냄";
+        }
         if (recipients.isEmpty()) throw CodeFailure.invalid("delivery","현재 단계의 받는 사람이 없습니다.");
-        String description=recipients.stream().map(r -> r.name()+" ("+r.userId()+")")
-            .collect(Collectors.joining(", "));
+        // 메일 주소가 없거나 틀린 사람이 있어도 다른 사람에게는 보내고(시스템 알림은 모두), 이력에 「메일 없음」을 남긴다.
+        var mailable=recipients.stream().filter(BillLocalMailbox::deliverable).toList();
+        String description=recipients.stream().map(r -> r.name()+" ("+r.userId()+")"
+                +(BillLocalMailbox.deliverable(r)?"":" (메일 없음)"))
+            .collect(Collectors.joining(", "))+(memo==null?"":" ("+memo+")");
         if (description.codePointCount(0,description.length())>300)
             throw CodeFailure.invalid("delivery","수신자 설명이 저장 범위를 초과합니다.");
-        String content=id+" 미수 알림 "+step+"단계"+(resend?" (다시)":"")+" · 미수금 "+balance.toPlainString()+"원";
-        Path accepted=mailbox.deliver(recipients,content);
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+        String content=content(bill,step,resend,balance);
+        Path accepted=mailable.isEmpty()?null:mailbox.deliver(mailable,content);
+        if (accepted!=null && TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override public void afterCompletion(int status) {
                     if (status!=STATUS_COMMITTED) mailbox.discard(accepted);
@@ -80,9 +90,18 @@ public class BillDunningService {
             if (mapper.history(new Delivery(id,step,calendar.today(),description,resend,actor.userId()))!=1)
                 throw CodeFailure.invalid("delivery","발송 이력 저장에 실패했습니다. 다시 시도해 주세요.");
         } catch (RuntimeException exception) {
-            mailbox.discard(accepted);
+            if (accepted!=null) mailbox.discard(accepted);
             throw exception;
         }
         return new SendResult(id,new DunningHistory(step,calendar.today(),description,"BOTH",resend));
+    }
+
+    /** 시안 알림 글: 「미수 2단계 알림: 다솜생명 보험금 지급 고도화 8월분 (32일 지남)」 + 청구번호·미수금. */
+    private String content(Invoice bill, int step, boolean resend, java.math.BigDecimal balance) {
+        long days=java.time.temporal.ChronoUnit.DAYS.between(bill.payDueDate(),calendar.today());
+        int month=Integer.parseInt(bill.billMonth().substring(4,6));
+        String text="미수 "+step+"단계 알림"+(resend?"(다시)":"")+": "+bill.projectName()+" "+month+"월분 ("
+            +days+"일 지남) · "+bill.billId()+" · 미수금 "+new java.text.DecimalFormat("#,##0").format(balance)+"원";
+        return text.codePointCount(0,text.length())<=300?text:text.substring(0,text.offsetByCodePoints(0,299))+"…";
     }
 }

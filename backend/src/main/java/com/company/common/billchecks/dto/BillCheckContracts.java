@@ -14,10 +14,12 @@ public final class BillCheckContracts {
         String latestBillId, String allowedAction) {}
     public record Summary(int totalCount, int missingCount, int underCount, int overCount,
         int matchedCount) {}
+    /** months: 점검 월 단추(올해 청구가 있는 달 중 이번 달까지 + 고른 달), lastClosedMonth: 마지막 마감 월(뒤 달은 「진행 중」). */
     public record CheckResult(String checkMonth, Summary summary, List<CheckRow> items,
-        String calculationMethod, boolean plannedBasis) {}
+        String calculationMethod, boolean plannedBasis, List<String> months, String lastClosedMonth) {}
+    /** supplyAmount: 창에서 고친 공급가(비우면 서버가 점검 값으로 채움). */
     public record Input(String projectId, String checkMonth, BigDecimal vatRate,
-        LocalDate billDate, LocalDate payDueDate, String taxInvoiceNo) {}
+        LocalDate billDate, LocalDate payDueDate, String taxInvoiceNo, BigDecimal supplyAmount) {}
     public record Bill(String billId, String projectId, String projectName, String customerName,
         int billOrder, String billMonth, LocalDate billDate, BigDecimal supplyAmount,
         BigDecimal vatRate, BigDecimal vatAmount, BigDecimal totalAmount,
@@ -25,9 +27,9 @@ public final class BillCheckContracts {
         String taxInvoiceNo, String status, boolean cancelled, String cancelReason,
         String cancelledBy, Instant cancelledAt, Integer dunningStep, int daysOverdue,
         boolean canEdit, boolean canCancel, boolean canReceive, boolean canCopy,
-        boolean canNextMonth) {}
+        boolean canNextMonth, Instant modifiedAt) {}
     public record Receipt(String receiptId, LocalDate receiptDate, BigDecimal amount,
         boolean cancelled, String cancelReason, String cancelledBy, Instant cancelledAt,
-        boolean canCancel) {}
+        boolean canCancel, Instant modifiedAt) {}
     public record Detail(Bill bill, List<Receipt> receipts, boolean missingTaxInvoiceNumber) {}
 }

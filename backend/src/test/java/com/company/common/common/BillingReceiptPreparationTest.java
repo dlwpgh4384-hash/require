@@ -96,8 +96,9 @@ class BillingReceiptPreparationTest {
             .isEqualTo("rcpt_id,bill_id,rcpt_dt,rcpt_amt,cncl_yn,cncl_rsn,cncl_user_id,cncl_dttm,reg_user_id,reg_dttm,mod_user_id,mod_dttm");
         assertThat(text("SELECT numeric_precision::text || ':' || numeric_scale::text FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='tb_bl_rcpt' AND column_name='rcpt_id'"))
             .isEqualTo("12:0");
-        assertThat(text("SELECT count(*)::text FROM pg_constraint WHERE conrelid='tb_bl_rcpt'::regclass AND contype='f'"))
-            .isEqualTo("0");
+        // 2026-11-19 DDL 외래 키 FK_TB_BL_RCPT_01(청구)·02(취소 처리자)를 준비 파일에 더함
+        assertThat(text("SELECT string_agg(conname,',' ORDER BY conname) FROM pg_constraint WHERE conrelid='tb_bl_rcpt'::regclass AND contype='f'"))
+            .isEqualTo("fk_tb_bl_rcpt_01,fk_tb_bl_rcpt_02");
         assertThat(text("SELECT count(*)::text FROM pg_indexes WHERE schemaname=current_schema() AND indexname IN ('ix_tb_bl_rcpt_01','ix_tb_bl_rcpt_02')"))
             .isEqualTo("2");
         assertThat(text("SELECT count(*)::text FROM tb_bl_rcpt")).isEqualTo("0");
@@ -159,6 +160,9 @@ class BillingReceiptPreparationTest {
     }
 
     private void insertReceipt() throws Exception {
+        // 입금은 청구를 가리켜야 한다(FK_TB_BL_RCPT_01).
+        execute("INSERT INTO tb_bl_bill(bill_id,proj_id,bill_ord,bill_ym,bill_dt,sply_amt,vat_rt,vat_amt,tot_amt,rcpt_sum_amt,unpaid_amt,pay_due_dt,reg_user_id) "
+            + "VALUES ('B-202611-001','receipt-project',1,'202611',DATE '2026-11-01',1000,10,100,1100,0,1100,DATE '2026-12-25','admin') ON CONFLICT DO NOTHING");
         execute("INSERT INTO tb_bl_rcpt(bill_id,rcpt_dt,rcpt_amt,reg_user_id) VALUES ('B-202611-001',DATE '2026-11-01',100,'admin')");
     }
 

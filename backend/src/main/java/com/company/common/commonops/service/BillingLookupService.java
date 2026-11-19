@@ -49,9 +49,9 @@ public class BillingLookupService {
         metadata.definition("식-00");
         metadata.definition("식-05");
         metadata.definition("식-10");
-        BigDecimal rate=metadata.effectiveStandard("VAT_RT",month).value();
-        BillingCalculationRules.rate(rate,"vatRate");
-        return new Options(projects,mapper.statuses(),filter.month(),today,month.plusMonths(1).atDay(25),estimate,rate);
+        BigDecimal rate=rules.defaultVatRate(month);
+        return new Options(projects,mapper.statuses(),filter.month(),today,month.plusMonths(1).atDay(25),estimate,rate,
+            mapper.closed(filter.month()));
     }
 
     public DunningResult getCommonBillDunning() {
@@ -68,6 +68,8 @@ public class BillingLookupService {
             throw CodeFailure.invalid("standardCode","미수 알림 단계 기준을 확인해 주세요.");
         var history=new HashMap<String,List<HistoryRow>>();
         for (var row:mapper.history(today)) history.computeIfAbsent(row.billId(),key -> new ArrayList<>()).add(row);
+        // 입금 등록 가능 여부는 이번 달 마감 여부 하나로 정해지므로 줄마다 상세를 다시 읽지 않는다.
+        boolean receivable=!mapper.closed(calendar.toDatabaseMonth(month));
         var items=new ArrayList<DunningRow>();
         for (var bill:mapper.overdue(today)) {
             if (bill.cancelled() || bill.unpaidAmount().signum()<=0 || !bill.payDueDate().isBefore(today)) continue;
@@ -85,7 +87,7 @@ public class BillingLookupService {
             items.add(new DunningRow(bill.billId(),bill.projectId(),bill.projectName(),bill.unpaidAmount(),
                 bill.payDueDate(),Math.toIntExact(ChronoUnit.DAYS.between(bill.payDueDate(),today)),step,
                 sent.stream().map(HistoryRow::value).toList(),next,step!=null && !resent,
-                resent?"이 단계 다시 알림 보냄":null));
+                resent?"이 단계 다시 알림 보냄":null,receivable));
         }
         var roles=new LinkedHashMap<String,String>();
         for (var role:mapper.recipientRoles()) roles.put(role.code(),role.name());
@@ -96,7 +98,7 @@ public class BillingLookupService {
                 if (role.getKey().equals("PM") || (step>=2 && role.getKey().equals("SALES_LDR"))
                     || (step==3 && Set.of("EXEC","FIN").contains(role.getKey()))) recipients.add(role.getValue());
             }
-            cards.add(new Card(step,recipients));
+            cards.add(new Card(step,recipients,thresholds[step-1]));
         }
         return new DunningResult(cards,items);
     }

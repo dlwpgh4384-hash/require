@@ -11,6 +11,7 @@ import com.company.common.support.service.CodeFailure;
 import com.company.common.support.service.CurrentBusinessActor;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.*;
@@ -83,13 +84,14 @@ public class ReceiptService {
 
     @Transactional
     public Result postCommonReceiptCancel(String id, JsonNode body) {
-        ClientRules.object(body,Set.of("reason"));
+        ClientRules.object(body,Set.of("reason","modifiedAt"));
         JsonNode raw=body.path("reason");
         if (!raw.isTextual() || raw.asText().strip().isBlank())
             throw CodeFailure.invalid("reason","취소 사유를 입력해 주세요.");
         String reason=raw.asText().strip();
         if (reason.codePointCount(0,reason.length())>500)
             throw CodeFailure.invalid("reason","취소 사유는 500자 이내로 입력해 주세요.");
+        Instant token=token(body);
         if (id==null || !id.matches("[0-9]{1,12}"))
             throw new CodeFailure(404,"receiptId","입금을 찾을 수 없습니다.");
         projects.lockSources();
@@ -99,11 +101,23 @@ public class ReceiptService {
         ReceiptRow receipt=mapper.lockReceipt(id);
         if (receipt==null) throw new CodeFailure(404,"receiptId","입금을 찾을 수 없습니다.");
         if (receipt.cancelled()) throw CodeFailure.invalid("receiptId","이미 취소된 입금입니다.");
-        open(YearMonth.from(receipt.receiptDate()),"receiptId");
-        if (mapper.cancel(id,reason,actor.userId())!=1)
-            throw CodeFailure.invalid("receiptId","이미 취소된 입금입니다.");
+        if (mapper.closed(calendar.toDatabaseMonth(YearMonth.from(receipt.receiptDate()))))
+            throw CodeFailure.invalid("receiptId",calendar.toDatabaseMonth(YearMonth.from(receipt.receiptDate())).substring(0,4)
+                +"-"+calendar.toDatabaseMonth(YearMonth.from(receipt.receiptDate())).substring(4)+"는 마감한 달이라 이 입금은 취소할 수 없습니다.");
+        // 00-1 동시 수정: 화면이 읽은 수정 시각과 지금 값이 다르면 409(공통 문구).
+        if (!Objects.equals(receipt.modifiedAt(),token)) throw CodeFailure.conflict();
+        if (mapper.cancel(id,reason,actor.userId(),token)!=1) throw CodeFailure.conflict();
         recompute(bill);
         return new Result(List.of(bill.billId()),List.of(mapper.receipt(id).view()));
+    }
+
+    private static Instant token(JsonNode body) {
+        JsonNode node=body.get("modifiedAt");
+        if (node==null || node.isNull()) throw CodeFailure.invalid("modifiedAt","수정 시각을 제출해 주세요.");
+        try {
+            if (!node.isTextual()) throw new IllegalArgumentException();
+            return Instant.parse(node.textValue());
+        } catch (RuntimeException exception) { throw CodeFailure.invalid("modifiedAt","수정 시각을 확인해 주세요."); }
     }
 
     private Bill requiredBill(String id,int status) {

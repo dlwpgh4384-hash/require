@@ -12,6 +12,12 @@ import org.springframework.stereotype.Component;
 /** Development delivery to an application-owned local MIME mailbox, not Internet SMTP. */
 @Component
 public class BillLocalMailbox {
+    /** 메일을 받을 수 있는 주소인지(비었거나 형식이 틀리면 메일만 빼고 시스템 알림은 보낸다). */
+    public static boolean deliverable(Recipient recipient) {
+        return recipient!=null && recipient.email()!=null && recipient.email().length()<=100
+            && recipient.email().matches("[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+");
+    }
+
     public Path deliver(List<Recipient> recipients, String content) {
         if (recipients==null || recipients.isEmpty())
             throw CodeFailure.invalid("delivery","받는 사람이 없습니다.");

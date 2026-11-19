@@ -31,7 +31,7 @@
     JOIN TB_PJ_PROJ p ON p.PROJ_ID=m.PROJ_ID
     LEFT JOIN TB_HR_DEV d ON d.DEV_ID=m.DEV_ID
     WHERE m.INPUT_YM=#{month} AND p.CTRT_TYPE_CD IN ('MO','DP') AND a.INPUT_TYPE_CD&lt;&gt;'FREE'
-    <if test="!closed">AND a.ASGN_STAT_CD='ACT'</if>
+      AND a.ASGN_STAT_CD='ACT'
     ORDER BY p.PROJ_NM,p.PROJ_ID,m.ASGN_ID
   </select>
   <resultMap id="invoice" type="com.company.common.billchecks.mapper.BillCheckSources$Invoice" autoMapping="false">
@@ -58,6 +58,7 @@
     <result column="cancelReason" property="cancelReason"/>
     <result column="cancelledBy" property="cancelledBy"/>
     <result column="cancelledAt" property="cancelledAt"/>
+    <result column="modifiedAt" property="modifiedAt"/>
   </resultMap>
   <sql id="invoiceSelect">
     SELECT b.BILL_ID AS "billId",b.PROJ_ID AS "projectId",p.PROJ_NM AS "projectName",
@@ -67,7 +68,8 @@
       b.SPLY_AMT AS "supplyAmount",b.VAT_RT AS "vatRate",b.VAT_AMT AS "vatAmount",
       b.TOT_AMT AS "totalAmount",b.RCPT_SUM_AMT AS "receiptSumAmount",b.UNPAID_AMT AS "unpaidAmount",
       b.PAY_DUE_DT AS "payDueDate",b.TAX_INVC_NO AS "taxInvoiceNo",(b.CNCL_YN='Y') AS "cancelled",
-      b.CNCL_RSN AS "cancelReason",b.CNCL_USER_ID AS "cancelledBy",b.CNCL_DTTM AS "cancelledAt"
+      b.CNCL_RSN AS "cancelReason",b.CNCL_USER_ID AS "cancelledBy",b.CNCL_DTTM AS "cancelledAt",
+      COALESCE(b.MOD_DTTM,b.REG_DTTM) AS "modifiedAt"
     FROM TB_BL_BILL b JOIN TB_PJ_PROJ p ON p.PROJ_ID=b.PROJ_ID
     LEFT JOIN TB_BS_CLNT c ON c.CLNT_ID=p.CUST_CLNT_ID
   </sql>
@@ -88,6 +90,7 @@
       <arg column="cancelledBy" javaType="string"/>
       <arg column="cancelledAt" javaType="java.time.Instant"/>
       <arg column="canCancel" javaType="_boolean"/>
+      <arg column="modifiedAt" javaType="java.time.Instant"/>
     </constructor>
   </resultMap>
   <select id="receipts" resultMap="receipt">
@@ -95,7 +98,8 @@
       (r.CNCL_YN='Y') AS "cancelled",r.CNCL_RSN AS "cancelReason",
       r.CNCL_USER_ID AS "cancelledBy",r.CNCL_DTTM AS "cancelledAt",
       (r.CNCL_YN='N' AND NOT EXISTS(SELECT 1 FROM TB_CL_CLOSE c
-        WHERE c.CLOSE_YM=to_char(r.RCPT_DT,'YYYYMM') AND c.CLOSE_STAT_CD='CLOSE')) AS "canCancel"
+        WHERE c.CLOSE_YM=to_char(r.RCPT_DT,'YYYYMM') AND c.CLOSE_STAT_CD='CLOSE')) AS "canCancel",
+      COALESCE(r.MOD_DTTM,r.REG_DTTM) AS "modifiedAt"
     FROM TB_BL_RCPT r WHERE r.BILL_ID=#{id} ORDER BY r.RCPT_DT,r.RCPT_ID
   </select>
   <select id="normalReceipts" resultType="java.math.BigDecimal">
@@ -103,7 +107,12 @@
   </select>
   <select id="latestProjectBill" resultType="string">
     SELECT b.BILL_ID FROM TB_BL_BILL b WHERE b.PROJ_ID=#{projectId} AND b.CNCL_YN='N'
-    ORDER BY b.BILL_ORD DESC,b.BILL_ID DESC LIMIT 1
+    ORDER BY b.BILL_YM DESC,b.BILL_ID DESC LIMIT 1
+  </select>
+  <select id="billMonths" resultType="string">
+    SELECT DISTINCT b.BILL_YM FROM TB_BL_BILL b
+    WHERE b.CNCL_YN='N' AND substring(b.BILL_YM,1,4)=#{year} AND b.BILL_YM&lt;=#{until}
+    ORDER BY b.BILL_YM
   </select>
   <!-- ProjectMapper.lockSources is always acquired first, matching existing project/assignment writers. -->
   <update id="lockMonthlySources">LOCK TABLE TB_PJ_ASGN_MON IN SHARE ROW EXCLUSIVE MODE</update>
@@ -111,10 +120,10 @@
 
   <insert id="insert">
     INSERT INTO TB_BL_BILL(BILL_ID,PROJ_ID,BILL_ORD,BILL_YM,BILL_DT,SPLY_AMT,VAT_RT,VAT_AMT,
-      TOT_AMT,RCPT_SUM_AMT,UNPAID_AMT,PAY_DUE_DT,TAX_INVC_NO,CNCL_YN,REG_USER_ID,MOD_USER_ID)
+      TOT_AMT,RCPT_SUM_AMT,UNPAID_AMT,PAY_DUE_DT,TAX_INVC_NO,CNCL_YN,REG_USER_ID,REG_DTTM,MOD_USER_ID)
     VALUES(#{billId},#{input.projectId},#{billOrder},#{input.checkMonth},#{input.billDate},
       #{amounts.supplyAmount},#{amounts.vatRate},#{amounts.vatAmount},#{amounts.totalAmount},
-      0,#{amounts.totalAmount},#{input.payDueDate},#{input.taxInvoiceNo,jdbcType=VARCHAR},'N',#{actor},#{actor})
+      0,#{amounts.totalAmount},#{input.payDueDate},#{input.taxInvoiceNo,jdbcType=VARCHAR},'N',#{actor},clock_timestamp(),#{actor})
   </insert>
   <update id="correct">
     UPDATE TB_BL_BILL SET SPLY_AMT=#{amounts.supplyAmount},VAT_RT=#{amounts.vatRate},

@@ -1,4 +1,6 @@
--- Original receipt structure, explicitly prepared; no business data or physical FK added.
+-- Original receipt structure, explicitly prepared; no business data added.
+-- 2026-11-19: DDL의 외래 키 FK_TB_BL_RCPT_01(BILL_ID → TB_BL_BILL), FK_TB_BL_RCPT_02(CNCL_USER_ID → TB_SY_USER)를
+-- V10~V14와 같은 방식(없으면 만들고, 다르면 고치지 않고 멈춤)으로 더한다.
 DO $billing_receipt$
 DECLARE
     ddl TEXT := $ddl$CREATE TABLE IF NOT EXISTS TB_BL_RCPT (
@@ -75,6 +77,32 @@ BEGIN
 END
 $billing_receipt$;
 
+DO $billing_receipt_references$
+DECLARE
+    spec record;
+    definition text;
+    expected text;
+BEGIN
+    FOR spec IN SELECT * FROM (VALUES
+        ('FK_TB_BL_RCPT_01','BILL_ID','TB_BL_BILL','BILL_ID'),
+        ('FK_TB_BL_RCPT_02','CNCL_USER_ID','TB_SY_USER','USER_ID')
+    ) AS refs(name,column_name,target,target_column) LOOP
+        expected := format('FOREIGN KEY (%s) REFERENCES %s(%s)',
+            lower(spec.column_name),lower(spec.target),lower(spec.target_column));
+        SELECT pg_get_constraintdef(oid) INTO definition FROM pg_constraint
+         WHERE conrelid='tb_bl_rcpt'::regclass AND conname=lower(spec.name);
+        IF definition IS NULL THEN
+            EXECUTE format('ALTER TABLE TB_BL_RCPT ADD CONSTRAINT %I %s',lower(spec.name),expected);
+        ELSIF lower(definition) IS DISTINCT FROM lower(expected) OR NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conrelid='tb_bl_rcpt'::regclass AND conname=lower(spec.name)
+                AND convalidated AND NOT condeferrable
+        ) THEN
+            RAISE EXCEPTION USING MESSAGE='TB_BL_RCPT.' || spec.name || ': expected original foreign key', ERRCODE='P0001';
+        END IF;
+    END LOOP;
+END
+$billing_receipt_references$;
+
 CREATE INDEX IF NOT EXISTS IX_TB_BL_RCPT_01 ON TB_BL_RCPT (BILL_ID);
 CREATE INDEX IF NOT EXISTS IX_TB_BL_RCPT_02 ON TB_BL_RCPT (CNCL_USER_ID);
 
@@ -105,12 +133,12 @@ $billing_receipt_indexes$;
 
 COMMENT ON TABLE TB_BL_RCPT IS '청구별 실제 입금과 취소 사유·처리자·시각을 보존한다. 취소 입금은 정상 입금 합계에서 제외하며 원행을 삭제하지 않는다.';
 COMMENT ON COLUMN TB_BL_RCPT.RCPT_ID IS 'SQ_TB_BL_RCPT로 발급하는 원문 입금 식별자 (FK 미선언)';
-COMMENT ON COLUMN TB_BL_RCPT.BILL_ID IS 'TB_BL_BILL.BILL_ID 참조 의도 (FK 미선언)';
+COMMENT ON COLUMN TB_BL_RCPT.BILL_ID IS 'TB_BL_BILL.BILL_ID 참조 (FK_TB_BL_RCPT_01)';
 COMMENT ON COLUMN TB_BL_RCPT.RCPT_DT IS '입금일자: 자금수지 실적 기준';
 COMMENT ON COLUMN TB_BL_RCPT.RCPT_AMT IS '입금금액: 0 초과, 미수금 이하';
 COMMENT ON COLUMN TB_BL_RCPT.CNCL_YN IS '취소 입금은 정상 입금 합계에서 제외하며 입금월 마감 뒤 취소할 수 없음';
 COMMENT ON COLUMN TB_BL_RCPT.CNCL_RSN IS '취소사유: 취소할 때 필수';
-COMMENT ON COLUMN TB_BL_RCPT.CNCL_USER_ID IS 'TB_SY_USER.USER_ID 참조 의도 (FK 미선언): 취소 처리자';
+COMMENT ON COLUMN TB_BL_RCPT.CNCL_USER_ID IS 'TB_SY_USER.USER_ID 참조 (FK_TB_BL_RCPT_02): 취소 처리자';
 COMMENT ON COLUMN TB_BL_RCPT.CNCL_DTTM IS '서버가 기록한 취소일시';
 COMMENT ON COLUMN TB_BL_RCPT.REG_USER_ID IS 'TB_SY_USER.USER_ID 참조 의도 (FK 미선언): 등록자';
 COMMENT ON COLUMN TB_BL_RCPT.REG_DTTM IS '등록일시';

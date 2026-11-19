@@ -468,3 +468,17 @@ it("등록 후 재조회 실패는 이미 저장된 등록을 다시 POST하지 
   await screen.findByTestId("management-row-m031");
   expect(writes()).toHaveLength(1);
 });
+
+// 시안 .fl.req: 필수 표시 *는 빨강 글자로 칸 이름 옆에 붙는다(2026-11-19 사용자 발견).
+it("필수 칸 이름의 *는 빨강 표시 글자로 그린다", async () => {
+  await mount();
+  await open();
+  const dialog = within(screen.getByTestId("menu-registration-dialog"));
+  const marks = [
+    dialog.getByText("레벨", { exact: false, selector: "legend" }),
+    dialog.getByText("메뉴 이름", { exact: false, selector: "label" }),
+    dialog.getByText("상위 대메뉴", { exact: false, selector: "label" }),
+    dialog.getByText("화면 번호", { exact: false, selector: "label" }),
+  ].map((label) => label.querySelector(".field-required"));
+  marks.forEach((mark) => expect(mark).toHaveTextContent("*"));
+});

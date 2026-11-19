@@ -18,7 +18,7 @@ import { ProjectDetail } from "../projects/ProjectDetail";
 import { useOpenProjectEdit } from "../projects/projectEdit";
 import { HQ_PART, projectFailure } from "../projects/projects";
 import { ProjectIssuesView } from "../projectissues/ProjectIssuesView";
-import { ProjectIssuesPanel } from "../projectissues/ProjectIssuesPanel";
+import { projectDetailIssues } from "../projects/projectDetailIssues";
 import {
   getCommonProjectBoard,
   getCommonProjectBoardExcel,
@@ -764,9 +764,7 @@ export function ProjectBoardPage() {
           initialTab={detail.tab}
           boardOperations
           dirtyScreenId="UI-31"
-          renderIssues={(project, changed) => (
-            <ProjectIssuesPanel project={project} onChanged={changed} />
-          )}
+          renderIssues={projectDetailIssues(false, "UI-31")}
           onClose={() => {
             setDetail(null);
             refresh();

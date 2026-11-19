@@ -421,7 +421,8 @@ it("등록 창을 고친 채 닫으면 공통 문구로 묻는다", async () => 
   const dialog = await screen.findByRole("dialog", { name: "청구 등록 · 지난 청구 복사" });
   fireEvent.change(within(dialog).getByTestId("bill-form-taxInvoiceNo"), { target: { value: "1" } });
   fireEvent.click(within(dialog).getByTestId("bill-form-cancel"));
-  const confirm = within(dialog).getByTestId("bill-form-dirty");
+  // 확인 창은 창 위에 따로 뜬다(공통 InlineConfirmation이 body에 그림).
+  const confirm = screen.getByTestId("bill-form-dirty");
   expect(confirm).toHaveTextContent("저장하지 않은 내용이 있습니다");
   expect(confirm).toHaveTextContent("나가면 입력한 내용이 사라집니다.");
   fireEvent.click(within(confirm).getByRole("button", { name: "나가기" }));
@@ -435,13 +436,13 @@ it("[청구 취소] 창은 사유를 적은 채 닫으면 공통 문구로 묻�
   const dialog = await screen.findByTestId("bill-cancel-dialog");
   fireEvent.change(within(dialog).getByTestId("bill-cancel-reason"), { target: { value: "잘못 등록" } });
   fireEvent.click(within(dialog).getByTestId("bill-cancel-back"));
-  const confirm = within(dialog).getByTestId("bill-cancel-dirty");
+  const confirm = screen.getByTestId("bill-cancel-dirty");
   expect(confirm).toHaveTextContent("저장하지 않은 내용이 있습니다");
   expect(confirm).toHaveTextContent("나가면 입력한 내용이 사라집니다.");
   fireEvent.click(within(confirm).getByRole("button", { name: "취소" }));
   expect(within(dialog).getByTestId("bill-cancel-reason")).toHaveValue("잘못 등록");
   fireEvent.click(within(dialog).getByTestId("bill-cancel-back"));
-  fireEvent.click(within(within(dialog).getByTestId("bill-cancel-dirty")).getByRole("button", { name: "나가기" }));
+  fireEvent.click(within(screen.getByTestId("bill-cancel-dirty")).getByRole("button", { name: "나가기" }));
   await waitFor(() => expect(screen.queryByTestId("bill-cancel-dialog")).not.toBeInTheDocument());
   expect(calls("POST", "/cancel")).toHaveLength(0);
 });

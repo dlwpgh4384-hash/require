@@ -27,4 +27,6 @@ public interface WithdrawalMapper {
     List<ExtensionRow> extensions(MonthFilter filter);
     List<OpportunityDemandRow> opportunityDemand(MonthFilter filter);
     List<ProjectDemandRow> projectDemand(MonthFilter filter);
+    /** 엑셀 다운로드 접근 기록(DNLD, SFR-011-03). */
+    int insertAccess(@org.apache.ibatis.annotations.Param("userId") String userId, @org.apache.ibatis.annotations.Param("target") String target);
 }

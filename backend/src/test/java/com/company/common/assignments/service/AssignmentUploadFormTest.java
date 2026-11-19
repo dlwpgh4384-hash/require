@@ -69,6 +69,8 @@ class AssignmentUploadFormTest {
     String extension(Inspection report){return ((AssignmentUploadForm.UploadRow)report.records().get(0)).extension();}
     @Test void seedHasTheExtensionCodesThisTestReliesOn(){assertThat(SEED).filteredOn(r->r.groupId.equals("EXT_PSBL")).extracting(r->r.codeName).contains("높음 (80%)","보통 (50%)","낮음 (0%)");}
     @Test void exactTenHeadersAndBlankMmDefaultsToOneWithoutAnyWrites(){assertThat(form.headers()).containsExactly("프로젝트ID","관리번호","직무","투입일","철수일","월 MM","청구 단가","투입 구분","계약상 인력 관리번호","연장 가능성");var report=inspect("valid.xlsx",bytes(List.of(row())));assertThat(report.errorCount()).isZero();verify(assignments).inspectRegistration(argThat(b->b.path("monthlyMm").decimalValue().compareTo(java.math.BigDecimal.ONE)==0 && "BE".equals(b.path("jobCode").asText()) && "NEW".equals(b.path("inputTypeCode").asText())));verify(assignments,never()).create(any(),any());}
+    // SFR-012-03: 점·빗금 날짜도 받아 서버 규칙에는 2026-10-01 모양으로 넘긴다(2026-11-19).
+    @Test void dottedAndSlashedDatesAreNormalized(){var r=new ArrayList<>(row(3,"2026.10.01"));r.set(4,"2026/12/31");inspect("dots.xlsx",bytes(List.of(r)));verify(assignments).inspectRegistration(argThat(b->"2026-10-01".equals(b.path("startDate").asText())&&"2026-12-31".equals(b.path("endDate").asText())));}
     @Test void malformedWorkbookIsRejected(){assertThatThrownBy(()->inspect("bad.xlsx",new byte[]{'P','K',3,4})).isInstanceOf(CodeFailure.class);verify(assignments,never()).create(any(),any());}
     @Test void renamedTextIsNotAcceptedAsExcel(){assertThatThrownBy(()->inspect("renamed.xlsx","text".getBytes(java.nio.charset.StandardCharsets.UTF_8))).isInstanceOf(CodeFailure.class);}
     /** 명세 B.5에 「같은 내용의 중복 행」 오류는 없다: 엑셀 한 줄 = 배정 한 건. */

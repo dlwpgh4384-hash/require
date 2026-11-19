@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { ProjectDetail } from "./ProjectDetail";
+import { projectDetailIssues } from "./projectDetailIssues";
 import { useOpenProjectEdit } from "./projectEdit";
 import "./projects.css";
 
@@ -43,6 +44,9 @@ export function ProjectLink({
             <ProjectDetail
               projectId={projectId}
               readOnly={readOnly}
+              // 프로젝트 화면에서 연 상세와 같은 기능: [이번 주 상태 적기]·[이슈 등록] 등(2026-11-19 사용자 결정).
+              boardOperations
+              renderIssues={projectDetailIssues(readOnly, "")}
               onClose={() => setOpen(false)}
               onEdit={(project) => {
                 // 시안 editform: 상세를 닫고 프로젝트 화면의 수정 폼을 연다.

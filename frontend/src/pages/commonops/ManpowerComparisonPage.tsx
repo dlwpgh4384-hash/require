@@ -12,6 +12,7 @@ import {
 import { YearBar } from "../../shared/period/YearBar";
 import { koreanToday } from "../../shared/time";
 import { ProjectDetail } from "../projects/ProjectDetail";
+import { projectDetailIssues } from "../projects/projectDetailIssues";
 import { useOpenProjectEdit } from "../projects/projectEdit";
 import {
   getCommonProjects,
@@ -421,6 +422,9 @@ export function ManpowerComparisonPage() {
           dirtyScreenId="UI-11"
           projectId={detail.projectId}
           initialTab={detail.tab}
+          // 프로젝트 화면에서 연 상세와 같은 기능: [이번 주 상태 적기]·[이슈 등록] 등(2026-11-19 사용자 결정).
+          boardOperations
+          renderIssues={projectDetailIssues(false, "UI-11")}
           onClose={() => {
             setDetail(null);
             refresh();

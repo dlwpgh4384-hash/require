@@ -39,6 +39,12 @@
   font-size: 14px;
   font-weight: 400;
 }
+/* 시안 .fl.req::after: 필수 표시 *는 빨강(var(--bad) #B91C1C, 어두운 화면 #F87171). 공통 field-required를 쓰되
+   색은 시안 값으로 맞춘다(공통코드 창과 같음). 글자로 두어 칸 이름(「메뉴 이름 *」)은 그대로 읽힌다. */
+[data-testid="menu-registration-dialog"] .field-required {
+  margin-left: 0;
+  color: var(--ls-bad, #b91c1c);
+}
 .menu-registration-form .ls-in {
   width: 100%;
   min-width: 0;

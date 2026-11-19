@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog, InlineConfirmation } from "../../shared/feedback/Dialog";
-import { feedbackMessages } from "../../shared/feedback/messages";
 import * as api from "./menuRegistration";
 import "../../shared/list/list.css";
 import "./menuRegistration.css";
+
+/** 시안 .fl.req: 필수 표시 *는 빨강. 다른 창과 같은 공통 표시(field-required)를 쓴다. */
+const req = <span className="field-required">*</span>;
 
 /** UI-25-M1 / SCR-UI-25-M1: ID와 아이콘은 서버가 정한다. */
 export function MenuRegistrationDialog({
@@ -136,8 +138,8 @@ export function MenuRegistrationDialog({
     <Dialog title="메뉴 등록" testId="menu-registration-dialog" onClose={close}>
       {closing ? (
         <InlineConfirmation
-          title="나가시겠습니까?"
-          description={feedbackMessages.unsaved}
+          title="저장하지 않은 내용이 있습니다"
+          description="나가면 입력한 내용이 사라집니다."
           onCancel={() => setClosing(false)}
           onProceed={onClose}
         />
@@ -157,7 +159,7 @@ export function MenuRegistrationDialog({
             data-testid="menu-registration-level"
             disabled={busy}
           >
-            <legend>레벨 *</legend>
+            <legend>레벨 {req}</legend>
             {(
               [
                 [1, "대메뉴(묶음)"],
@@ -180,7 +182,7 @@ export function MenuRegistrationDialog({
               </label>
             ))}
           </fieldset>
-          <label htmlFor="menu-registration-name">메뉴 이름 *</label>
+          <label htmlFor="menu-registration-name">메뉴 이름 {req}</label>
           <input
             id="menu-registration-name"
             data-testid="menu-registration-name"
@@ -199,7 +201,7 @@ export function MenuRegistrationDialog({
           {fieldError("menuNm")}
           {level === 2 ? (
             <>
-              <label htmlFor="menu-registration-parent">상위 대메뉴 *</label>
+              <label htmlFor="menu-registration-parent">상위 대메뉴 {req}</label>
               <select
                 id="menu-registration-parent"
                 data-testid="menu-registration-parent"
@@ -219,7 +221,7 @@ export function MenuRegistrationDialog({
                 ))}
               </select>
               {fieldError("upperMenuId")}
-              <label htmlFor="menu-registration-screen">화면 번호 *</label>
+              <label htmlFor="menu-registration-screen">화면 번호 {req}</label>
               <select
                 id="menu-registration-screen"
                 data-testid="menu-registration-screen"

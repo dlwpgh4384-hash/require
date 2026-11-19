@@ -180,6 +180,12 @@ class CommonClientIntegrationTest {
         mvc.perform(get("/api/common/clients").param("clientTypeCode","CUST")).andExpect(jsonPath("$.data.items.length()").value(1))
             .andExpect(jsonPath("$.data.items[0].clientId").value(both)).andExpect(jsonPath("$.data.items[0].personCount").value(1)).andExpect(jsonPath("$.data.items[0].projectCount").value(2));
         mvc.perform(get("/api/common/clients/"+both+"/assignments")).andExpect(jsonPath("$.data.items.length()").value(2));
+        // 시안 cliProj: 수주예정 프로젝트도 오늘 투입이 있으면 [투입 내역] 탭에 나오므로 목록 수에도 센다
+        project("p3",both,"PRE");
+        db.update("INSERT INTO TB_PJ_ASGN(asgn_id,proj_id,dev_id,job_cd,input_bgn_dt,input_end_dt,ctrt_mm,input_type_cd,ext_cnt,asgn_stat_cd,reg_user_id) VALUES('a3','p3','d1','BE','2030-01-01','2030-01-05',1,'NEW',0,'ACT','admin')");
+        mvc.perform(get("/api/common/clients/"+both+"/assignments")).andExpect(jsonPath("$.data.items.length()").value(3));
+        mvc.perform(get("/api/common/clients").param("clientTypeCode","CUST")).andExpect(jsonPath("$.data.items[0].projectCount").value(3))
+            .andExpect(jsonPath("$.data.items[0].personCount").value(1));
         mvc.perform(get("/api/common/clients").param("clientTypeCode","VNDR")).andExpect(jsonPath("$.data.items.length()").value(2));
         assertThat(mapper.selectClient(vendor,java.time.LocalDate.of(2030,1,2)).personCount).isZero();
     }

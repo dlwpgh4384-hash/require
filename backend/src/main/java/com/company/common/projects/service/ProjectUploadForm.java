@@ -121,16 +121,13 @@ public class ProjectUploadForm implements UploadForm {
         issues.sort(Comparator.comparingInt(i -> "오류".equals(i.severity())?0:1));
         return new Inspection(records,issues,successes,warnings,errors,rows.size(),assigned);
     }
-    /** 날짜 칸: 2026-01-31 모양만 받는다. */
+    /** 날짜 칸: SFR-012-03 — 2026-01-31·2026.01.31·2026/01/31 모두 받는다(개발자 업로드와 같은 규칙). */
     private static String date(TabularRow row,int col,String label,List<Issue> issues) {
         String text = row.values().get(col).trim();
         if (text.isEmpty()) { issue(issues,row,col,label+"을 입력해 주세요.","오류"); return null; }
-        try {
-            if (!text.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")) throw new java.time.DateTimeException(text);
-            return java.time.LocalDate.parse(text).toString();
-        } catch (java.time.DateTimeException e) {
-            issue(issues,row,col,label+"은 2026-01-31처럼 적어 주세요.","오류"); return null;
-        }
+        var parsed = com.company.common.developers.service.DeveloperUploadForm.parseDate(text);
+        if (parsed == null) { issue(issues,row,col,label+"은 2026-01-31처럼 적어 주세요.","오류"); return null; }
+        return parsed.toString();
     }
     /** 금액 칸: 원 단위 숫자. 천 단위 쉼표(1,000,000)는 지우고 읽는다. */
     private static java.math.BigDecimal amount(TabularRow row,int col,List<Issue> issues) {

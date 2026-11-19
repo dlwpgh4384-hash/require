@@ -49,11 +49,12 @@
     AND ((c.clnt_type_cd IN ('CUST','BOTH') AND p.cust_clnt_id = c.clnt_id)
       OR (c.clnt_type_cd IN ('VNDR','BOTH') AND d.blng_clnt_id = c.clnt_id))
   </sql>
+  <!-- 시안 UI-15 cliProj: 진행 프로젝트 수 = [투입 내역] 탭에 나오는 서로 다른 프로젝트 수(프로젝트 상태로 거르지 않음) -->
   <sql id="counts">
     (SELECT count(DISTINCT p.proj_id) FROM TB_PJ_ASGN a
       JOIN TB_PJ_PROJ p ON p.proj_id = a.proj_id
       JOIN TB_HR_DEV d ON d.dev_id = a.dev_id
-      WHERE <include refid="todayMembership"/> AND p.proj_stat_cd = 'ING') AS project_count,
+      WHERE <include refid="todayMembership"/>) AS project_count,
     (SELECT count(DISTINCT d.dev_id) FROM TB_PJ_ASGN a
       JOIN TB_PJ_PROJ p ON p.proj_id = a.proj_id
       JOIN TB_HR_DEV d ON d.dev_id = a.dev_id

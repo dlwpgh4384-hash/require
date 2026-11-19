@@ -135,3 +135,8 @@
     color: #fca5a5;
   }
 }
+
+/* 창 위에 뜨는 확인 창은 원래 창보다 위에 둔다. */
+.app-confirm-layer .app-scrim {
+  z-index: 110;
+}

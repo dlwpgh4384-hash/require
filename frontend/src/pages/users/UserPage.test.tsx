@@ -556,7 +556,7 @@ it("수정 창의 미저장 입력은 닫기 전에 확인한다", async () => {
     target: { value: "다른 이름" },
   });
   fireEvent.click(within(dialog).getByTestId("user-cancel"));
-  expect(within(dialog).getByText("나가시겠습니까?")).toBeInTheDocument();
+  expect(screen.getByText("저장하지 않은 내용이 있습니다")).toBeInTheDocument();
 });
 
 it("다른 계정의 상세를 읽는 동안 이전 계정의 처리 버튼을 재사용하지 않는다", async () => {

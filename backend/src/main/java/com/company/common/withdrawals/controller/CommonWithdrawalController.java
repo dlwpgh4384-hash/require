@@ -68,6 +68,7 @@ public class CommonWithdrawalController {
             "연장 " + r.extensionCount() + "회" + (r.earlyWithdrawalHistory().isEmpty() ? "" : " / " + String.join(" / ", r.earlyWithdrawalHistory())),
             r.extensionPossibilityName(), nextLabel(r))).toList();
         var now = service.now();
+        service.recordDownload(items.size(), filter.year());
         byte[] bytes = excel.write("철수 리스트", List.of("이름", "프로젝트", "직무", "철수일", "남은 일수", "연장·조기 철수", "연장 가능성", "다음 배정"),
             rows, service.userId(), now);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))

@@ -682,3 +682,24 @@ it.each([false, true])(
     }
   },
 );
+
+// 시안 c27grp·c27code·ratecodenew: 입력 칸 안내 글(placeholder)은 시안 그대로(2026-11-19 사용자 발견).
+it("그룹·코드·수당코드 추가 창의 입력 칸 안내 글은 시안과 같다", async () => {
+  await ready();
+  fireEvent.click(screen.getByTestId("code-group-add"));
+  expect(screen.getByLabelText("그룹 ID")).toHaveAttribute("placeholder", "예: EDU_COURSE");
+  expect(screen.getByLabelText("그룹 이름")).toHaveAttribute("placeholder", "예: 교육 과정");
+  fireEvent.click(screen.getByTestId("code-dialog-cancel"));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  fireEvent.click(screen.getByTestId("code-add"));
+  let dialog = within(screen.getByRole("dialog"));
+  expect(dialog.getByLabelText("새 코드")).toHaveAttribute("placeholder", "예: CLOUD");
+  expect(dialog.getByLabelText("새 코드 이름")).not.toHaveAttribute("placeholder");
+  fireEvent.click(screen.getByTestId("code-dialog-cancel"));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  await selectGroup("ALWNC");
+  fireEvent.click(screen.getByTestId("code-add"));
+  dialog = within(screen.getByRole("dialog"));
+  expect(dialog.getByLabelText("새 코드")).toHaveAttribute("placeholder", "예: NIGHT_FEE");
+  expect(dialog.getByLabelText("새 코드 이름")).toHaveAttribute("placeholder", "예: 야근 수당(월)");
+});

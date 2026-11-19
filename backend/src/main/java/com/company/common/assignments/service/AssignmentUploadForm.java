@@ -54,7 +54,8 @@ public class AssignmentUploadForm implements UploadForm {
                 if("INDRCT".equals(developer.directClassCode())) throw CodeFailure.invalid("developerId","간접 인력은 투입 배정 대상이 아닙니다.");
                 body.put("developerId",developer.id());
                 column=2;body.put("jobCode",resolve("JOB",row.values().get(2),row,column,issues));
-                body.put("startDate",row.values().get(3).trim());body.put("endDate",row.values().get(4).trim());
+                // SFR-012-03: 2026-11-19·2026.11.19·2026/11/19 모두 받는다(개발자 업로드와 같은 규칙). 못 읽으면 원문을 넘겨 아래 검사가 오류를 낸다.
+                body.put("startDate",uploadDate(row.values().get(3)));body.put("endDate",uploadDate(row.values().get(4)));
                 column=5;body.put("monthlyMm",row.values().get(5).isBlank()?BigDecimal.ONE:number(row.values().get(5),"monthlyMm"));
                 column=6;BigDecimal price=row.values().get(6).isBlank()?null:number(row.values().get(6),"billingPrice");
                 if(price==null) {
@@ -113,5 +114,10 @@ public class AssignmentUploadForm implements UploadForm {
             result.put(row.number(),assignments.create(row.body(),row.extension()).assignmentId());
         }
         return result;
+    }
+    private static String uploadDate(String raw) {
+        String text=raw.trim();
+        var parsed=com.company.common.developers.service.DeveloperUploadForm.parseDate(text);
+        return parsed==null?text:parsed.toString();
     }
 }

@@ -138,6 +138,36 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (url.startsWith("/api/common/bills?"))
+      return {
+        success: true,
+        meta: {},
+        data: {
+          items: [],
+          readOnly: false,
+          summary: {
+            yearBillCount: 0,
+            yearBillTotal: 0,
+            currentMonthBillTotal: 0,
+            unpaidCount: 0,
+            unpaidTotal: 0,
+            overdueCount: 0,
+          },
+          totals: {
+            supplyAmount: 0,
+            vatAmount: 0,
+            totalAmount: 0,
+            receiptSumAmount: 0,
+            unpaidAmount: 0,
+          },
+        },
+      };
+    if (url === "/api/common/bill-options")
+      return {
+        success: true,
+        meta: {},
+        data: { projects: [], statusOptions: [] },
+      };
     if (url.startsWith("/api/common/withdrawals?"))
       return {
         success: true,
@@ -528,7 +558,10 @@ describe("common placeholder screen contract", () => {
             expect(screen.getByRole("button", { name })).toBeEnabled();
           // 철수 리스트·인원 계획 대비 투입·프로젝트 현황판: 글 칸은 없지만 시안 조건 줄의 [조회]가 있다.
           else if (
-            (id === "UI-05" || id === "UI-11" || id === "UI-31") &&
+            (id === "UI-05" ||
+              id === "UI-11" ||
+              id === "UI-31" ||
+              id === "UI-13") &&
             name === "조회"
           )
             expect(screen.getByRole("button", { name })).toBeEnabled();

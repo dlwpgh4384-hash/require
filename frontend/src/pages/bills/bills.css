@@ -1,0 +1,207 @@
+.bill-page,
+.bill-panel,
+.bill-check-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  color: var(--text);
+}
+/* 시안 .tabs .tb (+ .nb 건수) */
+.bill-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--divider, var(--border));
+  overflow-x: auto;
+  margin-bottom: -8px;
+}
+.bill-tab {
+  height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-sub);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bill-tab.on {
+  color: var(--primary-text);
+  border-bottom-color: var(--primary-text);
+  font-weight: 600;
+}
+.bill-nb {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--ls-bad-bg, #fef2f2);
+  color: var(--ls-bad, #b91c1c);
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-grid;
+  place-items: center;
+}
+/* 시안 .kpis/.kpi */
+.bill-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 16px;
+}
+.bill-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 16px 20px;
+  border: 1px solid var(--divider, var(--border));
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+.bill-kpi .l {
+  font-size: 13px;
+  color: var(--text-sub);
+}
+.bill-kpi .v {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bill-kpi .d {
+  font-size: 12px;
+  line-height: 16px;
+  min-height: 16px;
+  color: var(--text-sub);
+  overflow-wrap: anywhere;
+}
+/* 시안 .card / .card-h */
+.bill-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px 20px;
+  border: 1px solid var(--divider, var(--border));
+  border-radius: 8px;
+  background: var(--surface);
+}
+.bill-card-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.bill-card-h h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+/* 시안 .seg: 붙은 단추, 고른 것 파란 바탕 */
+.bill-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+.bill-seg .ls-btn {
+  border-radius: 0;
+  margin-left: -1px;
+}
+.bill-seg .ls-btn:first-child {
+  margin-left: 0;
+  border-radius: 6px 0 0 6px;
+}
+.bill-seg .ls-btn:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.bill-seg .ls-btn-p {
+  position: relative;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.bill-sub {
+  color: var(--text-sub);
+  font-size: 12px;
+}
+.bill-normal {
+  font-weight: 400;
+}
+.bill-note {
+  margin: 0;
+}
+.bill-wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.bill-nowrap {
+  flex-wrap: nowrap;
+}
+.bill-warn {
+  color: var(--ls-warn, #b45309);
+}
+.bill-bad,
+.bill-overdue {
+  color: var(--ls-bad, #b91c1c);
+}
+.bill-overdue {
+  font-weight: 600;
+}
+.bill-danger-text {
+  color: var(--ls-bad, #b91c1c);
+}
+.bill-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+/* 청구 등록 창(시안 billNew): 칸 이름 위, 도움말 아래 */
+.bill-form {
+  display: grid;
+  gap: 12px;
+}
+.bill-fc {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.bill-form .bill-fc label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+.bill-form .bill-fc small {
+  font-size: 12px;
+}
+.bill-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bill-form input.bill-money {
+  width: 200px;
+  max-width: 100%;
+  text-align: right;
+}
+.bill-form input.bill-rate {
+  width: 80px;
+  text-align: right;
+}
+.bill-form .field-error:empty {
+  display: none;
+}
+.receipt-cancelled {
+  color: var(--text-sub);
+}
+.receipt-strike {
+  text-decoration: line-through;
+}

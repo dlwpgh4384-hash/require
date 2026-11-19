@@ -1,0 +1,68 @@
+.bill-check-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.bill-check-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.bill-check-summary strong {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.bill-check-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.bill-check-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.bill-check-fields input {
+  min-width: 0;
+  width: 100%;
+}
+.bill-check-fields input[readonly] {
+  color: var(--text-sub);
+  background: var(--surface);
+}
+.bill-check-fields p {
+  grid-column: 1 / -1;
+}
+.bill-check-fields [role="alert"] {
+  color: var(--ls-bad);
+}
+.bill-check-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.bill-check-detail-grid dt {
+  color: var(--text-sub);
+}
+.bill-check-detail-grid dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+.bill-check-calculation {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+@media (max-width: 760px) {
+  .bill-check-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .bill-check-fields,
+  .bill-check-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

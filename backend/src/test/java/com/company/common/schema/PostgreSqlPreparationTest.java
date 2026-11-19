@@ -63,7 +63,7 @@ class PostgreSqlPreparationTest {
             .isEqualTo(MigrationResources.tableCount());
         assertThat(names("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE'"))
             .isEqualTo(sorted(MigrationResources.tableNames()))
-            .contains("TB_SL_OPP", "TB_SL_OPP_NEED", "TB_SL_TENT_ASGN", "TB_PJ_ASGN", "TB_PJ_ASGN_HIST", "TB_PJ_ASGN_MON");
+            .contains("TB_SL_OPP", "TB_SL_OPP_NEED", "TB_SL_TENT_ASGN", "TB_PJ_ASGN", "TB_PJ_ASGN_HIST", "TB_PJ_ASGN_MON", "TB_BL_RCPT");
         assertThat(number("SELECT count(*) FROM tb_sy_menu")).isEqualTo(40);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NULL")).isEqualTo(10);
         assertThat(number("SELECT count(*) FROM tb_sy_menu WHERE scrn_id IS NOT NULL")).isEqualTo(30);

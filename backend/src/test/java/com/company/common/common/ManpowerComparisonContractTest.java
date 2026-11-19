@@ -31,7 +31,7 @@ class ManpowerComparisonContractTest {
     @Test void manualBytesRemainTheExistingHumanApprovedBytes() throws Exception {
         try (var input = new ClassPathResource("contracts/openapi-manual.yaml").getInputStream()) {
             assertThat(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(input.readAllBytes())))
-                .isEqualTo("092e783c08871ad7ca1def4b87ed2b4c63a4c8d9bf34b7533d3d4b733b865ff1"); // 2026-11-18 UI-11 엑셀 경로 추가, 2026-11-19 UI-31 이슈 엑셀 경로·프로젝트 신호등 이유 칸 추가(LF 기준)
+                .isEqualTo("9205b09316cbd4dd4c799531469d1434621fbc2f600ed70fbb697ef1252dd38d"); // 2026-11-18 UI-11 엑셀 경로 추가, 2026-11-19 UI-31 이슈 엑셀 경로·프로젝트 신호등 이유 칸 추가, 2026-11-19 UI-13 청구 목록 엑셀 경로 추가(LF 기준)
         }
     }
 

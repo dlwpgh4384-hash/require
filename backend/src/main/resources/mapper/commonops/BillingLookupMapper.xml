@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.commonops.mapper.BillingLookupMapper">
+  <resultMap id="project" type="com.company.common.commonops.dto.BillingLookupContracts$ProjectOption"><constructor>
+    <idArg column="projectId" javaType="string"/><arg column="projectName" javaType="string"/>
+    <arg column="customerName" javaType="string"/><arg column="projectType" javaType="string"/>
+  </constructor></resultMap>
+  <select id="projects" resultMap="project">
+    SELECT p.PROJ_ID AS "projectId",p.PROJ_NM AS "projectName",COALESCE(c.CLNT_NM,'') AS "customerName",
+      p.CTRT_TYPE_CD AS "projectType"
+    FROM TB_PJ_PROJ p LEFT JOIN TB_BS_CLNT c ON c.CLNT_ID=p.CUST_CLNT_ID
+    WHERE p.PROJ_STAT_CD='ING' AND p.CTRT_TYPE_CD IN ('MO','DP','TK')
+    <if test="projectId != null">AND p.PROJ_ID=#{projectId}</if>
+    ORDER BY p.PROJ_NM,p.PROJ_ID
+  </select>
+  <resultMap id="option" type="com.company.common.commonops.dto.BillingLookupContracts$StatusOption"><constructor>
+    <arg column="code" javaType="string"/><arg column="name" javaType="string"/>
+  </constructor></resultMap>
+  <select id="statuses" resultMap="option">
+    SELECT CODE AS "code",CODE_NM AS "name" FROM TB_SY_CODE
+    WHERE CODE_GRP_ID='BILL_STAT' AND USE_YN='Y' AND DEL_YN='N' ORDER BY SORT_ORD,CODE
+  </select>
+  <select id="recipientRoles" resultMap="option">
+    SELECT ROLE_ID AS "code",ROLE_NM AS "name" FROM TB_SY_ROLE
+    WHERE ROLE_ID IN ('PM','SALES_LDR','EXEC','FIN') AND USE_YN='Y' ORDER BY SORT_ORD,ROLE_ID
+  </select>
+  <resultMap id="monthly" type="com.company.common.common.BillingCalculationRules$MonthlyInput"><constructor>
+    <arg column="contractTypeCode" javaType="string"/><arg column="inputTypeCode" javaType="string"/>
+    <arg column="monthlyMm" javaType="java.math.BigDecimal"/><arg column="billingPrice" javaType="java.math.BigDecimal"/>
+  </constructor></resultMap>
+  <select id="monthly" resultMap="monthly">
+    SELECT p.CTRT_TYPE_CD AS "contractTypeCode",a.INPUT_TYPE_CD AS "inputTypeCode",
+      m.MON_MM AS "monthlyMm",COALESCE(m.APLY_UPRC,0) AS "billingPrice"
+    FROM TB_PJ_ASGN_MON m JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID
+    JOIN TB_PJ_PROJ p ON p.PROJ_ID=m.PROJ_ID
+    WHERE m.INPUT_YM=#{month} AND m.PROJ_ID=#{projectId}
+      AND p.CTRT_TYPE_CD IN ('MO','DP') AND a.INPUT_TYPE_CD&lt;&gt;'FREE' AND a.ASGN_STAT_CD='ACT'
+    ORDER BY m.ASGN_ID
+  </select>
+  <select id="closed" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_CL_CLOSE c WHERE c.CLOSE_YM=#{month} AND c.CLOSE_STAT_CD='CLOSE')
+  </select>
+  <resultMap id="unpaid" type="com.company.common.commonops.mapper.BillingLookupMapper$UnpaidBill"><constructor>
+    <idArg column="billId" javaType="string"/><arg column="projectId" javaType="string"/>
+    <arg column="projectName" javaType="string"/><arg column="unpaidAmount" javaType="java.math.BigDecimal"/>
+    <arg column="payDueDate" javaType="java.time.LocalDate"/><arg column="cancelled" javaType="_boolean"/>
+  </constructor></resultMap>
+  <sql id="overduePredicate">b.CNCL_YN='N' AND b.UNPAID_AMT&gt;0 AND b.PAY_DUE_DT&lt;#{today}</sql>
+  <select id="overdue" resultMap="unpaid">
+    SELECT b.BILL_ID AS "billId",b.PROJ_ID AS "projectId",p.PROJ_NM AS "projectName",
+      b.UNPAID_AMT AS "unpaidAmount",b.PAY_DUE_DT AS "payDueDate",(b.CNCL_YN='Y') AS "cancelled"
+    FROM TB_BL_BILL b JOIN TB_PJ_PROJ p ON p.PROJ_ID=b.PROJ_ID
+    WHERE <include refid="overduePredicate"/>
+    ORDER BY b.BILL_DT DESC,b.BILL_ORD DESC,b.BILL_ID DESC
+  </select>
+  <resultMap id="history" type="com.company.common.commonops.mapper.BillingLookupMapper$HistoryRow"><constructor>
+    <arg column="billId" javaType="string"/><arg column="sequence" javaType="_int"/>
+    <arg column="step" javaType="_int"/><arg column="sentDate" javaType="java.time.LocalDate"/>
+    <arg column="recipientDescription" javaType="string"/><arg column="sendMethodCode" javaType="string"/>
+    <arg column="resend" javaType="_boolean"/>
+  </constructor></resultMap>
+  <select id="history" resultMap="history">
+    SELECT h.BILL_ID AS "billId",h.DUN_SN AS "sequence",h.DUN_STEP AS "step",h.SEND_DT AS "sentDate",
+      h.RCVR_DESC AS "recipientDescription",h.SEND_MTHD_CD AS "sendMethodCode",(h.RESEND_YN='Y') AS "resend"
+    FROM TB_BL_DUN_HIST h JOIN TB_BL_BILL b ON b.BILL_ID=h.BILL_ID
+    WHERE <include refid="overduePredicate"/>
+    ORDER BY h.SEND_DT ASC,h.DUN_SN ASC,h.BILL_ID ASC
+  </select>
+</mapper>

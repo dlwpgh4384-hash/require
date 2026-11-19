@@ -1,0 +1,50 @@
+.billing-dunning-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  color: var(--text);
+}
+.billing-dunning-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.billing-dunning-cards article {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+.billing-dunning-cards h3 {
+  margin-top: 0;
+}
+.billing-row-actions,
+.billing-dialog-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.billing-dialog-actions {
+  justify-content: flex-end;
+}
+.billing-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.billing-receipt-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.billing-receipt-form input {
+  max-width: 100%;
+}
+.billing-receipt-form .field-error,
+.billing-dunning-panel .field-error {
+  color: var(--ls-bad);
+}
+@media (max-width: 767px) {
+  .billing-dunning-cards {
+    grid-template-columns: 1fr;
+  }
+}

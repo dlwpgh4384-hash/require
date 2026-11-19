@@ -64,7 +64,9 @@ class ClientProjectionTest {
         var config = config(); var params = Map.of("today", LocalDate.of(2030, 1, 1), "clientId", "client");
         String detail = sql(config, "selectClient", params);
         assertThat(detail).contains("count(DISTINCT p.proj_id)", "count(DISTINCT d.dev_id)", "a.asgn_stat_cd = 'ACT'",
-            "a.input_bgn_dt <= ?", "a.input_end_dt >= ?", "p.proj_stat_cd = 'ING'", "d.blng_clnt_id = c.clnt_id");
+            "a.input_bgn_dt <= ?", "a.input_end_dt >= ?", "d.blng_clnt_id = c.clnt_id")
+            // 시안 cliProj: 목록 수는 [투입 내역] 탭과 같게, 프로젝트 상태로 거르지 않는다
+            .doesNotContain("proj_stat_cd");
         assertThat(sql(config, "selectAssignments", params)).doesNotContain("DISTINCT", "GROUP BY").contains("a.asgn_id");
     }
     @Test void nullableVersionIsBoundAndNeverUsedAsBypassAndSelectableClientsAreActive() throws Exception {

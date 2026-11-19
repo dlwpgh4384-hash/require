@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog, Toast } from "../../shared/feedback/Dialog";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
-import { formatDateTime, koreanThisMonth } from "../../shared/time";
+import { koreanThisMonth } from "../../shared/time";
 import { Banner } from "../../shared/list";
 import { usePreferenceBusinessShortcuts } from "../userpreferences/UserPreferenceTools";
 import * as api from "./operatingStandards";
@@ -561,14 +561,16 @@ export function OperatingStandardsPanel({
           }}
         >
           {failure && <p role="alert">{failure}</p>}
-          {/* UI-27-M5: 보기 전용. 값 변경은 본 표에서만 한다. */}
+          {/* UI-27-M5: 보기 전용. 값 변경은 본 표에서만 한다.
+              시안 operhist: 본문(.mb) 안에 테두리 표(.twrap.free > table.t), 열은 적용 시작월·값(오른쪽 맞춤)·처리자. */}
+          <div className="operating-history-body">
+          <div className="operating-history-wrap">
           <table className="operating-history-table">
             <thead>
               <tr>
                 <th>적용 시작월</th>
-                <th>값</th>
+                <th className="operating-history-num">값</th>
                 <th>처리자</th>
-                <th>마지막 변경시각</th>
               </tr>
             </thead>
             <tbody>
@@ -580,20 +582,17 @@ export function OperatingStandardsPanel({
                     data-testid={`operating-history-row-${api.operatingTestKey(first.standardCode)}-${rowMonth}`}
                   >
                     <td>{first.effectiveMonth ?? "–"}</td>
-                    <td>
+                    <td className="operating-history-num">
                       {rows.map((row) => row.value).join(" / ")} {first.unit}
                     </td>
                     <td>{first.changedBy ?? "처음 설정"}</td>
-                    <td>
-                      <time dateTime={first.modifiedAt ?? undefined}>
-                        {formatDateTime(first.modifiedAt)}
-                      </time>
-                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+          </div>
+          </div>
           {Object.keys(errors).length > 0 && (
             <p role="alert">{Object.values(errors).join(" ")}</p>
           )}

@@ -462,6 +462,12 @@ it("cash base closed locks both inputs but ordinary closed history can get a new
   expect(screen.getByLabelText("자금수지 시작 월")).toBeDisabled();
   expect(screen.getByLabelText("자금수지 기초 잔액")).toBeDisabled();
   expect(screen.getByLabelText("부가세율")).not.toBeDisabled();
+  // 시안 operLock: 잠긴 두 줄은 이름 옆 ⓘ에 「시작 월을 마감해 수정할 수 없습니다」, 다른 줄은 없음.
+  for (const key of ["cash-base-ym", "cash-base-amt"])
+    expect(
+      screen.getByTestId(`operating-row-${key}`).querySelector(".operating-lock-note"),
+    ).toHaveAttribute("title", "시작 월을 마감해 수정할 수 없습니다");
+  expect(screen.getByTestId("operating-row-vat-rt").querySelector(".operating-lock-note")).toBeNull();
   change("vat-rt", "11");
   openSave();
   expect(screen.getByTestId("operating-effective-month")).toBeInTheDocument();
@@ -519,7 +525,12 @@ it("history window is view-only like the mockup", async () => {
     within(history)
       .getAllByRole("columnheader")
       .map((cell) => cell.textContent),
-  ).toEqual(["적용 시작월", "값", "처리자", "마지막 변경시각"]);
+  ).toEqual(["적용 시작월", "값", "처리자"]);
+  // 시안 operhist: 표는 테두리 상자(.twrap.free) 안에 있고, 값 열은 오른쪽 맞춤이다.
+  const table = within(history).getByRole("table");
+  expect(table.parentElement).toHaveClass("operating-history-wrap");
+  expect(table.parentElement?.parentElement).toHaveClass("operating-history-body");
+  expect(within(history).getByRole("columnheader", { name: "값" })).toHaveClass("operating-history-num");
   expect(within(history).getAllByRole("row")).toHaveLength(3);
   expect(
     screen.getByTestId("operating-history-row-vat-rt-2026-10"),
@@ -551,7 +562,7 @@ it("UI-27-M5 keeps the initial processor and absent modification time read-only"
     screen.getByTestId("operating-history-row-vat-rt-2026-01"),
   ).getAllByRole("cell");
   expect(cells[2]).toHaveTextContent("처음 설정");
-  expect(cells[3]).toHaveTextContent("–");
+  expect(cells).toHaveLength(3);
   expect(
     within(history).queryByRole("button", { name: /수정|저장|삭제/ }),
   ).not.toBeInTheDocument();
@@ -561,7 +572,8 @@ it("UI-27-M5 keeps the initial processor and absent modification time read-only"
   fireEvent.click(screen.getByTestId("operating-history-close"));
   expect(writes()).toHaveLength(0);
 });
-it("UI-27-M5 reads the processor and UTC token while displaying shared Korean time", async () => {
+// 시안 operhist·2026-11-14 결정: 이력 창은 적용 시작월·값·처리자만 보인다(마지막 변경 시각은 저장 때 동시 수정 확인에만 쓴다).
+it("UI-27-M5 shows the processor and keeps the modification time out of the history window", async () => {
   rows = rows.map((item) =>
     item.standardCode === "VAT_RT"
       ? {
@@ -576,11 +588,8 @@ it("UI-27-M5 reads the processor and UTC token while displaying shared Korean ti
   fireEvent.click(screen.getByTestId("operating-history-vat-rt"));
   const historyRow = screen.getByTestId("operating-history-row-vat-rt-2026-01");
   expect(historyRow).toHaveTextContent("운영 담당자");
-  expect(historyRow).toHaveTextContent("2026-11-14 09:12");
-  expect(historyRow.querySelector("time")).toHaveAttribute(
-    "datetime",
-    "2026-11-14T00:12:34.123456Z",
-  );
+  expect(historyRow).not.toHaveTextContent("2026-11-14 09:12");
+  expect(historyRow.querySelector("time")).toBeNull();
   fireEvent.click(screen.getByTestId("operating-history-close"));
   expect(screen.getByLabelText("부가세율")).toHaveValue("11");
   expect(writes()).toHaveLength(0);
@@ -606,4 +615,12 @@ it("save sends back the read modifiedAt so a later change is refused (FR-0106)",
     JSON.parse(String((writes()[0][1] as RequestInit).body)).items[0]
       .modifiedAt,
   ).toBe("2026-11-14T00:00:00.123456Z");
+});
+
+// 시안 operLock: 시작 월을 마감하기 전에는 두 줄 모두 고칠 수 있고 ⓘ도 없다.
+it("cash base rows stay editable without the lock note until the start month is closed", async () => {
+  await mount();
+  expect(screen.getByLabelText("자금수지 시작 월")).not.toBeDisabled();
+  expect(screen.getByLabelText("자금수지 기초 잔액")).not.toBeDisabled();
+  expect(document.querySelector(".operating-lock-note")).toBeNull();
 });

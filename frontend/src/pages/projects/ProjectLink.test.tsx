@@ -83,3 +83,27 @@ it("[수정] in a detail opened from another screen closes it and asks the proje
   stop();
   expect(received.map((p) => p.projectId)).toEqual(["P-1"]);
 });
+
+// 다른 화면에서 연 상세도 프로젝트 화면과 같은 기능: 진행 현황 [이번 주 상태 적기], 이슈 [이슈 등록](2026-11-19 사용자 결정).
+it("a detail opened from another screen has the weekly memo and issue registration like the project screen", async () => {
+  render(<ProjectLink projectId="P-1" name="링크 프로젝트" testId="link-p1" />);
+  fireEvent.click(screen.getByTestId("link-p1"));
+  const detail = within(await screen.findByTestId("project-detail"));
+  fireEvent.click(await detail.findByRole("tab", { name: "진행 현황" }));
+  expect(await detail.findByTestId("project-memo-add")).toHaveTextContent("이번 주 상태 적기");
+  fireEvent.click(detail.getByRole("tab", { name: /^이슈/ }));
+  expect(await detail.findByTestId("project-issues-panel")).toBeInTheDocument();
+  expect(await detail.findByTestId("project-issue-create")).toHaveTextContent("이슈 등록");
+});
+
+it("a read-only detail opened from another screen shows no weekly memo or issue registration", async () => {
+  render(<ProjectLink projectId="P-1" name="링크 프로젝트" testId="link-p1" readOnly />);
+  fireEvent.click(screen.getByTestId("link-p1"));
+  const detail = within(await screen.findByTestId("project-detail"));
+  fireEvent.click(await detail.findByRole("tab", { name: "진행 현황" }));
+  await waitFor(() => expect(detail.queryByText("주간 메모")).toBeInTheDocument());
+  expect(detail.queryByTestId("project-memo-add")).not.toBeInTheDocument();
+  fireEvent.click(detail.getByRole("tab", { name: /^이슈/ }));
+  expect(detail.queryByTestId("project-issues-panel")).not.toBeInTheDocument();
+  expect(detail.queryByTestId("project-issue-create")).not.toBeInTheDocument();
+});

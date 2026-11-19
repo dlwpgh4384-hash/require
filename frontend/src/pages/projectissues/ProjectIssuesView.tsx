@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { ProjectDetail } from "../projects/ProjectDetail";
 import { useOpenProjectEdit } from "../projects/projectEdit";
+import { projectDetailIssues } from "../projects/projectDetailIssues";
 import { ProjectIssuesPanel } from "./ProjectIssuesPanel";
 
 // UI-31의 이슈 탭 본문. 라우터/현황판은 부모가 소유한다.
@@ -41,9 +42,7 @@ export function ProjectIssuesView({
           initialTab="issues"
           boardOperations
           dirtyScreenId="UI-31"
-          renderIssues={(project, changed) => (
-            <ProjectIssuesPanel project={project} onChanged={changed} />
-          )}
+          renderIssues={projectDetailIssues(false, "UI-31")}
           onClose={() => {
             setDetail(null);
             setLocalRevision((v) => v + 1);

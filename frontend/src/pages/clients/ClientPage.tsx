@@ -99,7 +99,7 @@ export function ClientPage({
         key: "projects",
         label: "진행 프로젝트",
         align: "right",
-        calc: "오늘 투입 중인 내역이 있는 진행 프로젝트 수",
+        calc: "오늘 투입 중인 내역이 있는 프로젝트 수([투입 내역] 탭의 프로젝트 수)",
         // 시안: 0이면 링크 없이 「0건」만 쓴다.
         render: (row) => !row.projectCount ? "0건" : (
           <button

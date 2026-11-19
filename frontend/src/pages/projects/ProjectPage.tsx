@@ -17,7 +17,7 @@ import { YearBar } from "../../shared/period/YearBar";
 import { getCommonCodes } from "../codegroups/codeGroups";
 import { getCommonParts } from "../parts/parts";
 import { UploadActions } from "../uploads/UploadActions";
-import { ProjectIssuesPanel } from "../projectissues/ProjectIssuesPanel";
+import { projectDetailIssues } from "./projectDetailIssues";
 import { ProjectDetail } from "./ProjectDetail";
 import { ProjectDistribution } from "./ProjectDistribution";
 import { ProjectForm } from "./ProjectForm";
@@ -580,17 +580,7 @@ export function ProjectPage() {
           projectId={detail}
           readOnly={readOnly}
           boardOperations
-          renderIssues={
-            readOnly
-              ? undefined
-              : (project, changed) => (
-                  <ProjectIssuesPanel
-                    project={project}
-                    onChanged={changed}
-                    dirtyScreenId="UI-01"
-                  />
-                )
-          }
+          renderIssues={projectDetailIssues(readOnly, "UI-01")}
           onClose={() => setDetail(null)}
           onEdit={(p) => {
             setDetail(null);

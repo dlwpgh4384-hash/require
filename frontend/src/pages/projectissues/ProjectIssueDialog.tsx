@@ -66,6 +66,8 @@ export function ProjectIssueDialog({
   const setDirty = useScreenDirty();
   const dirty = JSON.stringify(initial) !== JSON.stringify(values);
   useEffect(() => {
+    // 빈 글자면 표시할 화면 탭이 없다(다른 화면에서 연 프로젝트 상세).
+    if (!dirtyScreenId) return;
     setDirty(dirtyScreenId, dirty);
     return () => setDirty(dirtyScreenId, false);
   }, [dirty, dirtyScreenId, setDirty]);

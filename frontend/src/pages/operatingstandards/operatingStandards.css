@@ -77,21 +77,35 @@
   border-collapse: collapse;
   font-size: 13px;
 }
+/* 시안 operhist: table.t — 13px·줄 20px·숫자 폭 같게, 머리 #F3F4F6·600, 칸 40px·좌우 12px, 값은 오른쪽 맞춤. */
+.operating-history-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
 .operating-history-table th,
 .operating-history-table td {
-  padding: 8px 10px;
+  height: 40px;
+  padding: 0 12px;
   border-bottom: 1px solid var(--divider);
   text-align: left;
+  white-space: nowrap;
+  background: var(--surface);
 }
 .operating-history-table th {
-  background: var(--hover);
+  background: var(--ls-head-bg, var(--hover));
+  font-weight: 600;
 }
-.operating-history-table td:last-child {
-  display: flex;
-  gap: 8px;
+.operating-history-table .operating-history-num {
+  text-align: right;
 }
-.operating-history-table input {
-  width: 120px;
+/* 시안 .twrap.free: 테두리 1px·둥근 모서리 8px·흰 바탕, 높이 제한 없음. */
+.operating-history-wrap {
+  overflow: auto;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
 }
 
 /* 시안 UI-27 [운영 기준값] 표(2026-11-14): 기준값·값·단위·적용 시작월·쓰는 곳·이력. */
@@ -252,8 +266,11 @@
   text-align: left;
 }
 .code-page .app-dialog .operating-history-table th {
-  background: var(--hover);
+  background: var(--ls-head-bg, var(--hover));
   font-weight: 600;
+}
+.code-page .app-dialog .operating-history-table .operating-history-num {
+  text-align: right;
 }
 /* 고칠 수 있는 달이 있으면 칸이 들어가도록 창을 넓힌다(읽기 전용이면 시안 폭 400). */
 .code-page .app-dialog[data-testid="operating-history-dialog"]:has(input) {
@@ -277,4 +294,13 @@
   min-height: 28px;
   height: 28px;
   padding: 0 6px;
+}
+/* 시안 operhist 창: 본문 .mb(위 4·좌우 24·아래 16, 글자 회색), 단추 줄 .mf(위 12·좌우 24·아래 20). */
+.code-page .app-dialog > .operating-history-body {
+  padding: 4px 24px 16px;
+  color: var(--text-sub);
+}
+.code-page .app-dialog[data-testid="operating-history-dialog"] > .app-actions {
+  margin: 0;
+  padding: 12px 24px 20px;
 }

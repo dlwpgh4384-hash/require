@@ -906,6 +906,7 @@ export function CodePage({
                       aria-label="그룹 ID"
                       data-testid="new-code-group-id"
                       maxLength={30}
+                      placeholder="예: EDU_COURSE"
                       value={newGroup.groupId}
                       onChange={(event) =>
                         setNewGroup((current) => ({
@@ -926,6 +927,7 @@ export function CodePage({
                       aria-label="그룹 이름"
                       data-testid="new-code-group-name"
                       maxLength={30}
+                      placeholder="예: 교육 과정"
                       value={newGroup.groupName}
                       onChange={(event) =>
                         setNewGroup((current) => ({
@@ -949,6 +951,8 @@ export function CodePage({
                       aria-label="새 코드"
                       data-testid="new-code-id"
                       maxLength={20}
+                      // 시안 placeholder: 코드 추가 「예: CLOUD」, 수당코드 추가 「예: NIGHT_FEE」.
+                      placeholder={numeric ? "예: NIGHT_FEE" : "예: CLOUD"}
                       value={newCode.code}
                       onChange={(event) =>
                         setNewCode((current) => ({
@@ -969,6 +973,8 @@ export function CodePage({
                     <input
                       aria-label="새 코드 이름"
                       data-testid="new-code-name"
+                      // 시안: 수당코드 추가만 「예: 야근 수당(월)」, 코드 추가 이름 칸은 없음.
+                      placeholder={numeric ? "예: 야근 수당(월)" : undefined}
                       maxLength={
                         numeric ? api.ALLOWANCE_NAME_MAX : api.CODE_NAME_MAX
                       }

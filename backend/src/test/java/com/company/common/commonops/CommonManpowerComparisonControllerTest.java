@@ -56,7 +56,8 @@ class CommonManpowerComparisonControllerTest {
     }
 
     @Test void happyUnionMissingSidesOrderingAndTotalsUseRealService() throws Exception {
-        mvc.perform(get(PATH).param("year", "2026")).andExpect(status().isOk())
+        mvc.perform(get("/api/common/manpower-comparisons").param("year", "2026")).andExpect(status().isOk())
+            .andExpect(OpenApiResponseContract.response("GET", "/api/common/manpower-comparisons"))
             .andExpect(content().contentTypeCompatibleWith("application/json"))
             .andExpect(jsonPath("$.data.items[0].projectName").isString())
             .andExpect(jsonPath("$.data.items[0].jobName").isString())
@@ -107,11 +108,12 @@ class CommonManpowerComparisonControllerTest {
         verifyNoInteractions(mapper, definitions);
     }
 
-    @Test void totalsFollowDifferenceFilterAndTieOrderIsIdentifierBased() throws Exception {
+    @Test @DisplayName("business: 차이 상태 필터 및 같은 결과의 합계")
+    void totalsFollowDifferenceFilterAndTieOrderIsIdentifierBased() throws Exception {
         when(mapper.selectSources(any())).thenReturn(List.of(
             source("P-B", "BE", "1", "0"), source("P-A", "FE", "1", "0"),
             source("P-A", "BE", "1", "0"), source("P-A", "PM", "0", "3")));
-        mvc.perform(get(PATH).param("year", "2026").param("differenceStatus", "부족"))
+        mvc.perform(get("/api/common/manpower-comparisons").param("year", "2026").param("differenceStatus", "부족"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.items.length()").value(3))
             .andExpect(jsonPath("$.data.items[0].jobCode").value("BE"))
             .andExpect(jsonPath("$.data.items[1].jobCode").value("FE"))
@@ -182,7 +184,7 @@ class CommonManpowerComparisonControllerTest {
     }
 
     @Test void excelHasEveryFilteredRowInListOrderWithScreenColumnsAndRecordsDownload() throws Exception {
-        byte[] bytes = mvc.perform(get(EXCEL).param("year", "2026")).andExpect(status().isOk())
+        byte[] bytes = mvc.perform(get("/api/common/manpower-comparisons/excel").param("year", "2026")).andExpect(status().isOk())
             .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .andExpect(header().string("X-Total-Count", "3"))
             .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("filename*=UTF-8''")))
@@ -218,7 +220,7 @@ class CommonManpowerComparisonControllerTest {
     }
 
     @Test void excelInvalidConditionIsJsonFieldErrorWithoutDownloadRecord() throws Exception {
-        mvc.perform(get(EXCEL)).andExpect(status().isBadRequest())
+        mvc.perform(get("/api/common/manpower-comparisons/excel")).andExpect(status().isBadRequest())
             .andExpect(content().contentTypeCompatibleWith("application/json"))
             .andExpect(jsonPath("$.errors[0].field").value("year"));
         mvc.perform(get(EXCEL).param("year", "2026").param("differenceStatus", "미정")).andExpect(status().isBadRequest())
@@ -226,9 +228,12 @@ class CommonManpowerComparisonControllerTest {
         verify(mapper, never()).insertAccess(anyString(), anyString());
     }
 
-    @Test void listReadDoesNotRecordDownload() throws Exception {
-        mvc.perform(get(PATH).param("year", "2026")).andExpect(status().isOk());
+    @Test @DisplayName("side-effect: TB_PJ_MNPW_PLAN 읽기 전용, 다운로드 기록 없음")
+    void listReadDoesNotRecordDownload() throws Exception {
+        mvc.perform(get("/api/common/manpower-comparisons").param("year", "2026")).andExpect(status().isOk());
+        verify(mapper).selectSources(new Filter(2026, null, null));
         verify(mapper, never()).insertAccess(anyString(), anyString());
+        verifyNoMoreInteractions(mapper);
     }
 
     @Test void incompatibleDefinitionsAreAnErrorEvenWhenSourcesWouldBeEmpty() throws Exception {

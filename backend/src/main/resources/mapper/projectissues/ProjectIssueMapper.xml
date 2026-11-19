@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.projectissues.mapper.ProjectIssueMapper">
+  <resultMap id="issue" type="com.company.common.projectissues.dto.ProjectIssueContracts$Issue" autoMapping="false">
+    <id property="issueId" column="issueId"/>
+    <result property="projectId" column="projectId"/>
+    <result property="projectName" column="projectName"/>
+    <result property="title" column="title"/>
+    <result property="dueDate" column="dueDate" javaType="java.time.LocalDate"/>
+    <result property="importanceCode" column="importanceCode"/>
+    <result property="statusCode" column="statusCode"/>
+    <result property="actionText" column="actionText"/>
+    <result property="assigneeId" column="assigneeId"/>
+    <result property="assigneeName" column="assigneeName"/>
+    <result property="createdBy" column="createdBy"/>
+    <result property="createdAt" column="createdAt" javaType="java.time.Instant"/>
+    <result property="updatedBy" column="updatedBy"/>
+    <result property="updatedAt" column="updatedAt" javaType="java.time.Instant"/>
+    <result property="overdueDays" column="overdueDays"/>
+  </resultMap>
+  <resultMap id="projectState" type="com.company.common.projectissues.dto.ProjectIssueContracts$ProjectState" autoMapping="false">
+    <id property="projectId" column="projectId"/>
+    <result property="statusCode" column="statusCode"/>
+    <result property="endDate" column="endDate" javaType="java.time.LocalDate"/>
+  </resultMap>
+  <sql id="columns">
+    i.ISSUE_ID::text AS "issueId", i.PROJ_ID AS "projectId", p.PROJ_NM AS "projectName",
+    i.ISSUE_TTL AS "title", i.DDLN_DT AS "dueDate", i.IMPR_CD AS "importanceCode",
+    i.ISSUE_STAT_CD AS "statusCode", i.ACTN_CN AS "actionText",
+    i.REG_USER_ID AS "assigneeId", COALESCE(u.USER_NM,i.REG_USER_ID) AS "assigneeName",
+    i.REG_USER_ID AS "createdBy", i.REG_DTTM AS "createdAt",
+    i.MOD_USER_ID AS "updatedBy", i.MOD_DTTM AS "updatedAt",
+    CASE WHEN i.ISSUE_STAT_CD!='CLOSE' THEN GREATEST(0,CAST(#{today} AS date)-i.DDLN_DT)
+      ELSE 0 END AS "overdueDays"
+  </sql>
+  <sql id="from">
+    FROM TB_PJ_ISSUE i JOIN TB_PJ_PROJ p ON p.PROJ_ID=i.PROJ_ID
+    LEFT JOIN TB_SY_USER u ON u.USER_ID=i.REG_USER_ID
+  </sql>
+  <select id="selectIssues" resultMap="issue">
+    <bind name="today" value="_parameter.today"/>
+    SELECT <include refid="columns"/> <include refid="from"/>
+    LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='IMPR' AND c.CODE=i.IMPR_CD
+    <where>
+      <choose>
+        <when test="filter.statusCode != null">i.ISSUE_STAT_CD=#{filter.statusCode}</when>
+        <otherwise>i.ISSUE_STAT_CD IN ('OPEN','ACT')</otherwise>
+      </choose>
+      <if test="filter.overdue != null and filter.overdue">
+        AND i.DDLN_DT &lt; #{today} AND i.ISSUE_STAT_CD!='CLOSE'
+      </if>
+      <if test="filter.importanceCode != null">AND i.IMPR_CD=#{filter.importanceCode}</if>
+      <if test="filter.projectId != null">AND i.PROJ_ID=#{filter.projectId}</if>
+    </where>
+    ORDER BY CASE WHEN i.ISSUE_STAT_CD='CLOSE' THEN 1 ELSE 0 END,
+      c.SORT_ORD NULLS LAST, i.DDLN_DT, i.ISSUE_ID
+  </select>
+  <select id="selectIssue" resultMap="issue">
+    SELECT <include refid="columns"/> <include refid="from"/> WHERE i.ISSUE_ID=#{issueId}
+  </select>
+  <select id="issueProject" resultType="string">
+    SELECT i.PROJ_ID FROM TB_PJ_ISSUE i WHERE i.ISSUE_ID=#{issueId}
+  </select>
+  <select id="lockProject" resultMap="projectState">
+    SELECT p.PROJ_ID AS "projectId", p.PROJ_STAT_CD AS "statusCode", p.CTRT_END_DT AS "endDate"
+    FROM TB_PJ_PROJ p WHERE p.PROJ_ID=#{projectId} FOR UPDATE
+  </select>
+  <select id="lockIssue" resultType="long">
+    SELECT i.ISSUE_ID FROM TB_PJ_ISSUE i WHERE i.ISSUE_ID=#{issueId} AND i.PROJ_ID=#{projectId} FOR UPDATE
+  </select>
+  <select id="codeName" resultType="string">
+    SELECT c.CODE_NM FROM TB_SY_CODE c WHERE c.CODE_GRP_ID=#{group} AND c.CODE=#{code}
+      AND c.USE_YN='Y' AND c.DEL_YN='N'
+  </select>
+  <insert id="insertIssue">
+    <selectKey keyProperty="issueId" resultType="long" order="BEFORE">
+      SELECT nextval('SQ_TB_PJ_ISSUE')
+    </selectKey>
+    INSERT INTO TB_PJ_ISSUE (ISSUE_ID,PROJ_ID,ISSUE_TTL,IMPR_CD,DDLN_DT,ISSUE_STAT_CD,ACTN_CN,REG_USER_ID)
+    VALUES (#{issueId},#{input.projectId},#{input.title},#{input.importanceCode},#{input.dueDate},
+      #{input.statusCode},#{input.actionText},#{actor})
+  </insert>
+  <update id="updateIssue">
+    UPDATE TB_PJ_ISSUE SET ISSUE_TTL=#{input.title},IMPR_CD=#{input.importanceCode},
+      DDLN_DT=#{input.dueDate},ISSUE_STAT_CD=#{input.statusCode},ACTN_CN=#{input.actionText},
+      MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp()
+    WHERE ISSUE_ID=#{issueId} AND PROJ_ID=#{input.projectId}
+  </update>
+</mapper>

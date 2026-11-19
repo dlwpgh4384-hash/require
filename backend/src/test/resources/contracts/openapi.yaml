@@ -3567,7 +3567,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonDeveloperInput'
       x-business-rules:
-      - 전체 화면에서 이름·직원구분·소속·주 직무·영업 파트·직접/간접 필수 및 등급·보조 직무·직위·입사일·월 단가·월 급여·스킬·거주지를 저장한다. 직위 기본 팀원·직접/간접 기본 직접, 영업 파트 기본값 없음. 연락처·번지는 받지 않는다.
+      - 전체 화면에서 이름·직원구분·소속·주 직무·영업 파트·직접/간접 필수 및 등급·보조 직무·직위·입사일·월 단가·월 급여·스킬·거주지를 저장한다. 직위 기본 팀원·직접/간접 기본 직접,
+        영업 파트 기본값 없음. 연락처·번지는 받지 않는다.
       x-side-effects:
       - TB_HR_DEV·스킬 연결·월 단가/급여 이력 저장. 자동번호 발급은 동시 유일성 보장.
       x-state-transitions:
@@ -3824,7 +3825,8 @@ paths:
       - 퇴사일만 등록하고 상태 이력 퇴사 줄을 원본으로 기본정보 퇴사일 복사값을 함께 갱신한다. 진행 휴직은 퇴사 전날로 닫는다.
       - 기존 퇴사·마감월·퇴사일 뒤 남은 투입 배정은 거부하며 배정 건수와 프로젝트·투입 › 투입 배정 조기 철수를 안내한다. 퇴사 뒤 날짜 상태 등록은 불가다.
       - 퇴사일이 지나면 퇴사·자동 사용 중지하고 더 이상 상태 등록을 허용하지 않는다.
-      - 등록·종료일 수정·재직 취소·퇴사 취소 저장 전 휴직 비중첩·종료≥시작·퇴사전날 상한/종료필수·복귀=다음날/휴직당1개·새휴직은 복귀다음날부터·퇴사1개를 전체 검사한다. 어긋나면 이유 표시·저장0, 저장 뒤 이력으로 상태 재판정한다.
+      - 등록·종료일 수정·재직 취소·퇴사 취소 저장 전 휴직 비중첩·종료≥시작·퇴사전날 상한/종료필수·복귀=다음날/휴직당1개·새휴직은 복귀다음날부터·퇴사1개를 전체 검사한다. 어긋나면 이유
+        표시·저장0, 저장 뒤 이력으로 상태 재판정한다.
       - 근무 상태 업무는 관리자·재무만 허용하고 퇴사일 경과 취소는 시스템 관리자만 허용한다. 현재 HTTP는 admin 고정이다.
       - 재직·퇴사 줄마다 닫은 휴직 줄 번호와 원래 휴직 종료일을 보관한다.
       x-side-effects:
@@ -4311,13 +4313,15 @@ paths:
                 $ref: '#/components/schemas/ApiError'
       parameters: []
       x-business-rules:
-      - 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력 없이 (자체)이고 빈 계약금액은 0·매출 제외다.
+      - 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력 없이 (자체)이고 빈 계약금액은
+        0·매출 제외다.
       - 프로젝트명100자·근무지200자·특징500자와 유형별 필수, 종료일≥시작일을 검증하고 등록 상태는 진행/수주예정만 허용한다.
       - 등록 시 계약 시작월 파트 첫 이력과 계약 변경 이력 계약 한 줄을 함께 저장한다.
       - 계약금액 입력 시 DB 식-19의 계약금액×(1−목표 마진율)을 채운다.
       - TEAM_FEE·PEXP_FEE 각각 기본50000원을 읽고 프로젝트별로 수정 가능하다.
       x-side-effects:
-      - 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력 없이 (자체)이고 빈 계약금액은 0·매출 제외다.
+      - 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력 없이 (자체)이고 빈 계약금액은
+        0·매출 제외다.
       - 등록 시 계약 시작월 파트 첫 이력과 계약 변경 이력 계약 한 줄을 함께 저장한다.
       x-state-transitions:
       - 검증 통과한 해당 프로젝트 업무값만 저장; 실패하면 기존 상태와 이력 불변
@@ -4332,7 +4336,8 @@ paths:
       - 'auth: 무인증 프로젝트 등록 -> 200·실행자 admin, 현재 인증 401/403 추가0'
       - 'validation: projectName101자 -> 400 errors.projectName·TB_PJ_PROJ 추가0'
       - 'business: 등록 statusCode가 종료 -> 400·프로젝트 신규0행'
-      - 'side-effect: 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력 없이 (자체)이고 빈 계약금액은 0·매출 제외다. -> 해당 업무 GET/DB에서 위 행·필드 대조'
+      - 'side-effect: 등록 기본정보·금액·특징을 저장하고 ID를 자동 발급하여 선택한 진행/수주예정 상태로 생성하고 UI-12 선택 원천에 즉시 노출한다. 내부는 고객사·파트·근무지 입력
+        없이 (자체)이고 빈 계약금액은 0·매출 제외다. -> 해당 업무 GET/DB에서 위 행·필드 대조'
   /api/common/projects/{projectId}:
     get:
       operationId: getCommonProject
@@ -4424,7 +4429,8 @@ paths:
       - 등록/수주 시 ORGNL_CTRT_AMT에 계약금액을 복사한다. 수정 시 CNCL_YN=N 청구가 없으면 원금액도 수정하고 있으면 현재 금액만 수정한다. 입력칸·안내는 추가하지 않는다.
       - 기존값을 등록폼에 복원하여 변경값을 저장하고 견적금액 EST_AMT도 등록·수정에서 보존한다.
       - 수정폼의 영업 파트·계약유형·상태는 회색 readonly와 원문 안내를 보여 준다. 유형 변경·진행→수주예정은 허용하지 않고 실주에 수정 버튼이 없다.
-      - 명확화122행에 따라 새 기간 밖 투입건수·금액있는 배분월수·추가경비건수를 안내하고 저장을 거부한다. 자동 절단·삭제하지 않고 셋을 정리한 뒤만 변경한다. 마감월과 이미 시작한 배정 시작일을 침범할 수 없다.
+      - 명확화122행에 따라 새 기간 밖 투입건수·금액있는 배분월수·추가경비건수를 안내하고 저장을 거부한다. 자동 절단·삭제하지 않고 셋을 정리한 뒤만 변경한다. 마감월과 이미 시작한 배정 시작일을
+        침범할 수 없다.
       - 종료일 경과 시 자동 종료하고 종료도 진행과 같은 수정범위를 갖되 지난 해/마감 보호를 적용한다. 종료일을 오늘 이후로 연장하면 진행으로 자동복귀하며 ⋯는 종료에 없다.
       x-side-effects:
       - TB_PJ_PROJ_CHG 변경 항목별 전후 표시명 기록
@@ -6413,59 +6419,89 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
-  /api/common/manpower-comparisons/excel:
+  /api/common/projects/excel:
     get:
-      operationId: getCommonManpowerComparisonsExcel
-      summary: 인원 계획 대비 투입 엑셀 다운로드(SFR-011)
-      description: 목록과 같은 조건(year·projectId·differenceStatus)의 전체 결과를 목록 순서(차이 오름차순, 부족 큰 순) 그대로 xlsx로 내려준다. 열은 프로젝트·직무·계획 MM·실제·예정 MM·차이(부족 n.nn·초과 n.nn·맞음). 파일 1행에 받은 사람·한국 시각, 파일 이름 「인원 계획 대비 투입_{year}년_다운로드일시.xlsx」, 접근 기록 DNLD.
+      operationId: getCommonProjectsExcel
+      summary: 프로젝트 목록 엑셀
       security: []
+      description: UI-22 전 무인증·현재 사용자 admin. 화면 목록과 같은 조건(연도·계약유형·상태·영업 파트·프로젝트명 또는 고객사)과 순서(시작일 늦은 순)로 내려받는다.
       parameters:
       - name: year
         in: query
-        required: true
+        required: false
         schema:
           type: integer
-          minimum: 2025
-          maximum: 2027
-        description: 조회 연도
-      - name: projectId
+          description: 조회 연도(그 해에 수행 기간이 걸친 프로젝트). 비우면 올해
+      - name: contractTypeCode
         in: query
         required: false
         schema:
           type: string
-          minLength: 1
-        description: 기존 프로젝트 식별자; 생략하면 연도 범위 전체
-      - name: differenceStatus
+      - name: statusCode
         in: query
         required: false
         schema:
           type: string
-          enum: [부족, 초과, 맞음]
-        description: 파생 차이 상태
+      - name: salesPartId
+        in: query
+        required: false
+        schema:
+          type: string
+          description: 영업 파트ID. unassigned = 미지정
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          description: 프로젝트명 또는 고객사
       responses:
         '200':
-          description: 인원 계획 대비 투입 엑셀 파일(0건이면 머리글만)
-          headers:
-            Content-Disposition:
-              schema:
-                type: string
-              description: 기존 ExcelExportService 파일 이름·인코딩 관례(filename*=UTF-8'')
-            X-Total-Count:
-              schema:
-                type: integer
-              description: 파일에 담은 조회 결과 건수
+          description: 프로젝트 목록 엑셀 결과
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
                 type: string
                 format: binary
         '400':
-          description: year 누락/형식/범위 또는 differenceStatus 허용값 오류; 해당 필드 오류 반환, 파일·접근 기록 없음
+          description: 형식 위반. ApiError.errors에 입력 필드와 한국어 사유.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-
+  /api/common/projects/budget-rule:
+    get:
+      operationId: getCommonProjectBudgetRule
+      summary: 예산 기본값 규칙(식-19)
+      security: []
+      description: 예산 기본값 = 계약금액 × budgetFactor(원 단위 버림). budgetFactor는 TB_SY_CALC_RULE 식-19와 이번 달 운영 기준값 TGT_MRGN_RT로 서버가 계산한다. 화면은 등록·수정 폼과 예산 변경 창의 기본값·안내 문구에 쓴다.
+      responses:
+        '200':
+          description: 예산 기본값 규칙
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - meta
+                - data
+                properties:
+                  success:
+                    type: boolean
+                  meta:
+                    type: object
+                  data:
+                    type: object
+                    required:
+                    - targetMarginRate
+                    - budgetFactor
+                    properties:
+                      targetMarginRate:
+                        type: number
+                        description: 목표 마진율(%)
+                      budgetFactor:
+                        type: number
+                        description: 계약금액에 곱하는 수(예 0.80)
   /api/common/clients/excel:
     get:
       operationId: getCommonClientsExcel
@@ -6585,142 +6621,6 @@ paths:
                 format: binary
         '400':
           description: 모르는 열·정렬 값
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-  /api/common/parts/{partId}/resume:
-    put:
-      operationId: putCommonPartResume
-      summary: 영업 파트 다시 사용
-      security: []
-      x-related-requirements:
-      - REQ-342
-      - REQ-306
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
-      parameters:
-      - name: partId
-        in: path
-        required: true
-        schema:
-          type: string
-          minLength: 1
-      x-business-rules:
-      - 시안 UI-15 ⋯ [다시 사용]: 중지된 파트만 사용으로 되돌림, 확인 창 없음
-      - 수정버전 불일치409
-      x-side-effects:
-      - TB_BS_PART.useYn=Y; TB_SY_CHG_HIST 사용 여부 N→Y; 기준·소속 관계 불변
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CommonPartStopInput'
-      responses:
-        '200':
-          description: 조회 또는 저장 결과
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/ApiResponse'
-                - type: object
-                  required:
-                  - data
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/CommonPart'
-        '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-        '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 데이터·성공 이력 불변
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-  /api/common/projects/budget-rule:
-    get:
-      operationId: getCommonProjectBudgetRule
-      summary: 예산 기본값 규칙(식-19)
-      security: []
-      description: 예산 기본값 = 계약금액 × budgetFactor(원 단위 버림). budgetFactor는 TB_SY_CALC_RULE 식-19와 이번 달 운영 기준값 TGT_MRGN_RT로 서버가 계산한다. 화면은 등록·수정 폼과 예산 변경 창의 기본값·안내 문구에 쓴다.
-      responses:
-        '200':
-          description: 예산 기본값 규칙
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - success
-                - meta
-                - data
-                properties:
-                  success:
-                    type: boolean
-                  meta:
-                    type: object
-                  data:
-                    type: object
-                    required:
-                    - targetMarginRate
-                    - budgetFactor
-                    properties:
-                      targetMarginRate:
-                        type: number
-                        description: 목표 마진율(%)
-                      budgetFactor:
-                        type: number
-                        description: 계약금액에 곱하는 수(예 0.80)
-  /api/common/projects/excel:
-    get:
-      operationId: getCommonProjectsExcel
-      summary: 프로젝트 목록 엑셀
-      security: []
-      description: UI-22 전 무인증·현재 사용자 admin. 화면 목록과 같은 조건(연도·계약유형·상태·영업 파트·프로젝트명 또는 고객사)과 순서(시작일 늦은 순)로 내려받는다.
-      parameters:
-      - name: year
-        in: query
-        required: false
-        schema:
-          type: integer
-          description: 조회 연도(그 해에 수행 기간이 걸친 프로젝트). 비우면 올해
-      - name: contractTypeCode
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: statusCode
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: salesPartId
-        in: query
-        required: false
-        schema:
-          type: string
-          description: 영업 파트ID. unassigned = 미지정
-      - name: q
-        in: query
-        required: false
-        schema:
-          type: string
-          description: 프로젝트명 또는 고객사
-      responses:
-        '200':
-          description: 프로젝트 목록 엑셀 결과
-          content:
-            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
-              schema:
-                type: string
-                format: binary
-        '400':
-          description: 형식 위반. ApiError.errors에 입력 필드와 한국어 사유.
           content:
             application/json:
               schema:
@@ -6910,8 +6810,1264 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/parts/{partId}/resume:
+    put:
+      operationId: putCommonPartResume
+      summary: 영업 파트 다시 사용
+      security: []
+      x-related-requirements:
+      - REQ-342
+      - REQ-306
+      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
+      parameters:
+      - name: partId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-business-rules:
+      - 시안 UI-15 ⋯ [다시 사용]: 중지된 파트만 사용으로 되돌림, 확인 창 없음
+      - 수정버전 불일치409
+      x-side-effects:
+      - TB_BS_PART.useYn=Y; TB_SY_CHG_HIST 사용 여부 N→Y; 기준·소속 관계 불변
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonPartStopInput'
+      responses:
+        '200':
+          description: 조회 또는 저장 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonPart'
+        '400':
+          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 데이터·성공 이력 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/manpower-comparisons/excel:
+    get:
+      operationId: getCommonManpowerComparisonsExcel
+      summary: 인원 계획 대비 투입 엑셀 다운로드(SFR-011)
+      description: 목록과 같은 조건(year·projectId·differenceStatus)의 전체 결과를 목록 순서(차이 오름차순, 부족 큰 순) 그대로 xlsx로 내려준다. 열은 프로젝트·직무·계획 MM·실제·예정 MM·차이(부족 n.nn·초과 n.nn·맞음). 파일 1행에 받은 사람·한국 시각, 파일 이름 「인원 계획 대비 투입_{year}년_다운로드일시.xlsx」, 접근 기록 DNLD.
+      security: []
+      parameters:
+      - name: year
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 2025
+          maximum: 2027
+        description: 조회 연도
+      - name: projectId
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 기존 프로젝트 식별자; 생략하면 연도 범위 전체
+      - name: differenceStatus
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [부족, 초과, 맞음]
+        description: 파생 차이 상태
+      responses:
+        '200':
+          description: 인원 계획 대비 투입 엑셀 파일(0건이면 머리글만)
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: 기존 ExcelExportService 파일 이름·인코딩 관례(filename*=UTF-8'')
+            X-Total-Count:
+              schema:
+                type: integer
+              description: 파일에 담은 조회 결과 건수
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: year 누락/형식/범위 또는 differenceStatus 허용값 오류; 해당 필드 오류 반환, 파일·접근 기록 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/project-board:
+    get:
+      operationId: getCommonProjectBoard
+      summary: 프로젝트 현황판 조회
+      security: []
+      x-related-requirements:
+      - REQ-619
+      - REQ-620
+      - REQ-621
+      - REQ-622
+      - REQ-623
+      - REQ-625
+      - REQ-646
+      - REQ-600
+      - REQ-626
+      - REQ-624
+      parameters:
+      - name: signal
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - 정상
+          - 주의
+          - 위험
+        description: 조건 선택; 생략하면 해당 조건 제한 없음
+      - name: contractTypeCode
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 조건 선택; 생략하면 해당 조건 제한 없음
+      - name: salesPartId
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 조건 선택; 생략하면 해당 조건 제한 없음
+      x-pagination-filtering:
+        pagination: 조건에 맞는 전체 행을 반환; 서버 페이지 파라미터 없음, ListView 로컬 페이지 재사용
+        filtering: signal·contractTypeCode·salesPartId
+        ordering: 위험→주의→정상; 동순위는 기존 표 순서 대조
+      x-aiops-query-role:
+        entity: TB_PJ_PROJ
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 프로젝트 현황판 조회 결과; 재조회 가능한 공개 데이터
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectBoardResult'
+        '400':
+          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/project-board/excel:
+    get:
+      operationId: getCommonProjectBoardExcel
+      summary: 프로젝트 현황판 엑셀
+      security: []
+      x-related-requirements:
+      - REQ-645
+      - REQ-646
+      - REQ-609
+      parameters:
+      - name: signal
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - 정상
+          - 주의
+          - 위험
+        description: 조건 선택; 생략하면 해당 조건 제한 없음
+      - name: contractTypeCode
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 조건 선택; 생략하면 해당 조건 제한 없음
+      - name: salesPartId
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 조건 선택; 생략하면 해당 조건 제한 없음
+      x-pagination-filtering:
+        pagination: 조건에 맞는 전체 행을 반환; 서버 페이지 파라미터 없음, ListView 로컬 페이지 재사용
+        filtering: signal·contractTypeCode·salesPartId
+        ordering: 정렬 세부는 OQ-UI-031; 기존 목록 관례 대조
+      responses:
+        '200':
+          description: 현황판 조건에 맞는 프로젝트 엑셀; 원가 금액 제외
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/projects/{projectId}/weekly-memos:
+    get:
+      operationId: getCommonProjectBoardWeeklyMemos
+      summary: 프로젝트 주간 메모 조회
+      security: []
+      x-related-requirements:
+      - REQ-631
+      - REQ-632
+      - REQ-647
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-pagination-filtering:
+        pagination: 조건에 맞는 전체 행을 반환; 서버 페이지 파라미터 없음, ListView 로컬 페이지 재사용
+        filtering: 경로 projectId 전체 하위 행; 추가 검색 입력 없음
+        ordering: 정렬 세부는 OQ-UI-031; 기존 목록 관례 대조
+      x-aiops-query-role:
+        entity: TB_PJ_WEEK_MEMO
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 프로젝트 주간 메모 조회 결과; 재조회 가능한 공개 데이터
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectBoardMemoList'
+        '400':
+          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    post:
+      operationId: postCommonProjectBoardWeeklyMemo
+      summary: 주간 메모 등록
+      security: []
+      x-related-requirements:
+      - REQ-628
+      - REQ-629
+      - REQ-630
+      - REQ-647
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-business-rules:
+      - 운영형은 텍스트 셋 중 하나 필수; 진척률 칸 없음. 턴키·내부는 0~100 정수.
+      - 종료·실주 신규 등록 거부; 작성자는 CurrentBusinessActor(admin).
+      x-side-effects:
+      - TB_PJ_WEEK_MEMO 신규 행; 마지막 업데이트=한국 오늘; 다음 보드 읽기에서 신호등 재계산.
+      x-required-tests:
+      - 'happy: 비종료 프로젝트에 유효 메모 등록 -> 200 후 메모 GET에서 새 memoId와 텍스트 조회.'
+      - 'auth: 인증 헤더 없는 현재 admin 신규 등록 -> 200·createdBy=admin; UI-22 전 역할 거부 시험은 해당 없음.'
+      - 'validation: 운영형 세 텍스트 공백 또는 201자 -> 400 errors에 텍스트 필드 오류·새 행0개.'
+      - 'business: 종료·실주 projectId에 신규 등록 -> 400·TB_PJ_WEEK_MEMO 행수와 latestMemoDate 불변.'
+      - 'side-effect: 14일 넘은 메모 프로젝트에 신규 등록 -> 보드 latestMemoDate=오늘·메모 지연 사유 제거.'
+      x-state-transitions:
+      - 비종료 프로젝트/신규 메모 없음 -> 새 메모 작성일=오늘; latestMemoDate=오늘
+      - 종료·실주 -> 등록 거부·상태 불변
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonProjectBoardMemoInput'
+      responses:
+        '200':
+          description: 주간 메모 등록 결과; 재조회 가능한 공개 데이터
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectBoardMemo'
+        '400':
+          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/projects/{projectId}/weekly-memos/{memoId}:
+    put:
+      operationId: putCommonProjectBoardWeeklyMemo
+      summary: 주간 메모 수정
+      security: []
+      x-related-requirements:
+      - REQ-631
+      - REQ-632
+      - REQ-629
+      - REQ-647
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: memoId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-business-rules:
+      - 누구나 해당 행 수정 가능; 종료·실주는 메모 수정 거부.
+      - 원작성일과 마지막 업데이트 유지; 고친 시각/수정자는 별도 기록.
+      x-side-effects:
+      - TB_PJ_WEEK_MEMO 선택 행 텍스트/허용 진척률·수정자·수정시각만 변경.
+      x-required-tests:
+      - 'happy: 비종료 기존 memoId의 요청 사항 수정 -> 200 후 메모 GET에서 해당 행의 requests 변경·다른 행 불변.'
+      - 'auth: 현재 무인증 admin이 기존 메모 수정 -> 200 updatedBy=admin; 작성자 동일성 제한 없음.'
+      - 'validation: actualProgress 소수 또는 범위 밖 -> 400 errors.actualProgress·해당 메모 불변.'
+      - 'business: 종료·실주 기존 memoId 수정 -> 400·원텍스트와 수정시각 불변.'
+      - 'side-effect: 2주 넘은 기존 메모 수정 -> createdAt/latestMemoDate 불변·updatedAt 별도·보드 주의 유지.'
+      x-state-transitions:
+      - 비종료/기존 메모 -> 동일 memoId 정정·작성일 보존
+      - 종료·실주 -> 수정 거부
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonProjectBoardMemoInput'
+      responses:
+        '200':
+          description: 주간 메모 수정 결과; 재조회 가능한 공개 데이터
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectBoardMemo'
+        '400':
+          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/projects/{projectId}/steps:
+    get:
+      operationId: getCommonProjectBoardSteps
+      summary: 프로젝트 단계 계획 조회
+      security: []
+      x-related-requirements:
+      - REQ-633
+      - REQ-635
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-pagination-filtering:
+        pagination: 조건에 맞는 전체 행을 반환; 서버 페이지 파라미터 없음, ListView 로컬 페이지 재사용
+        filtering: 경로 projectId 전체 하위 행; 추가 검색 입력 없음
+        ordering: 정렬 세부는 OQ-UI-031; 기존 목록 관례 대조
+      x-aiops-query-role:
+        entity: TB_PJ_STEP
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 프로젝트 단계 계획 조회 결과; 재조회 가능한 공개 데이터
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectBoardStepList'
+        '400':
+          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    put:
+      operationId: putCommonProjectBoardSteps
+      summary: 단계 계획 날짜 저장
+      security: []
+      x-related-requirements:
+      - REQ-634
+      - REQ-635
+      - REQ-646
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-business-rules:
+      - 단계명·비중·행수 불변; 날짜만 변경. 첫/마지막 계약 경계 일치·겹침/단절 없음.
+      - 완료 단계 날짜는 수정 불가; 담당 PM 정책은 후속 역할 연결 때 사용하고 현재 admin 유지.
+      x-side-effects:
+      - TB_PJ_STEP 미완료 대상의 계획 날짜만 원자 변경.
+      x-required-tests:
+      - 'happy: 미완료 단계 날짜를 연속 계약기간으로 저장 -> 200 후 steps GET에 새 날짜·동일 비중/단계수.'
+      - 'auth: 무인증 고정 admin으로 날짜 저장 -> 200; 후속 PM 정책에서 담당 프로젝트만 허용하고 현재403을 추가하지 않음.'
+      - 'validation: plannedEndDate가 plannedStartDate보다 빠름 -> 400 해당 날짜 필드 오류·TB_PJ_STEP 불변.'
+      - 'business: 완료 단계 날짜 변경 또는 기간 겹침 -> 400·전체 단계 날짜 snapshot 불변.'
+      - 'side-effect: 유효 날짜 저장 -> TB_PJ_STEP 날짜만 바뀌고 completedDate·TB_PJ_PROJ 계약기간은 불변.'
+      x-state-transitions:
+      - 미완료 단계 계획 -> 날짜 수정·완료일 불변
+      - 완료 단계 -> 날짜 수정 거부
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonProjectBoardStepDatesInput'
+      responses:
+        '200':
+          description: 단계 계획 날짜 저장 결과; 재조회 가능한 공개 데이터
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectBoardStepList'
+        '400':
+          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/projects/{projectId}/steps/ensure:
+    post:
+      operationId: postCommonProjectBoardStepsEnsure
+      summary: 누락 단계 기본값 보완
+      security: []
+      x-related-requirements:
+      - REQ-636
+      - REQ-601
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-business-rules:
+      - 비종료·단계0개만 생성; 기존 단계 있음/종료는 보존.
+      - PROJ_STEP 계약유형별7/5단계·비중대로 계약기간 배분·완료일 null.
+      x-side-effects:
+      - TB_PJ_STEP 누락 기본 행만 생성; 기존 행 수정 없음.
+      x-required-tests:
+      - 'happy: 비종료·단계0개 프로젝트 보완 -> 200 후 steps GET에서 턴키/내부7단계 또는 운영형5단계.'
+      - 'auth: 무인증 admin 보완 호출 -> 200·생성 처리자는 기존 CurrentBusinessActor.'
+      - 'validation: projectId 빈 값/형식 오류 -> 400 projectId 오류·단계 생성0행.'
+      - 'business: 종료 또는 기존 단계 존재 상태에서 보완 -> 200 기존 단계 행수·날짜 불변.'
+      - 'side-effect: 동일 프로젝트 보완 재호출 -> 최초 생성 행만 있고 중복0행·완료일 null.'
+      x-state-transitions:
+      - 비종료/단계0개 -> 기본 단계 생성
+      - 종료 또는 기존단계 -> 무변경
+      x-no-request-body-reason: 경로가 지정한 누락 단계 보완 동작이며 날짜·단계명·비중은 서버 계약/DB 원천에서 정한다.
+      responses:
+        '200':
+          description: 누락 단계 기본값 보완 결과; 재조회 가능한 공개 데이터
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectBoardStepList'
+        '400':
+          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/projects/{projectId}/steps/{stepId}/complete:
+    post:
+      operationId: postCommonProjectBoardStepComplete
+      summary: 프로젝트 단계 완료
+      security: []
+      x-related-requirements:
+      - REQ-637
+      - REQ-647
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-business-rules:
+      - 시작한 단계만 완료; 종료·실주 프로젝트는 거부. 재완료 처리의 세부 정책은 OQ-STATE-031.
+      x-side-effects:
+      - TB_PJ_STEP 선택 행 완료일=한국 오늘; 후속 실적 진척률은 식-74를 읽어 재계산.
+      x-required-tests:
+      - 'happy: 비종료의 시작한 미완료 stepId 완료 -> 200 후 steps GET에서 completedDate=오늘.'
+      - 'auth: 현재 무인증 admin 완료 호출 -> 200; 로그인 UI-22 전 역할403 시험 없음.'
+      - 'validation: stepId 누락/빈 식별자 -> 400 식별자 오류·완료일 불변.'
+      - 'business: 미시작 단계 또는 종료·실주 프로젝트 완료 -> 400·completedDate 불변.'
+      - 'side-effect: 단계 완료 후 보드 재조회 -> 식-74에 따른 실적/단계 상태 반영·TB_PJ_PROJ 금액 불변.'
+      x-state-transitions:
+      - 비종료/시작한 미완료 단계 -> completedDate=오늘
+      - 미시작 또는 종료·실주 -> 완료 거부
+      x-no-request-body-reason: 경로가 지정한 단계 완료 동작이며 날짜·단계명·비중은 서버 계약/DB 원천에서 정한다.
+      responses:
+        '200':
+          description: 프로젝트 단계 완료 결과; 재조회 가능한 공개 데이터
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectBoardStep'
+        '400':
+          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/project-issues:
+    get:
+      operationId: getCommonProjectBoardIssues
+      summary: 프로젝트 이슈 모아 보기
+      security: []
+      x-related-requirements:
+      - REQ-643
+      - REQ-644
+      - REQ-641
+      - REQ-647
+      parameters:
+      - name: statusCode
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: ISSUE_STAT 원천; 생략 시 열림·조치 중
+      - name: overdue
+        in: query
+        required: false
+        schema:
+          type: boolean
+        description: 조건 선택; 생략하면 해당 조건 제한 없음
+      - name: importanceCode
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 조건 선택; 생략하면 해당 조건 제한 없음
+      - name: projectId
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 조건 선택; 생략하면 해당 조건 제한 없음
+      x-pagination-filtering:
+        pagination: 조건에 맞는 전체 행을 반환; 서버 페이지 파라미터 없음, ListView 로컬 페이지 재사용
+        filtering: statusCode·overdue·importanceCode·projectId
+        ordering: 정렬 세부는 OQ-UI-031; 기존 목록 관례 대조
+      x-aiops-query-role:
+        entity: TB_PJ_ISSUE
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 프로젝트 이슈 모아 보기 결과; 재조회 가능한 공개 데이터
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectBoardIssueList'
+        '400':
+          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    post:
+      operationId: postCommonProjectBoardIssue
+      summary: 프로젝트 이슈 등록
+      security: []
+      x-related-requirements:
+      - REQ-638
+      - REQ-640
+      - REQ-641
+      - REQ-642
+      - REQ-647
+      x-business-rules:
+      - 필수 projectId/title/dueDate/importanceCode/statusCode·제목100/조치500.
+      - 담당자는 등록 CurrentBusinessActor(admin) 자동고정; 종료·실주 신규 등록 거부; 삭제 없음.
+      x-side-effects:
+      - TB_PJ_ISSUE 새 행과 등록자/등록시각 저장; 커밋 후 열린 수/신호등 재조회.
+      x-required-tests:
+      - 'happy: 유효 필수값으로 새 이슈 등록 -> 200 후 issues GET에서 새 issueId/title·담당자admin.'
+      - 'auth: 인증 없이 현재 admin 등록 -> 200 createdBy/assigneeId=admin; 다른 사용자 선택 입력 없음.'
+      - 'validation: title101자 또는 actionText501자/필수 누락 -> 400 해당 필드 오류·TB_PJ_ISSUE 증가0행.'
+      - 'business: 종료·실주 프로젝트에 새 이슈 등록 -> 400·기존 이슈 snapshot 불변.'
+      - 'side-effect: 기한지난 높음 열린 이슈 등록 -> 보드 열린 수 증가·위험 사유에 해당 이슈 반영.'
+      x-state-transitions:
+      - 비종료 프로젝트/이슈 없음 -> 입력 상태의 신규 이슈
+      - 종료·실주 -> 신규 등록 거부
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonProjectBoardIssueInput'
+      responses:
+        '200':
+          description: 프로젝트 이슈 등록 결과; 재조회 가능한 공개 데이터
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectBoardIssue'
+        '400':
+          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/project-issues/{issueId}:
+    put:
+      operationId: putCommonProjectBoardIssue
+      summary: 프로젝트 이슈 수정·종료
+      security: []
+      x-related-requirements:
+      - REQ-639
+      - REQ-640
+      - REQ-641
+      - REQ-642
+      - REQ-647
+      parameters:
+      - name: issueId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-business-rules:
+      - 기존 이슈는 종료·실주에서도 수정/종료 가능; 담당자/등록자/등록시각 불변.
+      - 삭제 대신 ISSUE_STAT의 종료값으로 저장; 미제공 상태전이 행렬을 추정하지 않음.
+      x-side-effects:
+      - TB_PJ_ISSUE 동일 행 갱신과 수정자/수정시각 기록; 열린 수/신호등 새 조회 반영.
+      x-required-tests:
+      - 'happy: 기존 이슈 title/actionText 수정 -> 200 후 issues GET에서 동일 issueId의 새 값.'
+      - 'auth: 다른 실행자 정책 fixture로 수정 -> assigneeId/createdBy 불변·updatedBy만 새 실행자; 현재 HTTP는 admin.'
+      - 'validation: 미등록 importanceCode/statusCode -> 400 해당 필드 오류·이슈 기존값 보존.'
+      - 'business: 종료·실주 프로젝트의 기존 이슈 종료 저장 -> 200 동일 행 유지; 신규 등록 차단과 구별.'
+      - 'side-effect: 기한지난 높음 이슈 종료 -> 보드 열린 수 감소·해당 사유 제거·updatedAt 기록·원등록시각 보존.'
+      x-state-transitions:
+      - 기존 이슈 -> 요청된 ISSUE_STAT 값; 종료도 동일 행 보존
+      - 담당자·등록시각 -> 불변; 구체 상태 전이 제한은 OQ-STATE-031
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonProjectBoardIssueInput'
+      responses:
+        '200':
+          description: 프로젝트 이슈 수정·종료 결과; 재조회 가능한 공개 데이터
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectBoardIssue'
+        '400':
+          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
 components:
   schemas:
+    CommonProjectBoardRow:
+      type: object
+      required:
+      - projectId
+      - projectName
+      - contractTypeCode
+      - signal
+      - signalReasons
+      - reasonSummary
+      - pmUserId
+      - pmName
+      - currentStepName
+      - stepDelayed
+      - plannedProgress
+      - actualProgress
+      - costUsageRate
+      - costProgressGap
+      - openIssueCount
+      - overdueIssueCount
+      - latestMemoDate
+      - daysWithoutMemo
+      - stale
+      properties:
+        projectId:
+          type: string
+        projectName:
+          type: string
+        contractTypeCode:
+          type: string
+        signal:
+          type: string
+          enum:
+          - 정상
+          - 주의
+          - 위험
+        signalReasons:
+          type: array
+          items:
+            type: string
+        reasonSummary:
+          type: string
+        pmUserId:
+          type: string
+          nullable: true
+        pmName:
+          type: string
+          nullable: true
+        currentStepName:
+          type: string
+          nullable: true
+        stepDelayed:
+          type: boolean
+        plannedProgress:
+          type: number
+          nullable: true
+        actualProgress:
+          type: number
+          nullable: true
+        costUsageRate:
+          type: number
+          nullable: true
+          description: 턴키만 원가 사용률; 월단위·파견은 null/화면 –; 내부는 OQ-CALC-031
+        costProgressGap:
+          type: number
+          nullable: true
+          description: 진척 대비 원가 %p; 원가 금액은 반환하지 않음
+        openIssueCount:
+          type: integer
+          minimum: 0
+        overdueIssueCount:
+          type: integer
+          minimum: 0
+        latestMemoDate:
+          type: string
+          nullable: true
+          format: date
+        daysWithoutMemo:
+          type: integer
+          nullable: true
+          description: 메모 없음 기준일은 OQ-CALC-031
+        stale:
+          type: boolean
+      additionalProperties: false
+    CommonProjectBoardSummary:
+      type: object
+      required:
+      - progress
+      - riskCount
+      - openIssues
+      - overdueIssueCount
+      - staleProjectCount
+      properties:
+        progress:
+          type: object
+          required:
+          - total
+          - normal
+          - caution
+          - danger
+          properties:
+            total:
+              type: integer
+              minimum: 0
+            normal:
+              type: integer
+              minimum: 0
+            caution:
+              type: integer
+              minimum: 0
+            danger:
+              type: integer
+              minimum: 0
+          additionalProperties: false
+        riskCount:
+          type: integer
+          minimum: 0
+        openIssues:
+          type: object
+          required:
+          - total
+          - high
+          properties:
+            total:
+              type: integer
+              minimum: 0
+            high:
+              type: integer
+              minimum: 0
+          additionalProperties: false
+        overdueIssueCount:
+          type: integer
+          minimum: 0
+        staleProjectCount:
+          type: integer
+          minimum: 0
+      additionalProperties: false
+    CommonProjectBoardResult:
+      type: object
+      required:
+      - summary
+      - staleProjects
+      - items
+      - calculationMethod
+      properties:
+        summary:
+          $ref: '#/components/schemas/CommonProjectBoardSummary'
+        staleProjects:
+          type: array
+          items:
+            type: object
+            required:
+            - projectId
+            - projectName
+            - daysWithoutMemo
+            properties:
+              projectId:
+                type: string
+              projectName:
+                type: string
+              daysWithoutMemo:
+                type: integer
+                nullable: true
+            additionalProperties: false
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProjectBoardRow'
+        calculationMethod:
+          type: string
+          description: 사용 DB 식의 계산 방법과 1차 경보/UI-04 상세확인 안내
+      additionalProperties: false
+    CommonProjectBoardMemo:
+      type: object
+      required:
+      - memoId
+      - projectId
+      - workDone
+      - nextWork
+      - requests
+      - actualProgress
+      - createdAt
+      - createdBy
+      - updatedAt
+      - updatedBy
+      properties:
+        memoId:
+          type: string
+        projectId:
+          type: string
+        workDone:
+          type: string
+          nullable: true
+          maxLength: 200
+        nextWork:
+          type: string
+          nullable: true
+          maxLength: 200
+        requests:
+          type: string
+          nullable: true
+          maxLength: 200
+        actualProgress:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 100
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        updatedAt:
+          type: string
+          nullable: true
+          format: date-time
+        updatedBy:
+          type: string
+          nullable: true
+      additionalProperties: false
+    CommonProjectBoardMemoList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProjectBoardMemo'
+      additionalProperties: false
+    CommonProjectBoardMemoInput:
+      type: object
+      required: []
+      properties:
+        workDone:
+          type: string
+          nullable: true
+          maxLength: 200
+        nextWork:
+          type: string
+          nullable: true
+          maxLength: 200
+        requests:
+          type: string
+          nullable: true
+          maxLength: 200
+        actualProgress:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 100
+      additionalProperties: false
+      description: 턴키·내부만 actualProgress 0~100 정수. 운영형은 actualProgress 미입력이고 텍스트 셋 중 하나 필수. 등록·수정 모두 적용.
+    CommonProjectBoardStep:
+      type: object
+      required:
+      - stepId
+      - projectId
+      - stepName
+      - weight
+      - plannedStartDate
+      - plannedEndDate
+      - completedDate
+      properties:
+        stepId:
+          type: string
+        projectId:
+          type: string
+        stepName:
+          type: string
+        weight:
+          type: number
+        plannedStartDate:
+          type: string
+          format: date
+        plannedEndDate:
+          type: string
+          format: date
+        completedDate:
+          type: string
+          nullable: true
+          format: date
+      additionalProperties: false
+    CommonProjectBoardStepList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProjectBoardStep'
+      additionalProperties: false
+    CommonProjectBoardStepDatesInput:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required:
+            - stepId
+            - plannedStartDate
+            - plannedEndDate
+            properties:
+              stepId:
+                type: string
+              plannedStartDate:
+                type: string
+                format: date
+              plannedEndDate:
+                type: string
+                format: date
+            additionalProperties: false
+          minItems: 1
+      additionalProperties: false
+    CommonProjectBoardIssueInput:
+      type: object
+      required:
+      - projectId
+      - title
+      - dueDate
+      - importanceCode
+      - statusCode
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        dueDate:
+          type: string
+          format: date
+          description: 등록 폼 기본값 한국 오늘+7일
+        importanceCode:
+          type: string
+          minLength: 1
+          description: IMPR DB값; 폼 기본 표시 중간
+        statusCode:
+          type: string
+          minLength: 1
+          description: ISSUE_STAT DB값
+        actionText:
+          type: string
+          nullable: true
+          maxLength: 500
+      additionalProperties: false
+    CommonProjectBoardIssue:
+      type: object
+      required:
+      - issueId
+      - projectId
+      - title
+      - dueDate
+      - importanceCode
+      - statusCode
+      - actionText
+      - projectName
+      - assigneeId
+      - assigneeName
+      - createdBy
+      - createdAt
+      - updatedBy
+      - updatedAt
+      - overdueDays
+      properties:
+        issueId:
+          type: string
+        projectId:
+          type: string
+          minLength: 1
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        dueDate:
+          type: string
+          format: date
+          description: 등록 폼 기본값 한국 오늘+7일
+        importanceCode:
+          type: string
+          minLength: 1
+          description: IMPR DB값; 폼 기본 표시 중간
+        statusCode:
+          type: string
+          minLength: 1
+          description: ISSUE_STAT DB값
+        actionText:
+          type: string
+          nullable: true
+          maxLength: 500
+        projectName:
+          type: string
+        assigneeId:
+          type: string
+          description: 등록 CurrentBusinessActor 고정
+        assigneeName:
+          type: string
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedBy:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          nullable: true
+          format: date-time
+        overdueDays:
+          type: integer
+          minimum: 0
+      additionalProperties: false
+    CommonProjectBoardIssueList:
+      type: object
+      required:
+      - items
+      - openCount
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProjectBoardIssue'
+        openCount:
+          type: integer
+          minimum: 0
+      additionalProperties: false
     CommonManpowerComparisonRow:
       type: object
       required: [projectId, projectName, jobCode, jobName, plannedMm, actualMm, differenceMm, differenceStatus]
@@ -10200,7 +11356,8 @@ components:
       - contractAmount
       - canEdit
       - canSaveManpowerPlan
-      description: 진행현황·신호등 식-67/76 세부 결과는 DB정의 확보 OQ-CALC-001; 이슈 SFR-131의 공개필드/연결은 OQ-ISSUE-001로 국소 보류. 빈 object를 완료된 이슈 계약으로 내보내지 않음.
+      description: 진행현황·신호등 식-67/76 세부 결과는 DB정의 확보 OQ-CALC-001; 이슈 SFR-131의 공개필드/연결은 OQ-ISSUE-001로 국소 보류. 빈 object를
+        완료된 이슈 계약으로 내보내지 않음.
     CommonProjectList:
       type: object
       properties:
@@ -10503,7 +11660,8 @@ components:
       - startDate
       - endDate
       - statusCode
-      description: 비내부 customerId/salesPartId/contractAmount 필수. 내부는 세 비해당 칸 제외·빈 계약금액0. 등록 상태는 DB의 진행/수주예정 코드만. 근무지는 텍스트이며 주소코드 사용 금지.
+      description: 비내부 customerId/salesPartId/contractAmount 필수. 내부는 세 비해당 칸 제외·빈 계약금액0. 등록 상태는 DB의 진행/수주예정 코드만. 근무지는
+        텍스트이며 주소코드 사용 금지.
     CommonProjectUpdateInput:
       type: object
       properties:
@@ -10549,7 +11707,6 @@ components:
       - projectName
       - startDate
       - endDate
-
     CommonProjectBudgetInput:
       type: object
       properties:
@@ -10906,9 +12063,6 @@ components:
           type: string
         name:
           type: string
-        jobName:
-          type: string
-          description: 그 사람의 이 프로젝트 마지막 배정 직무 이름
         endDate:
           type: string
           format: date
@@ -10919,6 +12073,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommonAssignment'
+        jobName:
+          type: string
+          description: 그 사람의 이 프로젝트 마지막 배정 직무 이름
       additionalProperties: false
     CommonAssignmentContractDeveloperList:
       type: object
@@ -11174,6 +12331,72 @@ x-requirement-context:
     REQ-043: '필수 경로 — /api/health 유지. GET·getHealth는 기존 설계 제안. 성공 값·DB 포함·오류·4xx 부재 근거 OQ-006. 제품 검증 화면 추가 금지.'
 
 x-uncovered-requirements:
+- canonical_id: REQ-599
+  status: screen-only
+  evidence: UI-31 기존 M005 본문 연결은 router/DevelopedScreenRegistry 검수 대상이며 새로운 HTTP 업무 동작이 아니다.
+- canonical_id: REQ-602
+  status: out-of-scope
+  evidence: 로그인·메뉴 권한 제외 — UI-31 진입·저장에 로그인 이동·새 메뉴 권한 검사 호출이 없다.
+- canonical_id: REQ-603
+  status: non-functional
+  evidence: 시안·SQL 근거 대조 — 실제 렌더링/DDL/식 원문을 확보해 대조하며 미제공 자료를 검증 완료로 보고하지 않는다.
+- canonical_id: REQ-604
+  status: non-functional
+  evidence: 자동 Flyway 비활성 — 일반 기동에서 자동 migration 실행이 없고 설정 false가 유지된다.
+- canonical_id: REQ-605
+  status: non-functional
+  evidence: 개발 인증 비활성 — 고정 admin 무인증 호출이 성공하고 runtime-check 설정이 false다.
+- canonical_id: REQ-606
+  status: non-functional
+  evidence: 인증 정의 미추가 — 유효 OpenAPI에 세 선언이 없고 신규 연산의 security는 []다.
+- canonical_id: REQ-607
+  status: non-functional
+  evidence: 기존 비교 엑셀 API 보존 — contracts/openapi-manual.yaml과 기존 유효 계약의 모든 해당 메서드를 구조 비교한다. 원문 부재는 OQ-API-031에 한정한다.
+- canonical_id: REQ-608
+  status: non-functional
+  evidence: ListView 재사용 — 현황판과 이슈 표의 컴포넌트가 ListView이고 별도 목록 엔진이 없다.
+- canonical_id: REQ-610
+  status: non-functional
+  evidence: ProjectDetail initialTab 보존 — UI-31 행은 진행 현황으로 열리고 기존 initialTab 없는 상세 호출은 기본 정보로 열린다.
+- canonical_id: REQ-611
+  status: data-constraint
+  evidence: V14 준비 보존 — V14 중복 준비 파일이 없으며 추가 자원과 SchemaPreparation 시험 목록이 일치한다.
+- canonical_id: REQ-612
+  status: out-of-scope
+  evidence: 메뉴 연결 범위 — 메뉴 전후 비교에서 UI-31 외 신규 활성 leaf가 없다.
+- canonical_id: REQ-613
+  status: non-functional
+  evidence: '미리보기 포트 형식 — Compose 포트 파싱에서 127.0.0.1: 접두사 없이 미리보기 포트가 검출된다.'
+- canonical_id: REQ-614
+  status: screen-only
+  evidence: UI-31에서 연 ProjectDetail의 수정은 useOpenProjectEdit로 UI-01 폼을 여는 기존 로컬 라우팅이다.
+- canonical_id: REQ-615
+  status: screen-only
+  evidence: 기존 ProjectDetail.onChanged 콜백의 알림을 UI-31에 표시하는 로컬 피드백이며 서버 연산을 추가하지 않는다.
+- canonical_id: REQ-616
+  status: non-functional
+  evidence: schema 이름 유일성 — 전체 schemas 키가 유일하고 기존 동명 정의를 덮어쓰지 않는다.
+- canonical_id: REQ-617
+  status: non-functional
+  evidence: 기존 시험 파일 보존 — 변경 전후 기존 시험 경로가 유지되고 회귀 시험을 실행한다.
+- canonical_id: REQ-618
+  status: non-functional
+  evidence: 공통 부품 기본 동작 보존 — 새 옵션 미지정 회귀에서 목록·상세·링크가 변경 전과 같게 동작한다.
+- canonical_id: REQ-627
+  status: screen-only
+  evidence: 현황판 행의 projectId와 기존 getCommonProject를 ProjectDetail.initialTab=진행 현황에 연결하는 로컬 상세 진입이다.
+- canonical_id: REQ-648
+  status: out-of-scope
+  evidence: 알림·메일 제외 — 위험 판정 후 보드 경보만 바뀌고 알림/메일 연계 호출이 없다.
+- canonical_id: REQ-649
+  status: out-of-scope
+  evidence: 주간 횟수 제한·별도 메모 모아보기 제외 — 같은 주 새 메모 추가 저장이 가능하고 새 메모 모아보기 route/menu는 없다.
+- canonical_id: REQ-650
+  status: non-functional
+  evidence: 업무 사용자 범위 — UI-31 인계 사용자에 네 업무 사용자가 기록되고 현재 인증은 고정 admin이다.
+- canonical_id: REQ-651
+  status: data-constraint
+  evidence: 저장 표 경계 — 메모/단계/이슈 쓰기 전후 TB_PJ_PROJ 원행과 다른 업무 표를 보존하며 보드 결과 저장 표를 만들지 않는다.
 - canonical_id: REQ-579
   status: data-constraint
   evidence: JOB/SRC DB 코드 재사용은 기존 getCommonCodes의 원천 계약이며 비교 GET에 코드 등록을 추가하지 않는다.

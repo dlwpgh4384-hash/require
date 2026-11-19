@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.projects.mapper.ProjectProgressMapper">
+  <resultMap id="owner" type="com.company.common.projects.mapper.ProjectProgressMapper$Owner">
+    <constructor>
+      <arg column="projectId" javaType="string"/>
+      <arg column="contractTypeCode" javaType="string"/>
+      <arg column="statusCode" javaType="string"/>
+      <arg column="startDate" javaType="java.time.LocalDate"/>
+      <arg column="endDate" javaType="java.time.LocalDate"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="memo" type="com.company.common.projects.dto.ProjectProgressContracts$Memo">
+    <constructor>
+      <arg column="memoId" javaType="string"/>
+      <arg column="projectId" javaType="string"/>
+      <arg column="workDone" javaType="string"/>
+      <arg column="nextWork" javaType="string"/>
+      <arg column="requests" javaType="string"/>
+      <arg column="actualProgress" javaType="java.lang.Integer"/>
+      <arg column="createdAt" javaType="java.time.Instant"/>
+      <arg column="createdBy" javaType="string"/>
+      <arg column="updatedAt" javaType="java.time.Instant"/>
+      <arg column="updatedBy" javaType="string"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="step" type="com.company.common.projects.dto.ProjectProgressContracts$Step">
+    <constructor>
+      <arg column="stepId" javaType="string"/>
+      <arg column="projectId" javaType="string"/>
+      <arg column="stepName" javaType="string"/>
+      <arg column="weight" javaType="java.math.BigDecimal"/>
+      <arg column="plannedStartDate" javaType="java.time.LocalDate"/>
+      <arg column="plannedEndDate" javaType="java.time.LocalDate"/>
+      <arg column="completedDate" javaType="java.time.LocalDate"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="definition" type="com.company.common.common.ProjectBoardStageCalendar$Definition">
+    <constructor>
+      <arg column="code" javaType="string"/>
+      <arg column="name" javaType="string"/>
+      <arg column="weight" javaType="java.math.BigDecimal"/>
+      <arg column="contractTypes" javaType="string"/>
+      <arg column="sortOrder" javaType="_int"/>
+    </constructor>
+  </resultMap>
+  <sql id="ownerColumns">
+    p.PROJ_ID AS "projectId", p.CTRT_TYPE_CD AS "contractTypeCode",
+    p.PROJ_STAT_CD AS "statusCode", p.CTRT_BGN_DT AS "startDate", p.CTRT_END_DT AS "endDate"
+  </sql>
+  <select id="owner" resultMap="owner">
+    SELECT <include refid="ownerColumns"/> FROM TB_PJ_PROJ p WHERE p.PROJ_ID=#{id}
+  </select>
+  <select id="lockOwner" resultMap="owner">
+    SELECT <include refid="ownerColumns"/> FROM TB_PJ_PROJ p WHERE p.PROJ_ID=#{id} FOR UPDATE
+  </select>
+  <select id="memos" resultMap="memo">
+    SELECT m.MEMO_SN::text AS "memoId", m.PROJ_ID AS "projectId",
+      m.THIS_WEEK_CN AS "workDone", m.NEXT_WEEK_CN AS "nextWork", m.REQ_CN AS "requests",
+      m.ACTL_PRGRS_RT AS "actualProgress", m.REG_DTTM AS "createdAt", m.REG_USER_ID AS "createdBy",
+      m.MOD_DTTM AS "updatedAt", m.MOD_USER_ID AS "updatedBy"
+    FROM TB_PJ_WEEK_MEMO m WHERE m.PROJ_ID=#{id} ORDER BY m.WRT_DT DESC, m.MEMO_SN DESC
+  </select>
+  <select id="nextMemoSequence" resultType="int">
+    SELECT COALESCE(MAX(m.MEMO_SN),0)+1 FROM TB_PJ_WEEK_MEMO m WHERE m.PROJ_ID=#{id}
+  </select>
+  <insert id="insertMemo">
+    INSERT INTO TB_PJ_WEEK_MEMO
+      (PROJ_ID,MEMO_SN,WRT_DT,THIS_WEEK_CN,NEXT_WEEK_CN,REQ_CN,ACTL_PRGRS_RT,REG_USER_ID,REG_DTTM)
+    VALUES (#{projectId},#{sequence},#{today},#{input.workDone},#{input.nextWork},#{input.requests},
+      #{input.actualProgress,jdbcType=NUMERIC},#{actor},#{now})
+  </insert>
+  <update id="updateMemo">
+    UPDATE TB_PJ_WEEK_MEMO SET THIS_WEEK_CN=#{input.workDone},NEXT_WEEK_CN=#{input.nextWork},
+      REQ_CN=#{input.requests},ACTL_PRGRS_RT=#{input.actualProgress,jdbcType=NUMERIC},
+      MOD_USER_ID=#{actor},MOD_DTTM=#{now}
+    WHERE PROJ_ID=#{projectId} AND MEMO_SN=#{sequence}
+  </update>
+  <select id="steps" resultMap="step">
+    SELECT s.STEP_SN::text AS "stepId", s.PROJ_ID AS "projectId",
+      COALESCE(c.CODE_NM,s.PROJ_STEP_CD) AS "stepName", s.STEP_WGHT_RT AS "weight",
+      s.PLAN_BGN_DT AS "plannedStartDate", s.PLAN_END_DT AS "plannedEndDate", s.CMPL_DT AS "completedDate"
+    FROM TB_PJ_STEP s LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='PROJ_STEP' AND c.CODE=s.PROJ_STEP_CD
+    WHERE s.PROJ_ID=#{id} ORDER BY s.STEP_SN
+  </select>
+  <select id="stageDefinitions" resultMap="definition">
+    SELECT c.CODE AS "code",c.CODE_NM AS "name",CAST(c.ADD_VAL1 AS numeric) AS "weight",
+      c.ADD_VAL2 AS "contractTypes",c.SORT_ORD::integer AS "sortOrder"
+    FROM TB_SY_CODE c WHERE c.CODE_GRP_ID='PROJ_STEP' AND c.USE_YN='Y' AND c.DEL_YN='N'
+    ORDER BY c.SORT_ORD,c.CODE
+  </select>
+  <insert id="insertStage">
+    INSERT INTO TB_PJ_STEP
+      (PROJ_ID,STEP_SN,PROJ_STEP_CD,STEP_WGHT_RT,PLAN_BGN_DT,PLAN_END_DT,CMPL_DT,REG_USER_ID)
+    VALUES (#{projectId},#{sequence},#{plan.code},#{plan.weight},#{plan.plannedStartDate},
+      #{plan.plannedEndDate},NULL,#{actor})
+  </insert>
+  <update id="updateDates">
+    UPDATE TB_PJ_STEP SET PLAN_BGN_DT=#{dates.plannedStartDate},PLAN_END_DT=#{dates.plannedEndDate},
+      MOD_USER_ID=#{actor},MOD_DTTM=#{now}
+    WHERE PROJ_ID=#{projectId} AND STEP_SN=CAST(#{dates.stepId} AS numeric) AND CMPL_DT IS NULL
+  </update>
+  <update id="complete">
+    UPDATE TB_PJ_STEP SET CMPL_DT=#{today},MOD_USER_ID=#{actor},MOD_DTTM=#{now}
+    WHERE PROJ_ID=#{projectId} AND STEP_SN=#{sequence} AND CMPL_DT IS NULL
+  </update>
+</mapper>

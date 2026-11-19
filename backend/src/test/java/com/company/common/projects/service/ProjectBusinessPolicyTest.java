@@ -15,6 +15,13 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ProjectBusinessPolicyTest {
+    @Test void futureProgressPolicyIsSeparateFromPublicHttpAndUsesAssignedProjectUnion() {
+        var grants=List.of(new Grant("PROJ",Set.of(),Set.of("one")),new Grant("PROJ",Set.of(),Set.of("two")));
+        assertThat(ProjectBusinessPolicy.canManageProgress(Set.of("ADMIN"),List.of(),"any")).isTrue();
+        assertThat(ProjectBusinessPolicy.canManageProgress(Set.of("PM"),grants,"two")).isTrue();
+        assertThat(ProjectBusinessPolicy.canManageProgress(Set.of("PM"),grants,"other")).isFalse();
+        assertThat(ProjectBusinessPolicy.canManageProgress(Set.of("FIN"),grants,"two")).isFalse();
+    }
     @ParameterizedTest @ValueSource(strings={"ADMIN","PM"}) void administratorOrResponsiblePmMaySave(String role) {
         assertThat(ProjectBusinessPolicy.canSaveManpower(Set.of(role),List.of(new Grant("PROJ",Set.of(),Set.of("P-owned"))),"P-owned")).isTrue();
     }

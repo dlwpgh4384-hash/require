@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.projectboard.mapper.ProjectBoardMapper">
+  <resultMap id="source" type="com.company.common.projectboard.mapper.ProjectBoardSource" autoMapping="false">
+    <id column="projectId" property="projectId"/>
+    <result column="projectName" property="projectName"/>
+    <result column="contractTypeCode" property="contractTypeCode"/>
+    <result column="statusCode" property="statusCode"/>
+    <result column="salesPartId" property="salesPartId"/>
+    <result column="pmUserId" property="pmUserId"/>
+    <result column="pmName" property="pmName"/>
+    <result column="startDate" property="startDate"/>
+    <result column="endDate" property="endDate"/>
+    <result column="latestMemoDate" property="latestMemoDate"/>
+    <result column="budgetAmount" property="budgetAmount"/>
+    <result column="costAmount" property="costAmount"/>
+    <result column="actualProgress" property="actualProgress"/>
+  </resultMap>
+  <resultMap id="issue" type="com.company.common.common.ProjectBoardSignalRules$Issue">
+    <constructor>
+      <arg column="issueId" javaType="string"/>
+      <arg column="importanceCode" javaType="string"/>
+      <arg column="statusCode" javaType="string"/>
+      <arg column="dueDate" javaType="java.time.LocalDate"/>
+    </constructor>
+  </resultMap>
+  <select id="sources" resultMap="source">
+    SELECT p.PROJ_ID AS "projectId", p.PROJ_NM AS "projectName",
+      p.CTRT_TYPE_CD AS "contractTypeCode", p.PROJ_STAT_CD AS "statusCode",
+      p.CTRT_BGN_DT AS "startDate", p.CTRT_END_DT AS "endDate",
+      pp.PART_ID AS "salesPartId", pm.USER_ID AS "pmUserId", pm.USER_NM AS "pmName",
+      p.BDGT_AMT AS "budgetAmount",
+      (SELECT MAX(m.WRT_DT) FROM TB_PJ_WEEK_MEMO m WHERE m.PROJ_ID=p.PROJ_ID) AS "latestMemoDate",
+      (SELECT m.ACTL_PRGRS_RT FROM TB_PJ_WEEK_MEMO m
+        WHERE m.PROJ_ID=p.PROJ_ID AND m.ACTL_PRGRS_RT IS NOT NULL
+        ORDER BY m.WRT_DT DESC, m.MEMO_SN DESC LIMIT 1) AS "actualProgress",
+      COALESCE((SELECT SUM(c.LABOR_ALLOC_AMT+c.DRCT_EXPS_AMT) FROM TB_CO_MON_COST c
+        WHERE c.PROJ_ID=p.PROJ_ID AND c.COST_YM &lt;= #{month}),0)
+      + COALESCE((SELECT SUM(e.EXPS_AMT) FROM TB_PJ_DRCT_EXPS e
+        WHERE e.PROJ_ID=p.PROJ_ID AND e.EXPS_YM &lt;= #{month}),0) AS "costAmount"
+    FROM TB_PJ_PROJ p
+    LEFT JOIN LATERAL (
+      SELECT h.PART_ID FROM TB_PJ_PROJ_PART h
+      WHERE h.PROJ_ID=p.PROJ_ID AND h.APLY_BGN_YM &lt;= #{month}
+      ORDER BY h.APLY_BGN_YM DESC LIMIT 1
+    ) pp ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT u.USER_ID, u.USER_NM FROM TB_SY_USER u
+      WHERE EXISTS (SELECT 1 FROM TB_SY_USER_SCOPE sc WHERE sc.USER_ID=u.USER_ID
+        AND sc.SCOPE_TYPE_CD='PROJ' AND sc.PROJ_ID=p.PROJ_ID)
+      AND EXISTS (SELECT 1 FROM TB_SY_USER_ROLE r WHERE r.USER_ID=u.USER_ID AND r.ROLE_ID='PM')
+      ORDER BY u.USER_ID ASC LIMIT 1
+    ) pm ON TRUE
+    WHERE p.PROJ_STAT_CD NOT IN ('END','LOSE') AND p.CTRT_END_DT &gt;= #{today}
+    <if test="filter.contractTypeCode != null">AND p.CTRT_TYPE_CD=#{filter.contractTypeCode}</if>
+    <if test="filter.salesPartId != null">AND pp.PART_ID=#{filter.salesPartId}</if>
+    ORDER BY p.CTRT_BGN_DT DESC, p.PROJ_ID ASC
+  </select>
+  <select id="issues" resultMap="issue">
+    SELECT i.ISSUE_ID::text AS "issueId", i.IMPR_CD AS "importanceCode",
+      i.ISSUE_STAT_CD AS "statusCode", i.DDLN_DT AS "dueDate"
+    FROM TB_PJ_ISSUE i WHERE i.PROJ_ID=#{projectId} ORDER BY i.ISSUE_ID
+  </select>
+  <select id="partExists" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_BS_PART p WHERE p.PART_ID=#{partId})
+  </select>
+</mapper>

@@ -1,0 +1,10 @@
+<!-- 임시(2026-11-19, 사용자 허락): Maven 중앙 저장소가 429로 막혀 구글 공식 복사본에서 받는다. 35번 PR 점검 때 되돌린다. -->
+<settings>
+  <mirrors>
+    <mirror>
+      <id>google-maven-central</id>
+      <mirrorOf>central</mirrorOf>
+      <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
+    </mirror>
+  </mirrors>
+</settings>

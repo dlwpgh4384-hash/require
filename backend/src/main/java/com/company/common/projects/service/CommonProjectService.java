@@ -23,7 +23,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
-public class CommonProjectService {
+public class CommonProjectService implements org.springframework.context.ApplicationEventPublisherAware {
+    private org.springframework.context.ApplicationEventPublisher events;
+
+    @Override
+    public void setApplicationEventPublisher(org.springframework.context.ApplicationEventPublisher events) {
+        this.events = events;
+    }
+
+    private void activated(String id) {
+        if (events != null) events.publishEvent(new ProjectStageService.ProjectActivated(id));
+    }
     private final ProjectMapper mapper;
     private final BusinessCalendar calendar;
     private final CurrentBusinessActor actor;
@@ -214,6 +224,7 @@ public class CommonProjectService {
         mapper.insertPart(new PartWrite(p.projectId, db(YearMonth.from(p.startDate)),
             internal(p) ? null : input.salesPartId(), null, actor.userId()));
         history(p.projectId, "CTRT", "계약", null, p.projectName);
+        activated(p.projectId);
         return getCommonProject(p.projectId);
     }
     @Transactional
@@ -369,6 +380,7 @@ public class CommonProjectService {
         var p = locked(id); writable(p);
         if (!"PRE".equals(p.statusCode)) throw ProjectRules.invalid("projectId");
         mapper.start(id);
+        activated(id);
         return getCommonProject(id);
     }
     @Transactional

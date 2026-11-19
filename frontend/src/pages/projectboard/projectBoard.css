@@ -1,0 +1,73 @@
+.project-board-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  color: var(--text);
+}
+.project-board-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.project-board-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.project-board-summary strong {
+  font-size: 24px;
+}
+.project-board-summary small {
+  color: var(--text-sub);
+  overflow-wrap: anywhere;
+}
+.project-board-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.project-board-tabs [aria-selected="true"] {
+  color: var(--primary-text);
+  font-weight: 600;
+}
+.project-board-page [role="tabpanel"] > .ls-filters {
+  margin-bottom: 16px;
+}
+.project-board-project {
+  min-width: 180px;
+  max-width: 320px;
+  white-space: normal;
+}
+.project-board-progress {
+  min-width: 110px;
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+}
+.project-board-progress progress {
+  width: 100%;
+  height: 7px;
+  accent-color: var(--primary-text);
+}
+.project-board-overdue {
+  color: var(--ls-bad);
+}
+.project-board-page .project-pre {
+  margin-top: 16px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1000px) {
+  .project-board-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .project-board-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

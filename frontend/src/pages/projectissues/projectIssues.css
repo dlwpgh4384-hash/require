@@ -1,0 +1,39 @@
+.project-issue-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.project-issue-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.project-issue-form textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.project-issue-form .ls-in {
+  width: 100%;
+}
+.project-issue-form p {
+  font-size: 13px;
+}
+.project-issue-panel {
+  min-width: 0;
+}
+.project-issue-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0;
+}
+@media (max-width: 640px) {
+  .project-issue-form fieldset {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

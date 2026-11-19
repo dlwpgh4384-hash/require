@@ -1,10 +1,23 @@
-<!-- 임시(2026-11-19, 사용자 허락): Maven 중앙 저장소가 429로 막혀 구글 공식 복사본에서 받는다. 35번 PR 점검 때 되돌린다. -->
+<!-- Maven 중앙 저장소에서 먼저 받고, 받지 못하면(예: 429 막힘) 구글 공식 복사본에서 받는다(2026-11-19 사용자 결정). -->
 <settings>
-  <mirrors>
-    <mirror>
-      <id>google-maven-central</id>
-      <mirrorOf>central</mirrorOf>
-      <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
-    </mirror>
-  </mirrors>
+  <profiles>
+    <profile>
+      <id>central-fallback</id>
+      <repositories>
+        <repository>
+          <id>google-maven-central</id>
+          <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
+        </repository>
+      </repositories>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>google-maven-central</id>
+          <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
+        </pluginRepository>
+      </pluginRepositories>
+    </profile>
+  </profiles>
+  <activeProfiles>
+    <activeProfile>central-fallback</activeProfile>
+  </activeProfiles>
 </settings>

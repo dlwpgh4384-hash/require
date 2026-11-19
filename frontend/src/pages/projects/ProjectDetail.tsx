@@ -671,29 +671,42 @@ export function ProjectDetail({
           ? "info"
           : "neutral";
   const steps = p.progress?.steps ?? [];
-  const currentStep = steps.find((s) => !s.completedDate);
-  // 시안: 진척률·차이는 정수 %로 보인다
-  const planRate =
-    p.progress?.plannedProgressRate == null
-      ? null
-      : Math.round(p.progress.plannedProgressRate);
+  // 시안 cur: 완료되지 않은 첫 단계, 모두 완료면 마지막 단계
+  const currentStep =
+    steps.find((s) => !s.completedDate) ?? steps[steps.length - 1];
+  // 진척률은 소수 첫째 자리(Q-식-72, 현황판과 같게)
+  const one = (value: number | null | undefined) =>
+    value == null ? null : Math.round(Number(value) * 10) / 10;
+  const planRate = one(p.progress?.plannedProgressRate);
   const actRate =
-    p.progress?.actualProgressRate == null
-      ? null
-      : Math.round(p.progress.actualProgressRate);
+    one(p.progress?.actualProgressRate) ??
+    // 턴키·내부는 실적을 안 적었으면 0%로 본다(식-74)
+    (planRate != null &&
+    (p.contractTypeCode === "TK" || p.contractTypeCode === "IN")
+      ? 0
+      : null);
+  const operational = p.contractTypeCode === "MO" || p.contractTypeCode === "DP";
   const lastMemo = p.memos?.[0];
-  const daysAgo = lastMemo
-    ? Math.round(
-        (Date.parse(`${today}T00:00:00Z`) -
-          Date.parse(`${lastMemo.writtenDate}T00:00:00Z`)) /
-          86400000,
-      )
-    : null;
+  // 마지막 업데이트: 서버 값(메모 작성일, 없으면 단계를 처음 만든 날)을 쓰고, 없으면 메모에서 센다.
+  const lastUpdate = p.lastUpdateDate ?? lastMemo?.writtenDate ?? null;
+  const daysAgo =
+    p.daysWithoutUpdate ??
+    (lastUpdate
+      ? Math.round(
+          (Date.parse(`${today}T00:00:00Z`) -
+            Date.parse(`${lastUpdate}T00:00:00Z`)) /
+            86400000,
+        )
+      : null);
   const stale =
-    daysAgo != null &&
-    daysAgo > 14 &&
-    p.statusCode !== "END" &&
-    p.statusCode !== "LOSE";
+    p.staleUpdate ??
+    (daysAgo != null &&
+      daysAgo > 14 &&
+      p.statusCode !== "END" &&
+      p.statusCode !== "LOSE");
+  const reasons = p.signalReasons ?? [];
+  const signedGap = (value: number) =>
+    `${value >= 0 ? "+" : ""}${Math.round(value * 10) / 10}%p`;
   const bar = (
     label: string,
     value: number | null | undefined,
@@ -714,19 +727,25 @@ export function ProjectDetail({
   );
   const progressSummary = (
     <>
-      {p.trafficLight && (
-        <Banner
-          kind={
-            p.trafficLight === "위험"
-              ? "bad"
-              : p.trafficLight === "주의"
-                ? "warn"
-                : "info"
-          }
-        >
-          <strong>{p.trafficLight}</strong>
-          {p.trafficLight === "정상" ? " — 계획대로 진행 중입니다." : ""}
-        </Banner>
+      {/* 시안 sig: 현황판과 같은 판정(식-76)의 신호등과 이유. 메모·원가가 없어도 띠는 보인다. */}
+      {!done && (
+        <div data-testid="project-progress-signal">
+          <Banner
+            kind={
+              p.trafficLight === "위험"
+                ? "bad"
+                : p.trafficLight === "주의"
+                  ? "warn"
+                  : "info"
+            }
+          >
+            {p.trafficLight === "위험" || p.trafficLight === "주의"
+              ? warnIcon
+              : infoIcon}{" "}
+            <strong>{p.trafficLight ?? "정상"}</strong> —{" "}
+            {reasons.length ? reasons.join(" · ") : "계획대로 진행 중입니다."}
+          </Banner>
+        </div>
       )}
       <KeyValues
         items={[
@@ -751,20 +770,47 @@ export function ProjectDetail({
                 {bar("계획", planRate, true)}
                 {bar("실적", actRate, false)}
               </div>
-              {planRate != null && actRate != null && (
-                <div className="project-cap">
-                  계획 대비 {actRate - planRate >= 0 ? "+" : ""}
-                  {actRate - planRate}%p
-                </div>
-              )}
+              <div className="project-cap">
+                {operational
+                  ? "운영형은 기간 기준으로 자동 계산"
+                  : planRate != null && actRate != null
+                    ? `계획 대비 ${signedGap(actRate - planRate)}`
+                    : ""}
+              </div>
             </>,
           ],
+          ...(p.costUsageRate != null
+            ? [
+                [
+                  "원가 사용률",
+                  <>
+                    <span
+                      className={
+                        (p.costProgressGap ?? 0) >= 15
+                          ? "project-bad"
+                          : (p.costProgressGap ?? 0) >= 5
+                            ? "project-warn-text"
+                            : ""
+                      }
+                    >
+                      {Number(p.costUsageRate).toFixed(1)}%
+                    </span>{" "}
+                    <span className="project-cap">
+                      {p.costProgressGap != null
+                        ? `진척률보다 ${signedGap(p.costProgressGap)} · `
+                        : ""}
+                      누적 원가 ÷ 예산
+                    </span>
+                  </>,
+                ] as [string, ReactNode],
+              ]
+            : []),
           [
             "마지막 업데이트",
-            lastMemo ? (
+            lastUpdate ? (
               <>
                 {/* 시안: 끝나지 않은 프로젝트가 14일 넘게 업데이트가 없으면 경고 색 */}
-                {lastMemo.writtenDate}{" "}
+                {lastUpdate}{" "}
                 <span
                   className={stale ? "project-warn-text" : "project-sub"}
                   data-testid="project-last-update-age"
@@ -1190,9 +1236,14 @@ export function ProjectDetail({
                       {progressSummary}
                       <ProjectProgressPanel
                         projectId={p.projectId}
+                        projectName={p.projectName}
                         contractTypeCode={p.contractTypeCode}
                         statusCode={p.statusCode}
+                        startDate={p.startDate}
                         endDate={p.endDate}
+                        plannedProgress={planRate}
+                        actualProgress={actRate}
+
                         readOnly={readOnly}
                         onChanged={(message) => {
                           void load();

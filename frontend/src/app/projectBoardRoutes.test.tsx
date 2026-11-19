@@ -247,7 +247,10 @@ it.each(["/screens/UI-31", "/#UI-31"])(
     expect(
       request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
     ).toBe(false);
-    expect(screen.getByTestId("screen-actions")).toBeEmptyDOMElement();
+    // 현황판 탭의 제목줄에는 단추가 없다(엑셀은 목록 도구줄 한 곳, 0장). [이슈 등록]은 이슈 모아 보기 탭에서만.
+    expect(
+      within(screen.getByTestId("screen-actions")).queryAllByRole("button"),
+    ).toHaveLength(0);
   },
 );
 
@@ -364,7 +367,7 @@ it("memo save from routed progress refreshes the owning board and displays onCha
   expect(router?.state.location.pathname).toBe("/screens/UI-31");
 });
 
-it("the registered issue tab uses the merged issue client and reports its open count without Excel", async () => {
+it("the registered issue tab uses the merged issue client, reports its open count and puts [이슈 등록] in the title bar", async () => {
   const { request } = respond();
   mount();
   await screen.findByTestId("list-row-selected-board-project");
@@ -378,8 +381,19 @@ it("the registered issue tab uses the merged issue client and reports its open c
   expect(request).toHaveBeenCalledWith("/api/common/project-issues", {
     signal: expect.any(AbortSignal),
   });
-  expect(screen.getByTestId("list-download")).not.toBeVisible();
+  const issues = within(screen.getByTestId("project-board-issues-panel"));
+  expect(issues.getByTestId("list-download")).toBeVisible();
+  expect(
+    await within(screen.getByTestId("screen-actions")).findByRole("button", {
+      name: "이슈 등록",
+    }),
+  ).toBeVisible();
+  fireEvent.click(screen.getByTestId("project-board-tab"));
+  expect(
+    within(screen.getByTestId("screen-actions")).queryAllByRole("button"),
+  ).toHaveLength(0);
   expectSingleShell();
+
 });
 
 it("an empty routed board retains filters and tabs", async () => {

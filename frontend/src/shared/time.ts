@@ -31,6 +31,34 @@ export function formatDateTime(value: string | null | undefined) {
   return `${date} ${clock}`;
 }
 
+/** 서버 시각(UTC ISO)의 한국 날짜 「yyyy-MM-dd」. 없으면 「–」. */
+export function formatDate(value: string | null | undefined) {
+  if (!value) return "–";
+  const time = new Date(value);
+  if (Number.isNaN(time.getTime())) return value;
+  return parts(time).date;
+}
+
+/** 서버 시각(UTC ISO)의 한국 날짜 「MM-dd」(시안 「10-15 작성」). 없으면 「–」. */
+export function formatMonthDay(value: string | null | undefined) {
+  const date = formatDate(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date.slice(5) : date;
+}
+
+/** 한국 날짜 두 개(yyyy-MM-dd) 사이의 날 수(to − from). */
+export function daysBetween(from: string, to: string) {
+  return Math.round(
+    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000,
+  );
+}
+
+/** 한국 날짜(yyyy-MM-dd)에 날 수를 더한 날짜. */
+export function addDays(date: string, days: number) {
+  const day = new Date(`${date}T00:00:00Z`);
+  day.setUTCDate(day.getUTCDate() + days);
+  return day.toISOString().slice(0, 10);
+}
+
 /** 화면에서 입력받은 한국 시각 「yyyy-MM-dd HH:mm」(또는 datetime-local 값)을 서버로 보낼 UTC ISO로. */
 export function koreanInputToUtc(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(

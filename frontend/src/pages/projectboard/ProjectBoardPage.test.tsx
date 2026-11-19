@@ -10,6 +10,10 @@ import {
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router-dom";
 import { ProjectBoardPage } from "./ProjectBoardPage";
+import {
+  ProjectBoardTitleActions,
+  ProjectBoardWorkspaceProvider,
+} from "./ProjectBoardWorkspace";
 import type { ProjectBoardResult, ProjectBoardRow } from "./projectBoard";
 
 const viewport = vi.hoisted(() => ({ mobile: false, tablet: false }));
@@ -30,7 +34,9 @@ vi.mock("../projects/ProjectDetail", () => ({
   }) => (
     <div data-testid="board-detail-boundary">
       {projectId} · {initialTab}
-      <button onClick={() => onChanged("저장했습니다.")}>상세 저장 알림</button>
+      <button onClick={() => onChanged("주간 상태를 저장했습니다.")}>
+        상세 저장 알림
+      </button>
       <button onClick={onClose}>상세 닫기</button>
     </div>
   ),
@@ -44,42 +50,34 @@ let request: ReturnType<typeof vi.fn>;
 let result: ProjectBoardResult;
 let failed: boolean;
 let optionFailed: boolean;
-let issueFailed: boolean;
-let waiting: Promise<ReturnType<typeof ok>> | undefined;
 const row = (over: Partial<ProjectBoardRow> = {}): ProjectBoardRow => ({
   projectId: "selected",
   projectName: "지연 프로젝트",
   contractTypeCode: "TK",
   signal: "위험",
-  signalReasons: ["일정 10.0%p 지연", "주간 메모 15일간 업데이트 없음"],
-  reasonSummary:
-    "일정 10.0%p 지연 · 주간 메모 15일간 업데이트 없음 · 1차 경보: UI-04에서 상세 확인",
+  signalReasons: [
+    "일정이 계획보다 12.5%p 늦음",
+    "원가 사용률이 진척률보다 15.5%p 높음 — 원가 초과 위험",
+    "17일째 상태 업데이트 없음",
+  ],
+  signalReasonLevels: ["위험", "위험", "주의"],
+  reasonSummary: "",
   pmUserId: "assigned-pm",
   pmName: "담당 PM",
-  currentStepName: "수행",
+  currentStepName: "개발",
   stepDelayed: true,
-  plannedProgress: 60,
-  actualProgress: 50,
-  costUsageRate: 65,
-  costProgressGap: 15,
+  plannedProgress: 50.5,
+  actualProgress: 38,
+  costUsageRate: 53.5,
+  costProgressGap: 15.5,
   openIssueCount: 2,
   overdueIssueCount: 1,
-  latestMemoDate: "2026-10-31",
-  daysWithoutMemo: 15,
+  latestMemoDate: "2026-10-29",
+  lastUpdateDate: "2026-10-29",
+  daysWithoutMemo: 17,
   stale: true,
+  salesPartId: "sales",
   ...over,
-});
-const empty = (): ProjectBoardResult => ({
-  summary: {
-    progress: { total: 0, normal: 0, caution: 0, danger: 0 },
-    riskCount: 0,
-    openIssues: { total: 0, high: 0 },
-    overdueIssueCount: 0,
-    staleProjectCount: 0,
-  },
-  items: [],
-  staleProjects: [],
-  calculationMethod: "DB 계산 방법 · 1차 경보 · UI-04 상세 확인",
 });
 beforeEach(() => {
   vi.stubGlobal(
@@ -90,60 +88,67 @@ beforeEach(() => {
       removeEventListener: vi.fn(),
     })),
   );
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-15T01:00:00Z"));
   viewport.mobile = false;
-  failed = optionFailed = issueFailed = false;
-  waiting = undefined;
+  failed = optionFailed = false;
   result = {
     summary: {
-      progress: { total: 2, normal: 1, caution: 0, danger: 1 },
+      progress: { total: 3, normal: 1, caution: 1, danger: 1 },
       riskCount: 1,
-      openIssues: { total: 2, high: 1 },
+      openIssues: { total: 4, high: 1 },
       overdueIssueCount: 1,
-      staleProjectCount: 1,
+      staleProjectCount: 2,
     },
     items: [
-      row(),
       row({
-        projectId: "monthly",
-        projectName: "월단위 프로젝트",
-        contractTypeCode: "MO",
+        projectId: "normal",
+        projectName: "가나 프로젝트",
+        contractTypeCode: "IN",
         signal: "정상",
         signalReasons: [],
-        reasonSummary: "해당하는 경보 사유 없음",
-        pmUserId: null,
-        pmName: null,
-        currentStepName: null,
+        signalReasonLevels: [],
+        currentStepName: "설계",
         stepDelayed: false,
         costUsageRate: null,
         costProgressGap: null,
         openIssueCount: 0,
         overdueIssueCount: 0,
-        daysWithoutMemo: 14,
+        daysWithoutMemo: 3,
+        lastUpdateDate: "2026-11-12",
         stale: false,
+        salesPartId: "HQ",
+      }),
+      row(),
+      row({
+        projectId: "caution",
+        projectName: "다라 프로젝트",
+        contractTypeCode: "MO",
+        signal: "주의",
+        signalReasons: ["기한 지난 이슈 1건", "21일째 상태 업데이트 없음"],
+        signalReasonLevels: ["주의", "주의"],
+        costUsageRate: null,
+        costProgressGap: null,
+        daysWithoutMemo: 21,
+        lastUpdateDate: "2026-10-25",
+        latestMemoDate: null,
+        salesPartId: null,
       }),
     ],
     staleProjects: [
-      {
-        projectId: "selected",
-        projectName: "지연 프로젝트",
-        daysWithoutMemo: 15,
-      },
+      { projectId: "selected", projectName: "지연 프로젝트", daysWithoutMemo: 17 },
+      { projectId: "caution", projectName: "다라 프로젝트", daysWithoutMemo: 21 },
     ],
-    calculationMethod: "DB 계산 방법 · 1차 경보 · UI-04 상세 확인",
+    calculationMethod: "DB 계산 방법",
   };
   request = vi.fn(async (url: string) => {
     const path = url.split("?")[0];
     if (path === "/api/common/project-board") {
-      if (waiting) return waiting;
       if (failed)
         return {
           ok: false,
-          status: 400,
-          json: async () => ({
-            success: false,
-            message: "조건을 확인해 주세요.",
-            errors: [{ field: "signal", message: "신호등을 확인해 주세요." }],
-          }),
+          status: 500,
+          json: async () => ({ success: false, message: "현황판을 불러오지 못했습니다." }),
         };
       return ok(result);
     }
@@ -158,8 +163,7 @@ beforeEach(() => {
         }),
         blob: async () => new Blob(["download-response"]),
       };
-    if (path === "/api/common/project-issues") {
-      if (issueFailed) throw new Error("이슈 조회 실패");
+    if (path === "/api/common/project-issues")
       return ok({
         items: [
           {
@@ -178,246 +182,276 @@ beforeEach(() => {
         ],
         openCount: 7,
       });
-    }
     if (path.endsWith("/CTRT_TYPE/codes")) {
       if (optionFailed) throw new Error("옵션 오류");
       return ok({
         items: [
           { code: "TK", codeName: "턴키" },
           { code: "MO", codeName: "월단위" },
+          { code: "IN", codeName: "내부(자체 개발)" },
         ],
       });
     }
     if (path.endsWith("/ISSUE_STAT/codes"))
-      return ok({
-        items: [
-          { code: "OPEN", codeName: "열림" },
-          { code: "CLOSE", codeName: "종료" },
-        ],
-      });
+      return ok({ items: [{ code: "OPEN", codeName: "열림" }] });
     if (path.endsWith("/IMPR/codes"))
       return ok({ items: [{ code: "HIGH", codeName: "높음" }] });
     if (path === "/api/common/parts")
-      return ok({ items: [{ partId: "sales", partName: "영업 파트" }] });
+      return ok({ items: [{ partId: "sales", partName: "영업 파트", useYn: "Y" }] });
     if (path === "/api/common/projects")
       return ok({
-        items: [{ projectId: "selected", projectName: "지연 프로젝트" }],
+        items: [
+          {
+            projectId: "selected",
+            projectName: "지연 프로젝트",
+            statusCode: "ING",
+            endDate: "2099-12-31",
+          },
+        ],
       });
     return ok({ items: [] });
   });
   vi.stubGlobal("fetch", request);
+  URL.createObjectURL = vi.fn(() => "blob:x");
+  URL.revokeObjectURL = vi.fn();
 });
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
-  vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 const mount = () =>
   render(
     <MemoryRouter>
-      <ProjectBoardPage />
+      <ProjectBoardWorkspaceProvider>
+        <div data-testid="title-bar">
+          <ProjectBoardTitleActions />
+        </div>
+        <ProjectBoardPage />
+      </ProjectBoardWorkspaceProvider>
     </MemoryRouter>,
   );
+const ids = () =>
+  screen
+    .getAllByTestId(/^list-row-/)
+    .map((r) => r.getAttribute("data-testid")?.replace("list-row-", ""));
 
-it("renders the five API-backed summaries and two tabs, retaining server order", async () => {
+it("five summary cards use 「건」 and the mockup captions; risk and overdue are red", async () => {
   mount();
   await screen.findByTestId("list-row-selected");
-  expect(screen.getByRole("tab", { name: "현황판" })).toHaveAttribute(
-    "aria-selected",
-    "true",
+  expect(screen.getByTestId("project-board-kpi-total")).toHaveTextContent(
+    "진행 프로젝트3건정상 1 · 주의 1 · 위험 1",
   );
-  expect(screen.getByRole("tab", { name: /이슈 모아 보기/ })).toBeVisible();
-  const summary = screen.getByLabelText("프로젝트 현황 요약");
-  expect(summary.children).toHaveLength(5);
-  expect(summary).toHaveTextContent("정상 1 · 주의 0 · 위험 1");
-  expect(summary).toHaveTextContent("높음 1");
-  const rows = screen.getAllByTestId(/^list-row-(selected|monthly)$/);
-  expect(rows.map((element) => element.getAttribute("data-testid"))).toEqual([
-    "list-row-selected",
-    "list-row-monthly",
-  ]);
-  expect(within(rows[0]).getByText("담당 PM")).toHaveAttribute(
-    "title",
-    "assigned-pm",
+  expect(screen.getByTestId("project-board-kpi-risk")).toHaveTextContent(
+    "위험1건일정·원가·중요 이슈 기준",
   );
+  expect(within(screen.getByTestId("project-board-kpi-risk")).getByText("1건")).toHaveClass(
+    "project-bad",
+  );
+  expect(screen.getByTestId("project-board-kpi-open")).toHaveTextContent(
+    "열린 이슈4건높음 1건",
+  );
+  expect(screen.getByTestId("project-board-kpi-overdue")).toHaveTextContent(
+    "기한 지난 이슈1건담당자 확인 필요",
+  );
+  expect(screen.getByTestId("project-board-kpi-stale")).toHaveTextContent(
+    "업데이트 없음2건2주 넘게 상태를 적지 않음",
+  );
+  expect(request).toHaveBeenCalledWith("/api/common/project-board?", {
+    signal: expect.any(AbortSignal),
+  });
 });
 
-it("shows all reasons on focus and the UI-04 first-warning explanation", async () => {
+it("default order is light severity then name; headers, reasons and stage/update texts follow the mockup", async () => {
   mount();
-  const target = await screen.findByTestId("list-row-selected");
-  const signal = within(target).getByLabelText(/위험: 일정/);
-  expect(signal).toHaveAttribute("tabindex", "0");
-  expect(signal).toHaveAttribute(
-    "title",
-    "일정 10.0%p 지연 · 주간 메모 15일간 업데이트 없음",
+  await screen.findByTestId("list-row-selected");
+  expect(ids()).toEqual(["selected", "caution", "normal"]);
+  expect(
+    screen.getByRole("columnheader", { name: /진척률 \(계획 \/ 실적\)/ }),
+  ).toBeVisible();
+  const selected = within(screen.getByTestId("list-row-selected"));
+  expect(selected.getByText("selected · 턴키")).toBeVisible();
+  expect(screen.getByTestId("project-board-reasons-selected")).toHaveTextContent(
+    "일정이 계획보다 12.5%p 늦음 · 원가 사용률이 진척률보다 15.5%p 높음 — 원가 초과 위험 · 17일째 상태 업데이트 없음",
   );
-  expect(target).toHaveTextContent("UI-04에서 상세 확인");
-  expect(
-    within(target).getByRole("progressbar", { name: "계획" }),
-  ).toHaveAttribute("value", "60");
-  expect(
-    within(target).getByRole("progressbar", { name: "실적" }),
-  ).toHaveAttribute("value", "50");
+  expect(screen.getByTestId("project-board-reasons-selected")).toHaveClass("project-bad");
+  expect(screen.getByTestId("project-board-reasons-caution")).toHaveClass(
+    "project-warn-text",
+  );
+  expect(selected.getByText("지연")).toHaveClass("ls-b-bad");
+  expect(selected.getByRole("cell", { name: "개발 지연" })).toBeVisible();
+  expect(selected.getByText("50.5%")).toBeVisible();
+  expect(selected.getByText("진척 대비 +15.5%p")).toBeVisible();
+  expect(screen.getByTestId("project-board-update-selected")).toHaveTextContent(
+    "2026-10-29 17일 전",
+  );
+  expect(within(screen.getByTestId("project-board-update-selected")).getByText("17일 전")).toHaveClass(
+    "ls-b-warn",
+  );
+  expect(screen.getByTestId("project-board-signal-normal")).toHaveAttribute(
+    "title",
+    "계획대로 진행",
+  );
+  expect(screen.getByTestId("project-board-signal-selected")).toHaveAttribute(
+    "title",
+    "일정이 계획보다 12.5%p 늦음 / 원가 사용률이 진척률보다 15.5%p 높음 — 원가 초과 위험 / 17일째 상태 업데이트 없음",
+  );
+  expect(within(screen.getByTestId("list-row-normal")).getByText("normal · 내부")).toBeVisible();
+  expect(screen.queryByText(/1차 경보: UI-04/)).not.toBeInTheDocument();
 });
 
-it("shows stale project name and days but no fourteen-day boundary warning", async () => {
+it("every column except progress sorts, and column settings are available", async () => {
+  mount();
+  await screen.findByTestId("list-row-selected");
+  fireEvent.click(screen.getByTestId("list-head-projectName"));
+  expect(ids()).toEqual(["normal", "caution", "selected"]);
+  fireEvent.click(screen.getByTestId("list-head-openIssueCount"));
+  expect(ids()).toEqual(["normal", "selected", "caution"]);
+  for (const key of ["signal", "pmName", "currentStepName", "costUsageRate", "overdueIssueCount", "lastUpdate"])
+    expect(screen.getByTestId(`list-head-${key}`)).toHaveAttribute("aria-sort");
+  expect(screen.getByTestId("list-head-progress")).not.toHaveAttribute("aria-sort");
+  expect(screen.getByTestId("list-columns")).toBeVisible();
+});
+
+it("stale banner is one warning line with clickable names opening project progress", async () => {
   mount();
   const banner = await screen.findByTestId("project-board-stale-banner");
-  expect(banner).toHaveTextContent("지연 프로젝트 · 15일");
-  expect(banner).not.toHaveTextContent("월단위 프로젝트");
-  expect(screen.getByTestId("list-row-selected")).toHaveTextContent(
-    "15일 초과 경고",
+  expect(banner).toHaveTextContent(
+    "2주 넘게 상태를 적지 않은 프로젝트: 지연 프로젝트 (17일), 다라 프로젝트 (21일)",
   );
-  expect(screen.getByTestId("list-row-monthly")).not.toHaveTextContent(
-    "초과 경고",
+  expect(within(banner).getByTestId("banner-warn")).toBeVisible();
+  fireEvent.click(within(banner).getByRole("button", { name: "다라 프로젝트" }));
+  expect(await screen.findByTestId("board-detail-boundary")).toHaveTextContent(
+    "caution · progress",
   );
 });
 
-it("renders non-turnkey cost and missing PM as dashes without monetary columns", async () => {
+it("filters are applied on the screen with 내부 and 본사(직접 영업) options; Excel sends the applied filter", async () => {
   mount();
-  const target = await screen.findByTestId("list-row-monthly");
-  expect(within(target).getAllByText("–").length).toBeGreaterThan(1);
-  expect(
-    screen.queryByRole("columnheader", { name: "원가 금액" }),
-  ).not.toBeInTheDocument();
-  expect(
-    screen.queryByRole("columnheader", { name: "예산" }),
-  ).not.toBeInTheDocument();
-});
-
-it("opens the selected project's shared progress tab and refreshes onChanged", async () => {
-  mount();
-  fireEvent.click(await screen.findByTestId("list-row-selected"));
-  expect(screen.getByTestId("board-detail-boundary")).toHaveTextContent(
-    "selected · progress",
-  );
-  const before = request.mock.calls.filter(([url]) =>
-    String(url).startsWith("/api/common/project-board?"),
-  ).length;
-  fireEvent.click(screen.getByRole("button", { name: "상세 저장 알림" }));
+  await screen.findByTestId("list-row-selected");
   await waitFor(() =>
     expect(
-      request.mock.calls.filter(([url]) =>
-        String(url).startsWith("/api/common/project-board?"),
-      ).length,
-    ).toBeGreaterThan(before),
+      [...screen.getByTestId("project-board-contract-type").querySelectorAll("option")].map(
+        (o) => o.textContent,
+      ),
+    ).toEqual(["전체", "턴키", "월단위", "내부"]),
   );
-  expect(await screen.findByTestId("project-board-toast")).toHaveTextContent(
-    "저장했습니다.",
-  );
-});
-
-it("applies only contracted filters and downloads with the applied, not draft, conditions", async () => {
-  mount();
-  await screen.findByRole("option", { name: "턴키" });
-  fireEvent.change(screen.getByTestId("project-board-signal"), {
-    target: { value: "위험" },
-  });
-  fireEvent.change(screen.getByTestId("project-board-contract-type"), {
-    target: { value: "TK" },
-  });
-  fireEvent.change(screen.getByTestId("project-board-sales-part"), {
-    target: { value: "sales" },
-  });
-  fireEvent.submit(screen.getByTestId("project-board-filters"));
-  const query = new URLSearchParams({
-    signal: "위험",
-    contractTypeCode: "TK",
-    salesPartId: "sales",
-  });
-  await waitFor(() =>
-    expect(request).toHaveBeenCalledWith(
-      `/api/common/project-board?${query}`,
-      expect.anything(),
+  expect(
+    [...screen.getByTestId("project-board-sales-part").querySelectorAll("option")].map(
+      (o) => o.textContent,
     ),
-  );
-  fireEvent.change(screen.getByTestId("project-board-contract-type"), {
-    target: { value: "MO" },
+  ).toEqual(["전체", "영업 파트", "본사(직접 영업)"]);
+  fireEvent.change(screen.getByTestId("project-board-sales-part"), {
+    target: { value: "HQ" },
   });
-  Object.defineProperty(URL, "createObjectURL", {
-    configurable: true,
-    value: vi.fn(() => "blob:board"),
-  });
-  Object.defineProperty(URL, "revokeObjectURL", {
-    configurable: true,
-    value: vi.fn(),
-  });
-  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
-    () => undefined,
-  );
+  fireEvent.click(screen.getByTestId("list-search"));
+  expect(ids()).toEqual(["normal"]);
+  // 요약은 조건과 상관없이 전체
+  expect(screen.getByTestId("project-board-kpi-total")).toHaveTextContent("3건");
   fireEvent.click(screen.getByTestId("list-download"));
   await waitFor(() =>
     expect(request).toHaveBeenCalledWith(
-      `/api/common/project-board/excel?${query}`,
+      "/api/common/project-board/excel?salesPartId=HQ",
     ),
   );
-});
-
-it("keeps filters and headers in the empty state", async () => {
-  result = empty();
-  mount();
-  expect(await screen.findByText("조건에 맞는 결과가 없습니다.")).toBeVisible();
-  expect(screen.getByTestId("project-board-filters")).toBeVisible();
-  expect(screen.getByRole("columnheader", { name: "PM" })).toBeVisible();
-  expect(screen.getByRole("tab", { name: /이슈 모아 보기/ })).toBeVisible();
-});
-
-it("shows loading without synthesized rows", async () => {
-  waiting = new Promise(() => undefined);
-  mount();
-  expect(await screen.findByText("목록을 불러오는 중입니다.")).toBeVisible();
-  expect(screen.queryByTestId("list-row-selected")).not.toBeInTheDocument();
-  expect(screen.getByLabelText("프로젝트 현황 요약")).toHaveTextContent("–");
-});
-
-it("keeps read failure local and retries with field errors visible", async () => {
-  failed = true;
-  mount();
-  expect(await screen.findByText("신호등을 확인해 주세요.")).toBeVisible();
-  expect(screen.getByRole("tab", { name: "현황판" })).toBeVisible();
-  failed = false;
-  fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
-  expect(await screen.findByTestId("list-row-selected")).toBeVisible();
-});
-
-it("retries filter option failures without replacing board data", async () => {
-  optionFailed = true;
-  mount();
-  expect(await screen.findByTestId("list-row-selected")).toBeVisible();
-  await screen.findByTestId("project-board-options-retry");
-  optionFailed = false;
-  fireEvent.click(screen.getByTestId("project-board-options-retry"));
-  expect(
-    await screen.findByRole("option", { name: "턴키" }),
-  ).toBeInTheDocument();
-});
-
-it("issue tab calls the other feature API, shows its openCount and hides Excel", async () => {
-  mount();
-  await screen.findByTestId("list-row-selected");
-  fireEvent.click(screen.getByTestId("project-board-issues-tab"));
-  const issue = await screen.findByTestId("list-row-71");
-  expect(issue).toHaveTextContent("납기 확인");
-  expect(issue).toHaveTextContent("1일 초과");
-  expect(
-    screen.getByRole("tab", { name: "이슈 모아 보기 (7)" }),
-  ).toHaveAttribute("aria-selected", "true");
-  expect(screen.getByTestId("list-download")).not.toBeVisible();
-  fireEvent.click(screen.getByTestId("project-issue-project-71"));
-  expect(screen.getByTestId("board-detail-boundary")).toHaveTextContent(
-    "selected · issues",
+  expect(await screen.findByTestId("project-board-toast")).toHaveTextContent(
+    "엑셀 파일을 만들었습니다 (조회 결과 1건)",
   );
 });
 
-it("issue request failure has its own retry and does not remove the tabs", async () => {
-  issueFailed = true;
+it("calculation method is the mockup table, not a raw formula dump", async () => {
+  mount();
+  const box = await screen.findByTestId("project-board-calculation");
+  expect(box).toHaveTextContent("계산 방법 이 화면의 숫자를 이렇게 계산합니다");
+  expect(
+    within(box)
+      .getAllByRole("row")
+      .slice(1)
+      .map((r) => within(r).getAllByRole("cell")[0].textContent),
+  ).toEqual(["계획 진척률", "실적 진척률", "원가 사용률", "진척 대비 원가", "신호등", "업데이트 없음"]);
+  expect(box).toHaveTextContent(
+    "수주예정 프로젝트도 선투입이 있으면 함께 봅니다. 종료된 프로젝트는 빠집니다.",
+  );
+  expect(box).toHaveTextContent("오늘 − 마지막 주간 메모 날짜 > 14일");
+  expect(screen.queryByText("DB 계산 방법")).not.toBeInTheDocument();
+});
+
+it("row click opens project progress; detail notices become one board toast and refresh", async () => {
+  mount();
+  fireEvent.click(await screen.findByTestId("list-row-selected"));
+  const detail = await screen.findByTestId("board-detail-boundary");
+  expect(detail).toHaveTextContent("selected · progress");
+  fireEvent.click(within(detail).getByText("상세 저장 알림"));
+  expect(await screen.findByTestId("project-board-toast")).toHaveTextContent(
+    "주간 상태를 저장했습니다.",
+  );
+  await waitFor(() =>
+    expect(
+      request.mock.calls.filter(([url]) => String(url).startsWith("/api/common/project-board?")),
+    ).toHaveLength(2),
+  );
+});
+
+it("a failed read keeps the summary, tabs, filters and toolbar and retries", async () => {
+  failed = true;
+  mount();
+  expect(await screen.findByText("현황판을 불러오지 못했습니다.")).toBeVisible();
+  expect(screen.getByTestId("project-board-kpi-total")).toHaveTextContent("–");
+  expect(screen.getByTestId("project-board-filters")).toBeVisible();
+  expect(screen.getByTestId("project-board-issues-tab")).toBeVisible();
+  expect(screen.getByTestId("project-board-calculation")).toBeVisible();
+  failed = false;
+  fireEvent.click(screen.getByTestId("list-retry"));
+
+  expect(await screen.findByTestId("list-row-selected")).toBeVisible();
+});
+
+it("empty board keeps filters, headers and the calculation box", async () => {
+  result.items = [];
+  result.staleProjects = [];
+  mount();
+  expect(await screen.findByTestId("list-empty")).toBeVisible();
+  expect(screen.queryByTestId("project-board-stale-banner")).not.toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: /프로젝트/ })).toBeVisible();
+  expect(screen.getByTestId("project-board-calculation")).toBeVisible();
+});
+
+it("option failure keeps the board usable and offers retry", async () => {
+  optionFailed = true;
   mount();
   await screen.findByTestId("list-row-selected");
+  expect(await screen.findByTestId("project-board-options-retry")).toBeVisible();
+  optionFailed = false;
+  fireEvent.click(screen.getByTestId("project-board-options-retry"));
+  await waitFor(() =>
+    expect(screen.queryByTestId("project-board-options-retry")).not.toBeInTheDocument(),
+  );
+});
+
+it("issue tab shows its count, the issue list with Excel and [이슈 등록] in the title bar only there", async () => {
+  mount();
+  await screen.findByTestId("list-row-selected");
+  const title = within(screen.getByTestId("title-bar"));
+  expect(title.queryAllByRole("button")).toHaveLength(0);
   fireEvent.click(screen.getByTestId("project-board-issues-tab"));
-  const panel = await screen.findByTestId("project-board-issues-panel");
-  await within(panel).findByRole("button", { name: "다시 시도" });
-  issueFailed = false;
-  fireEvent.click(within(panel).getByRole("button", { name: "다시 시도" }));
-  expect(await screen.findByTestId("list-row-71")).toBeVisible();
-  expect(screen.getByRole("tab", { name: "현황판" })).toBeVisible();
+  const issues = within(screen.getByTestId("project-board-issues-panel"));
+  expect(await issues.findByTestId("list-row-71")).toBeVisible();
+  await waitFor(() =>
+    expect(screen.getByTestId("project-board-issues-tab")).toHaveTextContent(
+      "이슈 모아 보기 (7)",
+    ),
+  );
+  expect(issues.getByTestId("list-download")).toBeVisible();
+  expect(await title.findByRole("button", { name: "이슈 등록" })).toBeVisible();
+  fireEvent.click(screen.getByTestId("project-board-tab"));
+  await waitFor(() => expect(title.queryAllByRole("button")).toHaveLength(0));
+});
+
+it("mobile card shows name + light, stage with plan/actual and issue counts", async () => {
+  viewport.mobile = true;
+  mount();
+  const card = await screen.findByTestId("list-card-selected");
+  expect(card).toHaveTextContent("지연 프로젝트위험");
+  expect(card).toHaveTextContent("개발 · 계획 50.5% / 실적 38.0%");
+  expect(card).toHaveTextContent("이슈 2 (지남 1)");
 });

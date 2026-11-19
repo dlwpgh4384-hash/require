@@ -11,6 +11,10 @@ export interface BoardMemo {
   createdBy: string;
   updatedAt: string | null;
   updatedBy: string | null;
+  /** 작성일(한국 날짜, 고쳐도 그대로). */
+  writtenDate?: string;
+  /** 동시 수정 확인 값: 수정 때 그대로 보낸다. */
+  modifiedAt?: string;
 }
 export interface BoardStep {
   stepId: string;
@@ -52,19 +56,29 @@ export const putCommonProjectBoardWeeklyMemo = (
   id: string,
   memoId: string,
   body: MemoInput,
+  modifiedAt?: string | null,
 ) =>
   request<BoardMemo>(
     id,
     `/weekly-memos/${encodeURIComponent(memoId)}`,
     "PUT",
-    body,
+    { ...body, modifiedAt: modifiedAt ?? null },
   );
 export const getCommonProjectBoardSteps = (id: string) =>
-  request<{ items: BoardStep[] }>(id, "/steps");
+  request<{ items: BoardStep[]; modifiedAt?: string | null }>(id, "/steps");
 export const postCommonProjectBoardStepsEnsure = (id: string) =>
   request<{ items: BoardStep[] }>(id, "/steps/ensure", "POST");
-export const putCommonProjectBoardSteps = (id: string, items: StepDate[]) =>
-  request<{ items: BoardStep[] }>(id, "/steps", "PUT", { items });
+/** 단계 계획 저장: 목록 조회 때 받은 modifiedAt을 함께 보낸다(그 사이 바뀌었으면 409). */
+export const putCommonProjectBoardSteps = (
+  id: string,
+  items: StepDate[],
+  modifiedAt?: string | null,
+) =>
+  request<{ items: BoardStep[] }>(id, "/steps", "PUT", {
+    items,
+    modifiedAt: modifiedAt ?? null,
+  });
+
 export const postCommonProjectBoardStepComplete = (
   id: string,
   stepId: string,

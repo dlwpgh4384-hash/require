@@ -44,6 +44,12 @@ class ProjectProgressControllerTest {
     Owner owner;
     List<Step> steps;
     List<Memo> memos;
+    Instant stepVersion;
+    static Memo memo(String id, String project, String done, String next, String request, Integer progress,
+        Instant createdAt, String createdBy, Instant updatedAt, String updatedBy) {
+        return new Memo(id, project, done, next, request, progress, createdAt, createdBy, updatedAt, updatedBy,
+            LocalDate.of(2026, 10, 15), updatedAt == null ? createdAt : updatedAt);
+    }
     @BeforeEach void setup() {
         owner = new Owner("P-0001","TK","ING",today.minusDays(10),today.plusDays(59));
         steps = new ArrayList<>(); memos = new ArrayList<>();
@@ -52,6 +58,7 @@ class ProjectProgressControllerTest {
         when(mapper.owner(anyString())).thenAnswer(c -> "P-0001".equals(c.getArgument(0)) ? owner : null);
         when(mapper.lockOwner(anyString())).thenAnswer(c -> "P-0001".equals(c.getArgument(0)) ? owner : null);
         when(mapper.steps(anyString())).thenAnswer(c -> List.copyOf(steps));
+        when(mapper.stepsVersion(anyString())).thenAnswer(c -> steps.isEmpty() ? null : stepVersion);
         when(mapper.memos(anyString())).thenAnswer(c -> List.copyOf(memos));
         when(mapper.nextMemoSequence(anyString())).thenAnswer(c -> memos.size()+1);
         when(mapper.stageDefinitions()).thenAnswer(c -> {
@@ -63,32 +70,33 @@ class ProjectProgressControllerTest {
         });
         when(mapper.insertStage(any())).thenAnswer(c -> {
             StageWrite w=c.getArgument(0); var p=w.plan();
-            steps.add(new Step(""+w.sequence(),w.projectId(),p.name(),p.weight(),p.plannedStartDate(),p.plannedEndDate(),null)); return 1;
+            steps.add(new Step(""+w.sequence(),w.projectId(),p.name(),p.weight(),p.plannedStartDate(),p.plannedEndDate(),null)); stepVersion=now; return 1;
         });
         when(mapper.complete(any())).thenAnswer(c -> {
             Completion w=c.getArgument(0); for(int i=0;i<steps.size();i++) { var s=steps.get(i);
                 if(s.stepId().equals(""+w.sequence())) steps.set(i,new Step(s.stepId(),s.projectId(),s.stepName(),s.weight(),s.plannedStartDate(),s.plannedEndDate(),w.today())); }
-            return 1;
+            stepVersion=stepVersion.plusSeconds(1); return 1;
         });
         when(mapper.updateDates(any())).thenAnswer(c -> {
             DatesWrite w=c.getArgument(0); for(int i=0;i<steps.size();i++) { var s=steps.get(i);
                 if(s.stepId().equals(w.dates().stepId())) steps.set(i,new Step(s.stepId(),s.projectId(),s.stepName(),s.weight(),w.dates().plannedStartDate(),w.dates().plannedEndDate(),s.completedDate())); }
-            return 1;
+            stepVersion=stepVersion.plusSeconds(1); return 1;
         });
         when(mapper.insertMemo(any())).thenAnswer(c -> { MemoWrite w=c.getArgument(0); var b=w.input();
-            memos.add(new Memo(""+w.sequence(),w.projectId(),b.workDone(),b.nextWork(),b.requests(),b.actualProgress(),w.now(),w.actor(),null,null));return 1; });
+            memos.add(memo(""+w.sequence(),w.projectId(),b.workDone(),b.nextWork(),b.requests(),b.actualProgress(),w.now(),w.actor(),null,null));return 1; });
         when(mapper.updateMemo(any())).thenAnswer(c -> { MemoWrite w=c.getArgument(0); var b=w.input();
-            for(int i=0;i<memos.size();i++) { var m=memos.get(i); if(m.memoId().equals(""+w.sequence()))
-                memos.set(i,new Memo(m.memoId(),m.projectId(),b.workDone(),b.nextWork(),b.requests(),b.actualProgress(),m.createdAt(),m.createdBy(),w.now(),w.actor())); } return 1; });
+            for(int i=0;i<memos.size();i++) { var m=memos.get(i); if(m.memoId().equals(""+w.sequence())) {
+                if(!java.util.Objects.equals(m.modifiedAt(),w.token())) return 0;
+                memos.set(i,memo(m.memoId(),m.projectId(),b.workDone(),b.nextWork(),b.requests(),b.actualProgress(),m.createdAt(),m.createdBy(),w.now(),w.actor())); } } return 1; });
     }
     void ensure() throws Exception { mvc.perform(post("/api/common/projects/P-0001/steps/ensure")).andExpect(status().isOk())
         .andExpect(response("POST", "/api/common/projects/{projectId}/steps/ensure")); }
     ObjectNode dates() {
-        var body=json.createObjectNode(); var items=body.putArray("items");
+        var body=json.createObjectNode(); if(steps.isEmpty()) body.putNull("modifiedAt"); else body.put("modifiedAt",stepVersion.toString()); var items=body.putArray("items");
         for(var s:steps) items.addObject().put("stepId",s.stepId()).put("plannedStartDate",s.plannedStartDate().toString()).put("plannedEndDate",s.plannedEndDate().toString());
         return body;
     }
-    void memo() { memos.add(new Memo("1","P-0001","원문",null,null,10,now.minusSeconds(30*86400),"other",null,null)); }
+    void memo() { memos.add(memo("1","P-0001","원문",null,null,10,now.minusSeconds(30*86400),"other",null,null)); }
     void closed(String status) { owner=new Owner(owner.projectId(),owner.contractTypeCode(),status,owner.startDate(),owner.endDate()); }
 
     @ParameterizedTest @ValueSource(strings={"TK","IN","MO","DP"})
@@ -159,8 +167,10 @@ class ProjectProgressControllerTest {
         verify(mapper, never()).insertMemo(any()); assertThat(memos).isEqualTo(before);
     }
     @Test @DisplayName("happy auth side-effect: TB_PJ_WEEK_MEMO 동일 memoId 정정과 작성일 보존")
-    void publicMemoEditPreservesCreationAndOtherRows() throws Exception { memo();var original=memos.get(0);memos.add(new Memo("2","P-0001",null,null,"다른 행",null,now,"admin",null,null));var other=memos.get(1);
-        mvc.perform(put("/api/common/projects/P-0001/weekly-memos/1").contentType("application/json").content("{\"requests\":\"새 요청\"}" )).andExpect(status().isOk())
+    void publicMemoEditPreservesCreationAndOtherRows() throws Exception { memo();var original=memos.get(0);memos.add(memo("2","P-0001",null,null,"다른 행",null,now,"admin",null,null));var other=memos.get(1);
+        mvc.perform(put("/api/common/projects/P-0001/weekly-memos/1").contentType("application/json").content("{\"requests\":\"새 요청\",\"modifiedAt\":\""+original.modifiedAt()+"\"}" )).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.writtenDate").value("2026-10-15"))
+            .andExpect(jsonPath("$.data.modifiedAt").value(now.toString()))
             .andExpect(response("PUT", "/api/common/projects/{projectId}/weekly-memos/{memoId}"))
             .andExpect(jsonPath("$.data.memoId").value("1")).andExpect(jsonPath("$.data.updatedBy").value("admin"));
         assertThat(memos.get(0).createdAt()).isEqualTo(original.createdAt());assertThat(memos.get(0).createdBy()).isEqualTo("other");assertThat(memos.get(0).updatedAt()).isEqualTo(now);assertThat(memos.get(1)).isEqualTo(other);
@@ -183,7 +193,34 @@ class ProjectProgressControllerTest {
             .andExpect(status().isBadRequest()).andExpect(response("PUT", "/api/common/projects/{projectId}/weekly-memos/{memoId}"));
         assertThat(memos).isEqualTo(before); verify(mapper, never()).updateMemo(any());
     }
-    @Test void missingMemoIs404NotUpsert() throws Exception { mvc.perform(put(root+"/weekly-memos/1").contentType("application/json").content("{}")).andExpect(status().isNotFound());verify(mapper,never()).insertMemo(any()); }
+    @Test @DisplayName("business: 다른 사람이 먼저 고친 주간 메모는 409, 내용 보존")
+    void staleMemoEditIsConflict() throws Exception {
+        memo(); var before = List.copyOf(memos);
+        mvc.perform(put(root+"/weekly-memos/1").contentType("application/json").content("{\"requests\":\"변경\",\"modifiedAt\":\"2026-01-01T00:00:00Z\"}"))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.errors[0].field").value("modifiedAt"))
+            .andExpect(response("PUT", "/api/common/projects/{projectId}/weekly-memos/{memoId}"));
+        assertThat(memos).isEqualTo(before); verify(mapper, never()).updateMemo(any());
+        mvc.perform(put(root+"/weekly-memos/1").contentType("application/json").content("{\"requests\":\"변경\"}"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("modifiedAt"));
+    }
+    @Test @DisplayName("business: 다른 사람이 먼저 바꾼 단계 계획은 409, 날짜 보존")
+    void staleStageSaveIsConflict() throws Exception {
+        ensure(); var body = dates();
+        mvc.perform(post(root+"/steps/1/complete")).andExpect(status().isOk());
+        var before = List.copyOf(steps);
+        mvc.perform(put(root+"/steps").contentType("application/json").content(body.toString()))
+            .andExpect(status().isConflict()).andExpect(response("PUT", "/api/common/projects/{projectId}/steps"));
+        assertThat(steps).isEqualTo(before); verify(mapper, never()).updateDates(any());
+        body.remove("modifiedAt");
+        mvc.perform(put(root+"/steps").contentType("application/json").content(body.toString()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("modifiedAt"));
+    }
+    @Test void stepListCarriesConcurrencyVersion() throws Exception {
+        ensure();
+        mvc.perform(get(root+"/steps")).andExpect(status().isOk()).andExpect(jsonPath("$.data.modifiedAt").value(now.toString()));
+    }
+    @Test void missingMemoIs404NotUpsert() throws Exception {
+ mvc.perform(put(root+"/weekly-memos/1").contentType("application/json").content("{}")).andExpect(status().isNotFound());verify(mapper,never()).insertMemo(any()); }
     @Test @DisplayName("happy auth side-effect: TB_PJ_STEP 날짜만 변경, 완료일·비중 보존")
     void validDateSaveChangesOnlyDates() throws Exception { ensure();var before=List.copyOf(steps);var body=dates();((ObjectNode)body.withArray("items").get(0)).put("plannedEndDate",steps.get(0).plannedEndDate().plusDays(1).toString());((ObjectNode)body.withArray("items").get(1)).put("plannedStartDate",steps.get(1).plannedStartDate().plusDays(1).toString());
         mvc.perform(put("/api/common/projects/P-0001/steps").contentType("application/json").content(body.toString())).andExpect(status().isOk())

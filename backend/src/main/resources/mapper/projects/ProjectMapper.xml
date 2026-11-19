@@ -245,6 +245,12 @@
         AND DDLN_DT &lt; #{today}) AS "overdueIssue",
       EXISTS (SELECT 1 FROM TB_PJ_ISSUE WHERE PROJ_ID=#{id} AND ISSUE_STAT_CD!='CLOSE'
         AND IMPR_CD='HIGH' AND DDLN_DT &lt; #{today}) AS "overdueHighIssue",
+      (SELECT COUNT(*) FROM TB_PJ_ISSUE WHERE PROJ_ID=#{id} AND ISSUE_STAT_CD!='CLOSE'
+        AND DDLN_DT &lt; #{today}) AS "overdueCount",
+      (SELECT COUNT(*) FROM TB_PJ_ISSUE WHERE PROJ_ID=#{id} AND ISSUE_STAT_CD!='CLOSE'
+        AND IMPR_CD='HIGH' AND DDLN_DT &lt; #{today}) AS "overdueHighCount",
+      (SELECT CAST(MIN(s.REG_DTTM AT TIME ZONE 'Asia/Seoul') AS date) FROM TB_PJ_STEP s
+        WHERE s.PROJ_ID=#{id}) AS "stagesCreatedDate",
       COALESCE((SELECT SUM(e.EXPS_AMT) FROM TB_PJ_DRCT_EXPS e WHERE e.PROJ_ID=#{id}
         AND e.EXPS_YM &lt;= to_char(CAST(#{today} AS date),'YYYYMM')),0) AS "additionalExpenseAmount"
   </select>

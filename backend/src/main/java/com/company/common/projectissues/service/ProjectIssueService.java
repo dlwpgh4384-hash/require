@@ -6,20 +6,34 @@ import com.company.common.projectissues.mapper.ProjectIssueMapper;
 import com.company.common.support.service.BusinessCalendar;
 import com.company.common.support.service.CodeFailure;
 import com.company.common.support.service.CurrentBusinessActor;
+import com.company.common.support.service.ExcelExportService;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Objects;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
 public class ProjectIssueService {
+    static final String SCREEN = "프로젝트 이슈";
     private final ProjectIssueMapper mapper;
     private final BusinessCalendar calendar;
     private final CurrentBusinessActor actor;
+    private final ExcelExportService excel;
 
     public ProjectIssueService(ProjectIssueMapper mapper, BusinessCalendar calendar, CurrentBusinessActor actor) {
+        this(mapper, calendar, actor, new ExcelExportService());
+    }
+
+    @Autowired
+    public ProjectIssueService(ProjectIssueMapper mapper, BusinessCalendar calendar, CurrentBusinessActor actor,
+            ExcelExportService excel) {
         this.mapper = mapper;
         this.calendar = calendar;
         this.actor = actor;
+        this.excel = excel;
     }
 
     public IssueList getCommonProjectBoardIssues(Filter filter) {
@@ -30,6 +44,37 @@ public class ProjectIssueService {
         var rows = mapper.selectIssues(new Query(filter, calendar.today()));
         return new IssueList(rows, rows.stream().filter(i -> !"CLOSE".equals(i.statusCode)).count());
     }
+
+    public record ExcelFile(byte[] bytes, String fileName, int count) {}
+
+    /**
+     * 이슈 모아 보기 엑셀(SFR-011): 목록과 같은 조건의 전체 결과를 화면 열 순서(중요도·제목·프로젝트·담당자·기한·상태·조치 내용·등록일)로.
+     * 파일 1행에 받은 사람·한국 시각, 접근 기록 DNLD(SER-006).
+     */
+    @Transactional
+    public ExcelFile getCommonProjectBoardIssuesExcel(Filter filter) {
+        var items = getCommonProjectBoardIssues(filter).items();
+        var korean = DateTimeFormatter.ofPattern("uuuu-MM-dd").withZone(java.time.ZoneId.of("Asia/Seoul"));
+        List<List<String>> rows = items.stream().map(i -> List.of(
+            name("IMPR", i.importanceCode), text(i.title), text(i.projectName), text(i.assigneeName),
+            i.dueDate == null ? "–" : i.dueDate + (i.overdueDays > 0 && !"CLOSE".equals(i.statusCode)
+                ? " (" + i.overdueDays + "일 지남)" : ""),
+            name("ISSUE_STAT", i.statusCode), text(i.actionText),
+            i.createdAt == null ? "–" : korean.format(i.createdAt))).toList();
+        var now = calendar.now();
+        byte[] bytes = excel.write(SCREEN, List.of("중요도", "제목", "프로젝트", "담당자", "기한", "상태", "조치 내용", "등록일"),
+            rows, actor.userId(), now);
+        mapper.insertAccess(actor.userId(), SCREEN + " " + items.size() + "건");
+        return new ExcelFile(bytes, excel.fileName(SCREEN, null, now), items.size());
+    }
+
+    private String name(String group, String code) {
+        if (code == null) return "–";
+        String found = mapper.codeName(group, code);
+        return found == null ? code : found;
+    }
+
+    private static String text(String value) { return value == null || value.isBlank() ? "–" : value; }
 
     private void code(String group, String value, String field) {
         if (value == null || value.isBlank() || mapper.codeName(group, value) == null)
@@ -72,6 +117,7 @@ public class ProjectIssueService {
         return mapper.selectIssue(write.issueId, today);
     }
 
+    /** 이슈 수정. 받은 modifiedAt이 지금 값과 다르면(그 사이 다른 사람이 고침) 409(공통 문구). */
     @Transactional
     public Issue putCommonProjectBoardIssue(String issueId, Input input) {
         long id = ProjectIssueRules.issueId(issueId);
@@ -82,7 +128,11 @@ public class ProjectIssueService {
             throw CodeFailure.invalid("projectId", "이슈의 프로젝트는 변경할 수 없습니다.");
         lockProject(projectId);
         if (mapper.lockIssue(id, projectId) == null) throw missing("issueId");
-        if (mapper.updateIssue(new Write(id, input, actor.userId())) != 1) throw missing("issueId");
-        return mapper.selectIssue(id, calendar.today());
+        var today = calendar.today();
+        var current = mapper.selectIssue(id, today);
+        if (current == null) throw missing("issueId");
+        if (!Objects.equals(current.modifiedAt, input.modifiedAt())) throw CodeFailure.conflict();
+        if (mapper.updateIssue(new Write(id, input, actor.userId())) != 1) throw CodeFailure.conflict();
+        return mapper.selectIssue(id, today);
     }
 }

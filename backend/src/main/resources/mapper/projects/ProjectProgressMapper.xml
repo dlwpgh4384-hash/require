@@ -22,6 +22,8 @@
       <arg column="createdBy" javaType="string"/>
       <arg column="updatedAt" javaType="java.time.Instant"/>
       <arg column="updatedBy" javaType="string"/>
+      <arg column="writtenDate" javaType="java.time.LocalDate"/>
+      <arg column="modifiedAt" javaType="java.time.Instant"/>
     </constructor>
   </resultMap>
   <resultMap id="step" type="com.company.common.projects.dto.ProjectProgressContracts$Step">
@@ -58,7 +60,8 @@
     SELECT m.MEMO_SN::text AS "memoId", m.PROJ_ID AS "projectId",
       m.THIS_WEEK_CN AS "workDone", m.NEXT_WEEK_CN AS "nextWork", m.REQ_CN AS "requests",
       m.ACTL_PRGRS_RT AS "actualProgress", m.REG_DTTM AS "createdAt", m.REG_USER_ID AS "createdBy",
-      m.MOD_DTTM AS "updatedAt", m.MOD_USER_ID AS "updatedBy"
+      m.MOD_DTTM AS "updatedAt", m.MOD_USER_ID AS "updatedBy",
+      m.WRT_DT AS "writtenDate", COALESCE(m.MOD_DTTM,m.REG_DTTM) AS "modifiedAt"
     FROM TB_PJ_WEEK_MEMO m WHERE m.PROJ_ID=#{id} ORDER BY m.WRT_DT DESC, m.MEMO_SN DESC
   </select>
   <select id="nextMemoSequence" resultType="int">
@@ -68,13 +71,14 @@
     INSERT INTO TB_PJ_WEEK_MEMO
       (PROJ_ID,MEMO_SN,WRT_DT,THIS_WEEK_CN,NEXT_WEEK_CN,REQ_CN,ACTL_PRGRS_RT,REG_USER_ID,REG_DTTM)
     VALUES (#{projectId},#{sequence},#{today},#{input.workDone},#{input.nextWork},#{input.requests},
-      #{input.actualProgress,jdbcType=NUMERIC},#{actor},#{now})
+      #{input.actualProgress,jdbcType=NUMERIC},#{actor},clock_timestamp())
   </insert>
   <update id="updateMemo">
     UPDATE TB_PJ_WEEK_MEMO SET THIS_WEEK_CN=#{input.workDone},NEXT_WEEK_CN=#{input.nextWork},
       REQ_CN=#{input.requests},ACTL_PRGRS_RT=#{input.actualProgress,jdbcType=NUMERIC},
-      MOD_USER_ID=#{actor},MOD_DTTM=#{now}
+      MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp()
     WHERE PROJ_ID=#{projectId} AND MEMO_SN=#{sequence}
+      AND COALESCE(MOD_DTTM,REG_DTTM) IS NOT DISTINCT FROM #{token,jdbcType=TIMESTAMP_WITH_TIMEZONE}
   </update>
   <select id="steps" resultMap="step">
     SELECT s.STEP_SN::text AS "stepId", s.PROJ_ID AS "projectId",
@@ -82,6 +86,15 @@
       s.PLAN_BGN_DT AS "plannedStartDate", s.PLAN_END_DT AS "plannedEndDate", s.CMPL_DT AS "completedDate"
     FROM TB_PJ_STEP s LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='PROJ_STEP' AND c.CODE=s.PROJ_STEP_CD
     WHERE s.PROJ_ID=#{id} ORDER BY s.STEP_SN
+  </select>
+  <select id="stepsVersion" resultType="java.time.Instant">
+    SELECT MAX(COALESCE(s.MOD_DTTM,s.REG_DTTM)) FROM TB_PJ_STEP s WHERE s.PROJ_ID=#{id}
+  </select>
+  <select id="projectsWithoutStages" resultType="string">
+    SELECT p.PROJ_ID FROM TB_PJ_PROJ p
+    WHERE p.PROJ_STAT_CD NOT IN ('END','LOSE') AND p.CTRT_END_DT &gt;= #{today}
+      AND NOT EXISTS (SELECT 1 FROM TB_PJ_STEP s WHERE s.PROJ_ID=p.PROJ_ID)
+    ORDER BY p.PROJ_ID
   </select>
   <select id="stageDefinitions" resultMap="definition">
     SELECT c.CODE AS "code",c.CODE_NM AS "name",CAST(c.ADD_VAL1 AS numeric) AS "weight",
@@ -91,17 +104,17 @@
   </select>
   <insert id="insertStage">
     INSERT INTO TB_PJ_STEP
-      (PROJ_ID,STEP_SN,PROJ_STEP_CD,STEP_WGHT_RT,PLAN_BGN_DT,PLAN_END_DT,CMPL_DT,REG_USER_ID)
+      (PROJ_ID,STEP_SN,PROJ_STEP_CD,STEP_WGHT_RT,PLAN_BGN_DT,PLAN_END_DT,CMPL_DT,REG_USER_ID,REG_DTTM)
     VALUES (#{projectId},#{sequence},#{plan.code},#{plan.weight},#{plan.plannedStartDate},
-      #{plan.plannedEndDate},NULL,#{actor})
+      #{plan.plannedEndDate},NULL,#{actor},clock_timestamp())
   </insert>
   <update id="updateDates">
     UPDATE TB_PJ_STEP SET PLAN_BGN_DT=#{dates.plannedStartDate},PLAN_END_DT=#{dates.plannedEndDate},
-      MOD_USER_ID=#{actor},MOD_DTTM=#{now}
+      MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp()
     WHERE PROJ_ID=#{projectId} AND STEP_SN=CAST(#{dates.stepId} AS numeric) AND CMPL_DT IS NULL
   </update>
   <update id="complete">
-    UPDATE TB_PJ_STEP SET CMPL_DT=#{today},MOD_USER_ID=#{actor},MOD_DTTM=#{now}
+    UPDATE TB_PJ_STEP SET CMPL_DT=#{today},MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp()
     WHERE PROJ_ID=#{projectId} AND STEP_SN=#{sequence} AND CMPL_DT IS NULL
   </update>
 </mapper>

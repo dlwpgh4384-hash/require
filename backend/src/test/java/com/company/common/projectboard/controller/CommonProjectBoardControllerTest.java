@@ -49,6 +49,7 @@ class CommonProjectBoardControllerTest {
     @MockBean BusinessCalendar calendar;
     @MockBean CalculationRuleService definitions;
     @MockBean PlatformTransactionManager transactions;
+    @MockBean com.company.common.projects.service.ProjectStageService stages;
     final LocalDate today = LocalDate.of(2026, 11, 15);
     List<ProjectBoardSource> sources;
 
@@ -101,7 +102,9 @@ class CommonProjectBoardControllerTest {
         source("visible", "MO");
         var result = board();
         var row = result.path("items").get(0);
-        assertThat(row.properties()).hasSize(19);
+        assertThat(row.properties()).hasSize(22);
+        assertThat(row.path("signalReasonLevels").isArray()).isTrue();
+        assertThat(row.path("salesPartId").asText()).isEqualTo("sales");
         assertThat(row.path("pmUserId").isNull()).isTrue();
         assertThat(row.path("pmName").isNull()).isTrue();
         assertThat(row.path("costUsageRate").isNull()).isTrue();
@@ -136,7 +139,10 @@ class CommonProjectBoardControllerTest {
         assertThat(result.path("summary").path("overdueIssueCount").asInt()).isEqualTo(1);
         assertThat(result.path("summary").path("staleProjectCount").asInt()).isEqualTo(1);
         assertThat(result.path("staleProjects").get(0).path("daysWithoutMemo").asInt()).isEqualTo(15);
-        assertThat(result.path("items").get(0).path("reasonSummary").asText()).contains("UI-04", "1차 경보");
+        assertThat(result.path("items").get(0).path("reasonSummary").asText())
+            .isEqualTo("기한 지난 중요(높음) 이슈 1건 · 15일째 상태 업데이트 없음")
+            .doesNotContain("UI-04", "1차 경보");
+        assertThat(result.path("items").get(0).path("signalReasonLevels").toString()).isEqualTo("[\"위험\",\"주의\"]");
     }
 
     @Test void typeAndPartFiltersRemoveOtherSourcesBeforeSummary() throws Exception {
@@ -148,7 +154,7 @@ class CommonProjectBoardControllerTest {
         assertThat(result.path("summary").path("progress").path("total").asInt()).isEqualTo(1);
     }
 
-    @Test void ordersWorstFirstThenStartDescendingThenId() throws Exception {
+    @Test void ordersWorstFirstThenProjectNameInKoreanOrder() throws Exception {
         source("normal", "MO");
         source("caution", "MO").latestMemoDate = today.minusDays(15);
         source("b", "MO");
@@ -157,7 +163,7 @@ class CommonProjectBoardControllerTest {
         for (String id : List.of("a", "b", "newest")) when(mapper.issues(id)).thenReturn(List.of(
             new ProjectBoardSignalRules.Issue(id, "HIGH", "OPEN", today.minusDays(1))));
         assertThat(board().path("items").findValuesAsText("projectId"))
-            .containsExactly("newest", "a", "b", "caution", "normal");
+            .containsExactly("a", "b", "newest", "caution", "normal");
     }
 
     @ParameterizedTest @ValueSource(strings = {"MO", "DP", "IN"})
@@ -173,7 +179,7 @@ class CommonProjectBoardControllerTest {
         source.budgetAmount = null;
         source.actualProgress = null;
         source.latestMemoDate = null;
-        source.startDate = today.minusDays(15);
+        source.stagesCreatedDate = today.minusDays(15);
         when(mapper.issues("missing")).thenReturn(List.of(
             new ProjectBoardSignalRules.Issue("99", "HIGH", "OPEN", today.minusDays(1))));
         var row = board().path("items").get(0);
@@ -182,23 +188,40 @@ class CommonProjectBoardControllerTest {
         assertThat(row.path("costUsageRate").isNull()).isTrue();
         assertThat(row.path("latestMemoDate").isNull()).isTrue();
         assertThat(row.path("daysWithoutMemo").asInt()).isEqualTo(15);
-        assertThat(row.path("reasonSummary").asText()).contains("원가 계산 불가", "99", "15일");
+        assertThat(row.path("lastUpdateDate").asText()).isEqualTo(today.minusDays(15).toString());
+        assertThat(row.path("reasonSummary").asText()).contains("기한 지난 중요(높음) 이슈 1건", "15일째 상태 업데이트 없음");
     }
 
     @Test void zeroBudgetIsMissingCalculationNotDivisionError() throws Exception {
         source("zero", "TK").budgetAmount = BigDecimal.ZERO;
-        assertThat(board().path("items").get(0).path("reasonSummary").asText()).contains("원가 계산 불가");
+        var row = board().path("items").get(0);
+        assertThat(row.path("costUsageRate").isNull()).isTrue();
+        assertThat(row.path("signal").asText()).isEqualTo("정상");
+    }
+
+    @Test void headquartersSalesPartIsAValidFilter() throws Exception {
+        source("hq", "TK").salesPartId = "HQ";
+        source("other", "TK");
+        assertThat(board("salesPartId", "HQ").path("items").findValuesAsText("projectId")).containsExactly("hq");
+    }
+
+    @Test void boardFirstCreatesMissingStagesThenReads() throws Exception {
+        source("visible", "MO");
+        board();
+        var order = inOrder(stages, mapper);
+        order.verify(stages).ensureMissingStages();
+        order.verify(mapper).sources(any(), eq(today), eq("202611"));
     }
 
     @Test void fourteenDaysIsNotStaleAndFutureNoMemoAgeIsZero() throws Exception {
         source("boundary", "MO").latestMemoDate = today.minusDays(14);
         var future = source("future", "MO");
         future.latestMemoDate = null;
-        future.startDate = today.plusDays(1);
+        future.stagesCreatedDate = today.plusDays(1);
         var result = board();
         assertThat(result.path("staleProjects")).isEmpty();
-        assertThat(result.path("items").get(0).path("daysWithoutMemo").asInt()).isZero();
-        assertThat(result.path("items").get(1).path("daysWithoutMemo").asInt()).isEqualTo(14);
+        assertThat(result.path("items").get(0).path("daysWithoutMemo").asInt()).isEqualTo(14);
+        assertThat(result.path("items").get(1).path("daysWithoutMemo").asInt()).isZero();
     }
 
     @Test void allIndependentReasonsAndRoundedCostPercentagesSurvive() throws Exception {
@@ -221,7 +244,7 @@ class CommonProjectBoardControllerTest {
         assertThat(row.path("currentStepName").asText()).isEqualTo("수행");
     }
 
-    @Test void repeatedReadRecalculatesWithoutWritesOrEnsure() throws Exception {
+    @Test void repeatedReadRecalculatesWithoutProjectWrites() throws Exception {
         var source = source("changed", "MO");
         source.latestMemoDate = today.minusDays(15);
         assertThat(board().path("items").get(0).path("signal").asText()).isEqualTo("주의");
@@ -230,6 +253,7 @@ class CommonProjectBoardControllerTest {
         verify(projects, never()).lockSources();
         verify(projects, never()).lockProject(anyString());
         verify(projects, never()).insertAccess(anyString(), anyString(), anyString());
+        verify(stages, times(2)).ensureMissingStages();
     }
 
     @ParameterizedTest @ValueSource(strings = {"/api/common/project-board", "/api/common/project-board/excel"})
@@ -237,6 +261,8 @@ class CommonProjectBoardControllerTest {
         mvc.perform(get(path).param("signal", "unknown")).andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("signal"));
         verifyNoInteractions(mapper);
+        verifyNoInteractions(stages);
+
     }
 
     @ParameterizedTest @ValueSource(strings = {"/api/common/project-board", "/api/common/project-board/excel"})

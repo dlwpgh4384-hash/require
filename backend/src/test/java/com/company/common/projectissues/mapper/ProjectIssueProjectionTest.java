@@ -37,7 +37,7 @@ class ProjectIssueProjectionTest {
         var c = config();
         for (String statement : List.of("selectIssues", "selectIssue", "lockProject")) {
             Object parameters = statement.equals("selectIssues")
-                ? new Query(new Filter(null, null, null, null), today)
+                ? new Query(new Filter(null, null, null, null, null), today)
                 : Map.of("today", today, "issueId", 3L, "projectId", "P-selected");
             var mapped = c.getMappedStatement(namespace + statement);
             var result = mapped.getResultMaps().get(0);
@@ -63,10 +63,10 @@ class ProjectIssueProjectionTest {
 
     @Test void optionalPredicatesBindOnlyPresentValuesAndKeepStrictOverdueRule() throws Exception {
         var statement = config().getMappedStatement(namespace + "selectIssues");
-        var defaults = statement.getBoundSql(new Query(new Filter(null, false, null, null), today));
+        var defaults = statement.getBoundSql(new Query(new Filter(null, false, null, null, null), today));
         assertThat(defaults.getSql()).contains("i.ISSUE_STAT_CD IN ('OPEN','ACT')").doesNotContain("IS NULL OR", "OFFSET", "LIMIT");
         assertThat(defaults.getParameterMappings()).extracting(m -> m.getProperty()).containsOnly("today");
-        var selected = statement.getBoundSql(new Query(new Filter("CLOSE", true, "HIGH", "P-selected"), today));
+        var selected = statement.getBoundSql(new Query(new Filter("CLOSE", true, "HIGH", "P-selected", null), today));
         assertThat(selected.getSql()).contains("i.DDLN_DT <", "i.ISSUE_STAT_CD!='CLOSE'", "c.SORT_ORD NULLS LAST, i.DDLN_DT, i.ISSUE_ID");
         assertThat(selected.getParameterMappings()).extracting(m -> m.getProperty())
             .contains("filter.statusCode", "filter.importanceCode", "filter.projectId", "today");

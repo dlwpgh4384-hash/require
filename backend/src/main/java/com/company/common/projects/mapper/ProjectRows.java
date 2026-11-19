@@ -32,7 +32,10 @@ public final class ProjectRows {
     }
     public static class HealthSource {
         public LocalDate latestMemoDate;
+        /** 메모가 없을 때 「업데이트 없음」 출발일: 단계를 처음 만든 날(TB_PJ_STEP.REG_DTTM의 한국 날짜). */
+        public LocalDate stagesCreatedDate;
         public boolean overdueHighIssue, overdueIssue;
+        public long overdueHighCount, overdueCount;
         public BigDecimal additionalExpenseAmount = BigDecimal.ZERO;
     }
     public static class Cost {

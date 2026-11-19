@@ -7192,7 +7192,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CommonProjectBoardMemoInput'
+              $ref: '#/components/schemas/CommonProjectBoardMemoUpdateInput'
       responses:
         '200':
           description: 주간 메모 수정 결과; 재조회 가능한 공개 데이터
@@ -7215,6 +7215,12 @@ paths:
                 $ref: '#/components/schemas/ApiError'
         '404':
           description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 그 사이 다른 사람이 먼저 바꿈(보낸 modifiedAt이 지금 값과 다름). errors.field=modifiedAt, 공통 문구 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」; 업무행 무변경
           content:
             application/json:
               schema:
@@ -7326,6 +7332,12 @@ paths:
                 $ref: '#/components/schemas/ApiError'
         '404':
           description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 그 사이 다른 사람이 먼저 바꿈(보낸 modifiedAt이 지금 값과 다름). errors.field=modifiedAt, 공통 문구 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」; 업무행 무변경
           content:
             application/json:
               schema:
@@ -7484,7 +7496,13 @@ paths:
         schema:
           type: string
           minLength: 1
-        description: 조건 선택; 생략하면 해당 조건 제한 없음
+        description: 조건 선택; 생략하면 해당 조건 제한 없음. 생략한 모아 보기는 종료·실주 프로젝트의 이슈를 빼고 보인다
+      - name: all
+        in: query
+        required: false
+        schema:
+          type: boolean
+        description: true면 상태 상관없이 전부(종료 이슈는 맨 뒤). 프로젝트 상세 [이슈] 탭이 쓴다. statusCode를 주면 statusCode가 우선
       x-pagination-filtering:
         pagination: 조건에 맞는 전체 행을 반환; 서버 페이지 파라미터 없음, ListView 로컬 페이지 재사용
         filtering: statusCode·overdue·importanceCode·projectId
@@ -7570,6 +7588,69 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/project-issues/excel:
+    get:
+      operationId: getCommonProjectBoardIssuesExcel
+      summary: 이슈 모아 보기 엑셀 다운로드(SFR-011)
+      description: 이슈 모아 보기와 같은 조건(statusCode·overdue·importanceCode·projectId·all)의 전체 결과를 목록 순서 그대로 xlsx로 내려준다. 열은 중요도·제목·프로젝트·담당자·기한(지나면 「N일 지남」)·상태·조치 내용·등록일(한국 날짜). 파일 1행에 받은 사람·한국 시각, 파일 이름 「프로젝트 이슈_다운로드일시.xlsx」, 접근 기록 DNLD(화면 UI-31).
+      security: []
+      parameters:
+      - name: statusCode
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: ISSUE_STAT 원천; 생략 시 열림·조치 중
+      - name: overdue
+        in: query
+        required: false
+        schema:
+          type: boolean
+        description: true면 기한 지난 것만
+      - name: importanceCode
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: IMPR 원천
+      - name: projectId
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 기존 프로젝트 식별자
+      - name: all
+        in: query
+        required: false
+        schema:
+          type: boolean
+        description: true면 상태 상관없이 전부
+      responses:
+        '200':
+          description: 이슈 모아 보기 엑셀 파일(0건이면 머리글만)
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: 기존 ExcelExportService 파일 이름·인코딩 관례(filename*=UTF-8'')
+            X-Total-Count:
+              schema:
+                type: integer
+              description: 파일에 담은 조회 결과 건수
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: statusCode·importanceCode 코드 오류 또는 projectId 형식 오류; 해당 필드 오류 반환, 파일·접근 기록 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/common/project-issues/{issueId}:
     put:
       operationId: putCommonProjectBoardIssue
@@ -7607,7 +7688,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CommonProjectBoardIssueInput'
+              $ref: '#/components/schemas/CommonProjectBoardIssueUpdateInput'
       responses:
         '200':
           description: 프로젝트 이슈 수정·종료 결과; 재조회 가능한 공개 데이터
@@ -7630,6 +7711,12 @@ paths:
                 $ref: '#/components/schemas/ApiError'
         '404':
           description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 그 사이 다른 사람이 먼저 바꿈(보낸 modifiedAt이 지금 값과 다름). errors.field=modifiedAt, 공통 문구 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」; 업무행 무변경
           content:
             application/json:
               schema:
@@ -7659,6 +7746,9 @@ components:
       - latestMemoDate
       - daysWithoutMemo
       - stale
+      - signalReasonLevels
+      - lastUpdateDate
+      - salesPartId
       properties:
         projectId:
           type: string
@@ -7716,9 +7806,26 @@ components:
         daysWithoutMemo:
           type: integer
           nullable: true
-          description: 메모 없음 기준일은 OQ-CALC-031
+          description: 마지막 업데이트(lastUpdateDate) 뒤 지난 날 수. 메모가 없으면 단계를 처음 만든 날부터 센다
         stale:
           type: boolean
+        signalReasonLevels:
+          type: array
+          description: signalReasons와 같은 순서의 등급(위험·주의). 프로젝트 칸 이유 요약 색(첫 이유 등급)에 쓴다
+          items:
+            type: string
+            enum:
+            - 위험
+            - 주의
+        lastUpdateDate:
+          type: string
+          nullable: true
+          format: date
+          description: 마지막 업데이트 = 가장 최근에 새로 쓴 주간 메모 작성일, 메모가 없으면 단계를 처음 만든 날(한국 날짜, 2026-11-19 사용자 결정)
+        salesPartId:
+          type: string
+          nullable: true
+          description: 이번 달 영업 파트(HQ = 본사 직접 영업, null = 미지정). 화면 영업 파트 조건에 쓴다
       additionalProperties: false
     CommonProjectBoardSummary:
       type: object
@@ -7821,6 +7928,8 @@ components:
       - createdBy
       - updatedAt
       - updatedBy
+      - writtenDate
+      - modifiedAt
       properties:
         memoId:
           type: string
@@ -7855,6 +7964,14 @@ components:
         updatedBy:
           type: string
           nullable: true
+        writtenDate:
+          type: string
+          format: date
+          description: 작성일(WRT_DT, 한국 날짜). 고쳐도 바뀌지 않는다
+        modifiedAt:
+          type: string
+          format: date-time
+          description: 동시 수정 확인 값(고친 시각, 없으면 등록 시각, UTC). 수정 때 그대로 돌려보낸다
       additionalProperties: false
     CommonProjectBoardMemoList:
       type: object
@@ -7889,6 +8006,34 @@ components:
           maximum: 100
       additionalProperties: false
       description: 턴키·내부만 actualProgress 0~100 정수. 운영형은 actualProgress 미입력이고 텍스트 셋 중 하나 필수. 등록·수정 모두 적용.
+    CommonProjectBoardMemoUpdateInput:
+      type: object
+      required:
+      - modifiedAt
+      properties:
+        workDone:
+          type: string
+          nullable: true
+          maxLength: 200
+        nextWork:
+          type: string
+          nullable: true
+          maxLength: 200
+        requests:
+          type: string
+          nullable: true
+          maxLength: 200
+        actualProgress:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 100
+        modifiedAt:
+          type: string
+          format: date-time
+          description: 조회 때 받은 메모의 modifiedAt 그대로. 지금 값과 다르면 409
+      additionalProperties: false
+      description: 주간 메모 수정 본문. 내용 규칙은 CommonProjectBoardMemoInput과 같고 modifiedAt을 꼭 보낸다(공통 00-1).
     CommonProjectBoardStep:
       type: object
       required:
@@ -7923,17 +8068,29 @@ components:
       type: object
       required:
       - items
+      - modifiedAt
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/CommonProjectBoardStep'
+        modifiedAt:
+          type: string
+          nullable: true
+          format: date-time
+          description: 단계 전체의 동시 수정 확인 값(단계들 중 가장 늦은 고친·등록 시각, UTC). 단계가 없으면 null. 단계 계획 저장 때 그대로 돌려보낸다
       additionalProperties: false
     CommonProjectBoardStepDatesInput:
       type: object
       required:
       - items
+      - modifiedAt
       properties:
+        modifiedAt:
+          type: string
+          nullable: true
+          format: date-time
+          description: 단계 목록 조회 때 받은 modifiedAt 그대로. 그 사이 날짜를 고치거나 완료 처리했으면 409
         items:
           type: array
           items:
@@ -7987,6 +8144,41 @@ components:
           nullable: true
           maxLength: 500
       additionalProperties: false
+    CommonProjectBoardIssueUpdateInput:
+      type: object
+      required:
+      - projectId
+      - title
+      - dueDate
+      - importanceCode
+      - statusCode
+      - modifiedAt
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        dueDate:
+          type: string
+          format: date
+        importanceCode:
+          type: string
+          minLength: 1
+        statusCode:
+          type: string
+          minLength: 1
+        actionText:
+          type: string
+          nullable: true
+          maxLength: 500
+        modifiedAt:
+          type: string
+          format: date-time
+          description: 조회 때 받은 이슈의 modifiedAt 그대로. 지금 값과 다르면 409(공통 00-1)
+      additionalProperties: false
     CommonProjectBoardIssue:
       type: object
       required:
@@ -8005,6 +8197,9 @@ components:
       - updatedBy
       - updatedAt
       - overdueDays
+      - createdByName
+      - updatedByName
+      - modifiedAt
       properties:
         issueId:
           type: string
@@ -8053,6 +8248,17 @@ components:
         overdueDays:
           type: integer
           minimum: 0
+        createdByName:
+          type: string
+          description: 등록한 사람 이름(사용자 표, 없으면 계정 ID). 수정 창 「MM-DD 이름 등록」
+        updatedByName:
+          type: string
+          nullable: true
+          description: 마지막으로 고친 사람 이름(없으면 null)
+        modifiedAt:
+          type: string
+          format: date-time
+          description: 동시 수정 확인 값(고친 시각, 없으면 등록 시각, UTC). 수정 때 그대로 돌려보낸다
       additionalProperties: false
     CommonProjectBoardIssueList:
       type: object
@@ -11273,7 +11479,33 @@ components:
           nullable: true
         trafficLight:
           type: string
-          description: 식-76 DB 정의의 표시 결과; enum 원문 확보
+          description: 식-76 신호등(현황판과 같은 판정). 종료·실주는 없음
+        signalReasons:
+          type: array
+          description: 신호등 이유(현황판과 같은 문구·순서). 종료·실주는 없음
+          items:
+            type: string
+        signalReasonLevels:
+          type: array
+          description: signalReasons와 같은 순서의 등급(위험·주의)
+          items:
+            type: string
+        lastUpdateDate:
+          type: string
+          format: date
+          description: 마지막 업데이트(마지막 주간 메모 작성일, 없으면 단계를 처음 만든 날)
+        daysWithoutUpdate:
+          type: integer
+          description: 마지막 업데이트 뒤 지난 날 수
+        staleUpdate:
+          type: boolean
+          description: 14일 넘게 업데이트 없음
+        costUsageRate:
+          type: number
+          description: 턴키만 원가 사용률(%), 예산이 없으면 없음
+        costProgressGap:
+          type: number
+          description: 턴키만 진척 대비 원가(%p) = 원가 사용률 − 실적 진척률
         preContractPeopleCount:
           type: integer
         loseDate:

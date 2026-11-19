@@ -42,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnabledIfEnvironmentVariable(named = "NAVIGATION_TEST_DB_URL", matches = "jdbc:postgresql:.*")
 @WebMvcTest(ProjectIssueController.class)
 @ContextConfiguration(classes = {ProjectIssueController.class, ProjectIssueService.class,
-    CurrentBusinessActor.class, CodeExceptionHandler.class, ApiExceptionHandler.class,
+    CurrentBusinessActor.class, CodeExceptionHandler.class, ApiExceptionHandler.class, ExcelExportService.class,
     ProjectIssuePersistenceTest.Persistence.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class ProjectIssuePersistenceTest {
@@ -113,12 +113,16 @@ class ProjectIssuePersistenceTest {
     }
     List<Map<String, Object>> snapshot() { return db.queryForList("SELECT * FROM TB_PJ_ISSUE ORDER BY ISSUE_ID"); }
     ProjectBoardSignalRules.Result signal() {
-        var definitions = new CalculationRuleService(sessions.getMapper(CalculationRuleMapper.class),
-            sessions.getMapper(UserPreferencePeriodSourceMapper.class));
-        var rows = mapper.selectIssues(new Query(new Filter(null, null, null, "P-issue"), today));
-        return new ProjectBoardSignalRules(definitions).evaluate(new ProjectBoardSignalRules.Source(
-            "IN", null, null, null, today, today.minusDays(10), rows.stream().map(i ->
-                new ProjectBoardSignalRules.Issue(i.issueId, i.importanceCode, i.statusCode, i.dueDate)).toList()), today);
+        var rows = mapper.selectIssues(new Query(new Filter(null, null, null, "P-issue", null), today));
+        long[] overdue = ProjectBoardSignalRules.overdue(rows.stream().map(i ->
+            new ProjectBoardSignalRules.Issue(i.issueId, i.importanceCode, i.statusCode, i.dueDate)).toList(), today);
+        return new ProjectBoardSignalRules().evaluate(new ProjectBoardSignalRules.Source(
+            "IN", null, null, null, today, today.minusDays(10), overdue[0], overdue[1]), today);
+    }
+    /** 동시 수정 확인 값(지금 DB 값): 수정 본문에 그대로 보낸다. */
+    String version(String id) {
+        return db.queryForObject("SELECT COALESCE(MOD_DTTM,REG_DTTM) FROM TB_PJ_ISSUE WHERE ISSUE_ID=CAST(? AS numeric)",
+            java.sql.Timestamp.class, id).toInstant().toString();
     }
 
     @Test void committedCreateAndCloseChangeSourceCountsAndIndependentSignalReasons() throws Exception {
@@ -126,9 +130,9 @@ class ProjectIssuePersistenceTest {
         String id = create();
         var original = snapshot().get(0);
         assertThat(signal().signal()).isEqualTo("위험");
-        assertThat(signal().signalReasons()).anySatisfy(reason -> assertThat(reason).contains(id));
+        assertThat(signal().signalReasons()).containsExactly("기한 지난 중요(높음) 이슈 1건");
         mvc.perform(get("/api/common/project-issues")).andExpect(jsonPath("$.data.openCount").value(1));
-        mvc.perform(put("/api/common/project-issues/" + id).contentType("application/json").content(input().put("statusCode", "CLOSE").put("actionText", "완료").toString()))
+        mvc.perform(put("/api/common/project-issues/" + id).contentType("application/json").content(input().put("statusCode", "CLOSE").put("actionText", "완료").put("modifiedAt", version(id)).toString()))
             .andExpect(status().isOk());
         var changed = snapshot().get(0);
         assertThat(changed.get("issue_id")).isEqualTo(original.get("issue_id"));
@@ -145,7 +149,7 @@ class ProjectIssuePersistenceTest {
             .andExpect(jsonPath("$.data.items[0].issueId").value(id));
         // 새 매퍼/서비스 인스턴스에서도 같은 DB 원행을 읽는다.
         var reopened = new ProjectIssueService(mapper, new BusinessCalendar(Clock.fixed(Instant.parse("2026-11-15T00:00:00Z"), ZoneOffset.UTC)), new CurrentBusinessActor());
-        assertThat(reopened.getCommonProjectBoardIssues(new Filter("CLOSE", null, null, "P-issue")).items()).hasSize(1);
+        assertThat(reopened.getCommonProjectBoardIssues(new Filter("CLOSE", null, null, "P-issue", null)).items()).hasSize(1);
     }
 
     @ParameterizedTest @ValueSource(strings = {"END", "LOSE"})
@@ -155,7 +159,7 @@ class ProjectIssuePersistenceTest {
         var before = snapshot();
         mvc.perform(post("/api/common/project-issues").contentType("application/json").content(input().toString())).andExpect(status().isBadRequest());
         assertThat(snapshot()).isEqualTo(before);
-        mvc.perform(put("/api/common/project-issues/" + id).contentType("application/json").content(input().put("statusCode", "CLOSE").toString()))
+        mvc.perform(put("/api/common/project-issues/" + id).contentType("application/json").content(input().put("statusCode", "CLOSE").put("modifiedAt", version(id)).toString()))
             .andExpect(status().isOk());
         assertThat(snapshot()).hasSize(1);
     }
@@ -167,7 +171,8 @@ class ProjectIssuePersistenceTest {
         // 프록시와 같은 실제 트랜잭션 안에서 대체 실행자 정책을 검증한다.
         new org.springframework.transaction.support.TransactionTemplate(new DataSourceTransactionManager(source)).execute(status -> {
             var edited = new ProjectIssueService(mapper, new BusinessCalendar(), editor)
-                .putCommonProjectBoardIssue(id, new Input("P-issue", "다른 편집자", today, "MID", "ACT", "처리"));
+                .putCommonProjectBoardIssue(id, new Input("P-issue", "다른 편집자", today, "MID", "ACT", "처리",
+                    java.time.Instant.parse(version(id))));
             assertThat(edited.assigneeId).isEqualTo("admin");
             assertThat(edited.createdBy).isEqualTo("admin");
             assertThat(edited.updatedBy).isEqualTo("second-editor");
@@ -180,7 +185,7 @@ class ProjectIssuePersistenceTest {
         String id = create();
         var before = snapshot();
         for (String field : List.of("importanceCode", "statusCode")) {
-            mvc.perform(put("/api/common/project-issues/" + id).contentType("application/json").content(input().put(field, "UNKNOWN").toString()))
+            mvc.perform(put("/api/common/project-issues/" + id).contentType("application/json").content(input().put(field, "UNKNOWN").put("modifiedAt", version(id)).toString()))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value(field));
             assertThat(snapshot()).isEqualTo(before);
         }
@@ -196,10 +201,27 @@ class ProjectIssuePersistenceTest {
         var before = snapshot();
         db.execute("CREATE FUNCTION reject_issue() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test rejection'; END $$");
         db.execute("CREATE TRIGGER reject_issue BEFORE UPDATE ON TB_PJ_ISSUE FOR EACH ROW EXECUTE FUNCTION reject_issue()");
-        mvc.perform(put("/api/common/project-issues/" + id).contentType("application/json").content(input().put("statusCode", "CLOSE").toString())).andExpect(status().is5xxServerError());
+        mvc.perform(put("/api/common/project-issues/" + id).contentType("application/json").content(input().put("statusCode", "CLOSE").put("modifiedAt", version(id)).toString())).andExpect(status().is5xxServerError());
         assertThat(snapshot()).isEqualTo(before);
         db.execute("DROP TRIGGER reject_issue ON TB_PJ_ISSUE");
-        mvc.perform(put("/api/common/project-issues/" + id).contentType("application/json").content(input().put("statusCode", "CLOSE").toString())).andExpect(status().isOk());
+        mvc.perform(put("/api/common/project-issues/" + id).contentType("application/json").content(input().put("statusCode", "CLOSE").put("modifiedAt", version(id)).toString())).andExpect(status().isOk());
+    }
+
+    @Test void realSqlRejectsStaleEditAndBoardCollectionSkipsEndedProjects() throws Exception {
+        String id = create();
+        var before = snapshot();
+        mvc.perform(put("/api/common/project-issues/" + id).contentType("application/json")
+                .content(input().put("title", "늦은 수정").put("modifiedAt", "2026-01-01T00:00:00Z").toString()))
+            .andExpect(status().isConflict());
+        assertThat(snapshot()).isEqualTo(before);
+        assertThat(before.get(0).get("reg_dttm")).isNotNull();
+        mvc.perform(get("/api/common/project-issues")).andExpect(jsonPath("$.data.openCount").value(1))
+            .andExpect(jsonPath("$.data.items[0].createdByName").isNotEmpty())
+            .andExpect(jsonPath("$.data.items[0].modifiedAt").isNotEmpty());
+        db.update("UPDATE TB_PJ_PROJ SET PROJ_STAT_CD='LOSE' WHERE PROJ_ID='P-issue'");
+        mvc.perform(get("/api/common/project-issues")).andExpect(jsonPath("$.data.openCount").value(0));
+        mvc.perform(get("/api/common/project-issues").param("projectId", "P-issue").param("all", "true"))
+            .andExpect(jsonPath("$.data.items.length()").value(1));
     }
 
     @Test void databaseFiltersAndOrderingKeepCountsAndDueTodayConsistent() throws Exception {

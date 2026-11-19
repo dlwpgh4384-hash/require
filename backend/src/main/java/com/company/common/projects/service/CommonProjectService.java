@@ -31,8 +31,19 @@ public class CommonProjectService implements org.springframework.context.Applica
         this.events = events;
     }
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CommonProjectService.class);
+
+    /**
+     * 등록·수주 처리 때 기본 단계를 만든다(SFR-131-07). 단계 만들기가 실패해도 프로젝트 저장은 그대로 끝낸다
+     * (단계 쪽은 저장점까지만 되돌리고, 프로젝트 현황판을 열 때 다시 만든다).
+     */
     private void activated(String id) {
-        if (events != null) events.publishEvent(new ProjectStageService.ProjectActivated(id));
+        if (events == null) return;
+        try {
+            events.publishEvent(new ProjectStageService.ProjectActivated(id));
+        } catch (RuntimeException failure) {
+            log.warn("프로젝트 {} 기본 단계를 만들지 못했습니다. 현황판을 열 때 다시 만듭니다.", id, failure);
+        }
     }
     private final ProjectMapper mapper;
     private final BusinessCalendar calendar;
@@ -117,8 +128,19 @@ public class CommonProjectService implements org.springframework.context.Applica
     private void decorate(Project p) {
         p.progress = progressRules.progress(p.contractTypeCode, mapper.steps(p.projectId),
             mapper.actualProgress(p.projectId), calendar.today());
-        p.trafficLight = progressRules.trafficLight(p, mapper.healthSource(p.projectId, calendar.today()),
+        var health = progressRules.signal(p, mapper.healthSource(p.projectId, calendar.today()),
             projectCosts(p), calendar.today());
+        if (health != null) {
+            var signal = health.result();
+            p.trafficLight = signal.signal();
+            p.signalReasons = signal.signalReasons();
+            p.signalReasonLevels = signal.signalReasonLevels();
+            p.lastUpdateDate = signal.lastUpdateDate();
+            p.daysWithoutUpdate = signal.daysWithoutMemo();
+            p.staleUpdate = signal.stale();
+            p.costUsageRate = health.costUsageRate();
+            p.costProgressGap = health.costProgressGap();
+        }
         boolean editable = currentYear(p) && !"LOSE".equals(p.statusCode);
         p.canEdit = editable;
         p.canChangeBudget = editable && !internal(p);

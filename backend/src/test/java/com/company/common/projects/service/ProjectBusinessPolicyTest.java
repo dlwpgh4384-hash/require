@@ -38,4 +38,15 @@ class ProjectBusinessPolicyTest {
         assertThatThrownBy(()->service.putCommonProjectManpowerPlan("P-owned",new ManpowerInput(List.of(new JobInput("BE",BigDecimal.ONE))))).isInstanceOfSatisfying(CodeFailure.class,e->assertThat(e.getStatus()).isEqualTo(403));
         verify(mapper,never()).savePlan(any());
     }
+    @Test void stageCreationFailureDoesNotBlockStartingTheProject() {
+        var mapper=mock(ProjectMapper.class);var calendar=new BusinessCalendar(Clock.fixed(Instant.parse("2026-11-15T00:00:00Z"),ZoneOffset.UTC));
+        var p=new Project();p.projectId="P-pre";p.startDate=LocalDate.of(2026,11,1);p.endDate=LocalDate.of(2026,12,31);p.statusCode="PRE";p.contractTypeCode="MO";
+        when(mapper.lockProject("P-pre")).thenReturn("P-pre");
+        when(mapper.selectProject(eq("P-pre"),any(),anyString())).thenReturn(p);
+        var service=new CommonProjectService(mapper,calendar,new CurrentBusinessActor(),mock(ProjectAmountRules.class),new ExcelExportService(),mock(ProjectProgressRules.class));
+        service.setApplicationEventPublisher(event -> { throw new IllegalStateException("PROJ_STEP 공통코드 정의를 확인해 주세요."); });
+        assertThat(service.postCommonProjectStart("P-pre").projectId).isEqualTo("P-pre");
+        verify(mapper).start("P-pre");
+    }
 }
+

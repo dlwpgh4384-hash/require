@@ -160,17 +160,19 @@ it.each(["END", "LOSE"])(
     render(<ProjectIssuesView />);
     fireEvent.click(await screen.findByTestId("project-issue-project-24"));
     const detail = await screen.findByTestId("project-detail");
-    const row = await within(detail).findByTestId("list-row-24");
-    await waitFor(() =>
-      expect(
-        within(detail)
-          .getByTestId("project-issue-status-filter")
-          .querySelectorAll("option").length,
-      ).toBeGreaterThan(1),
-    );
+    // 시안 상세 [이슈] 탭: 조건 없이 간단한 표, 종료·실주는 안내 글·[이슈 등록] 없음
+    const row = await within(detail).findByTestId("project-issue-row-24");
+    expect(
+      within(detail).queryByTestId("project-issue-status-filter"),
+    ).not.toBeInTheDocument();
     expect(
       within(detail).queryByTestId("project-issue-create"),
     ).not.toBeInTheDocument();
+    expect(request).toHaveBeenCalledWith(
+      "/api/common/project-issues?projectId=P-linked&all=true",
+      expect.anything(),
+    );
+
     fireEvent.click(row);
     expect(
       await screen.findByTestId("project-issue-dialog"),
@@ -218,4 +220,32 @@ it("detail edit closes detail and sends the same project to existing edit hook",
   } finally {
     unsubscribe();
   }
+});
+
+it("progress banner shows the board's light and reasons, and stays when memo or cost is missing", async () => {
+  project.trafficLight = "주의";
+  project.signalReasons = ["기한 지난 이슈 1건", "17일째 상태 업데이트 없음"];
+  project.lastUpdateDate = "2026-10-29";
+  project.daysWithoutUpdate = 17;
+  project.staleUpdate = true;
+  render(
+    <ProjectDetail projectId="P-linked" initialTab="progress" boardOperations onClose={vi.fn()} />,
+  );
+  const signal = await screen.findByTestId("project-progress-signal");
+  expect(signal).toHaveTextContent("주의 — 기한 지난 이슈 1건 · 17일째 상태 업데이트 없음");
+  expect(within(signal).getByTestId("banner-warn")).toBeVisible();
+  expect(screen.getByTestId("project-last-update-age")).toHaveTextContent("(17일 전)");
+  expect(screen.getByTestId("project-last-update-age")).toHaveClass("project-warn-text");
+  cleanup();
+  project.trafficLight = null;
+  project.signalReasons = undefined;
+  project.lastUpdateDate = undefined;
+  project.daysWithoutUpdate = undefined;
+  project.staleUpdate = undefined;
+  render(
+    <ProjectDetail projectId="P-linked" initialTab="progress" boardOperations onClose={vi.fn()} />,
+  );
+  expect(await screen.findByTestId("project-progress-signal")).toHaveTextContent(
+    "정상 — 계획대로 진행 중입니다.",
+  );
 });

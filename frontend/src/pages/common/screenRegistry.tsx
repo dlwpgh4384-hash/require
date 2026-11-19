@@ -15,6 +15,7 @@ import { OperatingStandardsPanel } from "../operatingstandards/OperatingStandard
 import { CodeHistoryPanel } from "../commonops/CodeHistoryPanel";
 import { ManpowerComparisonPage } from "../commonops/ManpowerComparisonPage";
 import { ProjectBoardPage } from "../projectboard/ProjectBoardPage";
+import { ProjectBoardTitleActions } from "../projectboard/ProjectBoardWorkspace";
 import {
   ClientPartWorkspace,
   ClientPartTitleActions,
@@ -48,7 +49,9 @@ export const screenRegistry: readonly ScreenEntry[] = [
   {
     id: "UI-31",
     Page: () => <ProjectBoardPage />,
+    TitleActions: () => <ProjectBoardTitleActions />,
     rootTestId: "project-board-page",
+
     hasInputs: false,
   },
   {

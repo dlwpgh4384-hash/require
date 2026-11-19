@@ -11,8 +11,13 @@ import java.util.Set;
 public final class ProjectIssueRules {
     private ProjectIssueRules() {}
 
-    public static Input input(JsonNode body) {
-        ClientRules.object(body, Set.of("projectId", "title", "dueDate", "importanceCode", "statusCode", "actionText"));
+    public static Input input(JsonNode body) { return input(body, false); }
+
+    /** update=true(이슈 수정)이면 modifiedAt을 꼭 받는다(공통 00-1 동시 수정 확인). */
+    public static Input input(JsonNode body, boolean update) {
+        ClientRules.object(body, update
+            ? Set.of("projectId", "title", "dueDate", "importanceCode", "statusCode", "actionText", "modifiedAt")
+            : Set.of("projectId", "title", "dueDate", "importanceCode", "statusCode", "actionText"));
         String projectId = ClientRules.text(body, "projectId", 20, true);
         String title = ClientRules.text(body, "title", 100, true);
         String date = ClientRules.text(body, "dueDate", 10, true);
@@ -24,9 +29,19 @@ public final class ProjectIssueRules {
             throw invalid("dueDate");
         }
         String action = body.hasNonNull("actionText") ? ClientRules.text(body, "actionText", 500, false) : null;
-        return new Input(projectId, title, due,
-            ClientRules.text(body, "importanceCode", 10, true),
-            ClientRules.text(body, "statusCode", 10, true), action);
+        String importance = ClientRules.text(body, "importanceCode", 10, true);
+        String status = ClientRules.text(body, "statusCode", 10, true);
+        java.time.Instant version = null;
+        if (update) {
+            if (!body.has("modifiedAt")) throw CodeFailure.invalid("modifiedAt", "수정 시각을 제출해 주세요.");
+            try {
+                if (!body.get("modifiedAt").isTextual()) throw new IllegalArgumentException();
+                version = java.time.Instant.parse(body.get("modifiedAt").textValue());
+            } catch (RuntimeException failure) {
+                throw CodeFailure.invalid("modifiedAt", "수정 시각을 확인해 주세요.");
+            }
+        }
+        return new Input(projectId, title, due, importance, status, action, version);
     }
 
     public static long issueId(String id) {

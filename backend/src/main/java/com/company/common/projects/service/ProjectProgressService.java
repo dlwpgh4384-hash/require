@@ -5,6 +5,7 @@ import com.company.common.projects.dto.ProjectProgressContracts.*;
 import com.company.common.projects.mapper.ProjectProgressMapper;
 import com.company.common.projects.mapper.ProjectProgressMapper.MemoWrite;
 import com.company.common.support.service.BusinessCalendar;
+import com.company.common.support.service.CodeFailure;
 import com.company.common.support.service.CurrentBusinessActor;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
@@ -47,13 +48,16 @@ public class ProjectProgressService {
         int sequence = ProjectProgressRulesInput.sequence(memoId, "memoId", 5);
         var today = calendar.today();
         var p = stages.owner(id, true);
-        memo(id, memoId);
+        var current = memo(id, memoId);
         ProjectBoardLifecycle.requireWritable(ProjectStageService.status(p, today),
             ProjectBoardLifecycle.Command.UPDATE_MEMO);
-        var input = ProjectProgressRulesInput.memo(body);
+        var input = ProjectProgressRulesInput.memo(body, true);
+        var token = ProjectProgressRulesInput.modifiedAt(body);
         ProjectProgressRulesInput.memoType(input, p.contractTypeCode());
-        if (mapper.updateMemo(new MemoWrite(id, sequence, input, today, actor.userId(), calendar.now())) != 1)
-            throw ProjectStageService.missing("memoId");
+        // 동시 수정(공통 00-1): 받은 modifiedAt이 지금 값과 다르면 409. DB도 같은 조건으로만 고친다.
+        if (!java.util.Objects.equals(current.modifiedAt(), token)) throw CodeFailure.conflict();
+        if (mapper.updateMemo(new MemoWrite(id, sequence, input, today, actor.userId(), calendar.now(), token)) != 1)
+            throw CodeFailure.conflict();
         return memo(id, memoId);
     }
     private Memo memo(String id, String memoId) {

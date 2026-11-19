@@ -28,7 +28,7 @@ import static com.company.common.support.controller.OpenApiResponseContract.resp
 
 @WebMvcTest(ProjectIssueController.class)
 @ContextConfiguration(classes = {ProjectIssueController.class, ProjectIssueService.class,
-    CodeExceptionHandler.class, ApiExceptionHandler.class, CurrentBusinessActor.class})
+    CodeExceptionHandler.class, ApiExceptionHandler.class, CurrentBusinessActor.class, ExcelExportService.class})
 class ProjectIssueControllerTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
@@ -61,9 +61,11 @@ class ProjectIssueControllerTest {
             row.projectId = w.input.projectId();
             row.projectName = "담당 프로젝트";
             row.createdBy = w.actor;
+            row.createdByName = w.actor;
             row.assigneeId = w.actor;
             row.assigneeName = w.actor;
             row.createdAt = now;
+            row.modifiedAt = now;
             apply(row, w);
             issues.put(w.issueId, row);
             return 1;
@@ -71,9 +73,12 @@ class ProjectIssueControllerTest {
         when(mapper.updateIssue(any())).thenAnswer(c -> {
             Write w = c.getArgument(0);
             var row = issues.get(w.issueId);
+            if (!java.util.Objects.equals(row.modifiedAt, w.input.modifiedAt())) return 0;
             apply(row, w);
             row.updatedBy = w.actor;
+            row.updatedByName = w.actor;
             row.updatedAt = now.plusSeconds(1);
+            row.modifiedAt = row.updatedAt;
             return 1;
         });
         when(mapper.issueProject(anyLong())).thenAnswer(c -> {
@@ -100,6 +105,12 @@ class ProjectIssueControllerTest {
         row.statusCode = w.input.statusCode();
         row.actionText = w.input.actionText();
         row.overdueDays = "CLOSE".equals(row.statusCode) ? 0 : Math.max(0, (int) java.time.temporal.ChronoUnit.DAYS.between(row.dueDate, today));
+    }
+
+    /** 수정 본문: 1번 이슈의 지금 modifiedAt을 함께 보낸다(공통 00-1). */
+    ObjectNode versioned(ObjectNode body) {
+        var row = issues.get(1L);
+        return body.put("modifiedAt", (row == null ? now : row.modifiedAt).toString());
     }
 
     ObjectNode input() {
@@ -157,7 +168,7 @@ class ProjectIssueControllerTest {
         String snapshot = json.writeValueAsString(issues);
         var b = input();
         b.remove(field);
-        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(b.toString()))
+        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(versioned(b).toString()))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value(field));
         verify(mapper, never()).updateIssue(any());
         assertThat(json.writeValueAsString(issues)).isEqualTo(snapshot);
@@ -168,7 +179,7 @@ class ProjectIssueControllerTest {
         create();
         String snapshot = json.writeValueAsString(issues);
         var b = input().put(field, "가".repeat(field.equals("title") ? 101 : 501));
-        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(b.toString()))
+        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(versioned(b).toString()))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value(field));
         verify(mapper, never()).updateIssue(any());
         assertThat(json.writeValueAsString(issues)).isEqualTo(snapshot);
@@ -219,7 +230,7 @@ class ProjectIssueControllerTest {
     @Test void putChangesSameRowAndPreservesOriginalIdentityAndAudit() throws Exception {
         create();
         var b = input().put("title", "수정 제목").put("actionText", "새 조치");
-        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(b.toString()))
+        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(versioned(b).toString()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.createdAt").value(now.toString()))
             .andExpect(jsonPath("$.data.updatedAt").value(now.plusSeconds(1).toString()));
         mvc.perform(get("/api/common/project-issues"))
@@ -239,7 +250,7 @@ class ProjectIssueControllerTest {
     void unregisteredCodesPreserveExistingValues(String field) throws Exception {
         create();
         String snapshot = json.writeValueAsString(issues);
-        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(input().put(field, "NO_CODE").toString()))
+        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(versioned(input().put(field, "NO_CODE")).toString()))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value(field));
         verify(mapper, never()).updateIssue(any());
         assertThat(json.writeValueAsString(issues)).isEqualTo(snapshot);
@@ -249,20 +260,20 @@ class ProjectIssueControllerTest {
     @DisplayName("business side-effect: 종료·실주 TB_PJ_ISSUE 동일 행 ISSUE_STAT 정정 허용")
     void existingEndedAndLostIssuesCanCloseAndReopen(String state) throws Exception {
         create(); project.statusCode = state; project.endDate = today.minusYears(1);
-        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(input().put("statusCode", "CLOSE").toString()))
+        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(versioned(input().put("statusCode", "CLOSE")).toString()))
             .andExpect(status().isOk()).andExpect(response("PUT", "/api/common/project-issues/{issueId}"))
             .andExpect(jsonPath("$.data.statusCode").value("CLOSE"));
         assertThat(issues).hasSize(1);
         mvc.perform(get("/api/common/project-issues").param("statusCode", "CLOSE"))
             .andExpect(jsonPath("$.data.items[0].issueId").value("1")).andExpect(jsonPath("$.data.openCount").value(0));
         verify(mapper).updateIssue(argThat(w -> w.issueId == 1L && w.input.statusCode().equals("CLOSE")));
-        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(input().toString()))
+        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(versioned(input()).toString()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.statusCode").value("OPEN"));
     }
 
     @Test void putCannotMoveProject() throws Exception {
         create();
-        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(input().put("projectId", "P-other").toString()))
+        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(versioned(input().put("projectId", "P-other")).toString()))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("projectId"));
         verify(mapper, never()).updateIssue(any());
     }
@@ -274,7 +285,7 @@ class ProjectIssueControllerTest {
         };
         var service = new ProjectIssueService(mapper, calendar, editor);
         var result = service.putCommonProjectBoardIssue("1", new Input("P-owned", "정정", today,
-            "MID", "ACT", "처리"));
+            "MID", "ACT", "처리", now));
         assertThat(result.assigneeId).isEqualTo("admin");
         assertThat(result.createdBy).isEqualTo("admin");
         assertThat(result.createdAt).isEqualTo(now);
@@ -290,14 +301,49 @@ class ProjectIssueControllerTest {
             Set.of("PM"), List.of(first, second), "P-other")).isFalse();
     }
 
+    @Test void staleEditIsConflictAndLeavesRowUnchanged() throws Exception {
+        create();
+        String snapshot = json.writeValueAsString(issues);
+        mvc.perform(put("/api/common/project-issues/1").contentType("application/json")
+                .content(input().put("title", "늦은 수정").put("modifiedAt", "2026-01-01T00:00:00Z").toString()))
+            .andExpect(status().isConflict()).andExpect(response("PUT", "/api/common/project-issues/{issueId}"))
+            .andExpect(jsonPath("$.errors[0].field").value("modifiedAt"));
+        verify(mapper, never()).updateIssue(any());
+        assertThat(json.writeValueAsString(issues)).isEqualTo(snapshot);
+        mvc.perform(put("/api/common/project-issues/1").contentType("application/json").content(input().toString()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("modifiedAt"));
+    }
+
+    @Test void excelUsesSameFilterWritesAccessLogAndNamesCodes() throws Exception {
+        when(calendar.now()).thenReturn(now);
+        create();
+        var bytes = mvc.perform(get("/api/common/project-issues/excel"))
+            .andExpect(status().isOk()).andExpect(header().string("X-Total-Count", "1"))
+            .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            .andReturn().getResponse().getContentAsByteArray();
+        try (var book = new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(bytes))) {
+            var sheet = book.getSheetAt(0);
+            var headers = new ArrayList<String>();
+            sheet.getRow(2).forEach(cell -> headers.add(cell.getStringCellValue()));
+            assertThat(headers).containsExactly("중요도", "제목", "프로젝트", "담당자", "기한", "상태", "조치 내용", "등록일");
+            assertThat(sheet.getRow(3).getCell(1).getStringCellValue()).isEqualTo("기한 확인");
+            assertThat(sheet.getRow(3).getCell(4).getStringCellValue()).isEqualTo("2026-11-14 (1일 지남)");
+            assertThat(sheet.getRow(3).getCell(7).getStringCellValue()).isEqualTo("2026-11-15");
+        }
+        verify(mapper).insertAccess(eq("admin"), contains("1건"));
+        mvc.perform(get("/api/common/project-issues/excel").param("statusCode", "unknown"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("statusCode"));
+        verify(mapper, times(1)).insertAccess(anyString(), anyString());
+    }
+
     @Test void missingIssueIs404() throws Exception {
-        mvc.perform(put("/api/common/project-issues/123").contentType("application/json").content(input().toString())).andExpect(status().isNotFound());
+        mvc.perform(put("/api/common/project-issues/123").contentType("application/json").content(versioned(input()).toString())).andExpect(status().isNotFound());
         verify(mapper, never()).updateIssue(any());
     }
 
     @ParameterizedTest @ValueSource(strings = {"0", "-1", "1.0", "10000000000", "abc"})
     void malformedNumericIdentityIs400(String id) throws Exception {
-        mvc.perform(put("/api/common/project-issues/" + id).contentType("application/json").content(input().toString())).andExpect(status().isBadRequest());
+        mvc.perform(put("/api/common/project-issues/" + id).contentType("application/json").content(versioned(input()).toString())).andExpect(status().isBadRequest());
         verify(mapper, never()).updateIssue(any());
     }
 

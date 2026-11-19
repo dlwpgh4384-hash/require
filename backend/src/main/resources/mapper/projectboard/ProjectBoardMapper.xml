@@ -12,6 +12,7 @@
     <result column="startDate" property="startDate"/>
     <result column="endDate" property="endDate"/>
     <result column="latestMemoDate" property="latestMemoDate"/>
+    <result column="stagesCreatedDate" property="stagesCreatedDate"/>
     <result column="budgetAmount" property="budgetAmount"/>
     <result column="costAmount" property="costAmount"/>
     <result column="actualProgress" property="actualProgress"/>
@@ -31,6 +32,8 @@
       pp.PART_ID AS "salesPartId", pm.USER_ID AS "pmUserId", pm.USER_NM AS "pmName",
       p.BDGT_AMT AS "budgetAmount",
       (SELECT MAX(m.WRT_DT) FROM TB_PJ_WEEK_MEMO m WHERE m.PROJ_ID=p.PROJ_ID) AS "latestMemoDate",
+      (SELECT CAST(MIN(s.REG_DTTM AT TIME ZONE 'Asia/Seoul') AS date) FROM TB_PJ_STEP s
+        WHERE s.PROJ_ID=p.PROJ_ID) AS "stagesCreatedDate",
       (SELECT m.ACTL_PRGRS_RT FROM TB_PJ_WEEK_MEMO m
         WHERE m.PROJ_ID=p.PROJ_ID AND m.ACTL_PRGRS_RT IS NOT NULL
         ORDER BY m.WRT_DT DESC, m.MEMO_SN DESC LIMIT 1) AS "actualProgress",

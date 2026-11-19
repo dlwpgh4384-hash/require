@@ -23,7 +23,8 @@ class ManualContractPreservationTest {
                 .digest(input.readAllBytes()));
             // 2026-11-18 사람이 manual에 거래처 투입 내역 칸·파트 [다시 사용] 경로를 더해 기준 지문을 새로 맞춤(LF 기준).
             // 2026-11-18 인원 계획 대비 투입 엑셀(GET /api/common/manpower-comparisons/excel) 경로를 더해 다시 맞춤(LF 기준).
-            assertThat(digest).isEqualTo("fe3de77ee85aee3bb6e86dcdf523e1a4b961980fb8edd625a618e89633f9d256");
+            // 2026-11-19 프로젝트 현황판 이슈 모아 보기 엑셀(GET /api/common/project-issues/excel) 경로와 프로젝트 상세 신호등 이유 칸(CommonProject)을 더해 다시 맞춤(LF 기준).
+            assertThat(digest).isEqualTo("092e783c08871ad7ca1def4b87ed2b4c63a4c8d9bf34b7533d3d4b733b865ff1");
         }
     }
 

@@ -9,10 +9,13 @@ export function ProjectIssuesView({
   onChanged,
   onOpenCount,
   revision = 0,
+  createHost,
 }: {
   onChanged?: (message?: string) => void;
   onOpenCount?: (count: number) => void;
   revision?: number;
+  /** [이슈 등록]을 그릴 제목줄 자리(현황판). null이면 그리지 않는다. */
+  createHost?: HTMLElement | null;
 }) {
   const [detail, setDetail] = useState<string | null>(null);
   const [localRevision, setLocalRevision] = useState(0);
@@ -28,7 +31,9 @@ export function ProjectIssuesView({
         onChanged={onChanged}
         onOpenCount={onOpenCount}
         onOpenProject={setDetail}
+        createHost={createHost}
       />
+
       {detail && (
         <ProjectDetail
           key={detail}
@@ -49,8 +54,9 @@ export function ProjectIssuesView({
           }}
           onChanged={(message, kind) => {
             setLocalRevision((v) => v + 1);
-            onChanged?.(message);
-            if (message) setNotice({ message, kind: kind ?? "ok" });
+            // 알림은 한 번만: 부모(현황판)가 띄우면 여기서는 띄우지 않는다.
+            if (onChanged) onChanged(message);
+            else if (message) setNotice({ message, kind: kind ?? "ok" });
           }}
         />
       )}

@@ -26,6 +26,12 @@ export interface ProjectBoardRow {
   latestMemoDate: string | null;
   daysWithoutMemo: number | null;
   stale: boolean;
+  /** signalReasons와 같은 순서의 등급(위험·주의). */
+  signalReasonLevels?: ("위험" | "주의")[];
+  /** 마지막 업데이트(마지막 주간 메모 작성일, 없으면 단계를 처음 만든 날). */
+  lastUpdateDate?: string | null;
+  /** 이번 달 영업 파트(HQ = 본사 직접 영업, null = 미지정). */
+  salesPartId?: string | null;
 }
 export interface ProjectBoardResult {
   summary: {
@@ -67,12 +73,15 @@ export async function getCommonProjectBoard(
   if (
     !result?.summary?.progress ||
     !result.summary.openIssues ||
-    !Array.isArray(result.items) ||
-    !Array.isArray(result.staleProjects) ||
-    typeof result.calculationMethod !== "string"
+    !Array.isArray(result.items)
   )
     throw new Error("현황판 응답을 확인하지 못했습니다. 다시 시도해 주세요.");
-  return result;
+  return {
+    ...result,
+    staleProjects: result.staleProjects ?? [],
+    calculationMethod: result.calculationMethod ?? "",
+  };
+
 }
 
 export async function getCommonProjectBoardExcel(filter: ProjectBoardFilter) {

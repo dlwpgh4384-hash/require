@@ -108,9 +108,11 @@ class ProjectUploadTest {
             assertThat(b9.inspect(rows, null).issues()).noneMatch(issue -> issue.reason().contains("수식"));
         }
     }
-    @Test void unsupportedProgressExpressionFailsWithoutEvaluatingCode() {
-        var metadata=mock(CalculationRuleService.class);var rules=new ProjectProgressRules(metadata);var step=new Step();step.weightRate=BigDecimal.TEN;step.plannedStartDate=LocalDate.of(2026,11,1);step.plannedEndDate=LocalDate.of(2026,11,10);
+    @Test void progressIsComputedInCodeEvenWhenDefinitionTextDiffers() {
+        var metadata=mock(CalculationRuleService.class);var rules=new ProjectProgressRules(metadata,new com.company.common.common.ProjectBoardSignalRules());var step=new Step();step.weightRate=BigDecimal.TEN;step.plannedStartDate=LocalDate.of(2026,11,1);step.plannedEndDate=LocalDate.of(2026,11,10);
         when(metadata.definition("식-73")).thenReturn(new Definition("식-73","Runtime.exec()",""));
-        assertThatThrownBy(()->rules.progress("TK",List.of(step),null,LocalDate.of(2026,11,5))).isInstanceOf(IllegalStateException.class).hasMessageContaining("식-73");
+        assertThat(rules.progress("TK",List.of(step),null,LocalDate.of(2026,11,5)).plannedProgressRate()).isEqualByComparingTo("5.0");
+        verifyNoInteractions(metadata);
     }
+
 }

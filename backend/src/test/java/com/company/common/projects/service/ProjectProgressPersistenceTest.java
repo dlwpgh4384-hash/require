@@ -82,7 +82,10 @@ class ProjectProgressPersistenceTest {
     @Test void memoEditPreservesWrittenDateAndCreationAndOnlyTouchesSelectedRow()throws Exception {
         db.update("INSERT INTO TB_PJ_WEEK_MEMO (PROJ_ID,MEMO_SN,WRT_DT,REQ_CN,REG_USER_ID,REG_DTTM) VALUES ('P-PROGRESS',1,'2026-10-01','원문','other','2026-10-01T00:00:00Z'),('P-PROGRESS',2,'2026-10-02','다른 행','other','2026-10-02T00:00:00Z')");
         var before=project();var other=db.queryForMap("SELECT * FROM TB_PJ_WEEK_MEMO WHERE MEMO_SN=2");
-        mvc.perform(put(root()+"/weekly-memos/1").contentType("application/json").content("{\"requests\":\"새 요청\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.data.updatedBy").value("admin"));
+        mvc.perform(put(root()+"/weekly-memos/1").contentType("application/json").content("{\"requests\":\"새 요청\",\"modifiedAt\":\"2026-10-01T00:00:00Z\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.data.updatedBy").value("admin"))
+            .andExpect(jsonPath("$.data.writtenDate").value("2026-10-01"));
+        mvc.perform(put(root()+"/weekly-memos/1").contentType("application/json").content("{\"requests\":\"늦은 수정\",\"modifiedAt\":\"2026-10-01T00:00:00Z\"}")).andExpect(status().isConflict());
+        assertThat(db.queryForObject("SELECT REQ_CN FROM TB_PJ_WEEK_MEMO WHERE MEMO_SN=1",String.class)).isEqualTo("새 요청");
         assertThat(db.queryForObject("SELECT WRT_DT FROM TB_PJ_WEEK_MEMO WHERE MEMO_SN=1",LocalDate.class)).isEqualTo(LocalDate.of(2026,10,1));
         assertThat(db.queryForObject("SELECT MAX(WRT_DT) FROM TB_PJ_WEEK_MEMO",LocalDate.class)).isEqualTo(LocalDate.of(2026,10,2));
         assertThat(db.queryForMap("SELECT * FROM TB_PJ_WEEK_MEMO WHERE MEMO_SN=2")).isEqualTo(other);assertThat(project()).isEqualTo(before);
@@ -95,9 +98,18 @@ class ProjectProgressPersistenceTest {
         var audit=db.queryForMap("SELECT * FROM TB_PJ_STEP WHERE STEP_SN=1");
         mvc.perform(post(root()+"/steps/1/complete")).andExpect(status().isOk());assertThat(db.queryForMap("SELECT * FROM TB_PJ_STEP WHERE STEP_SN=1")).isEqualTo(audit);
         var snapshot=db.queryForList("SELECT * FROM TB_PJ_STEP ORDER BY STEP_SN");
-        var body=json.createObjectNode();var items=body.putArray("items");for(var s:stages.getCommonProjectBoardSteps("P-PROGRESS").items())items.addObject().put("stepId",s.stepId()).put("plannedStartDate",s.plannedStartDate().toString()).put("plannedEndDate",s.plannedEndDate().toString());
+        var list=stages.getCommonProjectBoardSteps("P-PROGRESS");var body=json.createObjectNode();body.put("modifiedAt",list.modifiedAt().toString());var items=body.putArray("items");for(var s:list.items())items.addObject().put("stepId",s.stepId()).put("plannedStartDate",s.plannedStartDate().toString()).put("plannedEndDate",s.plannedEndDate().toString());
         ((com.fasterxml.jackson.databind.node.ObjectNode)items.get(6)).put("plannedEndDate","2026-11-01");
         mvc.perform(put(root()+"/steps").contentType("application/json").content(body.toString())).andExpect(status().isBadRequest());
         assertThat(db.queryForList("SELECT * FROM TB_PJ_STEP ORDER BY STEP_SN")).isEqualTo(snapshot);assertThat(project()).isEqualTo(before);
     }
+    @Test void boardEnsureCreatesStagesOnceForExistingProjectsAndSkipsClosed()throws Exception {
+        db.update("INSERT INTO TB_PJ_PROJ (PROJ_ID,PROJ_NM,CTRT_TYPE_CD,PROJ_STAT_CD,CTRT_BGN_DT,CTRT_END_DT,CTRT_AMT,TEAM_EXPS_AMT,PROJ_EXPS_AMT,REG_USER_ID) VALUES ('P-LOST','실주','TK','LOSE','2026-11-01','2027-01-31',0,0,0,'admin'),('P-OLD','끝남','MO','ING','2026-01-01','2026-11-14',0,0,0,'admin'),('P-BAD','유형 없음','XX','ING','2026-11-01','2027-01-31',0,0,0,'admin')");
+        stages.ensureMissingStages();
+        stages.ensureMissingStages();
+        assertThat(db.queryForObject("SELECT COUNT(*) FROM TB_PJ_STEP WHERE PROJ_ID='P-PROGRESS'",Integer.class)).isEqualTo(7);
+        assertThat(db.queryForObject("SELECT COUNT(*) FROM TB_PJ_STEP WHERE PROJ_ID<>'P-PROGRESS'",Integer.class)).isZero();
+        assertThat(db.queryForObject("SELECT COUNT(*) FROM TB_PJ_STEP WHERE REG_DTTM IS NULL OR MOD_DTTM IS NOT NULL",Integer.class)).isZero();
+    }
+
 }

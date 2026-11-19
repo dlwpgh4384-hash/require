@@ -164,7 +164,8 @@ public class DeveloperUploadForm implements UploadForm {
         issue(issues, row, 9, "사용 중인 영업 파트에 없는 이름입니다. 파트명 또는 「본사(직접 영업)」을 적어 주세요.", "오류");
         return null;
     }
-    static LocalDate parseDate(String text) {
+    /** 업로드 날짜 칸 공통 규칙(SFR-012-03): YYYY-MM-DD·YYYY.MM.DD·YYYY/MM/DD. 프로젝트·투입 업로드도 쓴다. */
+    public static LocalDate parseDate(String text) {
         var m = java.util.regex.Pattern.compile("([0-9]{2}|[0-9]{4})\\s*[-./]\\s*([0-9]{1,2})\\s*[-./]\\s*([0-9]{1,2})\\.?").matcher(text);
         if (!m.matches()) return null;
         int year = Integer.parseInt(m.group(1));

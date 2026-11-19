@@ -40,6 +40,12 @@ class ProjectUploadTest {
         var check=b9.inspect(List.of(project(2,"P-file"),project(3,"P-file")),null);assertThat(check.errorCount()).isEqualTo(1);
         assertThat(check.issues()).anyMatch(i->i.row()==3&&i.column().equals("프로젝트ID"));
     }
+    // SFR-012-03: 점·빗금 날짜(2026.11.01, 2026/12/31)도 받는다(엑셀 점검에서 찾음, 2026-11-19).
+    @Test void dottedAndSlashedB9DatesAreAccepted() {
+        var row=project(2,"");var values=new ArrayList<>(row.values());values.set(4,"2026.11.01");values.set(5,"2026/12/31");
+        var check=b9.inspect(List.of(new TabularRow(2,values,List.of())),null);
+        assertThat(check.issues()).noneMatch(i->i.column().equals("시작일")||i.column().equals("종료일"));
+    }
     @Test void reversedB9DatesAreRejectedBeforeWriting() {
         // 수식 칸은 엑셀이 저장해 둔 값으로 읽으므로(SFR-012-03) 날짜 오류만 본다.
         var row=project(2,"");var values=new ArrayList<>(row.values());values.set(5,"2026-10-01");

@@ -139,6 +139,14 @@ export function ProjectCostAnalysisDetail({
       next.headcountChange = "인원 변화를 입력해 주세요.";
     if (input.monthlyCostPerPerson === "") next.monthlyCostPerPerson = "1인 월 원가를 입력해 주세요.";
     if (input.months === "" || Number(input.months) < 1) next.months = "적용 개월을 1 이상으로 입력해 주세요.";
+    // 말이 되는 범위만(2026-11-20): 개월은 턴키 남은 기간·월단위 12개월까지, 인원은 지금 투입 인원까지만 뺌
+    else if (Number(input.months) > (turnkey ? Math.max(1, row.remainingMonths) : 12))
+      next.months = turnkey
+        ? `남은 기간 ${Math.max(1, row.remainingMonths)}개월 이하로 입력해 주세요.`
+        : "12개월 이하로 입력해 주세요.";
+    const currentPeople = new Set((workforce.data?.items ?? []).map((p) => p.developerId)).size;
+    if (!next.headcountChange && workforce.data && Number(input.headcountChange) < -currentPeople)
+      next.headcountChange = `지금 투입 인원 ${currentPeople}명까지만 뺄 수 있습니다.`;
     if (!turnkey && input.monthlyPricePerPerson === "")
       next.monthlyPricePerPerson = "추가 인원 1인 월 단가를 입력해 주세요.";
     setErrors(next);
@@ -177,7 +185,7 @@ export function ProjectCostAnalysisDetail({
       window.clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, key, input.headcountChange, input.monthlyCostPerPerson, input.months, input.monthlyPricePerPerson]);
+  }, [tab, key, input.headcountChange, input.monthlyCostPerPerson, input.months, input.monthlyPricePerPerson, workforce.data]);
   function go(target: string, context: string | null) {
     if ((target !== "UI-11" && target !== "UI-32") || !context) {
       setMessage("이동할 화면을 확인할 수 없습니다.");

@@ -633,7 +633,12 @@ it("turnkey simulation starts from mockup defaults, recalculates on input and cl
     target: { value: "-2명" },
   });
   expect(within(panel).getByLabelText("인원 변화 (명, 빼려면 −)")).toHaveValue("-2");
-  await waitFor(() => expect(out).toHaveTextContent("원가 −6,000만 원가 줄어듭니다"));
+  // 지금 투입 인원(1명)보다 많이 뺄 수 없다(2026-11-20 사용자 결정)
+  expect(await within(panel).findByText("지금 투입 인원 1명까지만 뺄 수 있습니다.")).toBeVisible();
+  fireEvent.change(within(panel).getByLabelText("인원 변화 (명, 빼려면 −)"), {
+    target: { value: "-1" },
+  });
+  await waitFor(() => expect(out).toHaveTextContent("원가 −3,000만 원가 줄어듭니다"));
   fireEvent.change(within(panel).getByLabelText("1인 월 원가"), { target: { value: "" } });
   expect(await within(panel).findByText("1인 월 원가를 입력해 주세요.")).toBeVisible();
   fireEvent.click(within(panel).getByRole("button", { name: "닫기" }));

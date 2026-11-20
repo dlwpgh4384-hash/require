@@ -168,6 +168,15 @@ public class CommonProjectCostAnalysisService {
         if ("IN".equals(p.contractTypeCode())) return new CommonProjectCostAnalysisSimulation(true, ZERO, ZERO, ZERO,
             ZERO, ZERO, population.target());
         boolean turnkey = "TK".equals(p.contractTypeCode());
+        // 말이 되는 범위만(2026-11-20 사용자 결정): 지금 투입 인원보다 많이 뺄 수 없고, 개월은 턴키 남은 기간·월단위 12개월까지
+        String cutoffYm = population.cutoff().format(YM);
+        long currentPeople = population.inputs().stream().filter(i -> i.projectId().equals(projectId) && i.yearMonth().equals(cutoffYm))
+            .map(i -> i.developerId()).distinct().count();
+        if (input.headcountChange().compareTo(BigDecimal.valueOf(-currentPeople)) < 0)
+            throw CodeFailure.invalid("headcountChange", "지금 투입 인원 " + currentPeople + "명까지만 뺄 수 있습니다.");
+        int maxMonths = turnkey ? Math.max(1, analysis.row().remainingMonths()) : 12;
+        if (input.months() > maxMonths)
+            throw CodeFailure.invalid("months", turnkey ? "남은 기간 " + maxMonths + "개월 이하로 입력해 주세요." : "12개월 이하로 입력해 주세요.");
         if (!turnkey && (input.monthlyPricePerPerson() == null || input.monthlyPricePerPerson().signum() < 0))
             throw CodeFailure.invalid("monthlyPricePerPerson", "추가 인원 1인 월 단가를 0 이상으로 입력해 주세요.");
         if (!turnkey && population.notice() != null) throw CodeFailure.invalid("baseMonth", population.notice() + ".");

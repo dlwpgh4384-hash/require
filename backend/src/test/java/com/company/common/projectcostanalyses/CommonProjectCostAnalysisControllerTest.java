@@ -370,6 +370,14 @@ class CommonProjectCostAnalysisControllerTest {
         mvc.perform(request("/P/simulation").param("headcountChange","-5")).andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("headcountChange"));
     }
+    /** 범위(2026-11-20 사용자 결정): 월단위는 12개월까지, 지금 투입 인원보다 많이 못 뺌. */
+    @Test void simulationRejectsMonthsAndHeadcountOutsideSensibleRange() throws Exception {
+        when(mapper.selectProjects()).thenReturn(List.of(project("P","MO")));
+        mvc.perform(request("/P/simulation").param("months","13")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("months")).andExpect(jsonPath("$.errors[0].message").value("12개월 이하로 입력해 주세요."));
+        mvc.perform(request("/P/simulation").param("headcountChange","-999")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("headcountChange"));
+    }
     @ParameterizedTest @ValueSource(strings={"monthlyCostPerPerson","monthlyPricePerPerson","months"})
     void simulationValidatesItsOwnFields(String field) throws Exception {
         mvc.perform(request("/P/simulation").param(field,"-1")).andExpect(status().isBadRequest())

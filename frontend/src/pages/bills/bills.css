@@ -45,41 +45,6 @@
   display: inline-grid;
   place-items: center;
 }
-/* 시안 .kpis/.kpi */
-.bill-kpis {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 16px;
-}
-.bill-kpi {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  padding: 16px 20px;
-  border: 1px solid var(--divider, var(--border));
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-}
-.bill-kpi .l {
-  font-size: 13px;
-  color: var(--text-sub);
-}
-.bill-kpi .v {
-  font-size: 24px;
-  line-height: 32px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.bill-kpi .d {
-  font-size: 12px;
-  line-height: 16px;
-  min-height: 16px;
-  color: var(--text-sub);
-  overflow-wrap: anywhere;
-}
 /* 시안 .card / .card-h */
 .bill-card {
   display: flex;

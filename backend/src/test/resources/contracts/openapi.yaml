@@ -258,6 +258,7 @@ paths:
           - PAGE_SIZE
           - DENSE
           - PERIOD
+          - AMT_UNIT
       - name: prefKey
         in: path
         required: true
@@ -308,7 +309,7 @@ paths:
               $ref: '#/components/schemas/UserPreferenceInput'
       x-business-rules:
       - FAV JSON 배열은 최대 10개, RECENT는 최대 5개다. 한도를 넘긴 요청을 저장하지 않는다.
-      - PAGE_SIZE는 20/50/100, DENSE는 넓게/좁게, MENU_FOLD는 true/false 문자열이다. PERIOD는 year 및 월형의 month를 직렬화한다.
+      - PAGE_SIZE는 20/50/100, DENSE는 넓게/좁게, MENU_FOLD는 true/false, AMT_UNIT은 원/천 원/백만 원 문자열이다. PERIOD는 year 및 월형의 month를 직렬화한다.
       - PERIOD의 허용 연도·최신 월 판정은 부품 입력과 최신 월 원천을 따르며 이 API가 업무 자료 연도를 조회하지 않는다.
       - 기존 행은 읽은 MOD_DTTM과 DB 시각이 같은 경우에만 갱신한다. 다른 시각은 덮어쓰지 않는다.
       x-side-effects:
@@ -11268,7 +11269,7 @@ components:
           type: string
           minLength: 1
           maxLength: 2000
-          description: 종류별 직렬화는 데이터 계약 참조. PAGE_SIZE=20/50/100, DENSE=넓게/좁게, MENU_FOLD=true/false. FAV/RECENT는 SCRN_ID
+          description: 종류별 직렬화는 데이터 계약 참조. PAGE_SIZE=20/50/100, DENSE=넓게/좁게, MENU_FOLD=true/false, AMT_UNIT=원/천 원/백만 원. FAV/RECENT는 SCRN_ID
             배열 JSON, PERIOD는 year/month JSON.
         modDttm:
           type: string
@@ -11294,6 +11295,7 @@ components:
           - PAGE_SIZE
           - DENSE
           - PERIOD
+          - AMT_UNIT
         prefKey:
           type: string
           maxLength: 30

@@ -20,6 +20,7 @@ export { MoneyUnitSelect, Money } from "./MoneyUnitSelect";
 export {
   MONEY_UNITS,
   DEFAULT_MONEY_UNIT,
+  isMoneyUnit,
   formatMoney,
   isNegativeMoney,
   formatKoreanMoney,
@@ -27,3 +28,4 @@ export {
 export type { MoneyUnit } from "./moneyUnit";
 export { FormulaBox } from "./FormulaBox";
 export type { FormulaRow } from "./FormulaBox";
+export { KpiCards, KpiCard } from "./KpiCards";

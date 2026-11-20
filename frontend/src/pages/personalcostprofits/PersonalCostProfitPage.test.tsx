@@ -228,12 +228,12 @@ it("renders the five summaries, exact year guidance, required table order and nu
   expect(
     screen
       .getByTestId("personal-cost-profit-summary")
-      .querySelectorAll("section"),
+      .querySelectorAll(".ls-kpi"),
   ).toHaveLength(5);
-  // 시안 kpi 5칸: 이름·값·보조 문구, 금액은 kor()(만 원·억 원)
+  // 시안 kpi 5칸(공통 KpiCards): 이름·값·보조 문구, 금액은 kor()(만 원·억 원)
   const summary = screen.getByTestId("personal-cost-profit-summary");
   expect(
-    [...summary.querySelectorAll("section")].map((card) => card.textContent),
+    [...summary.querySelectorAll(".ls-kpi")].map((card) => card.textContent),
   ).toEqual([
     "총 인원2명휴직 1명 포함 · 월평균 가동 0.5 · 가득 0.0",
     "인당 매출 (누계)0만 원단가 칸이 있는 1명(0 포함)",
@@ -356,6 +356,36 @@ it("money cells, footer and contribution cells follow the selected unit", async 
     target: { value: "백만 원" },
   });
   expect(screen.getByTestId("list-cell-D1-totalCost")).toHaveTextContent("0");
+  // 바꾼 단위는 계정 설정(AMT_UNIT/GLOBAL)에 저장한다
+  await waitFor(() =>
+    expect(
+      request.mock.calls.filter(
+        ([path, init]) =>
+          path === "/api/common/user-preferences/AMT_UNIT/GLOBAL" &&
+          init?.method === "PUT",
+      ),
+    ).toHaveLength(2),
+  );
+});
+it("opens with the unit saved for the account (AMT_UNIT)", async () => {
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (path: string, init?: RequestInit) =>
+    path === "/api/common/user-preferences/AMT_UNIT/GLOBAL" && !init?.method
+      ? ok({
+          prefTypeCd: "AMT_UNIT",
+          prefKey: "GLOBAL",
+          found: true,
+          prefVal: "원",
+          modDttm: "2026-11-20T00:00:00Z",
+        })
+      : base(path, init),
+  );
+  mount();
+  await ready();
+  await waitFor(() => expect(screen.getByLabelText("단위")).toHaveValue("원"));
+  expect(screen.getByTestId("list-cell-D1-totalCost")).toHaveTextContent(
+    "1,120",
+  );
 });
 it("shows 자사 and – for empty affiliation and position, and a spacer instead of ▸ without projects", async () => {
   result.items[0].affiliationName = "";
@@ -370,6 +400,12 @@ it("shows 자사 and – for empty affiliation and position, and a spacer instea
     "–",
   );
   expect(screen.queryByTestId("personal-expand-D1")).not.toBeInTheDocument();
+  // 단추 자리만큼 빈칸(시안 width:28px)
+  expect(
+    screen
+      .getByTestId("list-cell-D1-developerName")
+      .querySelector(".personal-cost-profit-exp-space"),
+  ).toBeInTheDocument();
   expect(screen.getByTestId("list-cell-D1-mm")).toHaveTextContent("–");
 });
 it("offers 자사 in the affiliation filter and the mockup detail options with an applied count", async () => {
@@ -382,6 +418,8 @@ it("offers 자사 in the affiliation filter and the mockup detail options with a
     "placeholder",
     "이름 일부",
   );
+  // 서버 한도(100자)와 같게 입력 칸에서 막는다
+  expect(screen.getByLabelText("이름")).toHaveAttribute("maxLength", "100");
   expect(screen.getByLabelText("직원 구분")).toBeVisible();
   expect(screen.queryByLabelText("보기")).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId("personal-advanced"));
@@ -508,7 +546,16 @@ it("display modes round trip as GET-only queries", async () => {
 it("individual and all-project expansion preserve paid/free identity and idle rows", async () => {
   mount();
   await ready();
+  // 시안 ibtn sm: 아이콘 단추(chevR → chevD 16px), 이름 「… 프로젝트별 보기」, 펼침 상태
+  const expand = screen.getByRole("button", { name: "김개발 프로젝트별 보기" });
+  expect(expand).toHaveClass("ls-ibtn", "ls-ibtn-sm");
+  expect(expand).toHaveAttribute("aria-expanded", "false");
+  expect(expand.querySelector("svg")).toHaveAttribute("width", "16");
+  expect(expand.querySelector("path")).toHaveAttribute("d", "M9 6l6 6-6 6");
+  expect(expand).not.toHaveTextContent("▸");
   fireEvent.click(screen.getByTestId("personal-expand-D1"));
+  expect(expand).toHaveAttribute("aria-expanded", "true");
+  expect(expand.querySelector("path")).toHaveAttribute("d", "M6 9l6 6 6-6");
   // 같은 표의 칸에 맞춘 펼친 줄(연월 칸 없음): 이름 칸 「└ 프로젝트 · 직무」, 무상지원 배지
   const paid = screen.getByTestId("personal-allocation-PAID");
   const free = screen.getByTestId("personal-allocation-FREE");
@@ -566,6 +613,24 @@ it("does not offer sensitive column headings or column options when policy omits
   expect(
     screen.queryByRole("checkbox", { name: "개인별 원가" }),
   ).not.toBeInTheDocument();
+  // 시안 SENS03: 구성 열(수당·4대보험·세금·퇴직금·실지급액)도 표와 열 설정에서 빠진다
+  for (const name of [
+    "그룹장·팀장 수당",
+    "4대보험(회사)",
+    "4대보험(본인)",
+    "3.3% 원천세",
+    "근로소득세",
+    "퇴직금 적립",
+    "실지급액",
+  ]) {
+    expect(
+      screen.queryByRole("checkbox", { name }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("columnheader", { name: new RegExp(`^${name.replace(/[().]/g, "\\$&")}`) }),
+    ).not.toBeInTheDocument();
+  }
+  expect(screen.getByRole("checkbox", { name: "팀비" })).toBeInTheDocument();
 });
 it("shows upload reference columns only after column selection and passes their keys in requests", async () => {
   mount();

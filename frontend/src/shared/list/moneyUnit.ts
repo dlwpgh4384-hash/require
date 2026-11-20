@@ -2,6 +2,9 @@
 export const MONEY_UNITS = ["원", "천 원", "백만 원"] as const;
 export type MoneyUnit = (typeof MONEY_UNITS)[number];
 export const DEFAULT_MONEY_UNIT: MoneyUnit = "천 원";
+/** 저장된 값이 세 단위 중 하나인지. */
+export const isMoneyUnit = (value: unknown): value is MoneyUnit =>
+  MONEY_UNITS.includes(value as MoneyUnit);
 
 const divisor = (unit: MoneyUnit) =>
   unit === "천 원" ? 1e3 : unit === "백만 원" ? 1e6 : 1;

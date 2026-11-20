@@ -17,6 +17,7 @@ import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
 import { DeveloperDetail } from "../developers/DeveloperDetail";
 import { projectFailure, ProjectRequestError } from "../projects/projects";
 import { Toast } from "../../shared/feedback/Dialog";
+import { ShellIcon } from "../../shared/layout/ShellIcon";
 import { PersonalCostProfitFilters } from "./PersonalCostProfitFilters";
 import {
   PersonalCostProfitSummary,
@@ -90,6 +91,18 @@ const referenceKeys = new Set<string>([
   "withholdingTax",
   "incomeTax",
   "netPay",
+]);
+/** 시안 SENS03: 민감 항목 권한이 있어야 보이는 열(월 급여·개인별 원가와 그 구성). 서버 정책과 같다. */
+const sensitiveKeys = new Set<string>([
+  "monthlySalary",
+  "allowance",
+  "companyInsurance",
+  "personalInsurance",
+  "withholdingTax",
+  "incomeTax",
+  "retirementReserve",
+  "netPay",
+  "personalCost",
 ]);
 /** 시안 req:1 — 열 설정에서 끌 수 없는 열. */
 const requiredKeys = new Set<string>([
@@ -226,7 +239,7 @@ function PersonalCostProfitContent({
             {canExpand(row) ? (
               <button
                 type="button"
-                className="personal-cost-profit-exp"
+                className="ls-ibtn ls-ibtn-sm"
                 data-testid={`personal-expand-${row.developerId}`}
                 aria-label={`${row.developerName} 프로젝트별 보기`}
                 aria-expanded={open}
@@ -235,7 +248,11 @@ function PersonalCostProfitContent({
                   toggle(row.developerId);
                 }}
               >
-                {open ? "▾" : "▸"}
+                {/* 시안 ibtn sm + ic(open?'chevD':'chevR',16) */}
+                <ShellIcon
+                  name={open ? "chevronDown" : "chevronRight"}
+                  size={16}
+                />
               </button>
             ) : (
               <span
@@ -292,14 +309,14 @@ function PersonalCostProfitContent({
       }
     }
   };
+  // 민감 항목 권한이 없으면 서버가 월 급여·개인별 원가를 합계에서 뺀다. 그때는 구성 열(시안 SENS03)까지 모두 뺀다
+  const sensitiveVisible =
+    !data ||
+    data.totals.monthlySalary !== undefined ||
+    data.totals.personalCost !== undefined;
   const columns: ListColumn<PersonalCostProfitRow>[] =
     personalCostProfitColumnLabels
-      .filter(
-        ([key]) =>
-          !data ||
-          !["monthlySalary", "personalCost"].includes(key) ||
-          data.totals[key as "monthlySalary" | "personalCost"] !== undefined,
-      )
+      .filter(([key]) => sensitiveVisible || !sensitiveKeys.has(key))
       .map(([key, label, calc]) => ({
         key,
         label: personalCostProfitHeading(key, label, monthlyAverage),

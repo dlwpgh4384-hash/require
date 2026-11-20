@@ -9,37 +9,10 @@
   flex-wrap: wrap;
   gap: 12px;
 }
-/* 시안 .kpis / .kpi: 요약 5칸 */
-.personal-cost-profit-summary {
-  display: grid;
+/* 요약 5칸: 칸 모양은 공통 KpiCards(.ls-kpis/.ls-kpi), 여기는 5칸 배치만 */
+.ls-kpis.personal-cost-profit-summary {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
-}
-.personal-cost-profit-kpi {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  padding: 16px 20px;
-  border: 1px solid var(--divider, var(--border));
-  border-radius: 8px;
-  background: var(--surface);
-}
-.personal-cost-profit-kpi-l {
-  font-size: 13px;
-  color: var(--text-sub);
-}
-.personal-cost-profit-kpi-v {
-  font-size: 24px;
-  line-height: 32px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.personal-cost-profit-kpi-d {
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--text-sub);
 }
 .personal-cost-profit-info {
   cursor: help;
@@ -74,24 +47,12 @@
   align-items: center;
   gap: 4px;
 }
-.personal-cost-profit-exp,
+/* 펼치기 단추는 공통 .ls-ibtn.ls-ibtn-sm(28px). 단추가 없는 사람은 같은 폭 빈칸 */
 .personal-cost-profit-exp-space {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-block;
   flex: none;
   width: 28px;
   height: 28px;
-}
-.personal-cost-profit-exp {
-  border: 0;
-  border-radius: 4px;
-  background: none;
-  color: var(--text-sub);
-  cursor: pointer;
-}
-.personal-cost-profit-exp:hover {
-  background: var(--hover);
 }
 .personal-cost-profit-pname {
   display: flex;
@@ -103,21 +64,21 @@
   color: var(--text-sub);
 }
 @media (max-width: 1100px) {
-  .personal-cost-profit-summary {
+  .ls-kpis.personal-cost-profit-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 767px) {
-  .personal-cost-profit-summary {
+  .ls-kpis.personal-cost-profit-summary {
     gap: 8px;
   }
-  .personal-cost-profit-kpi {
+  .personal-cost-profit-summary .ls-kpi {
     padding: 12px;
   }
-  .personal-cost-profit-kpi-v {
+  .personal-cost-profit-summary .ls-kpi .v {
     font-size: 20px;
   }
-  .personal-cost-profit-kpi:last-child {
+  .personal-cost-profit-summary .ls-kpi:last-child {
     grid-column: 1 / -1;
   }
 }

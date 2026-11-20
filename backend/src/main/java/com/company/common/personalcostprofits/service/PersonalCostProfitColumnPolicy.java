@@ -23,7 +23,9 @@ public final class PersonalCostProfitColumnPolicy {
         "3.3% 원천세 (참고)", "근로소득세 (참고)", "퇴직금 적립", "실지급액 (참고)", "개인별 원가",
         "팀비", "프로젝트경비", "원가합계", "영업이익", "이익률");
     public static final Set<String> REFERENCES = Set.of("personalInsurance", "withholdingTax", "incomeTax", "netPay");
-    private static final Set<String> SENSITIVE = Set.of("monthlySalary", "personalCost");
+    /** 시안 SENS03: 월 급여·개인별 원가와 그 구성 열. 민감 항목 권한이 없는 역할은 칸·합계·엑셀에서 뺀다. */
+    public static final Set<String> SENSITIVE = Set.of("monthlySalary", "allowance", "companyInsurance",
+        "personalInsurance", "withholdingTax", "incomeTax", "retirementReserve", "netPay", "personalCost");
 
     public static List<String> columns(List<String> requested, Collection<Role> roles) {
         if (requested != null && requested.stream().anyMatch(key -> !KEYS.contains(key))) {

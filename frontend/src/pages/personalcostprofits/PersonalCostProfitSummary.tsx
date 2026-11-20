@@ -1,31 +1,17 @@
-import type { ReactNode } from "react";
 import type { PersonalCostProfitResult } from "./personalCostProfitTypes";
-import { FormulaBox, formatKoreanMoney, type FormulaRow } from "../../shared/list";
+import {
+  FormulaBox,
+  KpiCard as Kpi,
+  KpiCards,
+  formatKoreanMoney,
+  type FormulaRow,
+} from "../../shared/list";
 
 /** 시안 pct(): 소수 첫째 자리 %, 음수는 「−」. */
 export const percentText = (value: number | null | undefined) =>
   value == null || !Number.isFinite(value)
     ? "–"
     : `${value < 0 ? "−" : ""}${Math.abs(value).toFixed(1)}%`;
-
-/** 시안 kpi(l, v, d): 이름 · 값 · 보조 문구. */
-function Kpi({
-  label,
-  value,
-  sub,
-}: {
-  label: ReactNode;
-  value: string;
-  sub: string;
-}) {
-  return (
-    <section className="personal-cost-profit-kpi">
-      <span className="personal-cost-profit-kpi-l">{label}</span>
-      <strong className="personal-cost-profit-kpi-v">{value}</strong>
-      <span className="personal-cost-profit-kpi-d">{sub}</span>
-    </section>
-  );
-}
 
 /** 시안 UI-03 요약 5칸. 금액은 kor()(억 원·만 원). */
 export function PersonalCostProfitSummary({
@@ -45,31 +31,32 @@ export function PersonalCostProfitSummary({
   const one = (value: number | undefined) =>
     value == null ? "–" : value.toFixed(1);
   return (
-    <div
+    <KpiCards
+      aria-label="개인 원가·수익 요약"
       className="personal-cost-profit-summary"
-      data-testid="personal-cost-profit-summary"
+      testId="personal-cost-profit-summary"
     >
       <Kpi
         label="총 인원"
         value={summary ? `${summary.totalPeople}명` : "–"}
-        sub={`휴직 ${summary?.leavePeople ?? "–"}명 포함 · 월평균 가동 ${one(summary?.averageOperatingPeople)} · 가득 ${one(summary?.averageEarningPeople)}`}
+        description={`휴직 ${summary?.leavePeople ?? "–"}명 포함 · 월평균 가동 ${one(summary?.averageOperatingPeople)} · 가득 ${one(summary?.averageEarningPeople)}`}
       />
       <Kpi
         label={monthlyAverage ? "평균 단가 (월)" : "인당 매출 (누계)"}
         value={summary ? formatKoreanMoney(summary.averageUnitPrice) : "–"}
-        sub={`단가 칸이 있는 ${summary?.unitPricePeople ?? "–"}명(0 포함)${turnkeyExcluded ? " · 턴키 제외" : ""}`}
+        description={`단가 칸이 있는 ${summary?.unitPricePeople ?? "–"}명(0 포함)${turnkeyExcluded ? " · 턴키 제외" : ""}`}
       />
       <Kpi
         label={monthlyAverage ? "평균 원가 (월)" : "인당 원가 (누계)"}
         value={summary ? formatKoreanMoney(summary.averageCost) : "–"}
-        sub={`원가합계 ÷ ${shownPeople}명 (휴직 제외)`}
+        description={`원가합계 ÷ ${shownPeople}명 (휴직 제외)`}
       />
       <Kpi
         label={monthlyAverage ? "평균 영업이익 (월)" : "인당 영업이익 (누계)"}
         value={
           summary ? formatKoreanMoney(summary.averageOperatingProfit) : "–"
         }
-        sub={`영업이익 합 ÷ ${shownPeople}명 · 적자 ${summary?.lossPeople ?? "–"}명`}
+        description={`영업이익 합 ÷ ${shownPeople}명 · 적자 ${summary?.lossPeople ?? "–"}명`}
       />
       <Kpi
         label={
@@ -88,9 +75,9 @@ export function PersonalCostProfitSummary({
             ? `${percentText(summary.operatingRate)} · ${percentText(summary.earningRate)}`
             : "–"
         }
-        sub={`1~${baseMonth}월 월평균 · 월평균 재직 직접 인력 ${Math.max(1, summary?.averageDirectPeople ?? 0).toFixed(1)}명 기준(간접 제외, 퇴사자는 퇴사한 달까지)`}
+        description={`1~${baseMonth}월 월평균 · 월평균 재직 직접 인력 ${Math.max(1, summary?.averageDirectPeople ?? 0).toFixed(1)}명 기준(간접 제외, 퇴사자는 퇴사한 달까지)`}
       />
-    </div>
+    </KpiCards>
   );
 }
 

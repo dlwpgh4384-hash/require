@@ -16,7 +16,11 @@ import {
   type UserPreferenceResult,
 } from "./userPreferences";
 
-export type GlobalPreferenceType = Exclude<PreferenceType, "PERIOD" | "COLS">;
+// AMT_UNIT은 단위 고르기가 직접 읽고 저장한다(여기서 미리 읽지 않음)
+export type GlobalPreferenceType = Exclude<
+  PreferenceType,
+  "PERIOD" | "COLS" | "AMT_UNIT"
+>;
 const globalTypes: GlobalPreferenceType[] = [
   "MENU_FOLD",
   "FAV",

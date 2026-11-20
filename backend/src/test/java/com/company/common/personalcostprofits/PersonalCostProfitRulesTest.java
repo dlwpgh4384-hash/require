@@ -73,9 +73,23 @@ class PersonalCostProfitRulesTest {
         assertThat(PersonalCostProfitColumnPolicy.project(source, PersonalCostProfitColumnPolicy.columns(null, List.of(role("PM", "N")))))
             .doesNotContainKeys("monthlySalary", "personalCost").containsKey("totalCost");
     }
+    // 시안 SENS03: 월 급여·수당·4대보험(회사·본인)·3.3%·근로소득세·퇴직금·실지급액·개인별 원가를 모두 숨긴다
+    @Test void sensitiveSetMatchesMockupSens03() {
+        var all = PersonalCostProfitColumnPolicy.KEYS;
+        assertThat(PersonalCostProfitColumnPolicy.columns(all, List.of(role("PM", "N"))))
+            .doesNotContainAnyElementsOf(PersonalCostProfitColumnPolicy.SENSITIVE)
+            .containsExactly("developerName", "affiliationName", "positionName", "employeeTypeName", "joinDate",
+                "operatingRate", "mm", "unitPrice", "teamExpenses", "projectExpenses", "totalCost",
+                "operatingProfit", "profitRate");
+        assertThat(PersonalCostProfitColumnPolicy.SENSITIVE).containsExactlyInAnyOrder("monthlySalary", "allowance",
+            "companyInsurance", "personalInsurance", "withholdingTax", "incomeTax", "retirementReserve", "netPay", "personalCost");
+        assertThat(PersonalCostProfitColumnPolicy.columns(all, List.of(role("FIN", "Y")))).containsExactlyElementsOf(all);
+    }
     @Test void workbookColumnsIntersectPolicyAndCanonicalOrder() {
         assertThat(PersonalCostProfitColumnPolicy.columns(List.of("incomeTax", "personalCost", "developerName", "unitPrice"), List.of(role("PM", "N"))))
-            .containsExactly("developerName", "unitPrice", "incomeTax");
+            .containsExactly("developerName", "unitPrice");
+        assertThat(PersonalCostProfitColumnPolicy.columns(List.of("incomeTax", "personalCost", "developerName", "unitPrice"), List.of(role("FIN", "Y"))))
+            .containsExactly("developerName", "unitPrice", "incomeTax", "personalCost");
     }
     @Test void disabledSensitiveRoleDoesNotGrantSensitiveColumns() {
         var disabled = new com.company.common.roles.dto.RoleContracts.Role("FIN", "재무", "ALL", "Y", "N", true);

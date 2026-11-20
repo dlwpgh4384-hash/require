@@ -40,10 +40,11 @@ export interface PersonalCostProfitRow {
   operatingRate: number;
   mm: number;
   unitPrice: number;
+  /** 민감 열(시안 SENS03): 권한이 없으면 서버가 뺀다. */
   monthlySalary?: number;
-  allowance: number;
-  companyInsurance: number;
-  retirementReserve: number;
+  allowance?: number;
+  companyInsurance?: number;
+  retirementReserve?: number;
   personalCost?: number;
   teamExpenses: number;
   projectExpenses: number;

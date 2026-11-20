@@ -185,6 +185,15 @@ class CommonPersonalCostProfitControllerTest {
             .andExpect(jsonPath("$.data.items[0].personalCost").doesNotExist())
             .andExpect(jsonPath("$.data.totals.monthlySalary").doesNotExist())
             .andExpect(jsonPath("$.data.totals.personalCost").doesNotExist());
+        // 시안 SENS03: 구성 열(수당·4대보험·세금·퇴직금·실지급액)도 열을 골라 달라고 해도 빠진다
+        String all = String.join(",", PersonalCostProfitColumnPolicy.KEYS);
+        var result = mvc.perform(request("").param("columns", all)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].totalCost").isNumber())
+            .andExpect(jsonPath("$.data.totals.totalCost").isNumber());
+        for (String key : PersonalCostProfitColumnPolicy.SENSITIVE) {
+            result.andExpect(jsonPath("$.data.items[0]." + key).doesNotExist())
+                .andExpect(jsonPath("$.data.totals." + key).doesNotExist());
+        }
     }
     @Test void emptyResponseHasNumericSummaryAndNoInventedContributionGroups() throws Exception {
         when(mapper.selectPeople(any())).thenReturn(List.of());
@@ -214,6 +223,11 @@ class CommonPersonalCostProfitControllerTest {
     }
     @Test void excelExcludesSensitiveAndDefaultReferenceColumnsWithoutAddingAuth() throws Exception {
         when(mapper.selectActorRoles("admin")).thenReturn(List.of(role("PM", "N")));
+        // 민감 구성 열을 달라고 해도 엑셀 제목에 없다(시안 SENS03)
+        byte[] asked = mvc.perform(request("/excel").param("columns", String.join(",", PersonalCostProfitColumnPolicy.KEYS)))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        assertThat(headers(asked)).containsExactly("이름", "소속", "직위", "구분", "입사일", "가동률", "MM", "매출",
+            "팀비", "프로젝트경비", "원가합계", "영업이익", "이익률");
         byte[] bytes = mvc.perform(request("/excel")).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
             var names = new java.util.ArrayList<String>();

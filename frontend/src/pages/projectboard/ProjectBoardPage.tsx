@@ -3,6 +3,8 @@ import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
   Banner,
+  KpiCard,
+  KpiCards,
   ListFilter,
   ListFilters,
   ListView,
@@ -483,56 +485,56 @@ export function ProjectBoardPage() {
       data-testid="project-board-page"
       data-screen-id="SCR-UI-31"
     >
-      <div className="project-board-kpis" aria-label="프로젝트 현황 요약">
-        <div className="project-board-kpi" data-testid="project-board-kpi-total">
-          <span className="l">진행 프로젝트</span>
-          <span className="v">{count(summary?.progress.total)}</span>
-          <span className="d">
-            {summary
+      <KpiCards aria-label="프로젝트 현황 요약" className="project-board-kpis">
+        <KpiCard
+          testId="project-board-kpi-total"
+          label="진행 프로젝트"
+          value={count(summary?.progress.total)}
+          description={
+            summary
               ? `정상 ${summary.progress.normal} · 주의 ${summary.progress.caution} · 위험 ${summary.progress.danger}`
-              : ""}
-          </span>
-        </div>
-        <div className="project-board-kpi" data-testid="project-board-kpi-risk">
-          <span className="l">위험</span>
-          <span className="v">
+              : ""
+          }
+        />
+        <KpiCard
+          testId="project-board-kpi-risk"
+          label="위험"
+          value={
             <span className={summary?.riskCount ? "project-bad" : ""}>
               {count(summary?.riskCount)}
             </span>
-          </span>
-          <span className="d">일정·원가·중요 이슈 기준</span>
-        </div>
-        <div className="project-board-kpi" data-testid="project-board-kpi-open">
-          <span className="l">열린 이슈</span>
-          <span className="v">{count(summary?.openIssues.total)}</span>
-          <span className="d">
-            {summary ? `높음 ${summary.openIssues.high}건` : ""}
-          </span>
-        </div>
-        <div
-          className="project-board-kpi"
-          data-testid="project-board-kpi-overdue"
-        >
-          <span className="l">기한 지난 이슈</span>
-          <span className="v">
+          }
+          description="일정·원가·중요 이슈 기준"
+        />
+        <KpiCard
+          testId="project-board-kpi-open"
+          label="열린 이슈"
+          value={count(summary?.openIssues.total)}
+          description={summary ? `높음 ${summary.openIssues.high}건` : ""}
+        />
+        <KpiCard
+          testId="project-board-kpi-overdue"
+          label="기한 지난 이슈"
+          value={
             <span className={summary?.overdueIssueCount ? "project-bad" : ""}>
               {count(summary?.overdueIssueCount)}
             </span>
-          </span>
-          <span className="d">
-            {summary
+          }
+          description={
+            summary
               ? summary.overdueIssueCount
                 ? "담당자 확인 필요"
                 : "없음"
-              : ""}
-          </span>
-        </div>
-        <div className="project-board-kpi" data-testid="project-board-kpi-stale">
-          <span className="l">업데이트 없음</span>
-          <span className="v">{count(summary?.staleProjectCount)}</span>
-          <span className="d">2주 넘게 상태를 적지 않음</span>
-        </div>
-      </div>
+              : ""
+          }
+        />
+        <KpiCard
+          testId="project-board-kpi-stale"
+          label="업데이트 없음"
+          value={count(summary?.staleProjectCount)}
+          description="2주 넘게 상태를 적지 않음"
+        />
+      </KpiCards>
       <div className="project-board-tabs" role="tablist" aria-label="현황판 보기">
         <button
           type="button"

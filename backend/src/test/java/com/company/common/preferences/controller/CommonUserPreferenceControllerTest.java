@@ -146,12 +146,30 @@ class CommonUserPreferenceControllerTest {
     @ParameterizedTest
     @ValueSource(strings = {"/api/common/user-preferences/OTHER/GLOBAL",
         "/api/common/user-preferences/PAGE_SIZE/OTHER",
-        "/api/common/user-preferences/PERIOD/too-long-screen-key"})
+        "/api/common/user-preferences/PERIOD/too-long-screen-key",
+        "/api/common/user-preferences/AMT_UNIT/UI-03"})
     void invalidPathIs400(String path) throws Exception {
         mvc.perform(get(path)).andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.errors[0].field").exists());
         verifyNoInteractions(mapper);
+    }
+
+    // 금액 단위(AMT_UNIT/GLOBAL): 처음 저장은 넣고, 틀린 값은 400과 안내 문구
+    @Test
+    void moneyUnitIsSavedForTheAccountAndUnknownUnitIs400() throws Exception {
+        when(mapper.selectPreference("AMT_UNIT", "GLOBAL")).thenReturn(null, row("백만 원", TOKEN));
+        mvc.perform(put("/api/common/user-preferences/AMT_UNIT/GLOBAL").contentType("application/json")
+            .content("{\"prefVal\":\"백만 원\",\"modDttm\":null}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.prefVal").value("백만 원"))
+            .andExpect(jsonPath("$.data.found").value(true));
+        verify(mapper).insertPreference("AMT_UNIT", "GLOBAL", "백만 원");
+        mvc.perform(put("/api/common/user-preferences/AMT_UNIT/GLOBAL").contentType("application/json")
+            .content("{\"prefVal\":\"만 원\",\"modDttm\":null}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("prefVal"))
+            .andExpect(jsonPath("$.errors[0].message").value("금액 단위는 원, 천 원, 백만 원 중에서 선택해 주세요."));
+        verify(mapper, never()).insertPreference("AMT_UNIT", "GLOBAL", "만 원");
     }
 
     @Test

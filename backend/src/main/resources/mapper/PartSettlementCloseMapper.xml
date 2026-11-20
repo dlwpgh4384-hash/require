@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.commonops.mapper.PartSettlementCloseMapper">
+  <resultMap id="closeTarget" type="com.company.common.commonops.mapper.PartSettlementCloseRow" autoMapping="false">
+    <id column="part_id" property="partId" javaType="java.lang.String"/>
+    <result column="confirmed" property="confirmed" javaType="_boolean"/>
+    <result column="mod_dttm" property="modifiedAt" javaType="java.time.Instant"/>
+  </resultMap>
+  <select id="selectTargets" resultMap="closeTarget">
+    SELECT p.part_id,
+           COALESCE(s.setl_stat_cd IN ('CNFM', 'AUTO'), false) AS confirmed,
+           s.mod_dttm
+      FROM tb_bs_part p
+      LEFT JOIN tb_co_part_setl s ON s.part_id = p.part_id AND s.setl_ym = #{month}
+      LEFT JOIN LATERAL (
+        SELECT h.hist_id, h.bfr_val
+          FROM tb_sy_chg_hist h
+         WHERE h.trgt_tbl_nm = 'TB_BS_PART'
+           AND h.trgt_key = p.part_id
+           AND h.chg_item_nm = '사용 여부'
+           AND h.reg_dttm &gt;= #{nextMonthStart,jdbcType=TIMESTAMP}
+         ORDER BY h.reg_dttm ASC, h.hist_id ASC
+         LIMIT 1
+      ) after_month ON true
+     WHERE p.hq_yn != 'Y'
+       AND CASE WHEN after_month.hist_id IS NULL THEN p.use_yn ELSE after_month.bfr_val END = 'Y'
+       AND EXISTS (
+         SELECT 1 FROM tb_bs_part_std criteria
+          WHERE criteria.part_id = p.part_id
+            AND criteria.aply_bgn_ym &lt;= #{month}
+            AND (criteria.aply_end_ym IS NULL OR criteria.aply_end_ym &gt;= #{month})
+       )
+     ORDER BY p.part_id
+  </select>
+</mapper>

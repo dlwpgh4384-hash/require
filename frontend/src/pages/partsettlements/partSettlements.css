@@ -1,0 +1,67 @@
+.part-settlement-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.part-settlement-conditions,
+.part-settlement-tabs,
+.part-settlement-card {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.part-settlement-page .part-settlement-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.part-settlement-tabs button {
+  border: 1px solid var(--ls-border, #d8dfe8);
+  border-radius: 6px;
+  background: var(--ls-bg, white);
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.part-settlement-tabs button[aria-selected="true"] {
+  color: var(--primary, #2f6fde);
+  border-color: currentColor;
+  font-weight: 600;
+}
+.part-settlement-banner {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--ls-border, #d8dfe8);
+  border-radius: 6px;
+  background: var(--ls-head-bg, #f4f6f9);
+}
+.part-settlement-negative {
+  color: var(--ls-bad, #c43b3b);
+}
+.part-settlement-card input {
+  max-width: 220px;
+  padding: 8px;
+  text-align: right;
+}
+.part-settlement-card input[readonly] {
+  background: var(--ls-head-bg, #f4f6f9);
+}
+.part-settlement-page .ls-twrap {
+  overflow: auto;
+}
+.part-settlement-page .ls-t td {
+  white-space: nowrap;
+}
+.part-settlement-card p {
+  flex-basis: 100%;
+  margin: 0;
+}
+@media (max-width: 900px) {
+  .part-settlement-page .part-settlement-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 480px) {
+  .part-settlement-page .part-settlement-summary {
+    grid-template-columns: 1fr;
+  }
+}

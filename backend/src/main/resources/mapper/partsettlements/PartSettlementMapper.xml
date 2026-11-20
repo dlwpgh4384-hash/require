@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.partsettlements.mapper.PartSettlementMapper">
+  <resultMap id="part" type="com.company.common.partsettlements.mapper.PartSettlementRows$Part" autoMapping="false">
+    <id column="part_id" property="partId"/>
+    <result column="part_nm" property="partName"/>
+    <result column="hq_yn" property="hqYn"/>
+    <result column="use_yn" property="useYn"/>
+    <result column="leader_name" property="leaderName"/>
+    <result column="prft_dstrb_rt" property="distributionRate"/>
+    <result column="sales_exps_amt" property="salesExpense"/>
+  </resultMap>
+  <resultMap id="header" type="com.company.common.partsettlements.mapper.PartSettlementRows$Header" autoMapping="false">
+    <result column="setl_stat_cd" property="state"/>
+    <result column="cnfm_user_id" property="confirmedBy"/>
+    <result column="cnfm_dttm" property="confirmedAt"/>
+    <result column="cncl_rsn" property="cancelReason"/>
+    <result column="corp_card_amt" property="card"/>
+    <result column="part_prft_amt" property="profit"/>
+    <result column="mod_dttm" property="modifiedAt"/>
+  </resultMap>
+  <resultMap id="input" type="com.company.common.partsettlements.mapper.PartSettlementRows$Input" autoMapping="false">
+    <id column="asgn_id" property="assignmentId"/>
+    <result column="dev_id" property="developerId"/>
+    <result column="dev_nm" property="developerName"/>
+    <result column="part_id" property="partId"/>
+    <result column="emp_type_cd" property="employeeTypeCode"/>
+    <result column="payroll_type" property="payrollType"/>
+    <result column="proj_id" property="projectId"/>
+    <result column="proj_nm" property="projectName"/>
+    <result column="ctrt_type_cd" property="contractType"/>
+    <result column="input_type_cd" property="inputType"/>
+    <result column="input_bgn_dt" property="startDate"/>
+    <result column="first_start" property="firstStart"/>
+    <result column="retire_dt" property="retireDate"/>
+    <result column="mm" property="mm"/>
+    <result column="price" property="price"/>
+    <result column="pay_amt" property="salary"/>
+    <result column="vndr_sply_amt" property="vendorSupply"/>
+    <result column="mon_pay_amt" property="monthlySalary"/>
+    <result column="uploaded" property="uploaded"/>
+    <result column="distribution" property="distribution"/>
+    <result column="allocated_cost" property="allocatedCost"/>
+    <result column="ctrt_amt" property="contractAmount"/>
+    <result column="bdgt_amt" property="budget"/>
+  </resultMap>
+  <resultMap id="history" type="com.company.common.partsettlements.mapper.PartSettlementRows$History" autoMapping="false">
+    <id column="hist_id" property="id"/>
+    <result column="trgt_tbl_nm" property="tableName"/>
+    <result column="trgt_key" property="target"/>
+    <result column="chg_item_nm" property="item"/>
+    <result column="bfr_val" property="before"/>
+    <result column="aft_val" property="after"/>
+    <result column="reg_dttm" property="at"/>
+  </resultMap>
+  <resultMap id="detail" type="com.company.common.partsettlements.mapper.PartSettlementRows$Detail" autoMapping="false">
+    <id column="dev_id" property="developerId"/>
+    <result column="dev_nm" property="developerName"/>
+    <result column="emp_type_cd" property="employeeTypeCode"/>
+    <result column="proj_nm_list" property="projectNames"/>
+    <result column="mm" property="monthlyMm"/>
+    <result column="uprc_amt" property="unitPrice"/>
+    <result column="pay_amt" property="salary"/>
+    <result column="sales_exps_amt" property="salesExpense"/>
+    <result column="retire_amt" property="retirementAmount"/>
+    <result column="cost_amt" property="totalCost"/>
+    <result column="diff_amt" property="profit"/>
+    <result column="prft_amt" property="profitShare"/>
+    <result column="rmrk" property="notes"/>
+  </resultMap>
+  <select id="selectParts" resultMap="part">
+    SELECT p.part_id,p.part_nm,p.hq_yn,p.use_yn,u.user_nm AS leader_name,s.prft_dstrb_rt,s.sales_exps_amt
+    FROM TB_BS_PART p LEFT JOIN LATERAL (
+      SELECT x.* FROM TB_BS_PART_STD x WHERE x.part_id=p.part_id AND x.aply_bgn_ym &lt;= #{month}
+        AND (x.aply_end_ym IS NULL OR x.aply_end_ym &gt;= #{month}) ORDER BY x.aply_bgn_ym DESC LIMIT 1
+    ) s ON true LEFT JOIN TB_SY_USER u ON u.user_id=s.part_ldr_user_id ORDER BY p.part_id
+  </select>
+  <select id="selectHeader" resultMap="header">
+    SELECT setl_stat_cd,cnfm_user_id,cnfm_dttm,cncl_rsn,corp_card_amt,part_prft_amt,mod_dttm
+    FROM TB_CO_PART_SETL WHERE part_id=#{partId} AND setl_ym=#{month}
+  </select>
+  <select id="isClosed" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_CL_CLOSE WHERE close_ym=#{month} AND close_stat_cd='CLOSE')
+  </select>
+  <select id="selectHistory" resultMap="history">
+    SELECT hist_id,trgt_tbl_nm,trgt_key,chg_item_nm,bfr_val,aft_val,reg_dttm FROM TB_SY_CHG_HIST
+    WHERE (trgt_tbl_nm='TB_HR_DEV' AND chg_item_nm='영업 파트')
+       OR (trgt_tbl_nm='TB_BS_PART' AND chg_item_nm IN ('파트명','사용 여부'))
+    ORDER BY reg_dttm,hist_id
+  </select>
+  <select id="selectInputs" resultMap="input">
+    WITH month AS (SELECT to_date(#{month},'YYYYMM') AS first_day,
+      (to_date(#{month},'YYYYMM')+interval '1 month'-interval '1 day')::date AS last_day)
+    SELECT a.asgn_id,d.dev_id,d.dev_nm,d.part_id,d.emp_type_cd,pay.emp_type_cd AS payroll_type,
+      p.proj_id,p.proj_nm,p.ctrt_type_cd,a.input_type_cd,a.input_bgn_dt,d.retire_dt,
+      (SELECT min(f.input_bgn_dt) FROM TB_PJ_ASGN f JOIN TB_PJ_PROJ fp ON fp.proj_id=f.proj_id
+        WHERE f.dev_id=d.dev_id AND f.asgn_stat_cd!='CNCL' AND fp.ctrt_type_cd!='IN') AS first_start,
+      COALESCE(n.mon_mm,round(COALESCE(h.mm,a.ctrt_mm)*
+        (LEAST(a.input_end_dt,m.last_day)-GREATEST(a.input_bgn_dt,m.first_day)+1)
+        /extract(day from m.last_day),2)) AS mm,
+      COALESCE(n.aply_uprc,h.price,a.bill_uprc,0) AS price,
+      pay.pay_amt,pay.vndr_sply_amt,prc.mon_pay_amt,(pay.dev_id IS NOT NULL) AS uploaded,
+      dist.amount AS distribution,cost.amount AS allocated_cost,p.ctrt_amt,p.bdgt_amt
+    FROM TB_PJ_ASGN a JOIN TB_HR_DEV d ON d.dev_id=a.dev_id JOIN TB_PJ_PROJ p ON p.proj_id=a.proj_id
+    CROSS JOIN month m
+    LEFT JOIN TB_PJ_ASGN_MON n ON n.asgn_id=a.asgn_id AND n.input_ym=#{month}
+    LEFT JOIN TB_HR_MON_PAY pay ON pay.dev_id=d.dev_id AND pay.pay_ym=#{month}
+    LEFT JOIN LATERAL (SELECT x.mon_pay_amt FROM TB_HR_DEV_PRC x WHERE x.dev_id=d.dev_id
+      AND x.aply_bgn_ym &lt;= #{month} AND (x.aply_end_ym IS NULL OR x.aply_end_ym &gt;= #{month})
+      ORDER BY x.aply_bgn_ym DESC LIMIT 1) prc ON true
+    LEFT JOIN LATERAL (SELECT
+      COALESCE((SELECT CASE WHEN trim(x.bfr_val) ~ '^[0-9]+([.][0-9]+)?$' THEN trim(x.bfr_val)::numeric END
+        FROM TB_PJ_ASGN_HIST x WHERE x.asgn_id=a.asgn_id AND x.aply_dt &gt; m.last_day
+        AND x.new_ctrt_mm IS NOT NULL ORDER BY x.aply_dt,x.hist_sn LIMIT 1),
+        (SELECT x.new_ctrt_mm FROM TB_PJ_ASGN_HIST x WHERE x.asgn_id=a.asgn_id AND x.aply_dt &lt;= m.last_day
+        AND x.new_ctrt_mm IS NOT NULL ORDER BY x.aply_dt DESC,x.hist_sn DESC LIMIT 1)) AS mm,
+      COALESCE((SELECT CASE WHEN trim(x.bfr_val) ~ '^[0-9]+([.][0-9]+)?$' THEN trim(x.bfr_val)::numeric END
+        FROM TB_PJ_ASGN_HIST x WHERE x.asgn_id=a.asgn_id AND x.aply_dt &gt; m.last_day
+        AND x.new_uprc IS NOT NULL ORDER BY x.aply_dt,x.hist_sn LIMIT 1),
+        (SELECT x.new_uprc FROM TB_PJ_ASGN_HIST x WHERE x.asgn_id=a.asgn_id AND x.aply_dt &lt;= m.last_day
+        AND x.new_uprc IS NOT NULL ORDER BY x.aply_dt DESC,x.hist_sn DESC LIMIT 1)) AS price) h ON true
+    LEFT JOIN LATERAL (SELECT sum(t.dstrb_amt) AS amount FROM TB_PJ_TK_DSTRB t
+      WHERE t.proj_id=a.proj_id AND t.dev_id=a.dev_id AND t.dstrb_ym=#{month} AND t.row_type_cd='DEV'
+        AND t.dstrb_step_cd=(SELECT z.dstrb_step_cd FROM TB_PJ_TK_DSTRB z
+          JOIN TB_SY_CODE c ON c.code_grp_id='DSTRB_STEP' AND c.code=z.dstrb_step_cd
+          WHERE z.proj_id=a.proj_id AND z.dev_id=a.dev_id AND z.dstrb_ym=#{month} AND z.row_type_cd='DEV'
+          ORDER BY c.sort_ord DESC,c.code DESC LIMIT 1)) dist ON true
+    LEFT JOIN LATERAL (SELECT sum(c.labor_alloc_amt+c.drct_exps_amt) AS amount FROM TB_CO_MON_COST c
+      WHERE c.proj_id=a.proj_id AND c.dev_id=a.dev_id AND c.cost_ym=#{month} AND c.cost_cls_cd='ALLOC') cost ON true
+    WHERE a.asgn_stat_cd!='CNCL' AND p.ctrt_type_cd!='IN' AND a.input_bgn_dt &lt;= m.last_day
+      AND a.input_end_dt &gt;= m.first_day AND (d.retire_dt IS NULL OR d.retire_dt &gt;= m.first_day)
+    ORDER BY d.dev_id,p.proj_id,a.asgn_id
+  </select>
+  <select id="selectDetails" resultMap="detail">
+    SELECT x.dev_id,COALESCE(n.bfr_val,d.dev_nm) AS dev_nm,x.emp_type_cd,x.proj_nm_list,x.mm,x.uprc_amt,
+      x.pay_amt,x.sales_exps_amt,x.retire_amt,x.cost_amt,x.diff_amt,x.prft_amt,x.rmrk
+    FROM TB_CO_PART_SETL_DTL x JOIN TB_HR_DEV d ON d.dev_id=x.dev_id
+    LEFT JOIN LATERAL (SELECT h.bfr_val FROM TB_SY_CHG_HIST h WHERE h.trgt_tbl_nm='TB_HR_DEV'
+      AND h.trgt_key=x.dev_id AND h.chg_item_nm='이름' AND h.reg_dttm &gt; x.reg_dttm
+      ORDER BY h.reg_dttm,h.hist_id LIMIT 1) n ON true
+    WHERE x.part_id=#{partId} AND x.setl_ym=#{month} ORDER BY dev_nm,x.dev_id
+  </select>
+  <update id="lockSources">
+    LOCK TABLE TB_SY_OPER_STD,TB_CL_CLOSE,TB_CO_PART_SETL,TB_BS_PART,TB_BS_PART_STD,
+      TB_SY_USER,TB_SY_USER_ROLE,TB_SY_ROLE,TB_HR_DEV,TB_PJ_PROJ,TB_PJ_PROJ_PART,
+      TB_SY_CHG_HIST,TB_HR_MON_PAY,TB_HR_DEV_PRC,TB_PJ_ASGN,TB_PJ_ASGN_MON,
+      TB_PJ_ASGN_HIST,TB_PJ_TK_DSTRB,TB_CO_MON_COST,TB_CO_PART_SETL_DTL,TB_SY_CODE,TB_SY_CALC_RULE
+      IN SHARE ROW EXCLUSIVE MODE
+  </update>
+  <insert id="insertHeader">
+    INSERT INTO TB_CO_PART_SETL(part_id,setl_ym,corp_card_amt,setl_stat_cd,reg_user_id,reg_dttm)
+    VALUES(#{key.partId},#{key.month},0,'WORK',#{actor},clock_timestamp())
+    ON CONFLICT(part_id,setl_ym) DO NOTHING
+  </insert>
+  <sql id="version">part_id=#{key.partId} AND setl_ym=#{key.month}
+    AND mod_dttm IS NOT DISTINCT FROM #{version,jdbcType=TIMESTAMP_WITH_TIMEZONE}</sql>
+  <sql id="touch">mod_user_id=#{actor},mod_dttm=GREATEST(clock_timestamp(),
+    COALESCE(mod_dttm,reg_dttm)+interval '1 microsecond')</sql>
+  <update id="updateCard">
+    UPDATE TB_CO_PART_SETL SET corp_card_amt=#{card},<include refid="touch"/>
+    WHERE <include refid="version"/> AND setl_stat_cd='WORK'
+  </update>
+  <update id="confirm">
+    UPDATE TB_CO_PART_SETL SET part_prft_amt=#{profit},setl_stat_cd=#{state},
+      cnfm_user_id=#{actor},cnfm_dttm=clock_timestamp(),<include refid="touch"/>
+    WHERE <include refid="version"/> AND setl_stat_cd='WORK'
+  </update>
+  <update id="cancel">
+    UPDATE TB_CO_PART_SETL SET setl_stat_cd='WORK',cncl_rsn=#{reason},cnfm_user_id=NULL,cnfm_dttm=NULL,
+      mod_user_id=#{mutation.actor},mod_dttm=GREATEST(clock_timestamp(),COALESCE(mod_dttm,reg_dttm)+interval '1 microsecond')
+    WHERE part_id=#{mutation.key.partId} AND setl_ym=#{mutation.key.month}
+      AND mod_dttm IS NOT DISTINCT FROM #{mutation.version,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+      AND setl_stat_cd IN ('CNFM','AUTO')
+  </update>
+  <delete id="deleteDetails">DELETE FROM TB_CO_PART_SETL_DTL WHERE part_id=#{partId} AND setl_ym=#{month}</delete>
+  <insert id="insertDetail">
+    INSERT INTO TB_CO_PART_SETL_DTL(part_id,setl_ym,dev_id,emp_type_cd,proj_nm_list,mm,uprc_amt,pay_amt,
+      sales_exps_amt,retire_amt,cost_amt,diff_amt,prft_amt,rmrk,reg_user_id,reg_dttm)
+    VALUES(#{key.partId},#{key.month},#{row.developerId},#{row.employeeTypeCode},
+      #{projectNames},
+      #{row.monthlyMm},#{row.unitPrice},#{row.salary},#{row.salesExpense},#{row.retirementAmount},#{row.totalCost},
+      #{row.profit},#{row.profitShare},#{notes},
+      #{actor},clock_timestamp())
+  </insert>
+  <insert id="insertHistory">
+    INSERT INTO TB_SY_CHG_HIST(trgt_tbl_nm,trgt_key,chg_type_cd,chg_item_nm,bfr_val,aft_val,chg_rsn,reg_user_id,reg_dttm)
+    VALUES('TB_CO_PART_SETL',#{key},'UPD',#{item},#{before,jdbcType=VARCHAR},#{after},#{reason,jdbcType=VARCHAR},#{actor},clock_timestamp())
+  </insert>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG(user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm)
+    VALUES(#{actor},'DNLD','UI-19',#{target},clock_timestamp(),#{actor},clock_timestamp())
+  </insert>
+</mapper>

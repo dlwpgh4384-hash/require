@@ -283,6 +283,12 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-19": async (content) => {
+    expect(
+      await content.findByTestId("part-settlement-conditions"),
+    ).toBeVisible();
+    expect(content.getByTestId("part-settlement-banner")).toBeVisible();
+  },
   "UI-03": async (content) => {
     expect(await content.findByTestId("list-empty")).toBeVisible();
     expect(content.getByRole("textbox", { name: "이름" })).toBeVisible();

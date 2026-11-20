@@ -4,10 +4,18 @@ import { listMessages } from "./listTypes";
  * SFR-011 엑셀 다운로드: 서버가 만든 .xlsx를 받아 저장한다.
  * 파일 이름은 서버의 Content-Disposition(filename*=UTF-8'')을 따른다.
  */
-export async function downloadFile(url: string, fallbackName: string) {
+export async function downloadFile(
+  url: string,
+  fallbackName: string,
+  createError?: (
+    message: string,
+    errors: { field: string; message: string }[],
+  ) => Error,
+) {
   const response = await fetch(url);
   if (!response.ok) {
     let message: string = listMessages.downloadError;
+    let errors: { field: string; message: string }[] = [];
     try {
       const body = await response.json();
       if (
@@ -15,10 +23,12 @@ export async function downloadFile(url: string, fallbackName: string) {
         typeof body.message === "string"
       )
         message = body.message;
+      if (response.status === 400 || response.status === 409)
+        errors = Array.isArray(body.errors) ? body.errors : [];
     } catch {
       /* 본문이 JSON이 아니면 기본 문구 */
     }
-    throw new Error(message);
+    throw createError ? createError(message, errors) : new Error(message);
   }
   const header = response.headers.get("Content-Disposition") ?? "";
   const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)?.[1];

@@ -138,6 +138,32 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (url.startsWith("/api/common/rate-renegotiations?"))
+      return {
+        success: true,
+        meta: {},
+        data: {
+          baseYearMonth: "2026-02",
+          appliedIncreaseRate: 5,
+          items: [],
+          summary: {
+            targetCount: 0,
+            averageProfitRate: null,
+            targetProfitRate: 20,
+            assumedAnnualProfitIncrease: 0,
+            targetAnnualProfitIncrease: 0,
+          },
+          totalAnnualProfitIncrease: 0,
+          formulaHelp: {
+            renewalDate: "갱신일 정의",
+            monthlyCost: "월 원가 정의",
+            profitRate: "이익률 정의",
+            targetUnitPrice: "목표 단가 정의",
+            requiredIncreaseRate: "필요 인상률 정의",
+            annualProfitIncrease: "연 이익 정의",
+          },
+        },
+      };
     if (url.startsWith("/api/common/project-cost-analyses?"))
       return {
         success: true,
@@ -283,6 +309,22 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-32": async (content) => {
+    expect(await content.findByTestId("list-empty")).toBeVisible();
+    expect(content.getByLabelText("갱신 시점")).toHaveValue("6");
+    expect(content.getByLabelText("인상률")).toHaveValue(5);
+    expect(content.getByTestId("rate-average")).toHaveTextContent("–");
+    // 목록 11열과 계산 도움말 표의 머리글을 구분한다.
+    expect(
+      within(content.getByTestId("rate-list")).getAllByRole("columnheader"),
+    ).toHaveLength(11);
+    expect(
+      within(content.getByTestId("rate-formulas"))
+        .getAllByRole("columnheader")
+        .map((header) => header.textContent),
+    ).toEqual(["항목", "계산식", "참고"]);
+    expect(content.getByTestId("list-download")).toBeEnabled();
+  },
   "UI-19": async (content) => {
     expect(
       await content.findByTestId("part-settlement-conditions"),
@@ -623,6 +665,7 @@ describe("common placeholder screen contract", () => {
             (id === "UI-05" ||
               id === "UI-11" ||
               id === "UI-31" ||
+              id === "UI-32" ||
               id === "UI-04" ||
               id === "UI-13") &&
             name === "조회"

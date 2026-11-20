@@ -21,6 +21,7 @@ import type { CodeItem } from "../pages/codegroups/codeGroups";
 import type { CodeMapItem } from "../pages/codemaps/codeMaps";
 import type { OperatingStandard } from "../pages/operatingstandards/operatingStandards";
 import type { CodeHistoryItem } from "../pages/commonops/codeHistory";
+import type { RateRenegotiationResult } from "../pages/raterenegotiations/rateRenegotiations";
 
 let router: ReturnType<typeof createAppRouter> | undefined;
 
@@ -927,6 +928,247 @@ describe("common code route composition", () => {
   });
 });
 
+function rateRenegotiationResult(): RateRenegotiationResult {
+  return {
+    baseYearMonth: "2026-02",
+    appliedIncreaseRate: 5,
+    items: [],
+    summary: {
+      targetCount: 0,
+      averageProfitRate: null,
+      targetProfitRate: 20,
+      assumedAnnualProfitIncrease: 0,
+      targetAnnualProfitIncrease: 0,
+    },
+    totalAnnualProfitIncrease: 0,
+    formulaHelp: {
+      renewalDate: "갱신일 정의",
+      monthlyCost: "월 원가 정의",
+      profitRate: "이익률 정의",
+      targetUnitPrice: "목표 단가 정의",
+      requiredIncreaseRate: "필요 인상률 정의",
+      annualProfitIncrease: "연 이익 정의",
+    },
+  };
+}
+
+function respondWithRateRenegotiations(available = true) {
+  const menus = response();
+  menus.data.push(
+    {
+      ...menus.data[0],
+      menuId: "G006",
+      menuNm: "원가·수익",
+      scrnId: null,
+      sortOrd: 2,
+    },
+    {
+      ...menus.data[0],
+      menuId: "M017",
+      upperMenuId: "G006",
+      menuNm: "단가 재협상 대상",
+      scrnId: "UI-32",
+      menuLvl: 2,
+    },
+  );
+  menus.meta.screenAccess.push({ scrnId: "UI-32", available, pcOnlyYn: "N" });
+  const result = rateRenegotiationResult();
+  const success = (data: unknown) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ success: true, meta: {}, data }),
+  });
+  const list = vi.fn(async () => success(result));
+  const request = vi.fn(async (url: string, _init?: RequestInit) => {
+    if (url === "/api/common/menus")
+      return { ok: true, status: 200, json: async () => menus };
+    if (url.startsWith("/api/common/user-preferences/"))
+      return {
+        ok: true,
+        status: 200,
+        json: async () => preferenceResponse(url),
+      };
+    if (url.startsWith("/api/common/rate-renegotiations?")) return list();
+    if (
+      url === "/api/common/projects" ||
+      url.startsWith("/api/common/code-groups/")
+    )
+      return success({ items: [] });
+    const developer = result.items.find(
+      (row) => url === `/api/common/developers/${row.developerId}`,
+    );
+    if (developer)
+      return success({
+        developerId: developer.developerId,
+        name: developer.developerName,
+        managementNumber: developer.developerId,
+        employeeTypeName: developer.employeeTypeName,
+        useYn: "Y",
+        skillNames: [],
+      });
+    if (
+      result.items.some((row) =>
+        ["assignments", "statuses", "change-history"].some(
+          (suffix) =>
+            url === `/api/common/developers/${row.developerId}/${suffix}`,
+        ),
+      )
+    )
+      return success({ items: [], canManageStatuses: true });
+    throw new Error(`예상하지 않은 요청: ${url}`);
+  });
+  vi.stubGlobal("fetch", request);
+  return { result, request, list, success };
+}
+
+describe("rate renegotiation route composition", () => {
+  it.each(["/screens/UI-32", "/#UI-32"])(
+    "%s renders UI-32 through the existing shell and public client",
+    async (path) => {
+      const { request } = respondWithRateRenegotiations();
+      mount(path);
+      await screen.findByTestId("list-empty");
+      expectSingleShell();
+      expect(screen.getAllByTestId("rate-renegotiation-page")).toHaveLength(1);
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+        "단가 재협상 대상",
+      );
+      expect(screen.getByTestId("rate-summary").children).toHaveLength(4);
+      expect(
+        within(screen.getByTestId("rate-list")).getAllByRole("columnheader"),
+      ).toHaveLength(11);
+      expect(
+        within(screen.getByTestId("rate-formulas"))
+          .getAllByRole("columnheader")
+          .map((header) => header.textContent),
+      ).toEqual(["항목", "계산식", "참고"]);
+      expect(
+        screen.getAllByRole("button", { name: /엑셀 다운로드/ }),
+      ).toHaveLength(1);
+      expect(screen.getByTestId("screen-actions")).toBeEmptyDOMElement();
+      expect(request).toHaveBeenCalledWith(
+        "/api/common/rate-renegotiations?renewalMonths=6&profitRateThreshold=15&increaseRate=5",
+        { signal: expect.any(AbortSignal) },
+      );
+      expect(
+        request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
+      ).toBe(false);
+      expect(
+        request.mock.calls
+          .filter(([url]) => url.startsWith("/api/common/rate-renegotiations?"))
+          .every(([, init]) => !init?.headers && !init?.body && !init?.method),
+      ).toBe(true);
+    },
+  );
+
+  it("M017 opens UI-32 under G006 without replacing the preferences provider", async () => {
+    respondWithRateRenegotiations();
+    mount("/screens/ADDED");
+    await screen.findByRole("region", { name: "ADDED 본문" });
+    const preferences = screen.getByTestId("user-preferences");
+    fireEvent.click(screen.getByTestId("menu-toggle-g006"));
+    fireEvent.click(screen.getByRole("link", { name: "단가 재협상 대상" }));
+    await screen.findByTestId("list-empty");
+    expect(router?.state.location.pathname).toBe("/screens/UI-32");
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
+    expectSingleShell();
+  });
+
+  it.each(["developer-first", "developer-second"])(
+    "opens clicked %s rather than assignmentId and retains list state on close",
+    async (developerId) => {
+      const { result, request, list } = respondWithRateRenegotiations();
+      result.items = ["developer-first", "developer-second"].map(
+        (id, index) => ({
+          assignmentId: `assignment-${index}`,
+          developerId: id,
+          developerName: `개발자 ${index}`,
+          employeeTypeName: "계약직",
+          projectName: "재협상 프로젝트",
+          renewalDate: "2026-03-03",
+          daysUntilRenewal: 30,
+          monthlyMm: 1,
+          currentUnitPrice: 1000000,
+          monthlyCost: 900000,
+          profitRate: 10,
+          targetUnitPrice: 1130000,
+          requiredIncreaseRate: 13,
+          annualProfitIncrease: 600000,
+        }),
+      );
+      mount("/screens/UI-32");
+      const row = result.items.find(
+        (item) => item.developerId === developerId,
+      )!;
+      await screen.findByTestId(`list-row-${row.assignmentId}`);
+      fireEvent.change(screen.getByLabelText("갱신 시점"), {
+        target: { value: "3" },
+      });
+      fireEvent.click(screen.getByTestId("list-search"));
+      await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+      await screen.findByTestId(`list-row-${row.assignmentId}`);
+      fireEvent.change(screen.getByLabelText("인상률"), {
+        target: { value: "8" },
+      });
+      await waitFor(() => expect(list).toHaveBeenCalledTimes(3));
+      await screen.findByTestId(`list-row-${row.assignmentId}`);
+      fireEvent.click(screen.getByTestId("list-columns"));
+      fireEvent.click(screen.getByTestId("list-column-monthlyCost"));
+      fireEvent.click(screen.getByTestId(`list-row-${row.assignmentId}`));
+      expect(
+        await screen.findByRole("dialog", { name: row.developerName }),
+      ).toBeVisible();
+      for (const suffix of ["", "/assignments", "/statuses", "/change-history"])
+        expect(
+          request.mock.calls.some(
+            ([url]) => url === `/api/common/developers/${developerId}${suffix}`,
+          ),
+        ).toBe(true);
+      expect(
+        request.mock.calls.some(([url]) =>
+          url.startsWith(`/api/common/developers/${row.assignmentId}`),
+        ),
+      ).toBe(false);
+      expect(screen.queryByTestId("developer-edit")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("developer-stop")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+      expect(
+        screen.queryByRole("dialog", { name: row.developerName }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByLabelText("갱신 시점")).toHaveValue("3");
+      expect(screen.getByLabelText("인상률")).toHaveValue(8);
+      expect(
+        screen.queryByTestId("list-head-monthlyCost"),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("unsaved-dialog")).not.toBeInTheDocument();
+      expect(list).toHaveBeenCalledTimes(3);
+      expect(router?.state.location.pathname).toBe("/screens/UI-32");
+    },
+  );
+
+  it("routed query failure retries without replacing the shell or showing empty success", async () => {
+    const { list } = respondWithRateRenegotiations();
+    list.mockRejectedValueOnce(new Error("network"));
+    mount("/screens/UI-32");
+    await screen.findByTestId("rate-error");
+    expect(screen.queryByTestId("list-empty")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("rate-retry"));
+    await screen.findByTestId("list-empty");
+    expect(list).toHaveBeenCalledTimes(2);
+    expectSingleShell();
+  });
+
+  it("preserves the existing unavailable-screen guard ahead of the feature client", async () => {
+    const { list } = respondWithRateRenegotiations(false);
+    mount("/screens/UI-32");
+    expect(await screen.findByText("사용할 수 없는 화면입니다")).toBeVisible();
+    expect(
+      screen.queryByTestId("rate-renegotiation-page"),
+    ).not.toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
+  });
+});
+
 function respondWithProjects() {
   const menus = response();
   menus.data.push({
@@ -1755,6 +1997,9 @@ function respondWithProjectCostAnalyses() {
     if (url === "/api/common/menus")
       return { ok: true, status: 200, json: async () => menus };
     if (url.startsWith("/api/common/project-cost-analyses?")) return list();
+    if (url.startsWith("/api/common/rate-renegotiations?"))
+      return success(rateRenegotiationResult());
+    if (url === "/api/common/projects") return success({ items: [] });
     if (url.startsWith("/api/common/code-groups/"))
       return success({ items: [] });
     if (url.startsWith("/api/common/user-preferences/")) {
@@ -1851,7 +2096,7 @@ describe("project cost analysis route composition", () => {
     expectSingleShell();
   });
 
-  it("UI-32 remains a placeholder and returning to UI-04 preserves the shared scope", async () => {
+  it("UI-32 opens its registered workspace and returning to UI-04 preserves the shared scope", async () => {
     respondWithProjectCostAnalyses();
     mount("/screens/UI-04");
     await screen.findByText("조건에 맞는 결과가 없습니다.");
@@ -1859,9 +2104,12 @@ describe("project cost analysis route composition", () => {
     await act(async () => {
       await router!.navigate("/screens/UI-32");
     });
+    expect(await screen.findByTestId("rate-renegotiation-page")).toBeVisible();
     expect(
-      await screen.findByRole("region", { name: "UI-32 본문" }),
-    ).toHaveTextContent("준비 중");
+      await within(screen.getByTestId("rate-renegotiation-page")).findByTestId(
+        "list-empty",
+      ),
+    ).toBeVisible();
     expect(screen.getByTestId("user-preferences")).toBe(preferences);
     await act(async () => {
       await router!.navigate("/screens/UI-04");

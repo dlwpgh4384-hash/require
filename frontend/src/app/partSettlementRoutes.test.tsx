@@ -190,8 +190,31 @@ function respond(developerId = "DEV-selected", available = true) {
         },
       );
     }
+    if (url === "/api/common/code-groups/EMP_TYPE/codes")
+      return ok({
+        items: [{ code: "FT", codeName: "정규직", sortOrd: 1, useYn: "Y" }],
+      });
     if (url.startsWith("/api/common/part-settlements?"))
       return tabs(new URLSearchParams(url.split("?")[1]).get("yearMonth")!);
+    const confirm =
+      /^\/api\/common\/part-settlements\/([^/]+)\/(\d{4}-\d{2})\/confirm$/.exec(
+        url,
+      );
+    if (confirm && init?.method === "PUT") {
+      const response = await settlement(
+        decodeURIComponent(confirm[1]),
+        confirm[2],
+      );
+      const data = (await response.json()).data as PartSettlement;
+      return ok({
+        ...data,
+        confirmed: true,
+        confirmedBy: "admin",
+        confirmedByName: "관리자",
+        confirmedAt: "2026-02-28T01:30:00Z",
+        modifiedAt: "2026-02-28T01:30:00Z",
+      });
+    }
     const match =
       /^\/api\/common\/part-settlements\/([^/]+)\/(\d{4}-\d{2})$/.exec(url);
     if (match) return settlement(decodeURIComponent(match[1]), match[2]);
@@ -407,5 +430,38 @@ it("unavailable UI-19 remains behind the shared navigation guard before feature 
   expect(tabs).not.toHaveBeenCalled();
   expect(settlement).not.toHaveBeenCalled();
   expect(detail).not.toHaveBeenCalled();
+  expectSingleShell();
+});
+
+it("in the real shell the title bar holds [정산 확정]; confirming asks first and then shows the lock banner and [확정 취소]", async () => {
+  const { request, developer } = respond();
+  mount("/screens/UI-19");
+  await screen.findByTestId(`list-row-${developer.developerId}`);
+  expect(
+    await within(
+      screen.getByTestId(`list-row-${developer.developerId}`),
+    ).findByText("정규직"),
+  ).toBeVisible();
+  expect(screen.queryByTestId("part-settlement-banner")).not.toBeInTheDocument();
+  const bar = within(screen.getByTestId("part-settlement-title-actions"));
+  fireEvent.click(bar.getByRole("button", { name: "정산 확정" }));
+  const dialog = screen.getByRole("alertdialog", {
+    name: "영업 가파트 2026-02 정산을 확정할까요?",
+  });
+  expect(
+    request.mock.calls.some(
+      ([url, init]) =>
+        String(url).includes("part-settlements") && init?.method === "PUT",
+    ),
+  ).toBe(false);
+  fireEvent.click(within(dialog).getByRole("button", { name: "확정하기" }));
+  expect(await screen.findByText("정산을 확정했습니다.")).toBeVisible();
+  expect(screen.getByTestId("part-settlement-banner")).toHaveTextContent(
+    "2026-02 영업 가파트 정산은 확정되었습니다 (관리자 · 2026-02-28 10:30).",
+  );
+  expect(bar.getByRole("button", { name: "확정 취소" })).toBeVisible();
+  expect(
+    bar.queryByRole("button", { name: "엑셀 다운로드" }),
+  ).not.toBeInTheDocument();
   expectSingleShell();
 });

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { DetailPanel, Banner, type DetailTab } from "../../shared/list/DetailPanel";
 import { Badge } from "../../shared/list/ListView";
 import { KpiCards, KpiCard } from "../../shared/list/KpiCards";
-import { ProjectRequestError } from "../projects/projects";
+import { ProjectRequestError, typeLabel } from "../projects/projects";
 import { ProjectDetail } from "../projects/ProjectDetail";
 import { useOpenProjectEdit } from "../projects/projectEdit";
 import { formatKoreanMoney, formatMoney } from "../../shared/list/moneyUnit";
@@ -551,7 +551,7 @@ export function ProjectCostAnalysisDetail({
   return (
     <DetailPanel
       title={row.projectName}
-      sub={`${row.projectId} · ${row.contractTypeName} · ${row.startDate} ~ ${row.endDate}`}
+      sub={`${row.projectId} · ${typeLabel(row)} · ${row.startDate} ~ ${row.endDate}`}
       actions={
         <button
           type="button"

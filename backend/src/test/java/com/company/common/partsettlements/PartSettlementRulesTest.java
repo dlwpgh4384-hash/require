@@ -29,15 +29,42 @@ class PartSettlementRulesTest {
         assertThat(result.unitPrice()).isEqualByComparingTo("5650332");assertThat(result.salary()).isEqualByComparingTo("4000000");
         assertThat(result.projectNames()).containsExactly("프로젝트");assertThat(result.monthlyMm()).isEqualByComparingTo("1.24");
     }
-    @Test void uploadedSalaryTypeAndBaseWinAndAreNotProrated() {
+    @Test void uploadedStartMonthStillProratesDeveloperPoolSalary() {
         var i=input("D","A");i.uploaded=true;i.payrollType="CT";i.salary=n("1234567");i.firstStart=LocalDate.of(2026,1,20);
         var result=rules.calculate(part("A"),month,List.of(i),List.of()).get(0);
-        assertThat(result.employeeTypeCode()).isEqualTo("CT");assertThat(result.salary()).isEqualByComparingTo("1234567");assertThat(result.retirementAmount()).isZero();
+        assertThat(result.employeeTypeCode()).isEqualTo("CT");assertThat(result.salary()).isEqualByComparingTo("1548387");
+        assertThat(result.retirementAmount()).isZero();assertThat(result.notes()).containsExactly("공통관리비","시작 달 12/31일");
+    }
+    @Test void uploadedStartMonthWithoutPoolSalaryProratesUploadedPay() {
+        var i=input("D","A");i.uploaded=true;i.payrollType="FT";i.salary=n("3100000");i.monthlySalary=null;i.firstStart=LocalDate.of(2026,1,16);
+        var result=rules.calculate(part("A"),month,List.of(i),List.of()).get(0);
+        assertThat(result.salary()).isEqualByComparingTo("1600000");assertThat(result.missingMonthlySalary()).isFalse();
+    }
+    @Test void startOnFirstDayIsNotProrated() {
+        var i=input("D","A");i.firstStart=LocalDate.of(2026,1,1);
+        var result=rules.calculate(part("A"),month,List.of(i),List.of()).get(0);
+        assertThat(result.salary()).isEqualByComparingTo("4000000");assertThat(result.notes()).containsExactly("공통관리비+퇴직금");
+    }
+    @Test void notUploadedOutsideStartMonthWarns() {
+        var result=rules.calculate(part("A"),month,List.of(input("D","A")),List.of()).get(0);
+        assertThat(result.notes()).containsExactly("공통관리비+퇴직금",UPLOAD_PENDING);
+    }
+    @Test void startMonthWithoutAnySalaryMarksMissing() {
+        var i=input("D","A");i.monthlySalary=null;i.firstStart=LocalDate.of(2026,1,20);
+        var result=rules.calculate(part("A"),month,List.of(i),List.of()).get(0);
+        assertThat(result.salary()).isZero();assertThat(result.missingMonthlySalary()).isTrue();
+        assertThat(result.notes()).containsExactly("공통관리비+퇴직금","시작 달 12/31일",MISSING_SALARY);
     }
     @Test void vendorUsesSupplyAndNoManagementExpense() {
-        var i=input("D","A");i.uploaded=true;i.payrollType="VN";i.vendorSupply=n("8000000");i.salary=n("1");
+        var i=input("D","A");i.uploaded=true;i.payrollType="OS";i.vendorSupply=n("8000000");i.salary=n("1");i.firstStart=LocalDate.of(2026,1,16);
         var row=rules.calculate(part("A"),month,List.of(i),List.of()).get(0);
         assertThat(row.salary()).isEqualByComparingTo("8000000");assertThat(row.salesExpense()).isZero();assertThat(row.retirementAmount()).isZero();
+        assertThat(row.notes()).isEmpty();
+    }
+    @Test void turnkeyWithoutAllocatedCostBeforeCloseWarns() {
+        var i=input("D","A");i.contractType="TK";i.contractAmount=n("12000000");i.budget=n("10000000");
+        var result=rules.calculate(part("A"),month,List.of(i),List.of()).get(0);
+        assertThat(result.unitPrice()).isZero();assertThat(result.notes()).contains(TURNKEY_COST_PENDING);
     }
     @Test void unuploadedStartMonthProratesOnce() {
         var a=input("D","A");a.firstStart=LocalDate.of(2026,1,16);

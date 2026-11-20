@@ -11,7 +11,7 @@ public final class PartSettlementRows {
         public BigDecimal distributionRate, salesExpense;
     }
     public static class Header {
-        public String state, confirmedBy, cancelReason;
+        public String state, confirmedBy, confirmedByName, cancelReason;
         public BigDecimal card, profit;
         public Instant confirmedAt, modifiedAt;
     }

@@ -176,7 +176,7 @@ class CommonManpowerComparisonControllerTest {
             assertThat(book.getNumberOfSheets()).isEqualTo(1);
             for (var row : book.getSheetAt(0)) {
                 var cells = new ArrayList<String>();
-                for (var cell : row) cells.add(cell.toString());
+                for (var cell : row) cells.add(new org.apache.poi.ss.usermodel.DataFormatter().formatCellValue(cell));
                 rows.add(cells);
             }
         }

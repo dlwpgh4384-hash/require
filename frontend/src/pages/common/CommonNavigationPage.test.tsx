@@ -287,7 +287,10 @@ const deepChecks: Record<string, (content: Content) => Promise<void>> = {
     expect(
       await content.findByTestId("part-settlement-conditions"),
     ).toBeVisible();
-    expect(content.getByTestId("part-settlement-banner")).toBeVisible();
+    // 시안: 잠금 띠는 확정된 정산에만 보인다.
+    expect(
+      content.queryByTestId("part-settlement-banner"),
+    ).not.toBeInTheDocument();
   },
   "UI-03": async (content) => {
     expect(await content.findByTestId("list-empty")).toBeVisible();

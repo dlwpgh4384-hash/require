@@ -83,17 +83,17 @@ class PartSettlementPersistenceTest {
         }
         db.update("INSERT INTO TB_HR_DEV(DEV_ID,MNG_NO,DEV_NM,EMP_TYPE_CD,JOB_CD,DRCT_CLS_CD,PART_ID,WORK_STAT_CD,REG_USER_ID) VALUES('settlement-dev','settlement-dev','정산 인력','FT',?,'DRCT','settlement-a','IDLE','admin')",job);
         db.update("INSERT INTO TB_PJ_PROJ(PROJ_ID,PROJ_NM,CTRT_TYPE_CD,PROJ_STAT_CD,CTRT_BGN_DT,CTRT_END_DT,CTRT_AMT,TEAM_EXPS_AMT,PROJ_EXPS_AMT,REG_USER_ID) VALUES('settlement-project','고정될 이름','MO','ING','2025-12-01','2026-12-31',100000000,0,0,'admin')");
-        db.update("INSERT INTO TB_PJ_ASGN(ASGN_ID,PROJ_ID,DEV_ID,JOB_CD,INPUT_BGN_DT,INPUT_END_DT,CTRT_MM,INPUT_TYPE_CD,EXT_CNT,ASGN_STAT_CD,BILL_UPRC,REG_USER_ID) VALUES('settlement-assignment','settlement-project','settlement-dev',?,'2026-01-01','2026-12-31',1,'NEW',0,'ACT',7000000,'admin')",job);
-        db.update("INSERT INTO TB_PJ_ASGN_MON(ASGN_ID,PROJ_ID,DEV_ID,INPUT_YM,INPUT_DAY_CNT,MON_MM,SALES_AMT,FIX_YN,REG_USER_ID) VALUES('settlement-assignment','settlement-project','settlement-dev','202601',31,1,7000000,'N','admin')");
+        db.update("INSERT INTO TB_PJ_ASGN(ASGN_ID,PROJ_ID,DEV_ID,JOB_CD,INPUT_BGN_DT,INPUT_END_DT,CTRT_MM,INPUT_TYPE_CD,EXT_CNT,ASGN_STAT_CD,BILL_UPRC,REG_USER_ID) VALUES('settlement-asgn','settlement-project','settlement-dev',?,'2026-01-01','2026-12-31',1,'NEW',0,'ACT',7000000,'admin')",job);
+        db.update("INSERT INTO TB_PJ_ASGN_MON(ASGN_ID,PROJ_ID,DEV_ID,INPUT_YM,INPUT_DAY_CNT,MON_MM,SALES_AMT,FIX_YN,REG_USER_ID) VALUES('settlement-asgn','settlement-project','settlement-dev','202601',31,1,7000000,'N','admin')");
         db.update("INSERT INTO TB_HR_MON_PAY(PAY_YM,DEV_ID,PAY_AMT,ALWNC_AMT,INSR_CMPNY_AMT,RETIRE_RSV_AMT,EMP_TYPE_CD,DRCT_CLS_CD,REG_USER_ID) VALUES('202601','settlement-dev',4000000,0,0,0,'FT','DRCT','admin')");
     }
     @AfterEach void removeOwnedSchema() throws Exception {
         try(var c=source.getConnection();var s=c.createStatement()){s.execute("DROP SCHEMA "+owned.name()+" CASCADE");}
     }
     String root(String action){return "/api/common/part-settlements/settlement-a/2026-01"+action;}
-    JsonNode read() throws Exception {return json.readTree(mvc.perform(get(root(""))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("data");}
+    JsonNode read() throws Exception {return json.readTree(mvc.perform(get(root(""))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).get("data");}
     String command(String action,Map<String,Object> fields) throws Exception {
-        return mvc.perform(put(root(action)).contentType("application/json").content(json.writeValueAsString(fields))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return mvc.perform(put(root(action)).contentType("application/json").content(json.writeValueAsString(fields))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
     }
     Map<String,Object> version(JsonNode row){var result=new LinkedHashMap<String,Object>();result.put("modifiedAt",row.path("modifiedAt").isNull()?null:row.path("modifiedAt").asText());return result;}
     int count(String table){return db.queryForObject("SELECT count(*) FROM "+table,Integer.class);}
@@ -114,7 +114,8 @@ class PartSettlementPersistenceTest {
     @Test void historicalMembershipSnapshotSurvivesSourceEditsAndCancelReleasesCurrentSources() throws Exception {
         db.update("UPDATE TB_HR_DEV SET PART_ID='settlement-b' WHERE DEV_ID='settlement-dev'");
         db.update("INSERT INTO TB_SY_CHG_HIST(TRGT_TBL_NM,TRGT_KEY,CHG_TYPE_CD,CHG_ITEM_NM,BFR_VAL,AFT_VAL,REG_USER_ID,REG_DTTM) VALUES('TB_HR_DEV','settlement-dev','UPD','영업 파트','settlement-a','settlement-b','admin','2026-02-01T00:00:00+09:00')");
-        assertThat(read().path("items").size()).isZero();
+        // 확정 전 화면도 월말 파트(가파트)로 모은다(2026-11-21 사용자 결정): 확정 전과 확정 뒤 숫자가 같다.
+        assertThat(read().path("items").size()).isEqualTo(1);
         var confirmed=json.readTree(command("/confirm",version(read()))).get("data");assertThat(confirmed.path("items").size()).isEqualTo(1);
         assertThat(db.queryForObject("SELECT EMP_TYPE_CD FROM TB_CO_PART_SETL_DTL WHERE PART_ID='settlement-a'",String.class)).isEqualTo("FT");
         db.update("UPDATE TB_PJ_PROJ SET PROJ_NM='바뀐 이름' WHERE PROJ_ID='settlement-project'");assertThat(read().path("items").get(0).path("projectNames").get(0).asText()).isEqualTo("고정될 이름");
@@ -143,6 +144,6 @@ class PartSettlementPersistenceTest {
         var result=mvc.perform(get("/api/common/part-settlements/excel").param("partId","settlement-a").param("yearMonth","2026-01").param("view","monthly")).andExpect(status().isOk()).andReturn();
         try(var book=new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(result.getResponse().getContentAsByteArray()))){assertThat(book.getSheetAt(0).getPhysicalNumberOfRows()).isGreaterThan(1);}
         assertThat(count("TB_SY_ACCS_LOG")).isEqualTo(logs+1);assertThat(count("TB_CO_PART_SETL")).isEqualTo(headers);
-        assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE SCRN_ID='UI-19' AND ACCS_TYPE_CD='DNLD'",Integer.class)).isEqualTo(1);
+        assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE SCRN_ID='UI-19' AND ACT_TYPE_CD='DNLD'",Integer.class)).isEqualTo(1);
     }
 }

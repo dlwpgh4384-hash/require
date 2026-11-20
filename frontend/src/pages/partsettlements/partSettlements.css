@@ -4,64 +4,120 @@
   gap: 16px;
   min-width: 0;
 }
-.part-settlement-conditions,
-.part-settlement-tabs,
-.part-settlement-card {
+.part-settlement-conditions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
 }
-.part-settlement-page .part-settlement-summary {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+/* 시안 본문 .tabs: 가장자리 여백 없이, 아래 칸과 간격 8px */
+.part-settlement-page .part-settlement-tabs {
+  padding: 0;
+  margin-bottom: -8px;
 }
-.part-settlement-tabs button {
-  border: 1px solid var(--ls-border, #d8dfe8);
-  border-radius: 6px;
-  background: var(--ls-bg, white);
-  padding: 8px 16px;
+.part-settlement-sub {
+  color: var(--text-sub);
+}
+/* 시안 .card + .fld(최대 560px, 칸 이름 120px) */
+.part-settlement-card {
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.part-settlement-fld {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: start;
+  max-width: 560px;
+}
+.part-settlement-fl {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-sub);
+  text-align: right;
+  padding-top: 8px;
+}
+.part-settlement-fc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.part-settlement-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.part-settlement-money {
+  width: 160px;
+  max-width: 100%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.part-settlement-money[readonly] {
+  background: var(--ls-head-bg, #f4f6f9);
+}
+.part-settlement-help {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+/* 이름: 테두리 없는 글자(누르면 개발자 상세) */
+.part-settlement-name {
+  border: 0;
+  background: none;
+  padding: 0;
+  min-height: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
 }
-.part-settlement-tabs button[aria-selected="true"] {
-  color: var(--primary, #2f6fde);
-  border-color: currentColor;
+.part-settlement-name:hover {
+  text-decoration: underline;
+}
+/* 시안 기간 추이: 기준월 칸 강조, 이익금 줄 굵게, 이름·비고는 위로 붙임 */
+.part-settlement-page .ls-t .part-settlement-cur {
+  background: var(--primary-bg);
+}
+.part-settlement-page .ls-t tr.part-settlement-strong td {
   font-weight: 600;
 }
-.part-settlement-banner {
-  margin: 0;
-  padding: 12px;
-  border: 1px solid var(--ls-border, #d8dfe8);
-  border-radius: 6px;
-  background: var(--ls-head-bg, #f4f6f9);
+.part-settlement-page .ls-t td.part-settlement-top {
+  vertical-align: top;
+  padding-top: 10px;
 }
-.part-settlement-negative {
-  color: var(--ls-bad, #c43b3b);
+.part-settlement-page .ls-t td.part-settlement-empty {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--text-sub);
 }
-.part-settlement-card input {
-  max-width: 220px;
-  padding: 8px;
-  text-align: right;
-}
-.part-settlement-card input[readonly] {
-  background: var(--ls-head-bg, #f4f6f9);
-}
-.part-settlement-page .ls-twrap {
-  overflow: auto;
-}
-.part-settlement-page .ls-t td {
+.part-settlement-trend-table td,
+.part-settlement-trend-table th {
   white-space: nowrap;
 }
-.part-settlement-card p {
-  flex-basis: 100%;
-  margin: 0;
+.part-settlement-reason {
+  height: auto;
+  min-height: 80px;
+  padding: 8px 10px;
+  resize: vertical;
 }
-@media (max-width: 900px) {
-  .part-settlement-page .part-settlement-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 600px) {
+  .part-settlement-fld {
+    grid-template-columns: minmax(0, 1fr);
   }
-}
-@media (max-width: 480px) {
-  .part-settlement-page .part-settlement-summary {
-    grid-template-columns: 1fr;
+  .part-settlement-fl {
+    text-align: left;
+    padding-top: 0;
+  }
+  .part-settlement-card {
+    padding: 16px;
   }
 }

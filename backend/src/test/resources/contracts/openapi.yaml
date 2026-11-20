@@ -13003,9 +13003,11 @@ components:
       - confirmed
       - closed
       - confirmedBy
+      - confirmedByName
       - confirmedAt
       - confirmationNote
       - modifiedAt
+      - turnkeyDeveloperIds
       properties:
         partId:
           type: string
@@ -13034,6 +13036,10 @@ components:
           type: string
           nullable: true
           description: 확정 실행자·자동은 마감 실행자
+        confirmedByName:
+          type: string
+          nullable: true
+          description: 확정한 사람 이름(TB_SY_USER.USER_NM)·안내 띠 표시
         confirmedAt:
           type: string
           format: date-time
@@ -13047,6 +13053,11 @@ components:
           format: date-time
           nullable: true
           description: 조회한 수정 시각. 기존 미저장 행/기존 null 버전은 null 그대로 전달하며 SQL에서도 비교한다.
+        turnkeyDeveloperIds:
+          type: array
+          items:
+            type: string
+          description: 이 파트 줄 가운데 그 달 턴키 프로젝트에 투입한 사람·화면 「턴키」 표시
       additionalProperties: false
     CommonPartSettlementTrendMonth:
       type: object

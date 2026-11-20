@@ -47,6 +47,10 @@ export interface PartSettlement {
   confirmedBy: string | null;
   confirmedAt: string | null;
   confirmationNote: string | null;
+  /** 확정한 사람 이름. 옛 응답에는 없어 confirmedBy를 대신 보인다. */
+  confirmedByName?: string | null;
+  /** 그 달 턴키 프로젝트에 투입한 사람(프로젝트 칸의 「턴키」). 옛 응답에는 없다. */
+  turnkeyDeveloperIds?: string[];
   modifiedAt: string | null;
 }
 export interface PartSettlementTrendMonth {
@@ -92,20 +96,6 @@ async function request<T>(
 }
 const path = (partId: string, yearMonth: string) =>
   `${root}/${encodeURIComponent(partId)}/${encodeURIComponent(yearMonth)}`;
-export interface PartSettlementCloseCheck {
-  yearMonth: string;
-  totalCount: number;
-  unconfirmedCount: number;
-  items: { partId: string; confirmed: boolean; modifiedAt: string | null }[];
-}
-export const getCommonPartSettlementCloseChecks = (
-  yearMonth: string,
-  signal?: AbortSignal,
-) =>
-  request<PartSettlementCloseCheck>(
-    `/api/common/part-settlement-close-checks?${new URLSearchParams({ yearMonth })}`,
-    { signal },
-  );
 export const getCommonPartSettlements = (
   yearMonth: string,
   signal?: AbortSignal,

@@ -14,6 +14,8 @@ import static java.math.BigDecimal.ZERO;
 
 public final class PartSettlementRules {
     public static final String MISSING_SALARY = "⚠ 월 급여 없음(시작 달 급여 0)";
+    public static final String UPLOAD_PENDING = "⚠ 급여 업로드 전";
+    public static final String TURNKEY_COST_PENDING = "턴키 배분 원가 없음(마감 전)";
     private static final ZoneId KOREA = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter DB = DateTimeFormatter.ofPattern("uuuuMM");
     public PartSettlementRules(List<Definition> definitions) {
@@ -71,20 +73,29 @@ public final class PartSettlementRules {
             Input person = assignments.get(0);
             boolean uploaded = Boolean.TRUE.equals(person.uploaded);
             String type = uploaded ? person.payrollType : person.employeeTypeCode;
-            boolean startMonth = person.firstStart != null && YearMonth.from(person.firstStart).equals(month);
-            BigDecimal salary = uploaded ? ("VN".equals(type) ? nz(person.vendorSupply) : nz(person.salary)) : nz(person.monthlySalary);
-            List<String> notes = new ArrayList<>(warnings);
-            if (!uploaded && startMonth) {
-                salary = salary.multiply(BigDecimal.valueOf(month.lengthOfMonth()-person.firstStart.getDayOfMonth()+1))
-                    .divide(BigDecimal.valueOf(month.lengthOfMonth()),16,RoundingMode.DOWN);
-                notes.add("시작 달 일수 비례");
-            }
+            boolean outsourced = "OS".equals(type);
+            boolean startMonth = !outsourced && person.firstStart != null && YearMonth.from(person.firstStart).equals(month);
+            List<String> notes = new ArrayList<>();
+            if (!outsourced) notes.add("FT".equals(type) ? "공통관리비+퇴직금" : "공통관리비");
+            BigDecimal salary;
+            boolean missing = false;
+            if (outsourced) salary = uploaded ? nz(person.vendorSupply) : nz(person.monthlySalary);
+            else if (startMonth) {
+                // 식-42: 시작 달은 월 급여(개발자 풀) × 일수 비례. 업로드 값은 개발자 풀 월 급여가 없을 때만 쓴다(2026-11-21 사용자 결정).
+                BigDecimal base = person.monthlySalary != null ? person.monthlySalary : uploaded ? person.salary : null;
+                missing = base == null;
+                salary = nz(base);
+                int days = month.lengthOfMonth(), from = person.firstStart.getDayOfMonth();
+                if (from > 1) {
+                    salary = salary.multiply(BigDecimal.valueOf(days - from + 1)).divide(BigDecimal.valueOf(days), 16, RoundingMode.DOWN);
+                    notes.add("시작 달 " + (days - from + 1) + "/" + days + "일");
+                }
+            } else salary = uploaded ? nz(person.salary) : nz(person.monthlySalary);
             salary = money(salary);
-            boolean missing = !uploaded && startMonth && person.monthlySalary == null;
             if (missing) notes.add(MISSING_SALARY);
-            BigDecimal expense = "VN".equals(type) ? ZERO : part.salesExpense;
+            if (!uploaded && !startMonth) notes.add(UPLOAD_PENDING);
+            BigDecimal expense = outsourced ? ZERO : part.salesExpense;
             BigDecimal retirement = "FT".equals(type) ? salary.divide(BigDecimal.valueOf(12),0,RoundingMode.DOWN) : ZERO;
-            notes.add("FT".equals(type) ? "공통관리비+퇴직금" : "공통관리비");
             BigDecimal cost = salary.add(expense).add(retirement);
             BigDecimal mm = assignments.stream().map(i -> i.mm).reduce(ZERO,BigDecimal::add).setScale(2,RoundingMode.HALF_UP);
             BigDecimal revenue = ZERO;
@@ -97,7 +108,8 @@ public final class PartSettlementRules {
                 if ("TK".equals(first.contractType)) {
                     if (first.distribution != null) revenue = revenue.add(money(first.distribution));
                     else if (first.budget == null || first.budget.signum() <= 0) notes.add("턴키 예산 없음: 단가 0");
-                    else revenue = revenue.add(money(nz(first.allocatedCost).multiply(nz(first.contractAmount))
+                    else if (first.allocatedCost == null) notes.add(TURNKEY_COST_PENDING);
+                    else revenue = revenue.add(money(first.allocatedCost.multiply(nz(first.contractAmount))
                         .divide(first.budget,16,RoundingMode.DOWN)));
                 } else for (Input assignment : paid) revenue = revenue.add(money(nz(assignment.price).multiply(assignment.mm)));
             }
@@ -107,6 +119,7 @@ public final class PartSettlementRules {
                 .map(rows -> rows.get(0).projectName).distinct().toList();
             BigDecimal profit = revenue.subtract(cost);
             BigDecimal share = money(profit.multiply(part.distributionRate).movePointLeft(2));
+            notes.addAll(warnings);
             result.add(new Workforce(person.developerId,person.developerName,type,names,mm,revenue,salary,
                 expense,retirement,cost,profit,share,notes.stream().distinct().toList(),missing));
         }

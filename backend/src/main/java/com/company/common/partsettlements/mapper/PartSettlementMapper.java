@@ -13,6 +13,7 @@ public interface PartSettlementMapper {
     List<PartSettlementRows.History> selectHistory();
     List<PartSettlementRows.Detail> selectDetails(Key key);
     boolean isClosed(@Param("month") String month);
+    String selectCodeName(@Param("group") String group, @Param("code") String code);
     void lockSources();
     int insertHeader(Mutation mutation);
     int updateCard(Mutation mutation);

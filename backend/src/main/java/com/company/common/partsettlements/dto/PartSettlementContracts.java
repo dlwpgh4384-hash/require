@@ -16,7 +16,8 @@ public final class PartSettlementContracts {
         BigDecimal profitShare, List<String> notes, boolean missingMonthlySalary) {}
     public record Settlement(String partId, String partName, String yearMonth, Summary summary,
         List<Workforce> items, BigDecimal corpCardAmount, boolean confirmed, boolean closed,
-        String confirmedBy, Instant confirmedAt, String confirmationNote, Instant modifiedAt) {}
+        String confirmedBy, String confirmedByName, Instant confirmedAt, String confirmationNote, Instant modifiedAt,
+        List<String> turnkeyDeveloperIds) {}
     public record TrendMonth(String yearMonth, BigDecimal monthlyMm, BigDecimal unitPrice,
         BigDecimal totalCost, BigDecimal profit, BigDecimal profitShare) {}
     public record TrendPerson(String developerId, String developerName, List<TrendMonth> months) {}

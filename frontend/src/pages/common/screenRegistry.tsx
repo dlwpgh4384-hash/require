@@ -19,6 +19,7 @@ import { ManpowerComparisonPage } from "../commonops/ManpowerComparisonPage";
 import { PersonalCostProfitPage } from "../personalcostprofits/PersonalCostProfitPage";
 import { ProjectCostAnalysisPage } from "../projectcostanalyses/ProjectCostAnalysisPage";
 import { PartSettlementPage } from "../partsettlements/PartSettlementPage";
+import { PartSettlementTitleActions } from "../partsettlements/PartSettlementWorkspace";
 import { ProjectBoardPage } from "../projectboard/ProjectBoardPage";
 import { ProjectBoardTitleActions } from "../projectboard/ProjectBoardWorkspace";
 import {
@@ -54,6 +55,7 @@ export const screenRegistry: readonly ScreenEntry[] = [
   {
     id: "UI-19",
     Page: () => <PartSettlementPage />,
+    TitleActions: () => <PartSettlementTitleActions />,
     rootTestId: "part-settlement-page",
     hasInputs: true,
   },

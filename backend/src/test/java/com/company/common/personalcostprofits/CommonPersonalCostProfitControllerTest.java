@@ -212,7 +212,7 @@ class CommonPersonalCostProfitControllerTest {
             // 연 누계 화면 제목과 같게 「월 급여」→「급여」
             assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("급여");
             assertThat(sheet.getRow(2).getCell(2).getStringCellValue()).isEqualTo("원가합계");
-            assertThat(sheet.getRow(3).getCell(2).getStringCellValue()).isEqualTo("2175");
+            assertThat(sheet.getRow(3).getCell(2).getNumericCellValue()).isEqualTo(2175d);
         }
         verify(mapper).insertAccess(eq("admin"), contains("개인 원가·수익표"));
     }
@@ -243,8 +243,8 @@ class CommonPersonalCostProfitControllerTest {
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
             assertThat(book.getSheetAt(0).getSheetName()).isEqualTo("턴키단가미포함");
-            assertThat(book.getSheetAt(0).getRow(3).getCell(1).getStringCellValue()).isEqualTo("0");
-            assertThat(book.getSheetAt(0).getRow(3).getCell(2).getStringCellValue()).isEqualTo("2130");
+            assertThat(book.getSheetAt(0).getRow(3).getCell(1).getNumericCellValue()).isEqualTo(0d);
+            assertThat(book.getSheetAt(0).getRow(3).getCell(2).getNumericCellValue()).isEqualTo(2130d);
         }
     }
     private static Person namedPerson(String id, String name, String partName) {

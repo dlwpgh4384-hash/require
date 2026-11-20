@@ -91,16 +91,17 @@ public class CommonPartSettlementService {
         var key=new Key(part.partId,db(month));
         Header header=mapper.selectHeader(key);
         List<Workforce> rows;
+        var inputs=mapper.selectInputs(db(month));
         if (confirmed(header)) rows=mapper.selectDetails(key).stream().map(d -> new Workforce(d.developerId,d.developerName,
             d.employeeTypeCode,split(d.projectNames,", "),d.monthlyMm,d.unitPrice,d.salary,d.salesExpense,d.retirementAmount,
             d.totalCost,d.profit,d.profitShare,split(d.notes," · "),d.notes!=null && d.notes.contains(MISSING_SALARY))).toList();
         else {
-            var inputs=mapper.selectInputs(db(month));
-            var history=historical ? mapper.selectHistory() : List.<History>of();
+            // 확정 전 화면도 확정과 같이 그 달 말일의 영업 파트로 모은다(2026-11-21, 확정 전후 숫자가 같게).
+            var history=mapper.selectHistory();
             var people=inputs.stream().collect(Collectors.groupingBy(i->i.developerId,LinkedHashMap::new,Collectors.toList()));
             var calculated=new ArrayList<Workforce>();
             for (var person:people.values()) {
-                var member=historical ? membership(person.get(0),month,parts,history) : new Membership(person.get(0).partId,null);
+                var member=membership(person.get(0),month,parts,history);
                 if (part.partId.equals(member.partId())) calculated.addAll(rules.calculate(part,month,person,
                     member.warning()==null ? List.of() : List.of(member.warning())));
             }
@@ -111,8 +112,15 @@ public class CommonPartSettlementService {
         BigDecimal share=confirmed(header) ? header.profit : rows.stream().map(Workforce::profitShare).reduce(ZERO,BigDecimal::add).subtract(card);
         var summary=new Summary(Objects.toString(part.leaderName,""),part.distributionRate,part.salesExpense,rows.size(),profit,share);
         return new Settlement(part.partId,part.partName,month.toString(),summary,rows,card,confirmed(header),mapper.isClosed(db(month)),
-            header==null ? null : header.confirmedBy,header==null ? null : header.confirmedAt,
-            header!=null && "AUTO".equals(header.state) ? "마감 시 자동 확정" : null,header==null ? null : header.modifiedAt);
+            header==null ? null : header.confirmedBy,header==null ? null : header.confirmedByName,header==null ? null : header.confirmedAt,
+            header!=null && "AUTO".equals(header.state) ? "마감 시 자동 확정" : null,header==null ? null : header.modifiedAt,
+            turnkey(inputs,rows));
+    }
+    /** 이 파트 줄 가운데 그 달 턴키 프로젝트에 투입한 사람(화면 「턴키」 표시). */
+    private static List<String> turnkey(List<Input> inputs,List<Workforce> rows) {
+        var people=rows.stream().map(Workforce::developerId).collect(Collectors.toSet());
+        return inputs.stream().filter(i->"TK".equals(i.contractType) && nz(i.mm).signum()>0 && people.contains(i.developerId))
+            .map(i->i.developerId).distinct().sorted().toList();
     }
     private static List<String> split(String value,String delimiter) {
         return value==null || value.isEmpty() ? List.of() : Arrays.asList(value.split(java.util.regex.Pattern.quote(delimiter),-1));

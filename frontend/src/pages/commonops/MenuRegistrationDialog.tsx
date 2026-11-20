@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog, InlineConfirmation } from "../../shared/feedback/Dialog";
-import * as api from "./menuRegistration";
+import * as api from "./menuRegistrationApi";
 import "../../shared/list/list.css";
 import "./menuRegistration.css";
 

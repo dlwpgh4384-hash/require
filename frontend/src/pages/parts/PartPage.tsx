@@ -188,8 +188,10 @@ export function PartPage() {
           </button>
         </div>
       )}
-      <Banner kind="info">
-        <svg className="ls-banner-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" /></svg>
+      <Banner
+        kind="info"
+        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" /></svg>}
+      >
         이익 배분율·공통관리비를 바꾸면 적용 시작월부터 새 기준을 씁니다. 지난 달 정산은 바뀌지 않습니다.
         기준 변경은 시스템 관리자·재무 담당만 할 수 있습니다.
       </Banner>

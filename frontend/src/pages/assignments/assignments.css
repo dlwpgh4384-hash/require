@@ -110,6 +110,10 @@
   flex-direction: column;
   gap: 16px;
 }
+/* 시안 p{margin:0}: 설명 글 사이도 .fsec 간격 16만 둔다 */
+.assignment-form > p {
+  margin: 0;
+}
 .assignment-form .project-fc select,
 .assignment-form .project-fc input:not([type="checkbox"]) {
   width: 100%;
@@ -127,10 +131,11 @@
 .assignment-form .assignment-row .project-money {
   flex: none;
 }
+/* 시안 .fsec 안 .btn: 다른 칸처럼 창 폭 가득(높이 36) */
 .assignment-ai {
-  align-self: flex-start;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 .assignment-err {

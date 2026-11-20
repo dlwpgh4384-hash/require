@@ -412,14 +412,6 @@
   margin: 4px 0 -6px;
   font-size: 14px;
 }
-/* 시안 .banner: 아이콘과 글 사이 간격 */
-.project-page .ls-banner svg,
-.project-distribution .ls-banner svg,
-.app-dialog .project-modal .ls-banner svg {
-  flex: none;
-  margin-right: 6px;
-  vertical-align: -3px;
-}
 
 /* 시안 .modal 본문: 글 회색, 칸 이름 굵기 500, 아래 여백 16, 제목 줄 높이 24 */
 .app-dialog:has(.project-modal) .app-dialog-head h2 {
@@ -434,6 +426,10 @@
 }
 .project-fc label {
   font-weight: 500;
+}
+/* 시안 .fc .fl: 칸 이름 위아래 여백 없음(간격은 .fc gap 4). 공통 창 label 여백(16·6)을 끈다 */
+.app-dialog .project-fc label {
+  margin: 0;
 }
 .project-fc select {
   padding: 0 4px 0 10px;
@@ -538,18 +534,7 @@
 .project-progress-error {
   font-size: 13px;
 }
-.project-progress-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-bottom: 16px;
-}
-.project-progress-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-}
+/* 주간 메모·단계 계획 창: 틀과 칸 간격은 공통 .project-modal·.project-fc */
 .project-progress-form textarea {
   width: 100%;
   resize: vertical;

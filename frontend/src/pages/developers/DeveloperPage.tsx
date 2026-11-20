@@ -18,6 +18,10 @@ import { getCommonOperatingStandards } from "../operatingstandards/operatingStan
 import { getCommonUploadTemplate, type UploadResult } from "../uploads/uploads";
 import { UploadResultDialog } from "../uploads/UploadResultDialog";
 import { DeveloperDetail } from "./DeveloperDetail";
+import {
+  subscribeDeveloperAction,
+  type DeveloperRequest,
+} from "./developerRequest";
 import { DeveloperForm } from "./DeveloperForm";
 import {
   developerFailure,
@@ -353,6 +357,30 @@ export function DeveloperPage({
       setBusy(false);
     }
   };
+  // 상세의 [사용 중지]/[다시 사용]: 목록에 있으면 투입 중 확인(askUse), 없으면 바로 확인 창
+  const stopOne = (d: Developer) =>
+    d.useYn !== "Y"
+      ? void resumeOne(d)
+      : rows?.some((r) => r.developerId === d.developerId)
+        ? askUse("N", [d.developerId])
+        : setPendingUse({
+            ids: [d.developerId],
+            useYn: "N",
+            names: [d.name],
+            busyRows: [],
+            retired: 0,
+          });
+  // 다른 화면(UI-03 등)에서 연 개발자 상세의 [수정]·[사용 중지] 요청을 이 화면의 폼·확인 창으로 받는다.
+  const takeRequest = useRef<(request: DeveloperRequest) => void>(() => {});
+  takeRequest.current = (request) => {
+    setDetail(null);
+    if (request.action === "edit") setForm({ developer: request.developer });
+    else stopOne(request.developer);
+  };
+  useEffect(
+    () => subscribeDeveloperAction((request) => takeRequest.current(request)),
+    [],
+  );
   const download = async () => {
     setDownloading(true);
     try {
@@ -598,19 +626,7 @@ export function DeveloperPage({
             setForm({ developer: d });
             setDetail(null);
           }}
-          onStop={(d) =>
-            d.useYn !== "Y"
-              ? void resumeOne(d)
-              : rows?.some((r) => r.developerId === d.developerId)
-                ? askUse("N", [d.developerId])
-                : setPendingUse({
-                    ids: [d.developerId],
-                    useYn: "N",
-                    names: [d.name],
-                    busyRows: [],
-                    retired: 0,
-                  })
-          }
+          onStop={stopOne}
           onNotice={(message) => {
             setNoticeKind("warn");
             setNotice(message);

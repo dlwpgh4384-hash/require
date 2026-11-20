@@ -1,5 +1,4 @@
-import { useCallback } from "react";
-import { useInRouterContext, useNavigate } from "react-router-dom";
+import { createScreenRequest } from "../../shared/layout/screenRequest";
 import type { Project } from "./projects";
 
 /**
@@ -7,43 +6,22 @@ import type { Project } from "./projects";
  * 프로젝트(UI-01) 화면의 수정 폼을 연다(2026-11-19 사용자 결정, 시안대로).
  * 프로젝트 화면이 아직 안 열려 있으면 열릴 때, 이미 열려 있으면 바로 요청을 받는다.
  */
-type Listener = (project: Project) => void;
-let pending: Project | null = null;
-const listeners = new Set<Listener>();
+const edit = createScreenRequest<Project>("UI-01");
 
-export function requestProjectEdit(project: Project) {
-  if (listeners.size === 0) {
-    pending = project;
-    return;
-  }
-  pending = null;
-  listeners.forEach((listener) => listener(project));
-}
-
+export const requestProjectEdit = edit.request;
 /** 프로젝트 화면이 쓴다: 남아 있는 요청을 먼저 받고, 이후 요청을 기다린다. */
-export function subscribeProjectEdit(listener: Listener) {
-  listeners.add(listener);
-  if (pending) {
-    const project = pending;
-    pending = null;
-    listener(project);
-  }
-  return () => {
-    listeners.delete(listener);
-  };
-}
-
+export const subscribeProjectEdit = edit.subscribe;
 /** 다른 화면이 쓴다: 수정 요청을 남기고 프로젝트 화면 탭으로 간다. */
-export function useOpenProjectEdit() {
-  const inRouter = useInRouterContext();
-  // 라우터 밖(단위 시험)에서는 이동 없이 요청만 남긴다. 한 화면 안에서 라우터 유무는 바뀌지 않는다.
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const navigate = inRouter ? useNavigate() : null;
-  return useCallback(
-    (project: Project) => {
-      requestProjectEdit(project);
-      navigate?.("/screens/UI-01");
-    },
-    [navigate],
-  );
-}
+export const useOpenProjectEdit = edit.useOpen;
+
+/**
+ * 시안 distopen: 어느 화면에서 연 프로젝트 상세든 턴키 [배분표]를 누르면 상세를 닫고
+ * 프로젝트(UI-01) 화면의 배분표 화면을 연다. 값은 프로젝트 ID.
+ */
+const distribution = createScreenRequest<string>("UI-01");
+
+export const requestProjectDistribution = distribution.request;
+/** 프로젝트 화면이 쓴다. */
+export const subscribeProjectDistribution = distribution.subscribe;
+/** 다른 화면이 쓴다: 배분표 요청을 남기고 프로젝트 화면 탭으로 간다. */
+export const useOpenProjectDistribution = distribution.useOpen;

@@ -231,7 +231,7 @@ it("M014 under G006 opens UI-03 without replacing the preference provider", asyn
 });
 
 it.each(["DEV-selected", "DEV-another"])(
-  "FX-PERSON-DETAIL opens the clicked developerId %s read-only and closing preserves the applied list and draft",
+  "FX-PERSON-DETAIL opens the clicked developerId %s like the developer pool (시안 openPerson) and closing preserves the applied list and draft",
   async (developerId) => {
     const { request, list } = respond(developerId);
     mount("/screens/UI-03");
@@ -261,16 +261,10 @@ it.each(["DEV-selected", "DEV-another"])(
         `/api/common/developers/${developerId}${suffix}`,
         undefined,
       );
-    expect(
-      panel.queryByRole("button", { name: "수정" }),
-    ).not.toBeInTheDocument();
-    expect(
-      panel.queryByRole("button", { name: "사용 중지" }),
-    ).not.toBeInTheDocument();
+    // 시안 openPerson: 개발자 풀과 같은 상세 — [수정]·[사용 중지]가 있다(누르면 개발자 풀로 넘김).
+    expect(panel.getByRole("button", { name: "수정" })).toBeVisible();
+    expect(panel.getByRole("button", { name: "사용 중지" })).toBeVisible();
     fireEvent.click(panel.getByRole("tab", { name: /근무 상태/ }));
-    expect(
-      panel.queryByRole("button", { name: /등록|취소|변경/ }),
-    ).not.toBeInTheDocument();
     fireEvent.click(panel.getByRole("button", { name: "닫기" }));
     expect(screen.queryByTestId("developer-detail")).not.toBeInTheDocument();
     expect(screen.getByLabelText("이름")).toHaveValue("미조회 조건");

@@ -253,13 +253,6 @@
 .code-page .ls-banner {
   margin: 0;
 }
-.ls-banner-icon,
-.code-banner-icon {
-  display: inline-flex;
-  flex: none;
-  vertical-align: -3px;
-  margin-right: 10px;
-}
 /* 제목 줄: 시안 .tbar .tl — 13px, 이름 굵게, ID 회색 */
 .code-page .code-detail-head {
   margin: 0 0 -12px;

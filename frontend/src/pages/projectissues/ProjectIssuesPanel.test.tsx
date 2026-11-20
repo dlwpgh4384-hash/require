@@ -420,3 +420,65 @@ it("audit line uses Korean dates (UTC evening is the next Korean day)", () => {
     ),
   ).toBe("10-15 김PM 등록");
 });
+it("이슈 창: 시안 창 틀(.project-modal), 필수 칸(프로젝트·제목·중요도·기한·상태)에 *, 조치 내용은 선택, 틀린 칸은 빨간 테두리", async () => {
+  render(<ProjectIssuesPanel />);
+  fireEvent.click(await screen.findByTestId("project-issue-create"));
+  const box = await screen.findByTestId("project-issue-dialog");
+  const dialog = within(box);
+  expect(box.querySelector("form.project-modal")).not.toBeNull();
+  const required = [...box.querySelectorAll(".project-fc label")]
+    .filter((label) => label.querySelector(".project-bad"))
+    .map((label) => label.textContent?.replace(" *", ""));
+  expect(required).toEqual(["프로젝트", "제목", "중요도", "기한", "상태"]);
+  expect(dialog.getByLabelText("조치 내용")).toBe(
+    dialog.getByTestId("project-issue-action"),
+  );
+  fireEvent.click(dialog.getByTestId("project-issue-save"));
+  await dialog.findByRole("alert");
+  expect(dialog.getByTestId("project-issue-project")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  fireEvent.change(dialog.getByTestId("project-issue-project"), {
+    target: { value: "P-selected" },
+  });
+  fireEvent.click(dialog.getByTestId("project-issue-save"));
+  await waitFor(() =>
+    expect(dialog.getByTestId("project-issue-title")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    ),
+  );
+  expect(dialog.getByTestId("project-issue-project")).not.toHaveAttribute(
+    "aria-invalid",
+  );
+  expect(
+    request.mock.calls.filter(([, init]) => init?.method === "POST"),
+  ).toHaveLength(0);
+});
+it("list: 중요도·상태 이름을 받기 전에는 코드(HIGH·OPEN) 대신 「불러오는 중」", async () => {
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/IMPR/codes")) await gate;
+    return base(url, init);
+  });
+  render(<ProjectIssuesPanel />);
+  await waitFor(() =>
+    expect(
+      request.mock.calls.some(([url]) =>
+        String(url).startsWith("/api/common/project-issues"),
+      ),
+    ).toBe(true),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(screen.queryByText("HIGH")).not.toBeInTheDocument();
+  expect(screen.queryByText("지난 이슈")).not.toBeInTheDocument();
+  release();
+  expect(await screen.findByText("지난 이슈")).toBeVisible();
+  expect(screen.getAllByText("높음").length).toBeGreaterThan(0);
+  expect(screen.queryByText("HIGH")).not.toBeInTheDocument();
+});

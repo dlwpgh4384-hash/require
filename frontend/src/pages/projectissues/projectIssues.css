@@ -1,25 +1,15 @@
-/* 시안 issueModal: 칸을 위에서 아래로 한 줄씩 */
+/* 시안 issueModal: 창 틀은 공통 .project-modal(폭 400), 칸은 .project-fc. 칸 사이 간격은 .mb와 같은 12 */
 .project-issue-form fieldset {
   border: 0;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.project-issue-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
   min-width: 0;
-  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 .project-issue-form textarea {
-  min-height: 72px;
   resize: vertical;
-}
-.project-issue-form .ls-in {
-  width: 100%;
 }
 .project-issue-form .project-issue-date {
   width: 170px;

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog, Dialog } from "../../shared/feedback/Dialog";
 import { Badge } from "../../shared/list";
 import { addDays, formatMonthDay, koreanToday } from "../../shared/time";
+import { ProjectField } from "./ProjectField";
 import { projectFailure } from "./projects";
 import * as api from "./projectBoardDetails";
 
@@ -184,13 +185,17 @@ export function ProjectProgressPanel({
       setBusy(false);
     }
   }
+  // 진척률 칸 오류일 때 그 칸에 빨간 테두리
+  const progressInvalid = modalError.startsWith("실적 진척률");
   function saveMemo() {
     const done = input.workDone.trim();
     const next = input.nextWork.trim();
     const request = input.requests.trim();
     let progress: number | null = null;
-    // 실적 진척률은 필수가 아니다(식-74). 적었으면 0~100 정수.
-    if (!operational && input.actualProgress.trim() !== "") {
+    // 실적 진척률은 필수(시안 「실적 진척률 *」, 2026-11-20 사용자 결정). 0~100 정수.
+    if (!operational && input.actualProgress.trim() === "")
+      return setModalError("실적 진척률을 입력해 주세요.");
+    if (!operational) {
       progress = Number(input.actualProgress.trim());
       if (!Number.isInteger(progress) || progress < 0 || progress > 100)
         return setModalError("실적 진척률은 0~100 사이 정수로 넣어 주세요.");
@@ -436,7 +441,9 @@ export function ProjectProgressPanel({
           onClose={close}
           closable
         >
-          <div className="project-progress-form">
+          {/* 시안 memoModal: 창 틀 .project-modal(폭 400), 칸 fcF.
+              실적 진척률은 시안대로 필수(*), 2026-11-20 사용자 결정. */}
+          <div className="project-modal project-progress-form">
             <p className="project-cap">
               {projectName} ·{" "}
               {selected
@@ -449,15 +456,21 @@ export function ProjectProgressPanel({
                 계산합니다.
               </p>
             ) : (
-              <label>
-                실적 진척률
+              <ProjectField
+                id="project-memo-progress"
+                label="실적 진척률"
+                required
+                help={`계획 진척률은 ${planText}%입니다`}
+              >
                 <span className="project-progress-rate">
                   <input
+                    id="project-memo-progress"
                     className="ls-in"
                     inputMode="numeric"
                     data-testid="project-memo-progress"
                     value={input.actualProgress}
                     disabled={busy}
+                    aria-invalid={progressInvalid || undefined}
                     onChange={(e) => {
                       setInput({ ...input, actualProgress: e.target.value });
                       setDirty(true);
@@ -465,8 +478,7 @@ export function ProjectProgressPanel({
                   />
                   <span className="project-sub">%</span>
                 </span>
-                <span className="project-cap">계획 진척률은 {planText}%입니다</span>
-              </label>
+              </ProjectField>
             )}
             {(
               [
@@ -475,9 +487,9 @@ export function ProjectProgressPanel({
                 ["requests", "요청 사항", "없으면 비워 두세요"],
               ] as const
             ).map(([key, label, placeholder]) => (
-              <label key={key}>
-                {label}
+              <ProjectField key={key} id={`project-memo-${key}`} label={label}>
                 <textarea
+                  id={`project-memo-${key}`}
                   className="ls-in"
                   rows={2}
                   data-testid={`project-memo-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`}
@@ -490,33 +502,33 @@ export function ProjectProgressPanel({
                     setDirty(true);
                   }}
                 />
-              </label>
+              </ProjectField>
             ))}
             {modalError && (
               <p className="project-error" role="alert" data-testid="project-progress-error">
                 {modalError}
               </p>
             )}
-          </div>
-          <div className="app-actions">
-            <button
-              type="button"
-              className="ls-btn"
-              data-testid="project-progress-cancel"
-              disabled={busy}
-              onClick={close}
-            >
-              취소
-            </button>
-            <button
-              type="button"
-              className="ls-btn ls-btn-p"
-              data-testid="project-progress-save"
-              disabled={busy}
-              onClick={saveMemo}
-            >
-              {busy ? "저장 중…" : "저장"}
-            </button>
+            <div className="app-actions">
+              <button
+                type="button"
+                className="ls-btn"
+                data-testid="project-progress-cancel"
+                disabled={busy}
+                onClick={close}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="ls-btn ls-btn-p"
+                data-testid="project-progress-save"
+                disabled={busy}
+                onClick={saveMemo}
+              >
+                {busy ? "저장 중…" : "저장"}
+              </button>
+            </div>
           </div>
         </Dialog>
       )}
@@ -527,7 +539,8 @@ export function ProjectProgressPanel({
           onClose={close}
           closable
         >
-          <div className="project-progress-form">
+          {/* 시안 stagePlanModal: 창 틀 .project-modal(폭 400) */}
+          <div className="project-modal project-progress-form">
             <p className="project-cap">
               {projectName} · 전체 {startDate ?? steps[0]?.plannedStartDate} ~{" "}
               {endDate}
@@ -587,26 +600,26 @@ export function ProjectProgressPanel({
                 {modalError}
               </p>
             )}
-          </div>
-          <div className="app-actions">
-            <button
-              type="button"
-              className="ls-btn"
-              data-testid="project-progress-cancel"
-              disabled={busy}
-              onClick={close}
-            >
-              취소
-            </button>
-            <button
-              type="button"
-              className="ls-btn ls-btn-p"
-              data-testid="project-progress-save"
-              disabled={busy}
-              onClick={saveDates}
-            >
-              {busy ? "저장 중…" : "저장"}
-            </button>
+            <div className="app-actions">
+              <button
+                type="button"
+                className="ls-btn"
+                data-testid="project-progress-cancel"
+                disabled={busy}
+                onClick={close}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="ls-btn ls-btn-p"
+                data-testid="project-progress-save"
+                disabled={busy}
+                onClick={saveDates}
+              >
+                {busy ? "저장 중…" : "저장"}
+              </button>
+            </div>
           </div>
         </Dialog>
       )}

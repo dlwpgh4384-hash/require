@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ProjectLink } from "./ProjectLink";
-import { subscribeProjectEdit } from "./projectEdit";
+import { subscribeProjectDistribution, subscribeProjectEdit } from "./projectEdit";
 import type { Project } from "./projects";
 
 // 다른 화면(철수 리스트 상세·개발자 풀·거래처)의 표 안에서 연 프로젝트 상세에서 인원 계획을 저장하면
@@ -106,4 +106,40 @@ it("a read-only detail opened from another screen shows no weekly memo or issue 
   fireEvent.click(detail.getByRole("tab", { name: /^이슈/ }));
   expect(detail.queryByTestId("project-issues-panel")).not.toBeInTheDocument();
   expect(detail.queryByTestId("project-issue-create")).not.toBeInTheDocument();
+});
+
+// 시안 distopen: 다른 화면(개발자 풀 등)에서 연 턴키 상세에도 [수정] 옆 [배분표]가 있고, 누르면 상세를 닫고 프로젝트 화면의 배분표로 간다.
+it("턴키 상세의 [배분표]는 다른 화면에서 열어도 보이고, 프로젝트 화면 배분표로 요청을 넘긴다", async () => {
+  request.mockImplementation(async (url: string) => {
+    const path = new URL(String(url), "http://localhost").pathname;
+    if (path === "/api/common/projects/P-1") return ok({ ...project, contractTypeCode: "TK", contractTypeName: "턴키" });
+    return ok({ items: [] });
+  });
+  const received: string[] = [];
+  render(
+    <MemoryRouter initialEntries={["/screens/UI-02"]}>
+      <Routes>
+        <Route path="/screens/UI-02" element={<ProjectLink projectId="P-1" name="링크 프로젝트" testId="link-p1" />} />
+        <Route path="/screens/UI-01" element={<p data-testid="project-screen">프로젝트 화면</p>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByTestId("link-p1"));
+  const detail = within(await screen.findByTestId("project-detail"));
+  const open = await detail.findByTestId("project-distribution-open");
+  expect(open).toHaveTextContent("배분표");
+  fireEvent.click(open);
+  expect(await screen.findByTestId("project-screen")).toBeInTheDocument();
+  expect(screen.queryByTestId("project-detail")).not.toBeInTheDocument();
+  const stop = subscribeProjectDistribution((id) => received.push(id));
+  stop();
+  expect(received).toEqual(["P-1"]);
+});
+
+it("턴키가 아니면 [배분표]가 없다", async () => {
+  render(<ProjectLink projectId="P-1" name="링크 프로젝트" testId="link-p1" />);
+  fireEvent.click(screen.getByTestId("link-p1"));
+  const detail = within(await screen.findByTestId("project-detail"));
+  await detail.findByTestId("project-edit");
+  expect(detail.queryByTestId("project-distribution-open")).not.toBeInTheDocument();
 });

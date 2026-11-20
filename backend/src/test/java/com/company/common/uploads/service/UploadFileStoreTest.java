@@ -53,6 +53,15 @@ class UploadFileStoreTest {
                 || java.util.Arrays.equals(saved, new byte[]{2, 2, 2})).isTrue();
         } finally { pool.shutdownNow(); }
     }
+    /** Windows 개발 PC처럼 posix 권한을 모르는 파일 시스템에서도 원본을 보관·읽기·정리한다(2026-11-20 로컬 업로드 500). */
+    @Test void storeWorksWithoutPosixPermissionsLikeWindows() {
+        var windowsLike = new UploadFileStore(owned.resolve("plain"), false);
+        windowsLike.retain(7, new byte[]{7, 7});
+        assertThat(new UploadFileStore(owned.resolve("plain"), false).read(7)).containsExactly((byte) 7, (byte) 7);
+        assertThatThrownBy(() -> windowsLike.retain(7, new byte[]{8})).isInstanceOf(IllegalStateException.class);
+        windowsLike.discard(7);
+        assertThatThrownBy(() -> windowsLike.read(7)).isInstanceOf(IllegalStateException.class);
+    }
     private boolean retain(byte[] bytes) {
         try { store().retain(1, bytes); return true; }
         catch (IllegalStateException conflict) { return false; }

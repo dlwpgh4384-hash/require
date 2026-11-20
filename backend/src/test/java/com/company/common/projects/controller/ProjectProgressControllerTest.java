@@ -140,7 +140,7 @@ class ProjectProgressControllerTest {
         .andExpect(response("POST", "/api/common/projects/{projectId}/steps/{stepId}/complete")); }
     @Test @DisplayName("happy auth side-effect: TB_PJ_WEEK_MEMO 등록과 latestMemoDate 원천 갱신")
     void publicCreateMemoGetsNewIdentityAndAdminWithOptionalTextAndProgress() throws Exception {
-        mvc.perform(post("/api/common/projects/P-0001/weekly-memos").contentType("application/json").content("{}"))
+        mvc.perform(post("/api/common/projects/P-0001/weekly-memos").contentType("application/json").content("{\"actualProgress\":10}"))
             .andExpect(response("POST", "/api/common/projects/{projectId}/weekly-memos"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.memoId").value("1")).andExpect(jsonPath("$.data.createdBy").value("admin"));
         mvc.perform(get(root+"/weekly-memos")).andExpect(jsonPath("$.data.items.length()").value(1));
@@ -148,6 +148,8 @@ class ProjectProgressControllerTest {
     }
     @ParameterizedTest @ValueSource(strings={"MO","DP"})
     void operationalBlankTextRejected(String type) throws Exception { owner=new Owner("P-0001",type,"ING",owner.startDate(),owner.endDate());mvc.perform(post(root+"/weekly-memos").contentType("application/json").content("{\"requests\":\"  \"}" )).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("workDone"));verify(mapper,never()).insertMemo(any()); }
+    /** 턴키·내부 주간 메모는 실적 진척률 필수(시안 「실적 진척률 *」, 2026-11-20 사용자 결정). */
+    @Test void turnkeyMemoWithoutProgressIsRejected() throws Exception { mvc.perform(post(root+"/weekly-memos").contentType("application/json").content("{\"workDone\":\"한 일\"}")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("actualProgress")).andExpect(jsonPath("$.errors[0].message").value("실적 진척률을 입력해 주세요."));verify(mapper,never()).insertMemo(any()); }
     @Test void operationalProgressForbidden() throws Exception { owner=new Owner("P-0001","MO","ING",owner.startDate(),owner.endDate());mvc.perform(post(root+"/weekly-memos").contentType("application/json").content("{\"requests\":\"요청\",\"actualProgress\":0}")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("actualProgress")); }
     @Test @DisplayName("validation: 주간 메모 201자 거부 및 TB_PJ_WEEK_MEMO 무변경")
     void longTextRejected() throws Exception {
@@ -162,13 +164,13 @@ class ProjectProgressControllerTest {
     @DisplayName("business: 종료·실주 주간 메모 등록 거부 및 latestMemoDate 원천 보존")
     void closedMemoCreateRejected(String status) throws Exception {
         memo(); closed(status); var before = List.copyOf(memos);
-        mvc.perform(post("/api/common/projects/P-0001/weekly-memos").contentType("application/json").content("{}"))
+        mvc.perform(post("/api/common/projects/P-0001/weekly-memos").contentType("application/json").content("{\"actualProgress\":10}"))
             .andExpect(status().isBadRequest()).andExpect(response("POST", "/api/common/projects/{projectId}/weekly-memos"));
         verify(mapper, never()).insertMemo(any()); assertThat(memos).isEqualTo(before);
     }
     @Test @DisplayName("happy auth side-effect: TB_PJ_WEEK_MEMO 동일 memoId 정정과 작성일 보존")
     void publicMemoEditPreservesCreationAndOtherRows() throws Exception { memo();var original=memos.get(0);memos.add(memo("2","P-0001",null,null,"다른 행",null,now,"admin",null,null));var other=memos.get(1);
-        mvc.perform(put("/api/common/projects/P-0001/weekly-memos/1").contentType("application/json").content("{\"requests\":\"새 요청\",\"modifiedAt\":\""+original.modifiedAt()+"\"}" )).andExpect(status().isOk())
+        mvc.perform(put("/api/common/projects/P-0001/weekly-memos/1").contentType("application/json").content("{\"actualProgress\":10,\"requests\":\"새 요청\",\"modifiedAt\":\""+original.modifiedAt()+"\"}" )).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.writtenDate").value("2026-10-15"))
             .andExpect(jsonPath("$.data.modifiedAt").value(now.toString()))
             .andExpect(response("PUT", "/api/common/projects/{projectId}/weekly-memos/{memoId}"))
@@ -189,18 +191,18 @@ class ProjectProgressControllerTest {
     @DisplayName("business: 종료·실주 TB_PJ_WEEK_MEMO 수정 거부와 작성일 보존")
     void closedMemoEditPreservesAuditAndText(String status) throws Exception {
         memo(); closed(status); var before = List.copyOf(memos);
-        mvc.perform(put("/api/common/projects/P-0001/weekly-memos/1").contentType("application/json").content("{\"requests\":\"변경\"}"))
+        mvc.perform(put("/api/common/projects/P-0001/weekly-memos/1").contentType("application/json").content("{\"actualProgress\":10,\"requests\":\"변경\"}"))
             .andExpect(status().isBadRequest()).andExpect(response("PUT", "/api/common/projects/{projectId}/weekly-memos/{memoId}"));
         assertThat(memos).isEqualTo(before); verify(mapper, never()).updateMemo(any());
     }
     @Test @DisplayName("business: 다른 사람이 먼저 고친 주간 메모는 409, 내용 보존")
     void staleMemoEditIsConflict() throws Exception {
         memo(); var before = List.copyOf(memos);
-        mvc.perform(put(root+"/weekly-memos/1").contentType("application/json").content("{\"requests\":\"변경\",\"modifiedAt\":\"2026-01-01T00:00:00Z\"}"))
+        mvc.perform(put(root+"/weekly-memos/1").contentType("application/json").content("{\"actualProgress\":10,\"requests\":\"변경\",\"modifiedAt\":\"2026-01-01T00:00:00Z\"}"))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.errors[0].field").value("modifiedAt"))
             .andExpect(response("PUT", "/api/common/projects/{projectId}/weekly-memos/{memoId}"));
         assertThat(memos).isEqualTo(before); verify(mapper, never()).updateMemo(any());
-        mvc.perform(put(root+"/weekly-memos/1").contentType("application/json").content("{\"requests\":\"변경\"}"))
+        mvc.perform(put(root+"/weekly-memos/1").contentType("application/json").content("{\"actualProgress\":10,\"requests\":\"변경\"}"))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("modifiedAt"));
     }
     @Test @DisplayName("business: 다른 사람이 먼저 바꾼 단계 계획은 409, 날짜 보존")

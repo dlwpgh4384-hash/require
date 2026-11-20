@@ -22,7 +22,10 @@ import { ProjectDetail } from "./ProjectDetail";
 import { ProjectDistribution } from "./ProjectDistribution";
 import { ProjectForm } from "./ProjectForm";
 import { useProjectTitleHost } from "./ProjectWorkspace";
-import { subscribeProjectEdit } from "./projectEdit";
+import {
+  subscribeProjectDistribution,
+  subscribeProjectEdit,
+} from "./projectEdit";
 import {
   HQ_PART,
   getCommonProjects,
@@ -154,6 +157,16 @@ export function ProjectPage() {
         setDetail(null);
         setDistribution(null);
         setForm({ project });
+      }),
+    [],
+  );
+  // 다른 화면에서 연 프로젝트 상세의 턴키 [배분표] → 이 화면의 배분표 화면(시안 distopen).
+  useEffect(
+    () =>
+      subscribeProjectDistribution((projectId) => {
+        setDetail(null);
+        setForm(null);
+        setDistribution(projectId);
       }),
     [],
   );

@@ -384,14 +384,9 @@
   line-height: 16px;
 }
 
-/* 시안 .sub(복직일 미정), 사용 중지 띠 아이콘 */
+/* 시안 .sub(복직일 미정). 사용 중지 띠 아이콘은 공통 Banner icon */
 .developer-sub {
   color: var(--text-sub);
-}
-.developer-banner-icon {
-  flex: none;
-  vertical-align: -3px;
-  margin-right: 6px;
 }
 
 /* 시안 .mb > p·.errmsg: 창 안 글줄은 바깥 여백 없음 */

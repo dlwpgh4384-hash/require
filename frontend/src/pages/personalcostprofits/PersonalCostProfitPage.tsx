@@ -15,8 +15,9 @@ import { YearBar } from "../../shared/period/YearBar";
 import { yearRange, type PeriodBasis } from "../../shared/period/periodRules";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
 import { DeveloperDetail } from "../developers/DeveloperDetail";
+import { useOpenDeveloperAction } from "../developers/developerRequest";
 import { projectFailure, ProjectRequestError } from "../projects/projects";
-import { Toast } from "../../shared/feedback/Dialog";
+import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { ShellIcon } from "../../shared/layout/ShellIcon";
 import { PersonalCostProfitFilters } from "./PersonalCostProfitFilters";
 import {
@@ -58,7 +59,11 @@ export const personalCostProfitColumnLabels: readonly (readonly [
   ],
   ["mm", "MM"],
   ["unitPrice", "단가"],
-  ["monthlySalary", "월 급여"],
+  [
+    "monthlySalary",
+    "월 급여",
+    "회사가 직원에게 주는 급여. 외주는 급여가 없어 0(협력사 공급가는 개인별 원가에 들어감, 2026-11-20 결정)",
+  ],
   ["allowance", "그룹장·팀장 수당"],
   ["companyInsurance", "4대보험(회사)"],
   ["personalInsurance", "4대보험(본인)"],
@@ -69,7 +74,7 @@ export const personalCostProfitColumnLabels: readonly (readonly [
   [
     "personalCost",
     "개인별 원가",
-    "월 급여 + 수당 + 4대보험(회사) + 퇴직금 적립 (엑셀 Q열)",
+    "월 급여 + 수당 + 4대보험(회사) + 퇴직금 적립 (엑셀 Q열). 프리랜서는 그 달 지급액, 외주는 협력사 공급가(식-10)",
   ],
   ["teamExpenses", "팀비", "팀비(1인당 월) × 그 사람 MM. 외주 0(식-11)"],
   [
@@ -170,8 +175,9 @@ const defaults = (
 export function PersonalCostProfitPage() {
   const period = useScreenPeriod("UI-03", { kind: "year" });
   return (
+    // screen-body: 다른 업무 화면처럼 회색 바탕 위에 연도 줄·요약·표를 따로 놓는다(흰 카드로 감싸지 않음).
     <div
-      className="personal-cost-profit-page"
+      className="screen-body personal-cost-profit-page"
       data-testid="personal-cost-profit-page"
       data-screen-id="UI-03"
     >
@@ -215,8 +221,11 @@ function PersonalCostProfitContent({
   const [sort, setSort] = useState<ListSort | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [notice, setNotice] = useState("");
+  const [noticeKind, setNoticeKind] = useState<ToastKind>("ok");
   const [unit, setUnit] = useState<MoneyUnit>(DEFAULT_MONEY_UNIT);
   const presentation = useListPresentation();
+  // 시안 openPerson: 개발자 풀과 같은 상세. [수정]·[사용 중지]는 개발자 풀(UI-02)로 넘긴다.
+  const openDeveloperAction = useOpenDeveloperAction();
   const monthlyAverage = applied.displayMode === "월평균";
   const turnkeyExcluded = applied.includeTurnkey === false;
   // 턴키 단가 미포함 보기에서 턴키만 하는 사람은 단가 칸을 비운다(시안 shownRate)
@@ -678,13 +687,40 @@ function PersonalCostProfitContent({
       />
       {detail && (
         <DeveloperDetail
+          key={detail}
           developerId={detail}
-          readOnly
           onClose={() => setDetail(null)}
+          onEdit={(developer) => {
+            setDetail(null);
+            openDeveloperAction({ developer, action: "edit" });
+          }}
+          onStop={(developer) => {
+            setDetail(null);
+            openDeveloperAction({ developer, action: "stop" });
+          }}
+          onNotice={(message) => {
+            setNoticeKind("warn");
+            setNotice(message);
+          }}
+          onChanged={(message) => {
+            // [상태 등록] 등은 상세 안에서 저장하고, 여기서는 표를 다시 읽고 알린다(개발자 풀과 같은 알림 종류).
+            setRevision((v) => v + 1);
+            if (message) {
+              setNoticeKind(message.includes("투입 배정이") ? "info" : "ok");
+              setNotice(message);
+            }
+          }}
         />
       )}
       {notice && (
-        <Toast message={notice} kind="ok" onDismiss={() => setNotice("")} />
+        <Toast
+          message={notice}
+          kind={noticeKind}
+          onDismiss={() => {
+            setNotice("");
+            setNoticeKind("ok");
+          }}
+        />
       )}
     </>
   );

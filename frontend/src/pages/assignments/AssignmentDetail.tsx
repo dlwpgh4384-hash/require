@@ -453,8 +453,7 @@ export function AssignmentDetail({
   const modalBand = change && (
     <>
       {(retro(change) || crosses(change)) && (
-        <Banner kind="warn">
-          {warnIcon}
+        <Banner kind="warn" icon={warnIcon}>
           <span data-testid="assignment-change-warning">
             {[
               retro(change) ? "지난 날짜로 기록합니다. '소급 입력'으로 표시되고 사유가 필요합니다." : "",

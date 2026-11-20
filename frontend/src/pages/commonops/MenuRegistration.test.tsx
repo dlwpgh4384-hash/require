@@ -13,7 +13,7 @@ import { MenuRegistration } from "./MenuRegistration";
 import type {
   MenuRegistrationItem,
   MenuRegistrationOptions,
-} from "./menuRegistration";
+} from "./menuRegistrationApi";
 import { MENU_REFRESH_EVENT } from "../../app/menuRefresh";
 
 let request: ReturnType<typeof vi.fn>;

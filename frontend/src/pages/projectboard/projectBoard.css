@@ -6,12 +6,13 @@
   color: var(--text);
 }
 /* 요약 칸은 공통 KpiCards(.ls-kpis/.ls-kpi). 휴대폰 배치만 아래 @media에서 더한다 */
-/* 시안 .tabs .tb */
+/* 시안 .tabs .tb. 시안 .content 간격 24라 요약 칸→탭은 24(화면 간격 16 + 8), 탭→아래는 16 그대로 */
 .project-board-tabs {
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--divider, var(--border));
   overflow-x: auto;
+  margin-top: 8px;
 }
 .project-board-tab {
   height: 40px;

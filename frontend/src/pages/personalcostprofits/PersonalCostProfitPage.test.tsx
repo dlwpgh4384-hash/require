@@ -11,6 +11,10 @@ import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router-dom";
 import { PersonalCostProfitPage } from "./PersonalCostProfitPage";
 import { DeveloperDetail } from "../developers/DeveloperDetail";
+import {
+  subscribeDeveloperAction,
+  type DeveloperRequest,
+} from "../developers/developerRequest";
 import type {
   PersonalCostProfitResult,
   PersonalCostProfitRow,
@@ -258,7 +262,7 @@ it("renders the five summaries, exact year guidance, required table order and nu
     "가동률 ⓘ",
     "MM",
     "매출",
-    "급여",
+    "급여 ⓘ",
     "그룹장·팀장 수당",
     "4대보험(회사)",
     "퇴직금 적립",
@@ -668,24 +672,58 @@ it("shows field-local errors and focuses the offending DB option", async () => {
   expect(await screen.findByText("사용할 수 없는 직무입니다.")).toBeVisible();
   expect(screen.getByLabelText("직무")).toHaveFocus();
 });
-it("developer detail is opt-in read-only and keeps GET tabs without mutation controls", async () => {
+it("시안 openPerson: 사람을 누르면 개발자 풀과 같은 상세 — [수정]·[사용 중지]는 개발자 풀로 넘기고 [상태 등록]은 상세 안에서 연다", async () => {
+  const received: DeveloperRequest[] = [];
+  const stop = subscribeDeveloperAction((value) => received.push(value));
+  try {
+    mount();
+    await ready();
+    fireEvent.click(screen.getByTestId("list-row-D1"));
+    let detail = await screen.findByTestId("developer-detail");
+    await waitFor(() =>
+      expect(within(detail).getByText("M1 · 소속 · 정규직")).toBeVisible(),
+    );
+    // 근무 상태 이력 탭의 [상태 등록](서버가 canManageStatuses를 준 경우)
+    fireEvent.click(within(detail).getByRole("tab", { name: /근무 상태/ }));
+    expect(
+      within(detail).getByRole("button", { name: /상태 등록/ }),
+    ).toBeVisible();
+    // [수정] → 상세를 닫고 개발자 풀(UI-02)에 수정 요청
+    fireEvent.click(within(detail).getByRole("button", { name: "수정" }));
+    expect(screen.queryByTestId("developer-detail")).not.toBeInTheDocument();
+    expect(received).toEqual([
+      expect.objectContaining({
+        action: "edit",
+        developer: expect.objectContaining({ developerId: "D1" }),
+      }),
+    ]);
+    // [사용 중지] → 개발자 풀의 확인 창으로 넘김(여기서 바로 바꾸지 않음)
+    fireEvent.click(screen.getByTestId("list-row-D1"));
+    detail = await screen.findByTestId("developer-detail");
+    await waitFor(() =>
+      expect(
+        within(detail).getByRole("button", { name: "사용 중지" }),
+      ).toBeEnabled(),
+    );
+    fireEvent.click(within(detail).getByRole("button", { name: "사용 중지" }));
+    expect(received.at(-1)).toEqual(
+      expect.objectContaining({ action: "stop" }),
+    );
+    expect(
+      request.mock.calls.some(
+        ([, init]) => init && (init as RequestInit).method && (init as RequestInit).method !== "GET",
+      ),
+    ).toBe(false);
+  } finally {
+    stop();
+  }
+});
+it("screen-body: 다른 업무 화면처럼 흰 카드로 감싸지 않는다", async () => {
   mount();
   await ready();
-  fireEvent.click(screen.getByTestId("list-row-D1"));
-  const detail = await screen.findByTestId("developer-detail");
-  await waitFor(() =>
-    expect(within(detail).getByText("M1 · 소속 · 정규직")).toBeVisible(),
+  expect(screen.getByTestId("personal-cost-profit-page")).toHaveClass(
+    "screen-body",
   );
-  expect(
-    within(detail).queryByRole("button", { name: "수정" }),
-  ).not.toBeInTheDocument();
-  expect(
-    within(detail).queryByRole("button", { name: "사용 중지" }),
-  ).not.toBeInTheDocument();
-  fireEvent.click(within(detail).getByRole("tab", { name: /근무 상태/ }));
-  expect(
-    within(detail).queryByRole("button", { name: /등록|취소|변경/ }),
-  ).not.toBeInTheDocument();
 });
 it("default developer detail preserves the existing UI-02 edit and stop callbacks", async () => {
   const onEdit = vi.fn(),

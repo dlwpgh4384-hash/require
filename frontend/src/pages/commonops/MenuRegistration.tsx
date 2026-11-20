@@ -3,7 +3,7 @@ import { ConfirmDialog, Toast } from "../../shared/feedback/Dialog";
 import { feedbackMessages } from "../../shared/feedback/messages";
 import { requestMenuRefresh } from "../../app/menuRefresh";
 import { MenuRegistrationDialog } from "./MenuRegistrationDialog";
-import type { MenuRegistrationItem } from "./menuRegistration";
+import type { MenuRegistrationItem } from "./menuRegistrationApi";
 
 /** UI-25 / SCR-UI-25: 관리 표의 draft는 부모 화면이 소유하며 등록은 이를 저장하지 않는다. */
 export function MenuRegistration({

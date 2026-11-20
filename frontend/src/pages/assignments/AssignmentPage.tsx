@@ -361,8 +361,7 @@ export function AssignmentPage({ roles = developmentRoles }: { roles?: readonly 
         }}
       />
       {readOnly && (
-        <Banner kind="lock">
-          {lockIcon}
+        <Banner kind="lock" icon={lockIcon}>
           <span data-testid="assignment-lock-banner">
             <strong>{year}년</strong>은 지난 해라 읽기만 할 수 있습니다.
           </span>

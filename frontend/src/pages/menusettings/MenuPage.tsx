@@ -4,7 +4,7 @@ import { Toast } from "../../shared/feedback/Dialog";
 import { Banner } from "../../shared/list";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { MenuRegistration } from "../commonops/MenuRegistration";
-import { MenuRegistrationRequestError } from "../commonops/menuRegistration";
+import { MenuRegistrationRequestError } from "../commonops/menuRegistrationApi";
 import { usePreferenceBusinessShortcuts } from "../userpreferences/UserPreferenceTools";
 import { useMenuWorkspace } from "./MenuWorkspace";
 import * as api from "./menuSettings";

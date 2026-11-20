@@ -236,20 +236,23 @@ export function OperatingStandardsPanel({
       {snapshot && !snapshot.length && <p>등록된 운영 기준값이 없습니다.</p>}
       {snapshot && snapshot.length > 0 && (
         <>
-          <Banner kind="info">
-            <svg
-              className="ls-banner-icon"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" />
-            </svg>
+          <Banner
+            kind="info"
+            icon={
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" />
+              </svg>
+            }
+          >
             계산에 쓰는 기준값을 한곳에서 관리합니다. 값을 바꾸면 적용
             시작월부터 쓰고, 그 앞 달은 예전 값 그대로 둡니다. 칸이 여러 개인
             줄은 칸마다 따로 저장됩니다. 자금수지 시작 월·기초 잔액은 처음 한 번

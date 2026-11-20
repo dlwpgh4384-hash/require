@@ -184,8 +184,7 @@ export function ProjectDistribution({
                   )}
                 </p>
                 {diff ? (
-                  <Banner kind="warn">
-                    {warnIcon}
+                  <Banner kind="warn" icon={warnIcon}>
                     <span data-testid="project-distribution-total-warning">
                       배분표 합계 {won(total)}원이 계약금액 {won(p.contractAmount)}원보다{" "}
                       <strong>
@@ -195,19 +194,15 @@ export function ProjectDistribution({
                     </span>
                   </Banner>
                 ) : (
-                  <Banner kind="info">
-                    {okIcon}
-                    <span>합계가 계약금액과 같습니다.</span>
+                  <Banner kind="info" icon={okIcon}>
+                    합계가 계약금액과 같습니다.
                   </Banner>
                 )}
                 {data.mismatches.length ? (
                   <>
-                    <Banner kind="warn">
-                      {warnIcon}
-                      <span>
-                        <strong>투입 배정과 안 맞는 곳 {data.mismatches.length}건</strong>이 있습니다. 배정이 바뀌었다면 실제 투입계획 배분표를 다시 올려
-                        주세요. 계산은 지금 표대로 합니다.
-                      </span>
+                    <Banner kind="warn" icon={warnIcon}>
+                      <strong>투입 배정과 안 맞는 곳 {data.mismatches.length}건</strong>이 있습니다. 배정이 바뀌었다면 실제 투입계획 배분표를 다시 올려
+                      주세요. 계산은 지금 표대로 합니다.
                     </Banner>
                     <div className="ls-twrap">
                       <table className="ls-t" data-testid="project-distribution-mismatches">
@@ -235,9 +230,8 @@ export function ProjectDistribution({
                     </div>
                   </>
                 ) : (
-                  <Banner kind="info">
-                    {okIcon}
-                    <span>투입 배정과 사람·월이 모두 맞습니다.</span>
+                  <Banner kind="info" icon={okIcon}>
+                    투입 배정과 사람·월이 모두 맞습니다.
                   </Banner>
                 )}
                 <div className="ls-twrap">

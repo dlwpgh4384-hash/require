@@ -18,7 +18,7 @@ import static org.mockito.Mockito.*;
 
 class ProjectCostAnalysisMappingTest {
     @ParameterizedTest
-    @ValueSource(strings={"selectProjects","selectHistory","selectSnapshots","selectInputs","selectExpenses","selectDistributions",
+    @ValueSource(strings={"selectProjects","selectHistory","selectSnapshots","selectInputs","selectExpenses","selectDistributions","selectPersonDistributions",
         "selectSalaries","selectProgress","selectPeople","selectPayroll","selectLeaves","selectCodes"})
     void realMyBatisConstructorsPreserveEveryNonDefaultColumnWithoutDatabase(String operation) throws Exception {
         var configuration = new Configuration();

@@ -41,8 +41,19 @@ export interface CommonProjectCostAnalysisRow {
   budgetColor: string | null;
   missingMonthlyCost: boolean;
   missingMonthlyCostReason: string | null;
-  costComposition: string;
   alertCount: number;
+  /** 진행 중 턴키의 남은 예상 원가(식-20)와 마우스 근거 */
+  remainingCost: number | null;
+  remainingCostBasis: string | null;
+  /** 경보 칸 아래 「주원인」(식-91) */
+  primaryCauseName: string | null;
+  primaryCauseAmount: number | null;
+  elapsedMonths: number;
+  totalMonths: number;
+  remainingMonths: number;
+  /** 기준월 당시 계약 기간(YYYY-MM-DD). 상세 창 부제에 쓴다. */
+  startDate: string;
+  endDate: string;
 }
 export interface CommonProjectCostAnalysisResult {
   summary: {
@@ -55,12 +66,18 @@ export interface CommonProjectCostAnalysisResult {
   projectOptions: { projectId: string; projectName: string }[];
   items: CommonProjectCostAnalysisRow[];
   totalCount: number;
+  targetMarginRate: number;
+  /** 작업중 달에 급여가 없을 때 월간 마진을 계산하지 않는다는 안내 */
+  monthlyMarginNotice: string | null;
 }
 export interface CommonProjectCostAnalysisMonthlyCosts {
   items: {
     yearMonth: string;
+    mm: number;
     cost: number;
+    revenue: number | null;
     distributionRevenue: number | null;
+    marginRate: number | null;
   }[];
 }
 export interface CommonProjectCostAnalysisWorkforce {
@@ -69,27 +86,43 @@ export interface CommonProjectCostAnalysisWorkforce {
     developerName: string;
     jobName: string;
     monthlyMm: number;
+    allocatedCost: number;
+    revenue: number | null;
+    inputTypeCode: string;
+    inputTypeName: string;
   }[];
 }
+export interface CommonProjectCostAnalysisCause {
+  causeKey: string;
+  causeName: string;
+  amount: number;
+  description: string;
+  owner: string;
+  task: string;
+  targetScreenId: string | null;
+  targetLabel: string | null;
+  navigationContext: string | null;
+}
 export interface CommonProjectCostAnalysisCauses {
+  items: CommonProjectCostAnalysisCause[];
+  actualProgressRate: number | null;
+  expectedCostAtProgress: number | null;
+  cumulativeCost: number;
+  progressExcessAmount: number | null;
+  remainderAmount: number | null;
   primaryBarColor: string;
   referenceNotice: string | null;
-  progressExcessAmount: number | null;
-  remainderExplanation: string | null;
-  items: {
-    causeName: string;
-    amount: number;
-    task: string;
-    targetScreenId: string;
-    navigationContext: string;
-  }[];
+  /** 단가 대비 원가 기준(%) */
+  costOverRate: number;
 }
 export interface CommonProjectCostAnalysisSimulation {
   virtual: boolean;
   marginRateBefore: number;
   marginRateAfter: number;
   marginRateChange: number;
-  calculationBasis: string;
+  addedRevenue: number;
+  addedCost: number;
+  targetMarginRate: number;
 }
 export interface ProjectCostAnalysisSimulationInput {
   headcountChange: string;
@@ -97,6 +130,22 @@ export interface ProjectCostAnalysisSimulationInput {
   months: string;
   monthlyPricePerPerson: string;
 }
+
+/** 시안 mmf(): MM은 소수 둘째 자리, 값이 없으면 「–」. */
+export const formatMm = (value: number | null | undefined) =>
+  value == null || !Number.isFinite(value) ? "–" : Number(value).toFixed(2);
+/** 시안 pct(): 소수 한 자리 %, 음수는 「−」. */
+export const formatPercent = (value: number | null | undefined) =>
+  value == null || !Number.isFinite(value)
+    ? "–"
+    : `${value < 0 ? "−" : ""}${Math.abs(value).toFixed(1)}%`;
+/** 시안 pp(): 부호를 붙인 %p(+1.0%p, −6.5%p). */
+export const formatPoint = (value: number) =>
+  `${value < 0 ? "−" : "+"}${Math.abs(value).toFixed(1)}%p`;
+/** YYYYMM → YYYY-MM(시안 월 표시). */
+export const formatYearMonth = (value: string) =>
+  /^\d{6}$/.test(value) ? `${value.slice(0, 4)}-${value.slice(4)}` : value;
+
 const root = "/api/common/project-cost-analyses";
 export function projectCostAnalysisQuery(value: object) {
   const query = new URLSearchParams();

@@ -19,4 +19,6 @@ public final class ProjectCostAnalysisRows {
     public record Expense(String projectId, String yearMonth, BigDecimal amount) {}
     public record Salary(String developerId, String startMonth, String endMonth, BigDecimal amount) {}
     public record Progress(String projectId, BigDecimal actualProgress) {}
+    /** 턴키 배분표(가장 나중 단계)의 사람·달 금액. 남은 예상 원가(식-20) ③에 쓴다. */
+    public record PersonDistribution(String projectId, String developerId, String yearMonth, BigDecimal amount) {}
 }

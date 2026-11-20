@@ -126,3 +126,20 @@
   line-height: 16px;
   color: var(--text-sub);
 }
+/* 시안 periodBar(연도+월): ‹ [2026년 10월 ▾] › 마감/작업중 (PeriodSelector variant="monthBox") */
+.period-selector.period-month-box {
+  gap: 6px;
+}
+.period-month-select {
+  min-height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 13px;
+}
+.period-selector.period-month-box > span {
+  margin-left: 6px;
+}

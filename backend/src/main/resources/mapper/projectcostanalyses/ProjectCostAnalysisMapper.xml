@@ -78,6 +78,14 @@
       <arg column="actualProgress" javaType="java.math.BigDecimal"/>
     </constructor>
   </resultMap>
+  <resultMap id="personDistribution" type="com.company.common.projectcostanalyses.mapper.ProjectCostAnalysisRows$PersonDistribution">
+    <constructor>
+      <arg column="projectId" javaType="java.lang.String"/>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="yearMonth" javaType="java.lang.String"/>
+      <arg column="amount" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
   <sql id="cutoff">to_char(make_date(#{year},#{baseMonth},1),'YYYYMM')</sql>
   <select id="selectProjects" resultMap="project">
     SELECT p.PROJ_ID AS "projectId", p.PROJ_NM AS "projectName",
@@ -172,6 +180,18 @@
         ORDER BY CASE c.CODE_NM WHEN '실제 투입계획' THEN 3 WHEN '최종 계약' THEN 2 WHEN '견적' THEN 1 ELSE 0 END DESC,
           z.DSTRB_STEP_CD LIMIT 1)
     GROUP BY t.PROJ_ID,t.DSTRB_YM ORDER BY t.PROJ_ID,t.DSTRB_YM
+  </select>
+  <!-- 식-20 ③: 배분표 가장 나중 단계의 사람·달 금액(남은 달을 보려고 기준월로 자르지 않는다) -->
+  <select id="selectPersonDistributions" resultMap="personDistribution">
+    SELECT t.PROJ_ID AS "projectId",t.DEV_ID AS "developerId",t.DSTRB_YM AS "yearMonth",sum(t.DSTRB_AMT) AS "amount"
+    FROM TB_PJ_TK_DSTRB t
+    WHERE t.ROW_TYPE_CD='DEV' AND t.DEV_ID IS NOT NULL
+      AND t.DSTRB_STEP_CD=(SELECT z.DSTRB_STEP_CD FROM TB_PJ_TK_DSTRB z
+        JOIN TB_SY_CODE c ON c.CODE_GRP_ID='DSTRB_STEP' AND c.CODE=z.DSTRB_STEP_CD
+        WHERE z.PROJ_ID=t.PROJ_ID
+        ORDER BY CASE c.CODE_NM WHEN '실제 투입계획' THEN 3 WHEN '최종 계약' THEN 2 WHEN '견적' THEN 1 ELSE 0 END DESC,
+          z.DSTRB_STEP_CD LIMIT 1)
+    GROUP BY t.PROJ_ID,t.DEV_ID,t.DSTRB_YM ORDER BY t.PROJ_ID,t.DEV_ID,t.DSTRB_YM
   </select>
   <select id="selectProgress" resultMap="progress">
     SELECT DISTINCT ON (w.PROJ_ID) w.PROJ_ID AS "projectId",w.ACTL_PRGRS_RT AS "actualProgress"

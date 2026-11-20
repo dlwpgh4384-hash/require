@@ -27,10 +27,11 @@ final class ProjectCostAnalysisTestSources {
             row.details = matcher.group(2).replace("''", "'");
             when(mapper.selectDefinition(row.calcId)).thenReturn(row);
         }
-        for (String key : List.of("TGT_MRGN_RT", "WTHLD_RT")) {
+        // 운영 기준값: 목표 마진율 20%, 원천세 3.3%, 단가 대비 원가 기준 80%(식-91)
+        for (String key : List.of("TGT_MRGN_RT", "WTHLD_RT", "COST_OVER_UPRC_RT")) {
             var standard = new CalculationStandardRow();
             standard.standardCode = key; standard.effectiveMonth = "202501";
-            standard.value = n(key.equals("TGT_MRGN_RT") ? "20" : "3.3");
+            standard.value = n(key.equals("TGT_MRGN_RT") ? "20" : key.equals("WTHLD_RT") ? "3.3" : "80");
             when(mapper.selectEffectiveStandard(eq(key), anyString())).thenReturn(standard);
         }
     }
@@ -52,6 +53,7 @@ final class ProjectCostAnalysisTestSources {
         return List.of(new Code("CTRT_TYPE","TK","턴키",null), new Code("CTRT_TYPE","MO","월단위",null),
             new Code("CTRT_TYPE","DP","파견",null), new Code("CTRT_TYPE","IN","내부",null),
             new Code("ALWNC","ALLOW_TEAM","팀장",n("200")), new Code("ALWNC","ALLOW_GROUP","그룹장",n("400")),
-            new Code("ALWNC","SEV_RATE","퇴직",n("8.33")));
+            new Code("ALWNC","SEV_RATE","퇴직",n("8.33")),
+            new Code("INPUT_TYPE","NEW","신규",null), new Code("INPUT_TYPE","FREE","무상지원",null));
     }
 }

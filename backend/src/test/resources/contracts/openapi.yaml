@@ -9007,13 +9007,13 @@ paths:
       - name: year
         in: query
         required: true
-        description: 선택 연도·기존 YearBar 범위
+        description: 선택 연도·공통 기간 선택(연도+월) 범위
         schema:
           type: integer
       - name: baseMonth
         in: query
         required: true
-        description: 기준월·초기 한국 이번 달
+        description: 기준월·처음은 가장 최근 달(마지막 마감 달 + 1)·CASH_BASE_YM의 달부터 가장 최근 달까지만
         schema:
           type: integer
           minimum: 1
@@ -9021,7 +9021,7 @@ paths:
       - name: projectId
         in: query
         required: false
-        description: 선택월 프로젝트 선택상자·미지정은 전체
+        description: 선택월 프로젝트 선택상자·미지정은 전체·그 달 대상이 아니면 400(projectId)
         schema:
           type: string
       - name: contractTypeCode
@@ -9047,14 +9047,14 @@ paths:
           type: boolean
       x-business-rules:
       - 열거된 CALC_ID와 식-00의 DB 정의를 읽어 계산하며 수식을 코드 상수로 복제하지 않는다.
-      - 기본 이번 달의 년·월을 선택해 해당 달 말까지 누적으로 읽는다. 기준월 이후 시작 프로젝트는 제외하고 월간 마진율은 선택 한 달이다. 마감월은 고정값, 미마감월은 현재자료와 그 달에 유효한
+      - 처음은 가장 최근 달(마지막 마감 달 + 1)의 년·월을 보여 주고 해당 달 말까지 누적으로 읽는다. 기준월 이후 시작 프로젝트는 제외하고 월간 마진율은 선택 한 달이다. 마감월은 고정값, 미마감월은 현재자료와 그 달에 유효한
         계약·투입 이력으로 계산한다.
       - 누적 매출·누적 이익(내부 제외)·저마진 경보 건수·예산 초과 건수·연구개발비 누계(내부)를 기준월 전체 대상 프로젝트로 집계한다. 목록 필터는 요약에 적용하지 않는다.
       - 턴키 누적 매출은 계약금액×진행률인 식-18, 월단위·파견은 월 매출 누계로 읽고 TB_BL_BILL 청구를 매출에 쓰지 않는다.
       - 선택월 프로젝트 선택상자(기본 전체)·계약유형·기준월 상태·경보 조건으로 연도 겹침 대상만 조회하고 수주예정·실주는 제외한다. 요청55행 모든 열을 경보 많은 순으로 표시한다.
       - 누적 원가에 배분 원가와 팀비·프로젝트경비·추가 직접 경비를 포함하고 열 옆 ⓘ에 근거를 표시한다. 무상지원 원가는 해당 프로젝트 원가를 쓴다.
       - 턴키 예상 최종 마진율의 남은 예상 원가는 남은 달 투입 배정 MM×그 사람 월 인건비이며 배분표 유무와 관계없이 같은 원천을 쓴다.
-      - 월 인건비 없는 사람이 있으면 예상값 칸에 단가 없음과 hover 근거를 표시하며 0원으로 대체하지 않는다.
+      - 월 인건비는 최근 월 인건비 → 개발자 풀 월 급여 → 배분표 남은 달 금액÷MM×예산÷계약금액 순서로 찾고 다 없으면 0으로 세며, 예상값 옆에 단가 없음과 hover 근거를 표시한다(식-20, 사람별 원 단위 버림).
       - 계획 MM은 TB_PJ_MNPW_PLAN.PLAN_MM 직무별 합계를 그대로 읽는다. 계획이 없으면 계획 없음으로 표시하고 투입 초과 원인을 계산하지 않는다.
       - 목표 기본20%보다 5%p 넘게 낮을 때만 저마진 경보로 판정한다. 정확히 5.0%p 낮음은 경보가 아니다.
       - 예산 소진율100% 이상은 빨강·80% 이상은 주황으로 표시한다.
@@ -9066,7 +9066,7 @@ paths:
       x-pagination-filtering:
         pagination: 조건 일치 전체를 반환·서버 page 없음·ListView 기존 로컬 페이지
         filtering: year/baseMonth·projectId/contractTypeCode/projectStatus/alertOnly는 목록만·요약은 전체
-        ordering: alertCount 내림차순·동순위는 기존 식/시안 대조
+        ordering: alertCount 내림차순·동순위는 프로젝트 이름 가나다순
       responses:
         '200':
           description: 프로젝트 원가 분석 조회 공개 결과
@@ -9082,7 +9082,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectCostAnalysisResult'
         '400':
-          description: year/baseMonth 누락·월1~12 밖·조건 형식/코드 오류; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
           content:
             application/json:
               schema:
@@ -9103,7 +9103,7 @@ paths:
       - 'closed-month: 마감월 조회 후 현재 계약/투입 정정·같은 월 재조회 -> 마감 고정값 불변; 미마감은 대상월 유효 이력 반영'
       - 'summary-scope: 동일 기준월에서 프로젝트/유형/상태/경보 조건 변경 -> summary 다섯 값 불변·totalCount는 필터 items 수'
       - 'alert-boundary: 목표20%와 차이5.0%p·소진80%/100% fixture 조회 -> 저마진false·주황/빨강'
-      - 'missing-cost: 월 인건비 누락 프로젝트 조회 -> expectedFinalMarginRate=null·missingMonthlyCost=true·근거 문자열 존재'
+      - 'missing-cost: 월 인건비 누락 프로젝트 조회 -> expectedFinalMarginRate는 0으로 센 값·missingMonthlyCost=true·근거 문자열 존재'
       - 'missing-plan: 인원계획 미존재 프로젝트 조회 -> plannedMm=null·투입초과 원인 계산 제외'
   /api/common/project-cost-analyses/excel:
     get:
@@ -9121,13 +9121,13 @@ paths:
       - name: year
         in: query
         required: true
-        description: 선택 연도·기존 YearBar 범위
+        description: 선택 연도·공통 기간 선택(연도+월) 범위
         schema:
           type: integer
       - name: baseMonth
         in: query
         required: true
-        description: 기준월·초기 한국 이번 달
+        description: 기준월·처음은 가장 최근 달(마지막 마감 달 + 1)·CASH_BASE_YM의 달부터 가장 최근 달까지만
         schema:
           type: integer
           minimum: 1
@@ -9135,7 +9135,7 @@ paths:
       - name: projectId
         in: query
         required: false
-        description: 선택월 프로젝트 선택상자·미지정은 전체
+        description: 선택월 프로젝트 선택상자·미지정은 전체·그 달 대상이 아니면 400(projectId)
         schema:
           type: string
       - name: contractTypeCode
@@ -9179,7 +9179,7 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: year/baseMonth 누락·월1~12 밖·조건 형식/코드 오류; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
           content:
             application/json:
               schema:
@@ -9212,19 +9212,19 @@ paths:
       - name: year
         in: query
         required: true
-        description: 선택 연도·기존 YearBar 범위
+        description: 선택 연도·공통 기간 선택(연도+월) 범위
         schema:
           type: integer
       - name: baseMonth
         in: query
         required: true
-        description: 기준월·초기 한국 이번 달
+        description: 기준월·처음은 가장 최근 달(마지막 마감 달 + 1)·CASH_BASE_YM의 달부터 가장 최근 달까지만
         schema:
           type: integer
           minimum: 1
           maximum: 12
       x-business-rules:
-      - 기본 이번 달의 년·월을 선택해 해당 달 말까지 누적으로 읽는다. 기준월 이후 시작 프로젝트는 제외하고 월간 마진율은 선택 한 달이다. 마감월은 고정값, 미마감월은 현재자료와 그 달에 유효한
+      - 처음은 가장 최근 달(마지막 마감 달 + 1)의 년·월을 보여 주고 해당 달 말까지 누적으로 읽는다. 기준월 이후 시작 프로젝트는 제외하고 월간 마진율은 선택 한 달이다. 마감월은 고정값, 미마감월은 현재자료와 그 달에 유효한
         계약·투입 이력으로 계산한다.
       - 상세 월별 원가에서 달별 원가와 턴키 배분 기준 매출(참고)을 함께 읽는다.
       - PM에게 원가·이익 금액을 노출하지 않는다. PM은 기존 UI-31 진척률·원가 사용률을 이용한다.
@@ -9249,7 +9249,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectCostAnalysisMonthlyCosts'
         '400':
-          description: year/baseMonth 누락·월1~12 밖·조건 형식/코드 오류; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
           content:
             application/json:
               schema:
@@ -9295,19 +9295,19 @@ paths:
       - name: year
         in: query
         required: true
-        description: 선택 연도·기존 YearBar 범위
+        description: 선택 연도·공통 기간 선택(연도+월) 범위
         schema:
           type: integer
       - name: baseMonth
         in: query
         required: true
-        description: 기준월·초기 한국 이번 달
+        description: 기준월·처음은 가장 최근 달(마지막 마감 달 + 1)·CASH_BASE_YM의 달부터 가장 최근 달까지만
         schema:
           type: integer
           minimum: 1
           maximum: 12
       x-business-rules:
-      - 기본 이번 달의 년·월을 선택해 해당 달 말까지 누적으로 읽는다. 기준월 이후 시작 프로젝트는 제외하고 월간 마진율은 선택 한 달이다. 마감월은 고정값, 미마감월은 현재자료와 그 달에 유효한
+      - 처음은 가장 최근 달(마지막 마감 달 + 1)의 년·월을 보여 주고 해당 달 말까지 누적으로 읽는다. 기준월 이후 시작 프로젝트는 제외하고 월간 마진율은 선택 한 달이다. 마감월은 고정값, 미마감월은 현재자료와 그 달에 유효한
         계약·투입 이력으로 계산한다.
       - 선택 프로젝트 상세 투입 인력 목록을 조회한다.
       - PM에게 원가·이익 금액을 노출하지 않는다. PM은 기존 UI-31 진척률·원가 사용률을 이용한다.
@@ -9332,7 +9332,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectCostAnalysisWorkforce'
         '400':
-          description: year/baseMonth 누락·월1~12 밖·조건 형식/코드 오류; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
           content:
             application/json:
               schema:
@@ -9379,13 +9379,13 @@ paths:
       - name: year
         in: query
         required: true
-        description: 선택 연도·기존 YearBar 범위
+        description: 선택 연도·공통 기간 선택(연도+월) 범위
         schema:
           type: integer
       - name: baseMonth
         in: query
         required: true
-        description: 기준월·초기 한국 이번 달
+        description: 기준월·처음은 가장 최근 달(마지막 마감 달 + 1)·CASH_BASE_YM의 달부터 가장 최근 달까지만
         schema:
           type: integer
           minimum: 1
@@ -9436,7 +9436,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectCostAnalysisSimulation'
         '400':
-          description: year/baseMonth 누락·월1~12 밖·조건 형식/코드 오류·가상 필수 숫자 누락·월단위/파견 1인 단가 누락; ApiError.errors[].field는
+          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId·가상 필수 숫자 누락·월단위/파견 1인 단가 누락·작업중 달 급여 없음(월단위·파견, errors[].field=baseMonth); ApiError.errors[].field는
             해당 입력명. 미정 업무 상한을 발명하지 않는다.
           content:
             application/json:
@@ -9481,13 +9481,13 @@ paths:
       - name: year
         in: query
         required: true
-        description: 선택 연도·기존 YearBar 범위
+        description: 선택 연도·공통 기간 선택(연도+월) 범위
         schema:
           type: integer
       - name: baseMonth
         in: query
         required: true
-        description: 기준월·초기 한국 이번 달
+        description: 기준월·처음은 가장 최근 달(마지막 마감 달 + 1)·CASH_BASE_YM의 달부터 가장 최근 달까지만
         schema:
           type: integer
           minimum: 1
@@ -9520,7 +9520,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectCostAnalysisCauses'
         '400':
-          description: year/baseMonth 누락·월1~12 밖·조건 형식/코드 오류; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
           content:
             application/json:
               schema:
@@ -9677,9 +9677,37 @@ components:
           type: string
           description: 단가 없음 hover 근거
           nullable: true
-        costComposition:
+        remainingCost:
+          type: number
+          description: 진행 중 턴키의 남은 예상 원가(식-20, 원 단위 버림). 그 외 null
+          nullable: true
+        remainingCostBasis:
           type: string
-          description: 누적 원가 ⓘ 근거
+          description: 예상 최종 마진율 칸 마우스 근거(몇 명, 단가 없음 몇 명은 0으로 셈). 진행 중 턴키 외 null
+          nullable: true
+        primaryCauseName:
+          type: string
+          description: 원가 초과 주원인(식-91 금액이 가장 큰 원인). 없으면 null
+          nullable: true
+        primaryCauseAmount:
+          type: number
+          description: 주원인 금액
+          nullable: true
+        elapsedMonths:
+          type: integer
+          description: 기준월까지 경과 개월
+        totalMonths:
+          type: integer
+          description: 계약 전체 개월
+        remainingMonths:
+          type: integer
+          description: 남은 개월
+        startDate:
+          type: string
+          description: 기준월 당시 계약 시작일(YYYY-MM-DD)
+        endDate:
+          type: string
+          description: 기준월 당시 계약 종료일(YYYY-MM-DD)
       required:
       - projectId
       - projectName
@@ -9711,7 +9739,15 @@ components:
       - budgetColor
       - missingMonthlyCost
       - missingMonthlyCostReason
-      - costComposition
+      - remainingCost
+      - remainingCostBasis
+      - primaryCauseName
+      - primaryCauseAmount
+      - elapsedMonths
+      - totalMonths
+      - remainingMonths
+      - startDate
+      - endDate
     CommonProjectCostAnalysisResult:
       type: object
       properties:
@@ -9726,6 +9762,7 @@ components:
           description: 필터 적용 목록 수
         projectOptions:
           type: array
+          description: 고른 달의 프로젝트(이름 가나다순)
           items:
             type: object
             properties:
@@ -9736,28 +9773,51 @@ components:
             required:
             - projectId
             - projectName
+        targetMarginRate:
+          type: number
+          description: 기준월의 목표 마진율(TGT_MRGN_RT)
+        monthlyMarginNotice:
+          type: string
+          description: 작업중 달에 그 달 급여가 없으면 「N월 급여가 아직 반영되지 않아 월간 마진을 계산하지 않습니다」, 아니면 null
+          nullable: true
       required:
       - summary
       - items
       - totalCount
       - projectOptions
+      - targetMarginRate
+      - monthlyMarginNotice
     CommonProjectCostAnalysisMonthlyCost:
       type: object
       properties:
         yearMonth:
           type: string
-          description: 선택 기준월 이하
+          description: YYYYMM. 기준월까지 경과한 달 중 최근 12달
+        mm:
+          type: number
+          description: 그 달 MM 합
         cost:
           type: number
-          description: 해당 월 원가
+          description: 해당 월 원가(배분 원가+직접 경비)
+        revenue:
+          type: number
+          description: 월단위·파견의 그 달 매출. 턴키·내부는 null
+          nullable: true
         distributionRevenue:
           type: number
-          description: 턴키 배분 기준 매출(참고); 그 외 null
+          description: 턴키 배분 기준 매출(참고, 식-25). 그 외 null
+          nullable: true
+        marginRate:
+          type: number
+          description: 그 달 마진율. 내부·매출 0은 null
           nullable: true
       required:
       - yearMonth
+      - mm
       - cost
+      - revenue
       - distributionRevenue
+      - marginRate
     CommonProjectCostAnalysisMonthlyCosts:
       type: object
       properties:
@@ -9781,13 +9841,30 @@ components:
           description: JOB 표시명
         monthlyMm:
           type: number
-          description: 기존 배정의 월 MM
+          description: 기준월 MM
+        allocatedCost:
+          type: number
+          description: 기준월 배분 원가
+        revenue:
+          type: number
+          description: 기준월 매출. 내부는 null
+          nullable: true
+        inputTypeCode:
+          type: string
+          description: INPUT_TYPE 코드
+        inputTypeName:
+          type: string
+          description: 투입 구분 표시명(무상지원 등)
       required:
       - developerId
       - developerName
       - jobName
       - monthlyMm
-      description: 투입 인력 목록의 최소 공개 DTO. 급여/연락처/개인 비밀필드는 공개하지 않음. 추가 열은 시안 대조 OQ-UI-004.
+      - allocatedCost
+      - revenue
+      - inputTypeCode
+      - inputTypeName
+      description: 투입 인력 목록(시안 이름·직무·MM·배분 원가·매출·구분). 급여/연락처/개인 비밀필드는 공개하지 않음.
     CommonProjectCostAnalysisWorkforce:
       type: object
       properties:
@@ -9806,45 +9883,76 @@ components:
           - true
         marginRateBefore:
           type: number
-          description: 식-26 계산 전
+          description: 지금 예상 최종(턴키)·월간(월단위·파견) 마진율
         marginRateAfter:
           type: number
           description: 식-26 가상 결과
         marginRateChange:
           type: number
-          description: 전후 변화
-        calculationBasis:
-          type: string
-          description: 월단위·파견은 한 달 기준 또는 턴키 식-26 근거
+          description: 전후 차이(%p)
+        addedRevenue:
+          type: number
+          description: 늘어나는 한 달 매출(월단위·파견). 턴키는 0
+        addedCost:
+          type: number
+          description: 늘어나는 원가(턴키는 인원×1인 월 원가×개월, 월단위·파견은 한 달)
+        targetMarginRate:
+          type: number
+          description: 목표 마진율
       required:
       - virtual
       - marginRateBefore
       - marginRateAfter
       - marginRateChange
-      - calculationBasis
+      - addedRevenue
+      - addedCost
+      - targetMarginRate
     CommonProjectCostAnalysisCause:
       type: object
       properties:
+        causeKey:
+          type: string
+          enum:
+          - mm
+          - pay
+          - free
+          description: 식-91 세 원인
         causeName:
           type: string
-          description: 식-91 원인명·임의 세 유형 enum 생성 금지
+          description: 시안 원인 이름
         amount:
           type: number
-          description: 월별 실제 금액 합
+          description: 월별 실제 금액 합(원 단위 버림)
+        description:
+          type: string
+          description: 원인 설명 한 줄(실제·계획 MM, 인원 수 등)
+        owner:
+          type: string
+          description: 고칠 사람
         task:
           type: string
-          description: 원인별 할 일
+          description: 할 일
         targetScreenId:
           type: string
-          description: 기존 UI-11/UI-32 등 원문/시안에서 확정한 대상만; 대응표 OQ-NAV-004
+          description: 이동 화면(UI-11·UI-32). 무상 지원은 null
+          nullable: true
+        targetLabel:
+          type: string
+          description: 이동 단추 이름. 무상 지원은 null
+          nullable: true
         navigationContext:
           type: string
-          description: 선택 프로젝트 문맥·기존 대상 계약 재사용
+          description: 선택 프로젝트 문맥. 이동 단추가 없으면 null
+          nullable: true
       required:
+      - causeKey
       - causeName
       - amount
+      - description
+      - owner
       - task
       - targetScreenId
+      - targetLabel
       - navigationContext
     CommonProjectCostAnalysisCauses:
       type: object
@@ -9853,13 +9961,24 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommonProjectCostAnalysisCause'
+        actualProgressRate:
+          type: number
+          description: 턴키 실적 진척률(%). 그 외·진척 없음 null
+          nullable: true
+        expectedCostAtProgress:
+          type: number
+          description: 예산 × 실적 진척률. 그 외 null
+          nullable: true
+        cumulativeCost:
+          type: number
+          description: 누적 원가
         progressExcessAmount:
           type: number
           description: 턴키 진척 대비 초과 금액·그 외 null
           nullable: true
-        remainderExplanation:
-          type: string
-          description: 턴키 세 원인 나머지 문구·그 외 null
+        remainderAmount:
+          type: number
+          description: 진척 대비 초과 − 세 원인 합(양수일 때만). 그 외 null
           nullable: true
         primaryBarColor:
           type: string
@@ -9870,12 +9989,19 @@ components:
           type: string
           description: 경보가 없는 프로젝트라 참고용·빨강이면 null
           nullable: true
+        costOverRate:
+          type: number
+          description: 단가 대비 원가 기준(%, COST_OVER_UPRC_RT)
       required:
       - items
+      - actualProgressRate
+      - expectedCostAtProgress
+      - cumulativeCost
       - progressExcessAmount
-      - remainderExplanation
+      - remainderAmount
       - primaryBarColor
       - referenceNotice
+      - costOverRate
     CommonBillingRow:
       type: object
       required:

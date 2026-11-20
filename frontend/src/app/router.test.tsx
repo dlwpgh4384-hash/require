@@ -1797,7 +1797,8 @@ describe("project cost analysis route composition", () => {
       expect(screen.getByTestId("project-cost-summary")).toBeVisible();
       expect(request).toHaveBeenCalledWith(
         expect.stringMatching(
-          /^\/api\/common\/project-cost-analyses\?year=\d{4}&baseMonth=\d{1,2}&alertOnly=false$/,
+          // 「보기: 전체」면 alertOnly를 보내지 않는다(시안 보기 선택 상자)
+          /^\/api\/common\/project-cost-analyses\?year=\d{4}&baseMonth=\d{1,2}$/,
         ),
         { signal: expect.any(AbortSignal) },
       );

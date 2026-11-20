@@ -15,6 +15,7 @@ public interface ProjectCostAnalysisMapper {
     List<Input> selectInputs(Period period);
     List<Expense> selectExpenses(Period period);
     List<Expense> selectDistributions(Period period);
+    List<PersonDistribution> selectPersonDistributions();
     List<Salary> selectSalaries();
     List<Progress> selectProgress(Period period);
     List<Person> selectPeople();

@@ -43,7 +43,12 @@ public final class ProjectCostAnalysisRules {
         if (!"TK".equals(project.contractTypeCode())) throw new IllegalArgumentException();
         if (project.contractAmount() == null) return null;
         var progress = "END".equals(project.statusCode()) ? ONE : ratio(cost, project.budget());
-        return progress == null ? null : project.contractAmount().multiply(progress.min(ONE));
+        // 식-57: 금액은 원 단위 버림
+        return progress == null ? null : money(project.contractAmount().multiply(progress.min(ONE)));
+    }
+    /** 식-57 금액 버림(원 단위). null은 그대로 둔다. */
+    public static BigDecimal money(BigDecimal value) {
+        return value == null ? null : value.setScale(0, RoundingMode.DOWN);
     }
     public static boolean lowMargin(BigDecimal margin, BigDecimal target) {
         return margin != null && target.subtract(margin).compareTo(BigDecimal.valueOf(5)) > 0;

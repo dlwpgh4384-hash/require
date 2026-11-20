@@ -292,6 +292,17 @@ table.ls-t {
   border-top: 2px solid var(--border);
   border-bottom: 0;
 }
+/* 시안 .sc: 첫 열 왼쪽 고정(stickyFirstColumn). 머리·합계 칸은 위에 겹친다 */
+.ls-t .ls-sc {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  border-right: 1px solid var(--divider);
+}
+.ls-t th.ls-sc,
+.ls-t tfoot.ls-foot td.ls-sc {
+  z-index: 3;
+}
 .ls-t tr.ls-sel td {
   background: var(--primary-bg);
 }

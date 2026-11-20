@@ -1,11 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { DetailPanel } from "../../shared/list/DetailPanel";
-import { ConfirmDialog } from "../../shared/feedback/Dialog";
-import { useScreenDirty } from "../../shared/layout/ScreenTabs";
+import { DetailPanel, Banner, type DetailTab } from "../../shared/list/DetailPanel";
+import { Badge } from "../../shared/list/ListView";
+import { KpiCards, KpiCard } from "../../shared/list/KpiCards";
 import { ProjectRequestError } from "../projects/projects";
-import { formatMoney, type MoneyUnit } from "../../shared/list/moneyUnit";
+import { ProjectDetail } from "../projects/ProjectDetail";
+import { useOpenProjectEdit } from "../projects/projectEdit";
+import { formatKoreanMoney, formatMoney } from "../../shared/list/moneyUnit";
 import {
+  formatMm,
+  formatPercent,
+  formatPoint,
+  formatYearMonth,
   getCommonProjectCostAnalysisMonthlyCosts,
   getCommonProjectCostAnalysisWorkforce,
   getCommonProjectCostAnalysisCauses,
@@ -16,18 +22,12 @@ import {
   type CommonProjectCostAnalysisSimulation,
 } from "./projectCostAnalyses";
 
-function useProjectCostAnalysisRegion<T>(
-  load: (signal: AbortSignal) => Promise<T>,
-  key: string,
-  enabled = true,
-) {
+function useRegion<T>(load: (signal: AbortSignal) => Promise<T>, key: string, enabled = true) {
   const loader = useRef(load);
   loader.current = load;
-  const [state, setState] = useState<{
-    data?: T;
-    error?: string;
-    loading: boolean;
-  }>({ loading: enabled });
+  const [state, setState] = useState<{ data?: T; error?: string; loading: boolean }>({
+    loading: enabled,
+  });
   const [version, setVersion] = useState(0);
   useEffect(() => {
     if (!enabled) return;
@@ -41,10 +41,7 @@ function useProjectCostAnalysisRegion<T>(
       .catch((failure) => {
         if (!controller.signal.aborted)
           setState({
-            error:
-              failure instanceof Error
-                ? failure.message
-                : "불러오지 못했습니다.",
+            error: failure instanceof Error ? failure.message : "불러오지 못했습니다.",
             loading: false,
           });
       });
@@ -69,7 +66,7 @@ function RegionStatus({
       {error && (
         <p role="alert">
           {error}{" "}
-          <button type="button" data-testid={testId} onClick={retry}>
+          <button type="button" className="ls-btn ls-btn-sm" data-testid={testId} onClick={retry}>
             다시 시도
           </button>
         </p>
@@ -77,416 +74,494 @@ function RegionStatus({
     </>
   );
 }
+const won = (value: number | null | undefined) => formatMoney(value, "원");
+const dash = <span className="ls-cap">–</span>;
+/** 숫자 칸: 숫자 아닌 글자는 입력 즉시 지운다(FR-0106). 인원 변화만 앞의 「−」를 받는다. */
+const digits = (value: string, signed = false) => {
+  const negative = signed && /^\s*[-−]/.test(value);
+  const number = value.replace(/[^\d]/g, "");
+  return (negative ? "-" : "") + number;
+};
+const comma = (value: string) =>
+  value === "" || value === "-" ? value : Number(value).toLocaleString("ko-KR");
+const roundTenThousand = (value: number | null | undefined, fallback: number) =>
+  String(Math.round((value ?? fallback) / 1e4) * 1e4);
+
 export function ProjectCostAnalysisDetail({
   row,
   period,
-  unit,
+  targetMarginRate,
+  monthlyMarginNotice,
   onClose,
 }: {
   row: CommonProjectCostAnalysisRow;
   period: ProjectCostAnalysisPeriod;
-  unit: MoneyUnit;
+  targetMarginRate: number;
+  monthlyMarginNotice: string | null;
   onClose: () => void;
 }) {
   const key = `${row.projectId}:${period.year}:${period.baseMonth}`;
-  const monthly = useProjectCostAnalysisRegion(
-    (signal) =>
-      getCommonProjectCostAnalysisMonthlyCosts(row.projectId, period, signal),
-    key,
-  );
-  const workforce = useProjectCostAnalysisRegion(
-    (signal) =>
-      getCommonProjectCostAnalysisWorkforce(row.projectId, period, signal),
-    key,
-  );
+  const internal = row.contractTypeCode === "IN";
+  const turnkey = row.contractTypeCode === "TK";
   const [tab, setTab] = useState("monthly");
-  const [causesOpen, setCausesOpen] = useState(false);
-  const causes = useProjectCostAnalysisRegion(
-    (signal) =>
-      getCommonProjectCostAnalysisCauses(row.projectId, period, signal),
+  const [projectOpen, setProjectOpen] = useState(false);
+  const openEdit = useOpenProjectEdit();
+  const navigate = useNavigate();
+  const [message, setMessage] = useState("");
+  const monthly = useRegion(
+    (signal) => getCommonProjectCostAnalysisMonthlyCosts(row.projectId, period, signal),
     key,
-    causesOpen,
   );
-  const [simulationOpen, setSimulationOpen] = useState(false);
-  const empty: ProjectCostAnalysisSimulationInput = {
-    headcountChange: "",
-    monthlyCostPerPerson: "",
-    months: "",
-    monthlyPricePerPerson: "",
-  };
-  const [input, setInput] = useState(empty);
+  const workforce = useRegion(
+    (signal) => getCommonProjectCostAnalysisWorkforce(row.projectId, period, signal),
+    key,
+  );
+  const [causesWanted, setCausesWanted] = useState(false);
+  const causes = useRegion(
+    (signal) => getCommonProjectCostAnalysisCauses(row.projectId, period, signal),
+    key,
+    causesWanted,
+  );
+  // 시안 기본값: 인원 1명, 1인 월 원가 = MM당 평균 원가, 개월 = 턴키는 남은 기간·월단위는 1, 월 단가 = MM당 평균 단가
+  const [input, setInput] = useState<ProjectCostAnalysisSimulationInput>({
+    headcountChange: "1",
+    monthlyCostPerPerson: roundTenThousand(row.costPerMm, 6_000_000),
+    months: String(turnkey ? Math.max(1, row.remainingMonths) : 1),
+    monthlyPricePerPerson: roundTenThousand(row.unitPricePerMm, 7_000_000),
+  });
   const [result, setResult] = useState<CommonProjectCostAnalysisSimulation>();
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [pending, setPending] = useState(false);
-  const [confirmation, setConfirmation] = useState<null | (() => void)>(null);
-  const [message, setMessage] = useState("");
-  const form = useRef<HTMLFormElement>(null);
-  const markDirty = useScreenDirty();
-  const navigate = useNavigate();
-  const dirty =
-    simulationOpen && Object.values(input).some((value) => value !== "");
+  const simulationBlocked = !turnkey && !!monthlyMarginNotice;
   useEffect(() => {
-    markDirty("UI-04", dirty);
-    return () => markDirty("UI-04", false);
-  }, [dirty, markDirty]);
-  function leave(action: () => void) {
-    if (dirty) setConfirmation(() => action);
-    else action();
-  }
-  async function calculate() {
+    if (tab !== "simulation" || internal || simulationBlocked) return;
     const next: Record<string, string> = {};
-    if (
-      input.headcountChange === "" ||
-      !Number.isFinite(Number(input.headcountChange))
-    )
-      next.headcountChange = "유한한 인원 변화를 입력해 주세요.";
-    if (
-      input.monthlyCostPerPerson === "" ||
-      !Number.isFinite(Number(input.monthlyCostPerPerson)) ||
-      Number(input.monthlyCostPerPerson) < 0
-    )
-      next.monthlyCostPerPerson = "1인 월 원가를 0 이상으로 입력해 주세요.";
-    if (!Number.isInteger(Number(input.months)) || Number(input.months) <= 0)
-      next.months = "적용 개월을 양의 정수로 입력해 주세요.";
-    if (
-      ["MO", "DP"].includes(row.contractTypeCode) &&
-      (input.monthlyPricePerPerson === "" ||
-        !Number.isFinite(Number(input.monthlyPricePerPerson)) ||
-        Number(input.monthlyPricePerPerson) < 0)
-    )
-      next.monthlyPricePerPerson = "1인 단가를 0 이상으로 입력해 주세요.";
+    if (input.headcountChange === "" || input.headcountChange === "-")
+      next.headcountChange = "인원 변화를 입력해 주세요.";
+    if (input.monthlyCostPerPerson === "") next.monthlyCostPerPerson = "1인 월 원가를 입력해 주세요.";
+    if (input.months === "" || Number(input.months) < 1) next.months = "적용 개월을 1 이상으로 입력해 주세요.";
+    if (!turnkey && input.monthlyPricePerPerson === "")
+      next.monthlyPricePerPerson = "추가 인원 1인 월 단가를 입력해 주세요.";
     setErrors(next);
-    setResult(undefined);
-    setMessage("");
     if (Object.keys(next).length) {
-      form.current
-        ?.querySelector<HTMLInputElement>(`[name="${Object.keys(next)[0]}"]`)
-        ?.focus();
+      setResult(undefined);
       return;
     }
-    setPending(true);
-    try {
-      setResult(
-        await getCommonProjectCostAnalysisSimulation(
-          row.projectId,
-          period,
-          input,
-        ),
-      );
-    } catch (failure) {
-      const fields =
-        failure instanceof ProjectRequestError
-          ? Object.fromEntries(
-              failure.errors.map((error) => [error.field, error.message]),
-            )
-          : {};
-      setErrors(fields);
-      setMessage(
-        failure instanceof Error ? failure.message : "계산하지 못했습니다.",
-      );
-      form.current
-        ?.querySelector<HTMLInputElement>(`[name="${Object.keys(fields)[0]}"]`)
-        ?.focus();
-    } finally {
-      setPending(false);
-    }
-  }
-  function go(target: string, context: string) {
-    if (target !== "UI-11" && target !== "UI-32") {
+    // 입력하면 바로 다시 계산한다(시안 data-sim). 짧게 기다렸다가 마지막 값만 보낸다.
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      getCommonProjectCostAnalysisSimulation(
+        row.projectId,
+        period,
+        turnkey ? { ...input, monthlyPricePerPerson: "" } : input,
+        controller.signal,
+      )
+        .then((value) => {
+          if (!controller.signal.aborted) setResult(value);
+        })
+        .catch((failure) => {
+          if (controller.signal.aborted) return;
+          setResult(undefined);
+          const fields =
+            failure instanceof ProjectRequestError
+              ? Object.fromEntries(failure.errors.map((error) => [error.field, error.message]))
+              : {};
+          setErrors(
+            Object.keys(fields).length
+              ? fields
+              : { headcountChange: failure instanceof Error ? failure.message : "계산하지 못했습니다." },
+          );
+        });
+    }, 250);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, key, input.headcountChange, input.monthlyCostPerPerson, input.months, input.monthlyPricePerPerson]);
+  function go(target: string, context: string | null) {
+    if ((target !== "UI-11" && target !== "UI-32") || !context) {
       setMessage("이동할 화면을 확인할 수 없습니다.");
       return;
     }
     try {
-      const value: unknown = JSON.parse(context);
-      if (!value || typeof value !== "object") throw new Error();
-      const state = value as ProjectCostAnalysisPeriod & { projectId: string };
+      const value = JSON.parse(context) as ProjectCostAnalysisPeriod & { projectId: string };
       if (
-        state.projectId !== row.projectId ||
-        state.year !== period.year ||
-        state.baseMonth !== period.baseMonth
+        value.projectId !== row.projectId ||
+        value.year !== period.year ||
+        value.baseMonth !== period.baseMonth
       )
         throw new Error();
-      leave(() =>
-        navigate(`/screens/${target}`, {
-          state: {
-            projectId: state.projectId,
-            year: state.year,
-            baseMonth: state.baseMonth,
-          },
-        }),
-      );
+      navigate(`/screens/${target}`, {
+        state: { projectId: value.projectId, year: value.year, baseMonth: value.baseMonth },
+      });
     } catch {
       setMessage("프로젝트 이동 문맥을 확인할 수 없습니다.");
     }
   }
+  if (projectOpen)
+    return (
+      <ProjectDetail
+        projectId={row.projectId}
+        dirtyScreenId="UI-04"
+        onClose={onClose}
+        onEdit={(project) => {
+          // 다른 화면에서 연 상세의 [수정]은 프로젝트 화면 수정 폼으로(명세 0장)
+          onClose();
+          openEdit(project);
+        }}
+      />
+    );
+  const marginLabel = turnkey ? "예상 최종 마진율" : "월간 마진율";
+  const marginValue = turnkey ? row.expectedFinalMarginRate : row.monthlyMarginRate;
   const monthlyContent = (
-    <section data-testid="project-cost-monthly-panel">
+    <section data-testid="project-cost-monthly-panel" className="project-cost-detail-section">
+      <KpiCards aria-label="경과와 마진" className="project-cost-detail-kpis">
+        <KpiCard
+          label="경과"
+          value={`${row.elapsedMonths}/${row.totalMonths}개월`}
+          description={`남은 기간 ${row.remainingMonths}개월`}
+        />
+        {internal ? (
+          <KpiCard
+            label="연구개발비 누계"
+            value={formatKoreanMoney(row.totalCost)}
+            description="판관비로 처리"
+          />
+        ) : (
+          <KpiCard
+            label={marginLabel}
+            value={formatPercent(marginValue)}
+            description={
+              row.targetDifference == null ? "" : `목표 대비 ${formatPoint(row.targetDifference)}`
+            }
+          />
+        )}
+      </KpiCards>
       <RegionStatus {...monthly} testId="project-cost-monthly-retry" />
       {monthly.data && (
-        <>
-          <table>
+        <div className="ls-twrap project-cost-free">
+          <table className="ls-t">
             <thead>
               <tr>
                 <th>월</th>
-                <th>원가</th>
-                {row.contractTypeCode === "TK" && <th>배분 기준 매출(참고)</th>}
+                <th className="ls-right">MM</th>
+                <th className="ls-right">원가</th>
+                <th className="ls-right">{turnkey ? "배분 기준 매출(참고)" : "매출"}</th>
+                <th className="ls-right">마진율</th>
               </tr>
             </thead>
             <tbody>
-              {monthly.data.items.map((item) => (
-                <tr
-                  key={item.yearMonth}
-                  data-testid={`project-cost-month-${item.yearMonth}`}
-                >
-                  <td>{item.yearMonth}</td>
-                  <td>{formatMoney(item.cost, unit)}</td>
-                  {row.contractTypeCode === "TK" && (
-                    <td>
-                      {item.distributionRevenue === null
-                        ? ""
-                        : formatMoney(item.distributionRevenue, unit)}
+              {monthly.data.items.map((item) => {
+                const revenue = turnkey ? item.distributionRevenue : item.revenue;
+                return (
+                  <tr key={item.yearMonth} data-testid={`project-cost-month-${item.yearMonth}`}>
+                    <td>{formatYearMonth(item.yearMonth)}</td>
+                    <td className="ls-right">{formatMm(item.mm)}</td>
+                    <td className="ls-right">{won(item.cost)}</td>
+                    <td className="ls-right">{internal ? dash : won(revenue)}</td>
+                    <td className="ls-right">
+                      {internal || item.marginRate == null ? (
+                        dash
+                      ) : (
+                        <span className={item.marginRate < 0 ? "ls-neg" : undefined}>
+                          {formatPercent(item.marginRate)}
+                        </span>
+                      )}
                     </td>
-                  )}
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
-          {monthly.data.items.length === 0 && <p>월별 원가가 없습니다.</p>}
-        </>
+        </div>
+      )}
+      {monthly.data && monthly.data.items.length === 0 && <p className="ls-cap">월별 원가가 없습니다.</p>}
+      {turnkey && (
+        <p className="ls-cap project-cost-note">
+          턴키의 누적 매출은 진행기준(원가 발생에 맞춰 인식)으로 계산합니다. 이 표의 월별 금액도 같은 방식(그 달 배분표 합계, 없으면 그 달 원가 × (계약금액 ÷ 예산))이라 다 더하면 누적 매출과 같아집니다.
+        </p>
       )}
     </section>
   );
+  const people = workforce.data?.items ?? [];
   const workforceContent = (
-    <section data-testid="project-cost-workforce-panel">
+    <section data-testid="project-cost-workforce-panel" className="project-cost-detail-section">
       <RegionStatus {...workforce} testId="project-cost-workforce-retry" />
-      {workforce.data && (
-        <>
-          <table>
-            <thead>
-              <tr>
-                <th>이름</th>
-                <th>직무</th>
-                <th>MM</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workforce.data.items.map((item, index) => (
-                <tr
-                  key={`${item.developerId}-${item.jobName}`}
-                  data-testid={`project-cost-workforce-${index}`}
-                >
-                  <td>{item.developerName}</td>
-                  <td>{item.jobName}</td>
-                  <td>{item.monthlyMm}</td>
+      {workforce.data &&
+        (people.length ? (
+          <div className="ls-twrap project-cost-free">
+            <table className="ls-t">
+              <thead>
+                <tr>
+                  <th>이름</th>
+                  <th>직무</th>
+                  <th className="ls-right">MM</th>
+                  <th className="ls-right">배분 원가</th>
+                  <th className="ls-right">매출</th>
+                  <th>구분</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {workforce.data.items.length === 0 && <p>투입 인력이 없습니다.</p>}
-        </>
-      )}
+              </thead>
+              <tbody>
+                {people.map((item, index) => (
+                  <tr
+                    key={`${item.developerId}-${item.jobName}-${item.inputTypeCode}`}
+                    data-testid={`project-cost-workforce-${index}`}
+                  >
+                    <td>{item.developerName}</td>
+                    <td>{item.jobName}</td>
+                    <td className="ls-right">{formatMm(item.monthlyMm)}</td>
+                    <td className="ls-right">{won(item.allocatedCost)}</td>
+                    <td className="ls-right">{internal || item.revenue == null ? "–" : won(item.revenue)}</td>
+                    <td>
+                      <Badge kind={item.inputTypeCode === "FREE" ? "warn" : "neutral"}>
+                        {item.inputTypeName}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="ls-cap">투입 기록이 없습니다.</p>
+        ))}
     </section>
   );
-  return (
-    <>
-      <DetailPanel
-        title="선택 프로젝트 원가 상세"
-        sub={row.projectName}
-        onClose={() => leave(onClose)}
-        testId="project-cost-detail"
-      >
-        <div className="ls-tabs" role="tablist" aria-label="프로젝트 원가 상세">
-          <button
-            type="button"
-            role="tab"
-            className={`ls-tb${tab === "monthly" ? " ls-on" : ""}`}
-            aria-selected={tab === "monthly"}
-            data-testid="project-cost-monthly-tab"
-            onClick={() => setTab("monthly")}
-          >
-            월별 원가{monthly.data ? ` (${monthly.data.items.length})` : ""}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            className={`ls-tb${tab === "workforce" ? " ls-on" : ""}`}
-            aria-selected={tab === "workforce"}
-            data-testid="project-cost-workforce-tab"
-            onClick={() => setTab("workforce")}
-          >
-            투입 인력{workforce.data ? ` (${workforce.data.items.length})` : ""}
-          </button>
-        </div>
-        <div role="tabpanel" data-testid="project-cost-detail-tab-panel">
-          {tab === "monthly" ? monthlyContent : workforceContent}
-        </div>
-        <button
-          type="button"
-          className="ls-btn"
-          data-testid="project-cost-causes-open"
-          onClick={() => setCausesOpen((value) => !value)}
-        >
-          원가 초과 원인 열기
-        </button>
-        {causesOpen && (
-          <section
-            data-testid="project-cost-causes"
-            className="project-cost-causes"
-          >
-            <RegionStatus {...causes} testId="project-cost-causes-retry" />
-            {causes.data && (
-              <>
-                {causes.data.referenceNotice && (
-                  <p>{causes.data.referenceNotice}</p>
-                )}
-                {causes.data.progressExcessAmount !== null && (
-                  <p>
-                    진척 대비 초과 금액{" "}
-                    {formatMoney(causes.data.progressExcessAmount, unit)}
-                  </p>
-                )}
-                {causes.data.remainderExplanation && (
-                  <p>{causes.data.remainderExplanation}</p>
-                )}
-                {causes.data.items.length === 0 && (
-                  <p>원가 초과 원인이 없습니다.</p>
-                )}
-                {causes.data.items.map((item, index) => (
-                  <article
-                    key={item.causeName}
-                    data-testid={`project-cost-cause-${index}`}
-                  >
-                    <strong>
-                      {item.causeName} · {formatMoney(item.amount, unit)}
-                    </strong>
-                    <div
-                      className={`project-cost-cause-bar ${causes.data?.primaryBarColor === "빨강" ? "is-red" : "is-grey"}`}
-                      style={{
-                        width: `${Math.max(1, (100 * item.amount) / Math.max(1, ...(causes.data?.items.map((cause) => cause.amount) ?? [])))}%`,
-                      }}
-                    />
-                    <p>
-                      {item.task} ·{" "}
-                      {item.targetScreenId === "UI-11" ? "PM" : "파트장"} (안내)
-                    </p>
+  const field = (
+    name: keyof ProjectCostAnalysisSimulationInput,
+    label: string,
+    control: ReactNode,
+    hint: string,
+  ) => (
+    <div className="project-cost-sim-field">
+      <label htmlFor={`sim-${name}`}>{label}</label>
+      {control}
+      {errors[name] ? (
+        <span role="alert" className="project-cost-field-error">
+          {errors[name]}
+        </span>
+      ) : (
+        hint && <span className="ls-cap">{hint}</span>
+      )}
+    </div>
+  );
+  const change = (name: keyof ProjectCostAnalysisSimulationInput, signed = false) =>
+    (event: ChangeEvent<HTMLInputElement>) =>
+      setInput((current) => ({ ...current, [name]: digits(event.target.value, signed) }));
+  const before = turnkey ? "예상 최종" : "월간";
+  const difference = result ? result.marginRateAfter - result.marginRateBefore : 0;
+  const n = Number(input.headcountChange);
+  const simulationContent = (
+    <section data-testid="project-cost-simulation" className="project-cost-detail-section">
+      <Banner kind="info">
+        인원을 더하거나 빼 보면서 마진이 어떻게 바뀌는지 봅니다. <Badge kind="info">가상</Badge> 결과는 저장되지 않습니다.
+      </Banner>
+      <div className="project-cost-sim-fields">
+        {field(
+          "headcountChange",
+          "인원 변화 (명, 빼려면 −)",
+          <input
+            id="sim-headcountChange"
+            name="headcountChange"
+            className="ls-in project-cost-num"
+            inputMode="numeric"
+            value={input.headcountChange}
+            aria-invalid={!!errors.headcountChange}
+            onChange={change("headcountChange", true)}
+          />,
+          "",
+        )}
+        {field(
+          "monthlyCostPerPerson",
+          "1인 월 원가",
+          <span className="project-cost-money">
+            <input
+              id="sim-monthlyCostPerPerson"
+              name="monthlyCostPerPerson"
+              className="ls-in project-cost-num"
+              inputMode="numeric"
+              value={comma(input.monthlyCostPerPerson)}
+              aria-invalid={!!errors.monthlyCostPerPerson}
+              onChange={change("monthlyCostPerPerson")}
+            />
+            <span className="ls-cap">원</span>
+          </span>,
+          "지금 투입 인력 MM당 평균 원가",
+        )}
+        {field(
+          "months",
+          "적용 개월",
+          <input
+            id="sim-months"
+            name="months"
+            className="ls-in project-cost-num"
+            inputMode="numeric"
+            value={input.months}
+            aria-invalid={!!errors.months}
+            onChange={change("months")}
+          />,
+          turnkey ? `남은 기간 ${row.remainingMonths}개월` : "월단위·파견은 한 달 기준",
+        )}
+        {!turnkey &&
+          field(
+            "monthlyPricePerPerson",
+            "추가 인원 1인 월 단가",
+            <span className="project-cost-money">
+              <input
+                id="sim-monthlyPricePerPerson"
+                name="monthlyPricePerPerson"
+                className="ls-in project-cost-num"
+                inputMode="numeric"
+                value={comma(input.monthlyPricePerPerson)}
+                aria-invalid={!!errors.monthlyPricePerPerson}
+                onChange={change("monthlyPricePerPerson")}
+              />
+              <span className="ls-cap">원</span>
+            </span>,
+            "월단위·파견은 사람이 늘면 매출도 늘어납니다",
+          )}
+      </div>
+      <div className="project-cost-sim-out" aria-live="polite" data-testid="project-cost-simulation-result">
+        {simulationBlocked ? (
+          <Banner kind="info">{monthlyMarginNotice}</Banner>
+        ) : result ? (
+          <>
+            <div className="project-cost-scores">
+              <div>
+                <div className="ls-cap">지금 {before} 마진율</div>
+                <div className="project-cost-score">{formatPercent(result.marginRateBefore)}</div>
+              </div>
+              <div>
+                <div className="ls-cap">
+                  바꾼 뒤 <Badge kind="info">가상</Badge>
+                </div>
+                <div className={`project-cost-score${result.marginRateAfter < 0 ? " is-bad" : ""}`}>
+                  {formatPercent(result.marginRateAfter)}
+                </div>
+              </div>
+              <div>
+                <div className="ls-cap">차이</div>
+                <div className={`project-cost-score ${difference < 0 ? "is-bad" : "is-ok"}`}>
+                  {formatPoint(difference)}
+                </div>
+              </div>
+            </div>
+            <p className="ls-cap project-cost-note">
+              {turnkey
+                ? `원가 ${formatKoreanMoney(result.addedCost)}가 ${n >= 0 ? "늘어납니다" : "줄어듭니다"}(턴키는 계약금액이 그대로라 매출은 변하지 않음).`
+                : `한 달 매출 ${formatKoreanMoney(result.addedRevenue)}, 원가 ${formatKoreanMoney(result.addedCost)}가 ${n >= 0 ? "늘어납니다" : "줄어듭니다"}.`}{" "}
+              목표 마진율 {targetMarginRate}% 대비 {formatPoint(result.marginRateAfter - targetMarginRate)}.
+            </p>
+          </>
+        ) : null}
+      </div>
+    </section>
+  );
+  const causeData = causes.data;
+  const top = causeData ? Math.max(1, ...causeData.items.map((item) => item.amount)) : 1;
+  const red = causeData?.primaryBarColor === "빨강";
+  const causesContent = (
+    <section data-testid="project-cost-causes" className="project-cost-detail-section project-cost-causes">
+      <RegionStatus {...causes} testId="project-cost-causes-retry" />
+      {causeData && (
+        <>
+          {causeData.actualProgressRate != null && causeData.expectedCostAtProgress != null && (
+            <Banner kind={(causeData.progressExcessAmount ?? 0) > 0 ? "bad" : "info"}>
+              실적 진척률 {causeData.actualProgressRate}%만큼이면 원가가{" "}
+              <strong>{formatKoreanMoney(causeData.expectedCostAtProgress)}</strong>여야 하는데 실제로{" "}
+              <strong>{formatKoreanMoney(causeData.cumulativeCost)}</strong>를 썼습니다 →{" "}
+              {(causeData.progressExcessAmount ?? 0) > 0 ? (
+                <strong>{formatKoreanMoney(causeData.progressExcessAmount)} 초과</strong>
+              ) : (
+                "초과 없음"
+              )}
+            </Banner>
+          )}
+          <p className="ls-cap">
+            지금까지 원가를 늘린 원인을 금액이 큰 순서로 보여 줍니다.
+            {red ? "" : " 경보가 없는 프로젝트라 참고용입니다(빨간색은 경보가 있을 때만)."}
+          </p>
+          {causeData.items.map((item, index) => (
+            <article key={item.causeKey} data-testid={`project-cost-cause-${index}`} className="project-cost-cause">
+              <div className="project-cost-cause-head">
+                <strong>{item.causeName}</strong>
+                <span>{item.amount ? formatKoreanMoney(item.amount) : "없음"}</span>
+              </div>
+              <div className="project-cost-track">
+                <div
+                  className={`project-cost-fill${red && index === 0 && item.amount > 0 ? " is-bad" : " is-grey"}`}
+                  style={{ width: `${(item.amount / top) * 100}%` }}
+                />
+              </div>
+              <div className="ls-cap">{item.description}</div>
+              {item.amount > 0 && (
+                <div className="project-cost-cause-task">
+                  <span>
+                    고칠 사람: <strong>{item.owner}</strong> — {item.task}
+                  </span>
+                  {item.targetScreenId && item.targetLabel && (
                     <button
                       type="button"
+                      className="ls-btn ls-btn-sm"
                       data-testid={`project-cost-cause-go-${index}`}
-                      onClick={() =>
-                        go(item.targetScreenId, item.navigationContext)
-                      }
+                      onClick={() => go(item.targetScreenId!, item.navigationContext)}
                     >
-                      이동
+                      {item.targetLabel}
                     </button>
-                  </article>
-                ))}
-              </>
-            )}
-          </section>
-        )}
+                  )}
+                </div>
+              )}
+            </article>
+          ))}
+          {causeData.remainderAmount != null && (
+            <p className="ls-cap project-cost-note">
+              나머지 {formatKoreanMoney(causeData.remainderAmount)}는 위 세 가지로 설명되지 않습니다(진척률을 낮게 적었거나, 일 자체가 예상보다 어려움). PM과 확인하세요.
+            </p>
+          )}
+          <p className="ls-cap project-cost-note">
+            투입 초과 = (실제 MM − 지금까지 계획 MM) × MM당 원가 · 단가 대비 원가 = 인력별 (배분 원가 − 단가 × MM × {causeData.costOverRate}%)의 양수를 달마다 더한 값 · 무상 지원 = 무상 지원 원가를 달마다 더한 값.
+          </p>
+          {message && <p role="alert">{message}</p>}
+        </>
+      )}
+    </section>
+  );
+  const tabs: DetailTab[] = [
+    { key: "monthly", label: "월별 원가", content: monthlyContent },
+    {
+      key: "workforce",
+      label: workforce.data ? `투입 인력 (${people.length})` : "투입 인력",
+      content: workforceContent,
+    },
+    ...(internal
+      ? []
+      : [
+          { key: "simulation", label: "시뮬레이션", content: simulationContent },
+          { key: "causes", label: "원가 초과 원인", content: causesContent },
+        ]),
+  ];
+  return (
+    <DetailPanel
+      title={row.projectName}
+      sub={`${row.projectId} · ${row.contractTypeName} · ${row.startDate} ~ ${row.endDate}`}
+      actions={
         <button
           type="button"
-          className="ls-btn"
-          data-testid="project-cost-simulation-open"
-          onClick={() => setSimulationOpen(true)}
+          className="ls-btn ls-btn-sm"
+          data-testid="project-cost-project-info"
+          onClick={() => setProjectOpen(true)}
         >
-          마진 시뮬레이션 열기
+          프로젝트 정보
         </button>
-        {simulationOpen && (
-          <section data-testid="project-cost-simulation">
-            <h3>마진 시뮬레이션 · 가상</h3>
-            {["MO", "DP"].includes(row.contractTypeCode) && (
-              <p>월단위·파견은 한 달 기준</p>
-            )}
-            <form
-              ref={form}
-              onSubmit={(event) => {
-                event.preventDefault();
-                void calculate();
-              }}
-              noValidate
-            >
-              {(
-                [
-                  ["headcountChange", "인원 변화"],
-                  ["monthlyCostPerPerson", "1인 월 원가"],
-                  ["months", "적용 개월"],
-                  ...(row.contractTypeCode === "TK" ||
-                  row.contractTypeCode === "IN"
-                    ? []
-                    : [["monthlyPricePerPerson", "1인 단가"]]),
-                ] as [keyof ProjectCostAnalysisSimulationInput, string][]
-              ).map(([field, label], index) => (
-                <label key={field}>
-                  {label}
-                  <input
-                    name={field}
-                    aria-label={label}
-                    data-testid={`project-cost-simulation-input-${index}`}
-                    type="number"
-                    step={field === "months" ? "1" : "any"}
-                    value={input[field]}
-                    aria-invalid={!!errors[field]}
-                    onChange={(event) => {
-                      setInput({ ...input, [field]: event.target.value });
-                      setResult(undefined);
-                    }}
-                  />
-                  {errors[field] && <span role="alert">{errors[field]}</span>}
-                </label>
-              ))}
-              <button
-                type="submit"
-                data-testid="project-cost-simulation-calculate"
-                disabled={pending}
-              >
-                {pending ? "계산 중" : "계산"}
-              </button>
-              <button
-                type="button"
-                data-testid="project-cost-simulation-close"
-                onClick={() =>
-                  leave(() => {
-                    setSimulationOpen(false);
-                    setInput(empty);
-                    setResult(undefined);
-                    setErrors({});
-                  })
-                }
-              >
-                취소·닫기
-              </button>
-            </form>
-            {message && <p role="alert">{message}</p>}
-            {result && (
-              <div data-testid="project-cost-simulation-result">
-                <p>가상 · 업무 자료에 저장하지 않습니다.</p>
-                <dl>
-                  <dt>전 마진율</dt>
-                  <dd>{result.marginRateBefore.toFixed(2)}%</dd>
-                  <dt>가상 마진율</dt>
-                  <dd>{result.marginRateAfter.toFixed(2)}%</dd>
-                  <dt>변화</dt>
-                  <dd>{result.marginRateChange.toFixed(2)}%p</dd>
-                </dl>
-                <p>{result.calculationBasis}</p>
-              </div>
-            )}
-          </section>
-        )}
-      </DetailPanel>
-      {confirmation && (
-        <ConfirmDialog
-          title="저장하지 않은 내용이 있습니다"
-          description="나가면 입력한 내용이 사라집니다."
-          onCancel={() => setConfirmation(null)}
-          onProceed={() => {
-            const action = confirmation;
-            setConfirmation(null);
-            action();
-          }}
-        />
-      )}
-    </>
+      }
+      tabs={tabs}
+      activeTab={tab}
+      onTab={(next) => {
+        setTab(next);
+        if (next === "causes") setCausesWanted(true);
+      }}
+      onClose={onClose}
+      testId="project-cost-detail"
+    />
   );
 }

@@ -107,3 +107,44 @@ describe("PeriodSelector reused with different settings (AC-0105)", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 });
+
+describe("PeriodSelector variant monthBox (시안 periodBar 연도+월)", () => {
+  function MonthHarness({ mobile = false, initial }: { mobile?: boolean; initial?: PeriodValue }) {
+    const [value, setValue] = useState<PeriodValue>(initial ?? latestPeriod(basis, "yearMonth"));
+    return (
+      <PeriodSelector basis={basis} kind="yearMonth" variant="monthBox" mobile={mobile} value={value} onChange={setValue} />
+    );
+  }
+
+  it("shows one 「2026년 10월」 box with arrows and only the 마감/작업중 badge", () => {
+    render(<MonthHarness />);
+    const select = screen.getByRole("combobox", { name: "조회 월" });
+    expect(select).toHaveDisplayValue("2026년 10월");
+    expect(Array.from((select as HTMLSelectElement).options).map((o) => o.text)).toEqual(
+      Array.from({ length: 10 }, (_, i) => `2026년 ${i + 1}월`),
+    );
+    expect(screen.getByTestId("period-month-badge")).toHaveTextContent("작업중");
+    expect(screen.queryByText("올해")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("period-description")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "다음 달" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "이전 달" }));
+    expect(select).toHaveDisplayValue("2026년 9월");
+    expect(screen.getByTestId("period-month-badge")).toHaveTextContent("마감");
+    fireEvent.change(select, { target: { value: "2026-1" } });
+    expect(screen.getByRole("button", { name: "이전 달" })).toBeDisabled();
+  });
+
+  it("mobile keeps only the dropdown and badge", () => {
+    render(<MonthHarness mobile />);
+    expect(screen.queryByRole("button", { name: "이전 달" })).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "조회 월" })).toBeInTheDocument();
+    expect(screen.getByTestId("period-month-badge")).toHaveTextContent("작업중");
+  });
+
+  it("without the variant the default look is unchanged", () => {
+    render(<Harness kind="yearMonth" />);
+    expect(screen.getByTestId("period-year")).toBeInTheDocument();
+    expect(screen.getByTestId("period-year-badge")).toHaveTextContent("올해");
+    expect(screen.getByTestId("period-selector")).not.toHaveAttribute("data-variant");
+  });
+});

@@ -191,10 +191,17 @@ export const nextBillMonth = (month: string) => {
     ? `${y + 1}01`
     : `${y}${String(m + 1).padStart(2, "0")}`;
 };
-/** 청구월 다음 달 25일(입금 예정일 기본값, Q-식-10). */
-export const defaultPayDue = (month: string) => {
+/**
+ * 입금 예정일 기본값(Q-식-10): 청구월 다음 달 25일.
+ * 지난 달을 청구해 그 날이 청구일(기본 오늘)보다 빠르면 청구일 다음 달 25일로 한다.
+ */
+export const defaultPayDue = (month: string, billDate?: string) => {
   const next = nextBillMonth(month);
-  return `${next.slice(0, 4)}-${next.slice(4)}-25`;
+  const due = `${next.slice(0, 4)}-${next.slice(4)}-25`;
+  if (!billDate || !/^\d{4}-\d{2}-\d{2}$/.test(billDate) || due >= billDate)
+    return due;
+  const after = nextBillMonth(billDate.slice(0, 4) + billDate.slice(5, 7));
+  return `${after.slice(0, 4)}-${after.slice(4)}-25`;
 };
 /** 00-1 공통 동시 수정 문구(서버 409). */
 export const CONFLICT_MESSAGE = "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.";

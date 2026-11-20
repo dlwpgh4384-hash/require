@@ -122,7 +122,11 @@ export function BillChecksPanel({
     {
       key: "explanation",
       label: "설명",
-      render: (r) => <span className="bill-sub bill-wrap">{r.explanation || "–"}</span>,
+      render: (r) => (
+        <span className="bill-sub bill-check-explanation">
+          {r.explanation || "–"}
+        </span>
+      ),
     },
     {
       key: "action",

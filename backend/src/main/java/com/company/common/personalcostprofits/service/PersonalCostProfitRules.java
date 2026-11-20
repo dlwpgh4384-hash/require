@@ -112,7 +112,7 @@ public final class PersonalCostProfitRules {
             BigDecimal team = feesExcluded ? ZERO : money(zero(a.team()).multiply(a.mm()));
             BigDecimal expense = feesExcluded ? ZERO : money(zero(a.expense()).multiply(a.mm()));
             result.add(new Cost(month, person.developerId(), a.projectId(), a.assignmentId(), a.projectName(),
-                a.jobName(), a.contractTypeCode(), a.mm(), revenue, cost, team, expense));
+                a.jobName(), a.contractTypeCode(), a.mm(), revenue, cost, team, expense, a.inputTypeCode()));
         }
         if (idle.signum() != 0 || (!external && sorted.isEmpty() && pay != null)) {
             result.add(idle(person, month, sorted.isEmpty() ? labor : idle));
@@ -121,6 +121,6 @@ public final class PersonalCostProfitRules {
     }
     public static Cost idle(Person person, String month, BigDecimal labor) {
         return new Cost(month, person.developerId(), "IDLE", "IDLE", "남는 몫(대기 원가)", null,
-            null, ZERO, ZERO, labor, ZERO, ZERO);
+            null, ZERO, ZERO, labor, ZERO, ZERO, null);
     }
 }

@@ -100,6 +100,9 @@ function respond(developerId = "DEV-selected", available = true) {
       lossPeople: 0,
       operatingRate: 100,
       earningRate: 100,
+      leavePeople: 0,
+      unitPricePeople: 1,
+      averageDirectPeople: 1,
     },
     totals: {
       mm: 1,

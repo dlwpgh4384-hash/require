@@ -113,7 +113,8 @@ export function BillForm({
   );
   const [date, setDate] = useState(bill?.billDate ?? koreanToday());
   const [due, setDue] = useState(
-    bill?.payDueDate ?? defaultPayDue(preset?.billMonth ?? koreanThisMonth()),
+    bill?.payDueDate ??
+      defaultPayDue(preset?.billMonth ?? koreanThisMonth(), koreanToday()),
   );
   const [invoice, setInvoice] = useState(bill?.taxInvoiceNo ?? "");
   const [dirty, setDirty] = useState(false);
@@ -325,7 +326,7 @@ export function BillForm({
               change(() => {
                 const next = event.target.value.replace("-", "");
                 setMonth(next);
-                if (/^\d{6}$/.test(next)) setDue(defaultPayDue(next));
+                if (/^\d{6}$/.test(next)) setDue(defaultPayDue(next, date));
               }, "billMonth")
             }
           />

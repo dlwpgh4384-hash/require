@@ -95,6 +95,7 @@ class PersonalCostProfitPersistenceTest {
         db.update("UPDATE TB_SY_CODE SET CODE_VAL=202601 WHERE CODE='CASH_BASE_YM'");
         db.update("INSERT INTO TB_CL_CLOSE(CLOSE_YM,CLOSE_STAT_CD,REG_USER_ID) VALUES('202601','CLOSE','admin')");
         job=db.queryForObject("SELECT min(CODE) FROM TB_SY_CODE WHERE CODE_GRP_ID='JOB' AND USE_YN='Y' AND DEL_YN='N'",String.class);
+        db.update("INSERT INTO TB_BS_PART(PART_ID,PART_NM,HQ_YN,USE_YN,REG_USER_ID) VALUES('personal-part','시험 영업파트','N','Y','admin')");
         person("personal-a", "검색%동일", "CT");
         db.update("INSERT INTO TB_PJ_PROJ(PROJ_ID,PROJ_NM,CTRT_TYPE_CD,PROJ_STAT_CD,CTRT_BGN_DT,CTRT_END_DT,CTRT_AMT,TEAM_EXPS_AMT,PROJ_EXPS_AMT,REG_USER_ID) VALUES('personal-p','프로젝트','MO','ING','2026-01-01','2026-12-31',10000,10,20,'admin')");
         assignment("personal-paid", "NEW"); assignment("personal-free", "FREE");
@@ -105,7 +106,7 @@ class PersonalCostProfitPersistenceTest {
         writes.count.set(0);
     }
     void person(String id,String name,String type) {
-        db.update("INSERT INTO TB_HR_DEV(DEV_ID,MNG_NO,DEV_NM,EMP_TYPE_CD,JOB_CD,GRADE_CD,DRCT_CLS_CD,WORK_STAT_CD,JNCMP_DT,REG_USER_ID) VALUES(?,?,?,?,?,'MD','DRCT','IDLE','2026-01-01','admin')",id,id,name,type,job);
+        db.update("INSERT INTO TB_HR_DEV(DEV_ID,MNG_NO,DEV_NM,EMP_TYPE_CD,JOB_CD,GRADE_CD,DRCT_CLS_CD,PART_ID,WORK_STAT_CD,JNCMP_DT,REG_USER_ID) VALUES(?,?,?,?,?,'MD','DRCT','personal-part','IDLE','2026-01-01','admin')",id,id,name,type,job);
     }
     void assignment(String id,String input) {
         db.update("INSERT INTO TB_PJ_ASGN(ASGN_ID,PROJ_ID,DEV_ID,JOB_CD,INPUT_BGN_DT,INPUT_END_DT,CTRT_MM,INPUT_TYPE_CD,EXT_CNT,ASGN_STAT_CD,REG_USER_ID) VALUES(?,'personal-p','personal-a',?,'2026-01-01','2026-12-31',0.5,?,0,'ACT','admin')",id,job,input);
@@ -135,7 +136,16 @@ class PersonalCostProfitPersistenceTest {
         var before=businessSnapshot();
         var annual=read("연누계",null);
         assertThat(annual.path("items")).hasSize(1);
-        assertThat(annual.path("items").get(0).path("allocations")).hasSize(4);
+        // 투입ID마다 한 줄(1월 마감 + 2월 계산을 더함): 유상·무상지원·대기 3줄
+        var allocations=annual.path("items").get(0).path("allocations");
+        assertThat(allocations).hasSize(3);
+        // 저장행 순서(투입ID 순): 무상지원(personal-free) → 유상(personal-paid)
+        assertThat(allocations.get(0).path("assignmentId").asText()).isEqualTo("personal-free");
+        assertThat(allocations.get(0).path("free").asBoolean()).isTrue();
+        assertThat(allocations.get(1).path("assignmentId").asText()).isEqualTo("personal-paid");
+        assertThat(allocations.get(1).path("mm").decimalValue()).isEqualByComparingTo("1.00");
+        assertThat(allocations.get(2).path("assignmentId").asText()).isEqualTo("IDLE");
+        assertThat(annual.path("items").get(0).path("managementNumber").asText()).isEqualTo("personal-a");
         read("월평균",null); read("연누계",null);
         assertThat(businessSnapshot()).isEqualTo(before);
         assertThat(writes.count).hasValue(0);
@@ -145,8 +155,10 @@ class PersonalCostProfitPersistenceTest {
         var before=read("연누계",null).path("items").get(0);
         db.update("UPDATE TB_HR_MON_PAY SET PAY_AMT=2000 WHERE PAY_YM='202602'");
         db.update("UPDATE TB_PJ_PROJ SET TEAM_EXPS_AMT=100,PROJ_EXPS_AMT=200 WHERE PROJ_ID='personal-p'");
-        db.update("INSERT INTO TB_PJ_DRCT_EXPS(PROJ_ID,EXPS_YM,EXPS_SN,EXPS_ITEM_CD,EXPS_AMT,REG_USER_ID) VALUES('personal-p','202602',1,'ETC',999999,'admin')");
+        db.update("INSERT INTO TB_PJ_DRCT_EXPS(PROJ_ID,EXPS_YM,EXPS_SN,DRCT_EXPS_ITEM_CD,EXPS_AMT,REG_USER_ID) VALUES('personal-p','202602',1,(SELECT min(CODE) FROM TB_SY_CODE WHERE CODE_GRP_ID='DRCT_EXPS_ITEM'),999999,'admin')");
         var after=read("연누계",null).path("items").get(0);
+        // 1월(마감)만 있는 무상지원 줄은 저장값 그대로
+        assertThat(after.path("allocations").get(0).path("assignmentId").asText()).isEqualTo("personal-free");
         assertThat(after.path("allocations").get(0)).isEqualTo(before.path("allocations").get(0));
         assertThat(after.path("totalCost").decimalValue()).isGreaterThan(before.path("totalCost").decimalValue());
         assertThat(after.path("totalCost").decimalValue()).isLessThan(new BigDecimal("999999"));
@@ -156,6 +168,13 @@ class PersonalCostProfitPersistenceTest {
         assertThat(read("연누계","%동일").path("items")).hasSize(2);
         assertThat(read("연누계","없는 사람").path("items")).isEmpty();
     }
+    @Test void selfAffiliationFindsPeopleWithoutClient() throws Exception {
+        // 소속 「자사」 = 소속 거래처가 없는 사람(시험 인력은 BLNG_CLNT_ID 없음)
+        var body=mvc.perform(get("/api/common/personal-cost-profits").param("year","2026").param("baseMonth","2")
+            .param("displayMode","연누계").param("affiliationId","__self"))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(json.readTree(body).path("data").path("items")).hasSize(1);
+    }
     @Test void leavePayrollIsHiddenFromParentsAndIncludedInAnonymousIdleTotals() throws Exception {
         var base=read("연누계",null).path("totals").path("totalCost").decimalValue();
         person("personal-leave","휴직", "CT"); payroll("personal-leave","202602",200);
@@ -163,6 +182,7 @@ class PersonalCostProfitPersistenceTest {
         var result=read("연누계",null);
         assertThat(result.path("items")).hasSize(1);
         assertThat(result.path("summary").path("totalPeople").asInt()).isEqualTo(2);
+        assertThat(result.path("summary").path("leavePeople").asInt()).isEqualTo(1);
         assertThat(result.path("totals").path("totalCost").decimalValue()).isEqualByComparingTo(base.add(new BigDecimal("300")));
     }
     @Test void successfulWorkbookCommitsExactlyOneDownloadWithDatabaseTimestampAndNoBusinessChanges() throws Exception {

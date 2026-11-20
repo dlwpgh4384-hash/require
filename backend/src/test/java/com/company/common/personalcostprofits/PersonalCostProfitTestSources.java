@@ -33,14 +33,14 @@ final class PersonalCostProfitTestSources {
     }
     static Person person(String id) {
         return new Person(id, "김" + id, "C1", "소속", null, "사원", "CT", "계약직",
-            LocalDate.of(2026,1,1), null, "BE", "백엔드", "MD", "중급", "PART", "DRCT");
+            LocalDate.of(2026,1,1), null, "BE", "백엔드", "MD", "중급", "PART", "DRCT", "K-" + id, "파트");
     }
     static Pay pay(String id, String month, String salary) {
         return new Pay(month, id, "CT", n(salary), n("0"), n("100"), n("0"), n("10"), n("33"), n("12"), n("945"), n("0"));
     }
     static Cost cost(String assignment, String mm, String revenue, String labor) {
         return new Cost("202601", "A", "P", assignment, "프로젝트", "백엔드", "MO",
-            n(mm), n(revenue), n(labor), n("10"), n("20"));
+            n(mm), n(revenue), n(labor), n("10"), n("20"), "FREE".equals(assignment) ? "FREE" : "NEW");
     }
     static Assignment assignment(String id, String month, String mm) {
         return new Assignment(month, "A", "P", id, "프로젝트", "백엔드", "MO", "PAID",

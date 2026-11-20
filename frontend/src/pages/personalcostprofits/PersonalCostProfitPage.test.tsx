@@ -31,6 +31,7 @@ let validation: boolean;
 const row = (): PersonalCostProfitRow => ({
   developerId: "D1",
   developerName: "김개발",
+  managementNumber: "K-0001",
   affiliationName: "소속",
   positionName: "사원",
   employeeTypeName: "정규직",
@@ -55,37 +56,40 @@ const row = (): PersonalCostProfitRow => ({
   netPay: 984,
   allocations: [
     {
-      yearMonth: "202602",
       projectId: "P1",
       assignmentId: "PAID",
       projectName: "동일 프로젝트",
       jobName: "백엔드",
+      contractTypeCode: "MO",
+      free: false,
       mm: 0.5,
       unitPrice: 0,
       allocatedCost: 550,
       operatingProfit: -550,
     },
     {
-      yearMonth: "202602",
       projectId: "P1",
       assignmentId: "FREE",
       projectName: "동일 프로젝트",
       jobName: "백엔드",
+      contractTypeCode: "MO",
+      free: true,
       mm: 0.51,
       unitPrice: 0,
       allocatedCost: 570,
       operatingProfit: -570,
     },
     {
-      yearMonth: "202601",
       projectId: "IDLE",
       assignmentId: "IDLE",
       projectName: "남는 몫(대기 원가)",
       jobName: null,
+      contractTypeCode: null,
+      free: false,
       mm: 0,
       unitPrice: 0,
-      allocatedCost: 0,
-      operatingProfit: 0,
+      allocatedCost: 3000,
+      operatingProfit: -3000,
     },
   ],
 });
@@ -106,6 +110,9 @@ beforeEach(() => {
       lossPeople: 1,
       operatingRate: 50,
       earningRate: 0,
+      leavePeople: 1,
+      unitPricePeople: 1,
+      averageDirectPeople: 1,
     },
     contributions: [
       {
@@ -223,7 +230,22 @@ it("renders the five summaries, exact year guidance, required table order and nu
       .getByTestId("personal-cost-profit-summary")
       .querySelectorAll("section"),
   ).toHaveLength(5);
-  expect(screen.getByText(/월평균 가동 0.5명/)).toBeVisible();
+  // 시안 kpi 5칸: 이름·값·보조 문구, 금액은 kor()(만 원·억 원)
+  const summary = screen.getByTestId("personal-cost-profit-summary");
+  expect(
+    [...summary.querySelectorAll("section")].map((card) => card.textContent),
+  ).toEqual([
+    "총 인원2명휴직 1명 포함 · 월평균 가동 0.5 · 가득 0.0",
+    "인당 매출 (누계)0만 원단가 칸이 있는 1명(0 포함)",
+    "인당 원가 (누계)0만 원원가합계 ÷ 1명 (휴직 제외)",
+    "인당 영업이익 (누계)−0만 원영업이익 합 ÷ 1명 · 적자 1명",
+    "가동률 · 가득률 ⓘ50.0% · 0.0%1~2월 월평균 · 월평균 재직 직접 인력 1.0명 기준(간접 제외, 퇴사자는 퇴사한 달까지)",
+  ]);
+  expect(within(summary).getByTitle(/가동률 = 그 달 일하는/)).toBeVisible();
+  // 올해 배지(시안 yearonly 막대), 기준월·표시 방식 고르기는 없음
+  expect(within(screen.getByTestId("year-bar")).getByText("올해")).toBeVisible();
+  expect(screen.queryByLabelText("표시 방식")).not.toBeInTheDocument();
+  expect(screen.queryByText(/기준월/)).not.toBeInTheDocument();
   const headers = within(screen.getByTestId("personal-cost-profit-list"))
     .getAllByRole("columnheader")
     .map((header) => header.textContent?.replace(/ [▲▼]/g, ""));
@@ -231,22 +253,33 @@ it("renders the five summaries, exact year guidance, required table order and nu
     "이름",
     "소속",
     "직위",
-    "직원구분",
+    "구분",
     "입사일",
-    "가동률",
+    "가동률 ⓘ",
     "MM",
-    "단가",
-    "월 급여",
-    "수당",
+    "매출",
+    "급여",
+    "그룹장·팀장 수당",
     "4대보험(회사)",
     "퇴직금 적립",
-    "개인별 원가",
-    "팀비",
-    "프로젝트경비",
-    "원가합계",
-    "영업이익",
+    "개인별 원가 ⓘ",
+    "팀비 ⓘ",
+    "프로젝트경비 ⓘ",
+    "원가합계 ⓘ",
+    "영업이익 ⓘ",
     "이익률",
   ]);
+  // 이름 아래 관리번호
+  expect(
+    within(screen.getByTestId("list-cell-D1-developerName")).getByText(
+      "K-0001",
+    ),
+  ).toBeVisible();
+  // 도구 줄: 「총 N명」만(「총 N건」 없음)
+  expect(screen.getByTestId("personal-period-text")).toHaveTextContent(
+    "2026년 1~2월 누계 · 총 1명",
+  );
+  expect(screen.queryByText(/총 1건/)).not.toBeInTheDocument();
   expect(
     within(screen.getByTestId("list-row-D1")).getByText("1.0 초과"),
   ).toBeVisible();
@@ -282,12 +315,123 @@ it("keeps contribution matrix folded initially with exactly four grades and miss
     within(panel)
       .getAllByRole("columnheader")
       .map((cell) => cell.textContent),
-  ).toEqual(["직무", "초급", "중급", "고급", "특급"]);
+  ).toEqual(["직무", "초급", "중급", "고급", "특급", "전체"]);
   expect(
     within(panel).getByRole("rowheader", { name: "백엔드" }),
   ).toBeVisible();
-  expect(within(panel).getByText("-1,120 (1명)")).toBeVisible();
-  expect(within(panel).getAllByText("– (0명)")).toHaveLength(3);
+  // 시안: 「금액 (인원)」, 없는 칸은 「–」, 단위는 화면 단위(처음 천 원)
+  expect(panel.querySelector("summary")).toHaveTextContent(
+    "직무·등급별 인당 공헌이익 (인당 평균 영업이익 · 단위 천 원)",
+  );
+  const cells = [
+    ...screen.getByTestId("personal-contribution-BE").querySelectorAll("td"),
+  ].map((cell) => cell.textContent);
+  expect(cells).toEqual(["–", "−1 (1)", "–", "–", "−1 (1)"]);
+});
+it("money cells, footer and contribution cells follow the selected unit", async () => {
+  mount();
+  await ready();
+  expect(screen.getByLabelText("단위")).toHaveValue("천 원");
+  expect(screen.getByTestId("list-cell-D1-totalCost")).toHaveTextContent("1");
+  expect(screen.getByTestId("list-cell-D1-operatingProfit")).toHaveTextContent(
+    "−1",
+  );
+  expect(
+    screen.getByTestId("list-cell-D1-operatingProfit").querySelector(".ls-neg"),
+  ).not.toBeNull();
+  fireEvent.change(screen.getByLabelText("단위"), { target: { value: "원" } });
+  expect(screen.getByTestId("list-cell-D1-totalCost")).toHaveTextContent(
+    "1,120",
+  );
+  expect(screen.getByTestId("list-cell-D1-operatingProfit")).toHaveTextContent(
+    "−1,120",
+  );
+  expect(screen.getByTestId("list-footer-totalCost")).toHaveTextContent(
+    "1,120",
+  );
+  expect(
+    screen.getByTestId("personal-cost-profit-contributions"),
+  ).toHaveTextContent("단위 원");
+  fireEvent.change(screen.getByLabelText("단위"), {
+    target: { value: "백만 원" },
+  });
+  expect(screen.getByTestId("list-cell-D1-totalCost")).toHaveTextContent("0");
+});
+it("shows 자사 and – for empty affiliation and position, and a spacer instead of ▸ without projects", async () => {
+  result.items[0].affiliationName = "";
+  result.items[0].positionName = "";
+  result.items[0].allocations = [];
+  mount();
+  await ready();
+  expect(screen.getByTestId("list-cell-D1-affiliationName")).toHaveTextContent(
+    "자사",
+  );
+  expect(screen.getByTestId("list-cell-D1-positionName")).toHaveTextContent(
+    "–",
+  );
+  expect(screen.queryByTestId("personal-expand-D1")).not.toBeInTheDocument();
+  expect(screen.getByTestId("list-cell-D1-mm")).toHaveTextContent("–");
+});
+it("offers 자사 in the affiliation filter and the mockup detail options with an applied count", async () => {
+  mount();
+  await ready();
+  await waitFor(() =>
+    expect(screen.getByLabelText("소속")).toHaveTextContent("자사"),
+  );
+  expect(screen.getByLabelText("이름")).toHaveAttribute(
+    "placeholder",
+    "이름 일부",
+  );
+  expect(screen.getByLabelText("직원 구분")).toBeVisible();
+  expect(screen.queryByLabelText("보기")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("personal-advanced"));
+  expect(screen.getByTestId("personal-advanced")).toHaveTextContent(
+    "상세 조건 ▲",
+  );
+  expect(
+    [...(screen.getByLabelText("보기") as HTMLSelectElement).options].map(
+      (option) => option.text,
+    ),
+  ).toEqual(["전체", "적자 인력만", "동시 투입·1.0 초과만"]);
+  expect(
+    [...(screen.getByLabelText("턴키 단가") as HTMLSelectElement).options].map(
+      (option) => option.text,
+    ),
+  ).toEqual(["포함", "미포함 (엑셀 「턴키단가미포함」 시트와 같음)"]);
+  fireEvent.change(screen.getByLabelText("보기"), {
+    target: { value: "적자만" },
+  });
+  expect(screen.getByTestId("personal-advanced")).toHaveTextContent(
+    "상세 조건 ▲ (1개 적용)",
+  );
+  fireEvent.change(screen.getByLabelText("소속"), {
+    target: { value: "__self" },
+  });
+  fireEvent.click(screen.getByTestId("list-search"));
+  await waitFor(() => expect(query().get("affiliationId")).toBe("__self"));
+  expect(query().get("view")).toBe("적자만");
+});
+it("shows the mockup calculation table with the monthly-average period text", async () => {
+  mount();
+  await ready();
+  const box = screen.getByTestId("personal-cost-profit-calculation");
+  const names = [...box.querySelectorAll("tbody tr")].map(
+    (row) => row.querySelector("td")?.textContent,
+  );
+  expect(names.slice(0, 5)).toEqual([
+    "기간",
+    "개인별 원가",
+    "원가합계",
+    "단가(매출)",
+    "영업이익",
+  ]);
+  expect(box).toHaveTextContent("2026년 1월~2월 매달 값을 더함 (연 누계)");
+  fireEvent.click(screen.getByTestId("personal-mode-월평균"));
+  await waitFor(() =>
+    expect(box).toHaveTextContent(
+      "1~2월 누계 ÷ 그 사람이 일한 달 수 (월 평균)",
+    ),
+  );
 });
 it("submits literal name and DB code filters, advanced OR-view and turnkey choice with no contract filter", async () => {
   mount();
@@ -330,13 +474,30 @@ it("reset preserves period and columns while removing optional codes and restori
 it("display modes round trip as GET-only queries", async () => {
   mount();
   await ready();
-  fireEvent.change(screen.getByLabelText("표시 방식"), {
-    target: { value: "월평균" },
-  });
+  // 시안 도구 줄 [연 누계][월 평균] 붙은 단추
+  expect(screen.getByTestId("personal-mode-연누계")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  fireEvent.click(screen.getByTestId("personal-mode-월평균"));
   await waitFor(() => expect(query().get("displayMode")).toBe("월평균"));
-  fireEvent.change(screen.getByLabelText("표시 방식"), {
-    target: { value: "연누계" },
-  });
+  await ready();
+  expect(screen.getByTestId("personal-mode-월평균")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(screen.getByTestId("personal-mode-월평균")).toHaveClass("ls-btn-p");
+  expect(screen.getByTestId("personal-period-text")).toHaveTextContent(
+    "2026년 1~2월 월 평균(÷ 사람마다 일한 달 수) · 총 1명",
+  );
+  expect(
+    screen.getByRole("columnheader", { name: /^단가/ }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("columnheader", { name: /^월 급여/ }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("평균 단가 (월)")).toBeVisible();
+  fireEvent.click(screen.getByTestId("personal-mode-연누계"));
   await waitFor(() => expect(query().get("displayMode")).toBe("연누계"));
   expect(
     request.mock.calls.every(
@@ -348,19 +509,42 @@ it("individual and all-project expansion preserve paid/free identity and idle ro
   mount();
   await ready();
   fireEvent.click(screen.getByTestId("personal-expand-D1"));
-  expect(
-    screen.getByTestId("personal-allocation-202602-P1-PAID"),
-  ).toBeVisible();
-  expect(
-    screen.getByTestId("personal-allocation-202602-P1-FREE"),
-  ).toBeVisible();
-  expect(screen.getByText("남는 몫(대기 원가)")).toBeVisible();
+  // 같은 표의 칸에 맞춘 펼친 줄(연월 칸 없음): 이름 칸 「└ 프로젝트 · 직무」, 무상지원 배지
+  const paid = screen.getByTestId("personal-allocation-PAID");
+  const free = screen.getByTestId("personal-allocation-FREE");
+  expect(paid.tagName).toBe("TR");
+  expect(paid.querySelectorAll("td")).toHaveLength(18);
+  expect(paid.querySelectorAll("td")[0]).toHaveTextContent(
+    "└ 동일 프로젝트 · 백엔드",
+  );
+  expect(free).toHaveTextContent("무상지원");
+  expect(paid).not.toHaveTextContent("무상지원");
+  expect(free.querySelectorAll("td")[6]).toHaveTextContent("0.51");
+  // 무상지원은 단가 「–」, 원가합계 칸은 배분 원가와 계산 도움말
+  expect(free.querySelectorAll("td")[7]).toHaveTextContent("–");
+  expect(free.querySelector("td span[title]")).toHaveAttribute(
+    "title",
+    "배분 원가 = 원가합계 × 0.51 ÷ 1.01",
+  );
+  expect(screen.queryByText(/202602/)).not.toBeInTheDocument();
+  const idle = screen.getByTestId("personal-idle-D1");
+  expect(idle.querySelectorAll("td")[0]).toHaveTextContent(
+    "└ 남는 몫(대기 원가)",
+  );
+  expect(idle.querySelectorAll("td")[15]).toHaveTextContent("3");
+  expect(idle.querySelectorAll("td")[16]).toHaveTextContent("−3");
+  expect(screen.getByTestId("personal-expand-all")).toHaveTextContent(
+    "모두 접기",
+  );
   fireEvent.click(screen.getByTestId("personal-expand-all"));
   expect(
-    screen.queryByTestId("personal-cost-profit-allocations"),
+    screen.queryByTestId("personal-allocation-PAID"),
   ).not.toBeInTheDocument();
+  expect(screen.getByTestId("personal-expand-all")).toHaveTextContent(
+    "프로젝트 모두 펼치기",
+  );
   fireEvent.click(screen.getByTestId("personal-expand-all"));
-  expect(screen.getByTestId("personal-cost-profit-allocations")).toBeVisible();
+  expect(screen.getByTestId("personal-allocation-PAID")).toBeVisible();
 });
 it("does not offer sensitive column headings or column options when policy omits their wire fields", async () => {
   delete result.items[0].monthlySalary;
@@ -370,29 +554,39 @@ it("does not offer sensitive column headings or column options when policy omits
   mount();
   await ready();
   expect(
-    screen.queryByRole("columnheader", { name: "월 급여" }),
+    screen.queryByRole("columnheader", { name: /^급여/ }),
   ).not.toBeInTheDocument();
   expect(
-    screen.queryByRole("columnheader", { name: "개인별 원가" }),
+    screen.queryByRole("columnheader", { name: /^개인별 원가/ }),
   ).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId("list-columns"));
   expect(
-    screen.queryByRole("checkbox", { name: "월 급여" }),
+    screen.queryByRole("checkbox", { name: "급여" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("checkbox", { name: "개인별 원가" }),
   ).not.toBeInTheDocument();
 });
 it("shows upload reference columns only after column selection and passes their keys in requests", async () => {
   mount();
   await ready();
   expect(
-    screen.queryByRole("columnheader", { name: "근로소득세" }),
+    screen.queryByRole("columnheader", { name: /^근로소득세/ }),
   ).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId("list-columns"));
   fireEvent.click(screen.getByRole("checkbox", { name: "근로소득세" }));
   await waitFor(() => expect(query().get("columns")).toContain("incomeTax"));
   await ready();
+  // 참고 열은 제목 뒤 「 (참고)」, 순서는 시안 C03(4대보험(회사) 뒤)
   expect(
-    screen.getByRole("columnheader", { name: "근로소득세" }),
+    screen.getByRole("columnheader", { name: "근로소득세 (참고)" }),
   ).toBeVisible();
+  const headers = within(screen.getByTestId("personal-cost-profit-list"))
+    .getAllByRole("columnheader")
+    .map((header) => header.textContent);
+  expect(headers.indexOf("근로소득세 (참고)")).toBe(
+    headers.indexOf("4대보험(회사)") + 1,
+  );
 });
 it("failed requests keep the condition skeleton and recover through the list retry", async () => {
   failed = true;

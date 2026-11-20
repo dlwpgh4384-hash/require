@@ -8685,7 +8685,7 @@ paths:
         ordering: 열 순서는 B.4/요청57행. 행 정렬/요약 필터 범위는 OQ-QUERY-003으로 확정 전 임의 규칙 금지
       x-business-rules:
       - 누계는 올해1월~기준월·지난해12월까지 합, 월 평균은 일한 달만 분모로 쓰며 급여/원가는 근무월·프리랜서/외주는 투입월을 따른다. 보기만 바뀐다.
-      - 개별 ▸ 또는 프로젝트 모두 펼치기로 프로젝트별 줄과 MM·단가·배분 원가·이익·남는 몫(대기 원가)을 읽는다. 마감월은 투입ID별 TB_CO_MON_COST 한 줄을 그대로 펼친다.
+      - 개별 ▸ 또는 프로젝트 모두 펼치기로 프로젝트별 줄과 MM·단가·배분 원가·이익·남는 몫(대기 원가)을 읽는다. 투입ID마다 한 줄로 조회 기간의 달별 값(마감월은 TB_CO_MON_COST 저장값)을 더해 펼친다.
       - 마감월의 팀비·프로젝트경비는 TB_CO_MON_COST.TEAM_EXPS_AMT·PROJ_EXPS_AMT를 읽고 추가 직접 경비는 사람에게 배분하지 않는다.
       - 월 MM 합1.0 초과는 「1.0 초과」로 표시한다.
       - 단가0이면 이익률을 「–」로 표시한다.
@@ -8746,7 +8746,7 @@ paths:
       - name: affiliationId
         in: query
         required: false
-        description: 기존 소속 식별자
+        description: 기존 소속 식별자. __self는 소속 「자사」(소속 거래처 없음)
         schema:
           type: string
       - name: salesPartId
@@ -8889,7 +8889,7 @@ paths:
       - name: affiliationId
         in: query
         required: false
-        description: 기존 소속 식별자
+        description: 기존 소속 식별자. __self는 소속 「자사」(소속 거래처 없음)
         schema:
           type: string
       - name: salesPartId
@@ -10932,6 +10932,10 @@ components:
         developerName:
           type: string
           description: 이름
+        managementNumber:
+          type: string
+          nullable: true
+          description: 관리번호(TB_HR_DEV.MNG_NO)·이름 아래 작게 표시
         affiliationName:
           type: string
           description: 소속
@@ -11003,26 +11007,25 @@ components:
           description: 월 MM 합1.0 초과 표시
         allocations:
           type: array
-          description: 프로젝트/대기 펼침행. 마감월은 투입ID별 저장행 그대로, 같은 프로젝트 복수 투입은 병합하지 않음
+          description: 프로젝트/대기 펼침행. 투입ID마다 한 줄(달별 값 합), 같은 프로젝트 복수 투입은 병합하지 않음
           items:
             $ref: '#/components/schemas/CommonPersonalCostProfitAllocation'
       description: 사람별 한 줄. 민감 필드는 기존 정책이 허용할 때만 제공; 참고열은 선택 columns에 있을 때 제공. 공개 DTO이지 물리 컬럼 정의가 아님.
     CommonPersonalCostProfitAllocation:
       type: object
+      description: 투입ID마다 한 줄. 조회 기간(1월~기준월)의 달별 값을 더하고 월평균이면 사람 줄과 같이 일한 달 수로 나눈다. 대기(IDLE)는 맨 아래 한 줄.
       required:
-      - yearMonth
       - projectId
       - assignmentId
       - projectName
       - jobName
+      - contractTypeCode
+      - free
       - mm
       - unitPrice
       - allocatedCost
       - operatingProfit
       properties:
-        yearMonth:
-          type: string
-          description: 원천 연월
         projectId:
           type: string
           nullable: true
@@ -11037,6 +11040,13 @@ components:
           type: string
           nullable: true
           description: 직무·대기는 원천 빈값 보존
+        contractTypeCode:
+          type: string
+          nullable: true
+          description: 프로젝트 계약유형(IN 내부 → 「연구개발」, TK 턴키)·대기는 null
+        free:
+          type: boolean
+          description: 무상지원 투입(INPUT_TYPE_CD=FREE)이면 true
         mm:
           type: number
           description: MM
@@ -11061,6 +11071,9 @@ components:
       - lossPeople
       - operatingRate
       - earningRate
+      - leavePeople
+      - unitPricePeople
+      - averageDirectPeople
       properties:
         totalPeople:
           type: integer
@@ -11089,6 +11102,15 @@ components:
         earningRate:
           type: number
           description: 가득률·표시된 인원으로 계산
+        leavePeople:
+          type: integer
+          description: 총 인원 중 기준월 말 휴직 인원(「휴직 N명 포함」)
+        unitPricePeople:
+          type: integer
+          description: 평균 단가 분모 인원(「단가 칸이 있는 N명(0 포함)」)·턴키 미포함이면 턴키만 하는 사람 제외
+        averageDirectPeople:
+          type: number
+          description: 월평균 재직 직접 인력·소수 첫째 자리(가동률·가득률 분모)
     CommonPersonalCostProfitTotals:
       type: object
       required:

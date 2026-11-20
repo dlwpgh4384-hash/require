@@ -4,6 +4,7 @@ export interface PersonalCostProfitFilter {
   displayMode: "연누계" | "월평균";
   name?: string;
   employeeTypeCode?: string;
+  /** 소속. 「자사」는 SELF_AFFILIATION(소속 거래처 없음). */
   affiliationId?: string;
   salesPartId?: string;
   jobCode?: string;
@@ -11,12 +12,18 @@ export interface PersonalCostProfitFilter {
   includeTurnkey?: boolean;
   columns?: string[];
 }
+/** 소속 조건 「자사」 값(서버와 같은 값). */
+export const SELF_AFFILIATION = "__self";
+/** 펼친 줄: 투입ID마다 한 줄(조회 기간 합, 월 평균이면 사람 줄처럼 나눔). 대기(IDLE)는 맨 아래. */
 export interface PersonalCostProfitAllocation {
-  yearMonth: string;
   projectId: string | null;
   assignmentId: string;
   projectName: string;
   jobName: string | null;
+  /** IN 내부(연구개발), TK 턴키. 대기는 null. */
+  contractTypeCode: string | null;
+  /** 무상지원 투입. */
+  free: boolean;
   mm: number;
   unitPrice: number;
   allocatedCost: number;
@@ -25,6 +32,7 @@ export interface PersonalCostProfitAllocation {
 export interface PersonalCostProfitRow {
   developerId: string;
   developerName: string;
+  managementNumber?: string | null;
   affiliationName: string;
   positionName: string;
   employeeTypeName: string;
@@ -69,6 +77,12 @@ export interface PersonalCostProfitResult {
     lossPeople: number;
     operatingRate: number;
     earningRate: number;
+    /** 총 인원 중 기준월 말 휴직 인원. */
+    leavePeople: number;
+    /** 평균 단가 분모 인원(단가 칸이 있는 사람). */
+    unitPricePeople: number;
+    /** 월평균 재직 직접 인력(소수 첫째 자리). */
+    averageDirectPeople: number;
   };
   totals: Partial<Record<keyof PersonalCostProfitRow, number>>;
   contributions: PersonalCostProfitContribution[];

@@ -4,97 +4,120 @@
   gap: 16px;
   min-width: 0;
 }
-.personal-cost-profit-period {
+.personal-cost-profit-period-error {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
   gap: 12px;
 }
-.personal-cost-profit-period .year-bar {
-  flex: 1;
-}
+/* 시안 .kpis / .kpi: 요약 5칸 */
 .personal-cost-profit-summary {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
-.personal-cost-profit-summary section {
+.personal-cost-profit-kpi {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 16px;
-  border: 1px solid var(--border);
+  gap: 4px;
+  min-width: 0;
+  padding: 16px 20px;
+  border: 1px solid var(--divider, var(--border));
   border-radius: 8px;
   background: var(--surface);
 }
-.personal-cost-profit-summary strong {
-  font-size: 20px;
+.personal-cost-profit-kpi-l {
+  font-size: 13px;
+  color: var(--text-sub);
+}
+.personal-cost-profit-kpi-v {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-.personal-cost-profit-summary small {
-  color: var(--muted);
-}
-.personal-cost-profit-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.personal-cost-profit-over {
-  display: inline-block;
-  margin-left: 6px;
-  color: var(--danger);
-  font-size: 11px;
-}
-.personal-cost-profit-scroll {
-  overflow-x: auto;
-  max-width: 100%;
-}
-.personal-cost-profit-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-variant-numeric: tabular-nums;
-}
-.personal-cost-profit-table th,
-.personal-cost-profit-table td {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
   white-space: nowrap;
-  text-align: right;
 }
-.personal-cost-profit-table th:first-child,
-.personal-cost-profit-table td:first-child {
-  text-align: left;
+.personal-cost-profit-kpi-d {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
 }
-.personal-cost-profit-advanced {
+.personal-cost-profit-info {
+  cursor: help;
+}
+/* 시안 details.card: 직무·등급별 인당 공헌이익 */
+.personal-cost-profit-card {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px;
+  border: 1px solid var(--divider, var(--border));
+  border-radius: 8px;
+  background: var(--surface);
 }
-.personal-cost-profit-advanced label {
+.personal-cost-profit-card > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.personal-cost-profit-card[open] > .ls-twrap {
+  margin-top: 8px;
+}
+.personal-cost-profit-free {
+  max-height: none;
+  min-height: 0;
+}
+.personal-cost-profit-name-in {
+  width: 120px;
+}
+/* 시안 이름 칸: [▸] + 이름(아래 관리번호) */
+.personal-cost-profit-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.personal-cost-profit-exp,
+.personal-cost-profit-exp-space {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-right: 12px;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
 }
-.personal-cost-profit-note p {
-  line-height: 1.7;
-  color: var(--muted);
-}
-.personal-cost-profit-page summary {
+.personal-cost-profit-exp {
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-sub);
   cursor: pointer;
-  padding: 8px 0;
+}
+.personal-cost-profit-exp:hover {
+  background: var(--hover);
+}
+.personal-cost-profit-pname {
+  display: flex;
+  flex-direction: column;
+  line-height: 18px;
+}
+.personal-cost-profit-pname small {
+  font-size: 12px;
+  color: var(--text-sub);
 }
 @media (max-width: 1100px) {
   .personal-cost-profit-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-@media (max-width: 600px) {
+@media (max-width: 767px) {
   .personal-cost-profit-summary {
-    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
   }
-  .personal-cost-profit-period {
-    align-items: stretch;
-    flex-direction: column;
+  .personal-cost-profit-kpi {
+    padding: 12px;
+  }
+  .personal-cost-profit-kpi-v {
+    font-size: 20px;
+  }
+  .personal-cost-profit-kpi:last-child {
+    grid-column: 1 / -1;
   }
 }

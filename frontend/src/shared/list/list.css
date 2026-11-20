@@ -630,3 +630,119 @@ table.ls-t {
 .ls-filters[hidden] {
   display: none;
 }
+/* 조건 줄 아래 한 줄(시안 「상세 조건」 펼친 줄) */
+.ls-filter-below {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: center;
+}
+/* 시안 펼친 줄(.t tr.subr): 바탕색, 12px 회색 글씨. 이름 칸은 들여쓰기(.t td.ind) */
+.ls-t tr.ls-subr td {
+  background: var(--bg);
+  font-size: 12px;
+  color: var(--text-sub);
+}
+.ls-t tr.ls-subr td.ls-ind {
+  padding-left: 28px;
+}
+/* 시안 .neg: 음수 금액 */
+.ls-neg {
+  color: var(--ls-bad);
+}
+/* 시안 .seg: 붙은 단추 묶음 */
+.ls-seg {
+  display: inline-flex;
+}
+.ls-seg .ls-btn {
+  border-radius: 0;
+}
+.ls-seg .ls-btn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.ls-seg .ls-btn:last-child {
+  border-radius: 0 4px 4px 0;
+  margin-left: -1px;
+}
+/* 시안 .unitsel: 「단위 [천 원]」 */
+.ls-unitsel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-sub);
+}
+/* 시안 fxBox: 계산 방법 카드(프로젝트 현황판 계산 방법과 같은 모양) */
+.ls-fx {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 24px;
+  border: 1px solid var(--divider, var(--border));
+  border-radius: 8px;
+  background: var(--surface);
+}
+.ls-fx summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ls-fx-sub {
+  font-weight: 400;
+}
+.ls-fx[open] > .ls-twrap {
+  margin-top: 8px;
+  max-height: none;
+  min-height: 0;
+}
+.ls-fx-table {
+  table-layout: fixed;
+  width: 100%;
+}
+.ls-fx-table th,
+.ls-fx-table td {
+  white-space: normal;
+  word-break: keep-all;
+  vertical-align: middle;
+  line-height: 20px;
+  height: auto;
+  padding-block: 8px;
+}
+.ls-fx-table td:first-child {
+  font-weight: 600;
+}
+.ls-fx-name {
+  width: 190px;
+}
+.ls-fx-ref {
+  width: 32%;
+}
+.ls-fx-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+@media (max-width: 767px) {
+  .ls-fx-table,
+  .ls-fx-table tbody,
+  .ls-fx-table tr,
+  .ls-fx-table td {
+    display: block;
+    width: auto !important;
+  }
+  .ls-fx-table thead {
+    display: none;
+  }
+  .ls-fx-table tr {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ls-fx-table td {
+    border: 0;
+    padding: 2px 0;
+  }
+}

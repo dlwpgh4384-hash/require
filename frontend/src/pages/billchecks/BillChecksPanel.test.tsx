@@ -420,3 +420,76 @@ it("공급가를 비우면 보내지 않는다", async () => {
   );
   expect(posts()).toHaveLength(0);
 });
+
+it("지난 달 [청구 등록]은 입금 예정일을 청구일 다음 달 25일로 채운다(청구월 다음 달 25일이 청구일보다 빠를 때)", async () => {
+  result = { ...result, checkMonth: "202609" };
+  renderPanel();
+  fireEvent.click(
+    await screen.findByTestId("bill-check-action-selected-project"),
+  );
+  await screen.findByTestId("bill-check-message");
+  expect(screen.getByTestId("bill-check-bill-date")).toHaveValue("2026-11-15");
+  // 2026-10-25는 청구일(2026-11-15)보다 빨라 2026-12-25로 늦춘다
+  expect(screen.getByTestId("bill-check-due-date")).toHaveValue("2026-12-25");
+});
+
+it("입금 예정일이 청구일보다 빠르면 그 칸 밑에 이유를 보이고 그 칸으로 간다", async () => {
+  renderPanel();
+  fireEvent.click(
+    await screen.findByTestId("bill-check-action-selected-project"),
+  );
+  await screen.findByTestId("bill-check-message");
+  fireEvent.change(screen.getByTestId("bill-check-due-date"), {
+    target: { value: "2026-11-01" },
+  });
+  fireEvent.click(screen.getByTestId("bill-check-save"));
+  expect(
+    await screen.findByTestId("bill-check-error-payDueDate"),
+  ).toHaveTextContent("입금 예정일이 청구일보다 빠릅니다.");
+  expect(screen.getByTestId("bill-check-error")).toBeEmptyDOMElement();
+  await waitFor(() =>
+    expect(screen.getByTestId("bill-check-due-date")).toHaveFocus(),
+  );
+  expect(posts()).toHaveLength(0);
+});
+
+it("서버의 입금 예정일 오류(errors[].field=payDueDate)는 창 아래가 아니라 그 칸 밑에 보인다", async () => {
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) =>
+    init?.method === "POST"
+      ? {
+          ok: false,
+          status: 400,
+          json: async () => ({
+            success: false,
+            message: "입금 예정일이 청구일보다 빠릅니다.",
+            errors: [
+              { field: "payDueDate", message: "입금 예정일이 청구일보다 빠릅니다." },
+            ],
+          }),
+        }
+      : base(input, init),
+  );
+  renderPanel();
+  fireEvent.click(
+    await screen.findByTestId("bill-check-action-selected-project"),
+  );
+  await screen.findByTestId("bill-check-message");
+  fireEvent.click(screen.getByTestId("bill-check-save"));
+  expect(
+    await screen.findByTestId("bill-check-error-payDueDate"),
+  ).toHaveTextContent("입금 예정일이 청구일보다 빠릅니다.");
+  expect(screen.getByTestId("bill-check-error")).toBeEmptyDOMElement();
+  await waitFor(() =>
+    expect(screen.getByTestId("bill-check-due-date")).toHaveFocus(),
+  );
+  expect(onNotice).not.toHaveBeenCalled();
+});
+
+it("「설명」 칸은 낱말 단위로 줄을 바꾸는 최소 폭 칸을 쓴다", async () => {
+  renderPanel();
+  await screen.findByTestId("bill-check-action-selected-project");
+  const cell = screen.getByTestId("list-cell-selected-project-explanation");
+  expect(cell.querySelector(".bill-check-explanation")).not.toBeNull();
+  expect(cell.querySelector(".bill-wrap")).toBeNull();
+});

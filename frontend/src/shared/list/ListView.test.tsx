@@ -204,3 +204,73 @@ it("상세 패널은 탭을 바꾸고 Esc·바깥·✕로 닫는다", () => {
   fireEvent.click(screen.getByTestId("detail-panel-close"));
   expect(close).toHaveBeenCalledTimes(2);
 });
+
+it("optional toolbar slots, header note and same-column expanded rows keep default behaviour when unused", () => {
+  const props = {
+    screenId: "TEST2",
+    columns: [
+      { key: "id", label: "아이디" },
+      { key: "memo", label: "메모", note: "(참고)" },
+    ] as ListColumn<Row>[],
+    hiddenColumns: [],
+    onToggleColumn: vi.fn(),
+    onResetColumns: vi.fn(),
+    rows: rows(2),
+    rowKey: (row: Row) => row.id,
+    total: 2,
+    page: 1,
+    pageSize: 20,
+    onPage: vi.fn(),
+    onPageSize: vi.fn(),
+    dense: false,
+    onDense: vi.fn(),
+    sort: null,
+    onSort: vi.fn(),
+  };
+  const { rerender } = render(
+    <ListView {...props} visibleColumns={props.columns} />,
+  );
+  // 쓰지 않으면 기존 「총 N건」 그대로, 펼친 줄 없음
+  expect(screen.getByTestId("list-count")).toHaveTextContent("총 2건");
+  expect(screen.getByRole("columnheader", { name: "메모 (참고)" })).toBeVisible();
+  expect(document.querySelectorAll("tbody tr")).toHaveLength(2);
+  rerender(
+    <ListView
+      {...props}
+      visibleColumns={props.columns}
+      toolbarLeft={<span>총 2명</span>}
+      toolbarRight={<span data-testid="slot-right">단위</span>}
+      renderExpandedRow={(row, visible) =>
+        row.id === "r1" ? (
+          <tr data-testid="sub-r1">
+            {visible.map((column) => (
+              <td key={column.key}>└ {column.key}</td>
+            ))}
+          </tr>
+        ) : null
+      }
+    />,
+  );
+  expect(screen.getByTestId("list-count")).toHaveTextContent("총 2명");
+  expect(screen.getByTestId("list-count")).not.toHaveTextContent("총 2건");
+  expect(screen.getByTestId("slot-right")).toBeVisible();
+  const sub = screen.getByTestId("sub-r1");
+  expect(sub.querySelectorAll("td")).toHaveLength(2);
+  // 펼친 줄은 그 줄 바로 아래
+  expect(screen.getByTestId("list-row-r1").nextElementSibling).toBe(sub);
+});
+
+it("ListFilters shows the optional row below the buttons only when given", () => {
+  const { rerender } = render(
+    <ListFilters onSearch={vi.fn()} onReset={vi.fn()}>
+      <span>칸</span>
+    </ListFilters>,
+  );
+  expect(document.querySelector(".ls-filter-below")).toBeNull();
+  rerender(
+    <ListFilters onSearch={vi.fn()} onReset={vi.fn()} below={<span>상세</span>}>
+      <span>칸</span>
+    </ListFilters>,
+  );
+  expect(document.querySelector(".ls-filter-below")).toHaveTextContent("상세");
+});

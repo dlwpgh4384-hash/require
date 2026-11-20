@@ -1,32 +1,36 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  Badge,
+  DEFAULT_MONEY_UNIT,
   ListView,
+  Money,
+  MoneyUnitSelect,
   useListColumns,
   useListPresentation,
   type ListColumn,
   type ListSort,
+  type MoneyUnit,
 } from "../../shared/list";
 import { YearBar } from "../../shared/period/YearBar";
 import { yearRange, type PeriodBasis } from "../../shared/period/periodRules";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
 import { DeveloperDetail } from "../developers/DeveloperDetail";
-import { projectFailure, ProjectRequestError, won } from "../projects/projects";
+import { projectFailure, ProjectRequestError } from "../projects/projects";
 import { Toast } from "../../shared/feedback/Dialog";
 import { PersonalCostProfitFilters } from "./PersonalCostProfitFilters";
 import {
   PersonalCostProfitSummary,
   PersonalCostProfitCalculationNote,
+  percentText,
 } from "./PersonalCostProfitSummary";
-import {
-  PersonalCostProfitAllocations,
-  PersonalCostProfitContributions,
-} from "./PersonalCostProfitContributions";
+import { PersonalCostProfitContributions } from "./PersonalCostProfitContributions";
 import {
   getCommonPersonalCostProfits,
   getCommonPersonalCostProfitsExcel,
   getPersonalCostProfitOptions,
 } from "./personalCostProfits";
 import type {
+  PersonalCostProfitAllocation,
   PersonalCostProfitFilter,
   PersonalCostProfitOptions,
   PersonalCostProfitResult,
@@ -34,51 +38,112 @@ import type {
 } from "./personalCostProfitTypes";
 import "./personalCostProfits.css";
 
-export const personalCostProfitColumnLabels = [
+type ColumnKey = keyof PersonalCostProfitRow & string;
+/** 시안 C03: [키, 제목, 계산 방법(ⓘ)]. 키는 서버 열 키, 순서는 시안·서버와 같다. */
+export const personalCostProfitColumnLabels: readonly (readonly [
+  ColumnKey,
+  string,
+  string?,
+])[] = [
   ["developerName", "이름"],
   ["affiliationName", "소속"],
   ["positionName", "직위"],
-  ["employeeTypeName", "직원구분"],
+  ["employeeTypeName", "구분"],
   ["joinDate", "입사일"],
-  ["operatingRate", "가동률"],
+  [
+    "operatingRate",
+    "가동률",
+    "투입된 달 ÷ 재직한 달. 조회 연도 1월(그 해 입사면 입사한 달)부터 이번 달(퇴사자는 퇴사한 달)까지",
+  ],
   ["mm", "MM"],
   ["unitPrice", "단가"],
   ["monthlySalary", "월 급여"],
-  ["allowance", "수당"],
+  ["allowance", "그룹장·팀장 수당"],
   ["companyInsurance", "4대보험(회사)"],
-  ["retirementReserve", "퇴직금 적립"],
-  ["personalCost", "개인별 원가"],
-  ["teamExpenses", "팀비"],
-  ["projectExpenses", "프로젝트경비"],
-  ["totalCost", "원가합계"],
-  ["operatingProfit", "영업이익"],
-  ["profitRate", "이익률"],
   ["personalInsurance", "4대보험(본인)"],
   ["withholdingTax", "3.3% 원천세"],
   ["incomeTax", "근로소득세"],
+  ["retirementReserve", "퇴직금 적립"],
   ["netPay", "실지급액"],
-] as const;
+  [
+    "personalCost",
+    "개인별 원가",
+    "월 급여 + 수당 + 4대보험(회사) + 퇴직금 적립 (엑셀 Q열)",
+  ],
+  ["teamExpenses", "팀비", "팀비(1인당 월) × 그 사람 MM. 외주 0(식-11)"],
+  [
+    "projectExpenses",
+    "프로젝트경비",
+    "프로젝트경비(1인당 월) × 그 사람 MM(식-11). 추가 직접 경비(출장비 등)는 사람에게 나누지 않고 프로젝트 원가에만 들어감",
+  ],
+  [
+    "totalCost",
+    "원가합계",
+    "개인별 원가 + 팀비 + 프로젝트경비 (엑셀 T열)",
+  ],
+  ["operatingProfit", "영업이익", "단가 − 원가합계 (엑셀 U열)"],
+  ["profitRate", "이익률"],
+];
+/** 참고 열: 제목 뒤 「 (참고)」, 처음에는 숨김. */
 const referenceKeys = new Set<string>([
   "personalInsurance",
   "withholdingTax",
   "incomeTax",
   "netPay",
 ]);
-const format = (key: string, value: unknown) =>
-  value == null
-    ? "–"
-    : typeof value !== "number"
-      ? String(value)
-      : key === "mm"
-        ? value.toFixed(2)
-        : key.endsWith("Rate")
-          ? `${value.toFixed(1)}%`
-          : won(value);
+/** 시안 req:1 — 열 설정에서 끌 수 없는 열. */
+const requiredKeys = new Set<string>([
+  "developerName",
+  "unitPrice",
+  "totalCost",
+  "operatingProfit",
+]);
+const textKeys = new Set<string>([
+  "developerName",
+  "affiliationName",
+  "positionName",
+  "employeeTypeName",
+  "joinDate",
+]);
+/** 시안 hl(): 연 누계면 「단가」→「매출」, 「월 급여」→「급여」. */
+export const personalCostProfitHeading = (
+  key: string,
+  label: string,
+  monthlyAverage: boolean,
+) =>
+  monthlyAverage
+    ? label
+    : key === "unitPrice"
+      ? "매출"
+      : key === "monthlySalary"
+        ? "급여"
+        : label;
+const dash = <span className="ls-cap">–</span>;
+const isIdle = (item: PersonalCostProfitAllocation) =>
+  item.assignmentId === "IDLE";
+const projectsOf = (row: PersonalCostProfitRow) =>
+  row.allocations.filter((item) => !isIdle(item));
+const idleCostOf = (row: PersonalCostProfitRow) =>
+  row.allocations
+    .filter(isIdle)
+    .reduce((sum, item) => sum + item.allocatedCost, 0);
+/** ▸ 단추는 프로젝트 투입이나 대기 몫이 있는 사람만(시안 can). */
+const canExpand = (row: PersonalCostProfitRow) =>
+  projectsOf(row).length > 0 || idleCostOf(row) > 0;
+const rateText = (value: number | null | undefined) =>
+  value == null || !Number.isFinite(value) ? (
+    dash
+  ) : (
+    <span className={value < 0 ? "ls-neg" : undefined}>
+      {percentText(value)}
+    </span>
+  );
 const defaults = (
   year: number,
   basis: PeriodBasis,
 ): PersonalCostProfitFilter => ({
   year,
+  // 기준월은 자동: 올해는 기간 기준의 최근 달, 지난 해는 12월
   baseMonth:
     year === Number(basis.latestYm.slice(0, 4))
       ? Number(basis.latestYm.slice(4))
@@ -137,7 +202,96 @@ function PersonalCostProfitContent({
   const [sort, setSort] = useState<ListSort | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [notice, setNotice] = useState("");
+  const [unit, setUnit] = useState<MoneyUnit>(DEFAULT_MONEY_UNIT);
   const presentation = useListPresentation();
+  const monthlyAverage = applied.displayMode === "월평균";
+  const turnkeyExcluded = applied.includeTurnkey === false;
+  // 턴키 단가 미포함 보기에서 턴키만 하는 사람은 단가 칸을 비운다(시안 shownRate)
+  const turnkeyOnly = (row: PersonalCostProfitRow) =>
+    turnkeyExcluded &&
+    projectsOf(row).length > 0 &&
+    projectsOf(row).every((item) => item.contractTypeCode === "TK");
+  const toggle = (id: string) =>
+    setExpanded((previous) =>
+      previous.includes(id)
+        ? previous.filter((value) => value !== id)
+        : [...previous, id],
+    );
+  const cell = (key: ColumnKey, row: PersonalCostProfitRow): ReactNode => {
+    switch (key) {
+      case "developerName": {
+        const open = expanded.includes(row.developerId);
+        return (
+          <span className="personal-cost-profit-name">
+            {canExpand(row) ? (
+              <button
+                type="button"
+                className="personal-cost-profit-exp"
+                data-testid={`personal-expand-${row.developerId}`}
+                aria-label={`${row.developerName} 프로젝트별 보기`}
+                aria-expanded={open}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  toggle(row.developerId);
+                }}
+              >
+                {open ? "▾" : "▸"}
+              </button>
+            ) : (
+              <span
+                className="personal-cost-profit-exp-space"
+                aria-hidden="true"
+              />
+            )}
+            <span className="personal-cost-profit-pname">
+              {row.developerName}
+              {row.managementNumber && <small>{row.managementNumber}</small>}
+            </span>
+          </span>
+        );
+      }
+      case "affiliationName":
+        return row.affiliationName || "자사";
+      case "positionName":
+        return row.positionName || "–";
+      case "employeeTypeName":
+        return row.employeeTypeName || "–";
+      case "joinDate":
+        return row.joinDate ?? dash;
+      case "operatingRate":
+        return rateText(row.operatingRate);
+      case "mm":
+        return projectsOf(row).length ? (
+          <>
+            {row.mm.toFixed(2)}
+            {row.mmOverOne && (
+              <>
+                {" "}
+                <Badge kind="warn">1.0 초과</Badge>
+              </>
+            )}
+          </>
+        ) : (
+          dash
+        );
+      case "unitPrice":
+        return turnkeyOnly(row) ? (
+          dash
+        ) : (
+          <Money value={row.unitPrice} unit={unit} />
+        );
+      case "profitRate":
+        return rateText(row.profitRate);
+      default: {
+        const value = row[key];
+        return typeof value === "number" ? (
+          <Money value={value} unit={unit} />
+        ) : (
+          dash
+        );
+      }
+    }
+  };
   const columns: ListColumn<PersonalCostProfitRow>[] =
     personalCostProfitColumnLabels
       .filter(
@@ -146,50 +300,15 @@ function PersonalCostProfitContent({
           !["monthlySalary", "personalCost"].includes(key) ||
           data.totals[key as "monthlySalary" | "personalCost"] !== undefined,
       )
-      .map(([key, label]) => ({
+      .map(([key, label, calc]) => ({
         key,
-        label,
-        required: key === "developerName",
+        label: personalCostProfitHeading(key, label, monthlyAverage),
+        calc,
+        note: referenceKeys.has(key) ? "(참고)" : undefined,
+        required: requiredKeys.has(key),
         hiddenByDefault: referenceKeys.has(key),
-        align: [
-          "developerName",
-          "affiliationName",
-          "positionName",
-          "employeeTypeName",
-          "joinDate",
-        ].includes(key)
-          ? "left"
-          : "right",
-        render: (row) =>
-          key === "developerName" ? (
-            <span className="personal-cost-profit-name">
-              <button
-                type="button"
-                className="link-button"
-                data-testid={`personal-expand-${row.developerId}`}
-                aria-label={`${row.developerName} 프로젝트 펼치기`}
-                aria-expanded={expanded.includes(row.developerId)}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setExpanded((previous) =>
-                    previous.includes(row.developerId)
-                      ? previous.filter((id) => id !== row.developerId)
-                      : [...previous, row.developerId],
-                  );
-                }}
-              >
-                {expanded.includes(row.developerId) ? "▾" : "▸"}
-              </button>
-              {row.developerName}
-            </span>
-          ) : (
-            <>
-              {format(key, row[key])}
-              {key === "mm" && row.mmOverOne && (
-                <span className="personal-cost-profit-over">1.0 초과</span>
-              )}
-            </>
-          ),
+        align: textKeys.has(key) ? "left" : "right",
+        render: (row) => cell(key, row),
       }));
   const columnState = useListColumns("UI-03", columns);
   // Required JSON data stays available for local column toggles; optional uploaded reference fields are requested only when shown.
@@ -282,47 +401,128 @@ function PersonalCostProfitContent({
       setDownloading(false);
     }
   };
+  const shownPeople = data?.items.length ?? 0;
+  const expandable = sorted.filter(canExpand).map((row) => row.developerId);
+  // 시안 tr.subr: 펼친 줄은 같은 표의 칸에 맞춘다. 단가·원가합계·영업이익·이익률 칸만 채운다
+  const subCell = (
+    key: string,
+    item: PersonalCostProfitAllocation,
+    row: PersonalCostProfitRow,
+  ): ReactNode => {
+    const internal = item.contractTypeCode === "IN";
+    switch (key) {
+      case "developerName":
+        return (
+          <>
+            └ {item.projectName} · {item.jobName ?? "–"}
+            {item.free && (
+              <>
+                {" "}
+                <Badge>무상지원</Badge>
+              </>
+            )}
+          </>
+        );
+      case "mm":
+        return item.mm.toFixed(2);
+      case "unitPrice":
+        return internal ||
+          item.free ||
+          (turnkeyExcluded && item.contractTypeCode === "TK") ? (
+          dash
+        ) : (
+          <Money value={item.unitPrice} unit={unit} />
+        );
+      case "totalCost":
+        return (
+          <span
+            title={`배분 원가 = 원가합계 × ${item.mm.toFixed(2)} ÷ ${Math.max(1, row.mm).toFixed(2)}`}
+          >
+            <Money value={item.allocatedCost} unit={unit} />
+          </span>
+        );
+      case "operatingProfit":
+        return (
+          <>
+            <Money value={item.operatingProfit} unit={unit} />
+            {internal && <span className="ls-cap"> 연구개발</span>}
+          </>
+        );
+      case "profitRate":
+        return item.unitPrice
+          ? rateText((item.operatingProfit / item.unitPrice) * 100)
+          : dash;
+      default:
+        return "";
+    }
+  };
+  const idleCell = (key: string, row: PersonalCostProfitRow): ReactNode => {
+    const idle = idleCostOf(row);
+    switch (key) {
+      case "developerName":
+        return "└ 남는 몫(대기 원가)";
+      case "mm":
+        // 월 평균이면 한 달 기준이라 1.0 − MM 합계를 보인다. 연 누계는 비운다
+        return monthlyAverage && row.mm < 1 ? (1 - row.mm).toFixed(2) : "";
+      case "totalCost":
+        return <Money value={idle} unit={unit} />;
+      case "operatingProfit":
+        return <Money value={-idle} unit={unit} />;
+      default:
+        return "";
+    }
+  };
+  const subRow = (
+    testId: string,
+    visible: ListColumn<PersonalCostProfitRow>[],
+    render: (key: string) => ReactNode,
+  ) => (
+    <tr key={testId} className="ls-subr" data-testid={testId}>
+      {visible.map((column) => (
+        <td
+          key={column.key}
+          className={`ls-${column.align ?? "left"}${column.key === "developerName" ? " ls-ind" : ""}`}
+        >
+          {render(column.key)}
+        </td>
+      ))}
+    </tr>
+  );
+  const unitLabel = (
+    <MoneyUnitSelect value={unit} onChange={setUnit} id="personal-unit" />
+  );
   return (
     <>
-      <div className="personal-cost-profit-period">
-        <YearBar
-          year={draft.year}
-          min={years.min}
-          max={years.max}
-          currentYear={Number(basis.latestYm.slice(0, 4))}
-          onChange={changeYear}
-          showBadge={false}
-          caption="그 해 1월부터 지금까지 누계"
-        />
-        <span>기준월 {draft.baseMonth}월</span>
-        <label>
-          표시 방식
-          <select
-            aria-label="표시 방식"
-            data-testid="personal-display-mode"
-            value={draft.displayMode}
-            onChange={(event) =>
-              apply({
-                ...applied,
-                displayMode: event.target
-                  .value as PersonalCostProfitFilter["displayMode"],
-              })
-            }
-          >
-            <option value="연누계">연 누계</option>
-            <option value="월평균">월 평균</option>
-          </select>
-        </label>
-        {fields.year && <span className="field-error">{fields.year}</span>}
-        {fields.baseMonth && (
-          <span className="field-error">{fields.baseMonth}</span>
-        )}
-        {fields.displayMode && (
-          <span className="field-error">{fields.displayMode}</span>
-        )}
-      </div>
-      <PersonalCostProfitSummary summary={data?.summary} />
-      <PersonalCostProfitContributions items={data?.contributions ?? []} />
+      <YearBar
+        year={draft.year}
+        min={years.min}
+        max={years.max}
+        currentYear={Number(basis.latestYm.slice(0, 4))}
+        onChange={changeYear}
+        caption="그 해 1월부터 지금까지 누계"
+      />
+      {(fields.year || fields.baseMonth || fields.displayMode) && (
+        <div className="personal-cost-profit-period-error">
+          {fields.year && <span className="field-error">{fields.year}</span>}
+          {fields.baseMonth && (
+            <span className="field-error">{fields.baseMonth}</span>
+          )}
+          {fields.displayMode && (
+            <span className="field-error">{fields.displayMode}</span>
+          )}
+        </div>
+      )}
+      <PersonalCostProfitSummary
+        summary={data?.summary}
+        shownPeople={shownPeople}
+        monthlyAverage={monthlyAverage}
+        turnkeyExcluded={turnkeyExcluded}
+        baseMonth={applied.baseMonth}
+      />
+      <PersonalCostProfitContributions
+        items={data?.contributions ?? []}
+        unit={unit}
+      />
       <PersonalCostProfitFilters
         value={draft}
         options={options}
@@ -343,19 +543,6 @@ function PersonalCostProfitContent({
           </button>
         </div>
       )}
-      <div>
-        <button
-          className="ls-btn"
-          data-testid="personal-expand-all"
-          onClick={() =>
-            setExpanded(
-              expanded.length ? [] : sorted.map((row) => row.developerId),
-            )
-          }
-        >
-          {expanded.length ? "프로젝트 모두 접기" : "프로젝트 모두 펼치기"}
-        </button>
-      </div>
       <ListView
         screenId="UI-03"
         columns={columns}
@@ -390,25 +577,88 @@ function PersonalCostProfitContent({
         onDownload={() => void download()}
         downloading={downloading}
         onResetFilters={() => apply(defaults(draft.year, basis))}
+        toolbarLeft={
+          <>
+            <span className="ls-seg" role="group" aria-label="금액 보기">
+              {(
+                [
+                  ["연누계", "연 누계"],
+                  ["월평균", "월 평균"],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`ls-btn ls-btn-sm${applied.displayMode === mode ? " ls-btn-p" : ""}`}
+                  data-testid={`personal-mode-${mode}`}
+                  aria-pressed={applied.displayMode === mode}
+                  onClick={() =>
+                    apply({ ...applied, displayMode: mode })
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </span>
+            <span data-testid="personal-period-text">
+              {applied.year}년 1~{applied.baseMonth}월{" "}
+              {monthlyAverage ? "월 평균(÷ 사람마다 일한 달 수)" : "누계"} · 총{" "}
+              <strong>{shownPeople}</strong>명
+            </span>
+            <button
+              type="button"
+              className="ls-btn ls-btn-t"
+              data-testid="personal-expand-all"
+              onClick={() => setExpanded(expanded.length ? [] : expandable)}
+            >
+              {expanded.length ? "모두 접기" : "프로젝트 모두 펼치기"}
+            </button>
+          </>
+        }
+        toolbarRight={unitLabel}
         footer={Object.fromEntries(
-          columnState.visible.map((column) => [
-            column.key,
-            column.key === "developerName"
-              ? "합계"
-              : format(
-                  column.key,
-                  data?.totals[column.key as keyof PersonalCostProfitRow],
-                ),
-          ]),
+          columnState.visible.map((column) => {
+            const value =
+              data?.totals[column.key as keyof PersonalCostProfitRow];
+            return [
+              column.key,
+              column.key === "mm" ? (
+                typeof value === "number" ? value.toFixed(2) : ""
+              ) : textKeys.has(column.key) ||
+                column.key === "operatingRate" ||
+                column.key === "profitRate" ||
+                typeof value !== "number" ? (
+                ""
+              ) : (
+                <Money value={value} unit={unit} />
+              ),
+            ];
+          }),
         )}
-        renderExpandedRow={(row) =>
+        renderExpandedRow={(row, visible) =>
           expanded.includes(row.developerId) ? (
-            <PersonalCostProfitAllocations items={row.allocations} />
+            <>
+              {projectsOf(row).map((item) =>
+                subRow(
+                  `personal-allocation-${item.assignmentId}`,
+                  visible,
+                  (key) => subCell(key, item, row),
+                ),
+              )}
+              {idleCostOf(row) > 0 &&
+                subRow(`personal-idle-${row.developerId}`, visible, (key) =>
+                  idleCell(key, row),
+                )}
+            </>
           ) : null
         }
         testId="personal-cost-profit-list"
       />
-      <PersonalCostProfitCalculationNote />
+      <PersonalCostProfitCalculationNote
+        year={applied.year}
+        baseMonth={applied.baseMonth}
+        monthlyAverage={monthlyAverage}
+      />
       {detail && (
         <DeveloperDetail
           developerId={detail}

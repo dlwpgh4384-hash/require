@@ -19,6 +19,8 @@
       <arg column="gradeName" javaType="java.lang.String"/>
       <arg column="salesPartId" javaType="java.lang.String"/>
       <arg column="directClassCode" javaType="java.lang.String"/>
+      <arg column="managementNumber" javaType="java.lang.String"/>
+      <arg column="salesPartName" javaType="java.lang.String"/>
     </constructor>
   </resultMap>
   <resultMap id="pay" type="com.company.common.personalcostprofits.mapper.PersonalCostProfitRows$Pay">
@@ -51,6 +53,7 @@
       <arg column="labor" javaType="java.math.BigDecimal"/>
       <arg column="team" javaType="java.math.BigDecimal"/>
       <arg column="expense" javaType="java.math.BigDecimal"/>
+      <arg column="inputTypeCode" javaType="java.lang.String"/>
     </constructor>
   </resultMap>
   <resultMap id="assignment" type="com.company.common.personalcostprofits.mapper.PersonalCostProfitRows$Assignment">
@@ -106,8 +109,9 @@
       COALESCE(e.CODE_NM,h.EMP_TYPE_CD) AS "employeeTypeName",h.JNCMP_DT AS "joinDate",
       h.RETIRE_DT AS "retireDate",h.JOB_CD AS "jobCode",COALESCE(b.CODE_NM,h.JOB_CD) AS "jobName",
       h.GRADE_CD AS "gradeCode",g.CODE_NM AS "gradeName",h.PART_ID AS "salesPartId",
-      h.DRCT_CLS_CD AS "directClassCode"
+      h.DRCT_CLS_CD AS "directClassCode",h.MNG_NO AS "managementNumber",s.PART_NM AS "salesPartName"
     FROM TB_HR_DEV h LEFT JOIN TB_BS_CLNT c ON c.CLNT_ID=h.BLNG_CLNT_ID
+    LEFT JOIN TB_BS_PART s ON s.PART_ID=h.PART_ID
     LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JBPS' AND j.CODE=h.JBPS_CD
     LEFT JOIN TB_SY_CODE e ON e.CODE_GRP_ID='EMP_TYPE' AND e.CODE=h.EMP_TYPE_CD
     LEFT JOIN TB_SY_CODE b ON b.CODE_GRP_ID='JOB' AND b.CODE=h.JOB_CD
@@ -116,7 +120,9 @@
       AND (h.RETIRE_DT IS NULL OR h.RETIRE_DT &gt;= make_date(#{year},1,1))
     <if test="name != null and name != ''">AND position(lower(#{name}) in lower(h.DEV_NM)) &gt; 0</if>
     <if test="employeeTypeCode != null and employeeTypeCode != ''">AND h.EMP_TYPE_CD=#{employeeTypeCode}</if>
-    <if test="affiliationId != null and affiliationId != ''">AND h.BLNG_CLNT_ID=#{affiliationId}</if>
+    <!-- 소속 「자사」(__self) = 소속 거래처가 없는 사람 -->
+    <if test="affiliationId == '__self'">AND h.BLNG_CLNT_ID IS NULL</if>
+    <if test="affiliationId != null and affiliationId != '' and affiliationId != '__self'">AND h.BLNG_CLNT_ID=#{affiliationId}</if>
     <if test="salesPartId != null and salesPartId != ''">AND h.PART_ID=#{salesPartId}</if>
     <if test="jobCode != null and jobCode != ''">AND h.JOB_CD=#{jobCode}</if>
     ORDER BY h.DEV_NM,h.DEV_ID
@@ -140,7 +146,7 @@
       c.ASGN_ID AS "assignmentId",COALESCE(p.PROJ_NM,'남는 몫(대기 원가)') AS "projectName",
       j.CODE_NM AS "jobName",c.CTRT_TYPE_CD AS "contractTypeCode",
       c.ASGN_MM+c.FREE_MM AS "mm",c.SALES_AMT AS "revenue",c.LABOR_ALLOC_AMT AS "labor",
-      c.TEAM_EXPS_AMT AS "team",c.PROJ_EXPS_AMT AS "expense"
+      c.TEAM_EXPS_AMT AS "team",c.PROJ_EXPS_AMT AS "expense",a.INPUT_TYPE_CD AS "inputTypeCode"
     FROM TB_CO_MON_COST c LEFT JOIN TB_PJ_PROJ p ON p.PROJ_ID=c.PROJ_ID
     LEFT JOIN TB_PJ_ASGN a ON a.ASGN_ID=c.ASGN_ID
     LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=a.JOB_CD
@@ -148,7 +154,7 @@
   </select>
   <select id="selectAssignments" resultMap="assignment">
     WITH months AS (
-      SELECT to_char(m,'YYYYMM') AS ym,m::date AS first_day,(m+interval '1 month-1 day')::date AS last_day
+      SELECT to_char(m,'YYYYMM') AS ym,m::date AS first_day,(m+interval '1 month'-interval '1 day')::date AS last_day
       FROM generate_series(make_date(#{year},1,1),make_date(#{year},#{baseMonth},1),interval '1 month') m
     ), inputs AS (
       SELECT a.*,m.ym,m.first_day,m.last_day,

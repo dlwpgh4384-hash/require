@@ -66,3 +66,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* 「설명」 칸: 1000px 폭에서 한 글자씩 줄이 바뀌지 않게 최소 폭을 두고 낱말 단위로 줄을 바꾼다 */
+.bill-check-explanation {
+  display: inline-block;
+  min-width: 14em;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}

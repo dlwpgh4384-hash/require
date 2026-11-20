@@ -73,6 +73,16 @@ class CommonPersonalCostProfitControllerTest {
             .andExpect(jsonPath("$.data.items[0].allocations.length()").value(4))
             .andExpect(jsonPath("$.data.items[0].allocations[0].assignmentId").value("PAID"))
             .andExpect(jsonPath("$.data.items[0].allocations[1].assignmentId").value("FREE"))
+            // 무상지원 표시·계약유형·대기 줄은 맨 아래·달(yearMonth) 칸 없음
+            .andExpect(jsonPath("$.data.items[0].allocations[0].free").value(false))
+            .andExpect(jsonPath("$.data.items[0].allocations[1].free").value(true))
+            .andExpect(jsonPath("$.data.items[0].allocations[0].contractTypeCode").value("MO"))
+            .andExpect(jsonPath("$.data.items[0].allocations[3].assignmentId").value("IDLE"))
+            .andExpect(jsonPath("$.data.items[0].allocations[0].yearMonth").doesNotExist())
+            .andExpect(jsonPath("$.data.items[0].managementNumber").value("K-A"))
+            .andExpect(jsonPath("$.data.summary.leavePeople").value(0))
+            .andExpect(jsonPath("$.data.summary.unitPricePeople").value(1))
+            .andExpect(jsonPath("$.data.summary.averageDirectPeople").value(1.0))
             .andExpect(jsonPath("$.data.items[0].teamExpenses").value(25))
             .andExpect(jsonPath("$.data.items[0].projectExpenses").value(50))
             .andExpect(jsonPath("$.data.items[0].personalCost").value(2100))
@@ -150,6 +160,7 @@ class CommonPersonalCostProfitControllerTest {
         when(mapper.selectLeaves(any())).thenReturn(List.of(new Leave("LEAVE", LocalDate.of(2026,2,1), null)));
         mvc.perform(request("")).andExpect(jsonPath("$.data.items.length()").value(1))
             .andExpect(jsonPath("$.data.summary.totalPeople").value(2))
+            .andExpect(jsonPath("$.data.summary.leavePeople").value(1))
             .andExpect(jsonPath("$.data.totals.totalCost").value(2475))
             .andExpect(jsonPath("$.data.summary.averageCost").value(2175));
     }
@@ -189,7 +200,8 @@ class CommonPersonalCostProfitControllerTest {
             var sheet = book.getSheetAt(0);
             assertThat(book.getNumberOfSheets()).isEqualTo(1);
             assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("이름");
-            assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("월 급여");
+            // 연 누계 화면 제목과 같게 「월 급여」→「급여」
+            assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("급여");
             assertThat(sheet.getRow(2).getCell(2).getStringCellValue()).isEqualTo("원가합계");
             assertThat(sheet.getRow(3).getCell(2).getStringCellValue()).isEqualTo("2175");
         }
@@ -206,11 +218,11 @@ class CommonPersonalCostProfitControllerTest {
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
             var names = new java.util.ArrayList<String>();
             book.getSheetAt(0).getRow(2).forEach(cell -> names.add(cell.getStringCellValue()));
-            assertThat(names).doesNotContain("월 급여", "개인별 원가", "4대보험(본인)", "3.3% 원천세", "근로소득세", "실지급액");
+            assertThat(names).doesNotContain("급여", "월 급여", "개인별 원가", "4대보험(본인) (참고)", "3.3% 원천세 (참고)", "근로소득세 (참고)", "실지급액 (참고)");
         }
     }
     @Test void workbookTurnkeyExclusionMatchesListAndRetainsCosts() throws Exception {
-        when(mapper.selectCosts(any())).thenReturn(List.of(new Cost("202601", "A", "P", "TK", "턴키", "백엔드", "TK", n("1"), n("900"), n("1000"), n("10"), n("20"))));
+        when(mapper.selectCosts(any())).thenReturn(List.of(new Cost("202601", "A", "P", "TK", "턴키", "백엔드", "TK", n("1"), n("900"), n("1000"), n("10"), n("20"), "NEW")));
         when(mapper.selectAssignments(any())).thenReturn(List.of());
         mvc.perform(request("").param("includeTurnkey", "false")).andExpect(jsonPath("$.data.items[0].unitPrice").value(0));
         var bytes = mvc.perform(request("/excel").param("includeTurnkey", "false").param("columns", "developerName,unitPrice,totalCost"))
@@ -219,6 +231,60 @@ class CommonPersonalCostProfitControllerTest {
             assertThat(book.getSheetAt(0).getSheetName()).isEqualTo("턴키단가미포함");
             assertThat(book.getSheetAt(0).getRow(3).getCell(1).getStringCellValue()).isEqualTo("0");
             assertThat(book.getSheetAt(0).getRow(3).getCell(2).getStringCellValue()).isEqualTo("2130");
+        }
+    }
+    private static Person namedPerson(String id, String name, String partName) {
+        var p = PersonalCostProfitTestSources.person(id);
+        return new Person(p.developerId(), name, p.affiliationId(), p.affiliationName(), p.positionCode(),
+            p.positionName(), p.employeeTypeCode(), p.employeeTypeName(), p.joinDate(), p.retireDate(), p.jobCode(),
+            p.jobName(), p.gradeCode(), p.gradeName(), p.salesPartId(), p.directClassCode(), p.managementNumber(), partName);
+    }
+    @Test void rowsAreSortedBySalesPartNameThenKoreanName() throws Exception {
+        when(mapper.selectPeople(any())).thenReturn(List.of(namedPerson("A", "하나", "나파트"), namedPerson("B", "다라", "가파트"),
+            namedPerson("C", "가나", "나파트"), namedPerson("D", "마바", null)));
+        mvc.perform(request("")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].developerName").value("다라"))
+            .andExpect(jsonPath("$.data.items[1].developerName").value("가나"))
+            .andExpect(jsonPath("$.data.items[2].developerName").value("하나"))
+            .andExpect(jsonPath("$.data.items[3].developerName").value("마바"));
+    }
+    @Test void selfAffiliationIsAcceptedAsNoClientFilter() throws Exception {
+        mvc.perform(request("").param("affiliationId", CommonPersonalCostProfitService.SELF_AFFILIATION))
+            .andExpect(status().isOk());
+        verify(mapper).selectPeople(argThat(f -> CommonPersonalCostProfitService.SELF_AFFILIATION.equals(f.affiliationId())));
+    }
+    @Test void allocationsAreOnePerAssignmentSummedOverMonthsAndAveragedLikeTheParent() throws Exception {
+        when(periods.selectClosedMonths()).thenReturn(List.of("202601", "202602"));
+        when(mapper.selectCosts(any())).thenReturn(List.of(
+            new Cost("202601", "A", "P", "PAID", "프로젝트", "백엔드", "MO", n("0.5"), n("900"), n("400"), n("10"), n("20"), "NEW"),
+            new Cost("202602", "A", "P", "PAID", "프로젝트", "백엔드", "MO", n("0.75"), n("1100"), n("600"), n("10"), n("20"), "NEW")));
+        when(mapper.selectAssignments(any())).thenReturn(List.of());
+        mvc.perform(request("")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].allocations.length()").value(1))
+            .andExpect(jsonPath("$.data.items[0].allocations[0].mm").value(1.25))
+            .andExpect(jsonPath("$.data.items[0].allocations[0].unitPrice").value(2000))
+            .andExpect(jsonPath("$.data.items[0].allocations[0].allocatedCost").value(1060))
+            .andExpect(jsonPath("$.data.items[0].allocations[0].operatingProfit").value(940));
+        mvc.perform(get(PATH).param("year", "2026").param("baseMonth", "2").param("displayMode", "월평균"))
+            .andExpect(jsonPath("$.data.items[0].allocations[0].mm").value(0.63))
+            .andExpect(jsonPath("$.data.items[0].allocations[0].unitPrice").value(1000))
+            .andExpect(jsonPath("$.data.items[0].allocations[0].allocatedCost").value(530));
+    }
+    @Test void excelHeadersFollowScreenLabelsForEachDisplayMode() throws Exception {
+        String columns = "developerName,employeeTypeName,unitPrice,monthlySalary,allowance,incomeTax";
+        var annual = mvc.perform(request("/excel").param("columns", columns)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsByteArray();
+        var monthly = mvc.perform(get(PATH + "/excel").param("year", "2026").param("baseMonth", "2")
+            .param("displayMode", "월평균").param("columns", columns)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsByteArray();
+        assertThat(headers(annual)).containsExactly("이름", "구분", "매출", "급여", "그룹장·팀장 수당", "근로소득세 (참고)");
+        assertThat(headers(monthly)).containsExactly("이름", "구분", "단가", "월 급여", "그룹장·팀장 수당", "근로소득세 (참고)");
+    }
+    private static List<String> headers(byte[] bytes) throws Exception {
+        try (var book = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+            var names = new java.util.ArrayList<String>();
+            book.getSheetAt(0).getRow(2).forEach(cell -> names.add(cell.getStringCellValue()));
+            return names;
         }
     }
 }

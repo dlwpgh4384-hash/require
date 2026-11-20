@@ -86,7 +86,7 @@ class PersonalCostProfitRulesTest {
         var p = person("A");
         var retired = new Person(p.developerId(), p.developerName(), p.affiliationId(), p.affiliationName(),
             p.positionCode(), p.positionName(), p.employeeTypeCode(), p.employeeTypeName(), p.joinDate(),
-            java.time.LocalDate.of(2026,2,1), p.jobCode(), p.jobName(), p.gradeCode(), p.gradeName(), p.salesPartId(), p.directClassCode());
+            java.time.LocalDate.of(2026,2,1), p.jobCode(), p.jobName(), p.gradeCode(), p.gradeName(), p.salesPartId(), p.directClassCode(), p.managementNumber(), p.salesPartName());
         assertThat(PersonalCostProfitRules.employed(retired, java.time.YearMonth.of(2026,2))).isTrue();
         assertThat(PersonalCostProfitRules.employed(retired, java.time.YearMonth.of(2026,3))).isFalse();
     }

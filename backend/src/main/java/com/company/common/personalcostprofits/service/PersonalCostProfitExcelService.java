@@ -45,8 +45,9 @@ public class PersonalCostProfitExcelService {
         rows.add(values(totals, columns));
         String title = Boolean.FALSE.equals(filter.includeTurnkey()) ? "턴키단가미포함" : "개인 원가·수익표";
         var now = calendar.now();
-        byte[] bytes = excel.write(title, columns.stream().map(key -> PersonalCostProfitColumnPolicy.LABELS
-            .get(PersonalCostProfitColumnPolicy.KEYS.indexOf(key))).toList(), rows, actor.userId(), now);
+        // 엑셀 제목은 화면 열 제목과 같게(연 누계: 매출·급여)
+        byte[] bytes = excel.write(title, columns.stream().map(key -> PersonalCostProfitColumnPolicy
+            .label(key, filter.displayMode())).toList(), rows, actor.userId(), now);
         if (mapper.insertAccess(actor.userId(), "개인 원가·수익표 " + filter.year() + "년 "
             + calculation.result().items().size() + "건") != 1) {
             throw new IllegalStateException("다운로드 접근 기록을 저장하지 못했습니다.");

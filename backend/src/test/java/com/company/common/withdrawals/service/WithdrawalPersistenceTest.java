@@ -197,4 +197,16 @@ class WithdrawalPersistenceTest {
         assertThat(count("SELECT count(*) FROM TB_SL_TENT_ASGN WHERE DEV_ID='withdrawal-person-a' AND TENT_STAT_CD IN ('ACT','CNVT')")).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM TB_SL_TENT_ASGN WHERE TENT_STAT_CD='REL'")).isEqualTo(1);
     }
+
+    /** 엑셀을 받으면 실제 DB에 DNLD 기록이 한 줄 남는다(읽기 전용 트랜잭션 안에서 쓰기가 막히던 결함, 2026-11-20). */
+    @Test void excelDownloadWritesExactlyOneDownloadAccessRow()throws Exception {
+        String dnld="SELECT count(*) FROM TB_SY_ACCS_LOG WHERE SCRN_ID='UI-05' AND ACT_TYPE_CD='DNLD'";
+        assertThat(count(dnld)).isZero();
+        mvc.perform(get("/api/common/withdrawals/excel").param("year","2026")).andExpect(status().isOk())
+            .andExpect(header().string("X-Total-Count","2"));
+        assertThat(count(dnld)).isEqualTo(1);
+        var row=db.queryForMap("SELECT USER_ID,TRGT_DESC,ACT_DTTM FROM TB_SY_ACCS_LOG WHERE SCRN_ID='UI-05' AND ACT_TYPE_CD='DNLD'");
+        assertThat(row.get("trgt_desc")).isEqualTo("철수 리스트 2026년 2건");
+        assertThat(row.get("act_dttm")).isNotNull();
+    }
 }

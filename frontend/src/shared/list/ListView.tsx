@@ -145,6 +145,10 @@ interface ListViewProps<T> {
   mobileRows?: T[] | null;
   /** 시안 합계 줄(cfg.foot): 열 키별 값. 주면 표 맨 아래에 첫 칸 「합계」와 값을 보인다(0건이어도 보임). */
   footer?: Partial<Record<string, ReactNode>>;
+  /** 합계 줄 첫 칸 글(예: 시안 「합계(내부 제외)」). 주지 않으면 「합계」. */
+  footerLabel?: ReactNode;
+  /** 시안 .sc: 첫 열을 가로로 밀어도 왼쪽에 고정한다(휴대폰에서 표를 그대로 밀어 보는 화면). 기본 꺼짐. */
+  stickyFirstColumn?: boolean;
   /** 도구 줄 왼쪽(선택이 없을 때). 주면 「총 N건」 대신 이 내용을 보인다(시안 .tbar .tl). */
   toolbarLeft?: ReactNode;
   /** 도구 줄 오른쪽 [열 설정] 앞(예: 금액 단위 고르기). */
@@ -204,6 +208,9 @@ export function ListView<T>(props: ListViewProps<T>) {
         : "asc";
     props.onSort({ key: column.key, dir });
   };
+  // 시안 .sc: 첫 열 고정(stickyFirstColumn을 준 목록만)
+  const stickyClass = (index: number) =>
+    props.stickyFirstColumn && index === 0 ? " ls-sc" : "";
   if (mobile && props.renderCard) {
     // 시안 휴대폰: 도구 줄은 「총 N건」만, 표 대신 카드, 아래 [더 보기 (보인 수/전체)]
     const all = props.mobileRows ?? rows ?? [];
@@ -417,13 +424,13 @@ export function ListView<T>(props: ListViewProps<T>) {
                     />
                   </th>
                 )}
-                {visibleColumns.map((column) => {
+                {visibleColumns.map((column, index) => {
                   const active = props.sort?.key === column.key;
                   const sortable = column.sortable !== false;
                   return (
                     <th
                       key={column.key}
-                      className={`ls-${column.align ?? "left"}${sortable ? " ls-sortable" : ""}`}
+                      className={`ls-${column.align ?? "left"}${sortable ? " ls-sortable" : ""}${stickyClass(index)}`}
                       data-testid={`list-head-${column.key}`}
                       aria-sort={
                         active
@@ -528,10 +535,10 @@ export function ListView<T>(props: ListViewProps<T>) {
                           />
                         </td>
                       )}
-                      {visibleColumns.map((column) => (
+                      {visibleColumns.map((column, index) => (
                         <td
                           key={column.key}
-                          className={`ls-${column.align ?? "left"}`}
+                          className={`ls-${column.align ?? "left"}${stickyClass(index)}`}
                           data-testid={`list-cell-${key}-${column.key}`}
                         >
                           {column.render
@@ -556,10 +563,12 @@ export function ListView<T>(props: ListViewProps<T>) {
                   {visibleColumns.map((column, index) => (
                     <td
                       key={column.key}
-                      className={`ls-${column.align ?? "left"}`}
+                      className={`ls-${column.align ?? "left"}${stickyClass(index)}`}
                       data-testid={`list-footer-${column.key}`}
                     >
-                      {index === 0 ? "합계" : props.footer![column.key] ?? ""}
+                      {index === 0
+                        ? (props.footerLabel ?? "합계")
+                        : (props.footer![column.key] ?? "")}
                     </td>
                   ))}
                 </tr>

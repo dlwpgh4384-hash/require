@@ -138,6 +138,23 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (url.startsWith("/api/common/project-cost-analyses?"))
+      return {
+        success: true,
+        meta: {},
+        data: {
+          items: [],
+          projectOptions: [],
+          totalCount: 0,
+          summary: {
+            cumulativeRevenue: 0,
+            cumulativeProfit: 0,
+            lowMarginCount: 0,
+            budgetExceededCount: 0,
+            researchCost: 0,
+          },
+        },
+      };
     if (url.startsWith("/api/common/personal-cost-profits?"))
       return {
         success: true,
@@ -206,15 +223,16 @@ function respond(body: ShellMenuResponse) {
       url.startsWith("/api/common/user-preferences/")
         ? {
             success: true,
-            meta: url.endsWith("/UI-03")
-              ? {
-                  periodBasis: {
-                    latestYm: "202602",
-                    cashBaseYm: "202601",
-                    closedMonths: ["202601"],
-                  },
-                }
-              : {},
+            meta:
+              url.endsWith("/UI-03") || url.endsWith("/UI-04")
+                ? {
+                    periodBasis: {
+                      latestYm: "202602",
+                      cashBaseYm: "202601",
+                      closedMonths: ["202601"],
+                    },
+                  }
+                : {},
             data: {
               prefTypeCd: url.split("/").at(-2),
               prefKey: url.split("/").at(-1),
@@ -596,6 +614,7 @@ describe("common placeholder screen contract", () => {
             (id === "UI-05" ||
               id === "UI-11" ||
               id === "UI-31" ||
+              id === "UI-04" ||
               id === "UI-13") &&
             name === "조회"
           )

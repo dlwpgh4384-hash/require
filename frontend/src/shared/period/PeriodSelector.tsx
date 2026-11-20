@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { Badge } from "../list";
 import {
   isAllowed,
   monthRange,
@@ -20,10 +21,120 @@ export interface PeriodSelectorProps extends PeriodOptions {
   /** 휴대폰 폭이면 드롭다운만 보여 준다. */
   mobile?: boolean;
   disabled?: boolean;
+  /**
+   * 보이는 모양. 주지 않으면 지금 모양(연도·월 상자, 연도 배지, 설명).
+   * "monthBox"는 시안 periodBar의 연도+월 화면 모양: 「‹ [2026년 10월 ▾] › 마감/작업중」 한 줄(연도 배지·설명 없음).
+   * 연도+월(kind "yearMonth")에서만 쓴다. 휴대폰에서는 드롭다운과 배지만 보인다.
+   */
+  variant?: "default" | "monthBox";
 }
 
 const range = (min: number, max: number) =>
   Array.from({ length: Math.max(0, max - min + 1) }, (_, index) => min + index);
+
+const chevron = (d: string) => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d={d} />
+  </svg>
+);
+
+/** 시안 periodBar(연도+월): 고를 수 있는 달 전체를 한 상자에, 앞뒤 화살표와 마감/작업중 배지. */
+function MonthBox({
+  basis,
+  value,
+  onChange,
+  mobile,
+  disabled,
+  options,
+}: {
+  basis: PeriodBasis;
+  value: PeriodValue;
+  onChange: (value: PeriodValue) => void;
+  mobile: boolean;
+  disabled: boolean;
+  options: PeriodOptions;
+}) {
+  const years = yearRange(basis, options);
+  const all: PeriodValue[] = [];
+  for (const year of range(years.min, years.max)) {
+    const months = monthRange(basis, options, year);
+    for (const month of range(months.min, months.max)) all.push({ year, month });
+  }
+  const key = (item: PeriodValue) => `${item.year}-${item.month}`;
+  const index = all.findIndex((item) => key(item) === key(value));
+  const status = periodStatus(value, basis, options.kind);
+  const go = (next: PeriodValue | undefined) => {
+    if (next && !disabled && isAllowed(next, basis, options)) onChange(next);
+  };
+  return (
+    <div
+      className={`period-selector period-month-box${mobile ? " is-mobile" : ""}`}
+      data-testid="period-selector"
+      data-kind={options.kind}
+      data-variant="monthBox"
+      role="group"
+      aria-label="조회 월"
+    >
+      {!mobile && (
+        <button
+          type="button"
+          className="year-bar-arrow"
+          data-testid="period-month-prev"
+          aria-label="이전 달"
+          disabled={disabled || index <= 0}
+          onClick={() => go(all[index - 1])}
+        >
+          {chevron("M15 18l-6-6 6-6")}
+        </button>
+      )}
+      <select
+        className="period-month-select"
+        data-testid="period-month"
+        aria-label="조회 월"
+        value={key(value)}
+        disabled={disabled}
+        onChange={(event) =>
+          go(all.find((item) => key(item) === event.target.value))
+        }
+      >
+        {all.map((item) => (
+          <option key={key(item)} value={key(item)}>
+            {item.year}년 {item.month}월
+          </option>
+        ))}
+      </select>
+      {!mobile && (
+        <button
+          type="button"
+          className="year-bar-arrow"
+          data-testid="period-month-next"
+          aria-label="다음 달"
+          disabled={disabled || index < 0 || index >= all.length - 1}
+          onClick={() => go(all[index + 1])}
+        >
+          {chevron("M9 18l6-6-6-6")}
+        </button>
+      )}
+      <span aria-live="polite" data-testid="period-month-badge">
+        {status.monthBadge === "마감" ? (
+          <Badge kind="lock">마감</Badge>
+        ) : (
+          <Badge kind="info">작업중</Badge>
+        )}
+      </span>
+    </div>
+  );
+}
 
 /** FR-0105 공통 기간 선택 부품. 본문 맨 위에 두고, 업무 자료는 조회하지 않는다. */
 export function PeriodSelector({
@@ -33,9 +144,21 @@ export function PeriodSelector({
   description,
   mobile = false,
   disabled = false,
+  variant = "default",
   ...options
 }: PeriodSelectorProps) {
   const id = useId();
+  if (variant === "monthBox" && options.kind === "yearMonth")
+    return (
+      <MonthBox
+        basis={basis}
+        value={value}
+        onChange={onChange}
+        mobile={mobile}
+        disabled={disabled}
+        options={options}
+      />
+    );
   const years = yearRange(basis, options);
   const status = periodStatus(value, basis, options.kind);
   const change = (next: PeriodValue) => {

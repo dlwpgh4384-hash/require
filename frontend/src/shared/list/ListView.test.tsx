@@ -274,3 +274,39 @@ it("ListFilters shows the optional row below the buttons only when given", () =>
   );
   expect(document.querySelector(".ls-filter-below")).toHaveTextContent("상세");
 });
+
+it("footer label and sticky first column are optional and default to 「합계」 without sticky cells", () => {
+  const props = {
+    screenId: "TEST3",
+    columns: [
+      { key: "id", label: "아이디" },
+      { key: "memo", label: "메모" },
+    ] as ListColumn<Row>[],
+    hiddenColumns: [],
+    onToggleColumn: vi.fn(),
+    onResetColumns: vi.fn(),
+    rows: rows(1),
+    rowKey: (row: Row) => row.id,
+    total: 1,
+    page: 1,
+    pageSize: 20,
+    onPage: vi.fn(),
+    onPageSize: vi.fn(),
+    dense: false,
+    onDense: vi.fn(),
+    sort: null,
+    onSort: vi.fn(),
+    footer: { memo: "9" },
+  };
+  const { rerender } = render(<ListView {...props} visibleColumns={props.columns} />);
+  expect(screen.getByTestId("list-footer-id")).toHaveTextContent("합계");
+  expect(document.querySelectorAll(".ls-sc")).toHaveLength(0);
+  rerender(
+    <ListView {...props} visibleColumns={props.columns} footerLabel="합계(내부 제외)" stickyFirstColumn />,
+  );
+  expect(screen.getByTestId("list-footer-id")).toHaveTextContent("합계(내부 제외)");
+  expect(screen.getByTestId("list-head-id")).toHaveClass("ls-sc");
+  expect(screen.getByTestId("list-cell-r1-id")).toHaveClass("ls-sc");
+  expect(screen.getByTestId("list-footer-id")).toHaveClass("ls-sc");
+  expect(screen.getByTestId("list-head-memo")).not.toHaveClass("ls-sc");
+});

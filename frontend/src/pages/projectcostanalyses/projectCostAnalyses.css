@@ -1,0 +1,137 @@
+.project-cost-analysis-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.project-cost-analysis-page .period-selector {
+  margin-bottom: 0;
+}
+.project-cost-analysis-page .project-cost-summary {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.project-cost-field-error {
+  color: var(--ls-bad, #c43b3b);
+  font-size: 12px;
+}
+/* 시안 .bar: 예산 소진율 막대(80% 이상 주황, 100% 이상 빨강) */
+.project-cost-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 110px;
+}
+.project-cost-track {
+  flex: 1;
+  min-width: 60px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--ls-head-bg);
+  overflow: hidden;
+}
+.project-cost-fill {
+  height: 100%;
+  background: var(--primary, #2f6fde);
+}
+.project-cost-fill.is-warn {
+  background: var(--ls-warn, #c16c17);
+}
+.project-cost-fill.is-bad {
+  background: var(--ls-bad, #c43b3b);
+}
+.project-cost-fill.is-grey {
+  background: var(--text-dis, #8c96a5);
+}
+.project-cost-burn.is-warn {
+  color: var(--ls-warn, #c16c17);
+}
+.project-cost-burn.is-bad {
+  color: var(--ls-bad, #c43b3b);
+}
+/* 상세 창 */
+.project-cost-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.project-cost-detail-kpis {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.project-cost-free {
+  max-height: none;
+  min-height: 0;
+}
+.project-cost-note {
+  margin: 0;
+}
+.project-cost-sim-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+.project-cost-sim-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.project-cost-num {
+  width: 100px;
+  text-align: right;
+}
+.project-cost-money {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.project-cost-money .project-cost-num {
+  width: 160px;
+}
+.project-cost-sim-out {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--divider, var(--border));
+  border-radius: 8px;
+  background: var(--surface);
+}
+.project-cost-scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: baseline;
+}
+.project-cost-score {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 30px;
+}
+.project-cost-score.is-bad {
+  color: var(--ls-bad, #c43b3b);
+}
+.project-cost-score.is-ok {
+  color: var(--ls-ok, #1f8a4c);
+}
+.project-cost-cause {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-top: 1px solid var(--divider, var(--border));
+}
+.project-cost-cause-head,
+.project-cost-cause-task {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.project-cost-cause-task {
+  font-size: 13px;
+}
+@media (max-width: 767px) {
+  .project-cost-analysis-page .project-cost-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

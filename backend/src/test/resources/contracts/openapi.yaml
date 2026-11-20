@@ -8981,8 +8981,1027 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+  /api/common/project-cost-analyses:
+    get:
+      operationId: getCommonProjectCostAnalyses
+      summary: 프로젝트 원가 분석 조회
+      security: []
+      description: 프로젝트 원가 분석 조회. 현재 개발 admin·로그인/메뉴검사는 UI-22 후속. 업무 원자료/분석 결과는 저장하지 않는다. 마감월은 저장값, 미마감월은 해당월 유효 이력과
+        현재자료. 정확한 물리매핑/식은 OQ-DATA/CALC-004로 국소 대조.
+      x-related-requirements:
+      - REQ-775
+      - REQ-804
+      - REQ-805
+      - REQ-806
+      - REQ-807
+      - REQ-808
+      - REQ-809
+      - REQ-810
+      - REQ-811
+      - REQ-812
+      - REQ-813
+      - REQ-814
+      - REQ-823
+      - REQ-824
+      parameters:
+      - name: year
+        in: query
+        required: true
+        description: 선택 연도·공통 기간 선택(연도+월) 범위
+        schema:
+          type: integer
+      - name: baseMonth
+        in: query
+        required: true
+        description: 기준월·처음은 가장 최근 달(마지막 마감 달 + 1)·CASH_BASE_YM의 달부터 가장 최근 달까지만
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
+      - name: projectId
+        in: query
+        required: false
+        description: 선택월 프로젝트 선택상자·미지정은 전체·그 달 대상이 아니면 400(projectId)
+        schema:
+          type: string
+      - name: contractTypeCode
+        in: query
+        required: false
+        description: 기존 CTRT_TYPE 코드
+        schema:
+          type: string
+      - name: projectStatus
+        in: query
+        required: false
+        description: 기준월 당시 진행 또는 종료
+        schema:
+          type: string
+          enum:
+          - 진행
+          - 종료
+      - name: alertOnly
+        in: query
+        required: false
+        description: 경보 있는 것만
+        schema:
+          type: boolean
+      x-business-rules:
+      - 열거된 CALC_ID와 식-00의 DB 정의를 읽어 계산하며 수식을 코드 상수로 복제하지 않는다.
+      - 처음은 가장 최근 달(마지막 마감 달 + 1)의 년·월을 보여 주고 해당 달 말까지 누적으로 읽는다. 기준월 이후 시작 프로젝트는 제외하고 월간 마진율은 선택 한 달이다. 마감월은 고정값, 미마감월은 현재자료와 그 달에 유효한
+        계약·투입 이력으로 계산한다.
+      - 누적 매출·누적 이익(내부 제외)·저마진 경보 건수·예산 초과 건수·연구개발비 누계(내부)를 기준월 전체 대상 프로젝트로 집계한다. 목록 필터는 요약에 적용하지 않는다.
+      - 턴키 누적 매출은 계약금액×진행률인 식-18, 월단위·파견은 월 매출 누계로 읽고 TB_BL_BILL 청구를 매출에 쓰지 않는다.
+      - 선택월 프로젝트 선택상자(기본 전체)·계약유형·기준월 상태·경보 조건으로 연도 겹침 대상만 조회하고 수주예정·실주는 제외한다. 요청55행 모든 열을 경보 많은 순으로 표시한다.
+      - 누적 원가에 배분 원가와 팀비·프로젝트경비·추가 직접 경비를 포함하고 열 옆 ⓘ에 근거를 표시한다. 무상지원 원가는 해당 프로젝트 원가를 쓴다.
+      - 턴키 예상 최종 마진율의 남은 예상 원가는 남은 달 투입 배정 MM×그 사람 월 인건비이며 배분표 유무와 관계없이 같은 원천을 쓴다.
+      - 월 인건비는 최근 월 인건비 → 개발자 풀 월 급여 → 배분표 남은 달 금액÷MM×예산÷계약금액 순서로 찾고 다 없으면 0으로 세며, 예상값 옆에 단가 없음과 hover 근거를 표시한다(식-20, 사람별 원 단위 버림).
+      - 계획 MM은 TB_PJ_MNPW_PLAN.PLAN_MM 직무별 합계를 그대로 읽는다. 계획이 없으면 계획 없음으로 표시하고 투입 초과 원인을 계산하지 않는다.
+      - 목표 기본20%보다 5%p 넘게 낮을 때만 저마진 경보로 판정한다. 정확히 5.0%p 낮음은 경보가 아니다.
+      - 예산 소진율100% 이상은 빨강·80% 이상은 주황으로 표시한다.
+      - 내부 프로젝트는 실제 MM·연구개발비 누계만 표시하며 계약금액·마진 칸은 비운다.
+      - PM에게 원가·이익 금액을 노출하지 않는다. PM은 기존 UI-31 진척률·원가 사용률을 이용한다.
+      - UI-04는 조회 화면으로 업무 저장이 없다. 마감 해제·소급 재계산·재확정은 이 화면에서 만들지 않고 기존 월 마감 흐름을 보존한다.
+      x-side-effects:
+      - 업무 원자료·마감·계약·투입·분석 결과 쓰기0.
+      x-pagination-filtering:
+        pagination: 조건 일치 전체를 반환·서버 page 없음·ListView 기존 로컬 페이지
+        filtering: year/baseMonth·projectId/contractTypeCode/projectStatus/alertOnly는 목록만·요약은 전체
+        ordering: alertCount 내림차순·동순위는 프로젝트 이름 가나다순
+      responses:
+        '200':
+          description: 프로젝트 원가 분석 조회 공개 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectCostAnalysisResult'
+        '400':
+          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_CO_MON_COST
+        result_path:
+        - data
+        - items
+      x-required-tests:
+      - 'happy: 유효한 기준월과 선택 조건으로 프로젝트 원가 분석 조회 호출 -> 200 data는 CommonProjectCostAnalysisResult의 필수 공개 필드를 반환'
+      - 'auth: 인증 헤더 없이 개발 admin으로 getCommonProjectCostAnalyses 호출 -> 200·새401/403 없음; PM 금액 거부는 독립 정책 투영으로 검사'
+      - 'validation: getCommonProjectCostAnalyses에 baseMonth=13 제출 -> 400 success=false/meta 및 errors[].field=baseMonth·업무원자료
+        무변경'
+      - 'business: 기준월 뒤 시작/수주예정/실주 혼합 자료 조회 -> items에 세 대상 없음·요약은 목록필터 전 전체'
+      - 'side-effect: getCommonProjectCostAnalyses 호출 전후 DB snapshot 비교 -> TB_CO_MON_COST·TB_PJ_PROJ·TB_PJ_ASGN 불변·DNLD
+        증가0'
+      - 'closed-month: 마감월 조회 후 현재 계약/투입 정정·같은 월 재조회 -> 마감 고정값 불변; 미마감은 대상월 유효 이력 반영'
+      - 'summary-scope: 동일 기준월에서 프로젝트/유형/상태/경보 조건 변경 -> summary 다섯 값 불변·totalCount는 필터 items 수'
+      - 'alert-boundary: 목표20%와 차이5.0%p·소진80%/100% fixture 조회 -> 저마진false·주황/빨강'
+      - 'missing-cost: 월 인건비 누락 프로젝트 조회 -> expectedFinalMarginRate는 0으로 센 값·missingMonthlyCost=true·근거 문자열 존재'
+      - 'missing-plan: 인원계획 미존재 프로젝트 조회 -> plannedMm=null·투입초과 원인 계산 제외'
+  /api/common/project-cost-analyses/excel:
+    get:
+      operationId: getCommonProjectCostAnalysesExcel
+      summary: 프로젝트 원가 분석 엑셀
+      security: []
+      description: 프로젝트 원가 분석 엑셀. 현재 개발 admin·로그인/메뉴검사는 UI-22 후속. 업무 원자료/분석 결과는 저장하지 않는다. 마감월은 저장값, 미마감월은 해당월 유효 이력과
+        현재자료. 정확한 물리매핑/식은 OQ-DATA/CALC-004로 국소 대조.
+      x-related-requirements:
+      - REQ-790
+      - REQ-791
+      - REQ-792
+      - REQ-823
+      parameters:
+      - name: year
+        in: query
+        required: true
+        description: 선택 연도·공통 기간 선택(연도+월) 범위
+        schema:
+          type: integer
+      - name: baseMonth
+        in: query
+        required: true
+        description: 기준월·처음은 가장 최근 달(마지막 마감 달 + 1)·CASH_BASE_YM의 달부터 가장 최근 달까지만
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
+      - name: projectId
+        in: query
+        required: false
+        description: 선택월 프로젝트 선택상자·미지정은 전체·그 달 대상이 아니면 400(projectId)
+        schema:
+          type: string
+      - name: contractTypeCode
+        in: query
+        required: false
+        description: 기존 CTRT_TYPE 코드
+        schema:
+          type: string
+      - name: projectStatus
+        in: query
+        required: false
+        description: 기준월 당시 진행 또는 종료
+        schema:
+          type: string
+          enum:
+          - 진행
+          - 종료
+      - name: alertOnly
+        in: query
+        required: false
+        description: 경보 있는 것만
+        schema:
+          type: boolean
+      x-business-rules:
+      - UI-04 엑셀 CTA는 실제 엑셀 API와 연결한다.
+      - 엑셀을 받을 때 기존 접근 기록에 DNLD를 남긴다.
+      - 이번 변경에서 저장하는 접근 기록 시각은 clock_timestamp()로 넣는다.
+      - PM에게 원가·이익 금액을 노출하지 않는다. PM은 기존 UI-31 진척률·원가 사용률을 이용한다.
+      x-side-effects:
+      - 기존 TB_SY_ACCS_LOG에 DNLD·실행자 admin·clock_timestamp() 기록. 업무 원자료 쓰기0.
+      x-pagination-filtering:
+        pagination: 화면 페이지가 아닌 조건 전체 파일
+        filtering: 동일 year/baseMonth와 목록 필터·PM 금액 비노출 정책 동일
+        ordering: 목록 경보순·파일 세부열 OQ-EXPORT-004
+      responses:
+        '200':
+          description: 프로젝트 원가 분석 목록 xlsx·성공 다운로드 DNLD
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-required-tests:
+      - 'happy: 유효한 기준월과 선택 조건으로 프로젝트 원가 분석 엑셀 호출 -> 200 실제 xlsx와 해당 DNLD 접근기록'
+      - 'auth: 인증 헤더 없이 개발 admin으로 getCommonProjectCostAnalysesExcel 호출 -> 200·새401/403 없음; PM 금액 거부는 독립 정책 투영으로 검사'
+      - 'validation: getCommonProjectCostAnalysesExcel에 baseMonth=13 제출 -> 400 success=false/meta 및 errors[].field=baseMonth·업무원자료
+        무변경'
+      - 'business: 목록 조건을 좁힌 뒤 파일 요청 -> 같은조건 전체 행만 파일에 존재·다른 조건 행 제외'
+      - 'side-effect: 다운로드 후 독립DB 조회 -> TB_SY_ACCS_LOG에 DNLD·시각 존재·TB_CO_MON_COST 불변'
+  /api/common/project-cost-analyses/{projectId}/monthly-costs:
+    get:
+      operationId: getCommonProjectCostAnalysisMonthlyCosts
+      summary: 프로젝트 월별 원가 조회
+      security: []
+      description: 프로젝트 월별 원가 조회. 현재 개발 admin·로그인/메뉴검사는 UI-22 후속. 업무 원자료/분석 결과는 저장하지 않는다. 마감월은 저장값, 미마감월은 해당월 유효 이력과
+        현재자료. 정확한 물리매핑/식은 OQ-DATA/CALC-004로 국소 대조.
+      x-related-requirements:
+      - REQ-804
+      - REQ-815
+      - REQ-823
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        description: 선택 프로젝트 기존 식별자
+        schema:
+          type: string
+      - name: year
+        in: query
+        required: true
+        description: 선택 연도·공통 기간 선택(연도+월) 범위
+        schema:
+          type: integer
+      - name: baseMonth
+        in: query
+        required: true
+        description: 기준월·처음은 가장 최근 달(마지막 마감 달 + 1)·CASH_BASE_YM의 달부터 가장 최근 달까지만
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
+      x-business-rules:
+      - 처음은 가장 최근 달(마지막 마감 달 + 1)의 년·월을 보여 주고 해당 달 말까지 누적으로 읽는다. 기준월 이후 시작 프로젝트는 제외하고 월간 마진율은 선택 한 달이다. 마감월은 고정값, 미마감월은 현재자료와 그 달에 유효한
+        계약·투입 이력으로 계산한다.
+      - 상세 월별 원가에서 달별 원가와 턴키 배분 기준 매출(참고)을 함께 읽는다.
+      - PM에게 원가·이익 금액을 노출하지 않는다. PM은 기존 UI-31 진척률·원가 사용률을 이용한다.
+      x-side-effects:
+      - 업무 원자료·마감·계약·투입·분석 결과 쓰기0.
+      x-pagination-filtering:
+        pagination: 조건 일치 전체를 반환·서버 page 없음·ListView 기존 로컬 페이지
+        filtering: year/baseMonth·path projectId의 기준월 대상만
+        ordering: 기존 원천 순서·세부 정렬 OQ-UI-004
+      responses:
+        '200':
+          description: 프로젝트 월별 원가 조회 공개 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectCostAnalysisMonthlyCosts'
+        '400':
+          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 선택 projectId가 존재하지 않음·다른 프로젝트 결과를 반환하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_CO_MON_COST
+        result_path:
+        - data
+        - items
+      x-required-tests:
+      - 'happy: 유효한 기준월과 선택 조건으로 프로젝트 월별 원가 조회 호출 -> 200 data는 CommonProjectCostAnalysisMonthlyCosts의 필수 공개 필드를 반환'
+      - 'auth: 인증 헤더 없이 개발 admin으로 getCommonProjectCostAnalysisMonthlyCosts 호출 -> 200·새401/403 없음; PM 금액 거부는 독립 정책
+        투영으로 검사'
+      - 'validation: getCommonProjectCostAnalysisMonthlyCosts에 baseMonth=13 제출 -> 400 success=false/meta 및 errors[].field=baseMonth·업무원자료
+        무변경'
+      - 'business: 턴키 마감월 상세 요청 -> cost는 고정값·distributionRevenue는 참고로 병기'
+      - 'side-effect: getCommonProjectCostAnalysisMonthlyCosts 호출 전후 DB snapshot 비교 -> TB_CO_MON_COST·TB_PJ_PROJ·TB_PJ_ASGN
+        불변·DNLD 증가0'
+  /api/common/project-cost-analyses/{projectId}/workforce:
+    get:
+      operationId: getCommonProjectCostAnalysisWorkforce
+      summary: 프로젝트 투입 인력 조회
+      security: []
+      description: 프로젝트 투입 인력 조회. 현재 개발 admin·로그인/메뉴검사는 UI-22 후속. 업무 원자료/분석 결과는 저장하지 않는다. 마감월은 저장값, 미마감월은 해당월 유효 이력과
+        현재자료. 정확한 물리매핑/식은 OQ-DATA/CALC-004로 국소 대조.
+      x-related-requirements:
+      - REQ-804
+      - REQ-816
+      - REQ-823
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        description: 선택 프로젝트 기존 식별자
+        schema:
+          type: string
+      - name: year
+        in: query
+        required: true
+        description: 선택 연도·공통 기간 선택(연도+월) 범위
+        schema:
+          type: integer
+      - name: baseMonth
+        in: query
+        required: true
+        description: 기준월·처음은 가장 최근 달(마지막 마감 달 + 1)·CASH_BASE_YM의 달부터 가장 최근 달까지만
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
+      x-business-rules:
+      - 처음은 가장 최근 달(마지막 마감 달 + 1)의 년·월을 보여 주고 해당 달 말까지 누적으로 읽는다. 기준월 이후 시작 프로젝트는 제외하고 월간 마진율은 선택 한 달이다. 마감월은 고정값, 미마감월은 현재자료와 그 달에 유효한
+        계약·투입 이력으로 계산한다.
+      - 선택 프로젝트 상세 투입 인력 목록을 조회한다.
+      - PM에게 원가·이익 금액을 노출하지 않는다. PM은 기존 UI-31 진척률·원가 사용률을 이용한다.
+      x-side-effects:
+      - 업무 원자료·마감·계약·투입·분석 결과 쓰기0.
+      x-pagination-filtering:
+        pagination: 조건 일치 전체를 반환·서버 page 없음·ListView 기존 로컬 페이지
+        filtering: year/baseMonth·path projectId의 기준월 대상만
+        ordering: 기존 원천 순서·세부 정렬 OQ-UI-004
+      responses:
+        '200':
+          description: 프로젝트 투입 인력 조회 공개 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectCostAnalysisWorkforce'
+        '400':
+          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 선택 projectId가 존재하지 않음·다른 프로젝트 결과를 반환하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_PJ_ASGN
+        result_path:
+        - data
+        - items
+      x-required-tests:
+      - 'happy: 유효한 기준월과 선택 조건으로 프로젝트 투입 인력 조회 호출 -> 200 data는 CommonProjectCostAnalysisWorkforce의 필수 공개 필드를 반환'
+      - 'auth: 인증 헤더 없이 개발 admin으로 getCommonProjectCostAnalysisWorkforce 호출 -> 200·새401/403 없음; PM 금액 거부는 독립 정책 투영으로
+        검사'
+      - 'validation: getCommonProjectCostAnalysisWorkforce에 baseMonth=13 제출 -> 400 success=false/meta 및 errors[].field=baseMonth·업무원자료
+        무변경'
+      - 'business: 선택 프로젝트에 다른 프로젝트 인력이 혼재한 DB 조회 -> 선택 projectId의 투입 인력만 items에 존재'
+      - 'side-effect: getCommonProjectCostAnalysisWorkforce 호출 전후 DB snapshot 비교 -> TB_CO_MON_COST·TB_PJ_PROJ·TB_PJ_ASGN
+        불변·DNLD 증가0'
+  /api/common/project-cost-analyses/{projectId}/simulation:
+    get:
+      operationId: getCommonProjectCostAnalysisSimulation
+      summary: 프로젝트 가상 마진 계산
+      security: []
+      description: 프로젝트 가상 마진 계산. 현재 개발 admin·로그인/메뉴검사는 UI-22 후속. 업무 원자료/분석 결과는 저장하지 않는다. 마감월은 저장값, 미마감월은 해당월 유효 이력과
+        현재자료. 정확한 물리매핑/식은 OQ-DATA/CALC-004로 국소 대조.
+      x-related-requirements:
+      - REQ-775
+      - REQ-817
+      - REQ-818
+      - REQ-823
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        description: 선택 프로젝트 기존 식별자
+        schema:
+          type: string
+      - name: year
+        in: query
+        required: true
+        description: 선택 연도·공통 기간 선택(연도+월) 범위
+        schema:
+          type: integer
+      - name: baseMonth
+        in: query
+        required: true
+        description: 기준월·처음은 가장 최근 달(마지막 마감 달 + 1)·CASH_BASE_YM의 달부터 가장 최근 달까지만
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
+      - name: headcountChange
+        in: query
+        required: true
+        description: 인원 변화·음수 허용범위 OQ-SIM-004
+        schema:
+          type: number
+      - name: monthlyCostPerPerson
+        in: query
+        required: true
+        description: 1인 월 원가
+        schema:
+          type: number
+      - name: months
+        in: query
+        required: true
+        description: 적용 개월·월단위/파견도 칸은 유지·결과에서 무시
+        schema:
+          type: integer
+      - name: monthlyPricePerPerson
+        in: query
+        required: false
+        description: 월단위/파견에서는 필수·턴키는 사용하지 않음
+        schema:
+          type: number
+      x-business-rules:
+      - 열거된 CALC_ID와 식-00의 DB 정의를 읽어 계산하며 수식을 코드 상수로 복제하지 않는다.
+      - 인원 변화·1인 월 원가·적용 개월과 월단위/파견 1인 단가로 마진율 변화를 계산한다. 월단위·파견은 개월 칸을 남기되 한 달 계산만 하며 월단위·파견은 한 달 기준 안내를 표시한다.
+      - 가상 결과는 저장하지 않으며 원가·계약·배정·마감 자료를 바꾸지 않는다.
+      - PM에게 원가·이익 금액을 노출하지 않는다. PM은 기존 UI-31 진척률·원가 사용률을 이용한다.
+      x-side-effects:
+      - 업무 원자료·마감·계약·투입·분석 결과 쓰기0.
+      responses:
+        '200':
+          description: 프로젝트 가상 마진 계산 공개 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectCostAnalysisSimulation'
+        '400':
+          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId·가상 필수 숫자 누락·월단위/파견 1인 단가 누락·작업중 달 급여 없음(월단위·파견, errors[].field=baseMonth); ApiError.errors[].field는
+            해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 선택 projectId가 존재하지 않음·다른 프로젝트 결과를 반환하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-required-tests:
+      - 'happy: 유효한 기준월과 선택 조건으로 프로젝트 가상 마진 계산 호출 -> 200 data는 CommonProjectCostAnalysisSimulation의 필수 공개 필드를 반환'
+      - 'auth: 인증 헤더 없이 개발 admin으로 getCommonProjectCostAnalysisSimulation 호출 -> 200·새401/403 없음; PM 금액 거부는 독립 정책 투영으로
+        검사'
+      - 'validation: getCommonProjectCostAnalysisSimulation에 baseMonth=13 제출 -> 400 success=false/meta 및 errors[].field=baseMonth·업무원자료
+        무변경'
+      - 'business: 월단위/파견에서 months만 바꿔 두 번 요청 -> marginRateAfter/Change 동일·virtual=true'
+      - 'side-effect: getCommonProjectCostAnalysisSimulation 호출 전후 DB snapshot 비교 -> TB_CO_MON_COST·TB_PJ_PROJ·TB_PJ_ASGN
+        불변·DNLD 증가0'
+  /api/common/project-cost-analyses/{projectId}/causes:
+    get:
+      operationId: getCommonProjectCostAnalysisCauses
+      summary: 프로젝트 원가 초과 원인
+      security: []
+      description: 프로젝트 원가 초과 원인. 현재 개발 admin·로그인/메뉴검사는 UI-22 후속. 업무 원자료/분석 결과는 저장하지 않는다. 마감월은 저장값, 미마감월은 해당월 유효 이력과
+        현재자료. 정확한 물리매핑/식은 OQ-DATA/CALC-004로 국소 대조.
+      x-related-requirements:
+      - REQ-811
+      - REQ-819
+      - REQ-820
+      - REQ-821
+      - REQ-822
+      - REQ-823
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        description: 선택 프로젝트 기존 식별자
+        schema:
+          type: string
+      - name: year
+        in: query
+        required: true
+        description: 선택 연도·공통 기간 선택(연도+월) 범위
+        schema:
+          type: integer
+      - name: baseMonth
+        in: query
+        required: true
+        description: 기준월·처음은 가장 최근 달(마지막 마감 달 + 1)·CASH_BASE_YM의 달부터 가장 최근 달까지만
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
+      x-business-rules:
+      - 계획 MM은 TB_PJ_MNPW_PLAN.PLAN_MM 직무별 합계를 그대로 읽는다. 계획이 없으면 계획 없음으로 표시하고 투입 초과 원인을 계산하지 않는다.
+      - 원인은 월별 실제 금액 합으로 금액 큰 순에 표시한다. 턴키에는 진척 대비 초과 금액과 세 원인으로 설명 안 되는 나머지 문구를 함께 보여 준다.
+      - 각 원인마다 할 일과 이동 버튼을 제공한다. PM 할 일은 UI-11, 파트장은 UI-32에서 수행하며 이 화면의 고칠 사람 표기는 안내다. 다른 화면 전체를 이번에 활성화하지 않는다.
+      - 경보(저마진·예산 초과)가 있거나 턴키 진척 대비 원가 초과인 경우에만 주원인 막대를 빨강으로 표시한다. 그 외 회색과 경보가 없는 프로젝트라 참고용 문구를 표시한다.
+      - 원인 분석 열람은 화면과 같이 재무·경영진·관리자만 허용하는 정책으로 보존한다. 현재 고정 admin 및 UI-22 전 검사 미연결 경계는 유지한다.
+      - PM에게 원가·이익 금액을 노출하지 않는다. PM은 기존 UI-31 진척률·원가 사용률을 이용한다.
+      x-side-effects:
+      - 업무 원자료·마감·계약·투입·분석 결과 쓰기0.
+      x-pagination-filtering:
+        pagination: 조건 일치 전체를 반환·서버 page 없음·ListView 기존 로컬 페이지
+        filtering: year/baseMonth·path projectId의 기준월 대상만
+        ordering: 원인 amount 내림차순
+      responses:
+        '200':
+          description: 프로젝트 원가 초과 원인 공개 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonProjectCostAnalysisCauses'
+        '400':
+          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 선택 projectId가 존재하지 않음·다른 프로젝트 결과를 반환하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_CO_MON_COST
+        result_path:
+        - data
+        - items
+      x-required-tests:
+      - 'happy: 유효한 기준월과 선택 조건으로 프로젝트 원가 초과 원인 호출 -> 200 data는 CommonProjectCostAnalysisCauses의 필수 공개 필드를 반환'
+      - 'auth: 인증 헤더 없이 개발 admin으로 getCommonProjectCostAnalysisCauses 호출 -> 200·새401/403 없음; PM 금액 거부는 독립 정책 투영으로
+        검사'
+      - 'validation: getCommonProjectCostAnalysisCauses에 baseMonth=13 제출 -> 400 success=false/meta 및 errors[].field=baseMonth·업무원자료
+        무변경'
+      - 'business: 경보없음·턴키 진척초과없음 원인 요청 -> primaryBarColor=회색·referenceNotice=경보가 없는 프로젝트라 참고용'
+      - 'side-effect: getCommonProjectCostAnalysisCauses 호출 전후 DB snapshot 비교 -> TB_CO_MON_COST·TB_PJ_PROJ·TB_PJ_ASGN
+        불변·DNLD 증가0'
 components:
   schemas:
+    CommonProjectCostAnalysisSummary:
+      type: object
+      properties:
+        cumulativeRevenue:
+          type: number
+          description: 기준월 전체 대상·청구 제외 매출
+        cumulativeProfit:
+          type: number
+          description: 내부 제외 누적 이익
+        lowMarginCount:
+          type: integer
+        budgetExceededCount:
+          type: integer
+          description: 소진100% 이상
+        researchCost:
+          type: number
+          description: 내부 연구개발비 누계
+      required:
+      - cumulativeRevenue
+      - cumulativeProfit
+      - lowMarginCount
+      - budgetExceededCount
+      - researchCost
+    CommonProjectCostAnalysisRow:
+      type: object
+      properties:
+        projectId:
+          type: string
+        projectName:
+          type: string
+        contractTypeCode:
+          type: string
+          description: CTRT_TYPE 기존 코드
+        contractTypeName:
+          type: string
+        projectStatus:
+          type: string
+          description: 기준월 당시 진행/종료 표시값
+        originalContractAmount:
+          type: number
+          description: ORGNL_CTRT_AMT·내부는 비움
+          nullable: true
+        contractAmount:
+          type: number
+          description: 내부는 비움
+          nullable: true
+        plannedMm:
+          type: number
+          description: PLAN_MM 직무합계·계획없음 null
+          nullable: true
+        actualMm:
+          type: number
+        cumulativeRevenue:
+          type: number
+          description: 청구 제외
+          nullable: true
+        totalCost:
+          type: number
+          description: 배분+팀비+프로젝트경비+추가직접경비
+          nullable: true
+        cumulativeProfit:
+          type: number
+          description: 내부는 비움
+          nullable: true
+        cumulativeMarginRate:
+          type: number
+          description: 내부는 비움
+          nullable: true
+        expectedFinalMarginRate:
+          type: number
+          description: 턴키·인건비 누락 null
+          nullable: true
+        monthlyMarginRate:
+          type: number
+          description: 월단위/파견 기준월 한 달
+          nullable: true
+        targetDifference:
+          type: number
+          description: 목표 대비
+          nullable: true
+        budgetUsageRate:
+          type: number
+          description: 예산 소진율
+          nullable: true
+        unitPricePerMm:
+          type: number
+          nullable: true
+        costPerMm:
+          type: number
+          nullable: true
+        profitPerMm:
+          type: number
+          nullable: true
+        freeSupportMm:
+          type: number
+          nullable: true
+        freeSupportCost:
+          type: number
+          description: 해당 프로젝트 원가
+          nullable: true
+        researchCost:
+          type: number
+          description: 내부 실제 원가
+          nullable: true
+        lowMargin:
+          type: boolean
+        budgetExceeded:
+          type: boolean
+        alertCount:
+          type: integer
+          description: 경보 많은 순 정렬
+        alerts:
+          type: array
+          items:
+            type: string
+            description: 해당 경보 설명
+        budgetColor:
+          type: string
+          nullable: true
+          enum:
+          - 빨강
+          - 주황
+          - null
+          description: 80% 미만의 구체 색은 시안 대조·null은 경보색 없음
+        missingMonthlyCost:
+          type: boolean
+        missingMonthlyCostReason:
+          type: string
+          description: 단가 없음 hover 근거
+          nullable: true
+        remainingCost:
+          type: number
+          description: 진행 중 턴키의 남은 예상 원가(식-20, 원 단위 버림). 그 외 null
+          nullable: true
+        remainingCostBasis:
+          type: string
+          description: 예상 최종 마진율 칸 마우스 근거(몇 명, 단가 없음 몇 명은 0으로 셈). 진행 중 턴키 외 null
+          nullable: true
+        primaryCauseName:
+          type: string
+          description: 원가 초과 주원인(식-91 금액이 가장 큰 원인). 없으면 null
+          nullable: true
+        primaryCauseAmount:
+          type: number
+          description: 주원인 금액
+          nullable: true
+        elapsedMonths:
+          type: integer
+          description: 기준월까지 경과 개월
+        totalMonths:
+          type: integer
+          description: 계약 전체 개월
+        remainingMonths:
+          type: integer
+          description: 남은 개월
+        startDate:
+          type: string
+          description: 기준월 당시 계약 시작일(YYYY-MM-DD)
+        endDate:
+          type: string
+          description: 기준월 당시 계약 종료일(YYYY-MM-DD)
+      required:
+      - projectId
+      - projectName
+      - contractTypeCode
+      - contractTypeName
+      - projectStatus
+      - originalContractAmount
+      - contractAmount
+      - plannedMm
+      - actualMm
+      - cumulativeRevenue
+      - totalCost
+      - cumulativeProfit
+      - cumulativeMarginRate
+      - expectedFinalMarginRate
+      - monthlyMarginRate
+      - targetDifference
+      - budgetUsageRate
+      - unitPricePerMm
+      - costPerMm
+      - profitPerMm
+      - freeSupportMm
+      - freeSupportCost
+      - researchCost
+      - lowMargin
+      - budgetExceeded
+      - alertCount
+      - alerts
+      - budgetColor
+      - missingMonthlyCost
+      - missingMonthlyCostReason
+      - remainingCost
+      - remainingCostBasis
+      - primaryCauseName
+      - primaryCauseAmount
+      - elapsedMonths
+      - totalMonths
+      - remainingMonths
+      - startDate
+      - endDate
+    CommonProjectCostAnalysisResult:
+      type: object
+      properties:
+        summary:
+          $ref: '#/components/schemas/CommonProjectCostAnalysisSummary'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProjectCostAnalysisRow'
+        totalCount:
+          type: integer
+          description: 필터 적용 목록 수
+        projectOptions:
+          type: array
+          description: 고른 달의 프로젝트(이름 가나다순)
+          items:
+            type: object
+            properties:
+              projectId:
+                type: string
+              projectName:
+                type: string
+            required:
+            - projectId
+            - projectName
+        targetMarginRate:
+          type: number
+          description: 기준월의 목표 마진율(TGT_MRGN_RT)
+        monthlyMarginNotice:
+          type: string
+          description: 작업중 달에 그 달 급여가 없으면 「N월 급여가 아직 반영되지 않아 월간 마진을 계산하지 않습니다」, 아니면 null
+          nullable: true
+      required:
+      - summary
+      - items
+      - totalCount
+      - projectOptions
+      - targetMarginRate
+      - monthlyMarginNotice
+    CommonProjectCostAnalysisMonthlyCost:
+      type: object
+      properties:
+        yearMonth:
+          type: string
+          description: YYYYMM. 기준월까지 경과한 달 중 최근 12달
+        mm:
+          type: number
+          description: 그 달 MM 합
+        cost:
+          type: number
+          description: 해당 월 원가(배분 원가+직접 경비)
+        revenue:
+          type: number
+          description: 월단위·파견의 그 달 매출. 턴키·내부는 null
+          nullable: true
+        distributionRevenue:
+          type: number
+          description: 턴키 배분 기준 매출(참고, 식-25). 그 외 null
+          nullable: true
+        marginRate:
+          type: number
+          description: 그 달 마진율. 내부·매출 0은 null
+          nullable: true
+      required:
+      - yearMonth
+      - mm
+      - cost
+      - revenue
+      - distributionRevenue
+      - marginRate
+    CommonProjectCostAnalysisMonthlyCosts:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProjectCostAnalysisMonthlyCost'
+      required:
+      - items
+    CommonProjectCostAnalysisWorkforceRow:
+      type: object
+      properties:
+        developerId:
+          type: string
+          description: 기존 배정 인력 식별자
+        developerName:
+          type: string
+          description: 기존 인력 공개 이름
+        jobName:
+          type: string
+          description: JOB 표시명
+        monthlyMm:
+          type: number
+          description: 기준월 MM
+        allocatedCost:
+          type: number
+          description: 기준월 배분 원가
+        revenue:
+          type: number
+          description: 기준월 매출. 내부는 null
+          nullable: true
+        inputTypeCode:
+          type: string
+          description: INPUT_TYPE 코드
+        inputTypeName:
+          type: string
+          description: 투입 구분 표시명(무상지원 등)
+      required:
+      - developerId
+      - developerName
+      - jobName
+      - monthlyMm
+      - allocatedCost
+      - revenue
+      - inputTypeCode
+      - inputTypeName
+      description: 투입 인력 목록(시안 이름·직무·MM·배분 원가·매출·구분). 급여/연락처/개인 비밀필드는 공개하지 않음.
+    CommonProjectCostAnalysisWorkforce:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProjectCostAnalysisWorkforceRow'
+      required:
+      - items
+    CommonProjectCostAnalysisSimulation:
+      type: object
+      properties:
+        virtual:
+          type: boolean
+          enum:
+          - true
+        marginRateBefore:
+          type: number
+          description: 지금 예상 최종(턴키)·월간(월단위·파견) 마진율
+        marginRateAfter:
+          type: number
+          description: 식-26 가상 결과
+        marginRateChange:
+          type: number
+          description: 전후 차이(%p)
+        addedRevenue:
+          type: number
+          description: 늘어나는 한 달 매출(월단위·파견). 턴키는 0
+        addedCost:
+          type: number
+          description: 늘어나는 원가(턴키는 인원×1인 월 원가×개월, 월단위·파견은 한 달)
+        targetMarginRate:
+          type: number
+          description: 목표 마진율
+      required:
+      - virtual
+      - marginRateBefore
+      - marginRateAfter
+      - marginRateChange
+      - addedRevenue
+      - addedCost
+      - targetMarginRate
+    CommonProjectCostAnalysisCause:
+      type: object
+      properties:
+        causeKey:
+          type: string
+          enum:
+          - mm
+          - pay
+          - free
+          description: 식-91 세 원인
+        causeName:
+          type: string
+          description: 시안 원인 이름
+        amount:
+          type: number
+          description: 월별 실제 금액 합(원 단위 버림)
+        description:
+          type: string
+          description: 원인 설명 한 줄(실제·계획 MM, 인원 수 등)
+        owner:
+          type: string
+          description: 고칠 사람
+        task:
+          type: string
+          description: 할 일
+        targetScreenId:
+          type: string
+          description: 이동 화면(UI-11·UI-32). 무상 지원은 null
+          nullable: true
+        targetLabel:
+          type: string
+          description: 이동 단추 이름. 무상 지원은 null
+          nullable: true
+        navigationContext:
+          type: string
+          description: 선택 프로젝트 문맥. 이동 단추가 없으면 null
+          nullable: true
+      required:
+      - causeKey
+      - causeName
+      - amount
+      - description
+      - owner
+      - task
+      - targetScreenId
+      - targetLabel
+      - navigationContext
+    CommonProjectCostAnalysisCauses:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProjectCostAnalysisCause'
+        actualProgressRate:
+          type: number
+          description: 턴키 실적 진척률(%). 그 외·진척 없음 null
+          nullable: true
+        expectedCostAtProgress:
+          type: number
+          description: 예산 × 실적 진척률. 그 외 null
+          nullable: true
+        cumulativeCost:
+          type: number
+          description: 누적 원가
+        progressExcessAmount:
+          type: number
+          description: 턴키 진척 대비 초과 금액·그 외 null
+          nullable: true
+        remainderAmount:
+          type: number
+          description: 진척 대비 초과 − 세 원인 합(양수일 때만). 그 외 null
+          nullable: true
+        primaryBarColor:
+          type: string
+          enum:
+          - 빨강
+          - 회색
+        referenceNotice:
+          type: string
+          description: 경보가 없는 프로젝트라 참고용·빨강이면 null
+          nullable: true
+        costOverRate:
+          type: number
+          description: 단가 대비 원가 기준(%, COST_OVER_UPRC_RT)
+      required:
+      - items
+      - actualProgressRate
+      - expectedCostAtProgress
+      - cumulativeCost
+      - progressExcessAmount
+      - remainderAmount
+      - primaryBarColor
+      - referenceNotice
+      - costOverRate
     CommonBillingRow:
       type: object
       required:
@@ -15692,6 +16711,84 @@ x-uncovered-requirements:
 - canonical_id: REQ-773
   status: screen-only
   evidence: UI-03 YearBar의 안내 문구와 배지/잠정 띠 부재는 로컬 표시 계약이다.
+- canonical_id: REQ-774
+  status: screen-only
+  evidence: 'UI-04 로컬 계약: UI-04 본문 연결 — /screens/UI-04에서 M015/G006을 유지한 분석 본문이 보인다.'
+- canonical_id: REQ-776
+  status: data-constraint
+  evidence: 'UI-04 로컬 계약: 공통코드 원천 — 조건 표시명은 기존 공통코드 조회와 같고 임의 제품 코드 seed를 추가하지 않는다.'
+- canonical_id: REQ-777
+  status: out-of-scope
+  evidence: 'UI-04 로컬 계약: 로그인·메뉴 검사 후속 — UI-04 진입·조회에서 신규 로그인 이동·메뉴 검사 호출이 없다.'
+- canonical_id: REQ-778
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: 자동 Flyway 설정 보존 — 일반 기동에서 자동 Flyway가 실행되지 않는다.'
+- canonical_id: REQ-779
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: 개발 인증 설정 보존 — 인증 헤더 없는 개발 admin 조회가 기존 방식대로 허용된다.'
+- canonical_id: REQ-780
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: 시험용 인증 정의 금지 — 유효 OpenAPI에 세 인증 선언이 없고 신규 연산은 security=[]다.'
+- canonical_id: REQ-781
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: 수동 API와 모든 기존 메서드 보존 — 유효 계약과 manual의 경로·메서드·응답을 구조 비교하고 기존 GET도 남는다.'
+- canonical_id: REQ-782
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: 철수 결과 nullable 보존 — 원래 해당 schema의 modifiedAt nullable 값이 true로 유지된다.'
+- canonical_id: REQ-783
+  status: screen-only
+  evidence: UI-04 화면 등록/메뉴 회귀는 DevelopedScreenRegistry·screenRegistry와 두 시험을 동기화하며 HTTP 업무 명령이 아니다.
+- canonical_id: REQ-784
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: 공통 화면 부품 재사용 — 컴포넌트 연결과 AMT_UNIT 복원에서 공통 부품이 사용되며 제목이 중복되지 않는다.'
+- canonical_id: REQ-785
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: 시안 배치와 375 카드 — 375 및 PC 렌더링을 실제 시안과 대조한다. 17.7억 원은 시안 예시이며 seed가 아니다.'
+- canonical_id: REQ-786
+  status: screen-only
+  evidence: 'UI-04 로컬 계약: 엑셀 단일 배치 — UI-04 목록 도구줄에 엑셀 CTA가 하나만 있다.'
+- canonical_id: REQ-787
+  status: screen-only
+  evidence: 'UI-04 로컬 계약: 빈 선택지 안전성 — 옵션 null 응답에서도 조건 줄과 조회 버튼을 사용할 수 있다.'
+- canonical_id: REQ-788
+  status: screen-only
+  evidence: 'UI-04 로컬 계약: 0건 골격 보존 — items=[] 응답 후 조건·도구줄·표 머리가 남는다.'
+- canonical_id: REQ-789
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: 기존 행 변경의 낙관 잠금 — 변경 API가 발생한 경우 stale 요청409·기존값 불변을 검수하며 이번 조회/가상 계산에는 업무 UPDATE가 없다.'
+- canonical_id: REQ-793
+  status: screen-only
+  evidence: 'UI-04 로컬 계약: 필드 오류 안내 — 잘못된 baseMonth 요청400 후 해당 조건 아래 문구와 첫 오류 포커스가 보인다.'
+- canonical_id: REQ-794
+  status: screen-only
+  evidence: 'UI-04 로컬 계약: 공통 이탈 확인 — 시뮬레이션 입력 이탈 취소는 값 유지·확인 후 폐기이며 확인 창은 입력 창 밖에서 찾는다.'
+- canonical_id: REQ-795
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: 기능 파일 분리 — 후속 구현 파일 목록에서 기능별 모듈 분리를 확인한다.'
+- canonical_id: REQ-796
+  status: screen-only
+  evidence: 'UI-04 로컬 계약: 기존 프로젝트 상세 재사용 — 기존 상세 수정 시 같은 projectId의 UI-01 수정 폼을 열며 별도 수정 엔진이 없다.'
+- canonical_id: REQ-797
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: 준비 자원 시험 동기화 — 준비 자원을 추가한 경우 SchemaPreparation 시험 inventory에 같은 파일이 포함된다.'
+- canonical_id: REQ-798
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: 미리보기 포트 보존 — Compose 파싱에서 두 포트가 접두사 없이 검출된다.'
+- canonical_id: REQ-799
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: Maven 수동 설정 보존 — 두 파일과 저장소 순서/COPY를 변경 전후 비교한다.'
+- canonical_id: REQ-800
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: schema 이름 유일성 — 추가 CommonProjectCostAnalysis 계열 schema가 기존 키와 충돌하지 않는다.'
+- canonical_id: REQ-801
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: 기존 시험 경로 보존 — 기존 시험 경로가 모두 남고 회귀 실행 결과를 기록한다.'
+- canonical_id: REQ-802
+  status: non-functional
+  evidence: 'UI-04 로컬 계약: 공통 props 기본 동작 보존 — 새 props 미지정 공통 부품 회귀에서 이전 화면 렌더링이 보존된다.'
+- canonical_id: REQ-803
+  status: out-of-scope
+  evidence: 'UI-04 로컬 계약: 다른 메뉴 활성화 제외 — 메뉴 비교에서 M015 연결 외 다른 leaf 활성화가 없다.'
 
 x-change-supersession:
   description: 기존 operation과 기준선 시험은 원형 보존한다. 이번 공통 기능 인수에는 다음 예외가 우선하며 기존 메뉴 조회 자체를 상태 저장 API로 바꾸지 않는다.

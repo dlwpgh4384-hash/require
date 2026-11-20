@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.projectcostanalyses.mapper.ProjectCostAnalysisMapper">
+  <resultMap id="project" type="com.company.common.projectcostanalyses.mapper.ProjectCostAnalysisRows$Project">
+    <constructor>
+      <arg column="projectId" javaType="java.lang.String"/>
+      <arg column="projectName" javaType="java.lang.String"/>
+      <arg column="contractTypeCode" javaType="java.lang.String"/>
+      <arg column="contractTypeName" javaType="java.lang.String"/>
+      <arg column="statusCode" javaType="java.lang.String"/>
+      <arg column="startDate" javaType="java.time.LocalDate"/>
+      <arg column="endDate" javaType="java.time.LocalDate"/>
+      <arg column="originalAmount" javaType="java.math.BigDecimal"/>
+      <arg column="contractAmount" javaType="java.math.BigDecimal"/>
+      <arg column="budget" javaType="java.math.BigDecimal"/>
+      <arg column="team" javaType="java.math.BigDecimal"/>
+      <arg column="expense" javaType="java.math.BigDecimal"/>
+      <arg column="plannedMm" javaType="java.math.BigDecimal"/>
+      <arg column="modifiedDate" javaType="java.time.LocalDate"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="history" type="com.company.common.projectcostanalyses.mapper.ProjectCostAnalysisRows$History">
+    <constructor>
+      <arg column="projectId" javaType="java.lang.String"/>
+      <arg column="itemCode" javaType="java.lang.String"/>
+      <arg column="itemName" javaType="java.lang.String"/>
+      <arg column="beforeValue" javaType="java.lang.String"/>
+      <arg column="afterValue" javaType="java.lang.String"/>
+      <arg column="changeDate" javaType="java.time.LocalDate"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="snapshot" type="com.company.common.projectcostanalyses.mapper.ProjectCostAnalysisRows$Snapshot">
+    <constructor>
+      <arg column="yearMonth" javaType="java.lang.String"/>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="projectId" javaType="java.lang.String"/>
+      <arg column="assignmentId" javaType="java.lang.String"/>
+      <arg column="mm" javaType="java.math.BigDecimal"/>
+      <arg column="freeMm" javaType="java.math.BigDecimal"/>
+      <arg column="revenue" javaType="java.math.BigDecimal"/>
+      <arg column="labor" javaType="java.math.BigDecimal"/>
+      <arg column="team" javaType="java.math.BigDecimal"/>
+      <arg column="expense" javaType="java.math.BigDecimal"/>
+      <arg column="contractTypeCode" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="input" type="com.company.common.projectcostanalyses.mapper.ProjectCostAnalysisRows$Input">
+    <constructor>
+      <arg column="yearMonth" javaType="java.lang.String"/>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="projectId" javaType="java.lang.String"/>
+      <arg column="assignmentId" javaType="java.lang.String"/>
+      <arg column="jobName" javaType="java.lang.String"/>
+      <arg column="inputTypeCode" javaType="java.lang.String"/>
+      <arg column="mm" javaType="java.math.BigDecimal"/>
+      <arg column="revenue" javaType="java.math.BigDecimal"/>
+      <arg column="unitPrice" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="expense" type="com.company.common.projectcostanalyses.mapper.ProjectCostAnalysisRows$Expense">
+    <constructor>
+      <arg column="projectId" javaType="java.lang.String"/>
+      <arg column="yearMonth" javaType="java.lang.String"/>
+      <arg column="amount" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="salary" type="com.company.common.projectcostanalyses.mapper.ProjectCostAnalysisRows$Salary">
+    <constructor>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="startMonth" javaType="java.lang.String"/>
+      <arg column="endMonth" javaType="java.lang.String"/>
+      <arg column="amount" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="progress" type="com.company.common.projectcostanalyses.mapper.ProjectCostAnalysisRows$Progress">
+    <constructor>
+      <arg column="projectId" javaType="java.lang.String"/>
+      <arg column="actualProgress" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="personDistribution" type="com.company.common.projectcostanalyses.mapper.ProjectCostAnalysisRows$PersonDistribution">
+    <constructor>
+      <arg column="projectId" javaType="java.lang.String"/>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="yearMonth" javaType="java.lang.String"/>
+      <arg column="amount" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <sql id="cutoff">to_char(make_date(#{year},#{baseMonth},1),'YYYYMM')</sql>
+  <select id="selectProjects" resultMap="project">
+    SELECT p.PROJ_ID AS "projectId", p.PROJ_NM AS "projectName",
+      p.CTRT_TYPE_CD AS "contractTypeCode", COALESCE(c.CODE_NM,p.CTRT_TYPE_CD) AS "contractTypeName",
+      p.PROJ_STAT_CD AS "statusCode", p.CTRT_BGN_DT AS "startDate", p.CTRT_END_DT AS "endDate",
+      p.ORGNL_CTRT_AMT AS "originalAmount", p.CTRT_AMT AS "contractAmount", p.BDGT_AMT AS "budget",
+      p.TEAM_EXPS_AMT AS "team", p.PROJ_EXPS_AMT AS "expense", n.mm AS "plannedMm",
+      (p.MOD_DTTM AT TIME ZONE 'Asia/Seoul')::date AS "modifiedDate"
+    FROM TB_PJ_PROJ p
+    LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='CTRT_TYPE' AND c.CODE=p.CTRT_TYPE_CD
+    LEFT JOIN (SELECT m.PROJ_ID, sum(m.PLAN_MM) AS mm FROM TB_PJ_MNPW_PLAN m GROUP BY m.PROJ_ID) n
+      ON n.PROJ_ID=p.PROJ_ID
+    ORDER BY p.PROJ_ID
+  </select>
+  <select id="selectHistory" resultMap="history">
+    SELECT h.PROJ_ID AS "projectId", h.CHG_ITEM_CD AS "itemCode", h.CHG_ITEM_NM AS "itemName",
+      h.BFR_VAL AS "beforeValue", h.AFT_VAL AS "afterValue", h.CHG_DT AS "changeDate"
+    FROM TB_PJ_PROJ_CHG h ORDER BY h.CHG_DT,h.HIST_SN
+  </select>
+  <select id="selectSnapshots" resultMap="snapshot">
+    SELECT c.COST_YM AS "yearMonth", c.DEV_ID AS "developerId", c.PROJ_ID AS "projectId",
+      c.ASGN_ID AS "assignmentId", c.ASGN_MM+c.FREE_MM AS "mm", c.FREE_MM AS "freeMm",
+      c.SALES_AMT AS "revenue", c.LABOR_ALLOC_AMT AS "labor", c.TEAM_EXPS_AMT AS "team",
+      c.PROJ_EXPS_AMT AS "expense", c.CTRT_TYPE_CD AS "contractTypeCode"
+    FROM TB_CO_MON_COST c WHERE c.COST_YM &lt;= <include refid="cutoff"/>
+    ORDER BY c.COST_YM,c.DEV_ID,c.PROJ_ID,c.ASGN_ID
+  </select>
+  <select id="selectInputs" resultMap="input">
+    WITH periods AS (
+      SELECT a.ASGN_ID,a.DEV_ID,a.PROJ_ID,a.JOB_CD,a.INPUT_TYPE_CD,a.CTRT_MM,a.BILL_UPRC,
+        greatest(a.INPUT_BGN_DT,p.CTRT_BGN_DT) AS first_day,
+        least(a.INPUT_END_DT,p.CTRT_END_DT) AS last_day
+      FROM TB_PJ_ASGN a JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID
+      WHERE a.ASGN_STAT_CD != 'CNCL'
+    ), months AS (
+      SELECT a.*, m::date AS month_start,
+        (m+interval '1 month'-interval '1 day')::date AS month_end,to_char(m,'YYYYMM') AS ym
+      FROM periods a CROSS JOIN LATERAL generate_series(date_trunc('month',a.first_day),
+        date_trunc('month',a.last_day),interval '1 month') m
+    ), effective AS (
+      SELECT a.*,COALESCE(h.mm,a.CTRT_MM) AS contract_mm,COALESCE(h.price,a.BILL_UPRC) AS price
+      FROM months a
+      LEFT JOIN LATERAL (
+        SELECT COALESCE((SELECT CASE WHEN trim(x.BFR_VAL) ~ '^[0-9]+([.][0-9]+)?$'
+            THEN trim(x.BFR_VAL)::numeric END FROM TB_PJ_ASGN_HIST x WHERE x.ASGN_ID=a.ASGN_ID
+            AND x.APLY_DT &gt; a.month_end AND x.NEW_CTRT_MM IS NOT NULL
+            ORDER BY x.APLY_DT,x.HIST_SN LIMIT 1),
+          (SELECT x.NEW_CTRT_MM FROM TB_PJ_ASGN_HIST x WHERE x.ASGN_ID=a.ASGN_ID
+            AND x.APLY_DT &lt;= a.month_end AND x.NEW_CTRT_MM IS NOT NULL
+            ORDER BY x.APLY_DT DESC,x.HIST_SN DESC LIMIT 1)) AS mm,
+          COALESCE((SELECT CASE WHEN trim(x.BFR_VAL) ~ '^[0-9]+([.][0-9]+)?$'
+            THEN trim(x.BFR_VAL)::numeric END FROM TB_PJ_ASGN_HIST x WHERE x.ASGN_ID=a.ASGN_ID
+            AND x.APLY_DT &gt; a.month_end AND x.NEW_UPRC IS NOT NULL
+            ORDER BY x.APLY_DT,x.HIST_SN LIMIT 1),
+          (SELECT x.NEW_UPRC FROM TB_PJ_ASGN_HIST x WHERE x.ASGN_ID=a.ASGN_ID
+            AND x.APLY_DT &lt;= a.month_end AND x.NEW_UPRC IS NOT NULL
+            ORDER BY x.APLY_DT DESC,x.HIST_SN DESC LIMIT 1)) AS price
+      ) h ON true
+    ), amounts AS (
+      SELECT a.*, CASE WHEN a.ym &lt;= <include refid="cutoff"/>
+          THEN COALESCE(n.MON_MM,round(a.contract_mm*
+            (least(a.last_day,a.month_end)-greatest(a.first_day,a.month_start)+1)/extract(day from a.month_end),2))
+          ELSE round(a.contract_mm*(least(a.last_day,a.month_end)-greatest(a.first_day,a.month_start)+1)
+            /extract(day from a.month_end),2) END AS mm,
+        n.SALES_AMT AS stored_sales
+      FROM effective a LEFT JOIN TB_PJ_ASGN_MON n ON n.ASGN_ID=a.ASGN_ID AND n.INPUT_YM=a.ym
+    )
+    SELECT a.ym AS "yearMonth",a.DEV_ID AS "developerId",a.PROJ_ID AS "projectId",
+      a.ASGN_ID AS "assignmentId",COALESCE(j.CODE_NM,a.JOB_CD) AS "jobName",
+      a.INPUT_TYPE_CD AS "inputTypeCode",a.mm AS "mm",
+      CASE WHEN a.INPUT_TYPE_CD='FREE' THEN 0 ELSE COALESCE(a.stored_sales,trunc(a.price*a.mm),0) END AS "revenue",
+      a.price AS "unitPrice"
+    FROM amounts a LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=a.JOB_CD
+    ORDER BY a.ym,a.DEV_ID,a.PROJ_ID,a.ASGN_ID
+  </select>
+  <select id="selectExpenses" resultMap="expense">
+    SELECT e.PROJ_ID AS "projectId",e.EXPS_YM AS "yearMonth",sum(e.EXPS_AMT) AS "amount"
+    FROM TB_PJ_DRCT_EXPS e WHERE e.EXPS_YM &lt;= <include refid="cutoff"/>
+    GROUP BY e.PROJ_ID,e.EXPS_YM ORDER BY e.PROJ_ID,e.EXPS_YM
+  </select>
+  <select id="selectSalaries" resultMap="salary">
+    SELECT p.DEV_ID AS "developerId",p.APLY_BGN_YM AS "startMonth",p.APLY_END_YM AS "endMonth",
+      p.MON_PAY_AMT AS "amount" FROM TB_HR_DEV_PRC p ORDER BY p.DEV_ID,p.APLY_BGN_YM
+  </select>
+  <select id="selectDistributions" resultMap="expense">
+    SELECT t.PROJ_ID AS "projectId",t.DSTRB_YM AS "yearMonth",sum(t.DSTRB_AMT) AS "amount"
+    FROM TB_PJ_TK_DSTRB t
+    WHERE t.DSTRB_YM &lt;= <include refid="cutoff"/> AND t.ROW_TYPE_CD='DEV'
+      AND t.DSTRB_STEP_CD=(SELECT z.DSTRB_STEP_CD FROM TB_PJ_TK_DSTRB z
+        JOIN TB_SY_CODE c ON c.CODE_GRP_ID='DSTRB_STEP' AND c.CODE=z.DSTRB_STEP_CD
+        WHERE z.PROJ_ID=t.PROJ_ID
+        ORDER BY CASE c.CODE_NM WHEN '실제 투입계획' THEN 3 WHEN '최종 계약' THEN 2 WHEN '견적' THEN 1 ELSE 0 END DESC,
+          z.DSTRB_STEP_CD LIMIT 1)
+    GROUP BY t.PROJ_ID,t.DSTRB_YM ORDER BY t.PROJ_ID,t.DSTRB_YM
+  </select>
+  <!-- 식-20 ③: 배분표 가장 나중 단계의 사람·달 금액(남은 달을 보려고 기준월로 자르지 않는다) -->
+  <select id="selectPersonDistributions" resultMap="personDistribution">
+    SELECT t.PROJ_ID AS "projectId",t.DEV_ID AS "developerId",t.DSTRB_YM AS "yearMonth",sum(t.DSTRB_AMT) AS "amount"
+    FROM TB_PJ_TK_DSTRB t
+    WHERE t.ROW_TYPE_CD='DEV' AND t.DEV_ID IS NOT NULL
+      AND t.DSTRB_STEP_CD=(SELECT z.DSTRB_STEP_CD FROM TB_PJ_TK_DSTRB z
+        JOIN TB_SY_CODE c ON c.CODE_GRP_ID='DSTRB_STEP' AND c.CODE=z.DSTRB_STEP_CD
+        WHERE z.PROJ_ID=t.PROJ_ID
+        ORDER BY CASE c.CODE_NM WHEN '실제 투입계획' THEN 3 WHEN '최종 계약' THEN 2 WHEN '견적' THEN 1 ELSE 0 END DESC,
+          z.DSTRB_STEP_CD LIMIT 1)
+    GROUP BY t.PROJ_ID,t.DEV_ID,t.DSTRB_YM ORDER BY t.PROJ_ID,t.DEV_ID,t.DSTRB_YM
+  </select>
+  <select id="selectProgress" resultMap="progress">
+    SELECT DISTINCT ON (w.PROJ_ID) w.PROJ_ID AS "projectId",w.ACTL_PRGRS_RT AS "actualProgress"
+    FROM TB_PJ_WEEK_MEMO w WHERE w.WRT_DT &lt; make_date(#{year},#{baseMonth},1)+interval '1 month'
+      AND w.ACTL_PRGRS_RT IS NOT NULL ORDER BY w.PROJ_ID,w.WRT_DT DESC,w.MEMO_SN DESC
+  </select>
+  <select id="selectPeople" resultMap="com.company.common.personalcostprofits.mapper.PersonalCostProfitMapper.person">
+    SELECT h.DEV_ID AS "developerId",h.DEV_NM AS "developerName",h.BLNG_CLNT_ID AS "affiliationId",
+      '' AS "affiliationName",h.JBPS_CD AS "positionCode",'' AS "positionName",h.EMP_TYPE_CD AS "employeeTypeCode",
+      '' AS "employeeTypeName",h.JNCMP_DT AS "joinDate",h.RETIRE_DT AS "retireDate",
+      h.JOB_CD AS "jobCode",'' AS "jobName",h.GRADE_CD AS "gradeCode",'' AS "gradeName",
+      h.PART_ID AS "salesPartId",h.DRCT_CLS_CD AS "directClassCode",h.MNG_NO AS "managementNumber",
+      '' AS "salesPartName" FROM TB_HR_DEV h ORDER BY h.DEV_ID
+  </select>
+  <select id="selectPayroll" resultMap="com.company.common.personalcostprofits.mapper.PersonalCostProfitMapper.pay">
+    SELECT p.PAY_YM AS "yearMonth",p.DEV_ID AS "developerId",p.EMP_TYPE_CD AS "employeeTypeCode",
+      p.PAY_AMT AS "salary",p.ALWNC_AMT AS "allowance",p.INSR_CMPNY_AMT AS "companyInsurance",
+      p.RETIRE_RSV_AMT AS "retirementReserve",p.INSR_SELF_AMT AS "personalInsurance",
+      p.WTHLD_TAX_AMT AS "withholdingTax",p.INCM_TAX_AMT AS "incomeTax",p.REAL_PAY_AMT AS "netPay",
+      p.VNDR_SPLY_AMT AS "vendorSupply" FROM TB_HR_MON_PAY p WHERE p.PAY_YM &lt;= <include refid="cutoff"/>
+    ORDER BY p.PAY_YM,p.DEV_ID
+  </select>
+  <select id="selectLeaves" resultMap="com.company.common.personalcostprofits.mapper.PersonalCostProfitMapper.leave">
+    SELECT s.DEV_ID AS "developerId",s.BGN_DT AS "startDate",s.END_DT AS "endDate"
+    FROM TB_HR_DEV_STAT s WHERE s.WORK_STAT_CD='LEAVE'
+      AND s.BGN_DT &lt; make_date(#{year},#{baseMonth},1)+interval '1 month'
+  </select>
+  <select id="selectCodes" resultMap="com.company.common.personalcostprofits.mapper.PersonalCostProfitMapper.code">
+    SELECT c.CODE_GRP_ID AS "groupCode",c.CODE AS "code",c.CODE_NM AS "name",c.CODE_VAL AS "value"
+    FROM TB_SY_CODE c WHERE c.USE_YN='Y' AND c.DEL_YN='N'
+  </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES(#{userId},'DNLD','UI-04',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
+</mapper>

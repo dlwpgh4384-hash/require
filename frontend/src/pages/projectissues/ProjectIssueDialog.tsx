@@ -4,6 +4,7 @@ import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { addDays, formatMonthDay, koreanToday } from "../../shared/time";
 import type { CodeItem } from "../codegroups/codeGroups";
 import type { Project } from "../projects/projects";
+import { ProjectField } from "../projects/ProjectField";
 import * as api from "./projectIssues";
 // 로그인(UI-22) 전: 헤더와 같은 현재 사용자 이름을 담당자 자리에 보인다(새 이슈 담당자 = 등록한 사람).
 import { CURRENT_USER } from "../userpreferences/UserPreferenceTools";
@@ -60,6 +61,7 @@ export function ProjectIssueDialog({
   }));
   const [values, setValues] = useState(initial);
   const [error, setError] = useState("");
+  const [errorField, setErrorField] = useState("");
   const [busy, setBusy] = useState(false);
   const [discard, setDiscard] = useState(false);
   const pending = useRef(false);
@@ -84,19 +86,27 @@ export function ProjectIssueDialog({
     issue?.projectName ??
     projects.find((p) => p.projectId === values.projectId)?.projectName ??
     values.projectId;
+  // 틀린 칸은 빨간 테두리(aria-invalid)로도 보인다. 문구는 시안처럼 아래 한 줄.
+  const invalid = (field: keyof api.ProjectIssueInput) =>
+    errorField === field ? { "aria-invalid": true as const } : {};
+  const fail = (field: keyof api.ProjectIssueInput, message: string) => {
+    setErrorField(field);
+    setError(message);
+  };
   const save = async () => {
     if (pending.current) return;
     // 시안 issueModal 검사 문구
-    if (!values.projectId) return setError("프로젝트를 골라 주세요.");
-    if (!values.title.trim()) return setError("제목을 넣어 주세요.");
-    if (!values.dueDate) return setError("기한을 넣어 주세요.");
+    if (!values.projectId) return fail("projectId", "프로젝트를 골라 주세요.");
+    if (!values.title.trim()) return fail("title", "제목을 넣어 주세요.");
+    if (!values.dueDate) return fail("dueDate", "기한을 넣어 주세요.");
     if ([...values.title].length > 100)
-      return setError("제목은 100자까지 입력해 주세요.");
+      return fail("title", "제목은 100자까지 입력해 주세요.");
     if ([...(values.actionText ?? "")].length > 500)
-      return setError("조치 내용은 500자까지 입력해 주세요.");
+      return fail("actionText", "조치 내용은 500자까지 입력해 주세요.");
     pending.current = true;
     setBusy(true);
     setError("");
+    setErrorField("");
     const body = {
       ...values,
       title: values.title.trim(),
@@ -127,16 +137,16 @@ export function ProjectIssueDialog({
         testId="project-issue-dialog"
       >
         <form
-          className="project-issue-form"
+          className="project-modal project-issue-form"
           data-testid="project-issue-form"
           onSubmit={(event) => {
             event.preventDefault();
             void save();
           }}
         >
+          {/* 시안 issueModal(fcF): 필수 칸은 이름 뒤 빨간 *, 조치 내용만 선택 */}
           <fieldset disabled={busy}>
-            <label>
-              프로젝트
+            <ProjectField id="project-issue-project" label="프로젝트" required>
               {fixedProject ? (
                 <span
                   className="project-issue-fixed"
@@ -146,10 +156,12 @@ export function ProjectIssueDialog({
                 </span>
               ) : (
                 <select
+                  id="project-issue-project"
                   className="ls-in"
                   data-testid="project-issue-project"
                   value={values.projectId}
                   onChange={(e) => update("projectId", e.target.value)}
+                  {...invalid("projectId")}
                 >
                   <option value="">선택</option>
                   {projects.filter(projectIssueCanCreate).map((p) => (
@@ -159,20 +171,26 @@ export function ProjectIssueDialog({
                   ))}
                 </select>
               )}
-            </label>
-            <label>
-              제목
+            </ProjectField>
+            <ProjectField id="project-issue-title" label="제목" required>
               <input
+                id="project-issue-title"
                 className="ls-in"
                 data-testid="project-issue-title"
                 value={values.title}
                 maxLength={100}
                 onChange={(e) => update("title", e.target.value)}
+                {...invalid("title")}
               />
-            </label>
-            <label>
-              중요도
+            </ProjectField>
+            <ProjectField
+              id="project-issue-importance"
+              label="중요도"
+              required
+              help="높음: 일정·원가에 바로 영향 · 중간: 2주 안에 풀어야 함 · 낮음: 그 밖"
+            >
               <select
+                id="project-issue-importance"
                 className="ls-in"
                 data-testid="project-issue-importance"
                 value={values.importanceCode}
@@ -184,11 +202,7 @@ export function ProjectIssueDialog({
                   </option>
                 ))}
               </select>
-              <span className="project-cap">
-                높음: 일정·원가에 바로 영향 · 중간: 2주 안에 풀어야 함 · 낮음: 그
-                밖
-              </span>
-            </label>
+            </ProjectField>
             <div className="project-issue-owner" data-testid="project-issue-owner">
               <span className="project-issue-owner-label">담당자</span>
               <span>
@@ -203,19 +217,20 @@ export function ProjectIssueDialog({
                 (로그인 계정)
               </span>
             </div>
-            <label>
-              기한
+            <ProjectField id="project-issue-due-date" label="기한" required>
               <input
+                id="project-issue-due-date"
                 className="ls-in project-issue-date"
                 type="date"
                 data-testid="project-issue-due-date"
                 value={values.dueDate}
                 onChange={(e) => update("dueDate", e.target.value)}
+                {...invalid("dueDate")}
               />
-            </label>
-            <label>
-              상태
+            </ProjectField>
+            <ProjectField id="project-issue-status" label="상태" required>
               <select
+                id="project-issue-status"
                 className="ls-in"
                 data-testid="project-issue-status"
                 value={values.statusCode}
@@ -227,18 +242,19 @@ export function ProjectIssueDialog({
                   </option>
                 ))}
               </select>
-            </label>
-            <label>
-              조치 내용
+            </ProjectField>
+            <ProjectField id="project-issue-action" label="조치 내용">
               <textarea
+                id="project-issue-action"
                 className="ls-in"
                 data-testid="project-issue-action"
                 maxLength={500}
                 rows={3}
                 value={values.actionText ?? ""}
                 onChange={(e) => update("actionText", e.target.value)}
+                {...invalid("actionText")}
               />
-            </label>
+            </ProjectField>
           </fieldset>
           {issue && (
             <p className="project-cap" data-testid="project-issue-audit">

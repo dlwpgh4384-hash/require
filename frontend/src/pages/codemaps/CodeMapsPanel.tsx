@@ -257,20 +257,23 @@ export function CodeMapsPanel({
       data-testid="code-maps-panel"
       data-screen-id="UI-27"
     >
-      <Banner kind="info">
-        <svg
-          className="ls-banner-icon"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          aria-hidden="true"
-        >
-          <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" />
-        </svg>
+      <Banner
+        kind="info"
+        icon={
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" />
+          </svg>
+        }
+      >
         엑셀 업로드 때 이 표로 표기를 코드로 바꿔 읽고, 바꾼 사실을 경고로
         알립니다(예: 「정직원」을 「정규직」으로 바꿈). 표에 없는 모르는 표기는
         오류로 알려 주고 관리자가 여기에 추가합니다.

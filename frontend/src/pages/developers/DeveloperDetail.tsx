@@ -238,9 +238,10 @@ export function DeveloperDetail({
               <>
                 {d.useYn === "N" && (
                   // 시안: 사용 중지된 개발자 안내 띠
-                  <Banner kind="lock">
+                  <Banner
+                    kind="lock"
+                    icon={
                     <svg
-                      className="developer-banner-icon"
                       width="16"
                       height="16"
                       viewBox="0 0 24 24"
@@ -254,6 +255,8 @@ export function DeveloperDetail({
                       <rect x="5" y="11" width="14" height="10" rx="2" />
                       <path d="M8 11V7a4 4 0 0 1 8 0v4" />
                     </svg>
+                    }
+                  >
                     사용 중지된 개발자입니다. 배정 후보에서 빠지고 기록은 그대로
                     남습니다.
                   </Banner>

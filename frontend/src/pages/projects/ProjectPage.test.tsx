@@ -16,7 +16,7 @@ import {
   ProjectTitleActions,
 } from "./ProjectWorkspace";
 import type { Project } from "./projects";
-import { requestProjectEdit } from "./projectEdit";
+import { requestProjectDistribution, requestProjectEdit } from "./projectEdit";
 
 const viewport = vi.hoisted(() => ({ mobile: false, width: 1280 }));
 vi.mock("../../shared/layout/useViewport", () => ({
@@ -1033,4 +1033,10 @@ it("opens the edit form for a request left before the project screen opened", as
   shell();
   const form = within(await screen.findByTestId("project-form"));
   expect(form.getByTestId("project-projectName")).toHaveValue("파트 없는 운영");
+});
+it("다른 화면 상세의 턴키 [배분표] 요청을 받으면 배분표 화면을 연다(시안 distopen)", async () => {
+  shell();
+  await screen.findByTestId("list-row-P-0001");
+  act(() => requestProjectDistribution("P-0001"));
+  expect(await screen.findByTestId("project-distribution")).toBeInTheDocument();
 });

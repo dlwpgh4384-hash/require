@@ -165,7 +165,7 @@ it("memo list shows Korean 「작성 · 고침」 dates and the request in warni
   expect(within(memo).getByText("기존 요청")).toHaveClass("project-warn-text");
 });
 
-it("new memo: mockup labels, plan guide and toast text; progress is optional", async () => {
+it("new memo: mockup labels, plan guide and toast text; progress is required", async () => {
   render(<ProjectProgressPanel {...props} />);
   const add = await screen.findByTestId("project-memo-add");
   await waitFor(() => expect(add).toBeEnabled());
@@ -189,12 +189,19 @@ it("new memo: mockup labels, plan guide and toast text; progress is optional", a
     target: { value: "" },
   });
   fireEvent.click(dialog.getByTestId("project-progress-save"));
+  // 턴키·내부는 실적 진척률 필수(시안 「실적 진척률 *」, 2026-11-20 사용자 결정)
+  expect(await dialog.findByRole("alert")).toHaveTextContent("실적 진척률을 입력해 주세요.");
+  expect(writes()).toHaveLength(0);
+  fireEvent.change(dialog.getByTestId("project-memo-progress"), {
+    target: { value: "60" },
+  });
+  fireEvent.click(dialog.getByTestId("project-progress-save"));
   await waitFor(() => expect(changed).toHaveBeenCalledWith("주간 상태를 저장했습니다."));
   expect(JSON.parse(String(writes()[0][1].body))).toEqual({
     workDone: null,
     nextWork: null,
     requests: null,
-    actualProgress: null,
+    actualProgress: 60,
   });
 });
 
@@ -310,4 +317,32 @@ it("dirty close asks before discarding, without a write", async () => {
   fireEvent.click(screen.getByTestId("project-progress-cancel"));
   expect(await screen.findByText("입력한 내용을 버릴까요?")).toBeVisible();
   expect(writes()).toHaveLength(0);
+});
+it("메모·단계 계획 창은 시안 창 틀(.project-modal)이고 칸 이름이 입력과 이어지며, 진척률 오류 칸은 빨간 테두리", async () => {
+  render(<ProjectProgressPanel {...props} />);
+  const add = await screen.findByTestId("project-memo-add");
+  await waitFor(() => expect(add).toBeEnabled());
+  fireEvent.click(add);
+  const memo = await screen.findByTestId("project-memo-dialog");
+  expect(memo.querySelector(".project-modal")).not.toBeNull();
+  // 저장·취소 줄도 창 틀 안(시안 .mf)
+  expect(memo.querySelector(".project-modal > .app-actions")).not.toBeNull();
+  // 필수 표시(*)가 붙어 이름표 글이 「실적 진척률 *」가 됨
+  const progress = within(memo).getByLabelText(/^실적 진척률/);
+  expect(progress).toBe(within(memo).getByTestId("project-memo-progress"));
+  // 실적 진척률은 필수라 * 표시(2026-11-20 사용자 결정)
+  expect(memo.querySelector(".project-fc .project-bad")).not.toBeNull();
+  expect(within(memo).getByLabelText("이번 주 한 일")).toBe(
+    within(memo).getByTestId("project-memo-work-done"),
+  );
+  fireEvent.change(progress, { target: { value: "101" } });
+  fireEvent.click(within(memo).getByTestId("project-progress-save"));
+  await within(memo).findByRole("alert");
+  expect(progress).toHaveAttribute("aria-invalid", "true");
+  expect(writes()).toHaveLength(0);
+  cleanup();
+  render(<ProjectProgressPanel {...props} />);
+  fireEvent.click(await screen.findByTestId("project-stage-edit"));
+  const dates = await screen.findByTestId("project-dates-dialog");
+  expect(dates.querySelector(".project-modal > .app-actions")).not.toBeNull();
 });

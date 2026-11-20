@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -10,6 +11,7 @@ import "@testing-library/jest-dom/vitest";
 import { DeveloperPage } from "./DeveloperPage";
 import { DeveloperForm } from "./DeveloperForm";
 import { DeveloperDetail } from "./DeveloperDetail";
+import { requestDeveloperAction } from "./developerRequest";
 import {
   developerPayload,
   type Developer,
@@ -856,5 +858,21 @@ it("시안 UI-02: 이름은 떠날 때, 고르는 칸은 바꿀 때 바로 검�
   expect(await screen.findByText("직원구분을 입력해 주세요.")).toBeVisible();
   fireEvent.click(screen.getByTestId("developer-save"));
   await waitFor(() => expect(screen.getByTestId("developer-name")).toHaveFocus());
+  expect(writes()).toHaveLength(0);
+});
+// 시안 openPerson: 다른 화면(UI-03)에서 연 상세의 [수정]·[사용 중지]는 이 화면의 폼·확인 창으로 받는다.
+it("다른 화면이 남긴 [수정] 요청을 받으면 이 화면의 수정 폼을 연다", async () => {
+  requestDeveloperAction({ developer: row, action: "edit" });
+  render(<DeveloperPage />);
+  expect(await screen.findByTestId("developer-form")).toBeVisible();
+  expect(writes()).toHaveLength(0);
+});
+it("다른 화면의 [사용 중지] 요청은 이 화면의 확인 창으로 이어진다(바로 바꾸지 않음)", async () => {
+  current = false;
+  render(<DeveloperPage />);
+  await screen.findByText("김개발");
+  act(() => requestDeveloperAction({ developer: { ...row, useYn: "Y" }, action: "stop" }));
+  const box = await screen.findByTestId("developer-use-confirm-dialog");
+  expect(box).toHaveTextContent("1명의 사용을 중지할까요?");
   expect(writes()).toHaveLength(0);
 });

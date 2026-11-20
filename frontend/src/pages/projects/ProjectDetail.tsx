@@ -8,6 +8,8 @@ import { getCommonCodes } from "../codegroups/codeGroups";
 import { getCommonParts } from "../parts/parts";
 import { PartLabel } from "./ProjectPage";
 import * as api from "./projects";
+import { ProjectField } from "./ProjectField";
+import { useOpenProjectDistribution } from "./projectEdit";
 import { ProjectProgressPanel } from "./ProjectProgressPanel";
 import "./projects.css";
 
@@ -82,6 +84,14 @@ export function ProjectDetail({
   ) => ReactNode;
   boardOperations?: boolean;
 }) {
+  // 시안 distopen: 배분표를 넘겨받지 않은 화면(개발자 풀·현황판 등)에서는 상세를 닫고 프로젝트 화면 배분표로 간다.
+  const openDistribution = useOpenProjectDistribution();
+  const distribution =
+    onDistribution ??
+    ((id: string) => {
+      onClose();
+      openDistribution(id);
+    });
   const [p, setP] = useState<api.Project | null>(null);
   const [tab, setTab] = useState(initialTab);
   const [expenses, setExpenses] = useState<api.ProjectExpense[]>([]);
@@ -385,14 +395,9 @@ export function ProjectDetail({
     control: ReactNode,
     help?: string,
   ) => (
-    <div className="project-fc">
-      <label htmlFor={id}>
-        {label}
-        {required && <span className="project-bad"> *</span>}
-      </label>
+    <ProjectField id={id} label={label} required={required} help={help}>
       {control}
-      {help && <span className="project-help">{help}</span>}
-    </div>
+    </ProjectField>
   );
   const moneyInput = (id: string, key: string, width: number) => (
     <span className="project-row">
@@ -565,8 +570,8 @@ export function ProjectDetail({
         </Banner>
       )}
       {lost && (
-        <Banner kind="lock">
-          {lockIcon} 실주 {p.loseDate ?? ""} · 사유: {p.loseReasonName ?? ""}
+        <Banner kind="lock" icon={lockIcon}>
+          실주 {p.loseDate ?? ""} · 사유: {p.loseReasonName ?? ""}
           {p.loseMemo ? ` — ${p.loseMemo}` : ""}
         </Banner>
       )}
@@ -642,8 +647,8 @@ export function ProjectDetail({
         ]}
       />
       {p.statusCode === "PRE" && p.preContractPeopleCount > 0 && (
-        <Banner kind="warn">
-          {warnIcon} 계약 전에 {p.preContractPeopleCount}명이 먼저
+        <Banner kind="warn" icon={warnIcon}>
+          계약 전에 {p.preContractPeopleCount}명이 먼저
           투입되었습니다(미계약 선투입).
         </Banner>
       )}
@@ -738,10 +743,12 @@ export function ProjectDetail({
                   ? "warn"
                   : "info"
             }
+            icon={
+              p.trafficLight === "위험" || p.trafficLight === "주의"
+                ? warnIcon
+                : infoIcon
+            }
           >
-            {p.trafficLight === "위험" || p.trafficLight === "주의"
-              ? warnIcon
-              : infoIcon}{" "}
             <strong>{p.trafficLight ?? "정상"}</strong> —{" "}
             {reasons.length ? reasons.join(" · ") : "계획대로 진행 중입니다."}
           </Banner>
@@ -974,12 +981,9 @@ export function ProjectDetail({
         MM은 이 프로젝트 투입 배정의 월 MM을 모두 더한 값(예정 포함)이라
         자동으로 채워집니다.
       </p>
-      <Banner kind="info">
-        {infoIcon}
-        <span>
-          계획보다 모자라는 MM(미충원)은 인력 수요 예측의 필요 인력에 잡힙니다.
-          더 투입하지 않으면 계획 MM을 실제에 맞게 줄여 주세요.
-        </span>
+      <Banner kind="info" icon={infoIcon}>
+        계획보다 모자라는 MM(미충원)은 인력 수요 예측의 필요 인력에 잡힙니다.
+        더 투입하지 않으면 계획 MM을 실제에 맞게 줄여 주세요.
       </Banner>
       <div className="ls-twrap">
         <table className="ls-t" data-testid="project-plan">
@@ -1288,12 +1292,12 @@ export function ProjectDetail({
           수정
         </button>
       )}
-      {p.contractTypeCode === "TK" && onDistribution && (
+      {p.contractTypeCode === "TK" && (
         <button
           type="button"
           className="ls-btn ls-btn-sm"
           data-testid="project-distribution-open"
-          onClick={() => onDistribution(p.projectId)}
+          onClick={() => distribution(p.projectId)}
         >
           배분표
         </button>
@@ -1545,8 +1549,7 @@ export function ProjectDetail({
             {impact &&
               (impact.activePeopleCount > 0 ||
                 impact.futurePeopleCount > 0) && (
-                <Banner kind="warn">
-                  {warnIcon}{" "}
+                <Banner kind="warn" icon={warnIcon}>
                   {[
                     impact.activePeopleCount
                       ? `투입 중인 사람 ${impact.activePeopleCount}명은 오늘 날짜로 철수`

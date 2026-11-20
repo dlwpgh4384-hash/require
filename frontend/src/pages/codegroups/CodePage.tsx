@@ -542,8 +542,7 @@ export function CodePage({
           </nav>
           <div className="code-detail">
             {system && (
-              <Banner kind="lock">
-                <span className="code-banner-icon">{lockIcon}</span>
+              <Banner kind="lock" icon={lockIcon}>
                 계산 규칙에 쓰는 시스템 코드입니다. 이름만 바꿀 수 있고
                 추가·삭제·사용 끄기는 할 수 없습니다.
               </Banner>

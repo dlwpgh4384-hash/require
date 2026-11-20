@@ -124,15 +124,18 @@ export function KeyValues({ items }: { items: [string, ReactNode][] }) {
   );
 }
 
-/** 상세 패널 안내 띠. kind는 warn(잠김)·lock(중지)·info. */
+/** 상세 패널 안내 띠. kind는 warn(잠김)·lock(중지)·info.
+ * icon을 주면 시안 .banner처럼 아이콘을 글(span) 앞에 따로 둔다(간격 10px, 두 줄이어도 글만 줄바꿈). */
 export function Banner({
   kind,
   children,
   action,
+  icon,
 }: {
   kind: "warn" | "lock" | "info" | "bad";
   children: ReactNode;
   action?: ReactNode;
+  icon?: ReactNode;
 }) {
   return (
     <div
@@ -140,6 +143,7 @@ export function Banner({
       role="status"
       data-testid={`banner-${kind}`}
     >
+      {icon}
       <span>{children}</span>
       {action}
     </div>

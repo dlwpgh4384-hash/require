@@ -45,7 +45,8 @@
 .app-dialog [aria-invalid="true"] {
   border-color: #dc2626;
 }
-.app-dialog small {
+/* 창 안 작은 글은 회색. 칸 오류(.field-error)는 빼서 다른 화면처럼 빨강을 지킨다(밝은·어두운 화면 모두). */
+.app-dialog small:not(.field-error) {
   color: var(--text-sub);
 }
 .field-required {

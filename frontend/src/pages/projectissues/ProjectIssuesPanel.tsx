@@ -304,6 +304,9 @@ export function ProjectIssuesPanel({
     }
     return result;
   }, [data, sort]);
+  // 중요도·상태 이름(공통코드)을 받기 전에는 코드(HIGH·ACT)가 잠깐 보이므로 「불러오는 중」으로 둔다.
+  // 선택지를 못 받았으면(오류 안내가 뜸) 기다리지 않고 표를 보인다.
+  const ready = !!data && (!!options || !!optionError);
 
   if (project) {
     // 프로젝트 상세 [이슈] 탭(시안): 종료·실주 프로젝트는 안내 글·[이슈 등록] 없이 표만.
@@ -337,12 +340,12 @@ export function ProjectIssuesPanel({
             </button>
           </p>
         )}
-        {!data && !error && (
+        {!ready && !error && (
           <p className="project-sub" data-testid="project-issue-loading">
             불러오는 중입니다.
           </p>
         )}
-        {data &&
+        {ready &&
           (rows.length ? (
             <div className="ls-twrap">
               <table className="ls-t" data-testid="project-issue-table">
@@ -526,7 +529,7 @@ export function ProjectIssuesPanel({
         rows={
           error
             ? []
-            : data
+            : ready
               ? rows.slice(
                   (current - 1) * presentation.pageSize,
                   current * presentation.pageSize,
@@ -554,7 +557,7 @@ export function ProjectIssuesPanel({
         error={error || undefined}
         onRetry={() => setReload((v) => v + 1)}
         onResetFilters={reset}
-        mobileRows={error ? [] : data ? rows : null}
+        mobileRows={error ? [] : ready ? rows : null}
         renderCard={(row) => (
           <>
             <div className="ls-r1">

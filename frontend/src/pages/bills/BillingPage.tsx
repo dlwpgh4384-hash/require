@@ -469,8 +469,7 @@ export function BillingPage() {
       {tab === "list" && (
         <section role="tabpanel" aria-label="청구 목록" className="bill-panel" data-testid="bill-list-panel">
           {year < currentYear && (
-            <Banner kind="lock">
-              {lockIcon}
+            <Banner kind="lock" icon={lockIcon}>
               <span data-testid="bill-lock-banner">
                 <strong>{year}년</strong>은 지난 해라 읽기만 할 수 있습니다.
               </span>

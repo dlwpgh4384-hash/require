@@ -1,5 +1,5 @@
-import type { MenuRegistrationItem } from "../commonops/menuRegistration";
-import { MenuRegistrationRequestError } from "../commonops/menuRegistration";
+import type { MenuRegistrationItem } from "../commonops/menuRegistrationApi";
+import { MenuRegistrationRequestError } from "../commonops/menuRegistrationApi";
 
 export type MenuSettingItem = MenuRegistrationItem;
 export interface MenuUpdateItem {

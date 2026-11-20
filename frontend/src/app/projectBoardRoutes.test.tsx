@@ -340,6 +340,10 @@ it("memo save from routed progress refreshes the owning board and displays onCha
   fireEvent.change(await screen.findByTestId("project-memo-work-done"), {
     target: { value: "이번 주 진행 기록" },
   });
+  // 턴키·내부는 실적 진척률 필수(2026-11-20 사용자 결정)
+  fireEvent.change(screen.getByTestId("project-memo-progress"), {
+    target: { value: "30" },
+  });
   fireEvent.click(screen.getByTestId("project-progress-save"));
   expect(await screen.findByTestId("project-board-toast")).toHaveTextContent(
     "저장했습니다.",
@@ -354,7 +358,7 @@ it("memo save from routed progress refreshes the owning board and displays onCha
         workDone: "이번 주 진행 기록",
         nextWork: null,
         requests: null,
-        actualProgress: null,
+        actualProgress: 30,
       }),
     },
   );

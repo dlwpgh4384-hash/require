@@ -73,7 +73,7 @@ class ProjectProgressPersistenceTest {
             for(var future:pool.invokeAll(calls))future.get();
             assertThat(db.queryForObject("SELECT COUNT(*) FROM TB_PJ_STEP WHERE PROJ_ID='P-PROGRESS'",Integer.class)).isEqualTo(7);
             assertThat(db.queryForObject("SELECT COUNT(*) FROM TB_PJ_STEP WHERE CMPL_DT IS NOT NULL",Integer.class)).isZero();
-            calls.clear();for(int i=0;i<4;i++)calls.add(()->memos.postCommonProjectBoardWeeklyMemo("P-PROGRESS",json.readTree("{\"requests\":\"병행 등록\"}")));
+            calls.clear();for(int i=0;i<4;i++)calls.add(()->memos.postCommonProjectBoardWeeklyMemo("P-PROGRESS",json.readTree("{\"actualProgress\":10,\"requests\":\"병행 등록\"}")));
             for(var future:pool.invokeAll(calls))future.get();
             assertThat(db.queryForObject("SELECT COUNT(DISTINCT MEMO_SN) FROM TB_PJ_WEEK_MEMO WHERE PROJ_ID='P-PROGRESS'",Integer.class)).isEqualTo(4);
             assertThat(db.queryForList("SELECT DISTINCT REG_USER_ID FROM TB_PJ_WEEK_MEMO",String.class)).containsExactly("admin");
@@ -82,14 +82,14 @@ class ProjectProgressPersistenceTest {
     @Test void memoEditPreservesWrittenDateAndCreationAndOnlyTouchesSelectedRow()throws Exception {
         db.update("INSERT INTO TB_PJ_WEEK_MEMO (PROJ_ID,MEMO_SN,WRT_DT,REQ_CN,REG_USER_ID,REG_DTTM) VALUES ('P-PROGRESS',1,'2026-10-01','원문','other','2026-10-01T00:00:00Z'),('P-PROGRESS',2,'2026-10-02','다른 행','other','2026-10-02T00:00:00Z')");
         var before=project();var other=db.queryForMap("SELECT * FROM TB_PJ_WEEK_MEMO WHERE MEMO_SN=2");
-        mvc.perform(put(root()+"/weekly-memos/1").contentType("application/json").content("{\"requests\":\"새 요청\",\"modifiedAt\":\"2026-10-01T00:00:00Z\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.data.updatedBy").value("admin"))
+        mvc.perform(put(root()+"/weekly-memos/1").contentType("application/json").content("{\"actualProgress\":10,\"requests\":\"새 요청\",\"modifiedAt\":\"2026-10-01T00:00:00Z\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.data.updatedBy").value("admin"))
             .andExpect(jsonPath("$.data.writtenDate").value("2026-10-01"));
-        mvc.perform(put(root()+"/weekly-memos/1").contentType("application/json").content("{\"requests\":\"늦은 수정\",\"modifiedAt\":\"2026-10-01T00:00:00Z\"}")).andExpect(status().isConflict());
+        mvc.perform(put(root()+"/weekly-memos/1").contentType("application/json").content("{\"actualProgress\":10,\"requests\":\"늦은 수정\",\"modifiedAt\":\"2026-10-01T00:00:00Z\"}")).andExpect(status().isConflict());
         assertThat(db.queryForObject("SELECT REQ_CN FROM TB_PJ_WEEK_MEMO WHERE MEMO_SN=1",String.class)).isEqualTo("새 요청");
         assertThat(db.queryForObject("SELECT WRT_DT FROM TB_PJ_WEEK_MEMO WHERE MEMO_SN=1",LocalDate.class)).isEqualTo(LocalDate.of(2026,10,1));
         assertThat(db.queryForObject("SELECT MAX(WRT_DT) FROM TB_PJ_WEEK_MEMO",LocalDate.class)).isEqualTo(LocalDate.of(2026,10,2));
         assertThat(db.queryForMap("SELECT * FROM TB_PJ_WEEK_MEMO WHERE MEMO_SN=2")).isEqualTo(other);assertThat(project()).isEqualTo(before);
-        mvc.perform(post(root()+"/weekly-memos").contentType("application/json").content("{}")).andExpect(status().isOk());
+        mvc.perform(post(root()+"/weekly-memos").contentType("application/json").content("{\"actualProgress\":10}")).andExpect(status().isOk());
         assertThat(db.queryForObject("SELECT MAX(WRT_DT) FROM TB_PJ_WEEK_MEMO",LocalDate.class)).isEqualTo(LocalDate.of(2026,11,15));
     }
     @Test void completeReadbackRetryAndInvalidDateRollbackPreserveProjectMoney()throws Exception {

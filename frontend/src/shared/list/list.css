@@ -551,6 +551,11 @@ table.ls-t {
   flex: 1 1 240px;
   min-width: 0;
 }
+/* 시안 .banner: 아이콘은 글 앞에 따로 두고 줄어들지 않는다 */
+.ls-banner > svg,
+.ls-banner > .ls-banner-icon {
+  flex: none;
+}
 .ls-banner-warn {
   background: var(--ls-warn-bg);
   color: var(--ls-warn);

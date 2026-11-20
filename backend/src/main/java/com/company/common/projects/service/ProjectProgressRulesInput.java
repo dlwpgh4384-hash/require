@@ -48,6 +48,9 @@ public final class ProjectProgressRulesInput {
             if (input.actualProgress() != null) throw ProjectRules.invalid("actualProgress");
             if (blank(input.workDone()) && blank(input.nextWork()) && blank(input.requests()))
                 throw com.company.common.support.service.CodeFailure.invalid("workDone", "한 일·할 일·요청 사항 중 하나를 적어 주세요.");
+        } else if (input.actualProgress() == null) {
+            // 시안 memoModal 「실적 진척률 *」: 턴키·내부는 필수(2026-11-20 사용자 결정, 식-74의 「선택」에서 바꿈)
+            throw com.company.common.support.service.CodeFailure.invalid("actualProgress", "실적 진척률을 입력해 주세요.");
         }
     }
     private static boolean blank(String text) { return text == null || text.isBlank(); }

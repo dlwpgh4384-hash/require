@@ -572,8 +572,8 @@ export function ProjectBoardPage() {
       >
         {stale.length > 0 && (
           <div data-testid="project-board-stale-banner">
-            <Banner kind="warn">
-              {warnIcon} 2주 넘게 상태를 적지 않은 프로젝트:{" "}
+            <Banner kind="warn" icon={warnIcon}>
+              2주 넘게 상태를 적지 않은 프로젝트:{" "}
               {stale.map((project, index) => (
                 <span
                   key={project.projectId}

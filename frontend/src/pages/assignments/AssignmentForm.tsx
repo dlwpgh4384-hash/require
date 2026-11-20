@@ -438,8 +438,7 @@ export function AssignmentForm({
       >
         <div className="assignment-form" ref={body}>
           {warnings.length > 0 && (
-            <Banner kind="warn">
-              {warnIcon(16)}
+            <Banner kind="warn" icon={warnIcon(16)}>
               <span data-testid="assignment-form-warnings">
                 {warnings.map((w, i) => (
                   <span key={w}>
@@ -659,17 +658,13 @@ export function AssignmentForm({
               ))}
             </div>
             {closedMonth && withdrawDay.slice(0, 7) <= closedMonth && (
-              <Banner kind="warn">
-                {warnIcon(16)}
-                <span>
-                  마감한 달({withdrawDay.slice(0, 7)})에 걸칩니다. 마감한 달 금액은 그대로 두고 차액은 이번 달 전월 조정으로 넣습니다.
-                </span>
+              <Banner kind="warn" icon={warnIcon(16)}>
+                마감한 달({withdrawDay.slice(0, 7)})에 걸칩니다. 마감한 달 금액은 그대로 두고 차액은 이번 달 전월 조정으로 넣습니다.
               </Banner>
             )}
             {distWarn && (
-              <Banner kind="warn">
-                {warnIcon(16)}
-                <span>{TK_REUPLOAD}</span>
+              <Banner kind="warn" icon={warnIcon(16)}>
+                {TK_REUPLOAD}
               </Banner>
             )}
             <div className="project-fc">

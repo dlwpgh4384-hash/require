@@ -17,7 +17,7 @@ import {
 import type { ListColumn, ListSort } from "../../shared/list/listTypes";
 import { Toast } from "../../shared/feedback/Dialog";
 import { getCommonCodes } from "../codegroups/codeGroups";
-import { ProjectRequestError } from "../projects/projects";
+import { ProjectRequestError, typeLabel } from "../projects/projects";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
 import {
   formatMm,
@@ -154,7 +154,7 @@ export function ProjectCostAnalysisPage() {
   // 시안 19열(이름·순서 그대로). 시안 표는 정렬하지 않는다.
   const columnList: ListColumn<Row>[] = [
     { key: "projectName", label: "프로젝트", required: true, render: (r) => r.projectName },
-    { key: "contractTypeName", label: "유형", render: (r) => <Badge>{r.contractTypeName}</Badge> },
+    { key: "contractTypeName", label: "유형", render: (r) => <Badge>{typeLabel(r)}</Badge> },
     {
       key: "projectStatus",
       label: "상태",

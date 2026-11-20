@@ -108,7 +108,7 @@
   <update id="resume">UPDATE TB_BS_PART SET use_yn='Y' WHERE part_id=#{id}</update>
   <select id="selectLastConfirmed" resultType="java.lang.String">
     SELECT max(s.setl_ym) FROM TB_CO_PART_SETL s
-    WHERE s.part_id=#{id} AND s.setl_ym &gt;= #{month} AND s.setl_stat_cd='CNFM'
+    WHERE s.part_id=#{id} AND s.setl_ym &gt;= #{month} AND s.setl_stat_cd IN ('CNFM','AUTO')
       AND NOT EXISTS (SELECT 1 FROM TB_CL_CLOSE c
         WHERE c.close_ym=s.setl_ym AND c.close_stat_cd='CLOSE')
   </select>

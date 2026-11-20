@@ -38,6 +38,15 @@ public class ExcelExportService {
             head.setFont(bold);
             sheet.createRow(0).createCell(0).setCellValue(
                 title + " · 다운로드: " + downloadedBy + " · " + korea(atUtc).format(STAMP));
+            boolean[] numeric = numericColumns(headers, rows);
+            // 소수가 하나라도 있는 열(MM 등)은 열 전체를 소수 둘째 자리로 보인다(3.00).
+            boolean[] decimal = new boolean[headers.size()];
+            for (List<String> values : rows) for (int c = 0; c < Math.min(values.size(), decimal.length); c++)
+                if (numeric[c] && values.get(c) != null && values.get(c).contains(".")) decimal[c] = true;
+            CellStyle integerStyle = workbook.createCellStyle();
+            integerStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0"));
+            CellStyle decimalStyle = workbook.createCellStyle();
+            decimalStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
             Row header = sheet.createRow(2);
             for (int i = 0; i < headers.size(); i++) {
                 var cell = header.createCell(i);
@@ -47,7 +56,15 @@ public class ExcelExportService {
             for (int r = 0; r < rows.size(); r++) {
                 Row row = sheet.createRow(r + 3);
                 List<String> values = rows.get(r);
-                for (int c = 0; c < values.size(); c++) row.createCell(c).setCellValue(values.get(c) == null ? "" : values.get(c));
+                for (int c = 0; c < values.size(); c++) {
+                    String value = values.get(c) == null ? "" : values.get(c);
+                    var cell = row.createCell(c);
+                    if (c < numeric.length && numeric[c] && NUMBER.matcher(value).matches()) {
+                        var number = new java.math.BigDecimal(value.replace(",", ""));
+                        cell.setCellValue(number.doubleValue());
+                        cell.setCellStyle(decimal[c] ? decimalStyle : integerStyle);
+                    } else cell.setCellValue(value);
+                }
             }
             for (int i = 0; i < headers.size(); i++) sheet.setColumnWidth(i, 18 * 256);
             workbook.write(out);
@@ -56,6 +73,39 @@ public class ExcelExportService {
         } catch (IOException failure) {
             throw new UncheckedIOException(failure);
         }
+    }
+
+    /** 숫자 모양(1234, -1,234, 0.52). 앞자리 0(전화·계좌 등)은 글자로 둔다. */
+    private static final java.util.regex.Pattern NUMBER =
+        java.util.regex.Pattern.compile("-?(0|[1-9][0-9]{0,2}(,[0-9]{3})+|[1-9][0-9]*)(\\.[0-9]+)?");
+    /** 이름이 번호·코드·연도인 열은 숫자처럼 보여도 글자로 둔다(예: 사업자번호, 관리번호, 2026). */
+    private static final java.util.regex.Pattern TEXT_HEADER =
+        java.util.regex.Pattern.compile(".*(번호|코드|ID|아이디|연도|년도|년월|우편).*");
+
+    /**
+     * 엑셀에서 바로 더할 수 있게 숫자 열은 숫자 칸으로 쓴다(2026-11-21 사용자 결정, 전 화면 공통).
+     * 빈칸·「–」를 뺀 모든 값이 숫자 모양인 열만 숫자 열로 본다. 합계 줄 등 글자 값이 섞인 칸은 글자로 둔다.
+     */
+    static boolean[] numericColumns(List<String> headers, List<List<String>> rows) {
+        boolean[] numeric = new boolean[headers.size()];
+        for (int c = 0; c < headers.size(); c++) {
+            if (headers.get(c) != null && TEXT_HEADER.matcher(headers.get(c)).matches()) continue;
+            boolean any = false, all = true;
+            for (List<String> row : rows) {
+                if (c >= row.size()) continue;
+                String value = row.get(c);
+                if (value == null || value.isBlank() || value.equals("–") || value.equals("-")) continue;
+                if (NUMBER.matcher(value).matches()) any = true; else if (!isLabelRow(row)) { all = false; break; }
+            }
+            numeric[c] = any && all;
+        }
+        return numeric;
+    }
+
+    /** 「합계」 같은 맨 아래 줄은 글자가 섞여도 열 판단에서 뺀다(첫 칸이 글자이고 숫자 모양 칸이 아닌 값). */
+    private static boolean isLabelRow(List<String> row) {
+        return !row.isEmpty() && row.get(0) != null && (row.get(0).startsWith("합계") || row.get(0).startsWith("법인카드")
+            || row.get(0).startsWith("파트 이익금") || row.get(0).startsWith("월별"));
     }
 
     /** 파일 이름: 「화면이름_다운로드일시.xlsx」(기간이 있는 화면은 화면이름_기간_다운로드일시). */

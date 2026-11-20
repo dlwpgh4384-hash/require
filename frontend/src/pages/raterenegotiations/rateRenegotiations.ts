@@ -38,6 +38,8 @@ export interface RateRenegotiationResult {
     targetAnnualProfitIncrease: number;
   };
   totalAnnualProfitIncrease: number;
+  /** 이 달 급여 업로드 전이라 개발자 풀 월 급여로 계산한 대상자 */
+  salaryEstimatedDeveloperIds?: string[];
   formulaHelp: Record<
     | "renewalDate"
     | "monthlyCost"

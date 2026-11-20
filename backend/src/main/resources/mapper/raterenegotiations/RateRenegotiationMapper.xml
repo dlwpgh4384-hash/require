@@ -71,6 +71,19 @@
     ) h ON true
     ORDER BY a.ASGN_ID
   </select>
+  <resultMap id="poolSalary" type="com.company.common.raterenegotiations.mapper.RateRenegotiationRows$PoolSalary">
+    <constructor>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="amount" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <select id="selectPoolSalaries" resultMap="poolSalary">
+    SELECT DISTINCT ON (x.DEV_ID) x.DEV_ID AS "developerId", x.MON_PAY_AMT AS "amount"
+    FROM TB_HR_DEV_PRC x
+    WHERE x.MON_PAY_AMT IS NOT NULL AND x.APLY_BGN_YM &lt;= #{yearMonth}
+      AND (x.APLY_END_YM IS NULL OR x.APLY_END_YM &gt;= #{yearMonth})
+    ORDER BY x.DEV_ID, x.APLY_BGN_YM DESC
+  </select>
   <insert id="insertAccess">
     INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
     VALUES(#{userId},'DNLD','UI-32',#{target},clock_timestamp(),#{userId},clock_timestamp())

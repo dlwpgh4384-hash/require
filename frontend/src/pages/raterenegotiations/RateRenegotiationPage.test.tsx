@@ -346,3 +346,15 @@ it("keeps controls and headers while loading and ignores an older assumption res
     screen.getByTestId("list-head-annualProfitIncrease"),
   ).toHaveTextContent("8%");
 });
+it("shows how many people were calculated from the developer pool salary before payroll upload", async () => {
+  mount();
+  await ready();
+  expect(screen.queryByTestId("rate-salary-estimated")).not.toBeInTheDocument();
+  cleanup();
+  result = { ...result, salaryEstimatedDeveloperIds: ["developer-a"] };
+  mount();
+  await ready();
+  expect(screen.getByTestId("rate-salary-estimated")).toHaveTextContent(
+    "2026-02 급여 업로드 전: 1명은 개발자 풀 월 급여로 계산한 값입니다.",
+  );
+});

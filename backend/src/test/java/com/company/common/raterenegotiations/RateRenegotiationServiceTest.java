@@ -24,7 +24,7 @@ class RateRenegotiationServiceTest {
     }
     private void sources(List<Cost> costs, List<AssignmentInfo> assignments) {
         when(calendar.today()).thenReturn(TODAY);
-        when(source.read()).thenReturn(new RateRenegotiationSource.Context("202602", false, n("20"), costs, List.of(), help()));
+        when(source.read()).thenReturn(new RateRenegotiationSource.Context("202602", false, n("20"), costs, List.of(), help(), java.util.Set.of()));
         when(mapper.selectAssignmentInfo("202602", false)).thenReturn(assignments);
     }
     @Test void keepsAssignmentsDistinctCountsPeopleOnceAndSortsExactRatiosStably() {
@@ -57,7 +57,7 @@ class RateRenegotiationServiceTest {
         var actor = new CurrentBusinessActor();
         var export = new RateRenegotiationExcelService(calculation, mapper, writer, actor, calendar);
         when(calculation.getCommonRateRenegotiations(any())).thenReturn(new Result("2026-02", n("5"), List.of(),
-            new Summary(0, null, n("20"), n("0"), n("0")), n("0"), help()));
+            new Summary(0, null, n("20"), n("0"), n("0")), n("0"), help(), List.of()));
         when(calendar.now()).thenReturn(java.time.Instant.parse("2026-02-01T00:00:00Z"));
         when(writer.write(anyString(), anyList(), anyList(), anyString(), any())).thenThrow(new IllegalStateException("generation"));
         assertThatThrownBy(() -> export.getCommonRateRenegotiationsExcel(filter(), List.of("developerName")))

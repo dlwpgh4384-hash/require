@@ -234,6 +234,13 @@ export function RateRenegotiationWorkspace() {
           ? `기준월 ${data.baseYearMonth} · 1년 계속 투입 가정`
           : "기준월을 불러오는 중입니다."}
       </Banner>
+      {data && (data.salaryEstimatedDeveloperIds ?? []).length > 0 && (
+        <div data-testid="rate-salary-estimated">
+          <Banner kind="warn">
+            {`${data.baseYearMonth} 급여 업로드 전: ${(data.salaryEstimatedDeveloperIds ?? []).length}명은 개발자 풀 월 급여로 계산한 값입니다.`}
+          </Banner>
+        </div>
+      )}
       <ListFilters onSearch={search} onReset={reset}>
         <ListFilter label="갱신 시점" htmlFor="rate-renewalMonths">
           <select

@@ -92,7 +92,7 @@ class RateRenegotiationPersistenceTest {
         db = new JdbcTemplate(source);
         when(calendar.today()).thenReturn(LocalDate.of(2026, 2, 1));
         when(calendar.now()).thenReturn(Instant.parse("2026-02-01T00:00:00Z"));
-        db.update("UPDATE TB_SY_CODE SET CODE_VAL=202602 WHERE CODE='CASH_BASE_YM'");
+        db.update("UPDATE TB_SY_OPER_STD SET STD_VAL=202602 WHERE STD_CD='CASH_BASE_YM'");
         db.update("DELETE FROM TB_CL_CLOSE");
         job = db.queryForObject("SELECT min(CODE) FROM TB_SY_CODE WHERE CODE_GRP_ID='JOB' AND USE_YN='Y' AND DEL_YN='N'", String.class);
         db.update("INSERT INTO TB_BS_PART(PART_ID,PART_NM,HQ_YN,USE_YN,REG_USER_ID) VALUES('rate-part','시험 영업파트','N','Y','admin')");
@@ -138,6 +138,20 @@ class RateRenegotiationPersistenceTest {
         assertThat(read("-1").path("totalAnnualProfitIncrease").decimalValue()).isZero();
         assertThat(read("51").path("totalAnnualProfitIncrease").decimalValue()).isEqualByComparingTo("12000000");
         assertThat(snapshot(true)).isEqualTo(before);
+    }
+    @Test void beforePayrollUploadUsesPoolSalaryAndTurnkeyWithoutBudgetDoesNotStop() throws Exception {
+        db.update("DELETE FROM TB_HR_MON_PAY");
+        db.update("INSERT INTO TB_HR_DEV_PRC(DEV_ID,APLY_BGN_YM,MON_PAY_AMT,REG_USER_ID) VALUES('rate-dev','202601',1800000,'admin')");
+        db.update("INSERT INTO TB_HR_DEV(DEV_ID,MNG_NO,DEV_NM,EMP_TYPE_CD,JOB_CD,GRADE_CD,DRCT_CLS_CD,PART_ID,WORK_STAT_CD,JNCMP_DT,REG_USER_ID) VALUES('rate-tk-dev','rate-number2','박턴키','FT',?,'MD','DRCT','rate-part','INPUT','2026-01-01','admin')", job);
+        project("rate-turnkey", "TK");
+        db.update("INSERT INTO TB_PJ_ASGN(ASGN_ID,PROJ_ID,DEV_ID,JOB_CD,INPUT_BGN_DT,INPUT_END_DT,CTRT_MM,BILL_UPRC,INPUT_TYPE_CD,EXT_CNT,ASGN_STAT_CD,REG_USER_ID) VALUES('rate-tk','rate-turnkey','rate-tk-dev',?,'2026-01-01','2026-03-03',1,NULL,'NEW',0,'ACT','admin')", job);
+        db.update("INSERT INTO TB_PJ_ASGN_MON(ASGN_ID,PROJ_ID,DEV_ID,INPUT_YM,INPUT_DAY_CNT,MON_MM,APLY_UPRC,SALES_AMT,FIX_YN,REG_USER_ID) VALUES('rate-tk','rate-turnkey','rate-tk-dev','202602',20,1,0,0,'N','admin')");
+        var result = read("5");
+        // 계약직 풀 급여 1,800,000 + 4대보험(회사) 9.4% 169,200 = 1,969,200, 이 달 MM 2(0.5·0.5·무상 1) 중 0.5
+        assertThat(result.path("items")).hasSize(2);
+        assertThat(result.path("items").get(0).path("monthlyCost").decimalValue()).isEqualByComparingTo("492300");
+        assertThat(result.path("salaryEstimatedDeveloperIds")).hasSize(1);
+        assertThat(result.path("salaryEstimatedDeveloperIds").get(0).asText()).isEqualTo("rate-dev");
     }
     @Test void invalidQueryAndUnknownColumnHaveNoPersistenceSideEffects() throws Exception {
         var before = snapshot(true);

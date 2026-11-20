@@ -10513,6 +10513,7 @@ components:
       - items
       - summary
       - totalAnnualProfitIncrease
+      - salaryEstimatedDeveloperIds
       - formulaHelp
       properties:
         baseYearMonth:
@@ -10535,6 +10536,11 @@ components:
           description: n% 올리면 연 이익 칸 합계만; 다른 금액/비율 합계값을 반환하지 않음
         formulaHelp:
           $ref: '#/components/schemas/CommonRateRenegotiationFormulaHelp'
+        salaryEstimatedDeveloperIds:
+          type: array
+          items:
+            type: string
+          description: 이 달 급여 업로드 전이라 개발자 풀 월 급여로 원가를 계산한 대상자 ID(정렬)
       additionalProperties: false
     CommonProjectCostAnalysisSummary:
       type: object

@@ -59,6 +59,7 @@ public class CommonRateRenegotiationService {
         var summary = new Summary(people.size(), average, context.targetRate(), assumed, target);
         String ym = context.yearMonth();
         return new Result(ym.substring(0, 4) + "-" + ym.substring(4), filter.increaseRate(),
-            candidates.stream().map(Candidate::row).toList(), summary, assumed, context.help());
+            candidates.stream().map(Candidate::row).toList(), summary, assumed, context.help(),
+            people.stream().filter(context.salaryEstimated()::contains).sorted().toList());
     }
 }

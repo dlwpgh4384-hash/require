@@ -19,6 +19,7 @@ public final class RateRenegotiationContracts {
     public record FormulaHelp(String renewalDate, String monthlyCost, String profitRate,
         String targetUnitPrice, String requiredIncreaseRate, String annualProfitIncrease) {}
     public record Result(String baseYearMonth, BigDecimal appliedIncreaseRate, List<Row> items,
-        Summary summary, BigDecimal totalAnnualProfitIncrease, FormulaHelp formulaHelp) {}
+        Summary summary, BigDecimal totalAnnualProfitIncrease, FormulaHelp formulaHelp,
+        List<String> salaryEstimatedDeveloperIds) {}
     public record ExcelFile(byte[] bytes, String fileName, int count) {}
 }

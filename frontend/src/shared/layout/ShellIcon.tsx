@@ -1,6 +1,8 @@
 const paths = {
   chevron: "m9 5 7 7-7 7",
   chevronDown: "M6 9l6 6 6-6",
+  // 시안 chevR(펼치기 단추 ▸)
+  chevronRight: "M9 6l6 6-6 6",
   x: "M18 6L6 18M6 6l12 12",
   collapse: "m14 6-6 6 6 6",
   // 아래 아이콘은 화면 시안 v1.8과 같은 모양

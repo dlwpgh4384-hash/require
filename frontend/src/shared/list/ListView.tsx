@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   LIST_PAGE_SIZES,
   listMessages,
@@ -15,6 +15,7 @@ export function ListFilters({
   onReset,
   testId = "list-filters",
   activeCount = 0,
+  below,
 }: {
   children: ReactNode;
   onSearch: () => void;
@@ -22,6 +23,8 @@ export function ListFilters({
   testId?: string;
   /** 값이 든 조건 수. 휴대폰 [조건] 단추에 「조건 (n)」으로 보인다(시안). */
   activeCount?: number;
+  /** [초기화][조회] 아래 한 줄(시안 「상세 조건」을 펼친 줄). 없으면 기존과 같다. */
+  below?: ReactNode;
 }) {
   const { mobile } = useViewport();
   const [open, setOpen] = useState(false);
@@ -68,6 +71,7 @@ export function ListFilters({
           조회
         </button>
       </div>
+      {below && <div className="ls-filter-below">{below}</div>}
     </form>
     </>
   );
@@ -141,6 +145,15 @@ interface ListViewProps<T> {
   mobileRows?: T[] | null;
   /** 시안 합계 줄(cfg.foot): 열 키별 값. 주면 표 맨 아래에 첫 칸 「합계」와 값을 보인다(0건이어도 보임). */
   footer?: Partial<Record<string, ReactNode>>;
+  /** 도구 줄 왼쪽(선택이 없을 때). 주면 「총 N건」 대신 이 내용을 보인다(시안 .tbar .tl). */
+  toolbarLeft?: ReactNode;
+  /** 도구 줄 오른쪽 [열 설정] 앞(예: 금액 단위 고르기). */
+  toolbarRight?: ReactNode;
+  /**
+   * 줄 아래 펼친 줄(시안 tr.subr). 같은 표의 칸에 맞춘 <tr>들을 돌려준다. 보이는 열을 함께 넘긴다.
+   * 체크 칸이 있는 목록(selectable)에서는 쓰지 않는다.
+   */
+  renderExpandedRow?: (row: T, visibleColumns: ListColumn<T>[]) => ReactNode;
 }
 
 /** SFR-010 목록 공통: 도구 줄, 열 설정, 좁게 보기, 엑셀, 정렬, 선택, 페이지. */
@@ -285,6 +298,8 @@ export function ListView<T>(props: ListViewProps<T>) {
                 </button>
               ))}
             </>
+          ) : props.toolbarLeft !== undefined ? (
+            props.toolbarLeft
           ) : (
             <span>
               총 <strong>{total.toLocaleString("ko-KR")}</strong>건
@@ -292,6 +307,7 @@ export function ListView<T>(props: ListViewProps<T>) {
           )}
         </div>
         <div className="ls-tr">
+          {props.toolbarRight}
           {props.columnSettings !== false && (
           <div className="ls-pop-anchor" ref={columnAnchor}>
             <button
@@ -435,6 +451,9 @@ export function ListView<T>(props: ListViewProps<T>) {
                           ⓘ
                         </span>
                       )}
+                      {column.note && (
+                        <span className="ls-cap"> {column.note}</span>
+                      )}
                       {active && (props.sort!.dir === "asc" ? " ▲" : " ▼")}
                     </th>
                   );
@@ -473,6 +492,7 @@ export function ListView<T>(props: ListViewProps<T>) {
                   const key = rowKey(row);
                   const on = props.allResultsSelected || selected.includes(key);
                   return (
+                    <Fragment key={key}>
                     <tr
                       key={key}
                       data-testid={`list-row-${key}`}
@@ -523,6 +543,8 @@ export function ListView<T>(props: ListViewProps<T>) {
                         </td>
                       ))}
                     </tr>
+                    {props.renderExpandedRow?.(row, visibleColumns)}
+                    </Fragment>
                   );
                 })
               )}

@@ -12,6 +12,8 @@ export interface ListColumn<T> {
   hiddenByDefault?: boolean;
   /** 계산 열의 계산 방법(제목 옆 ⓘ). */
   calc?: string;
+  /** 제목 뒤 작은 글씨(시안 「 (참고)」). 열 설정 목록에는 붙이지 않는다. */
+  note?: string;
   align?: "left" | "right" | "center";
   render?: (row: T) => ReactNode;
 }

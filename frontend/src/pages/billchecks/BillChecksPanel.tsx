@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
+  KpiCard,
+  KpiCards,
   ListView,
   useListPresentation,
   type ListColumn,
@@ -122,7 +124,11 @@ export function BillChecksPanel({
     {
       key: "explanation",
       label: "설명",
-      render: (r) => <span className="bill-sub bill-wrap">{r.explanation || "–"}</span>,
+      render: (r) => (
+        <span className="bill-sub bill-check-explanation">
+          {r.explanation || "–"}
+        </span>
+      ),
     },
     {
       key: "action",
@@ -171,33 +177,45 @@ export function BillChecksPanel({
       role="tabpanel"
       aria-label="청구 누락 점검"
     >
-      <div className="bill-kpis" aria-label="점검 요약">
-        <div className="bill-kpi" data-testid="bill-check-kpi-total">
-          <span className="l">점검 프로젝트</span>
-          <span className="v">{items.length}건</span>
-          <span className="d">월단위·파견</span>
-        </div>
-        <div className="bill-kpi" data-testid="bill-check-kpi-ok">
-          <span className="l">맞음</span>
-          <span className="v">{items.length - bad.length}건</span>
-          <span className="d" />
-        </div>
-        <div className="bill-kpi" data-testid="bill-check-kpi-missing">
-          <span className="l">청구 없음</span>
-          <span className={`v${missingCount ? " bill-bad" : ""}`}>{missingCount}건</span>
-          <span className="d">투입은 있는데 청구가 없음</span>
-        </div>
-        <div className="bill-kpi" data-testid="bill-check-kpi-diff">
-          <span className="l">금액 차이</span>
-          <span className="v">{bad.length - missingCount}건</span>
-          <span className="d">차이 0.5% 넘음</span>
-        </div>
-        <div className="bill-kpi" data-testid="bill-check-kpi-amount">
-          <span className="l">빠진 것으로 보이는 금액</span>
-          <span className={`v${missing ? " bill-bad" : ""}`}>{billShortMoney(missing)}</span>
-          <span className="d">공급가 기준</span>
-        </div>
-      </div>
+      <KpiCards aria-label="점검 요약">
+        <KpiCard
+          testId="bill-check-kpi-total"
+          label="점검 프로젝트"
+          value={`${items.length}건`}
+          description="월단위·파견"
+        />
+        <KpiCard
+          testId="bill-check-kpi-ok"
+          label="맞음"
+          value={`${items.length - bad.length}건`}
+        />
+        <KpiCard
+          testId="bill-check-kpi-missing"
+          label="청구 없음"
+          value={
+            <span className={missingCount ? "bill-bad" : undefined}>
+              {missingCount}건
+            </span>
+          }
+          description="투입은 있는데 청구가 없음"
+        />
+        <KpiCard
+          testId="bill-check-kpi-diff"
+          label="금액 차이"
+          value={`${bad.length - missingCount}건`}
+          description="차이 0.5% 넘음"
+        />
+        <KpiCard
+          testId="bill-check-kpi-amount"
+          label="빠진 것으로 보이는 금액"
+          value={
+            <span className={missing ? "bill-bad" : undefined}>
+              {billShortMoney(missing)}
+            </span>
+          }
+          description="공급가 기준"
+        />
+      </KpiCards>
       {result && (
         <div className="bill-seg" role="group" aria-label="점검 월">
           {(result.months ?? []).map((value) => (

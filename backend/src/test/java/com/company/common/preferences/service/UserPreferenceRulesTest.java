@@ -12,14 +12,14 @@ class UserPreferenceRulesTest {
 
     @ParameterizedTest
     @CsvSource({"PAGE_SIZE,20", "PAGE_SIZE,50", "PAGE_SIZE,100", "DENSE,넓게", "DENSE,좁게",
-        "MENU_FOLD,true", "MENU_FOLD,false", "FAV,[]", "RECENT,[]"})
+        "MENU_FOLD,true", "MENU_FOLD,false", "FAV,[]", "RECENT,[]", "AMT_UNIT,원", "AMT_UNIT,천 원", "AMT_UNIT,백만 원"})
     void acceptedScalarValues(String type, String value) {
         assertThatCode(() -> rules.validate(type, "GLOBAL", value)).doesNotThrowAnyException();
     }
 
     @ParameterizedTest
     @CsvSource({"PAGE_SIZE,30", "PAGE_SIZE,020", "DENSE,dense", "MENU_FOLD,TRUE",
-        "FAV,{}", "RECENT,null"})
+        "FAV,{}", "RECENT,null", "AMT_UNIT,천원", "AMT_UNIT,만 원", "AMT_UNIT,KRW"})
     void eachInvalidValueIsRejected(String type, String value) {
         assertThatThrownBy(() -> rules.validate(type, "GLOBAL", value)).isInstanceOf(UserPreferenceFailure.class);
     }
@@ -69,6 +69,14 @@ class UserPreferenceRulesTest {
         assertThatThrownBy(() -> rules.validate("FAV", "GLOBAL", "[1]")).isInstanceOf(UserPreferenceFailure.class);
         assertThatThrownBy(() -> rules.validate("PERIOD", "UI-12", "{\"year\":2026,\"month\":1}"))
             .isInstanceOf(UserPreferenceFailure.class);
+    }
+    // 금액 단위: 계정에 한 값(키 GLOBAL), 값은 시안 unitSel 세 가지만
+    @Test
+    void moneyUnitIsGlobalAndOnlyTheThreeMockupUnits() {
+        assertThatThrownBy(() -> rules.validate("AMT_UNIT", "GLOBAL", "만 원"))
+            .hasMessage("금액 단위는 원, 천 원, 백만 원 중에서 선택해 주세요.");
+        assertThatThrownBy(() -> rules.validateKey("AMT_UNIT", "UI-03")).isInstanceOf(UserPreferenceFailure.class);
+        assertThatCode(() -> rules.validateKey("AMT_UNIT", "GLOBAL")).doesNotThrowAnyException();
     }
     @Test
     void columnSettingsAreStoredPerScreenAsHiddenColumnKeys() {

@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.personalcostprofits.mapper.PersonalCostProfitMapper">
+  <resultMap id="person" type="com.company.common.personalcostprofits.mapper.PersonalCostProfitRows$Person">
+    <constructor>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="developerName" javaType="java.lang.String"/>
+      <arg column="affiliationId" javaType="java.lang.String"/>
+      <arg column="affiliationName" javaType="java.lang.String"/>
+      <arg column="positionCode" javaType="java.lang.String"/>
+      <arg column="positionName" javaType="java.lang.String"/>
+      <arg column="employeeTypeCode" javaType="java.lang.String"/>
+      <arg column="employeeTypeName" javaType="java.lang.String"/>
+      <arg column="joinDate" javaType="java.time.LocalDate"/>
+      <arg column="retireDate" javaType="java.time.LocalDate"/>
+      <arg column="jobCode" javaType="java.lang.String"/>
+      <arg column="jobName" javaType="java.lang.String"/>
+      <arg column="gradeCode" javaType="java.lang.String"/>
+      <arg column="gradeName" javaType="java.lang.String"/>
+      <arg column="salesPartId" javaType="java.lang.String"/>
+      <arg column="directClassCode" javaType="java.lang.String"/>
+      <arg column="managementNumber" javaType="java.lang.String"/>
+      <arg column="salesPartName" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="pay" type="com.company.common.personalcostprofits.mapper.PersonalCostProfitRows$Pay">
+    <constructor>
+      <arg column="yearMonth" javaType="java.lang.String"/>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="employeeTypeCode" javaType="java.lang.String"/>
+      <arg column="salary" javaType="java.math.BigDecimal"/>
+      <arg column="allowance" javaType="java.math.BigDecimal"/>
+      <arg column="companyInsurance" javaType="java.math.BigDecimal"/>
+      <arg column="retirementReserve" javaType="java.math.BigDecimal"/>
+      <arg column="personalInsurance" javaType="java.math.BigDecimal"/>
+      <arg column="withholdingTax" javaType="java.math.BigDecimal"/>
+      <arg column="incomeTax" javaType="java.math.BigDecimal"/>
+      <arg column="netPay" javaType="java.math.BigDecimal"/>
+      <arg column="vendorSupply" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="cost" type="com.company.common.personalcostprofits.mapper.PersonalCostProfitRows$Cost">
+    <constructor>
+      <arg column="yearMonth" javaType="java.lang.String"/>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="projectId" javaType="java.lang.String"/>
+      <arg column="assignmentId" javaType="java.lang.String"/>
+      <arg column="projectName" javaType="java.lang.String"/>
+      <arg column="jobName" javaType="java.lang.String"/>
+      <arg column="contractTypeCode" javaType="java.lang.String"/>
+      <arg column="mm" javaType="java.math.BigDecimal"/>
+      <arg column="revenue" javaType="java.math.BigDecimal"/>
+      <arg column="labor" javaType="java.math.BigDecimal"/>
+      <arg column="team" javaType="java.math.BigDecimal"/>
+      <arg column="expense" javaType="java.math.BigDecimal"/>
+      <arg column="inputTypeCode" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="assignment" type="com.company.common.personalcostprofits.mapper.PersonalCostProfitRows$Assignment">
+    <constructor>
+      <arg column="yearMonth" javaType="java.lang.String"/>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="projectId" javaType="java.lang.String"/>
+      <arg column="assignmentId" javaType="java.lang.String"/>
+      <arg column="projectName" javaType="java.lang.String"/>
+      <arg column="jobName" javaType="java.lang.String"/>
+      <arg column="contractTypeCode" javaType="java.lang.String"/>
+      <arg column="inputTypeCode" javaType="java.lang.String"/>
+      <arg column="mm" javaType="java.math.BigDecimal"/>
+      <arg column="revenue" javaType="java.math.BigDecimal"/>
+      <arg column="team" javaType="java.math.BigDecimal"/>
+      <arg column="expense" javaType="java.math.BigDecimal"/>
+      <arg column="contractAmount" javaType="java.math.BigDecimal"/>
+      <arg column="budget" javaType="java.math.BigDecimal"/>
+      <arg column="distribution" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="leave" type="com.company.common.personalcostprofits.mapper.PersonalCostProfitRows$Leave">
+    <constructor>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="startDate" javaType="java.time.LocalDate"/>
+      <arg column="endDate" javaType="java.time.LocalDate"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="code" type="com.company.common.personalcostprofits.mapper.PersonalCostProfitRows$Code">
+    <constructor>
+      <arg column="groupCode" javaType="java.lang.String"/>
+      <arg column="code" javaType="java.lang.String"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="value" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="role" type="com.company.common.roles.dto.RoleContracts$Role">
+    <constructor>
+      <arg column="roleId" javaType="java.lang.String"/>
+      <arg column="roleName" javaType="java.lang.String"/>
+      <arg column="dataScopeCd" javaType="java.lang.String"/>
+      <arg column="snstvViewYn" javaType="java.lang.String"/>
+      <arg column="useYn" javaType="java.lang.String"/>
+      <arg column="basicRole" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+  <sql id="period">BETWEEN (CAST(#{year} AS text)||'01') AND
+    (CAST(#{year} AS text)||lpad(CAST(#{baseMonth} AS text),2,'0'))</sql>
+  <select id="selectPeople" resultMap="person">
+    SELECT h.DEV_ID AS "developerId",h.DEV_NM AS "developerName",h.BLNG_CLNT_ID AS "affiliationId",
+      COALESCE(c.CLNT_NM,'') AS "affiliationName",h.JBPS_CD AS "positionCode",
+      COALESCE(j.CODE_NM,'') AS "positionName",h.EMP_TYPE_CD AS "employeeTypeCode",
+      COALESCE(e.CODE_NM,h.EMP_TYPE_CD) AS "employeeTypeName",h.JNCMP_DT AS "joinDate",
+      h.RETIRE_DT AS "retireDate",h.JOB_CD AS "jobCode",COALESCE(b.CODE_NM,h.JOB_CD) AS "jobName",
+      h.GRADE_CD AS "gradeCode",g.CODE_NM AS "gradeName",h.PART_ID AS "salesPartId",
+      h.DRCT_CLS_CD AS "directClassCode",h.MNG_NO AS "managementNumber",s.PART_NM AS "salesPartName"
+    FROM TB_HR_DEV h LEFT JOIN TB_BS_CLNT c ON c.CLNT_ID=h.BLNG_CLNT_ID
+    LEFT JOIN TB_BS_PART s ON s.PART_ID=h.PART_ID
+    LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JBPS' AND j.CODE=h.JBPS_CD
+    LEFT JOIN TB_SY_CODE e ON e.CODE_GRP_ID='EMP_TYPE' AND e.CODE=h.EMP_TYPE_CD
+    LEFT JOIN TB_SY_CODE b ON b.CODE_GRP_ID='JOB' AND b.CODE=h.JOB_CD
+    LEFT JOIN TB_SY_CODE g ON g.CODE_GRP_ID='GRADE' AND g.CODE=h.GRADE_CD
+    WHERE (h.JNCMP_DT IS NULL OR h.JNCMP_DT &lt; make_date(#{year},#{baseMonth},1)+interval '1 month')
+      AND (h.RETIRE_DT IS NULL OR h.RETIRE_DT &gt;= make_date(#{year},1,1))
+    <if test="name != null and name != ''">AND position(lower(#{name}) in lower(h.DEV_NM)) &gt; 0</if>
+    <if test="employeeTypeCode != null and employeeTypeCode != ''">AND h.EMP_TYPE_CD=#{employeeTypeCode}</if>
+    <!-- 소속 「자사」(__self) = 소속 거래처가 없는 사람 -->
+    <if test="affiliationId == '__self'">AND h.BLNG_CLNT_ID IS NULL</if>
+    <if test="affiliationId != null and affiliationId != '' and affiliationId != '__self'">AND h.BLNG_CLNT_ID=#{affiliationId}</if>
+    <if test="salesPartId != null and salesPartId != ''">AND h.PART_ID=#{salesPartId}</if>
+    <if test="jobCode != null and jobCode != ''">AND h.JOB_CD=#{jobCode}</if>
+    ORDER BY h.DEV_NM,h.DEV_ID
+  </select>
+  <select id="selectPayroll" resultMap="pay">
+    SELECT p.PAY_YM AS "yearMonth",p.DEV_ID AS "developerId",p.EMP_TYPE_CD AS "employeeTypeCode",
+      p.PAY_AMT AS "salary",p.ALWNC_AMT AS "allowance",p.INSR_CMPNY_AMT AS "companyInsurance",
+      p.RETIRE_RSV_AMT AS "retirementReserve",p.INSR_SELF_AMT AS "personalInsurance",
+      p.WTHLD_TAX_AMT AS "withholdingTax",p.INCM_TAX_AMT AS "incomeTax",
+      p.REAL_PAY_AMT AS "netPay",p.VNDR_SPLY_AMT AS "vendorSupply"
+    FROM TB_HR_MON_PAY p WHERE p.PAY_YM <include refid="period"/>
+  </select>
+  <select id="selectLeaves" resultMap="leave">
+    SELECT s.DEV_ID AS "developerId",s.BGN_DT AS "startDate",s.END_DT AS "endDate"
+    FROM TB_HR_DEV_STAT s WHERE s.WORK_STAT_CD='LEAVE'
+      AND s.BGN_DT &lt; make_date(#{year},#{baseMonth},1)+interval '1 month'
+      AND (s.END_DT IS NULL OR s.END_DT &gt;= make_date(#{year},1,1))
+  </select>
+  <select id="selectCosts" resultMap="cost">
+    SELECT c.COST_YM AS "yearMonth",c.DEV_ID AS "developerId",c.PROJ_ID AS "projectId",
+      c.ASGN_ID AS "assignmentId",COALESCE(p.PROJ_NM,'남는 몫(대기 원가)') AS "projectName",
+      j.CODE_NM AS "jobName",c.CTRT_TYPE_CD AS "contractTypeCode",
+      c.ASGN_MM+c.FREE_MM AS "mm",c.SALES_AMT AS "revenue",c.LABOR_ALLOC_AMT AS "labor",
+      c.TEAM_EXPS_AMT AS "team",c.PROJ_EXPS_AMT AS "expense",a.INPUT_TYPE_CD AS "inputTypeCode"
+    FROM TB_CO_MON_COST c LEFT JOIN TB_PJ_PROJ p ON p.PROJ_ID=c.PROJ_ID
+    LEFT JOIN TB_PJ_ASGN a ON a.ASGN_ID=c.ASGN_ID
+    LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=a.JOB_CD
+    WHERE c.COST_YM <include refid="period"/> ORDER BY c.COST_YM,c.DEV_ID,c.PROJ_ID,c.ASGN_ID
+  </select>
+  <select id="selectAssignments" resultMap="assignment">
+    WITH months AS (
+      SELECT to_char(m,'YYYYMM') AS ym,m::date AS first_day,(m+interval '1 month'-interval '1 day')::date AS last_day
+      FROM generate_series(make_date(#{year},1,1),make_date(#{year},#{baseMonth},1),interval '1 month') m
+    ), inputs AS (
+      SELECT a.*,m.ym,m.first_day,m.last_day,
+        COALESCE(n.MON_MM,round(COALESCE(h.NEW_CTRT_MM,a.CTRT_MM)*
+          (LEAST(a.INPUT_END_DT,m.last_day)-GREATEST(a.INPUT_BGN_DT,m.first_day)+1)
+          /extract(day from m.last_day),2)) AS mm,
+        COALESCE(n.SALES_AMT,trunc(COALESCE(h.NEW_UPRC,a.BILL_UPRC,0)*
+          round(COALESCE(h.NEW_CTRT_MM,a.CTRT_MM)*
+          (LEAST(a.INPUT_END_DT,m.last_day)-GREATEST(a.INPUT_BGN_DT,m.first_day)+1)
+          /extract(day from m.last_day),2))) AS revenue
+      FROM TB_PJ_ASGN a JOIN months m ON a.INPUT_BGN_DT &lt;= m.last_day AND a.INPUT_END_DT &gt;= m.first_day
+      LEFT JOIN TB_PJ_ASGN_MON n ON n.ASGN_ID=a.ASGN_ID AND n.INPUT_YM=m.ym
+      LEFT JOIN LATERAL (SELECT
+        (SELECT x.NEW_CTRT_MM FROM TB_PJ_ASGN_HIST x WHERE x.ASGN_ID=a.ASGN_ID
+          AND x.APLY_DT &lt;= m.last_day AND x.NEW_CTRT_MM IS NOT NULL
+          ORDER BY x.APLY_DT DESC,x.HIST_SN DESC LIMIT 1) AS NEW_CTRT_MM,
+        (SELECT x.NEW_UPRC FROM TB_PJ_ASGN_HIST x WHERE x.ASGN_ID=a.ASGN_ID
+          AND x.APLY_DT &lt;= m.last_day AND x.NEW_UPRC IS NOT NULL
+          ORDER BY x.APLY_DT DESC,x.HIST_SN DESC LIMIT 1) AS NEW_UPRC) h ON true
+      WHERE a.ASGN_STAT_CD!='CNCL'
+    )
+    SELECT a.ym AS "yearMonth",a.DEV_ID AS "developerId",a.PROJ_ID AS "projectId",
+      a.ASGN_ID AS "assignmentId",p.PROJ_NM AS "projectName",j.CODE_NM AS "jobName",
+      p.CTRT_TYPE_CD AS "contractTypeCode",a.INPUT_TYPE_CD AS "inputTypeCode",a.mm AS "mm",
+      a.revenue AS "revenue",p.TEAM_EXPS_AMT AS "team",p.PROJ_EXPS_AMT AS "expense",
+      p.CTRT_AMT AS "contractAmount",p.BDGT_AMT AS "budget",d.amount AS "distribution"
+    FROM inputs a JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID
+    LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=a.JOB_CD
+    LEFT JOIN LATERAL (
+      SELECT sum(t.DSTRB_AMT) AS amount FROM TB_PJ_TK_DSTRB t
+      WHERE t.PROJ_ID=a.PROJ_ID AND t.DEV_ID=a.DEV_ID AND t.DSTRB_YM=a.ym AND t.ROW_TYPE_CD='DEV'
+        AND t.DSTRB_STEP_CD=(SELECT z.DSTRB_STEP_CD FROM TB_PJ_TK_DSTRB z
+          JOIN TB_SY_CODE c ON c.CODE_GRP_ID='DSTRB_STEP' AND c.CODE=z.DSTRB_STEP_CD
+          WHERE z.PROJ_ID=a.PROJ_ID
+          ORDER BY CASE c.CODE_NM WHEN '실제 투입계획' THEN 3 WHEN '최종 계약' THEN 2 WHEN '견적' THEN 1 ELSE 0 END DESC
+          LIMIT 1)
+    ) d ON true
+    WHERE a.mm &gt; 0 ORDER BY a.ym,a.DEV_ID,a.PROJ_ID,a.ASGN_ID
+  </select>
+  <select id="selectCodes" resultMap="code">
+    SELECT c.CODE_GRP_ID AS "groupCode",c.CODE AS "code",c.CODE_NM AS "name",c.CODE_VAL AS "value"
+    FROM TB_SY_CODE c WHERE c.USE_YN='Y' AND c.DEL_YN='N'
+    UNION ALL
+    SELECT 'affiliationId',c.CLNT_ID,c.CLNT_NM,NULL::numeric FROM TB_BS_CLNT c WHERE c.USE_YN='Y'
+    UNION ALL
+    SELECT 'salesPartId',p.PART_ID,p.PART_NM,NULL::numeric FROM TB_BS_PART p WHERE p.USE_YN='Y'
+  </select>
+  <select id="selectActorRoles" resultMap="role">
+    SELECT r.ROLE_ID AS "roleId",r.ROLE_NM AS "roleName",r.DATA_SCOPE_CD AS "dataScopeCd",
+      r.SNSTV_VIEW_YN AS "snstvViewYn",r.USE_YN AS "useYn",r.SYS_ROLE_YN='Y' AS "basicRole"
+    FROM TB_SY_ROLE r JOIN TB_SY_USER_ROLE u ON u.ROLE_ID=r.ROLE_ID
+    WHERE u.USER_ID=#{userId} AND r.USE_YN='Y'
+  </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES(#{userId},'DNLD','UI-03',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
+</mapper>

@@ -5,7 +5,9 @@ export type PreferenceType =
   | "PAGE_SIZE"
   | "DENSE"
   | "PERIOD"
-  | "COLS";
+  | "COLS"
+  /** 금액 단위(키 GLOBAL, 값 원·천 원·백만 원). 단위 고르기(MoneyUnitSelect)가 직접 읽고 저장한다. */
+  | "AMT_UNIT";
 export interface UserPreferenceResult {
   prefTypeCd: PreferenceType;
   prefKey: string;

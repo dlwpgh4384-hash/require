@@ -5,40 +5,7 @@
   min-width: 0;
   color: var(--text);
 }
-/* 시안 .kpis/.kpi: 요약 칸 */
-.project-board-kpis {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 16px;
-}
-.project-board-kpi {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  padding: 16px 20px;
-  border: 1px solid var(--divider, var(--border));
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-}
-.project-board-kpi .l {
-  font-size: 13px;
-  color: var(--text-sub);
-}
-.project-board-kpi .v {
-  font-size: 24px;
-  line-height: 32px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.project-board-kpi .d {
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--text-sub);
-  overflow-wrap: anywhere;
-}
+/* 요약 칸은 공통 KpiCards(.ls-kpis/.ls-kpi). 휴대폰 배치만 아래 @media에서 더한다 */
 /* 시안 .tabs .tb */
 .project-board-tabs {
   display: flex;
@@ -152,7 +119,7 @@
   width: 32%;
 }
 @media (max-width: 767px) {
-  .project-board-kpis {
+  .ls-kpis.project-board-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }

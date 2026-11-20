@@ -38,6 +38,7 @@ public class CommonWithdrawalService {
     public Instant now() { return calendar.now(); }
     public String userId() { return assignmentService.userId(); }
     /** 철수 리스트 엑셀을 받으면 접근 기록(DNLD)을 남긴다(다른 목록 엑셀과 같음, 2026-11-19 엑셀 점검에서 찾음). */
+    @Transactional
     public void recordDownload(int count, Integer year) { mapper.insertAccess(userId(), "철수 리스트 " + (year == null ? "" : year + "년 ") + count + "건"); }
 
     private ListFilter filter(Filter filter, String period, WithdrawalRecommendationService.Context context) {

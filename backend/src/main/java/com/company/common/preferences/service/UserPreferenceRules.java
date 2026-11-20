@@ -10,7 +10,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class UserPreferenceRules {
     /** COLS: 목록 열 설정(SFR-010-05). 키=화면 번호, 값=숨긴 열 key 목록(JSON 배열). */
-    private static final Set<String> TYPES = Set.of("FAV", "RECENT", "MENU_FOLD", "PAGE_SIZE", "DENSE", "PERIOD", "COLS");
+    /** AMT_UNIT: 금액 단위(공통코드 PREF_TYPE). 키=GLOBAL, 값=원·천 원·백만 원(시안 unitSel). */
+    private static final Set<String> TYPES = Set.of("FAV", "RECENT", "MENU_FOLD", "PAGE_SIZE", "DENSE", "PERIOD", "COLS", "AMT_UNIT");
     private static final Set<String> MONTH_SCREENS = Set.of("UI-04", "UI-10", "UI-14", "UI-16", "UI-19", "UI-20",
         "UI-07", "UI-08", "UI-09", "UI-18");
     private final ObjectMapper json;
@@ -32,6 +33,7 @@ public class UserPreferenceRules {
             case "PAGE_SIZE" -> { if (!Set.of("20", "50", "100").contains(value)) invalid("목록 건수는 20, 50, 100 중에서 입력해 주세요."); }
             case "DENSE" -> { if (!Set.of("넓게", "좁게").contains(value)) invalid("보기 밀도는 넓게 또는 좁게를 선택해 주세요."); }
             case "MENU_FOLD" -> { if (!Set.of("true", "false").contains(value)) invalid("메뉴 접기 값을 확인해 주세요."); }
+            case "AMT_UNIT" -> { if (!Set.of("원", "천 원", "백만 원").contains(value)) invalid("금액 단위는 원, 천 원, 백만 원 중에서 선택해 주세요."); }
             case "FAV", "RECENT" -> validateList(value, type.equals("FAV") ? 10 : 5);
             case "PERIOD" -> validatePeriod(key, value);
             case "COLS" -> validateColumns(value);

@@ -4,6 +4,8 @@ import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
   Banner,
+  KpiCard,
+  KpiCards,
   ListFilter,
   ListFilters,
   ListView,
@@ -474,28 +476,32 @@ export function BillingPage() {
               </span>
             </Banner>
           )}
-          <div className="bill-kpis" aria-label="청구 요약">
-            <div className="bill-kpi" data-testid="bill-kpi-year">
-              <span className="l">{year}년 청구</span>
-              <span className="v">{billShortMoney(data?.summary.yearBillTotal ?? 0)}</span>
-              <span className="d">{data?.summary.yearBillCount ?? 0}건 · 부가세 포함</span>
-            </div>
-            <div className="bill-kpi" data-testid="bill-kpi-month">
-              <span className="l">이번 달 청구</span>
-              <span className="v">{billShortMoney(data?.summary.currentMonthBillTotal ?? 0)}</span>
-              <span className="d">{current ? thisMonth.length : 0}건</span>
-            </div>
-            <div className="bill-kpi" data-testid="bill-kpi-unpaid">
-              <span className="l">미수금</span>
-              <span className="v">{billShortMoney(data?.summary.unpaidTotal ?? 0)}</span>
-              <span className="d">{data?.summary.unpaidCount ?? 0}건</span>
-            </div>
-            <div className="bill-kpi" data-testid="bill-kpi-late">
-              <span className="l">연체</span>
-              <span className="v">{data?.summary.overdueCount ?? 0}건</span>
-              <span className="d">입금 예정일 지남</span>
-            </div>
-          </div>
+          <KpiCards aria-label="청구 요약">
+            <KpiCard
+              testId="bill-kpi-year"
+              label={`${year}년 청구`}
+              value={billShortMoney(data?.summary.yearBillTotal ?? 0)}
+              description={`${data?.summary.yearBillCount ?? 0}건 · 부가세 포함`}
+            />
+            <KpiCard
+              testId="bill-kpi-month"
+              label="이번 달 청구"
+              value={billShortMoney(data?.summary.currentMonthBillTotal ?? 0)}
+              description={`${current ? thisMonth.length : 0}건`}
+            />
+            <KpiCard
+              testId="bill-kpi-unpaid"
+              label="미수금"
+              value={billShortMoney(data?.summary.unpaidTotal ?? 0)}
+              description={`${data?.summary.unpaidCount ?? 0}건`}
+            />
+            <KpiCard
+              testId="bill-kpi-late"
+              label="연체"
+              value={`${data?.summary.overdueCount ?? 0}건`}
+              description="입금 예정일 지남"
+            />
+          </KpiCards>
           <ListFilters
             testId="bill-filters"
             onSearch={() => {

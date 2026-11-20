@@ -78,7 +78,7 @@ function preferenceResponse(url: string) {
     meta: {},
     data: {
       prefTypeCd: url.split("/").at(-2),
-      prefKey: "GLOBAL",
+      prefKey: url.split("/").at(-1),
       found: false,
       prefVal: null,
       modDttm: null,
@@ -1697,6 +1697,177 @@ describe("assignment route composition", () => {
     });
     expect(await screen.findByTestId("assignment-empty")).toBeVisible();
     expect(screen.getAllByTestId("assignment-create")).toHaveLength(1);
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
+    expectSingleShell();
+  });
+});
+
+function respondWithProjectCostAnalyses() {
+  const menus = response();
+  menus.data.push(
+    {
+      ...menus.data[0],
+      menuId: "G006",
+      menuNm: "원가·수익",
+      scrnId: null,
+      sortOrd: 2,
+    },
+    {
+      ...menus.data[0],
+      menuId: "M015",
+      upperMenuId: "G006",
+      menuNm: "프로젝트 원가 분석",
+      scrnId: "UI-04",
+      menuLvl: 2,
+    },
+    {
+      ...menus.data[0],
+      menuId: "reference-menu",
+      menuNm: "단가 검토",
+      scrnId: "UI-32",
+      sortOrd: 3,
+    },
+  );
+  menus.meta.screenAccess.push(
+    { scrnId: "UI-04", available: true, pcOnlyYn: "N" },
+    { scrnId: "UI-32", available: true, pcOnlyYn: "N" },
+  );
+  const success = (data: unknown) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ success: true, meta: {}, data }),
+  });
+  const list = vi.fn(async () =>
+    success({
+      items: [],
+      projectOptions: [],
+      totalCount: 0,
+      summary: {
+        cumulativeRevenue: 0,
+        cumulativeProfit: 0,
+        lowMarginCount: 0,
+        budgetExceededCount: 0,
+        researchCost: 0,
+      },
+    }),
+  );
+  const request = vi.fn(async (url: string, _init?: RequestInit) => {
+    if (url === "/api/common/menus")
+      return { ok: true, status: 200, json: async () => menus };
+    if (url.startsWith("/api/common/project-cost-analyses?")) return list();
+    if (url.startsWith("/api/common/code-groups/"))
+      return success({ items: [] });
+    if (url.startsWith("/api/common/user-preferences/")) {
+      const body = preferenceResponse(url);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ...body,
+          meta: url.endsWith("/PERIOD/UI-04")
+            ? {
+                periodBasis: {
+                  cashBaseYm: "202501",
+                  latestYm: "202602",
+                  closedMonths: [],
+                },
+              }
+            : {},
+        }),
+      };
+    }
+    throw new Error(`예상하지 않은 요청: ${url}`);
+  });
+  vi.stubGlobal("fetch", request);
+  return { request, list };
+}
+
+describe("project cost analysis route composition", () => {
+  it.each(["/screens/UI-04", "/#UI-04"])(
+    "%s renders the registered page using its relative public client in one shell",
+    async (path) => {
+      const { request } = respondWithProjectCostAnalyses();
+      mount(path);
+      expect(
+        await screen.findByText("조건에 맞는 결과가 없습니다."),
+      ).toBeVisible();
+      expect(screen.getAllByTestId("project-cost-analysis-page")).toHaveLength(
+        1,
+      );
+      expect(screen.getByTestId("project-cost-summary")).toBeVisible();
+      expect(request).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /^\/api\/common\/project-cost-analyses\?year=\d{4}&baseMonth=\d{1,2}&alertOnly=false$/,
+        ),
+        { signal: expect.any(AbortSignal) },
+      );
+      expect(
+        request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
+      ).toBe(false);
+      expect(router?.state.location.pathname).toBe("/screens/UI-04");
+      expectSingleShell();
+    },
+  );
+
+  it("M015 under G006 opens UI-04 without replacing the preferences provider", async () => {
+    respondWithProjectCostAnalyses();
+    mount("/screens/ADDED");
+    await screen.findByRole("region", { name: "ADDED 본문" });
+    const preferences = screen.getByTestId("user-preferences");
+    fireEvent.click(screen.getByTestId("menu-toggle-g006"));
+    fireEvent.click(screen.getByRole("link", { name: "프로젝트 원가 분석" }));
+    await screen.findByText("조건에 맞는 결과가 없습니다.");
+    expect(router?.state.location.pathname).toBe("/screens/UI-04");
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
+    expect(screen.getByTestId("screen-tab-ui-04")).toBeVisible();
+    expectSingleShell();
+  });
+
+  it("routed list failure retries the same client without a login redirect", async () => {
+    const { request, list } = respondWithProjectCostAnalyses();
+    list.mockRejectedValueOnce(new Error("분석 조회 연결 실패"));
+    mount("/screens/UI-04");
+    await screen.findByText("분석 조회 연결 실패");
+    expect(
+      screen.queryByText("조건에 맞는 결과가 없습니다."),
+    ).not.toBeInTheDocument();
+    const first = request.mock.calls.find(([url]) =>
+      url.startsWith("/api/common/project-cost-analyses?"),
+    )![0];
+    fireEvent.click(
+      within(screen.getByTestId("project-cost-analysis-page")).getByRole(
+        "button",
+        { name: "다시 시도" },
+      ),
+    );
+    await screen.findByText("조건에 맞는 결과가 없습니다.");
+    expect(
+      request.mock.calls
+        .filter(([url]) => url.startsWith("/api/common/project-cost-analyses?"))
+        .map(([url]) => url),
+    ).toEqual([first, first]);
+    expect(router?.state.location.pathname).toBe("/screens/UI-04");
+    expectSingleShell();
+  });
+
+  it("UI-32 remains a placeholder and returning to UI-04 preserves the shared scope", async () => {
+    respondWithProjectCostAnalyses();
+    mount("/screens/UI-04");
+    await screen.findByText("조건에 맞는 결과가 없습니다.");
+    const preferences = screen.getByTestId("user-preferences");
+    await act(async () => {
+      await router!.navigate("/screens/UI-32");
+    });
+    expect(
+      await screen.findByRole("region", { name: "UI-32 본문" }),
+    ).toHaveTextContent("준비 중");
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
+    await act(async () => {
+      await router!.navigate("/screens/UI-04");
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("project-cost-analysis-page")).toBeVisible(),
+    );
     expect(screen.getByTestId("user-preferences")).toBe(preferences);
     expectSingleShell();
   });

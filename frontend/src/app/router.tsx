@@ -12,6 +12,7 @@ export function createAppRouter() {
       ),
       children: [
         { path: "/", element: <CommonNavigationPage /> },
+        // UI-04 (M015/G006) is resolved by screenRegistry inside the shared shell.
         { path: "/screens/:scrnId", element: <CommonNavigationPage /> },
         { path: "*", element: <CommonNavigationPage /> },
       ],

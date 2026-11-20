@@ -1,0 +1,111 @@
+.project-cost-analysis-page {
+  min-width: 0;
+}
+.project-cost-analysis-page .project-cost-summary {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.project-cost-month {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+}
+.project-cost-analysis-page select,
+.project-cost-analysis-page input {
+  max-width: 100%;
+}
+.project-cost-budget {
+  display: grid;
+  gap: 3px;
+  min-width: 86px;
+}
+.project-cost-budget meter {
+  width: 100%;
+  height: 6px;
+}
+.project-cost-budget.is-red {
+  color: var(--red, #c43b3b);
+}
+.project-cost-budget.is-orange {
+  color: var(--orange, #c16c17);
+}
+.project-cost-budget.is-red meter {
+  accent-color: #c43b3b;
+}
+.project-cost-budget.is-orange meter {
+  accent-color: #c16c17;
+}
+.project-cost-causes article {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border, #e3e7ed);
+}
+.project-cost-cause-bar {
+  height: 7px;
+  margin-top: 6px;
+  max-width: 100%;
+  border-radius: 4px;
+}
+.project-cost-cause-bar.is-red {
+  background: var(--red, #c43b3b);
+}
+.project-cost-cause-bar.is-grey {
+  background: var(--muted, #8c96a5);
+}
+[data-testid="project-cost-detail"] table {
+  width: 100%;
+  text-align: left;
+  border-collapse: collapse;
+}
+[data-testid="project-cost-detail"] th,
+[data-testid="project-cost-detail"] td {
+  padding: 8px 4px;
+  border-bottom: 1px solid #e3e7ed;
+  overflow-wrap: anywhere;
+}
+[data-testid="project-cost-simulation"] {
+  padding: 16px 0;
+}
+[data-testid="project-cost-simulation"] form {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+[data-testid="project-cost-simulation"] label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+[data-testid="project-cost-simulation"] input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+[data-testid="project-cost-simulation"] [role="alert"] {
+  color: var(--red, #c43b3b);
+  font-size: 12px;
+}
+.project-cost-mobile-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.project-cost-mobile-card dl {
+  margin: 10px 0;
+}
+.project-cost-mobile-card dl > div {
+  display: grid;
+  grid-template-columns: minmax(95px, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 4px 0;
+}
+.project-cost-mobile-card dd {
+  margin: 0;
+  text-align: right;
+}
+@media (max-width: 640px) {
+  .project-cost-analysis-page .project-cost-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  [data-testid="project-cost-simulation"] form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

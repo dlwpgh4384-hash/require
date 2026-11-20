@@ -30,17 +30,13 @@ import {
   type RateRenegotiationResult,
   type RateRenegotiationRow,
 } from "./rateRenegotiations";
+import {
+  rateRenegotiationColumnHelp,
+  rateRenegotiationFormulaFoot,
+  rateRenegotiationFormulas,
+} from "./rateRenegotiationFormulas";
 import "./rateRenegotiations.css";
 
-type HelpKey = keyof RateRenegotiationResult["formulaHelp"];
-const helpKeys = new Set<string>([
-  "renewalDate",
-  "monthlyCost",
-  "profitRate",
-  "targetUnitPrice",
-  "requiredIncreaseRate",
-  "annualProfitIncrease",
-]);
 const moneyKeys = new Set<string>([
   "currentUnitPrice",
   "monthlyCost",
@@ -71,7 +67,6 @@ export function RateRenegotiationWorkspace() {
   const [optionError, setOptionError] = useState(false);
   const [optionRevision, setOptionRevision] = useState(0);
   const [detail, setDetail] = useState<string | null>(null);
-  const [help, setHelp] = useState<HelpKey | null>(null);
   const [unit, setUnit] = useState<MoneyUnit>(DEFAULT_MONEY_UNIT);
   const [page, setPage] = useState(1);
   const [downloading, setDownloading] = useState(false);
@@ -200,7 +195,7 @@ export function RateRenegotiationWorkspace() {
       required: key === "developerName",
       sortable: false,
       align: typeof data?.items[0]?.[key] === "number" ? "right" : "left",
-      calc: helpKeys.has(key) ? data?.formulaHelp[key as HelpKey] : undefined,
+      calc: rateRenegotiationColumnHelp(data?.summary.targetProfitRate)[key],
       render: (row) => cell(row, key),
     }));
   const selected = useListColumns("UI-32", columns);
@@ -462,41 +457,11 @@ export function RateRenegotiationWorkspace() {
               </button>
             ))}
       </div>
-      <div className="rate-help-actions" aria-label="머리글 계산 도움말">
-        {rateRenegotiationColumns
-          .filter(([key]) => helpKeys.has(key))
-          .map(([key, label]) => (
-            <button
-              type="button"
-              className="ls-btn ls-btn-sm"
-              key={key}
-              data-testid={`rate-help-${kebab(key)}`}
-              aria-expanded={help === key}
-              disabled={!data}
-              onClick={() =>
-                setHelp((previous) =>
-                  previous === key ? null : (key as HelpKey),
-                )
-              }
-            >
-              {label} ⓘ
-            </button>
-          ))}
-      </div>
-      {help && data && (
-        <div className="rate-help-content" data-testid="rate-help-content">
-          {data.formulaHelp[help]}
-        </div>
-      )}
-      {data && (
-        <FormulaBox
-          rows={rateRenegotiationColumns
-            .filter(([key]) => helpKeys.has(key))
-            .map(([key, label]) => [label, data.formulaHelp[key as HelpKey]])}
-          foot={`기준월 ${data.baseYearMonth} · 1년 계속 투입 가정`}
-          testId="rate-formulas"
-        />
-      )}
+      <FormulaBox
+        rows={rateRenegotiationFormulas(data?.summary.targetProfitRate)}
+        foot={rateRenegotiationFormulaFoot}
+        testId="rate-formulas"
+      />
       {detail && (
         <DeveloperDetail
           developerId={detail}

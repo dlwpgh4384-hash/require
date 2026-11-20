@@ -7,8 +7,7 @@
 .rate-kpis {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
-.rate-assumption,
-.rate-help-actions {
+.rate-assumption {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -21,14 +20,6 @@
   display: block;
   color: var(--ls-bad);
   font-size: 12px;
-}
-.rate-help-content {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  padding: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
 }
 .rate-mobile-cards {
   display: none;

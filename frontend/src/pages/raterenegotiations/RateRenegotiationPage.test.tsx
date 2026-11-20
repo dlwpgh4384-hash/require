@@ -233,17 +233,22 @@ it.each([
     ).toBe(true);
   },
 );
-it("shows each field's DB help rather than copying one formula everywhere", async () => {
+it("shows the mockup's short formula box with the target rate and no long DB text", async () => {
   mount();
   await ready();
-  for (const [key, text] of Object.entries(result.formulaHelp)) {
-    fireEvent.click(
-      screen.getByTestId(
-        `rate-help-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`,
-      ),
-    );
-    expect(screen.getByTestId("rate-help-content")).toHaveTextContent(text);
-  }
+  const box = screen.getByTestId("rate-formulas");
+  const rows = within(box)
+    .getAllByRole("row")
+    .slice(1)
+    .map((row) => row.textContent);
+  expect(rows).toHaveLength(6);
+  expect(rows[3]).toContain("월 원가 ÷ MM ÷ (1 − 20%)");
+  expect(rows[1]).toContain("급여 업로드 전이면 개발자 풀 월 급여로 계산");
+  expect(box).toHaveTextContent(
+    "턴키는 계약금액 단위로 협상하므로 빠집니다. 줄을 누르면 그 사람의 상세가 열립니다.",
+  );
+  expect(box).not.toHaveTextContent("DB 갱신 정의");
+  expect(screen.queryByTestId("rate-help-renewal-date")).not.toBeInTheDocument();
 });
 it("opens the clicked developer read-only and retains conditions, assumption and hidden columns on close", async () => {
   mount();

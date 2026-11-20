@@ -15,6 +15,8 @@ import {
   KpiCard,
   KpiCards,
   ListView,
+  useListColumns,
+  useListPresentation,
   Money,
   MoneyUnitSelect,
   formatKoreanMoney,
@@ -90,10 +92,7 @@ export function PartSettlementPage() {
   const [developerId, setDeveloperId] = useState<string | null>(null);
   const [pending, setPending] = useState<(() => void) | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
   const [sort, setSort] = useState<ListSort | null>(null);
-  const [dense, setDense] = useState(false);
-  const [hidden, setHidden] = useState<string[]>([]);
   const cardRef = useRef<HTMLInputElement>(null);
   const reasonRef = useRef<HTMLTextAreaElement>(null);
   const saving = useRef(false);
@@ -383,6 +382,9 @@ export function PartSettlementPage() {
       ),
     },
   ];
+  // 열 설정·쪽당 건수·좁게 보기는 공통 사용자 설정에 저장한다(다른 목록 화면과 같음).
+  const columnState = useListColumns("UI-19", columns);
+  const presentation = useListPresentation();
   const items = detail?.items ?? [];
   const rows = [...items];
   if (sort)
@@ -424,7 +426,7 @@ export function PartSettlementPage() {
     partId && !loading && !error
       ? () => {
           void api
-            .getCommonPartSettlementsExcel(partId, yearMonth, view)
+            .getCommonPartSettlementsExcel(partId, yearMonth, view, columnState.visible.map((column) => column.key))
             .catch((cause) => toast(message(cause), "warn"));
         }
       : undefined;
@@ -655,34 +657,29 @@ export function PartSettlementPage() {
           <ListView
             screenId="UI-19"
             columns={columns}
-            visibleColumns={columns.filter(
-              (column) => !hidden.includes(column.key),
-            )}
-            hiddenColumns={hidden}
-            onToggleColumn={(key) =>
-              setHidden((previous) =>
-                previous.includes(key)
-                  ? previous.filter((value) => value !== key)
-                  : [...previous, key],
-              )
-            }
-            onResetColumns={() => setHidden([])}
+            visibleColumns={columnState.visible}
+            hiddenColumns={columnState.hidden}
+            onToggleColumn={columnState.toggle}
+            onResetColumns={columnState.reset}
             rows={
               loading || error
                 ? null
-                : rows.slice((page - 1) * pageSize, page * pageSize)
+                : rows.slice(
+                    (page - 1) * presentation.pageSize,
+                    page * presentation.pageSize,
+                  )
             }
             rowKey={(row) => row.developerId}
             total={rows.length}
             page={page}
-            pageSize={pageSize}
+            pageSize={presentation.pageSize}
             onPage={setPage}
             onPageSize={(value) => {
-              setPageSize(value);
+              presentation.setPageSize(value);
               setPage(1);
             }}
-            dense={dense}
-            onDense={setDense}
+            dense={presentation.dense}
+            onDense={presentation.setDense}
             sort={sort}
             onSort={setSort}
             error={error}

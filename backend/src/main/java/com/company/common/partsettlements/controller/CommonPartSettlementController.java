@@ -12,9 +12,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping(value="/api/common/part-settlements",produces="application/json")
 public class CommonPartSettlementController {
     private final CommonPartSettlementService service;
-    private final PartSettlementCloseService close;
+    private final PartSettlementAutoConfirmService close;
     private final PartSettlementExcelService excel;
-    public CommonPartSettlementController(CommonPartSettlementService service,PartSettlementCloseService close,PartSettlementExcelService excel) {
+    public CommonPartSettlementController(CommonPartSettlementService service,PartSettlementAutoConfirmService close,PartSettlementExcelService excel) {
         this.service=service;this.close=close;this.excel=excel;
     }
     @GetMapping
@@ -45,8 +45,9 @@ public class CommonPartSettlementController {
         return Response.of(close.putCommonPartSettlementCloseConfirm(PartSettlementInput.close(body)));
     }
     @GetMapping(value="/excel",produces={"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/json"})
-    public ResponseEntity<byte[]> getCommonPartSettlementsExcel(@RequestParam String partId,@RequestParam String yearMonth,@RequestParam String view) {
-        var file=excel.getCommonPartSettlementsExcel(partId,yearMonth,view);
+    public ResponseEntity<byte[]> getCommonPartSettlementsExcel(@RequestParam String partId,@RequestParam String yearMonth,@RequestParam String view,
+        @RequestParam(required=false) String columns) {
+        var file=excel.getCommonPartSettlementsExcel(partId,yearMonth,view,columns);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(file.fileName(),StandardCharsets.UTF_8).build().toString())
             .body(file.bytes());

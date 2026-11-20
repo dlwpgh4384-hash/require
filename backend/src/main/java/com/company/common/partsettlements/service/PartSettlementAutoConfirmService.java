@@ -10,11 +10,11 @@ import org.springframework.transaction.annotation.*;
 import static com.company.common.partsettlements.service.PartSettlementRules.*;
 
 @Service("partSettlementConfirmationService")
-public class PartSettlementCloseService {
+public class PartSettlementAutoConfirmService {
     private final PartSettlementMapper mapper;
     private final CommonPartSettlementService settlements;
     private final PartSettlementDefinitions definitions;
-    public PartSettlementCloseService(PartSettlementMapper mapper,CommonPartSettlementService settlements,PartSettlementDefinitions definitions) {
+    public PartSettlementAutoConfirmService(PartSettlementMapper mapper,CommonPartSettlementService settlements,PartSettlementDefinitions definitions) {
         this.mapper=mapper; this.settlements=settlements; this.definitions=definitions;
     }
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)

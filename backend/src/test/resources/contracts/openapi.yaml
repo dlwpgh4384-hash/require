@@ -10024,6 +10024,12 @@ paths:
           - monthly
           - trend
           description: 화면 이번 달/기간 추이 선택의 wire명·업무상태enum아님
+      - name: columns
+        in: query
+        required: false
+        schema:
+          type: string
+          description: 이번 달 표에서 보이는 열 key를 쉼표로 이음(예 developerName,unitPrice). 없으면 모든 열·기간 추이는 쓰지 않음
       x-pagination-filtering:
         pagination: 대상조건 전체결과·서버분할없음; UI ListView 기존 로컬페이지
         filtering: yearMonth·partId·view

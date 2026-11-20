@@ -15,7 +15,7 @@ class PartSettlementBoundaryPreservationTest {
     @Test
     void closeCheckAndConfirmationServicesCanBeScannedTogether() {
         var checks = com.company.common.commonops.service.PartSettlementCloseService.class;
-        var confirmation = com.company.common.partsettlements.service.PartSettlementCloseService.class;
+        var confirmation = com.company.common.partsettlements.service.PartSettlementAutoConfirmService.class;
         var registry = new DefaultListableBeanFactory();
         var scanner = new ClassPathBeanDefinitionScanner(registry, false);
         scanner.addIncludeFilter(new AssignableTypeFilter(checks));

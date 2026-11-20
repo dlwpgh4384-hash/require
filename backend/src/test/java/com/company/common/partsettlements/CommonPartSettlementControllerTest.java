@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(CommonPartSettlementController.class)
 @ContextConfiguration(classes={CommonPartSettlementController.class,CommonPartSettlementService.class,
-    PartSettlementCloseService.class,PartSettlementExcelService.class,PartSettlementDefinitions.class,
+    PartSettlementAutoConfirmService.class,PartSettlementExcelService.class,PartSettlementDefinitions.class,
     CalculationRuleService.class,CodeExceptionHandler.class,ApiExceptionHandler.class,
     ExcelExportService.class,BusinessCalendar.class,CurrentBusinessActor.class})
 class CommonPartSettlementControllerTest {
@@ -204,6 +204,20 @@ class CommonPartSettlementControllerTest {
             assertThat(workbook.getSheetAt(0).getRow(3).getCell(0).getStringCellValue()).isEqualTo("개발자 D");
         }
         verify(mapper,times(1)).insertAccess(eq("admin"),contains("A 2026-01 monthly"));assertThat(data.headers).isEmpty();
+    }
+    @Test void downloadKeepsOnlyVisibleColumnsAndAlwaysTheName() throws Exception {
+        byte[] bytes=mvc.perform(get(ROOT+"/excel").param("partId","A").param("yearMonth","2026-01").param("view","monthly")
+                .param("columns","unitPrice,profitShare"))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        try (var workbook=new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+            var header=workbook.getSheetAt(0).getRow(2);
+            assertThat(header.getPhysicalNumberOfCells()).isEqualTo(3);
+            assertThat(header.getCell(0).getStringCellValue()).isEqualTo("이름");
+            assertThat(header.getCell(1).getStringCellValue()).isEqualTo("단가");
+            assertThat(header.getCell(2).getStringCellValue()).startsWith("이익금(");
+        }
+        mvc.perform(get(ROOT+"/excel").param("partId","A").param("yearMonth","2026-01").param("view","monthly")
+            .param("columns","unknown")).andExpect(status().isBadRequest());
     }
     @Test void invalidDownloadDoesNotLogSuccess() throws Exception {
         mvc.perform(get(ROOT+"/excel").param("partId","A").param("yearMonth","2026-01").param("view","unknown"))

@@ -39,13 +39,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnabledIfEnvironmentVariable(named="NAVIGATION_TEST_DB_URL",matches="jdbc:postgresql:.*")
 @WebMvcTest(CommonPartSettlementController.class)
 @ContextConfiguration(classes={CommonPartSettlementController.class,CommonPartSettlementService.class,
-    PartSettlementCloseService.class,PartSettlementExcelService.class,PartSettlementDefinitions.class,
+    PartSettlementAutoConfirmService.class,PartSettlementExcelService.class,PartSettlementDefinitions.class,
     CalculationRuleService.class,CodeExceptionHandler.class,ApiExceptionHandler.class,
     PartSettlementPersistenceTest.Persistence.class,ExcelExportService.class,BusinessCalendar.class,CurrentBusinessActor.class})
 @DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class PartSettlementPersistenceTest {
     @Autowired MockMvc mvc; @Autowired ObjectMapper json; @Autowired DataSource source; @Autowired Owned owned;
-    @Autowired PartSettlementCloseService close;
+    @Autowired PartSettlementAutoConfirmService close;
     JdbcTemplate db;
     record Owned(String name) {}
     @TestConfiguration(proxyBeanMethods=false) @EnableTransactionManagement

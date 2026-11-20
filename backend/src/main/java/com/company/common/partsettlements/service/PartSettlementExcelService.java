@@ -18,8 +18,15 @@ public class PartSettlementExcelService {
         ExcelExportService excel,CurrentBusinessActor actor,BusinessCalendar calendar) {
         this.service=service;this.mapper=mapper;this.excel=excel;this.actor=actor;this.calendar=calendar;
     }
+    /** 이번 달 표 열 열쇠(화면 ListView 열 key와 같은 순서). */
+    static final List<String> MONTHLY_KEYS=List.of("developerName","employeeTypeCode","projectNames","monthlyMm","unitPrice",
+        "salary","salesExpense","retirementAmount","totalCost","profit","profitShare","notes");
     @Transactional(isolation=Isolation.REPEATABLE_READ)
     public ExcelFile getCommonPartSettlementsExcel(String partId,String yearMonth,String view) {
+        return getCommonPartSettlementsExcel(partId,yearMonth,view,null);
+    }
+    @Transactional(isolation=Isolation.REPEATABLE_READ)
+    public ExcelFile getCommonPartSettlementsExcel(String partId,String yearMonth,String view,String columns) {
         PartSettlementRules.month(yearMonth);
         List<String> headers;
         List<List<String>> rows=new ArrayList<>();
@@ -40,11 +47,22 @@ public class PartSettlementExcelService {
                 sum.apply(Workforce::profit),sum.apply(Workforce::profitShare),""));
             rows.add(List.of("법인카드","","","","","","","","","",data.corpCardAmount().negate().toPlainString(),""));
             rows.add(List.of("파트 이익금","","","","","","","","","",data.summary().partProfitAmount().toPlainString(),""));
+            // SFR-011: 화면에서 보이는 열만 내보낸다(이름 열은 늘 있음). 열 값이 없으면 모든 열.
+            if (columns!=null && !columns.isBlank()) {
+                var wanted=new LinkedHashSet<>(Arrays.asList(columns.split(",")));
+                for (String key:wanted) if (!MONTHLY_KEYS.contains(key)) throw CodeFailure.invalid("columns","내보낼 열을 확인해 주세요.");
+                var keep=new ArrayList<Integer>();
+                for (int i=0;i<MONTHLY_KEYS.size();i++) if (i==0 || wanted.contains(MONTHLY_KEYS.get(i))) keep.add(i);
+                var full=headers;
+                headers=keep.stream().map(full::get).toList();
+                rows.replaceAll(row->keep.stream().map(row::get).toList());
+            }
         } else if ("trend".equals(view)) {
             var data=service.getCommonPartSettlementTrends(partId,yearMonth);
-            headers=new ArrayList<>(List.of("이름","구분"));
-            data.monthlyTotals().forEach(t->headers.add(Integer.parseInt(t.yearMonth().substring(5))+"월"));
-            headers.add("합계");
+            var trendHeaders=new ArrayList<>(List.of("이름","구분"));
+            data.monthlyTotals().forEach(t->trendHeaders.add(Integer.parseInt(t.yearMonth().substring(5))+"월"));
+            trendHeaders.add("합계");
+            headers=trendHeaders;
             for (var person:data.items()) for (String metric:List.of("M/M","단가","비용","이익","이익금")) {
                 var row=new ArrayList<>(List.of(person.developerName(),metric));
                 java.math.BigDecimal sum=java.math.BigDecimal.ZERO;

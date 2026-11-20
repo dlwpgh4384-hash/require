@@ -148,9 +148,18 @@ export const getCommonPartSettlementsExcel = (
   partId: string,
   yearMonth: string,
   view: "monthly" | "trend",
+  columns?: string[],
 ) =>
   downloadFile(
-    `${root}/excel?${new URLSearchParams({ partId, yearMonth, view })}`,
+    `${root}/excel?${new URLSearchParams({
+      partId,
+      yearMonth,
+      view,
+      // 이번 달 표는 화면에 보이는 열만 내보낸다(SFR-011, UI-03과 같은 방식).
+      ...(view === "monthly" && columns?.length
+        ? { columns: columns.join(",") }
+        : {}),
+    })}`,
     "영업 파트 이익금.xlsx",
   );
 export const putCommonPartSettlementCloseConfirm = (body: {

@@ -18,6 +18,7 @@ import { WithdrawalWorkspaceProvider } from "../withdrawals/WithdrawalWorkspace"
 import { ProjectBoardWorkspaceProvider } from "../projectboard/ProjectBoardWorkspace";
 import { BillingWorkspaceProvider } from "../bills/BillingWorkspace";
 import { PartSettlementWorkspaceProvider } from "../partsettlements/PartSettlementWorkspace";
+import { FinanceItemWorkspaceProvider } from "../financeitems/FinanceItemWorkspace";
 import { CodeWorkspaceProvider } from "../codegroups/CodeWorkspace";
 import { ClientPartWorkspaceProvider } from "../clients/ClientPartWorkspace";
 import { DeveloperWorkspaceProvider } from "../developers/DeveloperWorkspace";
@@ -112,28 +113,31 @@ export function CommonNavigationPage() {
             <ClientPartWorkspaceProvider>
               <DeveloperWorkspaceProvider>
                 <ProjectWorkspaceProvider>
-                 <AssignmentWorkspaceProvider>
-                 <WithdrawalWorkspaceProvider>
-                 <ProjectBoardWorkspaceProvider>
-                 <BillingWorkspaceProvider>
-                 <PartSettlementWorkspaceProvider>
-                  {preferences ? (
-                    <PreferenceNavigation />
-                  ) : (
-                    <NavigationRoot
-                      tabs
-                      renderScreen={renderScreen}
-                      extensions={(context) => ({
-                        screenActions: screenActions(context.screenId),
-                      })}
-                    />
-                  )}
-                 </PartSettlementWorkspaceProvider>
-                 </BillingWorkspaceProvider>
-                 </ProjectBoardWorkspaceProvider>
-                 </WithdrawalWorkspaceProvider>
-
-                 </AssignmentWorkspaceProvider>
+                  <AssignmentWorkspaceProvider>
+                    <WithdrawalWorkspaceProvider>
+                      <ProjectBoardWorkspaceProvider>
+                        <BillingWorkspaceProvider>
+                          <PartSettlementWorkspaceProvider>
+                            <FinanceItemWorkspaceProvider>
+                              {preferences ? (
+                                <PreferenceNavigation />
+                              ) : (
+                                <NavigationRoot
+                                  tabs
+                                  renderScreen={renderScreen}
+                                  extensions={(context) => ({
+                                    screenActions: screenActions(
+                                      context.screenId,
+                                    ),
+                                  })}
+                                />
+                              )}
+                            </FinanceItemWorkspaceProvider>
+                          </PartSettlementWorkspaceProvider>
+                        </BillingWorkspaceProvider>
+                      </ProjectBoardWorkspaceProvider>
+                    </WithdrawalWorkspaceProvider>
+                  </AssignmentWorkspaceProvider>
                 </ProjectWorkspaceProvider>
               </DeveloperWorkspaceProvider>
             </ClientPartWorkspaceProvider>

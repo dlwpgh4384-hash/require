@@ -21,6 +21,8 @@ import { ProjectCostAnalysisPage } from "../projectcostanalyses/ProjectCostAnaly
 import { RateRenegotiationPage } from "../raterenegotiations/RateRenegotiationPage";
 import { PartSettlementPage } from "../partsettlements/PartSettlementPage";
 import { PartSettlementTitleActions } from "../partsettlements/PartSettlementWorkspace";
+import { FinanceItemPage } from "../financeitems/FinanceItemPage";
+import { FinanceItemTitleActions } from "../financeitems/FinanceItemWorkspace";
 import { ProjectBoardPage } from "../projectboard/ProjectBoardPage";
 import { ProjectBoardTitleActions } from "../projectboard/ProjectBoardWorkspace";
 import {
@@ -53,6 +55,13 @@ export interface ScreenEntry {
  * 공통 화면 틀 시험도 여기서 만든 화면과 「준비 중」 화면을 나눈다. 새 화면은 여기에 한 줄만 더한다.
  */
 export const screenRegistry: readonly ScreenEntry[] = [
+  {
+    id: "UI-10",
+    Page: () => <FinanceItemPage />,
+    TitleActions: () => <FinanceItemTitleActions />,
+    rootTestId: "finance-items-page",
+    hasInputs: true,
+  },
   {
     id: "UI-32",
     Page: () => <RateRenegotiationPage />,

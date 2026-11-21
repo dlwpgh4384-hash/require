@@ -10385,8 +10385,877 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/finance-items/{yearMonth}:
+    get:
+      operationId: getCommonFinanceItems
+      summary: 재무 항목 월별 조회
+      security: []
+      x-related-requirements:
+      - REQ-929
+      - REQ-943
+      - REQ-944
+      - REQ-963
+      - REQ-964
+      - REQ-972
+      - REQ-973
+      - REQ-974
+      - REQ-976
+      - REQ-986
+      - REQ-996
+      - REQ-1002
+      - REQ-930
+      - REQ-931
+      parameters:
+      - name: yearMonth
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{6}$
+      x-pagination-filtering:
+        pagination: 선택월 전체 행 반환; 이 입력 화면의 행을 서버 page로 자르지 않음
+        filtering: yearMonth 또는 previous-items 기존 키/엑셀 columns만; 임의 업무 필터 없음
+        ordering: 기존 저장 순서/시안 대조; 세부 동순위는 OQ-UI-010
+      description: UI-22 전 무인증 개발 호출. scheme/역할거부 시험은 OQ-AUTH-010의 충돌이며 새401/403으로 위장하지 않는다. 원문 SQL·DB 식의 정확 키/타입과
+        시안 문구는 OQ-DATA/CALC/UI-010 대조.
+      responses:
+        '200':
+          description: 요구별 공개 결과와 저장 후 새 modifiedAt
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonFinanceMonth'
+                  required:
+                  - data
+        '400':
+          description: 잘못된 선택월·필수 칸·코드/열 또는 마감/확인된 줄 보호 위반; errors[].field와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-business-rules:
+      - GET은 연간 줄을 생성하지 않음; 최초 화면 개방은 별도 과세연도 준비 후 조회
+      - 새 달 자동 채움은 저장0건/지난달 저장RPT_YN=Y만 응답 미저장 초안으로 제공
+      - 카드 목록=USE_YN=Y 또는 해당월금액>0; 마감월 합계 불변
+      x-aiops-query-role:
+        entity: TB_FI_ITEM
+        result_path:
+        - data
+        - items
+    put:
+      operationId: putCommonFinanceItems
+      summary: 재무 항목 두 탭 저장
+      security: []
+      x-related-requirements:
+      - REQ-945
+      - REQ-948
+      - REQ-949
+      - REQ-950
+      - REQ-965
+      - REQ-966
+      - REQ-967
+      - REQ-968
+      - REQ-969
+      - REQ-970
+      - REQ-971
+      - REQ-975
+      - REQ-977
+      - REQ-978
+      - REQ-979
+      - REQ-985
+      - REQ-987
+      - REQ-988
+      - REQ-989
+      - REQ-990
+      - REQ-991
+      - REQ-992
+      - REQ-993
+      - REQ-994
+      - REQ-995
+      - REQ-997
+      - REQ-998
+      - REQ-999
+      - REQ-1000
+      - REQ-1001
+      - REQ-947
+      - REQ-960
+      - REQ-1004
+      parameters:
+      - name: yearMonth
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{6}$
+      description: UI-22 전 무인증 개발 호출. scheme/역할거부 시험은 OQ-AUTH-010의 충돌이며 새401/403으로 위장하지 않는다. 원문 SQL·DB 식의 정확 키/타입과
+        시안 문구는 OQ-DATA/CALC/UI-010 대조.
+      responses:
+        '200':
+          description: 요구별 공개 결과와 저장 후 새 modifiedAt
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonFinanceMonth'
+                  required:
+                  - data
+        '400':
+          description: 잘못된 선택월·필수 칸·코드/열 또는 마감/확인된 줄 보호 위반; errors[].field와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 기존 행 modifiedAt 불일치; 공통 문구·필드/성공 부수효과 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonFinanceMonthInput'
+      x-business-rules:
+      - 두 탭 입력을 한 저장 경계로 처리; 각 기존 id의 modifiedAt을 SQL에서 재검증. 누락 행은 삭제 의도이며 UI-10 항목의 기존 uploadId는 보존
+      - 마감월 쓰기 금지. 확인 납부줄은 payload에서 제외·이미 PAY_YN=Y이면 덮어쓰지 않음; 미확인 과거 CNFM 예정 수정은 과세연도 마감과 별개
+      - 부가세빈값0·금액명시0허용/빈값거부·대여금양수/월내날짜·조정사유300·마감대상최근12개월
+      - 카드 USE_YN만 전월공유·월금액은독립·목록변화가마감금액/합계를바꾸지않음. 일반 카드 추가/삭제/되살리기는 이 저장에만 확정
+      - 선택월이 미마감이면 그 화면에서 표시된 작년 CNFM 미확인 예정 수정도 저장 가능; 전체마감 과세연도라는 이유로 거부하지 않음
+      x-side-effects:
+      - TB_FI_ITEM/CORP_TAX/TAX_PAY/CARD/CARD_MON/CARD_PAY/XFER/LOAN 및 TB_CO_PREV_ADJ 선택 변경 저장·시각clock_timestamp()
+      - 미마감 손익/자금 원천 재집계·마감 TB_CO_MON_PL 고정·CNFM 수기변경 TB_SY_CHG_HIST·파트 정산카드 불변
+      x-state-transitions:
+      - 화면미저장 -> 두탭저장확정
+      - 카드Y -> N 또는N -> Y; 월금액불변
+      - 확인납부Y -> 불변; 납부확인은 이 연산에서 실행하지 않음
+      x-required-tests:
+      - 'happy: 두탭 유효 변경과 최신시각을 저장 ->200 후 GET items/loans/cards가 TB_FI_ITEM/TB_FI_LOAN/TB_FI_CARD_MON 저장값과 같다'
+      - 'auth: 인증 헤더 없이 개발중 두탭저장 ->200; 원문18/23행상 역할거부는 후속UI-22이며 현재401/403을 발명하지 않는다(OQ-AUTH-010)'
+      - 'validation: items[2].amount를 비우고 저장 ->400 errors[].field=items[2].amount·기존 TB_FI_ITEM 불변'
+      - 'business: 마감월 또는 PAY_YN=Y 줄 금액변경 제출 ->400·마감 월값/확인납부액 불변; 과거 미확인CNFM 수정은 미마감 화면에서 허용'
+      - 'side-effect: 미확인CNFM 예상액을 수기로 저장 -> TB_SY_CHG_HIST에서 전후금액 조회·자금예정만 변경·월할손익 불변'
+  /api/common/finance-items/tax-years/{taxYear}:
+    post:
+      operationId: postCommonFinanceTaxYear
+      summary: 과세연도 초기 준비
+      security: []
+      x-related-requirements:
+      - REQ-977
+      parameters:
+      - name: taxYear
+        in: path
+        required: true
+        schema:
+          type: integer
+      description: UI-22 전 무인증 개발 호출. scheme/역할거부 시험은 OQ-AUTH-010의 충돌이며 새401/403으로 위장하지 않는다. 원문 SQL·DB 식의 정확 키/타입과
+        시안 문구는 OQ-DATA/CALC/UI-010 대조.
+      responses:
+        '200':
+          description: 요구별 공개 결과와 저장 후 새 modifiedAt
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonFinanceTaxYear'
+                  required:
+                  - data
+        '400':
+          description: 잘못된 선택월·필수 칸·코드/열 또는 마감/확인된 줄 보호 위반; errors[].field와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 기존 행 modifiedAt 불일치; 공통 문구·필드/성공 부수효과 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-no-request-body-reason: taxYear path만 필요하며 작년 EST_TAX_AMT/없으면0·MID/CNFM 규칙은 서버 DB 원천이다. 사용자 임의 초기값은 받지 않는다.
+      x-business-rules:
+      - 선택 과세연도 줄이 없을 때만 연간1줄+MID/CNFM2줄 보완; 기존값/납부확정 보존
+      - MID 그해8월31일/CNFM 다음해3월31일·PAY_AMT null·PAY_YN N·연간작년값/없으면0
+      x-side-effects:
+      - TB_FI_CORP_TAX와 TB_FI_TAX_PAY 부재줄 생성·clock_timestamp(); 반복 실행은 기존값/행수 보존
+      x-state-transitions:
+      - 연도줄없음 -> 연간예상+MID/CNFM미확인
+      - 기존연도 -> 기존값유지
+      x-required-tests:
+      - 'happy: 연도줄 없는 해 준비 ->200 후 연간1줄/MID·CNFM2줄과 기본날짜 조회'
+      - 'auth: 개발무인증 과세연도개방 ->200·현재 로그인 요구 없음; 새역할거부는 OQ-AUTH-010'
+      - 'validation: taxYear에 정수 아닌 경로 입력 ->400 경로필드 오류·TB_FI_CORP_TAX 추가0행'
+      - 'business: 이미 납부확인/예상수정된 해 재준비 ->200·PAY_AMT/EST_TAX_AMT/행수 불변'
+      - 'side-effect: 작년 연간값 없는 해 준비 -> TB_FI_CORP_TAX.EST_TAX_AMT=0 및 TB_FI_TAX_PAY.PAY_YN=N·PAY_AMT=null'
+  /api/common/finance-items/tax-payments/{paymentId}/confirm:
+    post:
+      operationId: postCommonFinanceTaxPaymentConfirm
+      summary: 법인세 납부 확인
+      security: []
+      x-related-requirements:
+      - REQ-980
+      - REQ-981
+      - REQ-945
+      - REQ-947
+      parameters:
+      - name: paymentId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      description: UI-22 전 무인증 개발 호출. scheme/역할거부 시험은 OQ-AUTH-010의 충돌이며 새401/403으로 위장하지 않는다. 원문 SQL·DB 식의 정확 키/타입과
+        시안 문구는 OQ-DATA/CALC/UI-010 대조.
+      responses:
+        '200':
+          description: 요구별 공개 결과와 저장 후 새 modifiedAt
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonFinanceTaxPayment'
+                  required:
+                  - data
+        '400':
+          description: 잘못된 선택월·필수 칸·코드/열 또는 마감/확인된 줄 보호 위반; errors[].field와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 기존 행 modifiedAt 불일치; 공통 문구·필드/성공 부수효과 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonFinancePaymentConfirmInput'
+      x-business-rules:
+      - 해당줄만 즉시확정·실제납부일/액은 화면예정값(미저장포함)을 기본으로 입력·modifiedAt SQL재검증
+      - 이미PAY_YN=Y 수정금지·확인후연간변경으로금액재계산금지·날짜경과자동확인금지
+      - 다른두탭dirty는 유지·이줄dirty만확정결과로치환·하단취소로되돌리지않음; 마감월에서 실제납부확인허용행렬은 OQ-STATE-010
+      x-side-effects:
+      - TB_FI_TAX_PAY.PAY_YN=Y·PAY_AMT=실제액·실제일 숫자고정·clock_timestamp()
+      - 자금수지 법인세 납부를 실제값으로 대체·손익월할불변·성공Toast
+      x-state-transitions:
+      - PAY_YN=N -> Y
+      - PAY_YN=Y -> 수정거부
+      x-required-tests:
+      - 'happy: 미확인줄에 실제일/실제액과최신시각 전송 ->200 후 TB_FI_TAX_PAY.PAY_YN=Y/PAY_AMT=입력액 재조회; 이어 하단취소/연간액수정해도 확인액 불변'
+      - 'auth: 무인증개발상태의 납부확인 ->200·로그인연결없음; 역할거부상태코드는 OQ-AUTH-010으로 미확정'
+      - 'validation: 실제납부일 누락 ->400 errors[].field=actualPaymentDate·PAY_YN=N 유지'
+      - 'business: 이미확인한줄 또는stale시각 확인 ->각400/409·PAY_AMT/실제일불변·다른dirty 입력유지'
+      - 'side-effect: 화면에 미저장예정액과다른탭dirty를 두고확인 -> 자금수지실제납부가확정액이며 해당줄만잠금·다른탭dirty그대로·Toast표시'
+  /api/common/finance-items/{yearMonth}/previous-items:
+    get:
+      operationId: getCommonFinancePreviousItems
+      summary: 지난달 누락 항목 조회
+      security: []
+      x-related-requirements:
+      - REQ-972
+      parameters:
+      - name: yearMonth
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{6}$
+      - name: existingKeys
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            description: 이번 달 화면의 구분+세부 항목 결합 키; 서버는 선택월 저장줄과 합집합으로 중복 제외
+      x-pagination-filtering:
+        pagination: 선택월 전체 행 반환; 이 입력 화면의 행을 서버 page로 자르지 않음
+        filtering: yearMonth 또는 previous-items 기존 키/엑셀 columns만; 임의 업무 필터 없음
+        ordering: 기존 저장 순서/시안 대조; 세부 동순위는 OQ-UI-010
+      description: UI-22 전 무인증 개발 호출. scheme/역할거부 시험은 OQ-AUTH-010의 충돌이며 새401/403으로 위장하지 않는다. 원문 SQL·DB 식의 정확 키/타입과
+        시안 문구는 OQ-DATA/CALC/UI-010 대조.
+      responses:
+        '200':
+          description: 요구별 공개 결과와 저장 후 새 modifiedAt
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonFinancePreviousItems'
+                  required:
+                  - data
+        '400':
+          description: 잘못된 선택월·필수 칸·코드/열 또는 마감/확인된 줄 보호 위반; errors[].field와 한국어 문구
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-business-rules:
+      - 저장/화면 초안 기존 구분+세부 항목을 제외한 지난달 항목만 응답
+      - 이번달 같은 날짜·없는 날은 말일; GET은 저장/기존출처 변경 없음
 components:
   schemas:
+    CommonFinanceItem:
+      type: object
+      properties:
+        itemId:
+          type: string
+          nullable: true
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 기존 행 조회값 그대로 필수 전달; 새 줄만 null. SQL 조건으로 재확인하고409 반환
+        classification:
+          type: string
+          description: FIN_CLS의 판관비/영업외수익/영업외비용 코드
+        itemCode:
+          type: string
+          nullable: true
+          description: 직접 입력은 null
+        itemName:
+          type: string
+          minLength: 1
+        amount:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+        vatAmount:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+          default: 0
+        cashDate:
+          type: string
+          format: date
+          nullable: true
+        repeatYn:
+          type: string
+          enum:
+          - Y
+          - N
+        autoFillYn:
+          type: string
+          enum:
+          - Y
+          - N
+          description: 자동 미리 채움 출처
+        uploadId:
+          type: string
+          nullable: true
+          description: 기존 줄을 고쳐도 원래 UPLD_ID 보존; 클라이언트가 출처를 바꿀 수 없음
+        memo:
+          type: string
+          nullable: true
+      required:
+      - itemId
+      - modifiedAt
+      - classification
+      - itemName
+      - amount
+      - vatAmount
+      - repeatYn
+      - autoFillYn
+      - uploadId
+    CommonFinanceLoan:
+      type: object
+      properties:
+        loanId:
+          type: string
+          nullable: true
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 기존 행 조회값 그대로 필수 전달; 새 줄만 null. SQL 조건으로 재확인하고409 반환
+        date:
+          type: string
+          format: date
+        direction:
+          type: string
+          description: IO의 받음/갚음 코드
+        amount:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+          exclusiveMinimum: true
+          minimum: 0
+        counterparty:
+          type: string
+          nullable: true
+        memo:
+          type: string
+          nullable: true
+      required:
+      - loanId
+      - modifiedAt
+      - date
+      - direction
+      - amount
+    CommonFinanceAdjustment:
+      type: object
+      properties:
+        adjustmentId:
+          type: string
+          nullable: true
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 기존 행 조회값 그대로 필수 전달; 새 줄만 null. SQL 조건으로 재확인하고409 반환
+        targetYearMonth:
+          type: string
+          pattern: ^[0-9]{6}$
+        adjustmentItem:
+          type: string
+          description: ADJ_ITEM의 매출/원가/판관비/기타 코드
+        amount:
+          type: number
+          description: 이익 증가 + / 감소 -
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 300
+      required:
+      - adjustmentId
+      - modifiedAt
+      - targetYearMonth
+      - adjustmentItem
+      - amount
+      - reason
+    CommonFinanceTransfer:
+      type: object
+      properties:
+        transferId:
+          type: string
+          nullable: true
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 기존 행 조회값 그대로 필수 전달; 새 줄만 null. SQL 조건으로 재확인하고409 반환
+        date:
+          type: string
+          format: date
+        classification:
+          type: string
+          description: 'XFER_CLS: 계좌이체(제경비)/특별비(미지급 인건비); 초기 계좌이체'
+        description:
+          type: string
+          minLength: 1
+        payee:
+          type: string
+          nullable: true
+        amount:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+        memo:
+          type: string
+          nullable: true
+      required:
+      - transferId
+      - modifiedAt
+      - date
+      - classification
+      - description
+      - amount
+    CommonFinanceCard:
+      type: object
+      properties:
+        cardId:
+          type: string
+          nullable: true
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 기존 행 조회값 그대로 필수 전달; 새 줄만 null. SQL 조건으로 재확인하고409 반환
+        cardName:
+          type: string
+          minLength: 1
+        lastFourDigits:
+          type: string
+          pattern: ^[0-9]{4}$
+        useYn:
+          type: string
+          enum:
+          - Y
+          - N
+        amount:
+          type: number
+          description: TB_FI_CARD_MON 선택월 금액; 마감월 불변
+        monthlyModifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 기존 행 조회값 그대로 필수 전달; 새 줄만 null. SQL 조건으로 재확인하고409 반환
+      required:
+      - cardId
+      - modifiedAt
+      - cardName
+      - lastFourDigits
+      - useYn
+      - amount
+      - monthlyModifiedAt
+    CommonFinanceTaxPayment:
+      type: object
+      properties:
+        paymentId:
+          type: string
+        taxYear:
+          type: integer
+        paymentType:
+          type: string
+          enum:
+          - MID
+          - CNFM
+        scheduledDate:
+          type: string
+          format: date
+        paymentAmount:
+          type: number
+          description: TB_FI_TAX_PAY.PAY_AMT 유일 금액 원천; null=자동 예상, 확인 뒤 숫자 고정
+          nullable: true
+        displayAmount:
+          type: number
+          description: 자동이면 연간-MID 계산; 즉시확정 창 기본값
+        paidYn:
+          type: string
+          enum:
+          - Y
+          - N
+        actualPaymentDate:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          enum:
+          - 예정
+          - 확인 필요
+          - 납부
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 기존 행 조회값 그대로 필수 전달; 새 줄만 null. SQL 조건으로 재확인하고409 반환
+      required:
+      - paymentId
+      - taxYear
+      - paymentType
+      - scheduledDate
+      - paymentAmount
+      - displayAmount
+      - paidYn
+      - status
+      - modifiedAt
+    CommonFinanceTaxEstimate:
+      type: object
+      properties:
+        taxYear:
+          type: integer
+        estimatedTaxAmount:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+        monthlyTaxAmount:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+        negativeTaxWarning:
+          type: boolean
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 기존 행 조회값 그대로 필수 전달; 새 줄만 null. SQL 조건으로 재확인하고409 반환
+      required:
+      - taxYear
+      - estimatedTaxAmount
+      - monthlyTaxAmount
+      - negativeTaxWarning
+      - modifiedAt
+    CommonFinanceCardPayment:
+      type: object
+      properties:
+        paymentAmount:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+        manualOverride:
+          type: boolean
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 기존 행 조회값 그대로 필수 전달; 새 줄만 null. SQL 조건으로 재확인하고409 반환
+      required:
+      - paymentAmount
+      - manualOverride
+      - modifiedAt
+    CommonFinanceSummary:
+      type: object
+      properties:
+        sgaAmount:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+        nonOperatingIncomeAmount:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+        nonOperatingExpenseAmount:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+        monthlyTaxAmount:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+        adjustmentAmount:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+        cardTotalAmount:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+        cardPaymentDifference:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+      required:
+      - sgaAmount
+      - nonOperatingIncomeAmount
+      - nonOperatingExpenseAmount
+      - monthlyTaxAmount
+      - adjustmentAmount
+      - cardTotalAmount
+      - cardPaymentDifference
+    CommonFinanceMonth:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 조회월 전체의 변경 기준 시각. 월 저장과 엑셀 반영 요청에 그대로 전달하며 신규월은 null.
+        yearMonth:
+          type: string
+          pattern: ^[0-9]{6}$
+        closed:
+          type: boolean
+        firstOpenYearMonth:
+          type: string
+          nullable: true
+        months:
+          type: array
+          items:
+            type: object
+            properties:
+              yearMonth:
+                type: string
+              closed:
+                type: boolean
+              itemCount:
+                type: integer
+                minimum: 0
+              future:
+                type: boolean
+            required:
+            - yearMonth
+            - closed
+            - itemCount
+            - future
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonFinanceItem'
+        loans:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonFinanceLoan'
+        adjustments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonFinanceAdjustment'
+        transfers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonFinanceTransfer'
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonFinanceCard'
+        taxEstimate:
+          $ref: '#/components/schemas/CommonFinanceTaxEstimate'
+        taxPayments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonFinanceTaxPayment'
+        cardPayment:
+          $ref: '#/components/schemas/CommonFinanceCardPayment'
+        summary:
+          $ref: '#/components/schemas/CommonFinanceSummary'
+        activeCardCount:
+          type: integer
+          minimum: 0
+        autoFillCount:
+          type: integer
+          minimum: 0
+      required:
+      - yearMonth
+      - closed
+      - months
+      - items
+      - loans
+      - adjustments
+      - transfers
+      - cards
+      - taxEstimate
+      - taxPayments
+      - cardPayment
+      - summary
+      - activeCardCount
+      - autoFillCount
+      - modifiedAt
+    CommonFinanceMonthInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 조회월 응답의 modifiedAt을 필수 전달. 기존 저장 원천과 다르면 409이며 신규월은 null.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonFinanceItem'
+        loans:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonFinanceLoan'
+        adjustments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonFinanceAdjustment'
+        transfers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonFinanceTransfer'
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonFinanceCard'
+        taxEstimate:
+          type: object
+          properties:
+            taxYear:
+              type: integer
+            estimatedTaxAmount:
+              type: number
+              description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+            modifiedAt:
+              type: string
+              format: date-time
+              nullable: true
+              description: 기존 행 조회값 그대로 필수 전달; 새 줄만 null. SQL 조건으로 재확인하고409 반환
+          required:
+          - taxYear
+          - estimatedTaxAmount
+          - modifiedAt
+        taxPayments:
+          type: array
+          items:
+            type: object
+            properties:
+              paymentId:
+                type: string
+              scheduledDate:
+                type: string
+                format: date
+              paymentAmount:
+                type: number
+                description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+                nullable: true
+              modifiedAt:
+                type: string
+                format: date-time
+                nullable: true
+                description: 기존 행 조회값 그대로 필수 전달; 새 줄만 null. SQL 조건으로 재확인하고409 반환
+            required:
+            - paymentId
+            - scheduledDate
+            - paymentAmount
+            - modifiedAt
+        cardPayment:
+          $ref: '#/components/schemas/CommonFinanceCardPayment'
+      required:
+      - items
+      - loans
+      - adjustments
+      - transfers
+      - cards
+      - taxEstimate
+      - taxPayments
+      - cardPayment
+      - modifiedAt
+    CommonFinancePaymentConfirmInput:
+      type: object
+      properties:
+        actualPaymentDate:
+          type: string
+          format: date
+        actualPaymentAmount:
+          type: number
+          description: 원 단위 BigDecimal; JSON 전송값은 정밀도 손실 없이 처리
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 기존 행 조회값 그대로 필수 전달; 새 줄만 null. SQL 조건으로 재확인하고409 반환
+      required:
+      - actualPaymentDate
+      - actualPaymentAmount
+      - modifiedAt
+    CommonFinanceTaxYear:
+      type: object
+      properties:
+        taxEstimate:
+          $ref: '#/components/schemas/CommonFinanceTaxEstimate'
+        taxPayments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonFinanceTaxPayment'
+      required:
+      - taxEstimate
+      - taxPayments
+    CommonFinancePreviousItems:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonFinanceItem'
+        count:
+          type: integer
+          minimum: 0
+      required:
+      - items
+      - count
     CommonRateRenegotiationRow:
       type: object
       required:
@@ -18397,6 +19266,73 @@ x-uncovered-requirements:
 - canonical_id: REQ-928
   status: out-of-scope
   evidence: 가짜 사용자·새 권한 표 금지 — UI-32에 사용자 전환 CTA가 없고 물리 권한 inventory가 증가하지 않는다.
+
+- canonical_id: REQ-932
+  status: out-of-scope
+  evidence: 인증 후속 경계은 out-of-scope 소유이며 T004에서 UI-10 조회·저장에 새 로그인 이동이나 메뉴 권한 검사 호출이 없다.
+- canonical_id: REQ-933
+  status: non-functional
+  evidence: Flyway 비활성 유지은 architecture-runtime 소유이며 T005에서 일반 서버 기동에서 자동 migration이 실행되지 않는다.
+- canonical_id: REQ-934
+  status: non-functional
+  evidence: 개발 인증 비활성 유지은 architecture-runtime 소유이며 T006에서 인증 헤더 없는 개발 호출이 기존 방식으로 허용된다.
+- canonical_id: REQ-935
+  status: non-functional
+  evidence: 인증 정의 금지은 architecture-runtime 소유이며 T007에서 유효 계약에 세 인증 선언이 없으며 새 operation은 security=[]다.
+- canonical_id: REQ-936
+  status: non-functional
+  evidence: 수동 API 및 기존 메서드 보존은 api-contract 소유이며 T008에서 manual과 전후 paths/methods/응답을 구조 비교한다. manual 원문 미제공은 OQ-API-010이다.
+- canonical_id: REQ-937
+  status: non-functional
+  evidence: 철수 결과 nullable 보존은 api-contract 소유이며 T009에서 병합 계약의 해당 schema 속성이 nullable:true다.
+- canonical_id: REQ-938
+  status: non-functional
+  evidence: 개발 화면·시험 목록 동기화은 ui-supporting 소유이며 T010에서 네 목록에 UI-10이 있고 글 칸 없는 조회 예외는 해당할 때만 적용된다.
+- canonical_id: REQ-939
+  status: non-functional
+  evidence: 공통 화면 부품 재사용은 ui-supporting 소유이며 T011에서 화면 전용 기간/카드 목록 엔진 없이 공통 부품을 사용하고 본문 제목 중복 및 빈 Toast가 없다.
+- canonical_id: REQ-940
+  status: non-functional
+  evidence: 시안 표현 준수은 ui-supporting 소유이며 T012에서 확보한 UI-10 시안과 PC 렌더링을 대조한다. 375폭은 업무 카드 신설 대신 기존 PC 전용 안내를 검수한다.
+- canonical_id: REQ-941
+  status: non-functional
+  evidence: 화면 계산 설명 분리은 ui-supporting 소유이며 T013에서 DB 식의 정의/예시/표 이름을 바꿔도 화면 설명은 시안 문구이며 계산은 DB 정의를 소비한다.
+- canonical_id: REQ-951
+  status: non-functional
+  evidence: 기능 파일 분리은 architecture-runtime 소유이며 T023에서 UI-10 구현 파일 검토에서 작업 공간 단일 파일에 모든 책임이 모이지 않는다.
+- canonical_id: REQ-952
+  status: non-functional
+  evidence: 기존 프로젝트 상세 재사용은 ui-supporting 소유이며 T024에서 기존 공유 상세 회귀에서 같은 projectId의 기존 수정 폼과 initialTab이 유지된다.
+- canonical_id: REQ-953
+  status: non-functional
+  evidence: DB 준비 시험 동기화은 seed-test-fixture 소유이며 T025에서 추가 준비 자원과 시험 inventory가 일치하고 재실행에서 기존 자료가 보존된다.
+- canonical_id: REQ-954
+  status: non-functional
+  evidence: 미리보기 포트 보존은 architecture-runtime 소유이며 T026에서 Compose 파싱에서 포트 앞 호스트 주소가 없다.
+- canonical_id: REQ-955
+  status: non-functional
+  evidence: Maven 저장소 보존은 architecture-runtime 소유이며 T027에서 두 파일 전후 비교에서 저장소 주소·순서·COPY가 동일하다.
+- canonical_id: REQ-956
+  status: non-functional
+  evidence: schema 이름 유일성은 api-contract 소유이며 T028에서 병합 schemas key가 유일하며 기존 schema 정의가 덮어써지지 않는다.
+- canonical_id: REQ-957
+  status: non-functional
+  evidence: 기존 시험 파일 보존은 seed-test-fixture 소유이며 T029에서 기존 시험 경로가 모두 남고 회귀 시험 결과가 기록된다.
+- canonical_id: REQ-958
+  status: non-functional
+  evidence: 공통 부품 하위 호환은 ui-supporting 소유이며 T030에서 새 props 미지정 회귀에서 기존 화면의 기간/목록/상세 동작이 보존된다.
+- canonical_id: REQ-959
+  status: data-constraint
+  evidence: 실제 DB fixture 매핑은 seed-test-fixture 소유이며 T031에서 NAVIGATION_TEST_DB_URL 설정 시험에서 fixture 원천과 조회 결과가 일치한다.
+- canonical_id: REQ-961
+  status: non-functional
+  evidence: 대소문자 파일 충돌 금지은 architecture-runtime 소유이며 T033에서 추가 경로를 casefold 비교하면 충돌0건이다.
+- canonical_id: REQ-962
+  status: out-of-scope
+  evidence: 메뉴 활성화 범위은 out-of-scope 소유이며 T034에서 M018/G007 외 다른 신규 활성 leaf가 없다.
+- canonical_id: REQ-1003
+  status: non-functional
+  evidence: 업무 사용자은 ui-supporting 소유이며 T075에서 UI-10 인계에 재무/관리자가 기록되고 현 단계 로그인은 추가되지 않는다.
 
 x-change-supersession:
   description: 기존 operation과 기준선 시험은 원형 보존한다. 이번 공통 기능 인수에는 다음 예외가 우선하며 기존 메뉴 조회 자체를 상태 저장 API로 바꾸지 않는다.

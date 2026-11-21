@@ -9,6 +9,7 @@ import {
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { NavigationRoot, type ShellMenuResponse } from "./NavigationRoot";
+import { CommonNavigationPage } from "../pages/common/CommonNavigationPage";
 
 afterEach(() => {
   cleanup();
@@ -76,6 +77,62 @@ function respond(body: ShellMenuResponse) {
 }
 
 describe("shared navigation composition", () => {
+  it("retains M019/G007 navigation for the implemented UI-07 screen", async () => {
+    const body = fixture();
+    body.data[0] = { ...body.data[0], menuId: "G007", menuNm: "손익" };
+    body.data[1] = {
+      ...body.data[1],
+      menuId: "M019",
+      upperMenuId: "G007",
+      menuNm: "전체 수익 구조",
+      scrnId: "UI-07",
+    };
+    body.meta.screenAccess = [
+      { scrnId: "UI-07", available: true, pcOnlyYn: "N" },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === "/api/common/menus") {
+          return { ok: true, json: async () => body };
+        }
+        const preference =
+          /^\/api\/common\/user-preferences\/([^/]+)\/([^/]+)$/.exec(url);
+        if (preference) {
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: {
+                prefTypeCd: preference[1],
+                prefKey: preference[2],
+                found: false,
+                prefVal: null,
+                modDttm: null,
+              },
+              meta: { periodBasis: null },
+            }),
+          };
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      }),
+    );
+    // 업무 화면 연결은 기본 틀이 아니라 실제 화면 조합이 담당한다.
+    render(
+      <MemoryRouter initialEntries={["/screens/UI-07"]}>
+        <CommonNavigationPage />
+        <Position />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId("profit-structures-page")).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "전체 수익 구조" }),
+    ).toHaveAttribute("href", "/screens/UI-07");
+    expect(
+      screen.getByRole("navigation", { name: "현재 화면 경로" }),
+    ).toHaveTextContent("손익");
+    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-07");
+  });
   it("renders accessible loading in both menu and body", () => {
     vi.stubGlobal(
       "fetch",

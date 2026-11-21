@@ -25,8 +25,10 @@ export interface PeriodSelectorProps extends PeriodOptions {
    * 보이는 모양. 주지 않으면 지금 모양(연도·월 상자, 연도 배지, 설명).
    * "monthBox"는 시안 periodBar의 연도+월 화면 모양: 「‹ [2026년 10월 ▾] › 마감/작업중」 한 줄(연도 배지·설명 없음).
    * 연도+월(kind "yearMonth")에서만 쓴다. 휴대폰에서는 드롭다운과 배지만 보인다.
+   * "cumulativeBar"는 시안 periodBar의 연도+누계 기준월 모양:
+   * 「‹ 2026년 › 누계 기준월 [11월 ▾] 1~11월 누계 · 진행 중/결산 완료」. 누계(kind "yearCumulative")에서만 쓴다.
    */
-  variant?: "default" | "monthBox";
+  variant?: "default" | "monthBox" | "cumulativeBar";
 }
 
 const range = (min: number, max: number) =>
@@ -136,6 +138,101 @@ function MonthBox({
   );
 }
 
+/**
+ * 시안 periodBar(kind 'year', 누계 화면): ‹ 2026년 › · 누계 기준월 [n월] · 「1~n월 누계」 ·
+ * 올해는 「진행 중」, 지난 해는 「결산 완료」. 시작 전(이관) 해는 「월별 손익만 옮겨 온 해 · 읽기 전용」을 덧붙인다.
+ */
+function CumulativeBar({
+  basis,
+  value,
+  onChange,
+  disabled,
+  options,
+}: {
+  basis: PeriodBasis;
+  value: PeriodValue;
+  onChange: (value: PeriodValue) => void;
+  disabled: boolean;
+  options: PeriodOptions;
+}) {
+  const years = yearRange(basis, options);
+  const months = monthRange(basis, options, value.year);
+  const month = value.month ?? months.max;
+  const latestYear = Number(basis.latestYm.slice(0, 4));
+  const done = value.year < latestYear;
+  const migrated = value.year < Number(basis.cashBaseYm.slice(0, 4));
+  const change = (next: PeriodValue) => {
+    if (!disabled && isAllowed(next, basis, options)) onChange(next);
+  };
+  const setYear = (year: number) => change(withYear(value, year, basis, options));
+  return (
+    <div
+      className="period-cumulative-bar"
+      data-testid="period-selector"
+      data-kind={options.kind}
+      data-variant="cumulativeBar"
+      role="group"
+      aria-label="조회 기간"
+    >
+      <div className="year-bar-nav">
+        <button
+          type="button"
+          className="year-bar-arrow"
+          data-testid="period-year-prev"
+          aria-label="이전 해"
+          disabled={disabled || value.year <= years.min}
+          onClick={() => setYear(value.year - 1)}
+        >
+          {chevron("M15 18l-6-6 6-6")}
+        </button>
+        <strong data-testid="period-year">{value.year}년</strong>
+        <button
+          type="button"
+          className="year-bar-arrow"
+          data-testid="period-year-next"
+          aria-label="다음 해"
+          disabled={disabled || value.year >= years.max}
+          onClick={() => setYear(value.year + 1)}
+        >
+          {chevron("M9 18l6-6-6-6")}
+        </button>
+      </div>
+      <label className="period-cumulative-field">
+        누계 기준월
+        <select
+          className="period-month-select"
+          data-testid="period-month"
+          aria-label="누계 기준월"
+          value={month}
+          disabled={disabled}
+          onChange={(event) =>
+            change({ year: value.year, month: Number(event.target.value) })
+          }
+        >
+          {range(months.min, months.max).map((item) => (
+            <option key={item} value={item}>
+              {item}월
+            </option>
+          ))}
+        </select>
+      </label>
+      <span className="year-bar-cap" data-testid="period-cumulative-cap">
+        1~{month}월 누계
+      </span>
+      <span aria-live="polite" data-testid="period-status">
+        {done ? (
+          <Badge kind="lock">결산 완료</Badge>
+        ) : (
+          <Badge kind="info">진행 중</Badge>
+        )}
+      </span>
+      {migrated && (
+        <span className="year-bar-cap">월별 손익만 옮겨 온 해 · 읽기 전용</span>
+      )}
+    </div>
+  );
+}
+
 /** FR-0105 공통 기간 선택 부품. 본문 맨 위에 두고, 업무 자료는 조회하지 않는다. */
 export function PeriodSelector({
   basis,
@@ -155,6 +252,16 @@ export function PeriodSelector({
         value={value}
         onChange={onChange}
         mobile={mobile}
+        disabled={disabled}
+        options={options}
+      />
+    );
+  if (variant === "cumulativeBar" && options.kind === "yearCumulative")
+    return (
+      <CumulativeBar
+        basis={basis}
+        value={value}
+        onChange={onChange}
         disabled={disabled}
         options={options}
       />

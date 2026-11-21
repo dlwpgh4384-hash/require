@@ -138,6 +138,49 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (url.startsWith("/api/common/profit-structures?")) {
+      const summary = {
+        revenue: 0,
+        grossProfit: 0,
+        grossProfitRate: null,
+        operatingProfit: 0,
+        operatingProfitRate: null,
+        idleCostShare: null,
+      };
+      return {
+        success: true,
+        meta: { previousPeriodAvailable: false },
+        data: {
+          periodStart: "202602",
+          periodEnd: "202602",
+          summary,
+          comparison: {
+            previousPeriod: summary,
+            previousYear: null,
+            previousYearVisible: false,
+            shareDifferenceUnit: "%p",
+          },
+          waterfall: {
+            revenue: 0,
+            costOfSales: 0,
+            grossProfit: 0,
+            sellingAdministrativeExpense: 0,
+            previousAdjustment: 0,
+            operatingProfit: 0,
+            nonOperatingProfitLoss: 0,
+            monthlyCorporateTax: 0,
+            netProfit: 0,
+          },
+          trends: [],
+          numericRows: [],
+          composition: null,
+          compositionVisible: false,
+          referenceRevenueVisible: false,
+          provisional: false,
+          provisionalNotice: null,
+        },
+      };
+    }
     if (/^\/api\/common\/finance-items\/tax-years\/\d{4}$/.test(url))
       return { success: true, meta: {}, data: {} };
     if (/^\/api\/common\/finance-items\/\d{6}$/.test(url))
@@ -297,7 +340,8 @@ function respond(body: ShellMenuResponse) {
             meta:
               url.endsWith("/UI-03") ||
               url.endsWith("/UI-04") ||
-              url.endsWith("/UI-10")
+              url.endsWith("/UI-10") ||
+              url.endsWith("/UI-07")
                 ? {
                     periodBasis: {
                       latestYm: "202602",
@@ -356,6 +400,16 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-07": async (content) => {
+    // 시안: 기간 줄(누계 기준월) + 월/분기/연 누계 탭, [엑셀 다운로드]는 제목줄에 한 개.
+    expect(await content.findByTestId("period-selector")).toBeVisible();
+    expect(content.getByRole("tablist", { name: "기간 단위" })).toBeVisible();
+    expect(await content.findByTestId("profit-table-empty")).toBeVisible();
+    expect(content.getByTestId("profit-waterfall")).toBeVisible();
+    const actions = within(screen.getByTestId("screen-actions"));
+    expect(actions.getAllByTestId("profit-excel")).toHaveLength(1);
+    expect(content.queryByTestId("profit-excel")).not.toBeInTheDocument();
+  },
   "UI-10": async (content) => {
     // 시안: 항목이 없어도 표 머리와 법인세(월할) 계산 줄은 보인다.
     expect(await content.findByTestId("finance-tax-row")).toBeVisible();
@@ -557,9 +611,7 @@ describe("common placeholder screen contract", () => {
         ),
       ).toBe(true);
       fireEvent.click(
-        within(screen.getByTestId("screen-actions")).getByTestId(
-          "upload-open",
-        ),
+        within(screen.getByTestId("screen-actions")).getByTestId("upload-open"),
       );
       // 시안: 재무 항목 엑셀 업로드는 공통 업로드 창(B.2, 연월 고르기)을 쓴다.
       expect(await screen.findByTestId("upload-dialog")).toBeVisible();

@@ -42,7 +42,18 @@ import {
   type AssignmentInput,
 } from "./assignments";
 const warnIcon = (size = 16) => (
-  <svg className="assignment-warn-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    className="assignment-warn-icon"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M12 3l9 16H3zM12 10v4M12 17h.01" />
   </svg>
 );
@@ -51,14 +62,27 @@ import "./assignments.css";
 
 type Option = { code: string; codeName: string };
 const digits = (value: string) => value.replace(/[^0-9]/g, "");
-const money = (value: number | null | undefined) => (value == null || !(value > 0) ? "" : won(value));
+const money = (value: number | null | undefined) =>
+  value == null || !(value > 0) ? "" : won(value);
 const sparkle = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />
   </svg>
 );
-const PM_NO_RATE = "월 단가가 없어 배정할 수 없습니다. 파트장·재무에게 요청해 주세요.";
-const TK_REUPLOAD = "턴키 배분표는 다시 옮겨 올려 주셔야 합니다. 그 전까지는 배분 불일치 경고가 뜹니다.";
+const PM_NO_RATE =
+  "월 단가가 없어 배정할 수 없습니다. 파트장·재무에게 요청해 주세요.";
+const TK_REUPLOAD =
+  "턴키 배분표는 다시 옮겨 올려 주셔야 합니다. 그 전까지는 배분 불일치 경고가 뜹니다.";
 const serverField: Record<string, string> = {
   projectId: "project",
   developerId: "developer",
@@ -72,7 +96,11 @@ const serverField: Record<string, string> = {
 };
 /** 시안 배정 창 개발자 목록 옆 표시: 휴직 / 투입 중 ~철수일 / 대기(2026-10-24 결정). */
 const availability = (p: DeveloperListRow) =>
-  p.workStatusName === "휴직" ? "휴직" : p.withdrawalDate ? `투입 중 ~${p.withdrawalDate}` : "대기";
+  p.workStatusName === "휴직"
+    ? "휴직"
+    : p.withdrawalDate
+      ? `투입 중 ~${p.withdrawalDate}`
+      : "대기";
 const personText = (p: DeveloperListRow) => `${p.name} (${p.managementNumber})`;
 
 /** 시안 투입 배정 창(오른쪽 창): 경고 띠, 프로젝트·개발자·직무·기간·월 MM·투입 구분·계약상 인력·청구 단가, AI 추천. */
@@ -96,13 +124,18 @@ export function AssignmentForm({
 }) {
   const navigate = useNavigate();
   const canRate = assignmentPriceEditable(roles);
-  const initial = projects.find((p) => p.projectId === candidate?.projectId) ?? projects[0];
+  const initial =
+    projects.find((p) => p.projectId === candidate?.projectId) ?? projects[0];
   const [v, setV] = useState(() => ({
     projectId: initial?.projectId ?? "",
     developerId: candidate?.developerId ?? "",
     jobCode: candidate?.jobCode ?? "BE",
-    ...(initial ? assignmentInitialDates(koreanToday(), initial, false, recommendedMonth) : { startDate: koreanToday(), endDate: "" }),
-    ...(candidate ? { startDate: candidate.startDate, endDate: candidate.endDate } : {}),
+    ...(initial
+      ? assignmentInitialDates(koreanToday(), initial, false, recommendedMonth)
+      : { startDate: koreanToday(), endDate: "" }),
+    ...(candidate
+      ? { startDate: candidate.startDate, endDate: candidate.endDate }
+      : {}),
     mm: "1.00",
     kind: "NEW",
     orig: "",
@@ -115,7 +148,10 @@ export function AssignmentForm({
   const [jobs, setJobs] = useState<Option[]>([]);
   const [reasons, setReasons] = useState<Option[]>([]);
   const [contracts, setContracts] = useState<AssignmentContractDeveloper[]>([]);
-  const [pool, setPool] = useState<{ rate?: number | null; retirementDate?: string | null } | null>(null);
+  const [pool, setPool] = useState<{
+    rate?: number | null;
+    retirementDate?: string | null;
+  } | null>(null);
   const [statuses, setStatuses] = useState<DeveloperStatus[]>([]);
   const [booked, setBooked] = useState<DeveloperAssignment[]>([]);
   const [closedMonth, setClosedMonth] = useState<string | null>(null);
@@ -125,12 +161,21 @@ export function AssignmentForm({
   const [error, setError] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [leaving, setLeaving] = useState(false);
-  const [replace, setReplace] = useState<{ ids: string[]; reason: string; memo: string; error: string } | null>(null);
+  const [replace, setReplace] = useState<{
+    ids: string[];
+    reason: string;
+    memo: string;
+    error: string;
+  } | null>(null);
   const body = useRef<HTMLDivElement>(null);
   const project = projects.find((p) => p.projectId === v.projectId);
   const dv = people.find((p) => p.developerId === v.developerId);
   const contract = contracts.find((c) => c.developerId === v.orig);
-  const showRate = !!project && ["MO", "DP"].includes(project.contractTypeCode) && v.kind !== "FREE" && canRate;
+  const showRate =
+    !!project &&
+    ["MO", "DP"].includes(project.contractTypeCode) &&
+    v.kind !== "FREE" &&
+    canRate;
   const setDirty = useScreenDirty();
   useEffect(() => {
     setDirty("UI-12", touched);
@@ -143,7 +188,11 @@ export function AssignmentForm({
   const leave = () => (touched ? setLeaving(true) : onClose());
   useEffect(() => {
     let active = true;
-    Promise.all([getCommonDevelopers({}), getCommonCodes("JOB"), getCommonCodes("ASGN_CHG_RSN")])
+    Promise.all([
+      getCommonDevelopers({}),
+      getCommonCodes("JOB"),
+      getCommonCodes("ASGN_CHG_RSN"),
+    ])
       .then(([p, j, r]) => {
         if (!active) return;
         setPeople(p.items ?? []);
@@ -167,7 +216,8 @@ export function AssignmentForm({
       .then((d) => {
         if (!active) return;
         setPool({ rate: d.monthlyRate, retirementDate: d.retirementDate });
-        if (!priceTouched) setV((x) => (x.orig ? x : { ...x, price: money(d.monthlyRate) }));
+        if (!priceTouched)
+          setV((x) => (x.orig ? x : { ...x, price: money(d.monthlyRate) }));
       })
       .catch((e) => active && setError(projectFailure(e)));
     getCommonDeveloperStatuses(v.developerId)
@@ -189,8 +239,18 @@ export function AssignmentForm({
       setContracts([]);
       return;
     }
-    getCommonAssignmentContractDevelopers(v.projectId, v.developerId, v.startDate)
-      .then((r) => active && setContracts((r.items ?? []).filter((c) => c.developerId !== v.developerId)))
+    getCommonAssignmentContractDevelopers(
+      v.projectId,
+      v.developerId,
+      v.startDate,
+    )
+      .then(
+        (r) =>
+          active &&
+          setContracts(
+            (r.items ?? []).filter((c) => c.developerId !== v.developerId),
+          ),
+      )
       .catch((e) => active && setError(projectFailure(e)));
     return () => {
       active = false;
@@ -207,7 +267,12 @@ export function AssignmentForm({
         setClosedMonth(p.closedMonth ?? null);
         if (p.contractTypeCode === "TK") {
           const d = await getCommonProjectDistribution(v.projectId);
-          if (active) setDistribution(d.items.filter((r) => r.rowTypeCode !== "ITEM").map((r) => r.managementNumber ?? r.name));
+          if (active)
+            setDistribution(
+              d.items
+                .filter((r) => r.rowTypeCode !== "ITEM")
+                .map((r) => r.managementNumber ?? r.name),
+            );
         }
       })
       .catch(() => undefined);
@@ -219,12 +284,16 @@ export function AssignmentForm({
   const distWarn =
     project?.contractTypeCode === "TK" &&
     !!contract &&
-    distribution.some((key) => key === origPerson?.managementNumber || key === contract.name);
+    distribution.some(
+      (key) => key === origPerson?.managementNumber || key === contract.name,
+    );
   const pickDeveloper = (value: string) => {
     setTouched(true);
     setText(value);
     const m = value.match(/\(([^()]+)\)\s*$/);
-    const byNo = people.find((p) => p.managementNumber === (m ? m[1] : value.trim()));
+    const byNo = people.find(
+      (p) => p.managementNumber === (m ? m[1] : value.trim()),
+    );
     const byName = people.filter((p) => p.name === value.trim());
     const next = byNo ?? (byName.length === 1 ? byName[0] : undefined);
     setV((d) => {
@@ -235,7 +304,10 @@ export function AssignmentForm({
         jobCode: next?.primaryJobCode ?? d.jobCode,
         orig: d.orig === next?.developerId ? "" : d.orig,
         // 단가를 직접 고치지 않았으면 새 사람의 월 단가로(읽은 뒤 채움)
-        price: priceTouched || (d.orig && d.orig !== next?.developerId) ? d.price : "",
+        price:
+          priceTouched || (d.orig && d.orig !== next?.developerId)
+            ? d.price
+            : "",
       };
     });
   };
@@ -249,7 +321,11 @@ export function AssignmentForm({
     });
   };
   const changeKind = (kind: string) =>
-    edit({ kind, orig: "", ...(v.orig && !priceTouched ? { price: money(pool?.rate) } : {}) });
+    edit({
+      kind,
+      orig: "",
+      ...(v.orig && !priceTouched ? { price: money(pool?.rate) } : {}),
+    });
   const changeOrig = (id: string) => {
     const c = contracts.find((x) => x.developerId === id);
     setPriceTouched(false);
@@ -261,33 +337,67 @@ export function AssignmentForm({
     // 시안: 기간이 [투입일, 철수일]과 겹치는 이 사람 배정의 지금 월 MM 합(프로젝트·연도·달 구분 없음) + 입력 MM
     const cur =
       v.startDate && v.endDate
-        ? booked.filter((a) => a.startDate <= v.endDate && a.endDate >= v.startDate).reduce((sum, a) => sum + (Number(a.mm) || 0), 0)
+        ? booked
+            .filter((a) => a.startDate <= v.endDate && a.endDate >= v.startDate)
+            .reduce((sum, a) => sum + (Number(a.mm) || 0), 0)
         : 0;
     const add = Number(v.mm) || 0;
     if (Math.round((cur + add) * 100) / 100 > 1)
-      warnings.push(`MM 1.0 초과: ${dv.name}님은 같은 기간에 이미 ${mmf(cur)}MM 배정되어 있습니다(합계 ${mmf(cur + add)}). 저장은 됩니다.`);
+      warnings.push(
+        `MM 1.0 초과: ${dv.name}님은 같은 기간에 이미 ${mmf(cur)}MM 배정되어 있습니다(합계 ${mmf(cur + add)}). 저장은 됩니다.`,
+      );
     const leave = statuses.find(
-      (s) => s.statusName === "휴직" && v.startDate && v.endDate && s.startDate <= v.endDate && (!s.endDate || s.endDate >= v.startDate),
+      (s) =>
+        s.statusName === "휴직" &&
+        v.startDate &&
+        v.endDate &&
+        s.startDate <= v.endDate &&
+        (!s.endDate || s.endDate >= v.startDate),
     );
-    if (leave) warnings.push(`${dv.name}님은 배정 기간에 휴직(${leave.startDate} ~ ${leave.endDate || "복직일 미정"})이 있습니다. 저장은 됩니다.`);
-    else if (dv.workStatusName === "휴직" && !statuses.length) warnings.push(`${dv.name}님은 휴직 기간입니다. 저장은 됩니다.`);
-    if (project && project.contractTypeCode !== "IN" && project.salesPartId && dv.salesPartId && dv.salesPartId !== project.salesPartId) {
-      const label = (id: string, name?: string | null) => (id === HQ_PART ? "본사" : name ?? id);
+    if (leave)
+      warnings.push(
+        `${dv.name}님은 배정 기간에 휴직(${leave.startDate} ~ ${leave.endDate || "복직일 미정"})이 있습니다. 저장은 됩니다.`,
+      );
+    else if (dv.workStatusName === "휴직" && !statuses.length)
+      warnings.push(`${dv.name}님은 휴직 기간입니다. 저장은 됩니다.`);
+    if (
+      project &&
+      project.contractTypeCode !== "IN" &&
+      project.salesPartId &&
+      dv.salesPartId &&
+      dv.salesPartId !== project.salesPartId
+    ) {
+      const label = (id: string, name?: string | null) =>
+        id === HQ_PART ? "본사" : (name ?? id);
       const mine = label(dv.salesPartId, dv.salesPartName);
       const theirs = label(project.salesPartId, project.salesPartName);
       warnings.push(
         `영업 파트가 다릅니다: ${dv.name}님은 ${mine} 소속, 프로젝트는 ${theirs}입니다. 매출은 ${theirs}로, 이 사람 이익금은 ${dv.salesPartId === HQ_PART ? "본사(파트 정산 제외)" : mine}로 잡힙니다. 파트를 잘못 골랐다면 개발자 풀에서 고쳐 주세요. 저장은 됩니다.`,
       );
     }
-    if (project?.contractTypeCode === "DP" && ["FL", "OS"].includes(dv.employeeTypeCode))
-      warnings.push(`파견 프로젝트에 ${dv.employeeTypeName} 인력을 배정합니다. 막지는 않으니 계약 조건을 확인하세요.`);
+    if (
+      project?.contractTypeCode === "DP" &&
+      ["FL", "OS"].includes(dv.employeeTypeCode)
+    )
+      warnings.push(
+        `파견 프로젝트에 ${dv.employeeTypeName} 인력을 배정합니다. 막지는 않으니 계약 조건을 확인하세요.`,
+      );
   }
-  if (project?.statusCode === "PRE") warnings.push("수주예정 프로젝트입니다. 저장하면 「미계약 선투입」으로 표시됩니다.");
+  if (project?.statusCode === "PRE")
+    warnings.push(
+      "수주예정 프로젝트입니다. 저장하면 「미계약 선투입」으로 표시됩니다.",
+    );
   if (closedMonth && v.startDate && v.startDate.slice(0, 7) <= closedMonth)
-    warnings.push(`마감한 달(${v.startDate.slice(0, 7)})에 걸칩니다. 마감한 달 금액은 그대로 두고 차액은 이번 달 전월 조정으로 넣습니다.`);
+    warnings.push(
+      `마감한 달(${v.startDate.slice(0, 7)})에 걸칩니다. 마감한 달 금액은 그대로 두고 차액은 이번 달 전월 조정으로 넣습니다.`,
+    );
   const overlapping = contract?.overlappingAssignments ?? [];
   const withdrawDay = v.startDate ? addDays(v.startDate, -1) : "";
-  const commit = async (withdraw: string[], reasonCode?: string, memo?: string) => {
+  const commit = async (
+    withdraw: string[],
+    reasonCode?: string,
+    memo?: string,
+  ) => {
     if (!project) return;
     setBusy(true);
     setError("");
@@ -304,8 +414,15 @@ export function AssignmentForm({
       if (showRate) payload.billingPrice = Number(digits(v.price));
       if (v.kind === "SUB") payload.contractDeveloperId = v.orig;
       if (v.kind === "SUB" && overlapping.length) {
-        payload.replacementAction = withdraw.length ? "together" : "assignment-only";
-        if (withdraw.length) Object.assign(payload, { earlyWithdrawalAssignmentIds: withdraw, reasonCode, ...(memo ? { memo } : {}) });
+        payload.replacementAction = withdraw.length
+          ? "together"
+          : "assignment-only";
+        if (withdraw.length)
+          Object.assign(payload, {
+            earlyWithdrawalAssignmentIds: withdraw,
+            reasonCode,
+            ...(memo ? { memo } : {}),
+          });
       }
       if (candidate) payload.candidateId = candidate.candidateId;
       const row = await postCommonAssignment(payload);
@@ -313,7 +430,9 @@ export function AssignmentForm({
       setTouched(false);
       const message =
         "배정을 저장했습니다. 변경 이력에 「투입」 1줄을 남겼습니다." +
-        (withdraw.length ? ` ${contract?.name}님 배정 ${withdraw.length}건을 ${withdrawDay}로 조기 철수했습니다.` : "") +
+        (withdraw.length
+          ? ` ${contract?.name}님 배정 ${withdraw.length}건을 ${withdrawDay}로 조기 철수했습니다.`
+          : "") +
         (distWarn ? " 턴키 배분표는 다시 옮겨 올려 주셔야 합니다." : "") +
         (row.warnings?.length ? " 경고: " + row.warnings.join(", ") : "");
       onSaved(row, message);
@@ -327,7 +446,11 @@ export function AssignmentForm({
       setError(projectFailure(e));
       if (e instanceof ProjectRequestError && e.errors.length) {
         // 서버 칸 오류(예: 후보의 프로젝트·개발자만 확정, 간접 인력 제외)는 그 칸 밑에 보이고 첫 오류 칸으로 간다.
-        setErrors(Object.fromEntries(e.errors.map((f) => [serverField[f.field] ?? f.field, f.message])));
+        setErrors(
+          Object.fromEntries(
+            e.errors.map((f) => [serverField[f.field] ?? f.field, f.message]),
+          ),
+        );
         window.setTimeout(() => focusFirstError(body.current), 0);
       }
     } finally {
@@ -338,10 +461,18 @@ export function AssignmentForm({
     if (busy || !loaded) return;
     const e: Record<string, string> = {};
     const mm = Number(v.mm);
-    if (project && ["MO", "DP"].includes(project.contractTypeCode) && v.kind !== "FREE" && dv && !canRate && !(v.kind === "SUB" && !v.orig)) {
+    if (
+      project &&
+      ["MO", "DP"].includes(project.contractTypeCode) &&
+      v.kind !== "FREE" &&
+      dv &&
+      !canRate &&
+      !(v.kind === "SUB" && !v.orig)
+    ) {
       // 시안: PM은 청구 단가 칸이 없어 개발자 풀 월 단가(대체투입이면 계약상 인력 단가)로 저장한다.
       const base = v.kind === "SUB" ? contract?.billingPrice : pool?.rate;
-      if (!((base ?? 0) > 0)) e[v.kind === "SUB" ? "orig" : "developer"] = PM_NO_RATE;
+      if (!((base ?? 0) > 0))
+        e[v.kind === "SUB" ? "orig" : "developer"] = PM_NO_RATE;
     }
     if (!dv) e.developer = "개발자를 골라 주세요.";
     if (!v.startDate || !v.endDate) e.dates = "투입일과 철수일을 넣어 주세요.";
@@ -350,9 +481,11 @@ export function AssignmentForm({
       e.dates = `철수일이 프로젝트 계약 종료일(${project.endDate})보다 늦습니다. 「프로젝트·투입 › 프로젝트」에서 계약 기간을 먼저 연장해 주세요.`;
     else if (dv && pool?.retirementDate && v.endDate > pool.retirementDate)
       e.dates = `철수일이 ${dv.name}님의 퇴사일(${pool.retirementDate})보다 늦습니다.`;
-    if (!(mm > 0 && mm <= 1)) e.mm = "월 MM은 0보다 크고 1.00 이하로 넣어 주세요.";
+    if (!(mm > 0 && mm <= 1))
+      e.mm = "월 MM은 0보다 크고 1.00 이하로 넣어 주세요.";
     if (v.kind === "SUB" && !v.orig) e.orig = "계약상 인력을 골라 주세요.";
-    if (showRate && !(Number(digits(v.price)) > 0)) e.price = "청구 단가를 넣어 주세요.";
+    if (showRate && !(Number(digits(v.price)) > 0))
+      e.price = "청구 단가를 넣어 주세요.";
     setErrors(e);
     setError("");
     if (Object.keys(e).length) {
@@ -361,7 +494,12 @@ export function AssignmentForm({
     }
     // 대체투입: 계약상 인력의 이 프로젝트 배정 중 투입일에 걸친 것이 있으면 조기 철수할지 묻는다.
     if (v.kind === "SUB" && overlapping.length) {
-      setReplace({ ids: overlapping.map((r) => r.assignmentId), reason: "", memo: `대체투입(${dv!.name})`, error: "" });
+      setReplace({
+        ids: overlapping.map((r) => r.assignmentId),
+        reason: "",
+        memo: `대체투입(${dv!.name})`,
+        error: "",
+      });
       return;
     }
     void commit([]);
@@ -381,10 +519,23 @@ export function AssignmentForm({
   }, []);
   // 목록 응답에는 코드(directClassCode)만 온다: 간접 인력(INDRCT)은 배정 대상이 아니다(SFR-102-10).
   const people2 = useMemo(
-    () => people.filter((p) => p.directClassCode !== "INDRCT" && directLabel(p.directClassName) !== "간접" && p.useYn !== "N"),
+    () =>
+      people.filter(
+        (p) =>
+          p.directClassCode !== "INDRCT" &&
+          directLabel(p.directClassName) !== "간접" &&
+          p.useYn !== "N",
+      ),
     [people],
   );
-  const field = (id: string, key: string, label: string, required: boolean, control: ReactNode, help?: ReactNode) => (
+  const field = (
+    id: string,
+    key: string,
+    label: string,
+    required: boolean,
+    control: ReactNode,
+    help?: ReactNode,
+  ) => (
     <div className="project-fc" data-testid={`assignment-field-${key}`}>
       <label htmlFor={id}>
         {label}
@@ -399,15 +550,26 @@ export function AssignmentForm({
       )}
     </div>
   );
-  const invalid = (key: string) => (errors[key] ? { "aria-invalid": true as const } : {});
+  const invalid = (key: string) =>
+    errors[key] ? { "aria-invalid": true as const } : {};
   const recommend = () => {
     // 시안 asgrec: 진행 중이고 내부가 아닌 프로젝트만 대상·직무·시작월(투입월과 프로젝트 시작월 중 늦은 달)을 넘긴다.
     // 묻지 않고 창을 닫은 뒤 AI 인력 추천(UI-30)으로 간다.
-    const target = project && project.statusCode === "ING" && project.contractTypeCode !== "IN" ? project : undefined;
-    let state: { projectId: string; jobCode: string; startMonth: string } | undefined;
+    const target =
+      project &&
+      project.statusCode === "ING" &&
+      project.contractTypeCode !== "IN"
+        ? project
+        : undefined;
+    let state:
+      | { projectId: string; jobCode: string; startMonth: string }
+      | undefined;
     if (target) {
       const projectStart = target.startDate.slice(0, 7);
-      const startMonth = v.startDate && v.startDate.slice(0, 7) > projectStart ? v.startDate.slice(0, 7) : projectStart;
+      const startMonth =
+        v.startDate && v.startDate.slice(0, 7) > projectStart
+          ? v.startDate.slice(0, 7)
+          : projectStart;
       state = { projectId: target.projectId, jobCode: v.jobCode, startMonth };
     }
     setTouched(false);
@@ -422,15 +584,32 @@ export function AssignmentForm({
     <>
       <DetailPanel
         title="투입 배정"
-        sub={candidate ? "배정 후보 확정" : recommendedMonth ? "AI 인력 추천에서 채움" : "오른쪽 창 입력(유형 B)"}
+        sub={
+          candidate
+            ? "배정 후보 확정"
+            : recommendedMonth
+              ? "AI 인력 추천에서 채움"
+              : "오른쪽 창 입력(유형 B)"
+        }
         testId="assignment-form"
         onClose={leave}
         footer={
           <>
-            <button type="button" className="ls-btn" data-testid="assignment-form-cancel" onClick={leave}>
+            <button
+              type="button"
+              className="ls-btn"
+              data-testid="assignment-form-cancel"
+              onClick={leave}
+            >
               취소
             </button>
-            <button type="button" className="ls-btn ls-btn-p" data-testid="assignment-form-save" disabled={busy || !loaded} onClick={save}>
+            <button
+              type="button"
+              className="ls-btn ls-btn-p"
+              data-testid="assignment-form-save"
+              disabled={busy || !loaded}
+              onClick={save}
+            >
               저장
             </button>
           </>
@@ -441,7 +620,7 @@ export function AssignmentForm({
             <Banner kind="warn" icon={warnIcon(16)}>
               <span data-testid="assignment-form-warnings">
                 {warnings.map((w, i) => (
-                  <span key={w}>
+                  <span key={w} data-testid={`assignment-form-warning-${i}`}>
                     {i > 0 && <br />}
                     {w}
                   </span>
@@ -450,7 +629,11 @@ export function AssignmentForm({
             </Banner>
           )}
           {error && (
-            <p role="alert" className="field-error" data-testid="assignment-form-error">
+            <p
+              role="alert"
+              className="field-error"
+              data-testid="assignment-form-error"
+            >
               {error}
             </p>
           )}
@@ -459,9 +642,19 @@ export function AssignmentForm({
             "project",
             "프로젝트",
             true,
-            <select id="assignment-project" data-testid="assignment-project" value={v.projectId} onChange={(e) => changeProject(e.target.value)} {...invalid("project")}>
+            <select
+              id="assignment-project"
+              data-testid="assignment-project"
+              value={v.projectId}
+              onChange={(e) => changeProject(e.target.value)}
+              {...invalid("project")}
+            >
               {projects.map((p) => (
-                <option key={p.projectId} value={p.projectId}>
+                <option
+                  key={p.projectId}
+                  value={p.projectId}
+                  data-testid={`assignment-project-option-${projects.indexOf(p)}`}
+                >
                   {p.projectName} ({typeLabel(p)}
                   {p.statusCode === "PRE" ? " · 수주예정" : ""})
                 </option>
@@ -486,7 +679,12 @@ export function AssignmentForm({
               />
               <datalist id="assignment-developer-list">
                 {people2.map((p) => (
-                  <option key={p.developerId} value={personText(p)} label={availability(p)} />
+                  <option
+                    key={p.developerId}
+                    value={personText(p)}
+                    label={availability(p)}
+                    data-testid={`assignment-developer-option-${people2.indexOf(p)}`}
+                  />
                 ))}
               </datalist>
             </>,
@@ -499,9 +697,19 @@ export function AssignmentForm({
             "job",
             "직무",
             true,
-            <select id="assignment-job" data-testid="assignment-job" value={v.jobCode} onChange={(e) => edit({ jobCode: e.target.value })} {...invalid("job")}>
+            <select
+              id="assignment-job"
+              data-testid="assignment-job"
+              value={v.jobCode}
+              onChange={(e) => edit({ jobCode: e.target.value })}
+              {...invalid("job")}
+            >
               {jobs.map((j) => (
-                <option key={j.code} value={j.code}>
+                <option
+                  key={j.code}
+                  value={j.code}
+                  data-testid={`assignment-job-option-${jobs.indexOf(j)}`}
+                >
                   {j.codeName}
                 </option>
               ))}
@@ -545,7 +753,9 @@ export function AssignmentForm({
                 style={{ width: 100 }}
                 inputMode="decimal"
                 value={v.mm}
-                onChange={(e) => edit({ mm: e.target.value.replace(/[^0-9.]/g, "") })}
+                onChange={(e) =>
+                  edit({ mm: e.target.value.replace(/[^0-9.]/g, "") })
+                }
                 {...invalid("mm")}
               />
               <span className="project-unit">MM</span>
@@ -557,9 +767,18 @@ export function AssignmentForm({
             "kind",
             "투입 구분",
             true,
-            <select id="assignment-input-type" data-testid="assignment-input-type" value={v.kind} onChange={(e) => changeKind(e.target.value)}>
+            <select
+              id="assignment-input-type"
+              data-testid="assignment-input-type"
+              value={v.kind}
+              onChange={(e) => changeKind(e.target.value)}
+            >
               {KIND_CODES.map((k) => (
-                <option key={k} value={k}>
+                <option
+                  key={k}
+                  value={k}
+                  data-testid={`assignment-input-type-option-${k.toLowerCase()}`}
+                >
                   {KIND_LABEL[k]}
                 </option>
               ))}
@@ -580,86 +799,116 @@ export function AssignmentForm({
               >
                 <option value="">선택</option>
                 {contracts.map((c) => (
-                  <option key={c.developerId} value={c.developerId}>
+                  <option
+                    key={c.developerId}
+                    value={c.developerId}
+                    data-testid={`assignment-contract-developer-option-${contracts.indexOf(c)}`}
+                  >
                     {c.name}
                     {c.jobName ? ` · ${c.jobName}` : ""}
-                    {showRate && c.billingPrice ? ` · ${won(c.billingPrice)}원` : ""}
+                    {showRate && c.billingPrice
+                      ? ` · ${won(c.billingPrice)}원`
+                      : ""}
                     {c.endDate < koreanToday() ? ` (철수 ${c.endDate})` : ""}
                   </option>
                 ))}
               </select>,
               "계약서에 이름이 올라간 사람입니다(이 프로젝트에 배정된 적 있는 사람, 철수한 사람 포함). " +
-                (showRate ? "고르면 청구 단가 기본값이 이 사람의 최근 월 단가로 바뀝니다. " : "") +
+                (showRate
+                  ? "고르면 청구 단가 기본값이 이 사람의 최근 월 단가로 바뀝니다. "
+                  : "") +
                 "저장할 때 이 사람 배정을 투입일 전날로 조기 철수할지 묻습니다.",
             )}
-          {showRate
-            ? field(
-                "assignment-billing-price",
-                "price",
-                "청구 단가(월)",
-                true,
-                <span className="project-row assignment-row">
-                  <input
-                    id="assignment-billing-price"
-                    data-testid="assignment-billing-price"
-                    className="project-money"
-                    style={{ width: 160 }}
-                    inputMode="numeric"
-                    value={v.price}
-                    onChange={(e) => {
-                      setPriceTouched(true);
-                      const n = digits(e.target.value);
-                      edit({ price: n ? won(Number(n)) : "" });
-                    }}
-                    {...invalid("price")}
-                  />
-                  <span className="project-unit">원</span>
-                </span>,
-                noRateHelp +
-                  "기본값은 개발자 월 단가입니다. 고객과 다르게 계약했으면 고쳐 넣습니다. 풀로 출근하지 않으면 단가는 그대로 두고 월 MM을 줄입니다(예: 주 3일 0.6).",
-              )
-            : (
-                <p className="project-cap" data-testid="assignment-no-price">
-                  {project?.contractTypeCode === "TK"
-                    ? "턴키는 배분표 금액으로 매출을 계산하므로 청구 단가 칸이 없습니다."
-                    : "내부 프로젝트는 매출이 없어 청구 단가 칸이 없습니다."}
-                </p>
-              )}
-          <p className="project-cap">연장 가능성은 처음에 「미정」이고 철수 리스트(UI-05)에서 바꿉니다.</p>
-          <button type="button" className="ls-btn assignment-ai" data-testid="assignment-ai-recommend" onClick={recommend}>
+          {showRate ? (
+            field(
+              "assignment-billing-price",
+              "price",
+              "청구 단가(월)",
+              true,
+              <span className="project-row assignment-row">
+                <input
+                  id="assignment-billing-price"
+                  data-testid="assignment-billing-price"
+                  className="project-money"
+                  style={{ width: 160 }}
+                  inputMode="numeric"
+                  value={v.price}
+                  onChange={(e) => {
+                    setPriceTouched(true);
+                    const n = digits(e.target.value);
+                    edit({ price: n ? won(Number(n)) : "" });
+                  }}
+                  {...invalid("price")}
+                />
+                <span className="project-unit">원</span>
+              </span>,
+              noRateHelp +
+                "기본값은 개발자 월 단가입니다. 고객과 다르게 계약했으면 고쳐 넣습니다. 풀로 출근하지 않으면 단가는 그대로 두고 월 MM을 줄입니다(예: 주 3일 0.6).",
+            )
+          ) : (
+            <p className="project-cap" data-testid="assignment-no-price">
+              {project?.contractTypeCode === "TK"
+                ? "턴키는 배분표 금액으로 매출을 계산하므로 청구 단가 칸이 없습니다."
+                : "내부 프로젝트는 매출이 없어 청구 단가 칸이 없습니다."}
+            </p>
+          )}
+          <p className="project-cap">
+            연장 가능성은 처음에 「미정」이고 철수 리스트(UI-05)에서 바꿉니다.
+          </p>
+          <button
+            type="button"
+            className="ls-btn assignment-ai"
+            data-testid="assignment-ai-recommend"
+            onClick={recommend}
+          >
             {sparkle} 이 자리에 맞는 사람 AI 추천 받기
           </button>
         </div>
       </DetailPanel>
       {replace && contract && project && (
-        <Dialog title="대체투입 저장" testId="assignment-replacement" closable onClose={() => !busy && setReplace(null)}>
+        <Dialog
+          title="대체투입 저장"
+          testId="assignment-replacement"
+          closable
+          onClose={() => !busy && setReplace(null)}
+        >
           <div className="project-modal">
             <p>
-              {contract.name}님의 「{project.projectName}」 배정을 <b>{withdrawDay}</b>로 조기 철수합니다.
+              {contract.name}님의 「{project.projectName}」 배정을{" "}
+              <b>{withdrawDay}</b>로 조기 철수합니다.
             </p>
             <div className="assignment-sub-list">
               {overlapping.map((r) => (
-                <label key={r.assignmentId} className="assignment-check" data-testid={`replacement-row-${r.assignmentId}`}>
+                <label
+                  key={r.assignmentId}
+                  className="assignment-check"
+                  data-testid={`replacement-row-${r.assignmentId}`}
+                >
                   <input
                     type="checkbox"
                     data-testid={`replacement-check-${r.assignmentId}`}
                     checked={replace.ids.includes(r.assignmentId)}
                     onChange={(e) =>
-                      setReplace((x) =>
-                        x && {
-                          ...x,
-                          ids: e.target.checked ? [...x.ids, r.assignmentId] : x.ids.filter((id) => id !== r.assignmentId),
-                        },
+                      setReplace(
+                        (x) =>
+                          x && {
+                            ...x,
+                            ids: e.target.checked
+                              ? [...x.ids, r.assignmentId]
+                              : x.ids.filter((id) => id !== r.assignmentId),
+                          },
                       )
                     }
                   />{" "}
-                  {r.startDate} ~ {r.endDate} · 월 MM {mmf(r.monthlyMm)} · {r.inputTypeName}
+                  {r.startDate} ~ {r.endDate} · 월 MM {mmf(r.monthlyMm)} ·{" "}
+                  {r.inputTypeName}
                 </label>
               ))}
             </div>
             {closedMonth && withdrawDay.slice(0, 7) <= closedMonth && (
               <Banner kind="warn" icon={warnIcon(16)}>
-                마감한 달({withdrawDay.slice(0, 7)})에 걸칩니다. 마감한 달 금액은 그대로 두고 차액은 이번 달 전월 조정으로 넣습니다.
+                마감한 달({withdrawDay.slice(0, 7)})에 걸칩니다. 마감한 달
+                금액은 그대로 두고 차액은 이번 달 전월 조정으로 넣습니다.
               </Banner>
             )}
             {distWarn && (
@@ -675,11 +924,19 @@ export function AssignmentForm({
                 id="replacement-reason"
                 data-testid="replacement-reason"
                 value={replace.reason}
-                onChange={(e) => setReplace((x) => x && { ...x, reason: e.target.value, error: "" })}
+                onChange={(e) =>
+                  setReplace(
+                    (x) => x && { ...x, reason: e.target.value, error: "" },
+                  )
+                }
               >
                 <option value="">고르세요</option>
                 {reasons.map((r) => (
-                  <option key={r.code} value={r.code}>
+                  <option
+                    key={r.code}
+                    value={r.code}
+                    data-testid={`replacement-reason-option-${reasons.indexOf(r)}`}
+                  >
                     {r.codeName}
                   </option>
                 ))}
@@ -692,20 +949,37 @@ export function AssignmentForm({
                 data-testid="replacement-memo"
                 maxLength={200}
                 value={replace.memo}
-                onChange={(e) => setReplace((x) => x && { ...x, memo: e.target.value })}
+                onChange={(e) =>
+                  setReplace((x) => x && { ...x, memo: e.target.value })
+                }
               />
             </div>
-            <p className="field-error" role="alert" data-testid="replacement-error">
+            <p
+              className="field-error"
+              role="alert"
+              data-testid="replacement-error"
+            >
               {replace.error}
             </p>
             <p className="project-help">
-              [대체투입만 저장]을 누르면 {contract.name}님 배정은 그대로 둡니다. 나중에 [변경 기록] › 조기 철수로 따로 처리할 수 있습니다.
+              [대체투입만 저장]을 누르면 {contract.name}님 배정은 그대로 둡니다.
+              나중에 [변경 기록] › 조기 철수로 따로 처리할 수 있습니다.
             </p>
             <div className="app-actions">
-              <button type="button" data-testid="replacement-cancel" disabled={busy} onClick={() => setReplace(null)}>
+              <button
+                type="button"
+                data-testid="replacement-cancel"
+                disabled={busy}
+                onClick={() => setReplace(null)}
+              >
                 취소
               </button>
-              <button type="button" data-testid="replacement-only" disabled={busy} onClick={() => void commit([])}>
+              <button
+                type="button"
+                data-testid="replacement-only"
+                disabled={busy}
+                onClick={() => void commit([])}
+              >
                 대체투입만 저장
               </button>
               <button
@@ -715,7 +989,9 @@ export function AssignmentForm({
                 disabled={busy}
                 onClick={() => {
                   if (replace.ids.length && !replace.reason) {
-                    setReplace((x) => x && { ...x, error: "철수 사유를 골라 주세요." });
+                    setReplace(
+                      (x) => x && { ...x, error: "철수 사유를 골라 주세요." },
+                    );
                     document.getElementById("replacement-reason")?.focus();
                     return;
                   }
@@ -729,15 +1005,29 @@ export function AssignmentForm({
         </Dialog>
       )}
       {leaving && (
-        <Dialog title="저장하지 않은 내용이 있습니다" closable testId="assignment-leave-confirm" onClose={() => setLeaving(false)}>
+        <Dialog
+          title="저장하지 않은 내용이 있습니다"
+          closable
+          testId="assignment-leave-confirm"
+          onClose={() => setLeaving(false)}
+        >
           {/* 시안 확인 창: 머리 [×]·폭 400(작은 창 모양) */}
           <div className="project-modal">
             <p>나가면 입력한 내용이 사라집니다.</p>
             <div className="app-actions">
-              <button type="button" data-testid="assignment-leave-cancel" onClick={() => setLeaving(false)}>
+              <button
+                type="button"
+                data-testid="assignment-leave-cancel"
+                onClick={() => setLeaving(false)}
+              >
                 취소
               </button>
-              <button type="button" className="primary-button" data-testid="assignment-leave-go" onClick={onClose}>
+              <button
+                type="button"
+                className="primary-button"
+                data-testid="assignment-leave-go"
+                onClick={onClose}
+              >
                 나가기
               </button>
             </div>

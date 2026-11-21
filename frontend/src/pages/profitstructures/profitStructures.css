@@ -1,0 +1,222 @@
+/* 시안 UI-07 전체 수익 구조: .content(간격 24, 휴대폰 16) · .card · .grid2/.grid3 · .t · 차트 색 --c1~--c6 */
+.profit-structures-page {
+  --pf-c1: #1d4ed8;
+  --pf-c2: #f59e0b;
+  --pf-c3: #10b981;
+  --pf-c4: #8b5cf6;
+  --pf-c6: #6b7280;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  max-width: 100%;
+}
+@media (prefers-color-scheme: dark) {
+  .profit-structures-page {
+    --pf-c1: #60a5fa;
+    --pf-c2: #fbbf24;
+    --pf-c3: #34d399;
+    --pf-c4: #a78bfa;
+    --pf-c6: #9ca3af;
+  }
+}
+.profit-structures-page > * {
+  min-width: 0;
+}
+/* 앱 공통 「버튼 최소 36px」을 풀고 시안 작은 단추(btn-sm) 28px */
+.profit-structures-page .ls-btn-sm {
+  min-height: 28px;
+  height: 28px;
+}
+/* 시안 .content > .tabs: 좌우 여백 없음, 아래 −8px */
+.profit-structures-page > .profit-tabs {
+  padding: 0;
+  margin-bottom: -8px;
+}
+.profit-field-error {
+  color: var(--ls-bad);
+  font-size: 12px;
+  margin: 0;
+}
+/* 시안 .card / .card-h */
+.profit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px 24px;
+  border: 1px solid var(--divider, var(--border));
+  border-radius: 8px;
+  background: var(--surface);
+}
+.profit-card-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.profit-card-h h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.profit-card-h > .ls-cap {
+  min-width: 0;
+}
+.profit-card-right {
+  margin-left: auto;
+}
+/* .card-h 안 이름·설명은 왼쪽에 붙이고 단위 고르기만 오른쪽(시안 margin-left:auto) */
+.profit-card-h:has(.profit-card-right) {
+  justify-content: flex-start;
+}
+.profit-grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.profit-grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+/* 시안 .chart */
+.profit-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.profit-chart .ax {
+  fill: var(--text-sub);
+  font-size: 12px;
+  font-family: inherit;
+}
+.profit-chart .profit-wf-value {
+  fill: var(--text);
+  font-weight: 600;
+}
+.profit-chart .gl {
+  stroke: var(--divider, var(--border));
+  stroke-width: 1;
+}
+.profit-chart .zl {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+/* 시안 .legend */
+.profit-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  font-size: 12px;
+  color: var(--text-sub);
+}
+.profit-legend i {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+.profit-legend i.is-dash {
+  height: 2px;
+  vertical-align: 3px;
+}
+/* 시안 mixRows(): 줄 간격 10, 13px, 막대 8px */
+.profit-mix {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.profit-mix-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.profit-tnum {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.profit-track {
+  width: 100%;
+  height: 8px;
+  margin-top: 4px;
+  border-radius: 3px;
+  background: var(--divider, var(--border));
+  overflow: hidden;
+}
+.profit-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--pf-c1);
+}
+.profit-ok {
+  color: var(--ls-ok);
+}
+.profit-bad {
+  color: var(--ls-bad);
+}
+.profit-sub {
+  color: var(--text-sub);
+}
+.profit-structures-page .profit-card > p {
+  margin: 0;
+}
+.profit-link {
+  color: var(--primary-text);
+  text-decoration: none;
+}
+.profit-link:hover {
+  text-decoration: underline;
+}
+/* 시안 .twrap.free: 표는 카드 안에서만 가로로 밀린다(높이 제한 없음) */
+.profit-structures-page .profit-twrap {
+  max-height: none;
+  min-height: 0;
+  max-width: 100%;
+}
+.profit-numeric-table th,
+.profit-numeric-table td {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.profit-numeric-table .ls-right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.profit-numeric-table td.profit-cur,
+.profit-numeric-table th.profit-cur {
+  background: var(--primary-bg);
+}
+.profit-numeric-table tr.profit-b td {
+  font-weight: 700;
+}
+.profit-numeric-table td.profit-ind {
+  padding-left: 28px;
+  color: var(--text-sub);
+}
+.profit-numeric-table .ls-b {
+  height: 18px;
+  margin-left: 2px;
+}
+@media (max-width: 1279px) {
+  .profit-grid3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 767px) {
+  .profit-structures-page {
+    gap: 16px;
+  }
+  .profit-grid2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .profit-card {
+    padding: 16px;
+  }
+}

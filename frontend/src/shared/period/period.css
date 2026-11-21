@@ -143,3 +143,25 @@
 .period-selector.period-month-box > span {
   margin-left: 6px;
 }
+/* 시안 periodBar(누계 화면, PeriodSelector variant="cumulativeBar"): .pbar 간격 8·12, .pf 13px 회색 */
+.period-cumulative-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 28px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text);
+}
+.period-cumulative-bar .year-bar-nav strong {
+  min-width: 64px;
+  text-align: center;
+}
+.period-cumulative-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-sub);
+}

@@ -41,6 +41,16 @@
 .rate-warn {
   color: var(--ls-warn);
 }
+/* 시안 pname: 이름 아래 관리번호(작게) */
+.rate-pname {
+  display: flex;
+  flex-direction: column;
+  line-height: 18px;
+}
+.rate-pname small {
+  font-size: 12px;
+  color: var(--text-sub);
+}
 /* 시안 휴대폰 카드 이름 아래 프로젝트(작게) */
 .rate-card-name {
   display: flex;

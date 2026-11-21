@@ -58,7 +58,8 @@ public final class RateRenegotiationRules {
         return new Row(a.assignmentId(), a.developerId(), a.developerName(), a.employeeTypeName(), a.projectName(),
             a.renewalDate(), Math.toIntExact(ChronoUnit.DAYS.between(today, a.renewalDate())), mm,
             a.currentUnitPrice(), labor, exactProfit(a.currentUnitPrice().multiply(mm), labor).setScale(1, RoundingMode.HALF_UP),
-            target, needed, annual(a.currentUnitPrice().multiply(increase.movePointLeft(2)), a.contractMm()));
+            target, needed, annual(a.currentUnitPrice().multiply(increase.movePointLeft(2)), a.contractMm()),
+            a.projectId(), a.managementNumber());
     }
     private static BigDecimal annual(BigDecimal difference, BigDecimal contractMm) {
         return difference.multiply(contractMm).multiply(valueOf(12)).setScale(0, RoundingMode.DOWN);

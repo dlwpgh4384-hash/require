@@ -52,6 +52,8 @@ beforeEach(() => {
         targetUnitPrice: 1130000,
         requiredIncreaseRate: 13,
         annualProfitIncrease: 600000,
+        projectId: "project-a",
+        managementNumber: "M-A",
       },
     ],
     summary: {
@@ -390,4 +392,14 @@ it("keeps an emptied assumption box empty without querying 0 and restores it on 
   ).toBe(false);
   fireEvent.blur(input);
   expect(input).toHaveValue(5);
+});
+it("shows the management number under the name, the type badge and a project link like the mockup", async () => {
+  mount();
+  await ready();
+  const name = screen.getByTestId("list-cell-assignment-a-developerName");
+  expect(name.querySelector("small")).toHaveTextContent("M-A");
+  expect(
+    screen.getByTestId("list-cell-assignment-a-employeeTypeName").querySelector(".ls-b-neutral"),
+  ).not.toBeNull();
+  expect(screen.getByTestId("rate-project-assignment-a")).toHaveTextContent("업무 시스템");
 });

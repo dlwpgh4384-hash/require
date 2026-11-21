@@ -25,6 +25,10 @@ export interface RateRenegotiationRow {
   targetUnitPrice: number;
   requiredIncreaseRate: number;
   annualProfitIncrease: number;
+  /** 프로젝트 이름을 누르면 여는 프로젝트 상세용 */
+  projectId?: string;
+  /** 시안 이름 아래 관리번호 */
+  managementNumber?: string | null;
 }
 export interface RateRenegotiationResult {
   baseYearMonth: string;
@@ -52,7 +56,11 @@ export interface RateRenegotiationResult {
 }
 export type RateRenegotiationColumn = Exclude<
   keyof RateRenegotiationRow,
-  "assignmentId" | "developerId" | "daysUntilRenewal"
+  | "assignmentId"
+  | "developerId"
+  | "daysUntilRenewal"
+  | "projectId"
+  | "managementNumber"
 >;
 export const rateRenegotiationColumns: readonly [
   RateRenegotiationColumn,

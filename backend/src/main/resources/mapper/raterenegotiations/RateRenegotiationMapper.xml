@@ -17,6 +17,7 @@
       <arg column="inputTypeCode" javaType="java.lang.String"/>
       <arg column="contractTypeCode" javaType="java.lang.String"/>
       <arg column="projectStatus" javaType="java.lang.String"/>
+      <arg column="managementNumber" javaType="java.lang.String"/>
     </constructor>
   </resultMap>
   <resultMap id="monthlyCost" type="com.company.common.personalcostprofits.mapper.PersonalCostProfitRows$Cost">
@@ -57,7 +58,8 @@
         <otherwise>COALESCE(m.APLY_UPRC,h.NEW_UPRC,a.BILL_UPRC,0)</otherwise>
       </choose> AS "currentUnitPrice",
       a.ASGN_STAT_CD AS "assignmentStatus", a.INPUT_TYPE_CD AS "inputTypeCode",
-      p.CTRT_TYPE_CD AS "contractTypeCode", p.PROJ_STAT_CD AS "projectStatus"
+      p.CTRT_TYPE_CD AS "contractTypeCode", p.PROJ_STAT_CD AS "projectStatus",
+      d.MNG_NO AS "managementNumber"
     FROM TB_PJ_ASGN a
     JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID
     JOIN TB_HR_DEV d ON d.DEV_ID=a.DEV_ID

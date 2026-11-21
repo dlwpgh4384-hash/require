@@ -19,6 +19,7 @@ import {
 } from "../../shared/list";
 import { DeveloperDetail } from "../developers/DeveloperDetail";
 import { ProjectRequestError } from "../projects/projects";
+import { ProjectLink } from "../projects/ProjectLink";
 import { Toast } from "../../shared/feedback/Dialog";
 import {
   getCommonRateRenegotiations,
@@ -184,6 +185,26 @@ export function RateRenegotiationWorkspace() {
     row: RateRenegotiationRow,
     key: RateRenegotiationColumn,
   ): ReactNode => {
+    // 시안 pname: 이름 아래 관리번호(작게)
+    if (key === "developerName")
+      return (
+        <span className="rate-pname">
+          {row.developerName}
+          {row.managementNumber && <small>{row.managementNumber}</small>}
+        </span>
+      );
+    // 시안 badge(구분)
+    if (key === "employeeTypeName")
+      return <Badge kind="neutral">{row.employeeTypeName}</Badge>;
+    // 시안 projLink: 프로젝트 이름을 누르면 프로젝트 상세(줄 누름과 따로)
+    if (key === "projectName")
+      return (
+        <ProjectLink
+          projectId={row.projectId}
+          name={row.projectName}
+          testId={`rate-project-${row.assignmentId}`}
+        />
+      );
     if (key === "renewalDate")
       return (
         <>

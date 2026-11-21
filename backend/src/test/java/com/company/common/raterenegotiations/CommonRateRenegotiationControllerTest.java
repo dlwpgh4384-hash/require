@@ -134,7 +134,7 @@ class CommonRateRenegotiationControllerTest {
             a.assignmentId(), a.developerId(), a.developerName(), a.employeeTypeCode(), a.employeeTypeName(),
             a.projectId(), a.projectName(), a.renewalDate(), a.contractMm(), reason.equals("ZERO") ? n("0") : a.currentUnitPrice(),
             reason.equals("CNCL") ? "CNCL" : "ACT", reason.equals("FREE") ? "FREE" : "NEW",
-            List.of("TK", "IN").contains(reason) ? reason : "MO", reason.equals("DONE") ? "DONE" : "ING")));
+            List.of("TK", "IN").contains(reason) ? reason : "MO", reason.equals("DONE") ? "DONE" : "ING", "M-1")));
         if (reason.equals("EQUAL")) {
             when(sources.selectPayroll(any())).thenReturn(List.of(new Pay("202602", "D", "CT", n("850000"), n("0"),
                 n("0"), n("0"), n("0"), n("0"), n("0"), n("0"), n("0"))));
@@ -189,7 +189,7 @@ class CommonRateRenegotiationControllerTest {
         when(mapper.selectAssignmentInfo(anyString(), anyBoolean())).thenReturn(List.of(new AssignmentInfo(
             a.assignmentId(), a.developerId(), "=1+1", a.employeeTypeCode(), a.employeeTypeName(), a.projectId(),
             a.projectName(), a.renewalDate(), a.contractMm(), a.currentUnitPrice(), a.assignmentStatus(),
-            a.inputTypeCode(), a.contractTypeCode(), a.projectStatus())));
+            a.inputTypeCode(), a.contractTypeCode(), a.projectStatus(), a.managementNumber())));
         var bytes = mvc.perform(get(PATH + "/excel").param("columns", "developerName"))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {

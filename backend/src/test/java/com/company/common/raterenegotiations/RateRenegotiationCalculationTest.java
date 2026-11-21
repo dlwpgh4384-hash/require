@@ -15,7 +15,7 @@ class RateRenegotiationCalculationTest {
     static final LocalDate TODAY = LocalDate.of(2026, 2, 1);
     static AssignmentInfo info(String id, int days) {
         return new AssignmentInfo(id, "D", "김개발", "CT", "계약직", "P", "프로젝트",
-            TODAY.plusDays(days), n("1"), n("1000000"), "ACT", "NEW", "MO", "ING");
+            TODAY.plusDays(days), n("1"), n("1000000"), "ACT", "NEW", "MO", "ING", "M-1");
     }
     static Filter filter() { return new Filter(null, null, null, null, null); }
 

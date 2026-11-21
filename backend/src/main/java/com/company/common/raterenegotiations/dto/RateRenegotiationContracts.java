@@ -13,7 +13,7 @@ public final class RateRenegotiationContracts {
         String employeeTypeName, String projectName, LocalDate renewalDate, int daysUntilRenewal,
         BigDecimal monthlyMm, BigDecimal currentUnitPrice, BigDecimal monthlyCost,
         BigDecimal profitRate, BigDecimal targetUnitPrice, BigDecimal requiredIncreaseRate,
-        BigDecimal annualProfitIncrease) {}
+        BigDecimal annualProfitIncrease, String projectId, String managementNumber) {}
     public record Summary(int targetCount, BigDecimal averageProfitRate, BigDecimal targetProfitRate,
         BigDecimal assumedAnnualProfitIncrease, BigDecimal targetAnnualProfitIncrease) {}
     public record FormulaHelp(String renewalDate, String monthlyCost, String profitRate,

@@ -10404,6 +10404,8 @@ components:
       - targetUnitPrice
       - requiredIncreaseRate
       - annualProfitIncrease
+      - projectId
+      - managementNumber
       properties:
         assignmentId:
           type: string
@@ -10448,6 +10450,13 @@ components:
         annualProfitIncrease:
           type: number
           description: 적용 인상률로 1년 계속 투입 시 연 이익 증가·원
+        projectId:
+          type: string
+          description: 프로젝트 이름을 누르면 여는 프로젝트 상세용
+        managementNumber:
+          type: string
+          nullable: true
+          description: 시안 이름 아래 관리번호(TB_HR_DEV.MNG_NO)
       additionalProperties: false
     CommonRateRenegotiationSummary:
       type: object

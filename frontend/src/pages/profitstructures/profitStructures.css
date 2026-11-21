@@ -1,0 +1,193 @@
+.profit-structures-page {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.profit-mobile-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+.profit-structures-page .ls-btn-sm {
+  min-height: 28px;
+  height: 28px;
+}
+.profit-structures-page .ls-t th,
+.profit-structures-page .ls-t td {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.profit-period-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.profit-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+.profit-panel {
+  min-width: 0;
+  border: 1px solid var(--line, #dbe2ea);
+  border-radius: 10px;
+  padding: 16px;
+  background: var(--panel, #fff);
+}
+.profit-panel h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+.profit-panel p {
+  color: var(--muted, #64748b);
+  font-size: 12px;
+}
+.profit-panel svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.profit-panel svg text {
+  font-size: 11px;
+  fill: currentColor;
+}
+.profit-waterfall,
+.profit-compositions {
+  grid-column: 1 / -1;
+}
+.profit-axis {
+  stroke: var(--line, #cbd5e1);
+  stroke-width: 1;
+}
+.profit-total {
+  fill: #2563eb;
+}
+.profit-deduction {
+  fill: #e07855;
+}
+.profit-change {
+  fill: #168477;
+}
+.profit-series {
+  fill: none;
+  stroke-width: 2;
+}
+.profit-series circle {
+  fill: currentColor;
+}
+.profit-series-0 {
+  stroke: #2563eb;
+  color: #2563eb;
+}
+.profit-series-1 {
+  stroke: #168477;
+  color: #168477;
+}
+.profit-series-2 {
+  stroke: #a96916;
+  color: #a96916;
+}
+.profit-waterfall-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  font-size: 12px;
+}
+.profit-waterfall-values dd {
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.profit-compositions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.profit-compositions > div {
+  min-width: 0;
+  overflow-x: auto;
+}
+.profit-composition-table {
+  font-size: 12px;
+}
+.profit-chart-values {
+  display: grid;
+  gap: 8px;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 12px;
+}
+.profit-chart-values > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.profit-cost-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.profit-stack {
+  display: flex;
+  flex-basis: 100%;
+  min-height: 16px;
+  background: var(--bg, #f1f5f9);
+}
+.profit-stack-0 {
+  background: #2563eb;
+}
+.profit-stack-1 {
+  background: #e07855;
+}
+.profit-stack-2 {
+  background: #168477;
+}
+.profit-field-error {
+  color: var(--danger, #b42318);
+  font-size: 12px;
+  margin: 0;
+}
+.profit-structures-page .ls-kpis .d > span {
+  display: block;
+}
+.profit-structures-page .ls-kpis {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 760px) {
+  .profit-chart-grid,
+  .profit-compositions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .profit-structures-page .ls-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .profit-waterfall-values {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .profit-period-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .profit-structures-page .ls-mcards dl > div {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .profit-structures-page .ls-mcards dd {
+    margin: 0;
+    overflow-x: auto;
+  }
+}
+@media (max-width: 400px) {
+  .profit-structures-page .ls-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .profit-panel {
+    padding: 12px;
+  }
+}

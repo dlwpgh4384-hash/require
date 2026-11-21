@@ -1,0 +1,73 @@
+.operating-profit-statements-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+}
+.operating-profit-statements-page > * {
+  min-width: 0;
+}
+.operating-actions,
+.operating-report-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.operating-profit-statements-page .ls-btn-sm,
+.operating-profit-statements-page .upload-title-button {
+  min-height: 28px;
+}
+.operating-report-card {
+  min-width: 0;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  padding: 16px;
+}
+.operating-report-heading {
+  margin-bottom: 12px;
+}
+.operating-report-heading h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.operating-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.operating-table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.operating-table th,
+.operating-table td {
+  padding: 10px 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+.operating-table th:first-child {
+  text-align: left;
+}
+.operating-table .operating-indent th {
+  padding-left: 28px;
+  font-weight: 400;
+}
+.operating-table .operating-bold {
+  font-weight: 700;
+  background: var(--surface-muted, #f8fafc);
+}
+.operating-bad {
+  color: var(--danger, #dc2626);
+}
+.operating-good {
+  color: var(--success, #15803d);
+}
+@media (max-width: 768px) {
+  .operating-actions .upload-title-button:not([data-testid="operating-excel"]) {
+    display: none;
+  }
+}

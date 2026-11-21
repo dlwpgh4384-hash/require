@@ -45,8 +45,8 @@ public class CommonProfitStructureService {
         var current = project(period, selected);
         var prev = previous == null ? List.<Month>of() : select(previous, source); var prior = select(previousYear, source);
         boolean prevAvailable = available(prev), priorAvailable = available(prior);
-        var comparison = new Comparison(prevAvailable ? summary(prev) : null, prevAvailable ? period.previousLabel() : null,
-            priorAvailable ? summary(prior) : null, priorAvailable, "%p");
+        var comparison = new Comparison(prevAvailable ? completeSummary(prev, prev.size()) : null, prevAvailable ? period.previousLabel() : null,
+            priorAvailable ? completeSummary(prior, prior.size()) : null, priorAvailable, "%p");
         var bucketMonths = period.buckets().stream().map(bucket -> Map.entry(bucket, select(bucket, source))).toList();
         var numeric = bucketMonths.stream().map(entry -> project(entry.getKey(), entry.getValue())).toList();
         List<List<ProfitStructureMonthlyProfitService.ProjectValue>> bucketProjects = new ArrayList<>();
@@ -61,7 +61,7 @@ public class CommonProfitStructureService {
             ProfitStructureTable.of(numeric, bucketProjects, compositionVisible));
         return new Response<>(true, Map.of("previousPeriodAvailable", prevAvailable), result);
     }
-    private static boolean available(List<Month> months) { return months.stream().anyMatch(Month::available); }
+    private static boolean available(List<Month> months) { return !months.isEmpty() && months.stream().allMatch(Month::available); }
     private static List<Month> select(ProfitStructurePeriod period, Map<String, Month> source) {
         List<Month> result = new ArrayList<>();
         for (YearMonth month = period.start(); !month.isAfter(period.end()); month = month.plusMonths(1)) {

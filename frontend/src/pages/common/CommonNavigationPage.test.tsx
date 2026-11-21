@@ -138,6 +138,31 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (url.startsWith("/api/common/operating-profit-statements?")) {
+      const metric = {
+        amount: null,
+        previousYearChangePercent: null,
+        previousMonthChangePercent: null,
+      };
+      return {
+        success: true,
+        meta: {},
+        data: {
+          year: 2026,
+          baseMonth: "202602",
+          provisional: false,
+          provisionalNotice: null,
+          summary: {
+            cumulativeRevenue: metric,
+            cumulativeGrossProfit: metric,
+            cumulativeOperatingProfit: metric,
+            operatingProfitRate: null,
+            baseMonthOperatingProfit: metric,
+          },
+          numericTable: { columns: [], rows: [] },
+        },
+      };
+    }
     if (url.startsWith("/api/common/profit-structures?")) {
       const summary = {
         revenue: 0,
@@ -341,7 +366,8 @@ function respond(body: ShellMenuResponse) {
               url.endsWith("/UI-03") ||
               url.endsWith("/UI-04") ||
               url.endsWith("/UI-10") ||
-              url.endsWith("/UI-07")
+              url.endsWith("/UI-07") ||
+              url.endsWith("/UI-08")
                 ? {
                     periodBasis: {
                       latestYm: "202602",
@@ -400,6 +426,19 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-08": async (content) => {
+    expect(await content.findByTestId("period-selector")).toBeVisible();
+    expect(await content.findByTestId("operating-empty")).toBeVisible();
+    expect(content.getByTestId("operating-numeric-table")).toBeVisible();
+    expect(content.queryByRole("textbox")).not.toBeInTheDocument();
+    const actions = within(screen.getByTestId("screen-actions"));
+    expect(
+      actions.getByRole("button", { name: "전년 손익 양식" }),
+    ).toBeVisible();
+    expect(
+      actions.getByRole("button", { name: "전년 손익 업로드" }),
+    ).toBeVisible();
+  },
   "UI-07": async (content) => {
     // 시안: 기간 줄(누계 기준월) + 월/분기/연 누계 탭, [엑셀 다운로드]는 제목줄에 한 개.
     expect(await content.findByTestId("period-selector")).toBeVisible();

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.operatingprofitstatements.mapper.OperatingProfitStatementMapper">
+  <select id="lockSources" resultType="java.lang.String">
+    SELECT pg_advisory_xact_lock(734901, 1)::text
+  </select>
+  <insert id="upsertImported">
+    INSERT INTO TB_CO_MON_PL(PL_YM,SALES_AMT,ALLOC_COST_AMT,IDLE_COST_AMT,DRCT_EXPS_AMT,
+      SALES_COST_AMT,GROSS_PRFT_AMT,SGA_INPUT_AMT,INDRCT_LABOR_AMT,RND_AMT,SGA_TOT_AMT,
+      PREV_ADJ_AMT,OPRT_PRFT_AMT,NOPR_INCM_AMT,NOPR_EXPS_AMT,CORP_TAX_AMT,NET_PRFT_AMT,
+      MIGR_YN,FIX_YN,REG_USER_ID,REG_DTTM)
+    VALUES(#{month},#{revenue},#{allocatedCost},#{idleCost},#{directExpense},#{costOfSales},
+      #{grossProfit},#{sellingAdministrativeInput},#{indirectLaborCost},#{internalResearchCost},#{sga},
+      #{previousAdjustment},#{operatingProfit},#{income},#{expense},#{tax},#{netProfit},
+      'Y','Y',#{userId},clock_timestamp())
+    ON CONFLICT (PL_YM) DO UPDATE SET
+      SALES_AMT=EXCLUDED.SALES_AMT,ALLOC_COST_AMT=EXCLUDED.ALLOC_COST_AMT,
+      IDLE_COST_AMT=EXCLUDED.IDLE_COST_AMT,DRCT_EXPS_AMT=EXCLUDED.DRCT_EXPS_AMT,
+      SALES_COST_AMT=EXCLUDED.SALES_COST_AMT,GROSS_PRFT_AMT=EXCLUDED.GROSS_PRFT_AMT,
+      SGA_INPUT_AMT=EXCLUDED.SGA_INPUT_AMT,INDRCT_LABOR_AMT=EXCLUDED.INDRCT_LABOR_AMT,
+      RND_AMT=EXCLUDED.RND_AMT,SGA_TOT_AMT=EXCLUDED.SGA_TOT_AMT,
+      PREV_ADJ_AMT=EXCLUDED.PREV_ADJ_AMT,OPRT_PRFT_AMT=EXCLUDED.OPRT_PRFT_AMT,
+      NOPR_INCM_AMT=EXCLUDED.NOPR_INCM_AMT,NOPR_EXPS_AMT=EXCLUDED.NOPR_EXPS_AMT,
+      CORP_TAX_AMT=EXCLUDED.CORP_TAX_AMT,NET_PRFT_AMT=EXCLUDED.NET_PRFT_AMT,
+      MIGR_YN='Y',FIX_YN='Y',MOD_USER_ID=EXCLUDED.REG_USER_ID,MOD_DTTM=clock_timestamp()
+  </insert>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES(#{userId},'DNLD','UI-08',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
+</mapper>

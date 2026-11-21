@@ -22,6 +22,8 @@ export function UploadActions({
   notes,
   dialog,
   onOpen,
+  templateLabel = "양식 내려받기",
+  uploadLabel = "엑셀 업로드",
 }: {
   onApplied: () => void;
   disabled?: boolean;
@@ -34,6 +36,8 @@ export function UploadActions({
   dialog?: DialogOptions;
   /** [엑셀 업로드]를 누를 때 화면이 먼저 확인할 일(예: 저장 안 한 내용). open()을 부르면 창이 열린다. */
   onOpen?: (open: () => void) => void;
+  templateLabel?: string;
+  uploadLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
@@ -62,8 +66,20 @@ export function UploadActions({
         disabled={disabled || downloading}
         onClick={() => void download()}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
-        양식 내려받기
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+        </svg>
+        {templateLabel}
       </button>
       <button
         type="button"
@@ -72,8 +88,20 @@ export function UploadActions({
         disabled={disabled}
         onClick={() => (onOpen ? onOpen(() => setOpen(true)) : setOpen(true))}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20V9M7 14l5-5 5 5M5 4h14" /></svg>
-        엑셀 업로드
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 20V9M7 14l5-5 5 5M5 4h14" />
+        </svg>
+        {uploadLabel}
       </button>
       {error && (
         <p role="alert" className="field-error">

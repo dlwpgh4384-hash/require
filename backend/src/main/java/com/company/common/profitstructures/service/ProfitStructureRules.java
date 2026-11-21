@@ -31,6 +31,17 @@ public final class ProfitStructureRules {
         }
         return total;
     }
+    public static BigDecimal completeSum(List<Month> months, int expected, Function<Snapshot, BigDecimal> field) {
+        if (expected < 1 || months.size() != expected || months.stream().anyMatch(m -> !m.available())) return null;
+        return sum(months, field);
+    }
+    public static Summary completeSummary(List<Month> months, int expected) {
+        var revenue = completeSum(months, expected, Snapshot::revenue);
+        var gross = completeSum(months, expected, Snapshot::grossProfit);
+        var operating = completeSum(months, expected, Snapshot::operatingProfit);
+        return new Summary(revenue, gross, ratio(gross, revenue), operating, ratio(operating, revenue),
+            ratio(completeSum(months, expected, Snapshot::idleCost), completeSum(months, expected, Snapshot::costOfSales)));
+    }
     public static Summary summary(List<Month> months) {
         var revenue = sum(months, Snapshot::revenue);
         var gross = sum(months, Snapshot::grossProfit);

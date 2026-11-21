@@ -1,0 +1,96 @@
+.rate-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.rate-kpis {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+/* 시안 안내 띠: 문구 + 오른쪽 「인상률 [ ] %」 */
+.rate-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  width: 100%;
+}
+.rate-banner-text {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.rate-assumption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.rate-assumption input {
+  width: 60px;
+  text-align: right;
+}
+.rate-field-error {
+  display: block;
+  color: var(--ls-bad);
+  font-size: 12px;
+}
+/* 시안: 이익률 10% 미만 빨강, 15% 미만 주황 */
+.rate-bad {
+  color: var(--ls-bad);
+}
+.rate-warn {
+  color: var(--ls-warn);
+}
+/* 시안 pname: 이름 아래 관리번호(작게) */
+.rate-pname {
+  display: flex;
+  flex-direction: column;
+  line-height: 18px;
+}
+.rate-pname small {
+  font-size: 12px;
+  color: var(--text-sub);
+}
+/* 시안 휴대폰 카드 이름 아래 프로젝트(작게) */
+.rate-card-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.rate-card-name small {
+  font-size: 12px;
+  color: var(--text-sub);
+}
+.rate-workspace .ls-tr {
+  flex-wrap: wrap;
+}
+@media (max-width: 700px) {
+  .rate-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .rate-kpis .ls-kpi {
+    min-width: 0;
+  }
+  .rate-kpis .v {
+    overflow-wrap: anywhere;
+    font-size: 20px;
+  }
+  .rate-workspace .ls-filters {
+    flex-wrap: wrap;
+  }
+  .rate-workspace .ls-filter-fields {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+  .rate-workspace .ls-filter {
+    min-width: 0;
+    flex: 1 1 130px;
+  }
+  .rate-workspace .ls-filter select {
+    max-width: 100%;
+  }
+  .rate-workspace .ls-tbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

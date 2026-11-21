@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.raterenegotiations.mapper.RateRenegotiationMapper">
+  <resultMap id="assignmentInfo" type="com.company.common.raterenegotiations.mapper.RateRenegotiationRows$AssignmentInfo">
+    <constructor>
+      <arg column="assignmentId" javaType="java.lang.String"/>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="developerName" javaType="java.lang.String"/>
+      <arg column="employeeTypeCode" javaType="java.lang.String"/>
+      <arg column="employeeTypeName" javaType="java.lang.String"/>
+      <arg column="projectId" javaType="java.lang.String"/>
+      <arg column="projectName" javaType="java.lang.String"/>
+      <arg column="renewalDate" javaType="java.time.LocalDate"/>
+      <arg column="contractMm" javaType="java.math.BigDecimal"/>
+      <arg column="currentUnitPrice" javaType="java.math.BigDecimal"/>
+      <arg column="assignmentStatus" javaType="java.lang.String"/>
+      <arg column="inputTypeCode" javaType="java.lang.String"/>
+      <arg column="contractTypeCode" javaType="java.lang.String"/>
+      <arg column="projectStatus" javaType="java.lang.String"/>
+      <arg column="managementNumber" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="monthlyCost" type="com.company.common.personalcostprofits.mapper.PersonalCostProfitRows$Cost">
+    <constructor>
+      <arg column="yearMonth" javaType="java.lang.String"/>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="projectId" javaType="java.lang.String"/>
+      <arg column="assignmentId" javaType="java.lang.String"/>
+      <arg column="projectName" javaType="java.lang.String"/>
+      <arg column="jobName" javaType="java.lang.String"/>
+      <arg column="contractTypeCode" javaType="java.lang.String"/>
+      <arg column="mm" javaType="java.math.BigDecimal"/>
+      <arg column="revenue" javaType="java.math.BigDecimal"/>
+      <arg column="labor" javaType="java.math.BigDecimal"/>
+      <arg column="team" javaType="java.math.BigDecimal"/>
+      <arg column="expense" javaType="java.math.BigDecimal"/>
+      <arg column="inputTypeCode" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <select id="selectMonthlyCosts" resultMap="monthlyCost">
+    SELECT c.COST_YM AS "yearMonth",c.DEV_ID AS "developerId",c.PROJ_ID AS "projectId",
+      c.ASGN_ID AS "assignmentId",p.PROJ_NM AS "projectName",j.CODE_NM AS "jobName",
+      c.CTRT_TYPE_CD AS "contractTypeCode",c.ASGN_MM AS "mm",c.SALES_AMT AS "revenue",
+      c.LABOR_ALLOC_AMT AS "labor",c.TEAM_EXPS_AMT AS "team",c.PROJ_EXPS_AMT AS "expense",
+      a.INPUT_TYPE_CD AS "inputTypeCode"
+    FROM TB_CO_MON_COST c JOIN TB_PJ_ASGN a ON a.ASGN_ID=c.ASGN_ID
+    JOIN TB_PJ_PROJ p ON p.PROJ_ID=c.PROJ_ID
+    LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=a.JOB_CD
+    WHERE c.COST_YM=#{yearMonth} ORDER BY c.ASGN_ID
+  </select>
+  <select id="selectAssignmentInfo" resultMap="assignmentInfo">
+    SELECT a.ASGN_ID AS "assignmentId", a.DEV_ID AS "developerId", d.DEV_NM AS "developerName",
+      d.EMP_TYPE_CD AS "employeeTypeCode", COALESCE(e.CODE_NM,d.EMP_TYPE_CD) AS "employeeTypeName",
+      a.PROJ_ID AS "projectId", p.PROJ_NM AS "projectName", a.INPUT_END_DT AS "renewalDate",
+      a.CTRT_MM AS "contractMm",
+      <choose>
+        <when test="closed">COALESCE(m.APLY_UPRC,0)</when>
+        <otherwise>COALESCE(m.APLY_UPRC,h.NEW_UPRC,a.BILL_UPRC,0)</otherwise>
+      </choose> AS "currentUnitPrice",
+      a.ASGN_STAT_CD AS "assignmentStatus", a.INPUT_TYPE_CD AS "inputTypeCode",
+      p.CTRT_TYPE_CD AS "contractTypeCode", p.PROJ_STAT_CD AS "projectStatus",
+      d.MNG_NO AS "managementNumber"
+    FROM TB_PJ_ASGN a
+    JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID
+    JOIN TB_HR_DEV d ON d.DEV_ID=a.DEV_ID
+    LEFT JOIN TB_SY_CODE e ON e.CODE_GRP_ID='EMP_TYPE' AND e.CODE=d.EMP_TYPE_CD
+    LEFT JOIN TB_PJ_ASGN_MON m ON m.ASGN_ID=a.ASGN_ID AND m.INPUT_YM=#{yearMonth}
+    LEFT JOIN LATERAL (
+      SELECT x.NEW_UPRC FROM TB_PJ_ASGN_HIST x
+      WHERE x.ASGN_ID=a.ASGN_ID AND x.NEW_UPRC IS NOT NULL
+        AND x.APLY_DT &lt; (to_date(#{yearMonth},'YYYYMM')+interval '1 month')::date
+      ORDER BY x.APLY_DT DESC,x.HIST_SN DESC LIMIT 1
+    ) h ON true
+    ORDER BY a.ASGN_ID
+  </select>
+  <resultMap id="poolSalary" type="com.company.common.raterenegotiations.mapper.RateRenegotiationRows$PoolSalary">
+    <constructor>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="amount" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <select id="selectPoolSalaries" resultMap="poolSalary">
+    SELECT DISTINCT ON (x.DEV_ID) x.DEV_ID AS "developerId", x.MON_PAY_AMT AS "amount"
+    FROM TB_HR_DEV_PRC x
+    WHERE x.MON_PAY_AMT IS NOT NULL AND x.APLY_BGN_YM &lt;= #{yearMonth}
+      AND (x.APLY_END_YM IS NULL OR x.APLY_END_YM &gt;= #{yearMonth})
+    ORDER BY x.DEV_ID, x.APLY_BGN_YM DESC
+  </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES(#{userId},'DNLD','UI-32',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
+</mapper>

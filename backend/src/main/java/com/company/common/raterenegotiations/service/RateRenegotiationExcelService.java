@@ -33,7 +33,8 @@ public class RateRenegotiationExcelService {
         var rows = result.items().stream().map(row -> columns.stream()
             .map(key -> RateRenegotiationColumnPolicy.value(row, key)).toList()).toList();
         var now = calendar.now();
-        var bytes = excel.write("단가 재협상 대상", columns.stream().map(RateRenegotiationColumnPolicy::label).toList(),
+        var bytes = excel.write("단가 재협상 대상", columns.stream().map(key -> RateRenegotiationColumnPolicy.label(key,
+            result.appliedIncreaseRate(), result.summary().targetProfitRate())).toList(),
             rows, actor.userId(), now);
         if (mapper.insertAccess(actor.userId(), "단가 재협상 대상 " + result.baseYearMonth() + " " + result.items().size() + "건") != 1) {
             throw new IllegalStateException("다운로드 접근 기록을 저장하지 못했습니다.");

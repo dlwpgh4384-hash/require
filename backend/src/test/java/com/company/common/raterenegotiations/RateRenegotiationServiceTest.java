@@ -38,6 +38,13 @@ class RateRenegotiationServiceTest {
         assertThat(result.totalAnnualProfitIncrease()).isEqualByComparingTo(result.summary().assumedAnnualProfitIncrease());
         verify(mapper, never()).insertAccess(anyString(), anyString());
     }
+    @Test void averageProfitRateIsRevenueWeightedLikeTheMockup() {
+        var a = new Cost("202602", "D", "P", "A", "프로젝트", "직무", "MO", n("1"), n("1000000"), n("950000"), n("0"), n("0"), "NEW");
+        var b = new Cost("202602", "D", "P", "B", "프로젝트", "직무", "MO", n("0.1"), n("100000"), n("90000"), n("0"), n("0"), "NEW");
+        sources(List.of(a, b), List.of(info("A", 1), info("B", 2)));
+        // 단순 평균은 (5% + 10%) ÷ 2 = 7.5%, 시안은 (1,100,000 − 1,040,000) ÷ 1,100,000 = 5.5%
+        assertThat(service.getCommonRateRenegotiations(filter()).summary().averageProfitRate()).isEqualByComparingTo("5.5");
+    }
     @Test void optionalEmployeeFilterAppliesToBothRowsAndSummaryWithoutRestrictingParts() {
         sources(List.of(cost("A", "450000")), List.of(info("A", 1)));
         var result = service.getCommonRateRenegotiations(new Filter(6, n("15"), "FT", null, n("5")));

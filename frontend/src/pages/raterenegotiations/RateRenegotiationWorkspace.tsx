@@ -5,6 +5,7 @@ import {
   FormulaBox,
   KpiCard,
   KpiCards,
+  formatKoreanMoney,
   ListFilter,
   ListFilters,
   ListView,
@@ -47,6 +48,11 @@ const kebab = (key: string) =>
   key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 const percent = (value: number | null | undefined) =>
   value == null ? "–" : `${value.toFixed(1)}%`;
+const plain = (value: number | null | undefined) =>
+  value == null ? "–" : String(Number(value));
+/** 시안 갱신 시점 이름: 3·6개월 안, 12개월은 「1년 안」 */
+const renewalLabel = (months: number) =>
+  months === 12 ? "1년 안" : `${months}개월 안`;
 const message = (reason: unknown) =>
   reason instanceof ProjectRequestError
     ? reason.message
@@ -71,6 +77,12 @@ export function RateRenegotiationWorkspace() {
   const [page, setPage] = useState(1);
   const [downloading, setDownloading] = useState(false);
   const [notice, setNotice] = useState("");
+  // 인상률 칸 글자. 비우거나 쓰는 중에는 바로 0으로 바꾸지 않고, 숫자일 때만 잠깐 뒤 다시 계산한다.
+  const [rateText, setRateText] = useState(
+    String(rateRenegotiationDefaults().increaseRate),
+  );
+  const rateTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(rateTimer.current), []);
   const root = useRef<HTMLDivElement>(null);
   const presentation = useListPresentation();
 
@@ -147,16 +159,26 @@ export function RateRenegotiationWorkspace() {
   };
   const reset = () => {
     const next = rateRenegotiationDefaults();
+    window.clearTimeout(rateTimer.current);
+    setRateText(String(next.increaseRate));
     setDraft(next);
     setApplied(next);
     setRevision((v) => v + 1);
   };
   const assumption = (text: string) => {
+    window.clearTimeout(rateTimer.current);
     const value = Number(text);
-    if (!Number.isFinite(value)) return;
+    if (text.trim() === "" || !Number.isFinite(value)) {
+      setRateText(text);
+      return;
+    }
     const increaseRate = Math.max(0, Math.min(50, value));
+    setRateText(increaseRate === value ? text : String(increaseRate));
     setDraft((previous) => ({ ...previous, increaseRate }));
-    setApplied((previous) => ({ ...previous, increaseRate }));
+    rateTimer.current = window.setTimeout(
+      () => setApplied((previous) => ({ ...previous, increaseRate })),
+      300,
+    );
   };
   const cell = (
     row: RateRenegotiationRow,
@@ -179,10 +201,34 @@ export function RateRenegotiationWorkspace() {
           </Badge>
         </>
       );
+    if (key === "annualProfitIncrease")
+      return (
+        <>
+          +<Money value={row.annualProfitIncrease} unit={unit} />
+        </>
+      );
     if (moneyKeys.has(key))
       return <Money value={row[key] as number} unit={unit} />;
-    if (key === "profitRate" || key === "requiredIncreaseRate")
-      return percent(row[key]);
+    // 시안: 이익률 10% 미만 빨강, 15% 미만 주황
+    if (key === "profitRate")
+      return (
+        <span
+          className={
+            row.profitRate < 10
+              ? "rate-bad"
+              : row.profitRate < 15
+                ? "rate-warn"
+                : undefined
+          }
+        >
+          {percent(row.profitRate)}
+        </span>
+      );
+    // 시안: 필요 인상률이 0이면 「–」
+    if (key === "requiredIncreaseRate")
+      return row.requiredIncreaseRate > 0
+        ? percent(row.requiredIncreaseRate)
+        : "–";
     return row[key];
   };
   const columns: ListColumn<RateRenegotiationRow>[] =
@@ -191,7 +237,11 @@ export function RateRenegotiationWorkspace() {
       label:
         key === "annualProfitIncrease"
           ? `${data?.appliedIncreaseRate ?? applied.increaseRate}% 올리면 연 이익`
-          : label,
+          : key === "monthlyCost"
+            ? "월 원가(기준월)"
+            : key === "targetUnitPrice"
+              ? `목표 단가 (${plain(data?.summary.targetProfitRate)}%)`
+              : label,
       required: key === "developerName",
       sortable: false,
       align: typeof data?.items[0]?.[key] === "number" ? "right" : "left",
@@ -224,11 +274,6 @@ export function RateRenegotiationWorkspace() {
   };
   return (
     <div className="rate-workspace" data-testid="rate-workspace" ref={root}>
-      <Banner kind="info">
-        {data
-          ? `기준월 ${data.baseYearMonth} · 1년 계속 투입 가정`
-          : "기준월을 불러오는 중입니다."}
-      </Banner>
       {data && (data.salaryEstimatedDeveloperIds ?? []).length > 0 && (
         <div data-testid="rate-salary-estimated">
           <Banner kind="warn">
@@ -236,6 +281,70 @@ export function RateRenegotiationWorkspace() {
           </Banner>
         </div>
       )}
+      <KpiCards
+        aria-label="재협상 대상 요약"
+        className="rate-kpis"
+        testId="rate-summary"
+      >
+        <KpiCard
+          label="재협상 대상"
+          value={summary ? `${summary.targetCount}명` : "–"}
+          description={`갱신 ${renewalLabel(applied.renewalMonths)} · 이익률 ${applied.profitRateThreshold}% 미만`}
+          testId="rate-count"
+        />
+        <KpiCard
+          label="대상 평균 이익률"
+          value={percent(summary?.averageProfitRate)}
+          description={`목표 ${plain(summary?.targetProfitRate)}%`}
+          testId="rate-average"
+        />
+        <KpiCard
+          label={`단가 ${plain(data?.appliedIncreaseRate ?? applied.increaseRate)}% 올리면`}
+          value={
+            summary
+              ? `+${formatKoreanMoney(summary.assumedAnnualProfitIncrease)}`
+              : "–"
+          }
+          description="연 이익 증가(12개월 기준)"
+          testId="rate-assumed"
+        />
+        <KpiCard
+          label="목표 단가까지 올리면"
+          value={
+            summary
+              ? `+${formatKoreanMoney(summary.targetAnnualProfitIncrease)}`
+              : "–"
+          }
+          description="연 이익 증가(12개월 기준)"
+          testId="rate-target"
+        />
+      </KpiCards>
+      <Banner kind="info">
+        <span className="rate-banner">
+          <span className="rate-banner-text">
+            월단위·파견 프로젝트에서 계약 갱신이 다가오는 사람 가운데 이익률이
+            낮은 사람입니다. 인상률을 바꾸면 이익 증가액을 다시 계산합니다.
+          </span>
+          <span className="rate-assumption">
+            <label htmlFor="rate-increaseRate">인상률</label>
+            <input
+              className="ls-in"
+              type="number"
+              step="any"
+              inputMode="decimal"
+              {...attributes("increaseRate")}
+              value={rateText}
+              onChange={(e) => assumption(e.target.value)}
+              onBlur={() => {
+                if (rateText.trim() === "" || !Number.isFinite(Number(rateText)))
+                  setRateText(String(draft.increaseRate));
+              }}
+            />
+            <span>%</span>
+          </span>
+        </span>
+        {fieldError("increaseRate")}
+      </Banner>
       <ListFilters onSearch={search} onReset={reset}>
         <ListFilter label="갱신 시점" htmlFor="rate-renewalMonths">
           <select
@@ -246,13 +355,13 @@ export function RateRenegotiationWorkspace() {
           >
             {[3, 6, 12].map((value) => (
               <option key={value} value={value}>
-                {value}개월 안
+                {renewalLabel(value)}
               </option>
             ))}
           </select>
           {fieldError("renewalMonths")}
         </ListFilter>
-        <ListFilter label="이익률 미만" htmlFor="rate-profitRateThreshold">
+        <ListFilter label="이익률" htmlFor="rate-profitRateThreshold">
           <select
             className="ls-in"
             {...attributes("profitRateThreshold")}
@@ -269,7 +378,7 @@ export function RateRenegotiationWorkspace() {
           </select>
           {fieldError("profitRateThreshold")}
         </ListFilter>
-        <ListFilter label="직원구분" htmlFor="rate-employeeTypeCode">
+        <ListFilter label="직원 구분" htmlFor="rate-employeeTypeCode">
           <select
             className="ls-in"
             {...attributes("employeeTypeCode")}
@@ -319,50 +428,6 @@ export function RateRenegotiationWorkspace() {
           선택지를 불러오지 못했습니다.
         </Banner>
       )}
-      <KpiCards
-        aria-label="재협상 대상 요약"
-        className="rate-kpis"
-        testId="rate-summary"
-      >
-        <KpiCard
-          label="대상 인원"
-          value={summary ? `${summary.targetCount}명` : "–"}
-          testId="rate-count"
-        />
-        <KpiCard
-          label="대상 평균 이익률"
-          value={percent(summary?.averageProfitRate)}
-          description={`목표 이익률 ${percent(summary?.targetProfitRate)}`}
-          testId="rate-average"
-        />
-        <KpiCard
-          label="인상률 가정 연 이익 증가"
-          value={
-            <Money value={summary?.assumedAnnualProfitIncrease} unit={unit} />
-          }
-          testId="rate-assumed"
-        />
-        <KpiCard
-          label="목표 단가 연 이익 증가"
-          value={
-            <Money value={summary?.targetAnnualProfitIncrease} unit={unit} />
-          }
-          testId="rate-target"
-        />
-      </KpiCards>
-      <div className="rate-assumption">
-        <label htmlFor="rate-increaseRate">인상률</label>
-        <input
-          className="ls-in"
-          type="number"
-          step="any"
-          {...attributes("increaseRate")}
-          value={draft.increaseRate}
-          onChange={(e) => assumption(e.target.value)}
-        />
-        <span>% (0~50%) · 1년 계속 투입 가정</span>
-        {fieldError("increaseRate")}
-      </div>
       {error && (
         <div data-testid="rate-error">
           <Banner
@@ -424,39 +489,38 @@ export function RateRenegotiationWorkspace() {
         footer={{
           annualProfitIncrease:
             data && !loading && !error ? (
-              <Money value={data.totalAnnualProfitIncrease} unit={unit} />
+              <>
+                +<Money value={data.totalAnnualProfitIncrease} unit={unit} />
+              </>
             ) : (
               "–"
             ),
         }}
+        mobileRows={data && !loading && !error ? rows : null}
+        renderCard={(row) => (
+          // 시안 휴대폰 카드: 이름·프로젝트 + D-일수 / 「단가 · 이익률」 + 연 이익
+          <>
+            <div className="ls-r1">
+              <span className="rate-card-name">
+                <strong>{row.developerName}</strong>
+                <small>{row.projectName}</small>
+              </span>
+              <Badge kind={row.daysUntilRenewal <= 92 ? "warn" : "neutral"}>
+                D-{row.daysUntilRenewal}
+              </Badge>
+            </div>
+            <div className="ls-r2">
+              <span>
+                단가 {formatKoreanMoney(row.currentUnitPrice)} · 이익률{" "}
+                {percent(row.profitRate)}
+              </span>
+              <b>+{formatKoreanMoney(row.annualProfitIncrease)}/년</b>
+            </div>
+          </>
+        )}
         testId="rate-list"
       />
       {fields.columns && <p className="rate-field-error">{fields.columns}</p>}
-      <div className="rate-mobile-cards" data-testid="rate-mobile-cards">
-        {!loading &&
-          !error &&
-          rows
-            .slice(
-              (page - 1) * presentation.pageSize,
-              page * presentation.pageSize,
-            )
-            .map((row) => (
-              <button
-                type="button"
-                className="ls-mcard"
-                key={row.assignmentId}
-                data-testid={`rate-card-${row.assignmentId}`}
-                onClick={() => setDetail(row.developerId)}
-              >
-                {selected.visible.map((column) => (
-                  <span key={column.key}>
-                    <span className="ls-cap">{column.label}</span>{" "}
-                    {cell(row, column.key as RateRenegotiationColumn)}
-                  </span>
-                ))}
-              </button>
-            ))}
-      </div>
       <FormulaBox
         rows={rateRenegotiationFormulas(data?.summary.targetProfitRate)}
         foot={rateRenegotiationFormulaFoot}
@@ -469,7 +533,7 @@ export function RateRenegotiationWorkspace() {
           onClose={() => setDetail(null)}
         />
       )}
-      <Toast message={notice} onDismiss={() => setNotice("")} />
+      {notice && <Toast message={notice} onDismiss={() => setNotice("")} />}
     </div>
   );
 }

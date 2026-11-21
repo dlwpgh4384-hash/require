@@ -157,7 +157,7 @@ class CommonRateRenegotiationControllerTest {
             .andReturn().getResponse().getContentAsByteArray();
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
             var sheet = book.getSheetAt(0);
-            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("월 원가");
+            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("월 원가(기준월)");
             assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("이름");
             assertThat(sheet.getRow(3).getCell(0).getNumericCellValue()).isEqualTo(900000d);
             assertThat(sheet.getRow(3).getCell(2).getNumericCellValue()).isEqualTo(1d);
@@ -179,7 +179,7 @@ class CommonRateRenegotiationControllerTest {
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
             var sheet = book.getSheetAt(0);
             assertThat(sheet.getRow(2).getLastCellNum()).isEqualTo((short) 11);
-            assertThat(sheet.getRow(2).getCell(6).getStringCellValue()).isEqualTo("월 원가");
+            assertThat(sheet.getRow(2).getCell(6).getStringCellValue()).isEqualTo("월 원가(기준월)");
             assertThat(sheet.getRow(3).getCell(6).getNumericCellValue()).isEqualTo(900000d);
         }
         verify(mapper).insertAccess(eq("admin"), anyString());

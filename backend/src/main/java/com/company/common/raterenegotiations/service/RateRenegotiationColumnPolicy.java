@@ -11,7 +11,7 @@ public final class RateRenegotiationColumnPolicy {
         "renewalDate", "monthlyMm", "currentUnitPrice", "monthlyCost", "profitRate", "targetUnitPrice",
         "requiredIncreaseRate", "annualProfitIncrease");
     private static final List<String> LABELS = List.of("이름", "구분", "프로젝트", "갱신일", "MM",
-        "현재 단가", "월 원가", "이익률", "목표 단가", "필요 인상률", "n% 올리면 연 이익");
+        "현재 단가", "월 원가(기준월)", "이익률", "목표 단가", "필요 인상률", "올리면 연 이익");
     public static List<String> validate(List<String> columns) {
         if (columns == null || columns.isEmpty() || new HashSet<>(columns).size() != columns.size()
             || columns.stream().anyMatch(c -> !KEYS.contains(c))) {
@@ -20,6 +20,17 @@ public final class RateRenegotiationColumnPolicy {
         return List.copyOf(columns);
     }
     public static String label(String key) { return LABELS.get(KEYS.indexOf(key)); }
+    /** 화면 열 이름과 같게: 목표 단가 (목표 이익률%), 인상률% 올리면 연 이익. */
+    public static String label(String key, java.math.BigDecimal increaseRate, java.math.BigDecimal targetRate) {
+        return switch (key) {
+            case "targetUnitPrice" -> "목표 단가 (" + plain(targetRate) + "%)";
+            case "annualProfitIncrease" -> plain(increaseRate) + "% 올리면 연 이익";
+            default -> label(key);
+        };
+    }
+    private static String plain(java.math.BigDecimal value) {
+        return value == null ? "–" : value.stripTrailingZeros().toPlainString();
+    }
     public static String value(Row row, String key) {
         Object value = switch (key) {
             case "developerName" -> row.developerName();

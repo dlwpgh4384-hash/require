@@ -47,15 +47,17 @@ public class CommonRateRenegotiationService {
         }
         candidates.sort(Comparator.comparing(Candidate::exactRate));
         var people = new HashSet<String>();
-        BigDecimal sumRates = ZERO, assumed = ZERO, target = ZERO;
+        BigDecimal sumRevenue = ZERO, sumCost = ZERO, assumed = ZERO, target = ZERO;
         for (var c : candidates) {
             people.add(c.row().developerId());
-            sumRates = sumRates.add(c.exactRate());
+            sumRevenue = sumRevenue.add(c.row().currentUnitPrice().multiply(c.row().monthlyMm()));
+            sumCost = sumCost.add(c.row().monthlyCost());
             assumed = assumed.add(c.row().annualProfitIncrease());
             target = target.add(c.targetAnnual());
         }
-        BigDecimal average = candidates.isEmpty() ? null
-            : sumRates.divide(BigDecimal.valueOf(candidates.size()), 1, RoundingMode.HALF_UP);
+        // 시안 KPI: 대상 전체 (매출 합 − 월 원가 합) ÷ 매출 합 × 100 (매출 가중, 사람별 이익률의 단순 평균 아님)
+        BigDecimal average = sumRevenue.signum() == 0 ? null
+            : sumRevenue.subtract(sumCost).multiply(BigDecimal.valueOf(100)).divide(sumRevenue, 1, RoundingMode.HALF_UP);
         var summary = new Summary(people.size(), average, context.targetRate(), assumed, target);
         String ym = context.yearMonth();
         return new Result(ym.substring(0, 4) + "-" + ym.substring(4), filter.increaseRate(),

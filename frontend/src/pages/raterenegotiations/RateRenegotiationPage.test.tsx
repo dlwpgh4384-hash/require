@@ -142,11 +142,26 @@ it("renders UI-32 without a second title, four server KPIs and eleven columns", 
     screen.queryByRole("heading", { name: "단가 재협상 대상" }),
   ).not.toBeInTheDocument();
   expect(screen.getByLabelText("갱신 시점")).toHaveValue("6");
-  expect(screen.getByLabelText("이익률 미만")).toHaveValue("15");
+  expect(screen.getByLabelText("이익률")).toHaveValue("15");
+  expect(screen.getByLabelText("직원 구분")).toBeInTheDocument();
   expect(screen.getByLabelText("인상률")).toHaveValue(5);
   expect(screen.getByTestId("rate-summary").children).toHaveLength(4);
+  // 시안 요약 칸 이름·설명·「+n만 원」
+  expect(screen.getByTestId("rate-count")).toHaveTextContent(
+    "갱신 6개월 안 · 이익률 15% 미만",
+  );
   expect(screen.getByTestId("rate-average")).toHaveTextContent("10.0%");
-  expect(screen.getByTestId("rate-average")).toHaveTextContent("20.0%");
+  expect(screen.getByTestId("rate-average")).toHaveTextContent("목표 20%");
+  expect(screen.getByTestId("rate-assumed")).toHaveTextContent("단가 5% 올리면");
+  expect(screen.getByTestId("rate-assumed")).toHaveTextContent("+60만 원");
+  expect(screen.getByTestId("rate-target")).toHaveTextContent("목표 단가까지 올리면");
+  expect(screen.getByTestId("list-head-monthlyCost")).toHaveTextContent("월 원가(기준월)");
+  expect(screen.getByTestId("list-head-targetUnitPrice")).toHaveTextContent("목표 단가 (20%)");
+  expect(
+    screen.getByTestId("list-cell-assignment-a-profitRate").querySelector(".rate-warn"),
+  ).not.toBeNull();
+  expect(screen.getByTestId("list-cell-assignment-a-annualProfitIncrease")).toHaveTextContent(/^\+/);
+  expect(screen.queryByTestId("app-toast")).not.toBeInTheDocument();
   expect(
     within(screen.getByTestId("rate-list")).getAllByRole("columnheader"),
   ).toHaveLength(11);
@@ -362,4 +377,17 @@ it("shows how many people were calculated from the developer pool salary before 
   expect(screen.getByTestId("rate-salary-estimated")).toHaveTextContent(
     "2026-02 급여 업로드 전: 1명은 개발자 풀 월 급여로 계산한 값입니다.",
   );
+});
+it("keeps an emptied assumption box empty without querying 0 and restores it on blur", async () => {
+  mount();
+  await ready();
+  const input = screen.getByLabelText("인상률");
+  fireEvent.change(input, { target: { value: "" } });
+  expect(input).toHaveValue(null);
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  expect(
+    request.mock.calls.some(([path]) => String(path).includes("increaseRate=0")),
+  ).toBe(false);
+  fireEvent.blur(input);
+  expect(input).toHaveValue(5);
 });

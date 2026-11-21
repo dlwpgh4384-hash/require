@@ -171,6 +171,7 @@ class RateRenegotiationPersistenceTest {
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
             var sheet = book.getSheetAt(0);
             assertThat(sheet.getRow(2).getLastCellNum()).isEqualTo((short) 3);
+            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("5% 올리면 연 이익");
             for (int i = 0; i < result.path("items").size(); i++) {
                 assertThat(sheet.getRow(i + 3).getCell(0).getNumericCellValue()).isEqualTo(result.path("items").get(i).path("annualProfitIncrease").asDouble());
                 assertThat(sheet.getRow(i + 3).getCell(1).getNumericCellValue()).isEqualTo(0.5);

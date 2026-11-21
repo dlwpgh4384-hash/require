@@ -25,6 +25,7 @@ public interface FinanceItemMapper {
     BigDecimal fixedTax(@Param("month") String month);
     String code(@Param("group") String group, @Param("value") String value);
     String codeName(@Param("group") String group, @Param("code") String code);
+    boolean duplicateCard(Card row);
     int prepareYear(@Param("year") String year, @Param("actor") String actor);
     int preparePayments(@Param("year") String year, @Param("actor") String actor);
     int confirm(PaymentWrite write);

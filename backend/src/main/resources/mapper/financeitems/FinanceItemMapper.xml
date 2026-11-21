@@ -150,6 +150,10 @@
       AND use_yn='Y' AND del_yn='N' ORDER BY CASE WHEN code=#{value} THEN 0 ELSE 1 END LIMIT 1
   </select>
   <select id="codeName" resultType="string">SELECT code_nm FROM TB_SY_CODE WHERE code_grp_id=#{group} AND code=#{code}</select>
+  <select id="duplicateCard" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_FI_CARD WHERE card_nm=#{cardName} AND card_no_l4=#{lastFourDigits}
+      <if test="cardId != null">AND card_id&lt;&gt;#{cardId}</if>)
+  </select>
   <insert id="prepareYear">
     INSERT INTO TB_FI_CORP_TAX(tax_yr,est_tax_amt,reg_user_id,reg_dttm)
     VALUES(#{year},COALESCE((SELECT est_tax_amt FROM TB_FI_CORP_TAX WHERE tax_yr=(CAST(#{year} AS integer)-1)::text),0),#{actor},clock_timestamp())

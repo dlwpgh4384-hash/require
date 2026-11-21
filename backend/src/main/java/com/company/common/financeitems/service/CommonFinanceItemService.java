@@ -131,10 +131,13 @@ public class CommonFinanceItemService {
                 throw CodeFailure.invalid(p+"targetYearMonth","최근 12개월 안의 마감월을 골라 주세요.");
             code("ADJ_ITEM",i.adjustmentItem(),p+"adjustmentItem"); amount(i.amount(),p+"amount"); text(i.reason(),p+"reason","사유",300,true);
         }
+        var pairs=new HashSet<String>();
         for (int n=0;n<input.cards().size();n++) {
             var i=input.cards().get(n); String p="cards["+n+"].";
             text(i.cardName(),p+"cardName","카드 이름",100,true);
             if (i.lastFourDigits()==null || !i.lastFourDigits().matches("[0-9]{4}")) throw CodeFailure.invalid(p+"lastFourDigits","숫자 4자리를 입력해 주세요.");
+            if (!pairs.add(i.cardName()+":"+i.lastFourDigits()) || mapper.duplicateCard(i))
+                throw CodeFailure.invalid(p+"lastFourDigits","같은 카드가 이미 있습니다.");
             if (!Set.of("Y","N").contains(Objects.toString(i.useYn(),""))) throw CodeFailure.invalid(p+"useYn","사용 여부를 확인해 주세요.");
             amount(zero(i.amount()),p+"amount");
         }

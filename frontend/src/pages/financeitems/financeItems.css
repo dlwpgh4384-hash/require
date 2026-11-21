@@ -148,13 +148,13 @@
   max-height: none;
   min-height: 0;
 }
-/* 1440×900에서 옆으로 밀리지 않게 시안 칸 폭(입력 칸 width)만 쓰고 칸 여백을 조금 줄인다 */
+/* 칸 폭은 시안 입력 칸 width, 칸 여백은 시안과 같은 12px(1440×900에서 표 폭 1135px로 옆으로 밀리지 않음) */
 .fin-items {
   width: 100%;
 }
-.fin-items td,
-.fin-items th {
-  padding: 0 8px;
+/* 시안 작은 단추(.btn-sm) 높이 28px: 앱 공통 button 최소 높이 36px을 이 화면의 작은 단추에서만 푼다 */
+.finance-items .ls-btn-sm {
+  min-height: 28px;
 }
 .fin-twrap td small.fin-err {
   display: block;

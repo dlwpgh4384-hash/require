@@ -112,10 +112,14 @@ class FinanceItemPersistenceTest {
         ((com.fasterxml.jackson.databind.node.ObjectNode)stale.withArray("cards").get(0)).put("cardName","다른 이름");
         mvc.perform(put("/api/common/finance-items/202602").contentType("application/json").content(stale.toString())).andExpect(status().isConflict());
     }
-    @Test void reissuedCardMayShareNameAndLastFourDigits() throws Exception {
+    @Test void sameCardNameAndLastFourDigitsIsRejectedLikeMockupEvenWhenDeleted() throws Exception {
         prepareYear(); var body=input(getMonth("202601"));
-        for(int n=0;n<2;n++) body.withArray("cards").addObject().putNull("cardId").putNull("modifiedAt").put("cardName","법인카드").put("lastFourDigits","1234").put("useYn",n==0?"N":"Y").put("amount",0);
-        save("202601",body); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_CARD",Integer.class)).isEqualTo(2);
+        body.withArray("cards").addObject().putNull("cardId").putNull("modifiedAt").put("cardName","법인카드").put("lastFourDigits","1234").put("useYn","N").put("amount",0);
+        save("202601",body);
+        var again=input(getMonth("202601")); again.withArray("cards").addObject().putNull("cardId").putNull("modifiedAt").put("cardName","법인카드").put("lastFourDigits","1234").put("useYn","Y").put("amount",0);
+        mvc.perform(put("/api/common/finance-items/202601").contentType("application/json").content(again.toString())).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value(org.hamcrest.Matchers.endsWith("].lastFourDigits"))).andExpect(jsonPath("$.errors[0].message").value("같은 카드가 이미 있습니다."));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_CARD",Integer.class)).isEqualTo(1);
     }
     @Test void invalidAmountRollsBackBothTabs() throws Exception {
         item("202601",1,"원본","N",null); var body=input(getMonth("202601")); ((com.fasterxml.jackson.databind.node.ObjectNode)body.withArray("items").get(0)).putNull("amount"); body.withArray("loans").addObject().putNull("loanId").putNull("modifiedAt").put("date","2026-01-02").put("direction","IN").put("amount",5);

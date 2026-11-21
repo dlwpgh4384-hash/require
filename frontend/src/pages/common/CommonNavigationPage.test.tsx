@@ -357,7 +357,8 @@ type Content = ReturnType<typeof within>;
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
   "UI-10": async (content) => {
-    expect(await content.findByText("입력한 항목이 없습니다.")).toBeVisible();
+    // 시안: 항목이 없어도 표 머리와 법인세(월할) 계산 줄은 보인다.
+    expect(await content.findByTestId("finance-tax-row")).toBeVisible();
     expect(content.getByTestId("finance-tab-0")).toBeVisible();
     expect(content.getByTestId("finance-tab-1")).toBeVisible();
     await waitFor(() =>
@@ -365,9 +366,10 @@ const deepChecks: Record<string, (content: Content) => Promise<void>> = {
     );
     expect(content.getByTestId("finance-cancel")).toBeVisible();
     const actions = within(screen.getByTestId("screen-actions"));
-    expect(actions.getByTestId("finance-template")).toBeVisible();
-    expect(actions.getByTestId("finance-upload")).toBeEnabled();
-    expect(content.queryByTestId("finance-template")).not.toBeInTheDocument();
+    expect(actions.getByTestId("finance-previous")).toBeVisible();
+    expect(actions.getByTestId("upload-template")).toBeVisible();
+    expect(actions.getByTestId("upload-open")).toBeEnabled();
+    expect(content.queryByTestId("upload-template")).not.toBeInTheDocument();
   },
   "UI-32": async (content) => {
     expect(await content.findByTestId("list-empty")).toBeVisible();
@@ -556,14 +558,14 @@ describe("common placeholder screen contract", () => {
       ).toBe(true);
       fireEvent.click(
         within(screen.getByTestId("screen-actions")).getByTestId(
-          "finance-upload",
+          "upload-open",
         ),
       );
-      expect(await screen.findByTestId("finance-upload-dialog")).toBeVisible();
-      fireEvent.click(screen.getByTestId("finance-upload-cancel"));
-      expect(
-        screen.queryByTestId("finance-upload-dialog"),
-      ).not.toBeInTheDocument();
+      // 시안: 재무 항목 엑셀 업로드는 공통 업로드 창(B.2, 연월 고르기)을 쓴다.
+      expect(await screen.findByTestId("upload-dialog")).toBeVisible();
+      expect(screen.getByTestId("upload-year-month")).toHaveValue("2026-02");
+      fireEvent.click(screen.getByTestId("upload-cancel"));
+      expect(screen.queryByTestId("upload-dialog")).not.toBeInTheDocument();
       expect(router.state.location.pathname).toBe("/screens/UI-10");
       expect(findScreen("UI-21")).toBeUndefined();
     } finally {

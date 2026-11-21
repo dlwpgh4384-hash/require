@@ -43,7 +43,12 @@ class FinanceItemUploadTest {
     }
     @Test void missingNameIsSeparateColumnError() { assertThat(inspect(bytes(List.of(row(2,"")))).issues().get(0).column()).isEqualTo("세부 항목"); }
     @Test void explicitZeroIsAccepted() { assertThat(((Item)inspect(bytes(List.of(row(3,"0")))).records().get(0)).amount()).isZero(); }
-    @Test void duplicateRowsAreRejected() { var report=inspect(bytes(List.of(row(),row()))); assertThat(report.errorCount()).isEqualTo(1); assertThat(report.issues().get(0).reason()).contains("같은 구분"); }
+    @Test void sameClassificationAndNameInOneFileIsAcceptedLikeDirectInput() { assertThat(inspect(bytes(List.of(row(),row()))).errorCount()).isZero(); }
+    @Test void cashDateAcceptsSharedUploadDateForms() {
+        for (String text : List.of("2026-02-28","2026.02.28","2026/2/28","2026. 2. 28.")) assertThat(((Item)inspect(bytes(List.of(row(5,text)))).records().get(0)).cashDate()).isEqualTo(LocalDate.of(2026,2,28));
+        assertThat(inspect(bytes(List.of(row(5,"28/02/2026")))).issues().get(0).reason()).isEqualTo("날짜는 2024-03-02처럼 적어 주세요.");
+    }
+    @Test void requiredNameMessageNamesTheColumn() { assertThat(inspect(bytes(List.of(row(2,"")))).issues().get(0).reason()).isEqualTo("세부 항목을 입력해 주세요."); }
     @Test void unknownClassificationIsRejected() { assertThat(inspect(bytes(List.of(row(0,"알수없음")))).issues().get(0).column()).isEqualTo("구분"); }
     @Test void malformedFileCannotReachApply() { assertThatThrownBy(()->inspect(new byte[]{'P','K',3,4})).isInstanceOf(CodeFailure.class); verify(mapper,never()).deleteUploaded(anyString()); }
     @Test void renamedTextCannotReachApply() { assertThatThrownBy(()->inspect("text".getBytes(java.nio.charset.StandardCharsets.UTF_8))).isInstanceOf(CodeFailure.class); }

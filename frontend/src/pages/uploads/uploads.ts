@@ -59,10 +59,13 @@ export function postCommonUpload(
   formTypeCode: string,
   file: File,
   context?: { projectId: string; distributionStepCode: string },
+  /** 한 달 양식(B.2 재무 항목 등): 고른 연월 YYYY-MM. 주지 않으면 보내지 않는다. */
+  yearMonth?: string,
 ) {
   const body = new FormData();
   body.set("formTypeCode", formTypeCode);
   body.set("file", file);
+  if (yearMonth) body.set("yearMonth", yearMonth);
   if (context) {
     body.set("projectId", context.projectId);
     body.set("distributionStepCode", context.distributionStepCode);

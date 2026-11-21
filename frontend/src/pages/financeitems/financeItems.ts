@@ -1,6 +1,4 @@
 import { ProjectRequestError } from "../projects/projects";
-import { downloadFile } from "../../shared/list/download";
-import type { UploadResult } from "../uploads/uploads";
 export type Amount = number | string;
 export interface FinanceItem {
   itemId: string | null;
@@ -107,13 +105,24 @@ export interface FinanceMonth {
 }
 const root = "/api/common/finance-items";
 const path = (month: string) => `${root}/${encodeURIComponent(month)}`;
+/** 서버 실패. status 409는 다른 사람이 먼저 바꾼 경우(공통 문구). */
+export class FinanceRequestError extends ProjectRequestError {
+  constructor(
+    message: string,
+    errors: { field: string; message: string }[] = [],
+    public status = 400,
+  ) {
+    super(message, errors);
+  }
+}
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { credentials: "same-origin", ...init });
   const body = await response.json();
   if (!response.ok || body.success === false)
-    throw new ProjectRequestError(
+    throw new FinanceRequestError(
       body.message || "재무 항목을 처리하지 못했습니다.",
       body.errors ?? [],
+      response.status,
     );
   return body.data;
 }
@@ -191,32 +200,3 @@ export const getCommonFinancePreviousItems = (
     `${path(month)}/previous-items?${query}`,
   );
 };
-export const postCommonFinanceItemsUpload = (
-  month: string,
-  file: File,
-  modifiedAt: string | null,
-) => {
-  const body = new FormData();
-  body.set("file", file);
-  body.set("modifiedAt", modifiedAt ?? "null");
-  return request<{
-    uploadId: string;
-    items: FinanceItem[];
-    replacedCount: number;
-    preservedCount: number;
-  }>(`${path(month)}/uploads`, { method: "POST", body });
-};
-export const checkCommonFinanceItemsUpload = (month: string, file: File) => {
-  const body = new FormData();
-  body.set("formTypeCode", "B2");
-  body.set("file", file);
-  body.set("yearMonth", `${month.slice(0, 4)}-${month.slice(4)}`);
-  return request<UploadResult>("/api/common/uploads", { method: "POST", body });
-};
-export const getCommonFinanceItemsExcel = (month: string, columns: string[]) =>
-  downloadFile(
-    `${path(month)}/excel?${new URLSearchParams({ columns: columns.join(",") })}`,
-    "재무 항목.xlsx",
-  );
-export const getCommonFinanceItemsTemplate = () =>
-  downloadFile(`${root}/upload-template`, "finance-items-template.xlsx");

@@ -32,13 +32,21 @@ public final class FinanceItemRules {
     }
     public static BigDecimal zero(BigDecimal value) { return value == null ? BigDecimal.ZERO : value; }
     public static void amount(BigDecimal value, String field) {
-        if (value == null) throw CodeFailure.invalid(field, "금액을 입력해 주세요");
+        if (value == null) throw CodeFailure.invalid(field, "금액을 입력해 주세요.");
         if (value.stripTrailingZeros().scale() > 0 || value.abs().compareTo(new BigDecimal("999999999999999")) > 0)
             throw CodeFailure.invalid(field, "원 단위 정수 금액을 입력해 주세요.");
     }
-    public static void text(String value, String field, int max, boolean required) {
-        if ((required && (value == null || value.isBlank())) || (value != null && value.codePointCount(0,value.length()) > max))
-            throw CodeFailure.invalid(field, "입력 내용을 확인해 주세요.");
+    public static void text(String value, String field, String label, int max, boolean required) {
+        if (required && (value == null || value.isBlank()))
+            throw CodeFailure.invalid(field, label + particle(label, "을", "를") + " 입력해 주세요.");
+        if (value != null && value.codePointCount(0,value.length()) > max)
+            throw CodeFailure.invalid(field, label + particle(label, "은", "는") + " " + max + "자 이하로 입력해 주세요.");
+    }
+    /** 받침이 있으면 앞 조사, 없으면 뒤 조사(한글이 아니면 뒤 조사). */
+    static String particle(String word, String withFinal, String withoutFinal) {
+        char last = word.charAt(word.length() - 1);
+        if (last < 0xAC00 || last > 0xD7A3) return withoutFinal;
+        return (last - 0xAC00) % 28 == 0 ? withoutFinal : withFinal;
     }
     public static Item copy(Item row, YearMonth month, boolean auto) {
         var date = row.cashDate() == null ? null : month.atDay(Math.min(row.cashDate().getDayOfMonth(),month.lengthOfMonth()));

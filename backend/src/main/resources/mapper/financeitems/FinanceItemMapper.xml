@@ -91,10 +91,8 @@
       UNION ALL SELECT max(COALESCE(l.mod_dttm,l.reg_dttm)) FROM TB_FI_LOAN l WHERE to_char(l.loan_dt,'YYYYMM')=#{month}
       UNION ALL SELECT max(COALESCE(x.mod_dttm,x.reg_dttm)) FROM TB_FI_XFER x WHERE to_char(x.xfer_dt,'YYYYMM')=#{month}
       UNION ALL SELECT max(COALESCE(a.mod_dttm,a.reg_dttm)) FROM TB_CO_PREV_ADJ a WHERE a.aply_ym=#{month}
-      UNION ALL SELECT max(COALESCE(c.mod_dttm,c.reg_dttm)) FROM TB_FI_CARD c
       UNION ALL SELECT max(COALESCE(m.mod_dttm,m.reg_dttm)) FROM TB_FI_CARD_MON m WHERE m.pay_ym=#{month}
       UNION ALL SELECT max(COALESCE(p.mod_dttm,p.reg_dttm)) FROM TB_FI_CARD_PAY p WHERE p.pay_ym=#{month}
-      UNION ALL SELECT max(COALESCE(t.mod_dttm,t.reg_dttm)) FROM TB_FI_CORP_TAX t WHERE t.tax_yr=substring(#{month},1,4)
     ) revisions
   </select>
   <select id="items" resultMap="item">
@@ -152,10 +150,6 @@
       AND use_yn='Y' AND del_yn='N' ORDER BY CASE WHEN code=#{value} THEN 0 ELSE 1 END LIMIT 1
   </select>
   <select id="codeName" resultType="string">SELECT code_nm FROM TB_SY_CODE WHERE code_grp_id=#{group} AND code=#{code}</select>
-  <select id="duplicateCard" resultType="boolean">
-    SELECT EXISTS(SELECT 1 FROM TB_FI_CARD WHERE card_nm=#{cardName} AND card_no_l4=#{lastFourDigits}
-      <if test="cardId != null">AND card_id&lt;&gt;#{cardId}</if>)
-  </select>
   <insert id="prepareYear">
     INSERT INTO TB_FI_CORP_TAX(tax_yr,est_tax_amt,reg_user_id,reg_dttm)
     VALUES(#{year},COALESCE((SELECT est_tax_amt FROM TB_FI_CORP_TAX WHERE tax_yr=(CAST(#{year} AS integer)-1)::text),0),#{actor},clock_timestamp())

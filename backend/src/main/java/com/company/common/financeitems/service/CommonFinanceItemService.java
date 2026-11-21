@@ -67,7 +67,7 @@ public class CommonFinanceItemService {
             statuses.add(new MonthStatus(db(current),mapper.isClosed(db(current)),mapper.items(db(current)).size(),current.isAfter(calendar.currentMonth())));
         }
         var closed=new HashSet<>(mapper.closedMonths());
-        var next=month.plusMonths(1);
+        var next=month;
         while (closed.contains(db(next)) && next.getYear()<9999) next=next.plusMonths(1);
         return new Month(key,mapper.isClosed(key),db(next),statuses,rows,mapper.loans(key),adjustments,
             mapper.transfers(key),cards,estimate,mapper.payments(String.format("%04d",month.getYear())),aggregate,
@@ -104,23 +104,23 @@ public class CommonFinanceItemService {
             throw CodeFailure.invalid("body","두 탭 입력을 모두 보내 주세요.");
         for (int n=0;n<input.items().size();n++) {
             var i=input.items().get(n); String p="items["+n+"].";
-            text(i.itemName(),p+"itemName",50,true); amount(i.amount(),p+"amount"); amount(zero(i.vatAmount()),p+"vatAmount");
+            text(i.itemName(),p+"itemName","세부 항목",50,true); amount(i.amount(),p+"amount"); amount(zero(i.vatAmount()),p+"vatAmount");
             code("FIN_CLS",i.classification(),p+"classification");
             if (i.itemCode()!=null) code("SGA_ITEM",i.itemCode(),p+"itemCode");
             if (!Set.of("Y","N").contains(Objects.toString(i.repeatYn(),""))) throw CodeFailure.invalid(p+"repeatYn","반복 여부를 확인해 주세요.");
-            text(i.memo(),p+"memo",500,false);
+            text(i.memo(),p+"memo","비고",500,false);
         }
         for (int n=0;n<input.loans().size();n++) {
             var i=input.loans().get(n); String p="loans["+n+"].";
             date(i.date(),month,p+"date"); amount(i.amount(),p+"amount");
             if (i.amount().signum()<=0) throw CodeFailure.invalid(p+"amount","금액은 양수로 입력해 주세요.");
-            code("IO",i.direction(),p+"direction"); text(i.counterparty(),p+"counterparty",100,false); text(i.memo(),p+"memo",200,false);
+            code("IO",i.direction(),p+"direction"); text(i.counterparty(),p+"counterparty","상대",100,false); text(i.memo(),p+"memo","메모",200,false);
         }
         for (int n=0;n<input.transfers().size();n++) {
             var i=input.transfers().get(n); String p="transfers["+n+"].";
             date(i.date(),month,p+"date"); code("XFER_CLS",i.classification(),p+"classification");
-            text(i.description(),p+"description",100,true); amount(i.amount(),p+"amount");
-            text(i.payee(),p+"payee",100,false); text(i.memo(),p+"memo",200,false);
+            text(i.description(),p+"description","내용",100,true); amount(i.amount(),p+"amount");
+            text(i.payee(),p+"payee","받는 곳",100,false); text(i.memo(),p+"memo","메모",200,false);
         }
         var closed=mapper.closedMonths();
         String latest=closed.stream().max(String::compareTo).orElse(null);
@@ -129,15 +129,12 @@ public class CommonFinanceItemService {
             var target=month(i.targetYearMonth());
             if (latest==null || !closed.contains(db(target)) || target.isBefore(month(latest).minusMonths(11)) || !target.isBefore(month))
                 throw CodeFailure.invalid(p+"targetYearMonth","최근 12개월 안의 마감월을 골라 주세요.");
-            code("ADJ_ITEM",i.adjustmentItem(),p+"adjustmentItem"); amount(i.amount(),p+"amount"); text(i.reason(),p+"reason",300,true);
+            code("ADJ_ITEM",i.adjustmentItem(),p+"adjustmentItem"); amount(i.amount(),p+"amount"); text(i.reason(),p+"reason","사유",300,true);
         }
-        var pairs=new HashSet<String>();
         for (int n=0;n<input.cards().size();n++) {
             var i=input.cards().get(n); String p="cards["+n+"].";
-            text(i.cardName(),p+"cardName",100,true);
+            text(i.cardName(),p+"cardName","카드 이름",100,true);
             if (i.lastFourDigits()==null || !i.lastFourDigits().matches("[0-9]{4}")) throw CodeFailure.invalid(p+"lastFourDigits","숫자 4자리를 입력해 주세요.");
-            if (!pairs.add(i.cardName()+":"+i.lastFourDigits())) throw CodeFailure.invalid(p+"lastFourDigits","같은 이름과 끝 4자리의 카드가 있습니다.");
-            if (mapper.duplicateCard(i)) throw CodeFailure.invalid(p+"lastFourDigits","같은 이름과 끝 4자리의 카드가 있습니다.");
             if (!Set.of("Y","N").contains(Objects.toString(i.useYn(),""))) throw CodeFailure.invalid(p+"useYn","사용 여부를 확인해 주세요.");
             amount(zero(i.amount()),p+"amount");
         }
@@ -173,23 +170,31 @@ public class CommonFinanceItemService {
         versions(old.loans(),input.loans(),Loan::loanId,Loan::modifiedAt);
         versions(old.transfers(),input.transfers(),Transfer::transferId,Transfer::modifiedAt);
         versions(old.adjustments(),input.adjustments(),Adjustment::adjustmentId,Adjustment::modifiedAt);
-        versions(old.cards(),input.cards(),Card::cardId,Card::modifiedAt);
+        for (var c:input.cards()) if (c.cardId()!=null) {
+            var previous=old.cards().stream().filter(x->x.cardId().equals(c.cardId())).findFirst().orElseThrow(CodeFailure::conflict);
+            if (cardChanged(previous,c) && !Objects.equals(previous.modifiedAt(),c.modifiedAt())) throw CodeFailure.conflict();
+        } else if (c.modifiedAt()!=null) throw CodeFailure.conflict();
+        if (input.cards().stream().filter(c->c.cardId()!=null).map(Card::cardId).distinct().count()
+            !=input.cards().stream().filter(c->c.cardId()!=null).count()) throw CodeFailure.conflict();
         for (var c:input.cards()) if (c.cardId()!=null) {
             var previous=old.cards().stream().filter(x->x.cardId().equals(c.cardId())).findFirst().orElseThrow(CodeFailure::conflict);
             if (!Objects.equals(previous.monthlyModifiedAt(),c.monthlyModifiedAt())) throw CodeFailure.conflict();
         }
-        if (!Objects.equals(old.taxEstimate().modifiedAt(),input.taxEstimate().modifiedAt())
+        boolean estimateChanged=!same(old.taxEstimate().estimatedTaxAmount(),input.taxEstimate().estimatedTaxAmount());
+        if ((estimateChanged && !Objects.equals(old.taxEstimate().modifiedAt(),input.taxEstimate().modifiedAt()))
             || !Objects.equals(old.cardPayment().modifiedAt(),input.cardPayment().modifiedAt())) throw CodeFailure.conflict();
         var paymentIds=new HashSet<String>();
-        for (var p:input.taxPayments()) {
+        for (int n=0;n<input.taxPayments().size();n++) {
+            var p=input.taxPayments().get(n); String f="taxPayments["+n+"]";
             paymentKey(p.paymentId());
             if (!paymentIds.add(p.paymentId())) throw CodeFailure.conflict();
             var previous=old.taxPayments().stream().filter(x->x.paymentId().equals(p.paymentId())).findFirst()
-                .orElseThrow(()->CodeFailure.invalid("taxPayments","납부 항목을 확인해 주세요."));
-            if ("Y".equals(previous.paidYn())) throw CodeFailure.invalid("taxPayments","확인한 납부는 변경할 수 없습니다.");
+                .orElseThrow(()->CodeFailure.invalid(f,"납부 항목을 확인해 주세요."));
+            if (!paymentChanged(previous,p)) continue;
+            if ("Y".equals(previous.paidYn())) throw CodeFailure.invalid(f,"확인한 납부는 변경할 수 없습니다.");
             if (!Objects.equals(previous.modifiedAt(),p.modifiedAt())) throw CodeFailure.conflict();
-            if (p.scheduledDate()==null) throw CodeFailure.invalid("taxPayments.scheduledDate","납부일을 입력해 주세요.");
-            if (p.paymentAmount()!=null) amount(p.paymentAmount(),"taxPayments.paymentAmount");
+            if (p.scheduledDate()==null) throw CodeFailure.invalid(f+".scheduledDate","납부일을 입력해 주세요.");
+            if (p.paymentAmount()!=null) amount(p.paymentAmount(),f+".paymentAmount");
         }
         String user=actor.userId();
         deleteMissing(value,items,input.items(),Item::itemId,Item::modifiedAt,mapper::deleteItem);
@@ -218,9 +223,10 @@ public class CommonFinanceItemService {
             if (i.adjustmentId()!=null) affected(mapper.updateAdjustment(new Write<>(value,i,user)));
             else affected(mapper.insertAdjustment(new Write<>(value,new Adjustment(Long.toString(mapper.nextAdjustment()),null,i.targetYearMonth(),i.adjustmentItem(),i.amount(),i.reason()),user)));
         }
-        affected(mapper.updateEstimate(new Write<>(value,input.taxEstimate(),user)));
+        if (estimateChanged) affected(mapper.updateEstimate(new Write<>(value,input.taxEstimate(),user)));
         for (var p:input.taxPayments()) {
             var previous=old.taxPayments().stream().filter(x->x.paymentId().equals(p.paymentId())).findFirst().orElseThrow();
+            if (!paymentChanged(previous,p)) continue;
             affected(mapper.updatePayment(new Write<>(value,p,user)));
             if (!Objects.equals(previous.paymentAmount(),p.paymentAmount())) affected(mapper.history(new History("TB_FI_TAX_PAY",p.paymentId(),"납부 예정액",
                 previous.paymentAmount()==null ? null : previous.paymentAmount().toPlainString(),p.paymentAmount()==null ? null : p.paymentAmount().toPlainString(),user)));
@@ -234,12 +240,25 @@ public class CommonFinanceItemService {
             if (c.cardId()==null) {
                 row=new Card(UUID.randomUUID().toString().replace("-","").substring(0,20),null,c.cardName(),c.lastFourDigits(),c.useYn(),zero(c.amount()),null);
                 affected(mapper.insertCard(new Write<>(value,row,user)));
-            } else affected(mapper.updateCard(new Write<>(value,row,user)));
+            } else {
+                var previous=old.cards().stream().filter(x->x.cardId().equals(c.cardId())).findFirst().orElseThrow();
+                if (cardChanged(previous,c)) affected(mapper.updateCard(new Write<>(value,row,user)));
+            }
             affected(mapper.updateCardMonth(new Write<>(value,row,user)));
         }
         reallocate(month.getYear());
         marker(value);
         return read(month);
+    }
+    private static boolean same(BigDecimal a,BigDecimal b) {
+        return a==null ? b==null : b!=null && a.compareTo(b)==0;
+    }
+    private static boolean cardChanged(Card before,Card after) {
+        return !Objects.equals(before.cardName(),after.cardName()) || !Objects.equals(before.lastFourDigits(),after.lastFourDigits())
+            || !Objects.equals(before.useYn(),after.useYn());
+    }
+    private static boolean paymentChanged(TaxPayment before,PaymentInput after) {
+        return !Objects.equals(before.scheduledDate(),after.scheduledDate()) || !same(before.paymentAmount(),after.paymentAmount());
     }
     public void reallocate(int year) {
         var annual=mapper.estimate(String.format("%04d",year));

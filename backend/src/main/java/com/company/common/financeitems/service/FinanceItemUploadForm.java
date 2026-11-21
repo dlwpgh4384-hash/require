@@ -35,7 +35,6 @@ public class FinanceItemUploadForm implements UploadForm {
     public Inspection inspect(List<TabularRow> rows,YearMonth month) {
         var issues=new ArrayList<Issue>();
         var records=new ArrayList<Item>();
-        var seen=new HashSet<String>();
         for (var row:rows) {
             int column=0;
             try {
@@ -49,8 +48,7 @@ public class FinanceItemUploadForm implements UploadForm {
                 column=1;
                 String itemCode=v.get(1).isBlank() ? null : mapper.code("SGA_ITEM",v.get(1).trim());
                 if (!v.get(1).isBlank() && itemCode==null) throw new IllegalArgumentException("판관비 항목을 확인해 주세요.");
-                column=2; text(v.get(2),"itemName",50,true);
-                if (!seen.add(classification+":"+v.get(2))) throw new IllegalArgumentException("파일 안에 같은 구분과 세부 항목이 있습니다.");
+                column=2; text(v.get(2),"itemName","세부 항목",50,true);
                 column=3;
                 BigDecimal amount=v.get(3).isBlank() ? null : new BigDecimal(v.get(3).replace(",",""));
                 amount(amount,"amount");
@@ -58,11 +56,12 @@ public class FinanceItemUploadForm implements UploadForm {
                 BigDecimal vat=v.get(4).isBlank() ? BigDecimal.ZERO : new BigDecimal(v.get(4).replace(",",""));
                 amount(vat,"vatAmount");
                 column=5;
-                LocalDate date=v.get(5).isBlank() ? null : LocalDate.parse(v.get(5));
+                LocalDate date=v.get(5).isBlank() ? null : com.company.common.developers.service.DeveloperUploadForm.parseDate(v.get(5).trim());
+                if (!v.get(5).isBlank() && date==null) throw new IllegalArgumentException("날짜는 2024-03-02처럼 적어 주세요.");
                 column=6;
                 String repeat=v.get(6).isBlank() ? "N" : v.get(6).trim();
                 if (!Set.of("Y","N").contains(repeat)) throw new IllegalArgumentException("Y 또는 N을 입력해 주세요.");
-                column=7; text(v.get(7),"memo",500,false);
+                column=7; text(v.get(7),"memo","비고",500,false);
                 records.add(new Item(null,null,classification,itemCode,v.get(2).trim(),amount,vat,date,repeat,"N",null,v.get(7)));
             } catch (RuntimeException failure) {
                 String message=failure instanceof CodeFailure ? failure.getMessage() :

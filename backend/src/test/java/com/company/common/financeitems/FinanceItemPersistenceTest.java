@@ -45,9 +45,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     BusinessCalendar.class,ExcelExportService.class,UploadWorkbookService.class,CommonUploadService.class,FinanceItemPersistenceTest.Database.class})
 @TestPropertySource(properties="spring.flyway.enabled=false")
 class FinanceItemPersistenceTest {
-    static final String URL=System.getenv("TEST_DATABASE_URL");
-    static final String USER=System.getenv("TEST_DATABASE_USERNAME");
-    static final String PASSWORD=System.getenv("TEST_DATABASE_PASSWORD");
+    static final String URL=System.getenv("NAVIGATION_TEST_DB_URL");
+    static final String USER=System.getenv("NAVIGATION_TEST_DB_USER");
+    static final String PASSWORD=System.getenv("NAVIGATION_TEST_DB_PASSWORD");
     static final String SCHEMA="finance_test_"+Long.toUnsignedString(System.nanoTime());
     @TempDir static Path files;
     @Autowired MockMvc mvc; @Autowired ObjectMapper json; @Autowired JdbcTemplate jdbc;
@@ -98,8 +98,27 @@ class FinanceItemPersistenceTest {
     @Test void staleAggregateProtectsOmittedRowsFromDeletion() throws Exception {
         prepareYear(); item("202601",1,"원본","N",null); var first=input(getMonth("202601")); save("202601",first); first.withArray("items").removeAll(); mvc.perform(put("/api/common/finance-items/202601").contentType("application/json").content(first.toString())).andExpect(status().isConflict()); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_ITEM",Integer.class)).isEqualTo(1);
     }
+    @Test void savingAnotherMonthDoesNotConflictWithSharedCardsTaxOrPayments() throws Exception {
+        prepareYear();
+        var first=input(getMonth("202601")); first.withArray("cards").addObject().putNull("cardId").putNull("modifiedAt").put("cardName","공용 카드").put("lastFourDigits","1111").put("useYn","Y").put("amount",7);
+        save("202601",first);
+        var openedFeb=input(getMonth("202602"));
+        var jan=input(getMonth("202601")); ((com.fasterxml.jackson.databind.node.ObjectNode)jan.withArray("cards").get(0)).put("amount",9); save("202601",jan);
+        openedFeb.withArray("items").addObject().putNull("itemId").putNull("modifiedAt").put("classification","SGA").put("itemName","2월 항목").put("amount",5).put("vatAmount",0).put("repeatYn","N");
+        save("202602",openedFeb);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_ITEM WHERE FIN_YM='202602'",Integer.class)).isEqualTo(1);
+        var stale=input(getMonth("202602"));
+        var renamed=input(getMonth("202601")); ((com.fasterxml.jackson.databind.node.ObjectNode)renamed.withArray("cards").get(0)).put("cardName","새 이름"); save("202601",renamed);
+        ((com.fasterxml.jackson.databind.node.ObjectNode)stale.withArray("cards").get(0)).put("cardName","다른 이름");
+        mvc.perform(put("/api/common/finance-items/202602").contentType("application/json").content(stale.toString())).andExpect(status().isConflict());
+    }
+    @Test void reissuedCardMayShareNameAndLastFourDigits() throws Exception {
+        prepareYear(); var body=input(getMonth("202601"));
+        for(int n=0;n<2;n++) body.withArray("cards").addObject().putNull("cardId").putNull("modifiedAt").put("cardName","법인카드").put("lastFourDigits","1234").put("useYn",n==0?"N":"Y").put("amount",0);
+        save("202601",body); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_CARD",Integer.class)).isEqualTo(2);
+    }
     @Test void invalidAmountRollsBackBothTabs() throws Exception {
-        item("202601",1,"원본","N",null); var body=input(getMonth("202601")); ((com.fasterxml.jackson.databind.node.ObjectNode)body.withArray("items").get(0)).putNull("amount"); body.withArray("loans").addObject().put("loanDate","2026-01-02").put("ioCode","IN").put("amount",5);
+        item("202601",1,"원본","N",null); var body=input(getMonth("202601")); ((com.fasterxml.jackson.databind.node.ObjectNode)body.withArray("items").get(0)).putNull("amount"); body.withArray("loans").addObject().putNull("loanId").putNull("modifiedAt").put("date","2026-01-02").put("direction","IN").put("amount",5);
         mvc.perform(put("/api/common/finance-items/202601").contentType("application/json").content(body.toString())).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("items[0].amount")); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_LOAN",Integer.class)).isZero(); assertThat(jdbc.queryForObject("SELECT AMT FROM TB_FI_ITEM",java.math.BigDecimal.class)).isEqualByComparingTo("100");
     }
     @Test void confirmationIsIndependentNumericImmutableAndVersionChecked() throws Exception {

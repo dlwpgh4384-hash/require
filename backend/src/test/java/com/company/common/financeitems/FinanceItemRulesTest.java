@@ -34,5 +34,12 @@ class FinanceItemRulesTest {
     @Test void amountZeroIsValidButBlankAndFractionHaveDistinctErrors() {
         FinanceItemRules.amount(BigDecimal.ZERO,"amount"); assertThatThrownBy(()->FinanceItemRules.amount(null,"amount")).isInstanceOfSatisfying(CodeFailure.class,error->assertThat(error.getField()).isEqualTo("amount")); assertThatThrownBy(()->FinanceItemRules.amount(n("0.5"),"amount")).isInstanceOf(CodeFailure.class);
     }
-    @Test void requiredTextAllowsExactlyThreeHundredCharacters() { FinanceItemRules.text("가".repeat(300),"reason",300,true); assertThatThrownBy(()->FinanceItemRules.text("가".repeat(301),"reason",300,true)).isInstanceOf(CodeFailure.class); }
+    @Test void requiredTextAllowsExactlyThreeHundredCharacters() { FinanceItemRules.text("가".repeat(300),"reason","사유",300,true); assertThatThrownBy(()->FinanceItemRules.text("가".repeat(301),"reason","사유",300,true)).isInstanceOf(CodeFailure.class).hasMessage("사유는 300자 이하로 입력해 주세요."); }
+    @Test void requiredTextMessageUsesColumnNameAndParticle() {
+        assertThatThrownBy(()->FinanceItemRules.text(" ","items[0].itemName","세부 항목",50,true)).hasMessage("세부 항목을 입력해 주세요.");
+        assertThatThrownBy(()->FinanceItemRules.text(null,"cards[0].cardName","카드 이름",100,true)).hasMessage("카드 이름을 입력해 주세요.");
+        assertThatThrownBy(()->FinanceItemRules.text("","transfers[0].description","내용",100,true)).hasMessage("내용을 입력해 주세요.");
+        assertThatThrownBy(()->FinanceItemRules.text("","x","비고",1,true)).hasMessage("비고를 입력해 주세요.");
+        assertThatThrownBy(()->FinanceItemRules.amount(null,"items[0].amount")).hasMessage("금액을 입력해 주세요.");
+    }
 }

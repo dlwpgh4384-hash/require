@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(CommonFinanceItemController.class)
-@Import({CommonFinanceItemService.class,FinanceTaxService.class,FinanceItemExcelService.class,FinanceItemUploadService.class,CurrentBusinessActor.class})
+@Import({CommonFinanceItemService.class,FinanceTaxService.class,CurrentBusinessActor.class})
 class CommonFinanceItemControllerTest {
     @Autowired MockMvc mvc; @Autowired ObjectMapper json;
     @MockBean FinanceItemMapper mapper; @MockBean FinanceItemDefinitions definitions;
@@ -60,18 +60,4 @@ class CommonFinanceItemControllerTest {
     @Test void closedViewStillAllowsIndependentConfirmation()throws Exception{when(mapper.isClosed(any())).thenReturn(true);when(mapper.payment(any())).thenReturn(payment("N"),payment("Y"));mvc.perform(post("/api/common/finance-items/tax-payments/2026:CNFM/confirm").contentType("application/json").content(json.writeValueAsBytes(new ConfirmInput(LocalDate.of(2026,1,2),BigDecimal.TEN,at)))).andExpect(status().isOk()).andExpect(jsonPath("$.data.paidYn").value("Y"));verify(mapper,never()).updateProfit(any(),any());}
     @Test void alreadyPaidCannotBeConfirmedAgain()throws Exception{when(mapper.payment(any())).thenReturn(payment("Y"));mvc.perform(post("/api/common/finance-items/tax-payments/2026:CNFM/confirm").contentType("application/json").content(json.writeValueAsBytes(new ConfirmInput(LocalDate.of(2026,1,2),BigDecimal.TEN,at)))).andExpect(status().isBadRequest());verify(mapper,never()).confirm(any());}
     @Test void stalePaymentSqlVersionProducesConflict()throws Exception{when(mapper.payment(any())).thenReturn(payment("N"));when(mapper.confirm(any())).thenReturn(0);mvc.perform(post("/api/common/finance-items/tax-payments/2026:CNFM/confirm").contentType("application/json").content(json.writeValueAsBytes(new ConfirmInput(LocalDate.of(2026,1,2),BigDecimal.TEN,at)))).andExpect(status().isConflict());}
-    org.springframework.mock.web.MockMultipartFile file(){return new org.springframework.mock.web.MockMultipartFile("file","finance.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",new byte[]{1});}
-    @Test void uploadPublicAdapterRechecksBaselineInsideApply()throws Exception{
-        var checked=new com.company.common.uploads.dto.UploadContracts.Result("9",at.toString(),"검사",1,0,0,List.of(),null,null);
-        when(uploads.postCommonUpload(eq("B2"),eq("2026-01"),eq("finance.xlsx"),any())).thenReturn(checked);
-        when(uploads.postCommonUploadApply(eq("9"),any(),any(Runnable.class))).thenAnswer(call->{call.<Runnable>getArgument(2).run();return checked;});
-        mvc.perform(multipart("/api/common/finance-items/202601/uploads").file(file()).param("modifiedAt",at.toString())).andExpect(status().isOk()).andExpect(jsonPath("$.data.uploadId").value("9"));verify(mapper).lockSources();
-    }
-    @Test void uploadValidationRetainsOriginalRowAndColumn()throws Exception{
-        var issue=new com.company.common.uploads.dto.UploadContracts.Issue(2,"금액","","금액 필수","오류");
-        when(uploads.postCommonUpload(anyString(),anyString(),anyString(),any())).thenReturn(new com.company.common.uploads.dto.UploadContracts.Result("9",at.toString(),"오류",0,0,1,List.of(issue),null,null));
-        mvc.perform(multipart("/api/common/finance-items/202601/uploads").file(file()).param("modifiedAt",at.toString())).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("file.rows[2].금액"));verify(uploads,never()).postCommonUploadApply(any(),any(),any());
-    }
-    @Test void templateContainsRealEightColumnWorkbook()throws Exception{when(uploads.getCommonUploadTemplate("B2")).thenReturn(new UploadWorkbookService(new ExcelExportService()).tabularFile(FinanceItemUploadForm.HEADERS,List.of(),null));when(uploads.templateFileName("B2")).thenReturn("finance.xlsx");byte[] result=mvc.perform(get("/api/common/finance-items/upload-template")).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();try(var book=new XSSFWorkbook(new java.io.ByteArrayInputStream(result))){assertThat(book.getSheetAt(0).getRow(0).getLastCellNum()).isEqualTo((short)8);}}
-    @Test void exportUsesRequestedColumnsOnlyAndLogsDownload()throws Exception{when(mapper.items("202601")).thenReturn(List.of(item("1",BigDecimal.TEN)));when(mapper.access(any(),any())).thenReturn(1);when(excel.fileName(any(),any(),any())).thenReturn("finance.xlsx");when(excel.write(any(),any(),any(),any(),any())).thenAnswer(c->new ExcelExportService().write(c.getArgument(0),c.getArgument(1),c.getArgument(2),c.getArgument(3),c.getArgument(4)));var response=mvc.perform(get("/api/common/finance-items/202601/excel").param("columns","amount")).andExpect(status().isOk()).andReturn();try(var book=new XSSFWorkbook(new java.io.ByteArrayInputStream(response.getResponse().getContentAsByteArray()))){assertThat(book.getSheetAt(0).getRow(2).getCell(0).getStringCellValue()).isEqualTo("금액");assertThat(book.getSheetAt(0).getRow(3).getCell(0).getNumericCellValue()).isEqualTo(10d);}verify(mapper).access(eq("admin"),any());}
 }

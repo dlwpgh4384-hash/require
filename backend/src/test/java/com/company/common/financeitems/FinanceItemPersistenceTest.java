@@ -18,6 +18,7 @@ import java.nio.file.Path;
 import java.sql.*;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.StreamSupport;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,8 +41,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(CommonFinanceItemController.class)
-@Import({CommonFinanceItemService.class,FinanceTaxService.class,FinanceItemUploadService.class,FinanceItemUploadForm.class,
-    FinanceItemExcelService.class,FinanceItemDefinitions.class,CalculationRuleService.class,CurrentBusinessActor.class,
+@Import({CommonFinanceItemService.class,FinanceTaxService.class,FinanceItemUploadForm.class,
+    FinanceItemDefinitions.class,CalculationRuleService.class,CurrentBusinessActor.class,
     BusinessCalendar.class,ExcelExportService.class,UploadWorkbookService.class,CommonUploadService.class,FinanceItemPersistenceTest.Database.class})
 @TestPropertySource(properties="spring.flyway.enabled=false")
 class FinanceItemPersistenceTest {
@@ -50,7 +51,7 @@ class FinanceItemPersistenceTest {
     static final String PASSWORD=System.getenv("NAVIGATION_TEST_DB_PASSWORD");
     static final String SCHEMA="finance_test_"+Long.toUnsignedString(System.nanoTime());
     @TempDir static Path files;
-    @Autowired MockMvc mvc; @Autowired ObjectMapper json; @Autowired JdbcTemplate jdbc;
+    @Autowired MockMvc mvc; @Autowired ObjectMapper json; @Autowired JdbcTemplate jdbc; @Autowired CommonUploadService uploads;
     @BeforeAll static void prepare() throws Exception {
         assumeTrue(URL!=null&&!URL.isBlank()&&USER!=null&&PASSWORD!=null,"선택된 PostgreSQL 시험 연결이 없습니다.");
         try(Connection c=DriverManager.getConnection(URL,USER,PASSWORD)) {
@@ -135,20 +136,27 @@ class FinanceItemPersistenceTest {
     @Test void unpaidStaleConfirmationLeavesAmountNull() throws Exception {
         prepareYear(); mvc.perform(post("/api/common/finance-items/tax-payments/2026:CNFM/confirm").contentType("application/json").content("{\"actualPaymentDate\":\"2026-03-20\",\"actualPaymentAmount\":1,\"modifiedAt\":\"2000-01-01T00:00:00Z\"}")).andExpect(status().isConflict()); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_TAX_PAY WHERE PAY_AMT IS NULL AND PAY_YN='N'",Integer.class)).isEqualTo(2);
     }
-    @Test void uploadUsesSameBaselinePreservesManualAndSourceOwnershipAfterEdits() throws Exception {
-        prepareYear(); item("202601",1,"직접","N",null); var baseline=getMonth("202601").path("modifiedAt").asText(); mvc.perform(multipart("/api/common/finance-items/202601/uploads").file(file("250")).param("modifiedAt",baseline)).andExpect(status().isOk()).andExpect(jsonPath("$.data.preservedCount").value(1));
-        var body=input(getMonth("202601")); ((com.fasterxml.jackson.databind.node.ObjectNode)body.withArray("items").get(1)).put("amount",300); save("202601",body);
-        baseline=getMonth("202601").path("modifiedAt").asText(); mvc.perform(multipart("/api/common/finance-items/202601/uploads").file(file("500")).param("modifiedAt",baseline)).andExpect(status().isOk());
+    com.company.common.uploads.dto.UploadContracts.Result upload(String amount) {
+        return uploads.postCommonUpload("B2","2026-01","finance.xlsx",new UploadWorkbookService(new ExcelExportService()).tabularFile(
+            List.of("구분","판관비 항목","세부 항목","금액","부가세","입출금일","매달 반복","비고"),List.of(List.of("SGA","","교체 항목",amount,"","","N","")),null));
+    }
+    com.company.common.uploads.dto.UploadContracts.Result apply(com.company.common.uploads.dto.UploadContracts.Result checked) {
+        return uploads.postCommonUploadApply(checked.uploadId(),new com.company.common.uploads.dto.UploadContracts.Apply(checked.modifiedAt()==null ? null : Instant.parse(checked.modifiedAt())));
+    }
+    @Test void sharedUploadReplacesOnlyUploadedRowsAndKeepsManualOnesAfterEdits() throws Exception {
+        prepareYear(); item("202601",1,"직접","N",null); apply(upload("250"));
+        var body=input(getMonth("202601")); var uploaded=StreamSupport.stream(body.withArray("items").spliterator(),false).filter(i->!i.path("uploadId").isNull()).findFirst().orElseThrow();
+        ((com.fasterxml.jackson.databind.node.ObjectNode)uploaded).put("amount",300); save("202601",body);
+        apply(upload("500"));
         assertThat(jdbc.queryForObject("SELECT AMT FROM TB_FI_ITEM WHERE UPLD_ID IS NOT NULL",java.math.BigDecimal.class)).isEqualByComparingTo("500"); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_ITEM WHERE UPLD_ID IS NULL",Integer.class)).isEqualTo(1);
     }
-    @Test void invalidUploadLeavesAllFinanceRowsAndStaleUploadCannotDeleteThem() throws Exception {
-        item("202601",1,"직접","N",null); var baseline=getMonth("202601").path("modifiedAt").asText(); mvc.perform(multipart("/api/common/finance-items/202601/uploads").file(file("")).param("modifiedAt",baseline)).andExpect(status().isBadRequest());
-        mvc.perform(multipart("/api/common/finance-items/202601/uploads").file(file("500")).param("modifiedAt","2000-01-01T00:00:00Z")).andExpect(status().isConflict()); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_ITEM",Integer.class)).isEqualTo(1);
+    @Test void sharedUploadWithErrorsDoesNotTouchFinanceRows() throws Exception {
+        item("202601",1,"직접","N",null); var checked=upload(""); assertThat(checked.errorCount()).isEqualTo(1);
+        assertThat(apply(checked).errorCount()).isEqualTo(1); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_ITEM",Integer.class)).isEqualTo(1);
     }
-    @Test void previousItemsAndExcelAreReadOnlyExceptDownloadAudit() throws Exception {
+    @Test void previousItemsAreReadOnly() throws Exception {
         item("202601",1,"지난달","N",null); mvc.perform(get("/api/common/finance-items/202602/previous-items")).andExpect(status().isOk()).andExpect(jsonPath("$.data.count").value(1));
-        int before=jdbc.queryForObject("SELECT COUNT(*) FROM TB_SY_ACCS_LOG WHERE ACT_TYPE_CD='DNLD' AND SCRN_ID='UI-10'",Integer.class);
-        mvc.perform(get("/api/common/finance-items/202601/excel").param("columns","amount")).andExpect(status().isOk()); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_SY_ACCS_LOG WHERE ACT_TYPE_CD='DNLD' AND SCRN_ID='UI-10'",Integer.class)).isEqualTo(before+1); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_ITEM",Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_ITEM",Integer.class)).isEqualTo(1);
     }
     @TestConfiguration
     @org.springframework.transaction.annotation.EnableTransactionManagement

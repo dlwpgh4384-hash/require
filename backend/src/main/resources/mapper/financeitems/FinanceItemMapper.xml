@@ -261,10 +261,6 @@
       mod_user_id=#{actor},mod_dttm=clock_timestamp()
     WHERE pl_ym=#{row.month} AND fix_yn='N' AND NOT EXISTS(SELECT 1 FROM TB_CL_CLOSE c WHERE c.close_ym=#{row.month} AND c.close_stat_cd='CLOSE')
   </update>
-  <insert id="access">
-    INSERT INTO TB_SY_ACCS_LOG(user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm)
-    VALUES(#{actor},'DNLD','UI-10',#{target},clock_timestamp(),#{actor},clock_timestamp())
-  </insert>
   <select id="cashContributions" resultMap="cash">
     SELECT s.month,s.category,sum(s.amount) AS amount FROM (
       SELECT COALESCE(to_char(i.io_dt,'YYYYMM'),i.fin_ym) AS month,'EXPENSE' AS category,i.amt+i.vat_amt AS amount

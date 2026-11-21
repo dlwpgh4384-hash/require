@@ -43,7 +43,6 @@ public final class FinanceItemContracts {
         Instant modifiedAt) {}
     public record TaxYear(TaxEstimate taxEstimate, List<TaxPayment> taxPayments) {}
     public record PreviousItems(List<Item> items, int count) {}
-    public record UploadResult(String uploadId, List<Item> items, int replacedCount, int preservedCount) {}
     public record Write<T>(String month, T row, String actor) {}
     public record Version(String month, String id, Instant modifiedAt) {}
     public record PaymentKey(String year, String type) {}

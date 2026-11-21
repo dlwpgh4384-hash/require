@@ -54,6 +54,5 @@ public interface FinanceItemMapper {
     long nextAdjustment();
     int history(History history);
     int updateProfit(@Param("row") Profit row, @Param("actor") String actor);
-    int access(@Param("actor") String actor, @Param("target") String target);
     List<CashContribution> cashContributions();
 }

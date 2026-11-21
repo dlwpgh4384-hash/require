@@ -18,16 +18,13 @@ class FinanceSourcePreservationTest {
         var paths = contract.path("paths");
         for (String path : List.of(
                 "/api/common/finance-items/{yearMonth}",
-                "/api/common/finance-items/{yearMonth}/previous-items",
-                "/api/common/finance-items/{yearMonth}/excel",
-                "/api/common/finance-items/upload-template")) {
+                "/api/common/finance-items/{yearMonth}/previous-items")) {
             assertPublic(paths.path(path).path("get"), "GET " + path);
         }
         assertPublic(paths.path("/api/common/finance-items/{yearMonth}").path("put"), "PUT month");
         for (String path : List.of(
                 "/api/common/finance-items/tax-years/{taxYear}",
-                "/api/common/finance-items/tax-payments/{paymentId}/confirm",
-                "/api/common/finance-items/{yearMonth}/uploads")) {
+                "/api/common/finance-items/tax-payments/{paymentId}/confirm")) {
             assertPublic(paths.path(path).path("post"), "POST " + path);
         }
     }

@@ -118,14 +118,10 @@ public class CommonUploadService {
         return workbooks.tabularFile(List.of("행", "열", "입력값", "사유"), rows, null);
     }
     public Result postCommonUploadApply(String uploadId, Apply input) {
-        return postCommonUploadApply(uploadId, input, () -> {});
-    }
-    /** Resource adapters may recheck their own aggregate token inside the actual apply transaction. */
-    public Result postCommonUploadApply(String uploadId, Apply input, Runnable sourceCheck) {
         long id = id(uploadId);
         for (int attempt = 0; attempt < 3; attempt++) {
             try {
-                return transaction.execute(status -> apply(id, input, sourceCheck));
+                return transaction.execute(status -> apply(id, input));
             } catch (DuplicateKeyException failure) {
                 if (!primaryKeyCollision(failure) || attempt == 2) throw failure;
                 // execute가 rollback을 마친 뒤 파일 전체를 새 트랜잭션에서 재검사한다.
@@ -136,11 +132,10 @@ public class CommonUploadService {
     private static YearMonth targetMonth(UploadRows.Upload row) {
         return row.targetMonth == null ? null : YearMonth.parse(row.targetMonth, DB_MONTH);
     }
-    private Result apply(long id, Apply input, Runnable sourceCheck) {
+    private Result apply(long id, Apply input) {
         var current = require(mapper.selectUpload(id));
         UploadForm form = contextual(current);
         form.lock();
-        sourceCheck.run();
         var upload = require(mapper.lockUpload(id));
         if ("APPLIED".equals(upload.statusCode)) return result(upload, Map.of());
         if (!"CHECKED".equals(upload.statusCode)) throw CodeFailure.invalid("uploadId", "반영할 수 없는 상태입니다.");

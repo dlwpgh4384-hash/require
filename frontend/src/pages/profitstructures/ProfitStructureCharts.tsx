@@ -37,7 +37,8 @@ export function axisScale(values: number[], headroom = 1.05) {
   const top = Math.max(0, ...values) * headroom;
   const bottom = Math.min(0, ...values);
   if (bottom >= 0) {
-    const high = niceMax(top);
+    // 자료가 없어 모두 0이면 눈금이 「0 0 0 0」으로 겹치지 않게 0~4백만 원으로 둔다.
+    const high = top > 0 ? niceMax(top) : 4e6;
     return { low: 0, high, ticks: [0, 1, 2, 3, 4].map((k) => (high * k) / 4) };
   }
   let step = niceMax((top - bottom) / MAX_STEPS);
@@ -54,7 +55,7 @@ export function axisScale(values: number[], headroom = 1.05) {
 }
 /** 백만 원 단위 눈금 글자(시안 Math.round(v/1e6).toLocaleString). */
 const million = (value: number) =>
-  Math.round(value / 1e6).toLocaleString("ko-KR");
+  (Math.round(value / 1e6) + 0).toLocaleString("ko-KR"); // + 0: 「-0」을 「0」으로
 const numbers = (values: Amount[]) =>
   values.filter((value): value is number => value != null && Number.isFinite(value));
 
@@ -377,7 +378,7 @@ export function WaterfallChart({ waterfall }: { waterfall: ProfitWaterfall }) {
     bw = Math.min(56, gw * 0.62);
   const ticks = <Grid ticks={scale.ticks} y={y} left={pl} right={VW - pr} />;
   const won = (value: Amount) =>
-    value == null ? "–" : `${Math.round(value).toLocaleString("ko-KR")}원`;
+    value == null ? "–" : `${(Math.round(value) + 0).toLocaleString("ko-KR")}원`;
   return (
     <>
       <svg

@@ -1,9 +1,17 @@
 import { expect, it } from "vitest";
 import { render } from "@testing-library/react";
-import { axisScale, BarChart } from "./ProfitStructureCharts";
+import { axisScale, BarChart, WaterfallChart } from "./ProfitStructureCharts";
 
 it("keeps the mockup axis (0 to niceMax, 4 steps) when nothing is negative", () => {
   expect(axisScale([30e6, 41e6])).toEqual({ low: 0, high: 50e6, ticks: [0, 12.5e6, 25e6, 37.5e6, 50e6] });
+});
+
+it("shows 0~4 (백만 원) instead of repeated 0 ticks when every value is 0, and never prints -0", () => {
+  expect(axisScale([0, 0]).ticks).toEqual([0, 1e6, 2e6, 3e6, 4e6]);
+  const zero = { revenue: 0, costOfSales: 0, grossProfit: 0, sellingAdministrativeExpense: 0, previousAdjustment: 0,
+    operatingProfit: 0, nonOperatingProfitLoss: 0, monthlyCorporateTax: 0, netProfit: 0 };
+  const { container } = render(<WaterfallChart waterfall={zero} />);
+  expect(container.textContent).not.toContain("-0");
 });
 
 it("puts 0 on a tick with even steps when a loss is negative", () => {

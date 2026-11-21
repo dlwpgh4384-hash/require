@@ -401,10 +401,14 @@ type Content = ReturnType<typeof within>;
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
   "UI-07": async (content) => {
-    expect(await content.findByTestId("profit-period-controls")).toBeVisible();
-    expect(await content.findByTestId("list-empty")).toBeVisible();
+    // 시안: 기간 줄(누계 기준월) + 월/분기/연 누계 탭, [엑셀 다운로드]는 제목줄에 한 개.
+    expect(await content.findByTestId("period-selector")).toBeVisible();
+    expect(content.getByRole("tablist", { name: "기간 단위" })).toBeVisible();
+    expect(await content.findByTestId("profit-table-empty")).toBeVisible();
     expect(content.getByTestId("profit-waterfall")).toBeVisible();
-    expect(content.getAllByTestId("list-download")).toHaveLength(1);
+    const actions = within(screen.getByTestId("screen-actions"));
+    expect(actions.getAllByTestId("profit-excel")).toHaveLength(1);
+    expect(content.queryByTestId("profit-excel")).not.toBeInTheDocument();
   },
   "UI-10": async (content) => {
     // 시안: 항목이 없어도 표 머리와 법인세(월할) 계산 줄은 보인다.
@@ -831,7 +835,6 @@ describe("common placeholder screen contract", () => {
               id === "UI-31" ||
               id === "UI-32" ||
               id === "UI-04" ||
-              id === "UI-07" ||
               id === "UI-13") &&
             name === "조회"
           )

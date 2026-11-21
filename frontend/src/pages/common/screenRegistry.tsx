@@ -23,6 +23,7 @@ import { PartSettlementPage } from "../partsettlements/PartSettlementPage";
 import { PartSettlementTitleActions } from "../partsettlements/PartSettlementWorkspace";
 import { FinanceItemPage } from "../financeitems/FinanceItemPage";
 import { ProfitStructurePage } from "../profitstructures/ProfitStructurePage";
+import { ProfitStructureTitleActions } from "../profitstructures/ProfitStructureWorkspace";
 import { FinanceItemTitleActions } from "../financeitems/FinanceItemWorkspace";
 import { ProjectBoardPage } from "../projectboard/ProjectBoardPage";
 import { ProjectBoardTitleActions } from "../projectboard/ProjectBoardWorkspace";
@@ -59,6 +60,7 @@ export const screenRegistry: readonly ScreenEntry[] = [
   {
     id: "UI-07",
     Page: () => <ProfitStructurePage />,
+    TitleActions: () => <ProfitStructureTitleActions />,
     rootTestId: "profit-structures-page",
     hasInputs: false,
   },

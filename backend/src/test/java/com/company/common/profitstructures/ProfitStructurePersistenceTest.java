@@ -95,20 +95,19 @@ class ProfitStructurePersistenceTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_CO_MON_PL WHERE PL_YM='202602'",Integer.class)).isZero();assertThat(business()).isEqualTo(before);
     }
     @Test void successfulExcelWritesExactlyOneDownloadAndNoBusinessChange() {
-        var before=business();var logs=downloads();var bytes=exports.getCommonProfitStructuresExcel(new Filter(2026,"month","202602"),List.of("period","revenue"));
+        var before=business();var logs=downloads();var bytes=exports.getCommonProfitStructuresExcel(new Filter(2026,"month","202602"));
         assertThat(bytes.bytes()).isNotEmpty();assertThat(downloads()).isEqualTo(logs+1);assertThat(business()).isEqualTo(before);
     }
-    @Test void invalidColumnAndInvalidMonthWriteNothing() {
+    @Test void invalidMonthWritesNothing() {
         var before=business();var logs=downloads();
-        assertThatThrownBy(()->exports.getCommonProfitStructuresExcel(new Filter(2026,"month","202602"),List.of("unknown"))).isInstanceOf(CodeFailure.class);
-        assertThatThrownBy(()->exports.getCommonProfitStructuresExcel(new Filter(2026,"month","202613"),List.of("period"))).isInstanceOf(CodeFailure.class);
+        assertThatThrownBy(()->exports.getCommonProfitStructuresExcel(new Filter(2026,"month","202613"))).isInstanceOf(CodeFailure.class);
         assertThat(downloads()).isEqualTo(logs);assertThat(business()).isEqualTo(before);
     }
     @Test void failedDownloadInsertRollsBackExportTransaction() {
         jdbc.execute("CREATE FUNCTION reject_profit_download() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'download rejected'; END $$");
         jdbc.execute("CREATE TRIGGER reject_profit_download BEFORE INSERT ON TB_SY_ACCS_LOG FOR EACH ROW EXECUTE FUNCTION reject_profit_download()");
         var before=business();var logs=downloads();
-        try { assertThatThrownBy(()->exports.getCommonProfitStructuresExcel(new Filter(2026,"month","202602"),List.of("period"))).isInstanceOf(RuntimeException.class); }
+        try { assertThatThrownBy(()->exports.getCommonProfitStructuresExcel(new Filter(2026,"month","202602"))).isInstanceOf(RuntimeException.class); }
         finally { jdbc.execute("DROP TRIGGER reject_profit_download ON TB_SY_ACCS_LOG");jdbc.execute("DROP FUNCTION reject_profit_download()"); }
         assertThat(downloads()).isEqualTo(logs);assertThat(business()).isEqualTo(before);
     }

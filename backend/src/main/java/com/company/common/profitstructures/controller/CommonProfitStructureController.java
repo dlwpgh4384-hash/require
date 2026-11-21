@@ -5,7 +5,6 @@ import com.company.common.profitstructures.service.CommonProfitStructureService;
 import com.company.common.profitstructures.service.ProfitStructureExcelService;
 import com.company.common.users.dto.UserContracts.Response;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,8 +23,8 @@ public class CommonProfitStructureController {
     }
     @GetMapping(value = "/api/common/profit-structures/excel", produces = {XLSX, "application/json"})
     public ResponseEntity<byte[]> getCommonProfitStructuresExcel(@RequestParam Integer year, @RequestParam String periodUnit,
-        @RequestParam String baseMonth, @RequestParam List<String> columns) {
-        var file = excel.getCommonProfitStructuresExcel(new Filter(year, periodUnit, baseMonth), columns);
+        @RequestParam String baseMonth) {
+        var file = excel.getCommonProfitStructuresExcel(new Filter(year, periodUnit, baseMonth));
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(XLSX))
             .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(file.fileName(), StandardCharsets.UTF_8).build().toString())
             .header("X-Total-Count", Integer.toString(file.count())).body(file.bytes());

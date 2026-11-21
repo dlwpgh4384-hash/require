@@ -111,7 +111,25 @@ class CommonProfitStructureControllerTest {
             .andExpect(jsonPath("$.data.periodStart").value("202604")).andExpect(jsonPath("$.data.periodEnd").value("202605"))
             .andExpect(jsonPath("$.data.summary.revenue").value(2000)).andExpect(jsonPath("$.data.comparison.previousPeriod.revenue").value(2000))
             .andExpect(jsonPath("$.data.trends.length()").value(2)).andExpect(jsonPath("$.data.trends[0].revenue").value(11000))
-            .andExpect(jsonPath("$.data.numericRows[1].summary.revenue").value(2000));
+            .andExpect(jsonPath("$.data.numericRows[1].summary.revenue").value(2000))
+            .andExpect(jsonPath("$.data.comparison.previousPeriodLabel").value("전 분기 같은 기간"))
+            .andExpect(jsonPath("$.data.periodName").value("2026년 2분기(5월까지)"))
+            .andExpect(jsonPath("$.data.numericTable.columns[0].label").value("1분기"))
+            .andExpect(jsonPath("$.data.numericTable.columns[1].label").value("2분기(5월까지)"))
+            .andExpect(jsonPath("$.data.numericTable.rows[0].label").value("매출"))
+            .andExpect(jsonPath("$.data.numericTable.rows[0].values[1]").value(2000));
+    }
+    @Test void yearToDateHasMonthlyCumulativeColumnsAndNoPreviousPeriod() throws Exception {
+        mvc.perform(query("","year-to-date","202602")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.numericTable.columns.length()").value(2))
+            .andExpect(jsonPath("$.data.numericTable.columns[0].label").value("1월"))
+            .andExpect(jsonPath("$.data.numericTable.columns[1].label").value("2월"))
+            .andExpect(jsonPath("$.data.numericRows[0].period").value("1월"))
+            .andExpect(jsonPath("$.data.numericRows[1].period").value("2월"))
+            .andExpect(jsonPath("$.data.periodName").value("2026년 1~2월 누계"))
+            .andExpect(jsonPath("$.data.comparison.previousPeriod").isEmpty())
+            .andExpect(jsonPath("$.data.comparison.previousPeriodLabel").isEmpty())
+            .andExpect(jsonPath("$.meta.previousPeriodAvailable").value(false));
     }
     @Test void migratedMonthKeepsUnknownLeavesAndIsNeverProvisional() throws Exception {
         when(mapper.snapshots(any())).thenReturn(List.of(migrated("202501")));
@@ -120,41 +138,45 @@ class CommonProfitStructureControllerTest {
             .andExpect(jsonPath("$.data.provisional").value(false)).andExpect(jsonPath("$.data.compositionVisible").value(false))
             .andExpect(jsonPath("$.data.referenceRevenueVisible").value(false)).andExpect(jsonPath("$.data.numericRows[0].composition").isEmpty());
     }
-    @Test void exportIsPublicAndUsesNumericRowsVisibleOrderAndNumericCells() throws Exception {
-        var bytes=mvc.perform(query("/excel","quarter","202602").param("columns","period,revenue,operatingProfit"))
+    @Test void exportIsPublicAndWritesTheNumericTableItemsByPeriods() throws Exception {
+        var bytes=mvc.perform(query("/excel","quarter","202602"))
             .andExpect(status().isOk()).andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .andExpect(header().string("Content-Disposition",org.hamcrest.Matchers.containsString("attachment"))).andReturn().getResponse().getContentAsByteArray();
         try(var book=new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
-            var sheet=book.getSheetAt(0); assertThat(sheet.getRow(2).getPhysicalNumberOfCells()).isEqualTo(3);
-            assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("매출");
-            assertThat(sheet.getRow(3).getCell(0).getCellType()).isEqualTo(CellType.STRING);
-            assertThat(sheet.getRow(3).getCell(0).getStringCellValue()).contains("잠정");
+            var sheet=book.getSheetAt(0); assertThat(sheet.getRow(2).getPhysicalNumberOfCells()).isEqualTo(2);
+            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("항목");
+            assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("1분기(2월까지) 잠정");
+            assertThat(sheet.getRow(3).getCell(0).getStringCellValue()).isEqualTo("매출");
             assertThat(sheet.getRow(3).getCell(1).getCellType()).isEqualTo(CellType.NUMERIC);
             assertThat(sheet.getRow(3).getCell(1).getNumericCellValue()).isEqualTo(2000);
-            assertThat(sheet.getRow(3).getCell(2).getNumericCellValue()).isEqualTo(825);
+            assertThat(sheet.getRow(12).getCell(0).getStringCellValue()).isEqualTo("영업이익");
+            assertThat(sheet.getRow(12).getCell(1).getNumericCellValue()).isEqualTo(825);
+            assertThat(sheet.getRow(9).getCell(0).getStringCellValue()).isEqualTo("매출총이익률");
+            assertThat(sheet.getRow(9).getCell(1).getCellStyle().getDataFormatString()).isEqualTo("0.0");
+            assertThat(sheet.getRow(3).getCell(1).getCellStyle().getDataFormatString()).isEqualTo("#,##0");
         }
         verify(mapper,times(1)).insertAccess(eq("admin"),contains("202601–202602"));
     }
     @Test void closedExportHasTextPeriodButNoProvisionalMarker() throws Exception {
-        var bytes=mvc.perform(query("/excel","month","202601").param("columns","period,revenue")).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        var bytes=mvc.perform(query("/excel","month","202601")).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         try(var book=new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
-            var cell=book.getSheetAt(0).getRow(3).getCell(0);
-            assertThat(cell.getCellType()).isEqualTo(CellType.STRING); assertThat(cell.getStringCellValue()).isEqualTo("202601");
+            var cell=book.getSheetAt(0).getRow(2).getCell(1);
+            assertThat(cell.getCellType()).isEqualTo(CellType.STRING); assertThat(cell.getStringCellValue()).isEqualTo("1월");
         }
     }
-    @ParameterizedTest @ValueSource(strings={"unknown","period,unknown","period,period"})
-    void invalidColumnsNeverGenerateDownloadLog(String columns) throws Exception {
-        mvc.perform(query("/excel","month","202602").param("columns",columns)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("columns"));
+    @Test void invalidMonthNeverGeneratesDownloadLog() throws Exception {
+        mvc.perform(query("/excel","month","202613")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("baseMonth"));
         verifyNoInteractions(mapper);
     }
     @Test void migratedExportOmitsHiddenCompositionReferenceAndProvisional() throws Exception {
         when(mapper.snapshots(any())).thenReturn(List.of(migrated("202501")));
-        var bytes=mvc.perform(query("/excel","month","202501").param("columns","period,revenue,netProfit,referenceRevenue,contractTypes"))
+        var bytes=mvc.perform(query("/excel","month","202501"))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         try(var book=new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
-            var sheet=book.getSheetAt(0); assertThat(sheet.getRow(2).getPhysicalNumberOfCells()).isEqualTo(3);
-            assertThat(sheet.getRow(3).getCell(0).getStringCellValue()).isEqualTo("202501");
-            assertThat(sheet.getRow(3).getCell(2).getStringCellValue()).isEqualTo("–");
+            var sheet=book.getSheetAt(0); assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("1월");
+            assertThat(sheet.getLastRowNum()).isEqualTo(3+14);
+            assertThat(sheet.getRow(3+13).getCell(0).getStringCellValue()).isEqualTo("당기순이익");
+            assertThat(sheet.getRow(3+13).getCell(1).getStringCellValue()).isEqualTo("–");
         }
     }
 }

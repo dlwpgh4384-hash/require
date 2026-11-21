@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { RouterProvider } from "react-router-dom";
@@ -155,9 +156,9 @@ function respond(failRead = false) {
         ok: false,
         status: 400,
         json: async () => ({
-          message: "내려받을 열을 확인해 주세요.",
+          message: "엑셀 조건을 확인해 주세요.",
           errors: [
-            { field: "columns", message: "내려받을 열을 확인해 주세요." },
+            { field: "baseMonth", message: "엑셀 조건을 확인해 주세요." },
           ],
         }),
       };
@@ -211,7 +212,7 @@ it("resolves UI-07 through the single shared shell and public feature client", a
     "href",
     "/screens/UI-07",
   );
-  expect(screen.getByTestId("list-empty")).toBeVisible();
+  expect(screen.getByTestId("profit-table-empty")).toBeVisible();
   expect(request).toHaveBeenCalledWith(
     "/api/common/profit-structures?year=2026&periodUnit=month&baseMonth=202602",
     { signal: expect.any(AbortSignal) },
@@ -254,8 +255,8 @@ it("keeps API field errors on UI-07 instead of redirecting to login", async () =
   expect(await screen.findByTestId("profit-error-baseMonth")).toHaveTextContent(
     "같은 연도의 기준월이어야 합니다.",
   );
-  expect(screen.getByTestId("period-year")).toHaveFocus();
-  expect(screen.queryByTestId("list-empty")).not.toBeInTheDocument();
+  expect(screen.getByTestId("period-month")).toHaveFocus();
+  expect(screen.queryByTestId("profit-table-empty")).not.toBeInTheDocument();
   expect(router?.state.location.pathname).toBe("/screens/UI-07");
 });
 
@@ -263,10 +264,12 @@ it("uses the feature-owned Excel client with the current period and reports serv
   const request = respond();
   mount();
   await ready();
-  fireEvent.click(screen.getByTestId("list-download"));
+  fireEvent.click(
+    within(screen.getByTestId("profit-title-actions")).getByTestId("profit-excel"),
+  );
   expect(
-    await screen.findByTestId("profit-download-message"),
-  ).toHaveTextContent("내려받을 열을 확인해 주세요.");
+    await screen.findByTestId("profit-toast"),
+  ).toHaveTextContent("엑셀 조건을 확인해 주세요.");
   const exports = request.mock.calls.filter(([url]) =>
     url.startsWith("/api/common/profit-structures/excel?"),
   );
@@ -275,7 +278,7 @@ it("uses the feature-owned Excel client with the current period and reports serv
   expect(params.get("year")).toBe("2026");
   expect(params.get("periodUnit")).toBe("month");
   expect(params.get("baseMonth")).toBe("202602");
-  expect(params.get("columns")?.split(",")).toContain("period");
+  expect(params.has("columns")).toBe(false);
   expect(exports[0][1]).toBeUndefined();
   expect(router?.state.location.pathname).toBe("/screens/UI-07");
 });

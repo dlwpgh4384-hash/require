@@ -58,12 +58,33 @@ export interface ProfitPeriodRow {
   composition: ProfitComposition | null;
   provisional: boolean;
 }
+/** 시안 「숫자로 보기」 열: 기간 이름과 잠정(마감 전) 여부. 마지막 열이 고른 기간이다. */
+export interface ProfitNumericColumn {
+  label: string;
+  provisional: boolean;
+}
+/** 시안 rowsDef 한 줄: bold=굵게(tr.b), indent=들여쓰기(ind), group=「매출 구성 · …」 머리 줄. */
+export interface ProfitNumericLine {
+  label: string;
+  style: "bold" | "indent" | "group" | "plain";
+  format: "money" | "percent";
+  values: Amount[];
+}
+export interface ProfitNumericTable {
+  columns: ProfitNumericColumn[];
+  rows: ProfitNumericLine[];
+}
 export interface ProfitStructureResult {
   periodStart: string;
   periodEnd: string;
+  /** 시안 perName: 「2026-11」, 「2026년 4분기(11월까지)」, 「2026년 1~11월 누계」 */
+  periodName?: string;
   summary: ProfitSummary;
   comparison: {
-    previousPeriod: ProfitSummary;
+    /** 연 누계는 null(전년 같은 기간만 비교) */
+    previousPeriod: ProfitSummary | null;
+    /** 「전월」·「전 분기」·「전 분기 같은 기간」, 연 누계는 null */
+    previousPeriodLabel?: string | null;
     previousYear: ProfitSummary | null;
     previousYearVisible: boolean;
     shareDifferenceUnit: "%p";
@@ -76,6 +97,7 @@ export interface ProfitStructureResult {
   provisional: boolean;
   provisionalNotice: string | null;
   numericRows: ProfitPeriodRow[];
+  numericTable?: ProfitNumericTable | null;
 }
 export class ProfitStructureRequestError extends ProjectRequestError {
   constructor(
@@ -119,14 +141,12 @@ export async function getCommonProfitStructures(
     );
   return body;
 }
+/** 「숫자로 보기」 표와 같은 엑셀(열 고르기 없음). */
 export async function getCommonProfitStructuresExcel(
   filter: ProfitStructureFilter,
-  columns: string[],
 ) {
-  const params = query(filter);
-  params.set("columns", columns.join(","));
   return downloadFile(
-    `${root}/excel?${params}`,
+    `${root}/excel?${query(filter)}`,
     "전체 수익 구조.xlsx",
     (message, errors) => new ProjectRequestError(message, errors),
   );

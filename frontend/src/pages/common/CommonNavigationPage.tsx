@@ -19,6 +19,7 @@ import { ProjectBoardWorkspaceProvider } from "../projectboard/ProjectBoardWorks
 import { BillingWorkspaceProvider } from "../bills/BillingWorkspace";
 import { PartSettlementWorkspaceProvider } from "../partsettlements/PartSettlementWorkspace";
 import { FinanceItemWorkspaceProvider } from "../financeitems/FinanceItemWorkspace";
+import { ProfitStructureWorkspaceProvider } from "../profitstructures/ProfitStructureWorkspace";
 import { CodeWorkspaceProvider } from "../codegroups/CodeWorkspace";
 import { ClientPartWorkspaceProvider } from "../clients/ClientPartWorkspace";
 import { DeveloperWorkspaceProvider } from "../developers/DeveloperWorkspace";
@@ -119,6 +120,7 @@ export function CommonNavigationPage() {
                         <BillingWorkspaceProvider>
                           <PartSettlementWorkspaceProvider>
                             <FinanceItemWorkspaceProvider>
+                              <ProfitStructureWorkspaceProvider>
                               {preferences ? (
                                 <PreferenceNavigation />
                               ) : (
@@ -132,6 +134,7 @@ export function CommonNavigationPage() {
                                   })}
                                 />
                               )}
+                              </ProfitStructureWorkspaceProvider>
                             </FinanceItemWorkspaceProvider>
                           </PartSettlementWorkspaceProvider>
                         </BillingWorkspaceProvider>

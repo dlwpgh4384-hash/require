@@ -10822,7 +10822,7 @@ paths:
       operationId: getCommonProfitStructuresExcel
       summary: 전체 수익 구조 엑셀
       security: []
-      description: 숫자로 보기의 같은 기간/열/값/잠정표식 xlsx. 기존 공통 export helper와 DNLD만 사용.
+      description: 숫자로 보기 표(줄 = 항목, 열 = 기간, 잠정 기간은 머리에 「잠정」)와 같은 xlsx. 기존 공통 export helper와 DNLD만 사용.
       parameters:
       - name: year
         in: query
@@ -10847,40 +10847,6 @@ paths:
           type: string
           pattern: ^[0-9]{4}(0[1-9]|1[0-2])$
         description: 선택 연도 안 기준월 YYYYMM; 진행 분기는 여기까지만
-      - name: columns
-        in: query
-        required: true
-        schema:
-          type: array
-          minItems: 1
-          items:
-            type: string
-            enum:
-            - period
-            - revenue
-            - grossProfit
-            - grossProfitRate
-            - operatingProfit
-            - operatingProfitRate
-            - idleCostShare
-            - costOfSales
-            - sellingAdministrativeExpense
-            - previousAdjustment
-            - nonOperatingProfitLoss
-            - monthlyCorporateTax
-            - netProfit
-            - allocatedCost
-            - idleCost
-            - directExpense
-            - referenceRevenue
-            - contractTypes
-            - topClients
-            - projectSalesParts
-        style: form
-        explode: false
-        description: 숫자로 보기의 보이는 열 key를 순서대로 전달한다. 아래 x-column-bindings는 numericRows
-          각 행 기준 경로다. 구성 배열 열은 해당 구성의 이름/매출/비중/이익률 하위 표와 같은 값으로 내보낸다. 헤더는 UI 표시명과 동일하며
-          이관 숨김은 파일에도 적용한다. 등록되지 않은 key는400이다.
       x-related-requirements:
       - REQ-1057
       - REQ-1064
@@ -10889,14 +10855,13 @@ paths:
       - REQ-1018
       x-business-rules:
       - 서버 계산/원천선택/기간/잠정/이관/전년표시를 조회와 공유
-      - 숫자로 보기 열/값만 내보냄·금액/MM 숫자셀·번호/코드 텍스트
+      - 숫자로 보기 표 그대로 내보냄·금액/비율 숫자셀·항목 이름 텍스트
       x-side-effects:
       - TB_SY_ACCS_LOG 기존 DNLD 기록만 INSERT; clock_timestamp(); 업무표는 불변
       x-required-tests:
-      - 'happy: 숫자로 보기의 보이는 columns로 엑셀 GET -> 200 실제xlsx의 기간/열/값이 numericRows와 같다.'
+      - 'happy: 엑셀 GET -> 200 실제xlsx의 항목 줄/기간 열/값이 numericTable과 같다.'
       - 'auth: 인증헤더 없는 개발단계 엑셀 GET -> 200 xlsx; 새 인증요구는 없으며 최종 열람정책 연결은 UI-22다.'
-      - 'validation: 등록되지 않은 columns로 GET -> 400 errors[].field=columns·xlsx 미생성·DNLD
-        증가없음이다.'
+      - 'validation: 잘못된 기준월로 GET -> 400 errors[].field=baseMonth·xlsx 미생성·DNLD 증가없음이다.'
       - 'business: 시작전2025 이관 구간으로 엑셀 GET -> 매출구성/참고선이 없고 잠정 표식도 없다.'
       - 'side-effect: 유효엑셀 수신 후 기존 접근기록 조회 -> TB_SY_ACCS_LOG에 UI-07 DNLD가 존재하고 TB_CO_MON_PL
         값/행수 불변이다.'
@@ -10915,32 +10880,11 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: 기간 입력 또는 columns 누락/미등록 key·필드별 오류, 파일 미생성
+          description: 기간 입력 필드별 오류, 파일 미생성
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-      x-column-bindings:
-        period: period
-        revenue: summary.revenue
-        grossProfit: summary.grossProfit
-        grossProfitRate: summary.grossProfitRate
-        operatingProfit: summary.operatingProfit
-        operatingProfitRate: summary.operatingProfitRate
-        idleCostShare: summary.idleCostShare
-        costOfSales: waterfall.costOfSales
-        sellingAdministrativeExpense: waterfall.sellingAdministrativeExpense
-        previousAdjustment: waterfall.previousAdjustment
-        nonOperatingProfitLoss: waterfall.nonOperatingProfitLoss
-        monthlyCorporateTax: waterfall.monthlyCorporateTax
-        netProfit: waterfall.netProfit
-        allocatedCost: trend.allocatedCost
-        idleCost: trend.idleCost
-        directExpense: trend.directExpense
-        referenceRevenue: trend.referenceRevenue
-        contractTypes: composition.contractTypes
-        topClients: composition.topClients
-        projectSalesParts: composition.projectSalesParts
       x-state-transitions:
       - from: 업무 손익 기존 상태
         to: 업무 손익 기존 상태
@@ -18266,12 +18210,19 @@ components:
       type: object
       required:
       - previousPeriod
+      - previousPeriodLabel
       - previousYear
       - previousYearVisible
       - shareDifferenceUnit
       properties:
         previousPeriod:
-          $ref: '#/components/schemas/CommonProfitStructureSummary'
+          allOf:
+          - $ref: '#/components/schemas/CommonProfitStructureSummary'
+          nullable: true
+        previousPeriodLabel:
+          type: string
+          nullable: true
+          description: 전월·전 분기·전 분기 같은 기간. 연 누계와 직전 자료 없음은 null
         previousYear:
           allOf:
           - $ref: '#/components/schemas/CommonProfitStructureSummary'
@@ -18431,11 +18382,64 @@ components:
           nullable: true
         provisional:
           type: boolean
+    CommonProfitStructureNumericColumn:
+      type: object
+      required:
+      - label
+      - provisional
+      properties:
+        label:
+          type: string
+        provisional:
+          type: boolean
+    CommonProfitStructureNumericLine:
+      type: object
+      required:
+      - label
+      - style
+      - format
+      - values
+      properties:
+        label:
+          type: string
+        style:
+          type: string
+          enum:
+          - bold
+          - indent
+          - group
+          - plain
+        format:
+          type: string
+          enum:
+          - money
+          - percent
+        values:
+          type: array
+          items:
+            type: number
+            nullable: true
+    CommonProfitStructureNumericTable:
+      type: object
+      required:
+      - columns
+      - rows
+      properties:
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProfitStructureNumericColumn'
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProfitStructureNumericLine'
+      description: 시안 숫자로 보기 표. 줄 = 항목(매출~대기 원가 비중, 매출 구성 3묶음), 열 = 기간. 엑셀도 같다.
     CommonProfitStructureResult:
       type: object
       required:
       - periodStart
       - periodEnd
+      - periodName
       - summary
       - comparison
       - waterfall
@@ -18446,11 +18450,15 @@ components:
       - provisional
       - provisionalNotice
       - numericRows
+      - numericTable
       properties:
         periodStart:
           type: string
         periodEnd:
           type: string
+        periodName:
+          type: string
+          description: 시안 기간 이름(2026-11, 2026년 4분기(11월까지), 2026년 1~11월 누계)
         summary:
           $ref: '#/components/schemas/CommonProfitStructureSummary'
         comparison:
@@ -18478,6 +18486,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommonProfitStructurePeriodRow'
+        numericTable:
+          $ref: '#/components/schemas/CommonProfitStructureNumericTable'
       description: 숫자로 보기와 차트의 공통 공개 투영. 계산방법 문구는 시안 UI 로컬모듈이며 DB 식 기록은 응답하지 않는다. 혼합 이관기간
         구성 정책 OQ-CALC-007-2.
 x-requirement-context:

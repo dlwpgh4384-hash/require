@@ -1,111 +1,60 @@
 import type { FormulaRow } from "../../shared/list";
-import type {
-  ProfitPeriodRow,
-  Amount,
-  ProfitWaterfall,
-} from "./profitStructures";
+import type { Amount } from "./profitStructures";
 
+/** 시안 fxBox('UI-07', …) 표. 문구는 시안 그대로. */
 export const profitFormulaRows: FormulaRow[] = [
   [
-    "매출",
-    "월단위·파견 월 매출 + 턴키 청구 공급가액",
-    "부가세 제외, 취소 청구 제외. 턴키는 청구일의 달로 집계합니다.",
-  ],
-  [
-    "매출원가",
-    "배분 원가 + 대기 원가 + 직접 경비",
-    "배분 원가는 내부를 제외한 인건비 몫이며, 직접 경비는 한 번만 더합니다.",
+    "기간",
+    "월: 그 달 · 분기: 그 분기 안의 달을 더함(진행 중인 분기는 기준월까지) · 연 누계: 1월부터 그 달까지 더함",
+    "요약 카드와 흐름 차트는 맨 오른쪽(가장 최근) 기간 기준",
   ],
   [
     "매출총이익(률)",
-    "매출 − 매출원가 / 매출총이익 ÷ 매출 × 100",
-    "기간 합계로 이익률을 계산합니다. 월별 이익률의 평균이 아닙니다.",
+    "매출 − 매출원가 · 매출총이익 ÷ 매출 × 100",
+    "매출원가 = 배분 원가(내부 제외) + 대기 원가 + 직접 경비 (3.4)",
   ],
-  ["판관비", "재무 입력 판관비 + 간접 인건비 + 내부 프로젝트 연구개발비"],
   [
-    "전월 조정",
-    "이전 마감월의 정정분을 이번 달 영업이익에 반영합니다.",
-    "저장된 조정금액은 이익 증감 부호입니다. 비용 증가를 다시 반전하지 않고 그대로 더합니다.",
+    "영업이익(률)",
+    "매출총이익 − 판관비 ± 전월 조정 · 영업이익 ÷ 매출 × 100",
+    "판관비 = 재무 항목 입력 + 간접 인건비 + 연구개발비",
   ],
-  ["영업이익(률)", "매출총이익 − 판관비 + 전월 조정 / 영업이익 ÷ 매출 × 100"],
-  ["영업외손익", "영업외수익 − 영업외비용"],
   [
-    "법인세(월할)",
-    "(연간 예상 법인세 − 마감 반영액) ÷ 남은 개월 수",
-    "원 단위 버림, 끝자리는 마지막 미마감월에 모읍니다.",
+    "당기순이익",
+    "영업이익 + 영업외수익 − 영업외비용 − 법인세(월할)",
+    "법인세(월할)는 재무 항목 화면의 연간 예상액에서 계산",
   ],
-  ["당기순이익", "영업이익 + 영업외손익 − 법인세(월할)"],
-  ["대기 원가 비중", "대기 원가 ÷ 매출원가 × 100"],
   [
-    "배분 기준 매출",
-    "월단위·파견 매출 + 턴키 배분표 금액",
-    "배분표가 없으면 턴키 배분 원가 × 계약금액 ÷ 예산입니다. 실제 매출과 다른 참고선입니다.",
+    "대기 원가 비중",
+    "대기 원가 ÷ 매출원가 × 100",
+    "투입되지 않은 정규·계약직 인건비가 원가에서 차지하는 몫",
+  ],
+  [
+    "배분 기준 매출(참고선)",
+    "월단위·파견 매출 + 턴키 배분표 금액(배분표가 없으면 그 달 원가 × 계약금액 ÷ 예산)",
+    "턴키는 청구한 달에만 매출이 잡혀 출렁이므로, 일한 만큼 나눈 금액으로 바꿔 본 선 (3.3)",
   ],
   [
     "매출 구성",
-    "비중 = 구성 매출 ÷ 전체 매출 × 100 / 이익률 = (매출 − 배분 원가) ÷ 매출 × 100",
-    "대기 원가와 직접 경비는 차감하지 않습니다. 프로젝트를 따온 영업 파트 기준입니다.",
-  ],
-  [
-    "직전·전년 비교",
-    "같은 개월 수의 금액·비중을 비교합니다.",
-    "부분 분기는 직전 분기 첫 동일 개월 수와 비교합니다. 비중 차이는 %p입니다.",
-  ],
-  [
-    "마감·이관",
-    "마감 고정값은 다시 계산하지 않습니다.",
-    "이관 자료의 알 수 없는 값과 분모가 0인 비율은 –입니다. 이관이 섞인 기간의 매출 구성·참고선은 숨깁니다.",
+    "계약 유형·고객사·영업 파트별로 투입 매출과 배분 원가를 더함 · 이익률 = (매출 − 배분 원가) ÷ 매출",
+    "영업 파트는 프로젝트를 따온 파트 기준(파트 이익금은 사람의 소속 파트 기준, D-31) · 대기 원가·판관비는 나누지 않음",
   ],
 ];
-export const profitLabels = {
-  period: "기간",
-  revenue: "매출",
-  grossProfit: "매출총이익",
-  grossProfitRate: "매출총이익률",
-  operatingProfit: "영업이익",
-  operatingProfitRate: "영업이익률",
-  idleCostShare: "대기 원가 비중",
-  costOfSales: "매출원가",
-  sellingAdministrativeExpense: "판관비",
-  previousAdjustment: "전월 조정",
-  nonOperatingProfitLoss: "영업외손익",
-  monthlyCorporateTax: "법인세(월할)",
-  netProfit: "당기순이익",
-  allocatedCost: "배분 원가",
-  idleCost: "대기 원가",
-  directExpense: "직접 경비",
-  referenceRevenue: "배분 기준 매출",
-  contractTypes: "계약 유형별",
-  topClients: "고객사 상위 5곳(+그 밖)",
-  projectSalesParts: "프로젝트 영업 파트별",
-} as const;
-export type ProfitColumn = keyof typeof profitLabels;
-export const compositionKeys = [
-  "contractTypes",
-  "topClients",
-  "projectSalesParts",
-] as const;
-export const waterfallKeys: (keyof ProfitWaterfall)[] = [
-  "revenue",
-  "costOfSales",
-  "grossProfit",
-  "sellingAdministrativeExpense",
-  "previousAdjustment",
-  "operatingProfit",
-  "nonOperatingProfitLoss",
-  "monthlyCorporateTax",
-  "netProfit",
-];
+export const profitFormulaFoot =
+  "숫자는 영업이익표·순이익표와 같은 계산입니다.";
+
+/** 시안 pct(): 소수 한 자리 %, 음수는 「−」, 값이 없으면 「–」. */
 export const percentage = (value: Amount | undefined) =>
-  value == null ? "–" : `${value.toFixed(1)}%`;
-export function numericValue(
-  row: ProfitPeriodRow,
-  key: string,
-): Amount | string {
-  if (key === "period") return row.period + (row.provisional ? " 잠정" : "");
-  if (key in row.summary) return row.summary[key as keyof typeof row.summary];
-  if (key in row.waterfall)
-    return row.waterfall[key as keyof typeof row.waterfall];
-  if (key in row.trend) return row.trend[key as keyof typeof row.trend];
-  return null;
+  value == null || !Number.isFinite(value)
+    ? "–"
+    : `${value < 0 ? "−" : ""}${Math.abs(value).toFixed(1)}%`;
+/** 시안 pp(): 비중 차이 「+1.2%p」·「−0.4%p」. */
+export const percentPoint = (value: number) =>
+  `${value < 0 ? "−" : "+"}${Math.abs(value).toFixed(1)}%p`;
+/** 시안 dl()·yy(): (지금 − 비교) ÷ |비교| × 100. 비교 값이 없거나 0이면 null. */
+export function changeRate(
+  current: Amount | undefined,
+  previous: Amount | undefined,
+) {
+  if (current == null || previous == null || previous === 0) return null;
+  return ((current - previous) / Math.abs(previous)) * 100;
 }

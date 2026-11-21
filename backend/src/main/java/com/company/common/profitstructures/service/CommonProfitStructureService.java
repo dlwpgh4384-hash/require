@@ -33,7 +33,9 @@ public class CommonProfitStructureService {
         definitions.require();
         var previous = period.previous(); var previousYear = period.previousYear();
         Map<Integer, Integer> years = new TreeMap<>();
-        for (var window : List.of(period, previous, previousYear)) {
+        var windows = new ArrayList<ProfitStructurePeriod>(List.of(period, previousYear));
+        if (previous != null) windows.add(previous);
+        for (var window : windows) {
             for (var month = window.start(); !month.isAfter(window.end()); month = month.plusMonths(1))
                 years.merge(month.getYear(), month.getMonthValue(), Math::max);
         }
@@ -41,15 +43,22 @@ public class CommonProfitStructureService {
         years.forEach((year, last) -> source.putAll(monthly.year(year, last, basis.cashBaseYm())));
         var selected = select(period, source);
         var current = project(period, selected);
-        var prev = select(previous, source); var prior = select(previousYear, source);
+        var prev = previous == null ? List.<Month>of() : select(previous, source); var prior = select(previousYear, source);
         boolean prevAvailable = available(prev), priorAvailable = available(prior);
-        var comparison = new Comparison(summary(prev), priorAvailable ? summary(prior) : null, priorAvailable, "%p");
-        var numeric = period.buckets().stream().map(bucket -> project(bucket, select(bucket, source))).toList();
+        var comparison = new Comparison(prevAvailable ? summary(prev) : null, prevAvailable ? period.previousLabel() : null,
+            priorAvailable ? summary(prior) : null, priorAvailable, "%p");
+        var bucketMonths = period.buckets().stream().map(bucket -> Map.entry(bucket, select(bucket, source))).toList();
+        var numeric = bucketMonths.stream().map(entry -> project(entry.getKey(), entry.getValue())).toList();
+        List<List<ProfitStructureMonthlyProfitService.ProjectValue>> bucketProjects = new ArrayList<>();
+        for (var entry : bucketMonths) bucketProjects.add(entry.getValue().stream().anyMatch(Month::migrated) ? null
+            : entry.getValue().stream().flatMap(month -> month.projects().stream()).toList());
         String notice = current.provisional() ? period.end().getMonthValue()
             + "월은 아직 마감 전이라 요약 칸과 누계는 잠정 숫자입니다. 마감하면 확정됩니다." : null;
-        var result = new Result(key(period.start()), key(period.end()), current.summary(), comparison, current.waterfall(),
-            numeric.stream().map(PeriodRow::trend).toList(), current.composition(), current.composition() != null,
-            current.trend().referenceRevenue() != null, current.provisional(), notice, numeric);
+        boolean compositionVisible = current.composition() != null;
+        var result = new Result(key(period.start()), key(period.end()), period.name(), current.summary(), comparison,
+            current.waterfall(), numeric.stream().map(PeriodRow::trend).toList(), current.composition(), compositionVisible,
+            current.trend().referenceRevenue() != null, current.provisional(), notice, numeric,
+            ProfitStructureTable.of(numeric, bucketProjects, compositionVisible));
         return new Response<>(true, Map.of("previousPeriodAvailable", prevAvailable), result);
     }
     private static boolean available(List<Month> months) { return months.stream().anyMatch(Month::available); }

@@ -29,10 +29,17 @@ class ProfitStructureRulesTest {
     }
     @Test void chronologicalBucketsNeverIncludeFutureQuarterOrMonth() {
         var q=ProfitStructurePeriod.of(new Filter(2026,"quarter","202605"));
-        assertThat(q.buckets()).extracting(ProfitStructurePeriod::label).containsExactly("202601–202603","202604–202605");
-        assertThat(ProfitStructurePeriod.of(new Filter(2026,"month","202602")).buckets()).extracting(ProfitStructurePeriod::label).containsExactly("202601","202602");
-        var y=ProfitStructurePeriod.of(new Filter(2026,"year-to-date","202605"));
-        assertThat(y.buckets()).containsExactly(y); assertThat(y.previous().end()).isEqualTo(YearMonth.of(2025,5));
+        assertThat(q.buckets()).extracting(ProfitStructurePeriod::label).containsExactly("1분기","2분기(5월까지)");
+        assertThat(q.previousLabel()).isEqualTo("전 분기 같은 기간");
+        assertThat(ProfitStructurePeriod.of(new Filter(2026,"quarter","202606")).previousLabel()).isEqualTo("전 분기");
+        assertThat(ProfitStructurePeriod.of(new Filter(2026,"month","202602")).buckets()).extracting(ProfitStructurePeriod::label).containsExactly("1월","2월");
+        // 시안: 연 누계는 1월, 1~2월 … 달마다 누계 칸이고 직전 비교 없이 전년 같은 기간만 본다.
+        var y=ProfitStructurePeriod.of(new Filter(2026,"year-to-date","202603"));
+        assertThat(y.buckets()).extracting(ProfitStructurePeriod::start).containsOnly(YearMonth.of(2026,1));
+        assertThat(y.buckets()).extracting(ProfitStructurePeriod::end).containsExactly(YearMonth.of(2026,1),YearMonth.of(2026,2),YearMonth.of(2026,3));
+        assertThat(y.buckets()).extracting(ProfitStructurePeriod::label).containsExactly("1월","2월","3월");
+        assertThat(y.previous()).isNull(); assertThat(y.previousLabel()).isNull();
+        assertThat(y.previousYear().end()).isEqualTo(YearMonth.of(2025,3)); assertThat(y.name()).isEqualTo("2026년 1~3월 누계");
     }
     @Test void ratiosAreWeightedAmountsAndUndefinedRatesAreNull() {
         var first=month(fixed("202601"));
@@ -60,9 +67,28 @@ class ProfitStructureRulesTest {
         for(String id:List.of("C7","C6","C5","C4","C3","C2","C1"))values.add(new ProjectValue(project("202601",id,"MO",id),n("100"),n(id.equals("C7")?"90":"50")));
         var source=new Month(fixed("202601"),values,n("700"),true,false,false);
         var rows=composition(List.of(source)).topClients();
-        assertThat(rows).extracting(CompositionRow::name).containsExactly("C1","C2","C3","C4","C5","그 밖");
+        assertThat(rows).extracting(CompositionRow::name).containsExactly("C1","C2","C3","C4","C5","그 밖 2곳");
         assertThat(rows.get(5).revenue()).isEqualByComparingTo("200");assertThat(rows.get(5).profitRate()).isEqualByComparingTo("30.0");
         assertThat(rows.stream().map(CompositionRow::revenue).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo("700");
+    }
+    @Test void numericTableUsesSelectedPeriodTopFiveForEveryColumnAndOtherIsTheRest() {
+        var jan=new ArrayList<ProjectValue>(); var feb=new ArrayList<ProjectValue>();
+        for(String id:List.of("C1","C2","C3","C4","C5","C6","C7")) {
+            jan.add(new ProjectValue(project("202601",id,"MO",id),n(id.equals("C7")?"900":"10"),n("0")));
+            feb.add(new ProjectValue(project("202602",id,"MO",id),n(id.equals("C7")?"1":"100"),n("0")));
+        }
+        var rows=List.of(project(ProfitStructurePeriod.of(new Filter(2026,"month","202601")),List.of(new Month(fixed("202601"),jan,n("960"),true,false,false))),
+            project(ProfitStructurePeriod.of(new Filter(2026,"month","202602")),List.of(new Month(fixed("202602"),feb,n("601"),true,false,false))));
+        var table=ProfitStructureTable.of(rows,List.<List<ProjectValue>>of(jan,feb),true);
+        assertThat(table.columns()).extracting(NumericColumn::label).containsExactly("1월","2월");
+        assertThat(table.rows().get(0).label()).isEqualTo("매출");
+        int head=table.rows().stream().map(NumericLine::label).toList().indexOf("매출 구성 · 고객사 상위 5곳");
+        var clients=table.rows().subList(head+1,head+7);
+        assertThat(clients).extracting(NumericLine::label).containsExactly("C1","C2","C3","C4","C5","그 밖 2곳");
+        // 1월 칸: 2월 상위 다섯 곳(C1~C5)은 10씩, 나머지(C6 10 + C7 900)는 그 밖
+        assertThat(clients.get(0).values().get(0)).isEqualByComparingTo("10");
+        assertThat(clients.get(5).values().get(0)).isEqualByComparingTo("910");
+        assertThat(clients.get(5).values().get(1)).isEqualByComparingTo("101");
     }
     @Test void fiveClientsNeverCreateInventedOtherAndCompositionSubtractsOnlyAllocatedCost() {
         var source=new Month(fixed("202601"),List.of(new ProjectValue(project("202601","P","MO","C1"),n("100"),n("50"))),n("100"),true,false,false);

@@ -12,7 +12,8 @@ import static java.math.BigDecimal.ZERO;
 
 public final class ProfitStructureRules {
     private ProfitStructureRules() {}
-    public static final String SALES_PART_NOTICE = "영업 파트 이익금은 사람 소속 파트 기준이라 이 숫자와 다를 수 있습니다";
+    public static final String OTHER_PREFIX = "그 밖 ";
+    public static final String SALES_PART_NOTICE ="영업 파트 이익금은 사람 소속 파트 기준이라 이 숫자와 다를 수 있습니다";
     /** UI-22 integration projection only; neither development GET calls this policy. */
     public static boolean projectedRoleAllows(Set<String> roles) {
         return roles != null && roles.stream().anyMatch(Set.of("FIN", "EXEC", "ADMIN")::contains);
@@ -71,11 +72,12 @@ public final class ProfitStructureRules {
                 value.revenue().add(old == null ? ZERO : old.revenue()), value.allocatedCost().add(old == null ? ZERO : old.cost())));
             total = total.add(value.revenue());
         }
+        // 시안 top(): 세 묶음 모두 매출 큰 순서, 고객사는 6곳부터 「그 밖 N곳」으로 합친다.
         List<Group> ranked = new ArrayList<>(groups.values());
-        if (topFive) ranked.sort(Comparator.comparing(Group::revenue).reversed().thenComparing(Group::id));
+        ranked.sort(Comparator.comparing(Group::revenue).reversed().thenComparing(Group::id));
         if (topFive && ranked.size() > 5) {
             var rest = ranked.subList(5, ranked.size());
-            var other = new Group("", "그 밖", rest.stream().map(Group::revenue).reduce(ZERO, BigDecimal::add),
+            var other = new Group("", OTHER_PREFIX + rest.size() + "곳", rest.stream().map(Group::revenue).reduce(ZERO, BigDecimal::add),
                 rest.stream().map(Group::cost).reduce(ZERO, BigDecimal::add));
             ranked = new ArrayList<>(ranked.subList(0, 5)); ranked.add(other);
         }

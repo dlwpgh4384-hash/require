@@ -5,17 +5,17 @@ import com.company.common.profitstructures.mapper.ProfitStructureMapper;
 import com.company.common.support.service.BusinessCalendar;
 import com.company.common.support.service.CurrentBusinessActor;
 import com.company.common.support.service.ExcelExportService;
-import java.util.*;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
-import static com.company.common.profitstructures.service.ProfitStructureColumnPolicy.*;
 
+/** 시안: 「엑셀 다운로드는 이 표와 같습니다」 — 숫자로 보기 표(줄 = 항목, 열 = 기간)를 그대로 쓴다. */
 @Service
 public class ProfitStructureExcelService {
     private final CommonProfitStructureService service;
@@ -28,48 +28,44 @@ public class ProfitStructureExcelService {
         this.service = service; this.mapper = mapper; this.excel = excel; this.actor = actor; this.calendar = calendar;
     }
     @Transactional(isolation = Isolation.REPEATABLE_READ)
-    public ExcelFile getCommonProfitStructuresExcel(Filter filter, List<String> requested) {
-        var selected = validate(requested);
+    public ExcelFile getCommonProfitStructuresExcel(Filter filter) {
         var result = service.getCommonProfitStructures(filter).data();
-        var columns = selected.stream().filter(key -> (result.compositionVisible() || !COMPOSITION.contains(key))
-            && (result.referenceRevenueVisible() || !key.equals("referenceRevenue"))).toList();
+        var table = result.numericTable();
         List<String> headers = new ArrayList<>();
-        List<Integer> textColumns = new ArrayList<>();
-        for (var key : columns) {
-            if (key.equals("period") || COMPOSITION.contains(key)) textColumns.add(headers.size());
-            if (COMPOSITION.contains(key)) for (var suffix : List.of("이름", "매출", "비중", "이익률")) headers.add(LABELS.get(key) + " " + suffix);
-            else headers.add(LABELS.get(key));
-        }
+        headers.add("항목");
+        for (var column : table.columns()) headers.add(column.label() + (column.provisional() ? " 잠정" : ""));
         List<List<String>> rows = new ArrayList<>();
-        for (var row : result.numericRows()) {
-            int count = columns.stream().filter(COMPOSITION::contains).mapToInt(key -> composition(row, key).size()).max().orElse(1);
-            for (int n = 0; n < Math.max(1, count); n++) {
-                List<String> cells = new ArrayList<>();
-                for (var key : columns) {
-                    if (!COMPOSITION.contains(key)) cells.add(n == 0 ? decimal(value(row, key)) : "");
-                    else {
-                        var group = composition(row, key);
-                        if (n < group.size()) {
-                            var item = group.get(n);
-                            cells.add(item.name()); cells.add(decimal(item.revenue())); cells.add(decimal(item.share())); cells.add(decimal(item.profitRate()));
-                        } else cells.addAll(List.of("", "", "", ""));
-                    }
-                }
-                rows.add(cells);
-            }
+        List<Integer> percentRows = new ArrayList<>();
+        for (var line : table.rows()) {
+            List<String> cells = new ArrayList<>();
+            cells.add(line.label());
+            for (var value : line.values()) cells.add(line.style().equals("group") ? "" : value == null ? "–" : value.toPlainString());
+            if (line.format().equals("percent")) percentRows.add(rows.size());
+            rows.add(cells);
         }
         var now = calendar.now();
-        var bytes = preserveText(excel.write("전체 수익 구조", headers, rows, actor.userId(), now), rows, textColumns);
+        var bytes = percentStyle(excel.write("전체 수익 구조", headers, rows, actor.userId(), now), rows, percentRows, headers.size());
         if (mapper.insertAccess(actor.userId(), "전체 수익 구조 " + result.periodStart() + "–" + result.periodEnd()) != 1)
             throw new IllegalStateException("다운로드 접근 기록을 저장하지 못했습니다.");
-        return new ExcelFile(bytes, excel.fileName("전체 수익 구조", result.periodStart() + "–" + result.periodEnd(), now), result.numericRows().size());
+        return new ExcelFile(bytes, excel.fileName("전체 수익 구조", result.periodStart() + "–" + result.periodEnd(), now), rows.size());
     }
-    private static byte[] preserveText(byte[] bytes, List<List<String>> rows, List<Integer> columns) {
-        if (columns.isEmpty()) return bytes;
+    /** 공통 부품은 소수가 섞인 열을 모두 0.00으로 보이므로, 금액 줄은 #,##0, 비율 줄만 0.0으로 다시 맞춘다. */
+    private static byte[] percentStyle(byte[] bytes, List<List<String>> rows, List<Integer> percentRows, int width) {
         try (var workbook = new XSSFWorkbook(new ByteArrayInputStream(bytes)); var out = new ByteArrayOutputStream()) {
             var sheet = workbook.getSheetAt(0);
-            for (int r = 0; r < rows.size(); r++) for (int c : columns)
-                sheet.getRow(r + 3).getCell(c).setCellValue(rows.get(r).get(c));
+            var integer = workbook.createCellStyle();
+            integer.setDataFormat(workbook.createDataFormat().getFormat("#,##0"));
+            var percent = workbook.createCellStyle();
+            percent.setDataFormat(workbook.createDataFormat().getFormat("0.0"));
+            for (int r = 0; r < rows.size(); r++) {
+                var row = sheet.getRow(r + 3);
+                if (row == null) continue;
+                for (int c = 1; c < width; c++) {
+                    var cell = row.getCell(c);
+                    if (cell == null || cell.getCellType() != org.apache.poi.ss.usermodel.CellType.NUMERIC) continue;
+                    cell.setCellStyle(percentRows.contains(r) ? percent : integer);
+                }
+            }
             workbook.write(out);
             return out.toByteArray();
         } catch (IOException failure) { throw new UncheckedIOException(failure); }

@@ -198,7 +198,9 @@ class SchemaPreparationTest {
             "TB_PJ_PROJ_CHG", "TB_PJ_MNPW_PLAN", "TB_PJ_STEP", "TB_PJ_WEEK_MEMO", "TB_PJ_ISSUE", "TB_PJ_TK_DSTRB",
             "TB_PJ_DRCT_EXPS", "TB_PJ_ASGN_HIST", "TB_PJ_ASGN_MON", "TB_CO_MON_COST",
             "TB_SL_OPP", "TB_SL_OPP_NEED", "TB_SL_TENT_ASGN", "TB_SL_RCMD_LOG", "TB_BL_RCPT",
-            "TB_CO_PART_SETL_DTL", "TB_CL_CLOSE_CHK");
+            "TB_CO_PART_SETL_DTL", "TB_CL_CLOSE_CHK",
+            "TB_CO_MON_PL", "TB_CO_PREV_ADJ", "TB_FI_ITEM", "TB_FI_CORP_TAX", "TB_FI_TAX_PAY", "TB_FI_LOAN",
+            "TB_FI_CARD", "TB_FI_CARD_MON", "TB_FI_CARD_PAY", "TB_FI_XFER");
         assertThat(tables).isEqualTo(MigrationResources.tableNames());
         assertThat(tables).allMatch(name -> name.startsWith("TB_"));
         assertThat(tables).contains("TB_SY_CALC_RULE", "TB_SY_CHG_HIST", "TB_SY_CODE", "TB_SY_CODE_GRP",

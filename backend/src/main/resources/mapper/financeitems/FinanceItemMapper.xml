@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.financeitems.mapper.FinanceItemMapper">
+  <resultMap id="item" type="com.company.common.financeitems.dto.FinanceItemContracts$Item" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="version" javaType="java.time.Instant"/>
+      <arg column="fin_cls_cd" javaType="java.lang.String"/>
+      <arg column="sga_item_cd" javaType="java.lang.String"/>
+      <arg column="item_nm" javaType="java.lang.String"/>
+      <arg column="amt" javaType="java.math.BigDecimal"/>
+      <arg column="vat_amt" javaType="java.math.BigDecimal"/>
+      <arg column="io_dt" javaType="java.time.LocalDate"/>
+      <arg column="rpt_yn" javaType="java.lang.String"/>
+      <arg column="auto_fill_yn" javaType="java.lang.String"/>
+      <arg column="upload_id" javaType="java.lang.String"/>
+      <arg column="rmrk" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="loan" type="com.company.common.financeitems.dto.FinanceItemContracts$Loan" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/><arg column="version" javaType="java.time.Instant"/>
+      <arg column="loan_dt" javaType="java.time.LocalDate"/><arg column="io_cd" javaType="java.lang.String"/>
+      <arg column="amt" javaType="java.math.BigDecimal"/><arg column="cntprt_nm" javaType="java.lang.String"/>
+      <arg column="rmrk" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="transfer" type="com.company.common.financeitems.dto.FinanceItemContracts$Transfer" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/><arg column="version" javaType="java.time.Instant"/>
+      <arg column="xfer_dt" javaType="java.time.LocalDate"/><arg column="xfer_cls_cd" javaType="java.lang.String"/>
+      <arg column="item_nm" javaType="java.lang.String"/><arg column="rcvr_nm" javaType="java.lang.String"/>
+      <arg column="amt" javaType="java.math.BigDecimal"/><arg column="rmrk" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="adjustment" type="com.company.common.financeitems.dto.FinanceItemContracts$Adjustment" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/><arg column="version" javaType="java.time.Instant"/>
+      <arg column="trgt_ym" javaType="java.lang.String"/><arg column="adj_item_cd" javaType="java.lang.String"/>
+      <arg column="adj_amt" javaType="java.math.BigDecimal"/><arg column="adj_rsn" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="card" type="com.company.common.financeitems.dto.FinanceItemContracts$Card" autoMapping="false">
+    <constructor>
+      <arg column="card_id" javaType="java.lang.String"/><arg column="version" javaType="java.time.Instant"/>
+      <arg column="card_nm" javaType="java.lang.String"/><arg column="card_no_l4" javaType="java.lang.String"/>
+      <arg column="use_yn" javaType="java.lang.String"/><arg column="pay_amt" javaType="java.math.BigDecimal"/>
+      <arg column="monthly_version" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="estimate" type="com.company.common.financeitems.dto.FinanceItemContracts$TaxEstimate" autoMapping="false">
+    <constructor>
+      <arg column="year" javaType="_int"/><arg column="est_tax_amt" javaType="java.math.BigDecimal"/>
+      <arg column="monthly" javaType="java.math.BigDecimal"/><arg column="negative" javaType="_boolean"/>
+      <arg column="version" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="payment" type="com.company.common.financeitems.dto.FinanceItemContracts$TaxPayment" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/><arg column="year" javaType="_int"/>
+      <arg column="pay_type_cd" javaType="java.lang.String"/><arg column="pay_due_dt" javaType="java.time.LocalDate"/>
+      <arg column="pay_amt" javaType="java.math.BigDecimal"/><arg column="display_amount" javaType="java.math.BigDecimal"/>
+      <arg column="pay_yn" javaType="java.lang.String"/><arg column="pay_dt" javaType="java.time.LocalDate"/>
+      <arg column="status" javaType="java.lang.String"/><arg column="version" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="cardPayment" type="com.company.common.financeitems.dto.FinanceItemContracts$CardPayment" autoMapping="false">
+    <constructor>
+      <arg column="cash_amt" javaType="java.math.BigDecimal"/><arg column="manual" javaType="_boolean"/>
+      <arg column="version" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="cash" type="com.company.common.financeitems.dto.FinanceItemContracts$CashContribution" autoMapping="false">
+    <constructor><arg column="month" javaType="java.lang.String"/><arg column="category" javaType="java.lang.String"/>
+      <arg column="amount" javaType="java.math.BigDecimal"/></constructor>
+  </resultMap>
+  <update id="lockSources">
+    LOCK TABLE TB_FI_CARD, TB_FI_CORP_TAX, TB_FI_TAX_PAY, TB_FI_ITEM, TB_FI_LOAN,
+      TB_FI_XFER, TB_CO_PREV_ADJ, TB_FI_CARD_MON, TB_FI_CARD_PAY, TB_CL_CLOSE,
+      TB_CO_MON_PL IN SHARE ROW EXCLUSIVE MODE
+  </update>
+  <select id="isClosed" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_CL_CLOSE WHERE close_ym=#{month} AND close_stat_cd='CLOSE')
+  </select>
+  <select id="closedMonths" resultType="string">SELECT close_ym FROM TB_CL_CLOSE WHERE close_stat_cd='CLOSE' ORDER BY close_ym</select>
+  <select id="baseline" resultType="java.time.Instant">
+    SELECT max(revision) FROM (
+      SELECT max(h.reg_dttm) AS revision FROM TB_SY_CHG_HIST h
+      WHERE h.trgt_tbl_nm='TB_FI_ITEM' AND h.trgt_key=#{month} AND h.chg_item_nm='UI-10 월 저장'
+      UNION ALL SELECT max(COALESCE(i.mod_dttm,i.reg_dttm)) FROM TB_FI_ITEM i WHERE i.fin_ym=#{month}
+      UNION ALL SELECT max(COALESCE(l.mod_dttm,l.reg_dttm)) FROM TB_FI_LOAN l WHERE to_char(l.loan_dt,'YYYYMM')=#{month}
+      UNION ALL SELECT max(COALESCE(x.mod_dttm,x.reg_dttm)) FROM TB_FI_XFER x WHERE to_char(x.xfer_dt,'YYYYMM')=#{month}
+      UNION ALL SELECT max(COALESCE(a.mod_dttm,a.reg_dttm)) FROM TB_CO_PREV_ADJ a WHERE a.aply_ym=#{month}
+      UNION ALL SELECT max(COALESCE(c.mod_dttm,c.reg_dttm)) FROM TB_FI_CARD c
+      UNION ALL SELECT max(COALESCE(m.mod_dttm,m.reg_dttm)) FROM TB_FI_CARD_MON m WHERE m.pay_ym=#{month}
+      UNION ALL SELECT max(COALESCE(p.mod_dttm,p.reg_dttm)) FROM TB_FI_CARD_PAY p WHERE p.pay_ym=#{month}
+      UNION ALL SELECT max(COALESCE(t.mod_dttm,t.reg_dttm)) FROM TB_FI_CORP_TAX t WHERE t.tax_yr=substring(#{month},1,4)
+    ) revisions
+  </select>
+  <select id="items" resultMap="item">
+    SELECT item_sn::text AS id,mod_dttm AS version,fin_cls_cd,sga_item_cd,item_nm,amt,vat_amt,io_dt,
+      rpt_yn,auto_fill_yn,upld_id::text AS upload_id,rmrk FROM TB_FI_ITEM WHERE fin_ym=#{month} ORDER BY item_sn
+  </select>
+  <select id="loans" resultMap="loan">
+    SELECT loan_sn::text AS id,mod_dttm AS version,loan_dt,io_cd,amt,cntprt_nm,rmrk
+    FROM TB_FI_LOAN WHERE to_char(loan_dt,'YYYYMM')=#{month} ORDER BY loan_sn
+  </select>
+  <select id="transfers" resultMap="transfer">
+    SELECT xfer_sn::text AS id,mod_dttm AS version,xfer_dt,xfer_cls_cd,item_nm,rcvr_nm,amt,rmrk
+    FROM TB_FI_XFER WHERE to_char(xfer_dt,'YYYYMM')=#{month} ORDER BY xfer_sn
+  </select>
+  <select id="adjustments" resultMap="adjustment">
+    SELECT adj_id::text AS id,mod_dttm AS version,trgt_ym,adj_item_cd,adj_amt,adj_rsn
+    FROM TB_CO_PREV_ADJ WHERE aply_ym=#{month} ORDER BY adj_id
+  </select>
+  <select id="cards" resultMap="card">
+    SELECT c.card_id,c.mod_dttm AS version,c.card_nm,c.card_no_l4,c.use_yn,
+      COALESCE(p.pay_amt,0) AS pay_amt,p.mod_dttm AS monthly_version
+    FROM TB_FI_CARD c LEFT JOIN TB_FI_CARD_PAY p ON p.card_id=c.card_id AND p.pay_ym=#{month}
+    WHERE c.use_yn='Y' OR p.pay_amt&gt;0 ORDER BY c.use_yn DESC,c.card_id
+  </select>
+  <select id="estimate" resultMap="estimate">
+    SELECT tax_yr::integer AS year,est_tax_amt,0::numeric AS monthly,false AS negative,mod_dttm AS version
+    FROM TB_FI_CORP_TAX WHERE tax_yr=#{year}
+  </select>
+  <sql id="paymentColumns">
+    p.tax_yr||':'||p.pay_type_cd AS id,p.tax_yr::integer AS year,p.pay_type_cd,p.pay_due_dt,p.pay_amt,
+    COALESCE(p.pay_amt,CASE WHEN p.pay_type_cd='MID' THEN 0 ELSE COALESCE(t.est_tax_amt,0)-
+      COALESCE((SELECT mid.pay_amt FROM TB_FI_TAX_PAY mid WHERE mid.tax_yr=p.tax_yr AND mid.pay_type_cd='MID'),0) END) AS display_amount,
+    p.pay_yn,p.pay_dt,CASE WHEN p.pay_yn='Y' THEN '납부'
+      WHEN p.pay_due_dt &lt; (clock_timestamp() AT TIME ZONE 'Asia/Seoul')::date THEN '확인 필요' ELSE '예정' END AS status,
+    p.mod_dttm AS version
+  </sql>
+  <select id="payments" resultMap="payment">
+    SELECT <include refid="paymentColumns"/> FROM TB_FI_TAX_PAY p
+    LEFT JOIN TB_FI_CORP_TAX t ON t.tax_yr=p.tax_yr
+    WHERE p.tax_yr=#{year} OR (p.tax_yr=(CAST(#{year} AS integer)-1)::text AND p.pay_type_cd='CNFM')
+      OR (p.tax_yr &lt; #{year} AND p.pay_yn='N') ORDER BY p.pay_due_dt,p.tax_yr,p.pay_type_cd
+  </select>
+  <select id="payment" resultMap="payment">
+    SELECT <include refid="paymentColumns"/> FROM TB_FI_TAX_PAY p
+    LEFT JOIN TB_FI_CORP_TAX t ON t.tax_yr=p.tax_yr WHERE p.tax_yr=#{year} AND p.pay_type_cd=#{type}
+  </select>
+  <select id="cardPayment" resultMap="cardPayment">
+    SELECT cash_amt,(edit_yn='Y') AS manual,mod_dttm AS version FROM TB_FI_CARD_MON WHERE pay_ym=#{month}
+  </select>
+  <select id="fixedTax" resultType="java.math.BigDecimal">
+    SELECT COALESCE(corp_tax_amt,0) FROM TB_CO_MON_PL WHERE pl_ym=#{month}
+  </select>
+  <select id="code" resultType="string">
+    SELECT code FROM TB_SY_CODE WHERE code_grp_id=#{group} AND (code=#{value} OR code_nm=#{value})
+      AND use_yn='Y' AND del_yn='N' ORDER BY CASE WHEN code=#{value} THEN 0 ELSE 1 END LIMIT 1
+  </select>
+  <select id="codeName" resultType="string">SELECT code_nm FROM TB_SY_CODE WHERE code_grp_id=#{group} AND code=#{code}</select>
+  <select id="duplicateCard" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_FI_CARD WHERE card_nm=#{cardName} AND card_no_l4=#{lastFourDigits}
+      <if test="cardId != null">AND card_id&lt;&gt;#{cardId}</if>)
+  </select>
+  <insert id="prepareYear">
+    INSERT INTO TB_FI_CORP_TAX(tax_yr,est_tax_amt,reg_user_id,reg_dttm)
+    VALUES(#{year},COALESCE((SELECT est_tax_amt FROM TB_FI_CORP_TAX WHERE tax_yr=(CAST(#{year} AS integer)-1)::text),0),#{actor},clock_timestamp())
+    ON CONFLICT(tax_yr) DO NOTHING
+  </insert>
+  <insert id="preparePayments">
+    INSERT INTO TB_FI_TAX_PAY(tax_yr,pay_type_cd,pay_due_dt,pay_amt,pay_yn,reg_user_id,reg_dttm)
+    VALUES(#{year},'MID',make_date(CAST(#{year} AS integer),8,31),NULL,'N',#{actor},clock_timestamp()),
+      (#{year},'CNFM',make_date(CAST(#{year} AS integer)+1,3,31),NULL,'N',#{actor},clock_timestamp())
+    ON CONFLICT(tax_yr,pay_type_cd) DO NOTHING
+  </insert>
+  <update id="confirm">
+    UPDATE TB_FI_TAX_PAY SET pay_amt=#{input.actualPaymentAmount},pay_dt=#{input.actualPaymentDate},pay_yn='Y',
+      mod_user_id=#{actor},mod_dttm=clock_timestamp()
+    WHERE tax_yr=#{key.year} AND pay_type_cd=#{key.type} AND pay_yn='N'
+      AND mod_dttm IS NOT DISTINCT FROM #{input.modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+  </update>
+  <update id="updateEstimate">
+    UPDATE TB_FI_CORP_TAX SET est_tax_amt=#{row.estimatedTaxAmount},mod_user_id=#{actor},mod_dttm=clock_timestamp()
+    WHERE tax_yr=substring(#{month},1,4) AND mod_dttm IS NOT DISTINCT FROM #{row.modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+  </update>
+  <update id="updatePayment">
+    UPDATE TB_FI_TAX_PAY SET pay_due_dt=#{row.scheduledDate},pay_amt=#{row.paymentAmount,jdbcType=NUMERIC},
+      mod_user_id=#{actor},mod_dttm=clock_timestamp()
+    WHERE tax_yr=split_part(#{row.paymentId},':',1) AND pay_type_cd=split_part(#{row.paymentId},':',2) AND pay_yn='N'
+      AND mod_dttm IS NOT DISTINCT FROM #{row.modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+  </update>
+  <select id="nextItem" resultType="long">SELECT COALESCE(max(item_sn),0)+1 FROM TB_FI_ITEM WHERE fin_ym=#{month}</select>
+  <select id="nextLoan" resultType="long">SELECT nextval('SQ_TB_FI_LOAN')</select>
+  <select id="nextTransfer" resultType="long">SELECT nextval('SQ_TB_FI_XFER')</select>
+  <select id="nextAdjustment" resultType="long">SELECT nextval('SQ_TB_CO_PREV_ADJ')</select>
+  <insert id="insertItem">
+    INSERT INTO TB_FI_ITEM(fin_ym,item_sn,fin_cls_cd,sga_item_cd,item_nm,amt,vat_amt,io_dt,rpt_yn,auto_fill_yn,rmrk,upld_id,reg_user_id,reg_dttm,mod_dttm)
+    VALUES(#{month},CAST(#{row.itemId} AS numeric),#{row.classification},#{row.itemCode},#{row.itemName},#{row.amount},
+      COALESCE(#{row.vatAmount,jdbcType=NUMERIC},0),#{row.cashDate},#{row.repeatYn},#{row.autoFillYn},#{row.memo},
+      CAST(#{row.uploadId,jdbcType=VARCHAR} AS numeric),#{actor},clock_timestamp(),clock_timestamp())
+  </insert>
+  <update id="updateItem">
+    UPDATE TB_FI_ITEM SET fin_cls_cd=#{row.classification},sga_item_cd=#{row.itemCode},item_nm=#{row.itemName},amt=#{row.amount},
+      vat_amt=COALESCE(#{row.vatAmount,jdbcType=NUMERIC},0),io_dt=#{row.cashDate},rpt_yn=#{row.repeatYn},rmrk=#{row.memo},mod_user_id=#{actor},mod_dttm=clock_timestamp()
+    WHERE fin_ym=#{month} AND item_sn=CAST(#{row.itemId} AS numeric)
+      AND mod_dttm IS NOT DISTINCT FROM #{row.modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+  </update>
+  <insert id="insertLoan">
+    INSERT INTO TB_FI_LOAN(loan_sn,loan_dt,io_cd,amt,cntprt_nm,rmrk,reg_user_id,reg_dttm,mod_dttm)
+    VALUES(CAST(#{row.loanId} AS numeric),#{row.date},#{row.direction},#{row.amount},#{row.counterparty},#{row.memo},#{actor},clock_timestamp(),clock_timestamp())
+  </insert>
+  <update id="updateLoan">
+    UPDATE TB_FI_LOAN SET loan_dt=#{row.date},io_cd=#{row.direction},amt=#{row.amount},cntprt_nm=#{row.counterparty},rmrk=#{row.memo},mod_user_id=#{actor},mod_dttm=clock_timestamp()
+    WHERE loan_sn=CAST(#{row.loanId} AS numeric) AND to_char(loan_dt,'YYYYMM')=#{month}
+      AND mod_dttm IS NOT DISTINCT FROM #{row.modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+  </update>
+  <insert id="insertTransfer">
+    INSERT INTO TB_FI_XFER(xfer_sn,xfer_dt,xfer_cls_cd,item_nm,rcvr_nm,amt,rmrk,reg_user_id,reg_dttm,mod_dttm)
+    VALUES(CAST(#{row.transferId} AS numeric),#{row.date},#{row.classification},#{row.description},#{row.payee},#{row.amount},#{row.memo},#{actor},clock_timestamp(),clock_timestamp())
+  </insert>
+  <update id="updateTransfer">
+    UPDATE TB_FI_XFER SET xfer_dt=#{row.date},xfer_cls_cd=#{row.classification},item_nm=#{row.description},rcvr_nm=#{row.payee},amt=#{row.amount},rmrk=#{row.memo},mod_user_id=#{actor},mod_dttm=clock_timestamp()
+    WHERE xfer_sn=CAST(#{row.transferId} AS numeric) AND to_char(xfer_dt,'YYYYMM')=#{month}
+      AND mod_dttm IS NOT DISTINCT FROM #{row.modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+  </update>
+  <insert id="insertAdjustment">
+    INSERT INTO TB_CO_PREV_ADJ(adj_id,aply_ym,trgt_ym,adj_item_cd,adj_amt,adj_rsn,reg_user_id,reg_dttm,mod_dttm)
+    VALUES(CAST(#{row.adjustmentId} AS numeric),#{month},#{row.targetYearMonth},#{row.adjustmentItem},#{row.amount},#{row.reason},#{actor},clock_timestamp(),clock_timestamp())
+  </insert>
+  <update id="updateAdjustment">
+    UPDATE TB_CO_PREV_ADJ SET trgt_ym=#{row.targetYearMonth},adj_item_cd=#{row.adjustmentItem},adj_amt=#{row.amount},adj_rsn=#{row.reason},mod_user_id=#{actor},mod_dttm=clock_timestamp()
+    WHERE adj_id=CAST(#{row.adjustmentId} AS numeric) AND aply_ym=#{month}
+      AND mod_dttm IS NOT DISTINCT FROM #{row.modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+  </update>
+  <insert id="insertCard">
+    INSERT INTO TB_FI_CARD(card_id,card_nm,card_no_l4,use_yn,reg_user_id,reg_dttm,mod_dttm)
+    VALUES(#{row.cardId},#{row.cardName},#{row.lastFourDigits},#{row.useYn},#{actor},clock_timestamp(),clock_timestamp())
+  </insert>
+  <update id="updateCard">
+    UPDATE TB_FI_CARD SET card_nm=#{row.cardName},card_no_l4=#{row.lastFourDigits},use_yn=#{row.useYn},mod_user_id=#{actor},mod_dttm=clock_timestamp()
+    WHERE card_id=#{row.cardId} AND mod_dttm IS NOT DISTINCT FROM #{row.modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+  </update>
+  <insert id="updateCardMonth">
+    INSERT INTO TB_FI_CARD_PAY(pay_ym,card_id,pay_amt,reg_user_id,reg_dttm,mod_dttm)
+    VALUES(#{month},#{row.cardId},#{row.amount},#{actor},clock_timestamp(),clock_timestamp())
+    ON CONFLICT(pay_ym,card_id) DO UPDATE SET pay_amt=EXCLUDED.pay_amt,mod_user_id=#{actor},mod_dttm=clock_timestamp()
+    WHERE TB_FI_CARD_PAY.mod_dttm IS NOT DISTINCT FROM #{row.monthlyModifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+  </insert>
+  <insert id="saveCardPayment">
+    INSERT INTO TB_FI_CARD_MON(pay_ym,card_sum_amt,cash_amt,edit_yn,reg_user_id,reg_dttm,mod_dttm)
+    VALUES(#{write.month},#{total},#{write.row.paymentAmount},CASE WHEN #{write.row.manualOverride} THEN 'Y' ELSE 'N' END,#{write.actor},clock_timestamp(),clock_timestamp())
+    ON CONFLICT(pay_ym) DO UPDATE SET card_sum_amt=EXCLUDED.card_sum_amt,cash_amt=EXCLUDED.cash_amt,edit_yn=EXCLUDED.edit_yn,mod_user_id=#{write.actor},mod_dttm=clock_timestamp()
+    WHERE TB_FI_CARD_MON.mod_dttm IS NOT DISTINCT FROM #{write.row.modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+  </insert>
+  <delete id="deleteItem">DELETE FROM TB_FI_ITEM WHERE fin_ym=#{month} AND item_sn=CAST(#{id} AS numeric) AND mod_dttm IS NOT DISTINCT FROM #{modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}</delete>
+  <delete id="deleteLoan">DELETE FROM TB_FI_LOAN WHERE to_char(loan_dt,'YYYYMM')=#{month} AND loan_sn=CAST(#{id} AS numeric) AND mod_dttm IS NOT DISTINCT FROM #{modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}</delete>
+  <delete id="deleteTransfer">DELETE FROM TB_FI_XFER WHERE to_char(xfer_dt,'YYYYMM')=#{month} AND xfer_sn=CAST(#{id} AS numeric) AND mod_dttm IS NOT DISTINCT FROM #{modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}</delete>
+  <delete id="deleteAdjustment">DELETE FROM TB_CO_PREV_ADJ WHERE aply_ym=#{month} AND adj_id=CAST(#{id} AS numeric) AND mod_dttm IS NOT DISTINCT FROM #{modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}</delete>
+  <delete id="deleteUploaded">DELETE FROM TB_FI_ITEM WHERE fin_ym=#{month} AND upld_id IS NOT NULL</delete>
+  <insert id="history">
+    INSERT INTO TB_SY_CHG_HIST(trgt_tbl_nm,trgt_key,chg_type_cd,chg_item_nm,bfr_val,aft_val,reg_user_id,reg_dttm)
+    VALUES(#{table},#{key},'UPD',#{field},#{before},#{after},#{actor},clock_timestamp())
+  </insert>
+  <update id="updateProfit">
+    UPDATE TB_CO_MON_PL SET sga_input_amt=#{row.sga},sga_tot_amt=#{row.sga}+COALESCE(indrct_labor_amt,0)+COALESCE(rnd_amt,0),
+      prev_adj_amt=#{row.adjustment},nopr_incm_amt=#{row.income},nopr_exps_amt=#{row.expense},corp_tax_amt=#{row.tax},
+      oprt_prft_amt=sales_amt-sales_cost_amt-#{row.sga}-COALESCE(indrct_labor_amt,0)-COALESCE(rnd_amt,0)+#{row.adjustment},
+      net_prft_amt=sales_amt-sales_cost_amt-#{row.sga}-COALESCE(indrct_labor_amt,0)-COALESCE(rnd_amt,0)+#{row.adjustment}+#{row.income}-#{row.expense}-#{row.tax},
+      mod_user_id=#{actor},mod_dttm=clock_timestamp()
+    WHERE pl_ym=#{row.month} AND fix_yn='N' AND NOT EXISTS(SELECT 1 FROM TB_CL_CLOSE c WHERE c.close_ym=#{row.month} AND c.close_stat_cd='CLOSE')
+  </update>
+  <insert id="access">
+    INSERT INTO TB_SY_ACCS_LOG(user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm)
+    VALUES(#{actor},'DNLD','UI-10',#{target},clock_timestamp(),#{actor},clock_timestamp())
+  </insert>
+  <select id="cashContributions" resultMap="cash">
+    SELECT s.month,s.category,sum(s.amount) AS amount FROM (
+      SELECT COALESCE(to_char(i.io_dt,'YYYYMM'),i.fin_ym) AS month,'EXPENSE' AS category,i.amt+i.vat_amt AS amount
+      FROM TB_FI_ITEM i WHERE i.fin_cls_cd IN ('SGA','NOPR_OUT')
+      UNION ALL SELECT to_char(i.io_dt,'YYYYMM'),'OTHER_INCOME',i.amt FROM TB_FI_ITEM i WHERE i.fin_cls_cd='NOPR_IN' AND i.io_dt IS NOT NULL
+      UNION ALL SELECT to_char(l.loan_dt,'YYYYMM'),'LOAN',CASE WHEN l.io_cd='IN' THEN l.amt ELSE -l.amt END FROM TB_FI_LOAN l
+      UNION ALL SELECT to_char(x.xfer_dt,'YYYYMM'),CASE WHEN x.xfer_cls_cd='SPCL' THEN 'UNPAID_LABOR' ELSE 'EXPENSE' END,x.amt FROM TB_FI_XFER x
+      UNION ALL SELECT c.pay_ym,'EXPENSE',c.cash_amt FROM TB_FI_CARD_MON c
+      UNION ALL SELECT to_char(CASE WHEN p.pay_yn='Y' THEN p.pay_dt ELSE p.pay_due_dt END,'YYYYMM'),'CORPORATE_TAX',
+        COALESCE(p.pay_amt,CASE WHEN p.pay_type_cd='MID' THEN 0 ELSE COALESCE(t.est_tax_amt,0)-COALESCE(m.pay_amt,0) END)
+      FROM TB_FI_TAX_PAY p LEFT JOIN TB_FI_CORP_TAX t ON t.tax_yr=p.tax_yr
+      LEFT JOIN TB_FI_TAX_PAY m ON m.tax_yr=p.tax_yr AND m.pay_type_cd='MID'
+    ) s GROUP BY s.month,s.category ORDER BY s.month,s.category
+  </select>
+</mapper>

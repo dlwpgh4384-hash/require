@@ -138,6 +138,51 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (/^\/api\/common\/finance-items\/tax-years\/\d{4}$/.test(url))
+      return { success: true, meta: {}, data: {} };
+    if (/^\/api\/common\/finance-items\/\d{6}$/.test(url))
+      return {
+        success: true,
+        meta: {},
+        data: {
+          yearMonth: url.split("/").at(-1),
+          modifiedAt: null,
+          closed: false,
+          firstOpenYearMonth: null,
+          months: [
+            { yearMonth: "202602", closed: false, itemCount: 0, future: false },
+          ],
+          items: [],
+          loans: [],
+          transfers: [],
+          adjustments: [],
+          cards: [],
+          taxPayments: [],
+          taxEstimate: {
+            taxYear: 2026,
+            estimatedTaxAmount: 0,
+            monthlyTaxAmount: 0,
+            negativeTaxWarning: false,
+            modifiedAt: null,
+          },
+          cardPayment: {
+            paymentAmount: 0,
+            manualOverride: false,
+            modifiedAt: null,
+          },
+          summary: {
+            sgaAmount: 0,
+            nonOperatingIncomeAmount: 0,
+            nonOperatingExpenseAmount: 0,
+            monthlyTaxAmount: 0,
+            adjustmentAmount: 0,
+            cardTotalAmount: 0,
+            cardPaymentDifference: 0,
+          },
+          activeCardCount: 0,
+          autoFillCount: 0,
+        },
+      };
     if (url.startsWith("/api/common/rate-renegotiations?"))
       return {
         success: true,
@@ -250,7 +295,9 @@ function respond(body: ShellMenuResponse) {
         ? {
             success: true,
             meta:
-              url.endsWith("/UI-03") || url.endsWith("/UI-04")
+              url.endsWith("/UI-03") ||
+              url.endsWith("/UI-04") ||
+              url.endsWith("/UI-10")
                 ? {
                     periodBasis: {
                       latestYm: "202602",
@@ -309,6 +356,19 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-10": async (content) => {
+    expect(await content.findByText("입력한 항목이 없습니다.")).toBeVisible();
+    expect(content.getByTestId("finance-tab-0")).toBeVisible();
+    expect(content.getByTestId("finance-tab-1")).toBeVisible();
+    await waitFor(() =>
+      expect(content.getByTestId("finance-save")).toBeEnabled(),
+    );
+    expect(content.getByTestId("finance-cancel")).toBeVisible();
+    const actions = within(screen.getByTestId("screen-actions"));
+    expect(actions.getByTestId("finance-template")).toBeVisible();
+    expect(actions.getByTestId("finance-upload")).toBeEnabled();
+    expect(content.queryByTestId("finance-template")).not.toBeInTheDocument();
+  },
   "UI-32": async (content) => {
     expect(await content.findByTestId("list-empty")).toBeVisible();
     expect(content.getByLabelText("갱신 시점")).toHaveValue("6");
@@ -473,6 +533,60 @@ async function ensureOpen(name: string) {
 }
 
 describe("common placeholder screen contract", () => {
+  it("the application router opens UI-10 with public finance requests and shared title actions", async () => {
+    const request = respond(fixture());
+    window.history.replaceState(null, "", "/screens/UI-10");
+    const router = createAppRouter();
+    const view = render(<RouterProvider router={router} />);
+    try {
+      await expectScreenContent("UI-10");
+      expect(screen.getAllByRole("main")).toHaveLength(1);
+      expect(screen.getAllByTestId("finance-items-page")).toHaveLength(1);
+      const calls = request.mock.calls.filter(([url]) =>
+        url.startsWith("/api/common/finance-items/"),
+      );
+      expect(calls.map(([url, init]) => [url, init?.method ?? "GET"])).toEqual([
+        ["/api/common/finance-items/tax-years/2026", "POST"],
+        ["/api/common/finance-items/202602", "GET"],
+      ]);
+      expect(
+        calls.every(
+          ([, init]) => !new Headers(init?.headers).has("Authorization"),
+        ),
+      ).toBe(true);
+      fireEvent.click(
+        within(screen.getByTestId("screen-actions")).getByTestId(
+          "finance-upload",
+        ),
+      );
+      expect(await screen.findByTestId("finance-upload-dialog")).toBeVisible();
+      fireEvent.click(screen.getByTestId("finance-upload-cancel"));
+      expect(
+        screen.queryByTestId("finance-upload-dialog"),
+      ).not.toBeInTheDocument();
+      expect(router.state.location.pathname).toBe("/screens/UI-10");
+      expect(findScreen("UI-21")).toBeUndefined();
+    } finally {
+      view.unmount();
+      router.dispose();
+      window.history.replaceState(null, "", "/");
+    }
+  });
+
+  it("UI-10 mobile direct entry keeps the PC-only shell and never calls finance", async () => {
+    mobile = true;
+    const request = respond(fixture());
+    mount("/screens/UI-10");
+    expect(await screen.findByText("PC에서 이용해 주세요")).toBeVisible();
+    expect(screen.queryByTestId("finance-items-page")).not.toBeInTheDocument();
+    expect(
+      request.mock.calls.some(([url]) =>
+        url.startsWith("/api/common/finance-items"),
+      ),
+    ).toBe(false);
+    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-10");
+  });
+
   it("UI-12 keyword filtering keeps the registered screen and uses only relative read requests", async () => {
     const request = respond(fixture());
     mount("/screens/UI-12");
@@ -919,9 +1033,7 @@ describe("common placeholder screen contract", () => {
       ]),
     );
     mount("/screens/UI-10");
-    expect(
-      await screen.findByRole("region", { name: "UI-10 본문" }),
-    ).toHaveTextContent("준비 중");
+    await expectScreenContent("UI-10");
     expect(
       screen.getByRole("button", { name: "시험 메뉴 group" }),
     ).toBeInTheDocument();
@@ -932,9 +1044,7 @@ describe("common placeholder screen contract", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-10");
     width(false);
-    expect(
-      screen.getByRole("region", { name: "UI-10 본문" }),
-    ).toHaveTextContent("준비 중");
+    await expectScreenContent("UI-10");
     expect(
       screen.getByRole("button", { name: "시험 메뉴 group" }),
     ).toBeInTheDocument();

@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { formatKoreanMoney } from "../../shared/list";
 import type { Amount, ProfitCompositionRow, ProfitWaterfall } from "./profitStructures";
 import { percentage } from "./profitStructureFormulas";
@@ -27,6 +26,31 @@ function niceMax(value: number) {
   for (const m of [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10])
     if (value <= m * power) return m * power;
   return 10 * power;
+}
+/**
+ * 세로축 범위와 눈금. 모든 값이 0 이상이면 시안과 같다(0부터 niceMax까지 4칸).
+ * 손실 같은 음수가 있으면 0을 반드시 지나는 깔끔한 간격으로 눈금을 잡되, 6칸 안에서 가장 촘촘한 간격을 골라
+ * 0 아래(마이너스) 칸이 꼭 필요한 만큼만 생기게 한다.
+ */
+const MAX_STEPS = 6;
+export function axisScale(values: number[], headroom = 1.05) {
+  const top = Math.max(0, ...values) * headroom;
+  const bottom = Math.min(0, ...values);
+  if (bottom >= 0) {
+    const high = niceMax(top);
+    return { low: 0, high, ticks: [0, 1, 2, 3, 4].map((k) => (high * k) / 4) };
+  }
+  let step = niceMax((top - bottom) / MAX_STEPS);
+  const fit = (size: number) => ({
+    low: Math.floor(bottom / size) * size,
+    high: Math.max(size, Math.ceil(top / size) * size),
+  });
+  // 바닥·천장을 간격 단위로 올리고 내리면 칸이 늘 수 있으므로, 6칸 안에 들 때까지 다음 깔끔한 간격으로 넓힌다.
+  while ((fit(step).high - fit(step).low) / step > MAX_STEPS + 1e-9) step = niceMax(step * 1.0001);
+  const { low, high } = fit(step);
+  const ticks: number[] = [];
+  for (let value = low; value <= high + step / 2; value += step) ticks.push(Math.round(value / step) * step);
+  return { low, high, ticks };
 }
 /** 백만 원 단위 눈금 글자(시안 Math.round(v/1e6).toLocaleString). */
 const million = (value: number) =>
@@ -61,36 +85,36 @@ const W = 640,
   PT = 12,
   PB = 28;
 
+/** 눈금 줄. 0 줄은 진하게(zl) — 음수가 있어도 어디가 0인지 보인다. */
 function Grid({
-  low,
-  high,
+  ticks,
   y,
-  zeroLine = false,
+  left = PL,
+  right = W - PR,
 }: {
-  low: number;
-  high: number;
+  ticks: number[];
   y: (value: number) => number;
-  zeroLine?: boolean;
+  left?: number;
+  right?: number;
 }) {
-  const lines: ReactNode[] = [];
-  for (let k = 0; k <= 4; k++) {
-    const value = low + ((high - low) * k) / 4;
-    lines.push(
-      <g key={k}>
-        <line
-          className={zeroLine && value === 0 ? "zl" : "gl"}
-          x1={PL}
-          x2={W - PR}
-          y1={y(value)}
-          y2={y(value)}
-        />
-        <text className="ax" x={PL - 8} y={y(value) + 4} textAnchor="end">
-          {million(value)}
-        </text>
-      </g>,
-    );
-  }
-  return <>{lines}</>;
+  return (
+    <>
+      {ticks.map((value) => (
+        <g key={value}>
+          <line
+            className={value === 0 ? "zl" : "gl"}
+            x1={left}
+            x2={right}
+            y1={y(value)}
+            y2={y(value)}
+          />
+          <text className="ax" x={left - 8} y={y(value) + 4} textAnchor="end">
+            {million(value)}
+          </text>
+        </g>
+      ))}
+    </>
+  );
 }
 
 /** 시안 lineChart(): 기간별 꺾은선, 끝점에 동그라미. 값은 원, 눈금은 백만 원. */
@@ -107,8 +131,7 @@ export function LineChart({
 }) {
   const H = height;
   const values = series.flatMap((item) => numbers(item.values));
-  const high = niceMax(Math.max(0, ...values) * 1.05);
-  const low = Math.min(0, ...values);
+  const { low, high, ticks } = axisScale(values);
   const y = (value: number) => PT + (H - PT - PB) * (1 - (value - low) / (high - low));
   const x = (index: number) =>
     PL + (W - PL - PR) * (labels.length === 1 ? 0.5 : index / Math.max(1, labels.length - 1));
@@ -121,7 +144,7 @@ export function LineChart({
         aria-label={`${series.map((item) => item.name).join(", ")} 추이`}
         data-testid={testId}
       >
-        <Grid low={low} high={high} y={y} />
+        <Grid ticks={ticks} y={y} />
         {labels.map((label, index) => (
           <text key={`${label}-${index}`} className="ax" x={x(index)} y={H - 8} textAnchor="middle">
             {label}
@@ -171,8 +194,7 @@ export function BarChart({
   const H = height;
   const values = series.flatMap((item) => numbers(item.values));
   const guideValues = guide ? numbers(guide.values) : [];
-  const high = niceMax(Math.max(0, ...values, ...guideValues) * 1.05);
-  const low = Math.min(0, ...values);
+  const { low, high, ticks } = axisScale([...values, ...guideValues]);
   const y = (value: number) => PT + (H - PT - PB) * (1 - (value - low) / (high - low));
   const gw = (W - PL - PR) / Math.max(1, labels.length);
   const bw = Math.min(22, (gw - 12) / Math.max(1, series.length));
@@ -193,7 +215,7 @@ export function BarChart({
         aria-label={`${series.map((item) => item.name).join(", ")} 비교`}
         data-testid={testId}
       >
-        <Grid low={low} high={high} y={y} zeroLine />
+        <Grid ticks={ticks} y={y} />
         {labels.map((label, index) => (
           <g key={`${label}-${index}`}>
             <text className="ax" x={center(index)} y={H - 8} textAnchor="middle">
@@ -259,7 +281,7 @@ export function StackChart({
   const totals = labels.map((_, index) =>
     series.reduce((sum, item) => sum + part(item.values[index]), 0),
   );
-  const high = niceMax(Math.max(0, ...totals) * 1.05);
+  const { high, ticks } = axisScale(totals);
   const y = (value: number) => PT + (H - PT - PB) * (1 - value / high);
   const gw = (W - PL - PR) / Math.max(1, labels.length);
   const bw = Math.min(34, gw * 0.6);
@@ -272,7 +294,7 @@ export function StackChart({
         aria-label={`${series.map((item) => item.name).join(", ")} 구성`}
         data-testid={testId}
       >
-        <Grid low={0} high={high} y={y} zeroLine />
+        <Grid ticks={ticks} y={y} />
         {labels.map((label, index) => {
           const cx = PL + gw * index + gw / 2;
           let acc = 0;
@@ -348,23 +370,12 @@ export function WaterfallChart({ waterfall }: { waterfall: ProfitWaterfall }) {
     return { ...step, a, b };
   });
   const values = bars.flatMap((bar) => [bar.a, bar.b]);
-  const high = niceMax(Math.max(0, ...values) * 1.08),
-    low = Math.min(0, ...values);
+  const scale = axisScale(values, 1.08);
+  const { low, high } = scale;
   const y = (value: number) => pt + (H - pt - pb) * (1 - (value - low) / (high - low));
   const gw = (VW - pl - pr) / bars.length,
     bw = Math.min(56, gw * 0.62);
-  const ticks: ReactNode[] = [];
-  for (let k = 0; k <= 4; k++) {
-    const value = low + ((high - low) * k) / 4;
-    ticks.push(
-      <g key={k}>
-        <line className="gl" x1={pl} x2={VW - pr} y1={y(value)} y2={y(value)} />
-        <text className="ax" x={pl - 8} y={y(value) + 4} textAnchor="end">
-          {million(value)}
-        </text>
-      </g>,
-    );
-  }
+  const ticks = <Grid ticks={scale.ticks} y={y} left={pl} right={VW - pr} />;
   const won = (value: Amount) =>
     value == null ? "–" : `${Math.round(value).toLocaleString("ko-KR")}원`;
   return (

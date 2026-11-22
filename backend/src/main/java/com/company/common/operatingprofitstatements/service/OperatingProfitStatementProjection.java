@@ -72,6 +72,21 @@ public final class OperatingProfitStatementProjection {
         var baseMetric = new Metric(baseAmount,
             change(baseAmount, single(source.get(String.format("%04d%02d", year - 1, end)), Snapshot::operatingProfit)),
             change(baseAmount, single(source.get(lastKey), Snapshot::operatingProfit)));
+        var rate = ratio(operating.amount(), revenue.amount());
+        return new Result(year, filter.baseMonth(), provisional, provisional ? end
+            + "월은 아직 마감 전이라 요약 칸과 누계는 잠정 숫자입니다. 마감하면 확정됩니다." : null,
+            new Summary(revenue, gross, operating, rate, baseMetric), table(filter, source, firstYear, false));
+    }
+
+    public static NumericTable netProfitTable(Filter filter, Map<String, Month> source, boolean firstYear) {
+        return table(filter, source, firstYear, true);
+    }
+
+    private static NumericTable table(Filter filter, Map<String, Month> source, boolean firstYear,
+        boolean netProfit) {
+        int year = filter.year(), end = Integer.parseInt(filter.baseMonth().substring(4));
+        var base = source.get(filter.baseMonth());
+        boolean provisional = base != null && base.provisional();
         var columns = new ArrayList<Column>();
         for (int m = 1; m <= 12; m++) {
             var month = source.get(String.format("%04d%02d", year, m));
@@ -84,34 +99,55 @@ public final class OperatingProfitStatementProjection {
         }
         var rows = new ArrayList<Line>();
         for (var item : ITEMS) {
-            var values = new ArrayList<Cell>();
-            for (int m = 1; m <= 12; m++) values.add(new Cell(m > end ? null :
-                single(source.get(String.format("%04d%02d", year, m)), item.field()), "money"));
-            var sum = total(current, end, item.field());
-            values.add(new Cell(sum, "money"));
-            if (!firstYear) {
-                var old = total(prior, end, item.field());
-                values.add(new Cell(old, "money"));
-                values.add(new Cell(change(sum, old), "percent"));
-            }
-            rows.add(new Line(item.label(), item.style(), item.cost(), List.copyOf(values)));
+            rows.add(moneyLine(filter, source, firstYear, item));
         }
+        rows.add(rateLine(filter, source, firstYear, "영업이익률", Snapshot::operatingProfit));
+        if (netProfit) {
+            for (var item : List.of(
+                new Item("영업외수익", "plain", false, Snapshot::income),
+                new Item("영업외비용", "plain", true, Snapshot::expense),
+                new Item("법인세(월할)", "plain", true, Snapshot::tax),
+                new Item("당기순이익", "bold", false, Snapshot::netProfit))) {
+                rows.add(moneyLine(filter, source, firstYear, item));
+            }
+            rows.add(rateLine(filter, source, firstYear, "순이익률", Snapshot::netProfit));
+        }
+        return new NumericTable(List.copyOf(columns), List.copyOf(rows));
+    }
+
+    private static Line moneyLine(Filter filter, Map<String, Month> source, boolean firstYear, Item item) {
+        int year = filter.year(), end = Integer.parseInt(filter.baseMonth().substring(4));
+        var values = new ArrayList<Cell>();
+        for (int m = 1; m <= 12; m++) values.add(new Cell(m > end ? null :
+            single(source.get(String.format("%04d%02d", year, m)), item.field()), "money"));
+        var sum = total(window(source, year, end), end, item.field());
+        values.add(new Cell(sum, "money"));
+        if (!firstYear) {
+            var old = total(window(source, year - 1, end), end, item.field());
+            values.add(new Cell(old, "money"));
+            values.add(new Cell(change(sum, old), "percent"));
+        }
+        return new Line(item.label(), item.style(), item.cost(), List.copyOf(values));
+    }
+
+    private static Line rateLine(Filter filter, Map<String, Month> source, boolean firstYear,
+        String label, Function<Snapshot, BigDecimal> profit) {
+        int year = filter.year(), end = Integer.parseInt(filter.baseMonth().substring(4));
+        var current = window(source, year, end);
+        var prior = window(source, year - 1, end);
         var rates = new ArrayList<Cell>();
         for (int m = 1; m <= 12; m++) {
             var month = m > end ? null : source.get(String.format("%04d%02d", year, m));
-            rates.add(new Cell(ratio(single(month, Snapshot::operatingProfit), single(month, Snapshot::revenue)), "percent"));
+            rates.add(new Cell(ratio(single(month, profit), single(month, Snapshot::revenue)), "percent"));
         }
-        var rate = ratio(operating.amount(), revenue.amount());
+        var rate = ratio(total(current, end, profit), total(current, end, Snapshot::revenue));
         rates.add(new Cell(rate, "percent"));
         if (!firstYear) {
-            var oldRate = ratio(total(prior, end, Snapshot::operatingProfit), total(prior, end, Snapshot::revenue));
+            var oldRate = ratio(total(prior, end, profit), total(prior, end, Snapshot::revenue));
             rates.add(new Cell(oldRate, "percent"));
             rates.add(new Cell(rate == null || oldRate == null ? null : rate.subtract(oldRate), "percentage-point"));
         }
-        rows.add(new Line("영업이익률", "plain", false, List.copyOf(rates)));
-        return new Result(year, filter.baseMonth(), provisional, provisional ? end
-            + "월은 아직 마감 전이라 요약 칸과 누계는 잠정 숫자입니다. 마감하면 확정됩니다." : null,
-            new Summary(revenue, gross, operating, rate, baseMetric), new NumericTable(List.copyOf(columns), List.copyOf(rows)));
+        return new Line(label, "plain", false, List.copyOf(rates));
     }
     private static Metric metric(List<Month> current, List<Month> prior, List<Month> previous,
         int end, Function<Snapshot, BigDecimal> field) {

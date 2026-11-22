@@ -21,6 +21,7 @@ import { PartSettlementWorkspaceProvider } from "../partsettlements/PartSettleme
 import { FinanceItemWorkspaceProvider } from "../financeitems/FinanceItemWorkspace";
 import { ProfitStructureWorkspaceProvider } from "../profitstructures/ProfitStructureWorkspace";
 import { OperatingProfitStatementWorkspaceProvider } from "../operatingprofitstatements/OperatingProfitStatementWorkspace";
+import { NetProfitStatementWorkspaceProvider } from "../netprofitstatements/NetProfitStatementWorkspace";
 import { CodeWorkspaceProvider } from "../codegroups/CodeWorkspace";
 import { ClientPartWorkspaceProvider } from "../clients/ClientPartWorkspace";
 import { DeveloperWorkspaceProvider } from "../developers/DeveloperWorkspace";
@@ -123,19 +124,21 @@ export function CommonNavigationPage() {
                             <FinanceItemWorkspaceProvider>
                               <ProfitStructureWorkspaceProvider>
                                 <OperatingProfitStatementWorkspaceProvider>
-                                  {preferences ? (
-                                    <PreferenceNavigation />
-                                  ) : (
-                                    <NavigationRoot
-                                      tabs
-                                      renderScreen={renderScreen}
-                                      extensions={(context) => ({
-                                        screenActions: screenActions(
-                                          context.screenId,
-                                        ),
-                                      })}
-                                    />
-                                  )}
+                                  <NetProfitStatementWorkspaceProvider>
+                                    {preferences ? (
+                                      <PreferenceNavigation />
+                                    ) : (
+                                      <NavigationRoot
+                                        tabs
+                                        renderScreen={renderScreen}
+                                        extensions={(context) => ({
+                                          screenActions: screenActions(
+                                            context.screenId,
+                                          ),
+                                        })}
+                                      />
+                                    )}
+                                  </NetProfitStatementWorkspaceProvider>
                                 </OperatingProfitStatementWorkspaceProvider>
                               </ProfitStructureWorkspaceProvider>
                             </FinanceItemWorkspaceProvider>

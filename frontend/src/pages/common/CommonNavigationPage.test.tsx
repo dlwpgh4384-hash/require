@@ -138,6 +138,27 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (url.startsWith("/api/common/net-profit-statements?")) {
+      return {
+        success: true,
+        meta: {},
+        data: {
+          year: 2026,
+          baseMonth: "202602",
+          provisional: false,
+          provisionalNotice: null,
+          summary: {
+            cumulativeNetProfit: null,
+            netProfitRate: null,
+            baseMonthNetProfit: null,
+            previousMonthChangePercent: null,
+          },
+          numericTable: { columns: [], rows: [] },
+          contributionVisible: true,
+          contributions: [],
+        },
+      };
+    }
     if (url.startsWith("/api/common/operating-profit-statements?")) {
       const metric = {
         amount: null,
@@ -367,7 +388,8 @@ function respond(body: ShellMenuResponse) {
               url.endsWith("/UI-04") ||
               url.endsWith("/UI-10") ||
               url.endsWith("/UI-07") ||
-              url.endsWith("/UI-08")
+              url.endsWith("/UI-08") ||
+              url.endsWith("/UI-09")
                 ? {
                     periodBasis: {
                       latestYm: "202602",
@@ -426,6 +448,17 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-09": async (content) => {
+    expect(await content.findByTestId("period-selector")).toBeVisible();
+    expect(await content.findByTestId("net-profit-empty")).toBeVisible();
+    expect(content.getByTestId("net-profit-kpis").children).toHaveLength(2);
+    const actions = within(screen.getByTestId("screen-actions"));
+    expect(
+      actions.getAllByRole("button", { name: "엑셀 다운로드" }),
+    ).toHaveLength(1);
+    expect(content.queryByTestId("net-profit-excel")).not.toBeInTheDocument();
+    expect(content.queryByRole("textbox")).not.toBeInTheDocument();
+  },
   "UI-08": async (content) => {
     expect(await content.findByTestId("period-selector")).toBeVisible();
     expect(await content.findByTestId("operating-empty")).toBeVisible();

@@ -1,0 +1,35 @@
+.net-profit-statements-page .ls-kpis {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.net-profit-contribution-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+.net-profit-contribution-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--divider);
+  border-radius: 4px;
+  background: var(--surface);
+}
+.net-profit-contribution-card h4 {
+  margin: 0 0 12px;
+}
+.net-profit-contribution-track {
+  height: 8px;
+  background: var(--primary-bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.net-profit-contribution-track > div {
+  height: 100%;
+  background: var(--primary);
+}
+@media (max-width: 767px) {
+  .net-profit-contribution-grid,
+  .net-profit-statements-page .ls-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

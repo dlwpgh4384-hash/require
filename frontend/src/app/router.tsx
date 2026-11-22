@@ -12,7 +12,7 @@ export function createAppRouter() {
       ),
       children: [
         { path: "/", element: <CommonNavigationPage /> },
-        // UI-07 (M019/G007) and UI-08 (M020/G007) resolve through screenRegistry.
+        // UI-07 (M019/G007), UI-08 (M020/G007), UI-09 (M021/G007) resolve through screenRegistry.
         // Keep the shared screen route; feature pages own their API clients.
         { path: "/screens/:scrnId", element: <CommonNavigationPage /> },
         { path: "*", element: <CommonNavigationPage /> },

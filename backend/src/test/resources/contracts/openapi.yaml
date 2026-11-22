@@ -11137,6 +11137,174 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/net-profit-statements:
+    get:
+      operationId: getCommonNetProfitStatements
+      summary: 순이익표 조회
+      security: []
+      description: UI-09 조회. 기존 year(…)·projection 직접 재사용; UI-09 첫 해 열 제외/순이익 확장 옵션만 적용. UI-22 전 인증 검사
+        없음; 인증 정의 표준 충돌은 OQ-AUTH-009.
+      parameters:
+      - name: year
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 2025
+        description: 공통 useScreenPeriod 허용 연도; 기존 잠금 조건 유지
+      - name: baseMonth
+        in: query
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{4}(0[1-9]|1[0-2])$
+        description: 선택연도와 같은 YYYYMM; 지난 해도 1~12월 누계 기준월 선택 가능
+      x-related-requirements:
+      - REQ-1126
+      - REQ-1137
+      - REQ-1141
+      - REQ-1142
+      - REQ-1144
+      - REQ-1145
+      - REQ-1146
+      - REQ-1147
+      - REQ-1148
+      - REQ-1149
+      - REQ-1150
+      - REQ-1151
+      - REQ-1156
+      - REQ-1157
+      - REQ-1158
+      - REQ-1159
+      - REQ-1160
+      - REQ-1161
+      x-pagination-filtering:
+        pagination: 보고서 1~12월·누계·비교 전체, 서버 페이지로 분할하지 않음
+        filtering: year/baseMonth만; 행 필터·columns 없음
+        ordering: 기존 UI-08 행 뒤 영업외수익·영업외비용·법인세(월할)·당기순이익·순이익률; 첫 해 전년 두 열 제외
+      x-aiops-query-role:
+        entity: TB_CO_MON_PL
+        result_path:
+        - data
+      x-business-rules:
+      - ProfitStructureMonthlyProfitService.year(…) 직접 재사용; OperatingProfitStatementProjection UI-09 옵션으로만
+        확장; 기본 UI-08 불변
+      - TB_CO_MON_PL.FIX_YN=Y 마감 고정값·미마감 잠정. 첫 해인 시작월 전년은 전년누계/대비 열 없음
+      - 운영시작 이후 빈 달0·미이관/빈칸null·비교기간 빈 달은 해당 비교null; 미확정 분모0/모두적자 정책은 OQ-CALC-009
+      - 계약유형별 매출총이익에 식-34 적용; 적자 유형은 비율/막대에서 제외하고 흑자끼리100%·2025 시작전은 카드숨김
+      x-side-effects:
+      - 읽기로 TB_CO_MON_PL·TB_CO_MON_COST·TB_FI_ITEM·TB_SY_ACCS_LOG 값/행수 변경 없음; 기존 설정 저장은 별도 API
+      x-required-tests:
+      - 'happy: FX-NET-009의 정상 운영기간으로 GET -> 200 summary 두 칸과 numericTable의 당기순이익이 같은 year(…) 값이다.'
+      - 'auth: UI-22 전 인증헤더 없이 UI-09 GET -> 200 보고서, 신규401/403과 역할 필터 없음; 역할거부 표준 충돌은 OQ-AUTH-009 리뷰다.'
+      - 'validation: year=2026/baseMonth=202613 또는 year/baseMonth 불일치로 GET -> 400 ApiError.errors[].field=baseMonth,
+        TB_CO_MON_PL 불변이다.'
+      - 'business: 비교기간 한 항목 한 달 공백인 fixture로 GET -> 해당 비교값 null·완전 항목 비교값 유지, 저장된 이관 원값은 불변이다.'
+      - 'side-effect: 마감/미마감 fixture를 GET 전후 읽기 -> TB_CO_MON_PL·TB_CO_MON_COST·TB_FI_ITEM·TB_SY_ACCS_LOG
+        값/행수 불변이다.'
+      - 'first-year: 시작월 전년 보고서 GET -> numericTable.columns에 전년 누계/전년 대비가 없고 다음 해 GET에는 있다.'
+      - 'contribution: 흑자/적자 유형 혼합 GET -> 적자 sharePercent=null·흑자 sharePercent 합계100%, amount는 매출총이익이다.'
+      - 'visibility: 2025 시작전 GET 후 운영기간 GET -> contributionVisible=false/true와 안내/카드 표시가 일치한다.'
+      responses:
+        '200':
+          description: 동일기간 순이익 요약·서버 표·기여도·잠정 안내
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonNetProfitStatementResult'
+        '400':
+          description: year/baseMonth 누락·형식·연도 불일치 또는 공통 허용기간 오류; 필드별 오류·원천 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/net-profit-statements/excel:
+    get:
+      operationId: getCommonNetProfitStatementsExcel
+      summary: 순이익표 엑셀
+      security: []
+      description: UI-09 조회와 같은 projection/첫 해 열/머리글·금액단위. columns 입력 없음. 정상 수신에 DNLD/clock_timestamp().
+        인증 예외 OQ-AUTH-009.
+      parameters:
+      - name: year
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 2025
+        description: 공통 useScreenPeriod 허용 연도; 기존 잠금 조건 유지
+      - name: baseMonth
+        in: query
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{4}(0[1-9]|1[0-2])$
+        description: 선택연도와 같은 YYYYMM; 지난 해도 1~12월 누계 기준월 선택 가능
+      - name: amountUnit
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - 원
+          - 천 원
+          - 백만 원
+        description: 기존 MoneyUnitSelect/AMT_UNIT 선택값
+      x-related-requirements:
+      - REQ-1146
+      - REQ-1147
+      - REQ-1148
+      - REQ-1149
+      - REQ-1153
+      - REQ-1154
+      - REQ-1162
+      - REQ-1151
+      x-business-rules:
+      - 같은 numericTable 행·열·작업중/잠정; 첫 해 전년 두 열 제외·누락「–」; columns 입력 없음
+      - 금액은 숫자 셀, 비율은 0.0"%" 서식. 전월 조정 양수는 부호 없이·음수 빨간 −; 업무 손익 저장 없음
+      x-side-effects:
+      - 정상 파일 수신 뒤 기존 TB_SY_ACCS_LOG helper에 UI-09 DNLD와 clock_timestamp() 시각 기록; 원천 손익 불변
+      x-required-tests:
+      - 'happy: 화면과 같은 year/baseMonth/amountUnit으로 엑셀 GET -> 200 xlsx행열·머리글·금액 숫자셀·비율 0.0"%"가 numericTable과
+        같다.'
+      - 'auth: 현 단계 인증헤더 없이 엑셀 GET -> 200 파일 수신; UI-22 전에 새401/403 거부를 붙이지 않으며 OQ-AUTH-009를 보존한다.'
+      - 'validation: baseMonth=202613 또는 amountUnit 허용값 밖으로 엑셀 GET -> 400 ApiError.errors[]에 해당 필드, 파일
+        없음·DNLD 증가0이다.'
+      - 'business: 첫 해 fixture와 전년 한 달 공백 항목 fixture로 각각 엑셀 GET -> 첫 해는 전년 두 열 없음·다음 해 누락항목 비교셀「–」, 원
+        이관금액 불변이다.'
+      - 'side-effect: 정상 순이익 파일 수신 후 접근기록 읽기 -> TB_SY_ACCS_LOG에 UI-09 DNLD/DB 생성시각 존재·TB_CO_MON_PL 값/행수
+        불변이다.'
+      x-state-transitions:
+      - from: 업무손익 기존 상태
+        to: 업무손익 기존 상태
+        condition: 정상 다운로드는 손익 전이 없이 TB_SY_ACCS_LOG의 UI-09 DNLD 기록만 추가
+      responses:
+        '200':
+          description: 화면 표와 동일한 B.4 xlsx
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: attachment; 기존 exporter 파일명 관례
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 기간 또는 amountUnit 필드 오류; 파일 미생성·접근기록 미추가
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
 components:
   schemas:
     CommonFinanceItem:
@@ -18876,6 +19044,112 @@ components:
         numericTable:
           $ref: '#/components/schemas/CommonOperatingProfitStatementNumericTable'
       description: UI-08 공개결과; 이관원값보존·항목별전년완전성·첫해비교. SQL필드/비밀정보는노출하지않음.
+    CommonNetProfitStatementSummary:
+      type: object
+      required:
+      - cumulativeNetProfit
+      - netProfitRate
+      - baseMonthNetProfit
+      - previousMonthChangePercent
+      properties:
+        cumulativeNetProfit:
+          type: number
+          nullable: true
+          description: 식-32의 선택기간 누계 당기순이익; 공백은 null
+        netProfitRate:
+          type: number
+          nullable: true
+          description: 식-32의 누계 순이익률; 분모0 표현은 OQ-CALC-009
+        baseMonthNetProfit:
+          type: number
+          nullable: true
+          description: 기준월 당기순이익; 공백은 null
+        previousMonthChangePercent:
+          type: number
+          nullable: true
+          description: 기준월 전월 대비; 비교 공백은 null, 분모0 정책은 OQ-CALC-009
+      description: 요약 두 칸의 공개 수치. 제목에 잠정을 붙이지 않는다.
+    CommonNetProfitStatementLine:
+      allOf:
+      - $ref: '#/components/schemas/CommonOperatingProfitStatementLine'
+      description: 기존 UI-08 행을 유지하고 영업외수익·영업외비용·법인세(월할)·당기순이익·순이익률을 추가. 당기순이익 style=bold. UI-09 옵션으로 전월조정
+        양수는 무부호.
+    CommonNetProfitStatementNumericTable:
+      type: object
+      required:
+      - columns
+      - rows
+      properties:
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonOperatingProfitStatementColumn'
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonNetProfitStatementLine'
+      description: UI-09 화면과 xlsx의 동일 표. 첫 해는 전년 누계·전년 대비 두 열 자체를 제외한다. 값 배열은 columns와 같은 순서/개수.
+    CommonNetProfitStatementContribution:
+      type: object
+      required:
+      - contractTypeCode
+      - contractTypeName
+      - amount
+      - sharePercent
+      properties:
+        contractTypeCode:
+          type: string
+          description: TB_CO_MON_COST.CTRT_TYPE_CD; CTRT_TYPE 실제 코드. 새 enum 없음
+        contractTypeName:
+          type: string
+          description: CTRT_TYPE의 턴키·월단위·파견 표시명
+        amount:
+          type: number
+          nullable: true
+          description: 기준월 해당 계약유형의 매출총이익 금액; 순이익이 아님
+        sharePercent:
+          type: number
+          nullable: true
+          description: 흑자 유형끼리 100%; 적자 null/막대 없음. 모두0/적자 정책은 OQ-CALC-009
+      description: 서비스 프로젝트별 계약유형·매출·원가로 식-34 적용. amount<0이면 빨간 적자 −금액만 표시.
+    CommonNetProfitStatementResult:
+      type: object
+      required:
+      - year
+      - baseMonth
+      - provisional
+      - provisionalNotice
+      - summary
+      - numericTable
+      - contributionVisible
+      - contributions
+      properties:
+        year:
+          type: integer
+        baseMonth:
+          type: string
+          pattern: ^[0-9]{4}(0[1-9]|1[0-2])$
+        provisional:
+          type: boolean
+          description: TB_CO_MON_PL.FIX_YN=Y이면 false; 미마감 true
+        provisionalNotice:
+          type: string
+          nullable: true
+          description: 'UI-08 동일 잠정 띠: ○월은 아직 마감 전이라 요약 칸과 누계는 잠정 숫자입니다. 마감하면 확정됩니다. 마감이면 null'
+        summary:
+          $ref: '#/components/schemas/CommonNetProfitStatementSummary'
+        numericTable:
+          $ref: '#/components/schemas/CommonNetProfitStatementNumericTable'
+        contributionVisible:
+          type: boolean
+          description: 시작한 달 이전 2025년은 false·카드 대신 안내. 운영기간 true
+        contributions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonNetProfitStatementContribution'
+          description: 기준월 계약유형별 금액/비율. contributionVisible=false이면 빈 배열; 정확 안내문구는 화면 시안 OQ-UI-009
+      description: UI-09 읽기 전용 결과. 운영시작 이후 자료없는 달은0, 미이관/빈칸은null; 비교기간 공백은 항목 비교null. 결과 저장 없음.
+
 x-requirement-context:
   description: >-
     아래 항목은 관련 요구별 역할·관찰 증거다. 면제 목록이 아니다.
@@ -18936,7 +19210,62 @@ x-requirement-context:
   getHealth:
     REQ-043: '필수 경로 — /api/health 유지. GET·getHealth는 기존 설계 제안. 성공 값·DB 포함·오류·4xx 부재 근거 OQ-006. 제품 검증 화면 추가 금지.'
 
+
 x-uncovered-requirements:
+- canonical_id: REQ-1127
+  status: data-constraint
+  evidence: DB 식 소비：TB_SY_CALC_RULE에서 지정 CALC_ID와 식-00을 읽으며 식 정의나 계산 상수를 새로 저장하지 않는다.
+- canonical_id: REQ-1128
+  status: data-constraint
+  evidence: 기존 코드 그룹：네 그룹의 실제 DB 값과 표시명이 일치하고 시안 예시를 새 seed로 넣지 않는다.
+- canonical_id: REQ-1129
+  status: out-of-scope
+  evidence: 인증·메뉴 권한 후속 범위：인증 헤더 없는 UI-09 조회가 가능하고 신규 로그인 이동·메뉴 권한 검사·401/403을 추가하지 않는다.
+- canonical_id: REQ-1130
+  status: out-of-scope
+  evidence: 입력·업로드 제외：UI-09 제목줄에는 엑셀 다운로드 하나만 있고 입력·업로드·저장 API가 없다.
+- canonical_id: REQ-1131
+  status: non-functional
+  evidence: Flyway 비활성 보존：일반 서버 기동에서 자동 Flyway migration이 실행되지 않는다.
+- canonical_id: REQ-1132
+  status: non-functional
+  evidence: 개발 인증 비활성：auth.required가 false이며 UI-09 조회에 인증 헤더를 강제하지 않는다.
+- canonical_id: REQ-1133
+  status: non-functional
+  evidence: 인증 정의 금지：effective OpenAPI에 securitySchemes·bearerAuth·최상위 security가 추가되지 않는다.
+- canonical_id: REQ-1134
+  status: non-functional
+  evidence: 기존 빌드·포트 보존：세 파일의 지정 포트·Maven 설정·COPY 줄을 전후 비교하여 동일함을 확인한다.
+- canonical_id: REQ-1135
+  status: non-functional
+  evidence: 기존 API 보존：기존 모든 paths/components.schemas 및 manual 내용이 유지된다.
+- canonical_id: REQ-1136
+  status: non-functional
+  evidence: 새 schema 이름 유일성：CommonNetProfitStatement 계열 키가 기존 schema를 덮어쓰지 않는다.
+- canonical_id: REQ-1138
+  status: non-functional
+  evidence: 기존 시험 파일 보존：UI-07·UI-08 등 기존 시험 경로가 전후 동일하다.
+- canonical_id: REQ-1139
+  status: non-functional
+  evidence: 실제 DB 시험 계약：별도 DB fixture가 원문 DDL과 일치하며 세 환경 변수로 실제 DB 시험을 실행한다.
+- canonical_id: REQ-1140
+  status: non-functional
+  evidence: UI-09 범위와 파일명：UI-09 이외 미개발 본문이 활성화되지 않고 경로 casefold 중복이 없다.
+- canonical_id: REQ-1143
+  status: non-functional
+  evidence: 기본값 후방 호환：옵션 없는 UI-08 snapshot·수치·첫해 비교가 기존과 같고 UI-09 옵션만 첫해 열을 숨긴다.
+- canonical_id: REQ-1152
+  status: non-functional
+  evidence: 공통 화면 틀·금액 부품：공통 부품과 표 클래스를 재사용하고 제목은 공통 제목줄에 한 번만 보인다.
+- canonical_id: REQ-1155
+  status: non-functional
+  evidence: 1440px 폭 제한：1440px viewport에서 문서 scrollWidth가 clientWidth를 넘지 않고 표 내부만 가로 이동한다.
+- canonical_id: REQ-1163
+  status: non-functional
+  evidence: 사용자 범위 보존：UI-09 설명의 사용자 범위를 세 역할 그대로 보존하고 이번 HTTP에 새 역할 거부를 만들지 않는다.
+- canonical_id: REQ-1164
+  status: data-constraint
+  evidence: 조회 원천·비저장：GET 전후 세 원천 표 값/행수는 동일하며 새 순이익 결과표·DDL·이력표가 없다.
 - canonical_id: REQ-599
   status: screen-only
   evidence: UI-31 기존 M005 본문 연결은 router/DevelopedScreenRegistry 검수 대상이며 새로운 HTTP 업무 동작이 아니다.

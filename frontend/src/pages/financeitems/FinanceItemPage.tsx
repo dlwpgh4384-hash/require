@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link } from "react-router-dom";
-import { ConfirmDialog, Toast, type ToastKind } from "../../shared/feedback/Dialog";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { isAllowed } from "../../shared/period/periodRules";
+import {
+  ConfirmDialog,
+  Toast,
+  type ToastKind,
+} from "../../shared/feedback/Dialog";
 import { feedbackMessages } from "../../shared/feedback/messages";
 import { NavigationState } from "../../shared/layout/NavigationState";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
@@ -44,12 +49,15 @@ type Ask = {
 const SCREEN = "UI-10";
 const clone = <T,>(value: T): T => structuredClone(value);
 const failure = (reason: unknown) =>
-  reason instanceof Error ? reason.message : "처리하지 못했습니다. 다시 시도해 주세요.";
+  reason instanceof Error
+    ? reason.message
+    : "처리하지 못했습니다. 다시 시도해 주세요.";
 const isConflict = (reason: unknown) =>
   (reason instanceof api.FinanceRequestError && reason.status === 409) ||
   (reason instanceof Error && reason.message === feedbackMessages.conflict);
 const addMonth = (month: string, delta: number) => {
-  const total = Number(month.slice(0, 4)) * 12 + Number(month.slice(4)) - 1 + delta;
+  const total =
+    Number(month.slice(0, 4)) * 12 + Number(month.slice(4)) - 1 + delta;
   return `${Math.floor(total / 12)}${String((total % 12) + 1).padStart(2, "0")}`;
 };
 // 금액 칸은 쓰는 동안 숫자 글자로 보관한다. 같은 금액이면 바뀐 것으로 보지 않는다.
@@ -74,10 +82,15 @@ const cardSum = (value: api.FinanceMonth) =>
   value.cards.reduce((total, card) => total + Number(card.amount || 0), 0);
 const cardTotal = (value: api.FinanceMonth) => ({
   manual: value.cardPayment.manualOverride,
-  amount: value.cardPayment.manualOverride ? value.cardPayment.paymentAmount : null,
+  amount: value.cardPayment.manualOverride
+    ? value.cardPayment.paymentAmount
+    : null,
 });
 /** 시안 finDirty(): 저장 안 한 묶음 이름(순서 그대로). */
-function dirtySections(draft: api.FinanceMonth | null, base: api.FinanceMonth | null) {
+function dirtySections(
+  draft: api.FinanceMonth | null,
+  base: api.FinanceMonth | null,
+) {
   if (!draft || !base) return [];
   return (
     [
@@ -91,7 +104,10 @@ function dirtySections(draft: api.FinanceMonth | null, base: api.FinanceMonth | 
       ],
       ["대여금", same(draft.loans, base.loans)],
       ["전월 조정", same(draft.adjustments, base.adjustments)],
-      ["법인카드", same([draft.cards, cardTotal(draft)], [base.cards, cardTotal(base)])],
+      [
+        "법인카드",
+        same([draft.cards, cardTotal(draft)], [base.cards, cardTotal(base)]),
+      ],
       ["계좌이체 지출", same(draft.transfers, base.transfers)],
     ] as const
   )
@@ -137,6 +153,9 @@ function emptyMonth(month: string, closed: boolean): api.FinanceMonth {
 /** UI-10 / SCR-UI-10 재무 항목: 두 탭의 초안은 하단 [저장] 한 번으로 함께 저장한다. */
 export function FinanceItemPage() {
   const period = useScreenPeriod(SCREEN, { kind: "yearMonth" });
+  const location = useLocation();
+  const navigate = useNavigate();
+  const consumedHandoff = useRef<string | null>(null);
   const { mobile } = useViewport();
   const host = useFinanceItemTitleHost();
   const setDirty = useScreenDirty();
@@ -237,7 +256,7 @@ export function FinanceItemPage() {
   }, [month, revision, mobile]);
   // [전월 조정 입력]으로 왔으면 그 달을 읽은 뒤 전월 조정 표로 옮겨 금액 칸에 커서를 둔다.
   useEffect(() => {
-    if (!adjFocus.current || !draft) return;
+    if (!adjFocus.current || !draft || loading || draft.closed) return;
     adjFocus.current = false;
     requestAnimationFrame(() => {
       document
@@ -245,7 +264,44 @@ export function FinanceItemPage() {
         ?.scrollIntoView?.({ block: "start" });
       adjAmount.current?.focus();
     });
-  }, [draft]);
+  }, [draft, adjPreset, loading]);
+
+  useEffect(() => {
+    const source = location.state?.financeAdjustmentSourceMonth;
+    if (
+      typeof source !== "string" ||
+      !/^[0-9]{4}(0[1-9]|1[0-2])$/.test(source) ||
+      consumedHandoff.current === location.key ||
+      !draft ||
+      loading ||
+      draft.yearMonth !== month ||
+      !basis
+    )
+      return;
+    if (
+      source !== month &&
+      isAllowed(
+        { year: Number(source.slice(0, 4)), month: Number(source.slice(4)) },
+        basis,
+        { kind: "yearMonth" },
+      )
+    ) {
+      goMonth(source);
+      return;
+    }
+    consumedHandoff.current = location.key;
+    goAdjustment(source, true);
+    const { financeAdjustmentSourceMonth: _source, ...rest } = location.state;
+    navigate(location.pathname, { replace: true, state: rest });
+  }, [
+    location.key,
+    location.state,
+    location.pathname,
+    draft,
+    loading,
+    month,
+    basis,
+  ]);
 
   const change = (edit: (value: api.FinanceMonth) => void) =>
     setDraft((old) => {
@@ -371,9 +427,11 @@ export function FinanceItemPage() {
         return;
       const element = root.current;
       if (!element || element.closest("[hidden]")) return;
-      if (document.querySelector('[role="dialog"],[role="alertdialog"]')) return;
+      if (document.querySelector('[role="dialog"],[role="alertdialog"]'))
+        return;
       event.preventDefault();
-      if (closedRef.current) notify("이 화면에는 저장할 내용이 없습니다.", "info");
+      if (closedRef.current)
+        notify("이 화면에는 저장할 내용이 없습니다.", "info");
       else void saveRef.current();
     };
     window.addEventListener("keydown", keydown);
@@ -392,7 +450,10 @@ export function FinanceItemPage() {
     if (!draft) return;
     const previousMonth = dash(addMonth(month, -1));
     try {
-      const result = await api.getCommonFinancePreviousItems(month, draft.items);
+      const result = await api.getCommonFinancePreviousItems(
+        month,
+        draft.items,
+      );
       if (!result.count) {
         notify(`${previousMonth}에서 가져올 새 항목이 없습니다.`, "info");
         return;
@@ -426,7 +487,11 @@ export function FinanceItemPage() {
     setBusy(true);
     setPaymentFields({});
     try {
-      const confirmed = await api.postCommonFinanceTaxPaymentConfirm(row, date, amount);
+      const confirmed = await api.postCommonFinanceTaxPaymentConfirm(
+        row,
+        date,
+        amount,
+      );
       const merge = (value: api.FinanceMonth | null) =>
         value && {
           ...value,
@@ -450,13 +515,35 @@ export function FinanceItemPage() {
     }
   }
   /** 시안 ACT.adjgo: 마감 안 된 첫 달의 「전월 조정」 표로 가서 보던 마감월을 미리 고른다. */
-  const goAdjustment = () => {
-    if (!draft?.firstOpenYearMonth || !basis) return;
+  function goAdjustment(source = month, handoff = false) {
+    if (!draft?.firstOpenYearMonth || !basis) {
+      if (handoff)
+        notify("전월 조정을 입력할 수 있는 미마감월이 없습니다.", "info");
+      return;
+    }
+    if (
+      handoff &&
+      (!basis.closedMonths.includes(source) ||
+        !isAllowed(
+          {
+            year: Number(draft.firstOpenYearMonth.slice(0, 4)),
+            month: Number(draft.firstOpenYearMonth.slice(4)),
+          },
+          basis,
+          { kind: "yearMonth" },
+        ) ||
+        basis.closedMonths.includes(draft.firstOpenYearMonth) ||
+        draft.firstOpenYearMonth <= source ||
+        source < addMonth([...basis.closedMonths].sort().at(-1) ?? source, -11))
+    ) {
+      notify("전월 조정을 입력할 수 있는 미마감월이 없습니다.", "info");
+      return;
+    }
     const target =
-      draft.firstOpenYearMonth > basis.latestYm
+      !handoff && draft.firstOpenYearMonth > basis.latestYm
         ? basis.latestYm
         : draft.firstOpenYearMonth;
-    setAdjPreset(month);
+    setAdjPreset(source);
     setTab(0);
     adjFocus.current = true;
     goMonth(target);
@@ -464,7 +551,7 @@ export function FinanceItemPage() {
       `${Number(target.slice(4))}월 재무 항목의 「전월 조정」 표에 넣어 주세요.`,
       "info",
     );
-  };
+  }
 
   if (mobile)
     return (
@@ -490,7 +577,11 @@ export function FinanceItemPage() {
     : "";
   const targets: string[] = [];
   if (closedTo)
-    for (let key = closedTo; key >= addMonth(closedTo, -11) && key < month; key = addMonth(key, -1))
+    for (
+      let key = closedTo;
+      key >= addMonth(closedTo, -11) && key < month;
+      key = addMonth(key, -1)
+    )
       targets.push(key);
   const openMonths: string[] = [];
   if (basis) {
@@ -552,7 +643,9 @@ export function FinanceItemPage() {
           title: "엑셀 업로드 · 재무 항목",
           checkLabel: "올리기",
           month: {
-            value: openMonths.includes(dash(month)) ? dash(month) : (openMonths[0] ?? dash(month)),
+            value: openMonths.includes(dash(month))
+              ? dash(month)
+              : (openMonths[0] ?? dash(month)),
             options: openMonths.length ? openMonths : [dash(month)],
             help: financeText.uploadHelp,
           },
@@ -621,14 +714,14 @@ export function FinanceItemPage() {
               className="ls-btn ls-btn-sm"
               data-testid="finance-adjust-closed"
               disabled={!draft?.firstOpenYearMonth || busy}
-              onClick={goAdjustment}
+              onClick={() => goAdjustment()}
             >
               전월 조정 입력
             </button>
           }
         >
-          <strong>{dash(month)}</strong>는 마감되었습니다. 고칠 내용은 다음 달 전월
-          조정으로 입력하세요.
+          <strong>{dash(month)}</strong>는 마감되었습니다. 고칠 내용은 다음 달
+          전월 조정으로 입력하세요.
         </Banner>
       )}
       {error && (
@@ -673,7 +766,11 @@ export function FinanceItemPage() {
           불러오는 중입니다.
         </p>
       )}
-      <div role="tablist" aria-label="재무 항목 탭" className="ls-tabs fin-tabs">
+      <div
+        role="tablist"
+        aria-label="재무 항목 탭"
+        className="ls-tabs fin-tabs"
+      >
         {financeText.tabs.map(([label, title], index) => (
           <button
             role="tab"
@@ -827,7 +924,10 @@ export function FinanceItemPage() {
                 change((data) => {
                   data.adjustments.splice(index, 1);
                 });
-                notify("전월 조정 줄을 지웠습니다. [저장]을 누르면 반영됩니다.", "info");
+                notify(
+                  "전월 조정 줄을 지웠습니다. [저장]을 누르면 반영됩니다.",
+                  "info",
+                );
               }}
             />
           </div>

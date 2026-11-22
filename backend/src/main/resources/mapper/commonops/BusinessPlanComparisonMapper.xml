@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.commonops.mapper.BusinessPlanComparisonMapper">
+  <resultMap id="target" type="com.company.common.commonops.mapper.BusinessPlanComparisonRows$Target">
+    <constructor>
+      <arg column="yearMonth" javaType="java.lang.String"/>
+      <arg column="revenueTarget" javaType="java.math.BigDecimal"/>
+      <arg column="operatingProfitTarget" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <select id="targets" resultMap="target">
+    SELECT PLAN_YM AS "yearMonth", SALES_TGT_AMT AS "revenueTarget",
+      OPRT_PRFT_TGT_AMT AS "operatingProfitTarget"
+    FROM TB_FI_BIZ_PLAN
+    WHERE PART_ID = 'ALL'
+      AND PLAN_YM BETWEEN (CAST(#{year} AS text) || '01') AND (CAST(#{year} AS text) || '12')
+    ORDER BY PLAN_YM
+  </select>
+</mapper>

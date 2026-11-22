@@ -50,6 +50,8 @@ export interface PeriodOptions {
   allowNextYear?: boolean;
   /** UI-07·08·09만 true: CASH_BASE_YM 앞의 해를 고를 수 있다 */
   allowBeforeStart?: boolean;
+  /** UI-18 사업계획: 첫 연도부터 1~12월 누계 기준 선택(기본 잠금은 유지). */
+  allowAnnualPlanMonths?: boolean;
 }
 
 const ym = (value: string) => ({
@@ -57,7 +59,10 @@ const ym = (value: string) => ({
   month: Number(value.slice(4, 6)),
 });
 
-export function latestPeriod(basis: PeriodBasis, kind: PeriodKind): PeriodValue {
+export function latestPeriod(
+  basis: PeriodBasis,
+  kind: PeriodKind,
+): PeriodValue {
   const latest = ym(basis.latestYm);
   return kind === "year" ? { year: latest.year } : latest;
 }
@@ -65,8 +70,12 @@ export function latestPeriod(basis: PeriodBasis, kind: PeriodKind): PeriodValue 
 export function yearRange(basis: PeriodBasis, options: PeriodOptions) {
   const latestYear = ym(basis.latestYm).year;
   const startYear = ym(basis.cashBaseYm).year;
+  if (options.allowAnnualPlanMonths)
+    return { min: options.firstDataYear ?? startYear, max: latestYear };
   const max =
-    options.kind === "year" && options.allowNextYear ? latestYear + 1 : latestYear;
+    options.kind === "year" && options.allowNextYear
+      ? latestYear + 1
+      : latestYear;
   let min = startYear;
   if (options.allowBeforeStart) {
     min = Math.min(startYear, options.firstDataYear ?? startYear - 1);
@@ -75,7 +84,10 @@ export function yearRange(basis: PeriodBasis, options: PeriodOptions) {
   }
   if (!options.allowBeforeStart && options.lastDataYear !== undefined) {
     // 자료가 있는 해까지. 올해(가장 최근 달의 해)는 언제나 고를 수 있다.
-    return { min, max: Math.max(latestYear, Math.min(max, options.lastDataYear)) };
+    return {
+      min,
+      max: Math.max(latestYear, Math.min(max, options.lastDataYear)),
+    };
   }
   return { min, max };
 }
@@ -87,7 +99,12 @@ export function monthRange(
 ) {
   const latest = ym(basis.latestYm);
   const start = ym(basis.cashBaseYm);
-  const min = !options.allowBeforeStart && year === start.year ? start.month : 1;
+  const min =
+    !options.allowAnnualPlanMonths &&
+    !options.allowBeforeStart &&
+    year === start.year
+      ? start.month
+      : 1;
   const max = year === latest.year ? latest.month : 12;
   return { min, max };
 }
@@ -98,7 +115,11 @@ export function isAllowed(
   options: PeriodOptions,
 ) {
   const years = yearRange(basis, options);
-  if (!Number.isInteger(value.year) || value.year < years.min || value.year > years.max)
+  if (
+    !Number.isInteger(value.year) ||
+    value.year < years.min ||
+    value.year > years.max
+  )
     return false;
   if (options.kind === "year") return value.month === undefined;
   if (value.month === undefined || !Number.isInteger(value.month)) return false;
@@ -118,7 +139,10 @@ export function withYear(
   const latestYear = ym(basis.latestYm).year;
   if (options.kind === "yearCumulative")
     return { year, month: year < latestYear ? 12 : months.max };
-  const month = Math.min(Math.max(current.month ?? months.max, months.min), months.max);
+  const month = Math.min(
+    Math.max(current.month ?? months.max, months.min),
+    months.max,
+  );
   return { year, month };
 }
 
@@ -144,7 +168,8 @@ export function periodStatus(
           ? "결산 완료"
           : "지난 해 · 읽기 전용"
         : "올해";
-  if (kind === "year" || value.month === undefined) return { yearBadge, readOnly };
+  if (kind === "year" || value.month === undefined)
+    return { yearBadge, readOnly };
   const key = `${value.year}${String(value.month).padStart(2, "0")}`;
   return {
     yearBadge,

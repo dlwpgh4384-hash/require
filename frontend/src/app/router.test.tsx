@@ -22,6 +22,7 @@ import type { CodeMapItem } from "../pages/codemaps/codeMaps";
 import type { OperatingStandard } from "../pages/operatingstandards/operatingStandards";
 import type { CodeHistoryItem } from "../pages/commonops/codeHistory";
 import type { RateRenegotiationResult } from "../pages/raterenegotiations/rateRenegotiations";
+import type { BusinessPlanComparisonResult } from "../pages/commonops/businessPlanComparisons";
 
 let router: ReturnType<typeof createAppRouter> | undefined;
 
@@ -493,6 +494,157 @@ function respondWithClientParts() {
   return { request, clients, parts, success };
 }
 
+function respondWithBusinessPlanComparisons(available = true) {
+  const menus = response();
+  menus.data.push(
+    {
+      ...menus.data[0],
+      menuId: "G007",
+      menuNm: "재무·자금",
+      scrnId: null,
+      sortOrd: 2,
+    },
+    {
+      ...menus.data[0],
+      menuId: "M022",
+      upperMenuId: "G007",
+      menuNm: "사업계획 대비 실적",
+      scrnId: "UI-18",
+      menuLvl: 2,
+    },
+  );
+  menus.meta.screenAccess.push({ scrnId: "UI-18", available, pcOnlyYn: "N" });
+  const result: BusinessPlanComparisonResult = {
+    year: 2026,
+    baseMonth: "202611",
+    baseMonthClosed: false,
+    hasTargets: false,
+    summary: {
+      cumulativeRevenueAchievementRate: null,
+      cumulativeRevenueActual: null,
+      cumulativeRevenueTarget: 0,
+      cumulativeOperatingProfitAchievementRate: null,
+      cumulativeOperatingProfitActual: null,
+      cumulativeOperatingProfitTarget: 0,
+      baseMonthRevenueAchievementRate: null,
+      baseMonthRevenueTarget: 0,
+    },
+    months: Array.from({ length: 12 }, (_, index) => ({
+      yearMonth: `2026${String(index + 1).padStart(2, "0")}`,
+      revenueTarget: 0,
+      revenueActual: null,
+      operatingProfitTarget: 0,
+      operatingProfitActual: null,
+      achievementRate: null,
+      profitRateDifference: null,
+    })),
+  };
+  const success = (data: unknown) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ success: true, meta: {}, data }),
+  });
+  const list = vi.fn(async () => success(result));
+  const request = vi.fn(async (url: string, _init?: RequestInit) => {
+    if (url === "/api/common/menus")
+      return { ok: true, status: 200, json: async () => menus };
+    if (url.startsWith("/api/common/business-plan-comparisons?")) return list();
+    if (url.startsWith("/api/common/user-preferences/"))
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ...preferenceResponse(url),
+          meta: {
+            periodBasis: {
+              latestYm: "202611",
+              cashBaseYm: "202603",
+              closedMonths: ["202610"],
+            },
+          },
+        }),
+      };
+    throw new Error(`예상하지 않은 요청: ${url}`);
+  });
+  vi.stubGlobal("fetch", request);
+  return { request, list };
+}
+
+describe("business plan comparison route composition", () => {
+  it.each(["/screens/UI-18", "/#UI-18"])(
+    "%s renders the developed screen with public client and title actions",
+    async (path) => {
+      const { request } = respondWithBusinessPlanComparisons();
+      mount(path);
+      expect(await screen.findByTestId("business-plan-empty")).toBeVisible();
+      expectSingleShell();
+      expect(
+        screen.getAllByTestId("business-plan-comparison-page"),
+      ).toHaveLength(1);
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+        "사업계획 대비 실적",
+      );
+      const actions = within(screen.getByTestId("screen-actions"));
+      expect(actions.getAllByTestId("M25-399")).toHaveLength(1);
+      expect(actions.getAllByTestId("M25-400")).toHaveLength(1);
+      expect(request).toHaveBeenCalledWith(
+        "/api/common/business-plan-comparisons?year=2026&baseMonth=202611",
+        {
+          signal: expect.any(AbortSignal),
+        },
+      );
+      expect(
+        request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
+      ).toBe(false);
+      fireEvent.click(actions.getByRole("button", { name: "목표 업로드" }));
+      expect(
+        await screen.findByRole("dialog", { name: "목표 업로드" }),
+      ).toBeVisible();
+      expect(router?.state.location.pathname).toBe("/screens/UI-18");
+      expect(
+        request.mock.calls.some(([, init]) => init?.method === "POST"),
+      ).toBe(false);
+    },
+  );
+
+  it("M022 opens UI-18 in the existing preferences shell", async () => {
+    respondWithBusinessPlanComparisons();
+    mount("/screens/ADDED");
+    await screen.findByRole("region", { name: "ADDED 본문" });
+    const preferences = screen.getByTestId("user-preferences");
+    fireEvent.click(screen.getByTestId("menu-toggle-g007"));
+    fireEvent.click(screen.getByRole("link", { name: "사업계획 대비 실적" }));
+    await screen.findByTestId("business-plan-empty");
+    expect(router?.state.location.pathname).toBe("/screens/UI-18");
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
+    expectSingleShell();
+  });
+
+  it("a failed comparison retries the direct client without losing title upload actions", async () => {
+    const { list } = respondWithBusinessPlanComparisons();
+    list.mockRejectedValueOnce(new Error("비교 조회 실패"));
+    mount("/screens/UI-18");
+    fireEvent.click(await screen.findByTestId("M25-414"));
+    expect(await screen.findByTestId("business-plan-empty")).toBeVisible();
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(
+      within(screen.getByTestId("screen-actions")).getByTestId("M25-400"),
+    ).toBeEnabled();
+    expectSingleShell();
+  });
+
+  it("the existing unavailable-screen guard prevents comparison requests", async () => {
+    const { list } = respondWithBusinessPlanComparisons(false);
+    mount("/screens/UI-18");
+    expect(await screen.findByText("사용할 수 없는 화면입니다")).toBeVisible();
+    expect(
+      screen.queryByTestId("business-plan-comparison-page"),
+    ).not.toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
+    expectSingleShell();
+  });
+});
+
 describe("client and part route composition", () => {
   it.each(["/screens/UI-15", "/#UI-15"])(
     "%s mounts real tabs with tab-specific title actions",
@@ -550,6 +702,9 @@ describe("client and part route composition", () => {
     const { request } = respondWithClientParts();
     mount("/screens/UI-15");
     await screen.findByText("조건에 맞는 결과가 없습니다.");
+    await waitFor(() =>
+      expect(screen.getByTestId("client-create")).toBeEnabled(),
+    );
     fireEvent.click(screen.getByTestId("client-create"));
     expect(await screen.findByText(/구분을 고르면 고객사는/)).toBeVisible();
     expect(screen.queryByTestId("client-page")).not.toBeInTheDocument();
@@ -565,6 +720,9 @@ describe("client and part route composition", () => {
     const { request } = respondWithClientParts();
     mount("/screens/UI-15");
     await screen.findByText("조건에 맞는 결과가 없습니다.");
+    await waitFor(() =>
+      expect(screen.getByTestId("upload-open")).toBeEnabled(),
+    );
     fireEvent.click(screen.getByTestId("upload-open"));
     await screen.findByTestId("upload-dialog");
     fireEvent.change(screen.getByTestId("upload-file"), {
@@ -1758,6 +1916,9 @@ describe("assignment route composition", () => {
     const { request } = respondWithAssignments();
     mount("/screens/UI-12");
     await screen.findByTestId("assignment-empty");
+    await waitFor(() =>
+      expect(screen.getByTestId("upload-open")).toBeEnabled(),
+    );
     fireEvent.click(screen.getByTestId("upload-open"));
     fireEvent.change(await screen.findByTestId("upload-file"), {
       target: { files: [new File(["workbook"], "assignments.xlsx")] },
@@ -1835,6 +1996,9 @@ describe("assignment route composition", () => {
       mount("/screens/UI-12");
       await screen.findByTestId("assignment-empty");
       const initialReads = list.mock.calls.length;
+      await waitFor(() =>
+        expect(screen.getByTestId("upload-open")).toBeEnabled(),
+      );
       fireEvent.click(screen.getByTestId("upload-open"));
       fireEvent.change(await screen.findByTestId("upload-file"), {
         target: { files: [new File(["workbook"], "assignments.xlsx")] },
@@ -2172,8 +2336,15 @@ describe("application route registration", () => {
     const { request, list } = respondWithMenuSettings();
     mount("/screens/UI-25");
     await screen.findByLabelText("M029 메뉴 이름");
+    await waitFor(() =>
+      expect(screen.getByTestId("menu-registration-open")).toBeEnabled(),
+    );
     fireEvent.click(screen.getByTestId("menu-registration-open"));
-    await screen.findByTestId("menu-registration-no-screens", {}, { timeout: 3000 });
+    await screen.findByTestId(
+      "menu-registration-no-screens",
+      {},
+      { timeout: 3000 },
+    );
     expect(request).toHaveBeenCalledWith("/api/common/menu-options?menuLvl=2", {
       signal: expect.any(AbortSignal),
     });
@@ -2384,6 +2555,9 @@ describe("application route registration", () => {
     const { request } = respondWithRoles();
     mount("/screens/UI-24");
     await screen.findByTestId("role-settings");
+    await waitFor(() =>
+      expect(screen.getByTestId("role-copy-open")).toBeEnabled(),
+    );
     fireEvent.click(screen.getByTestId("role-copy-open"));
     expect(await screen.findByTestId("role-copy-dialog")).toBeVisible();
     expect(router?.state.location.pathname).toBe("/screens/UI-24");

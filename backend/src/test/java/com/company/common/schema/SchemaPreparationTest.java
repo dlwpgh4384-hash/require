@@ -114,6 +114,14 @@ class SchemaPreparationTest {
         ordered.verify(connection).createStatement();
         ordered.verify(statement).execute(contains("DO $part_settlement$"));
         ordered.verify(statement).close();
+        ordered.verify(session).getConnection();
+        ordered.verify(connection).createStatement();
+        ordered.verify(statement).execute(contains("DO $finance_schema$"));
+        ordered.verify(statement).close();
+        ordered.verify(session).getConnection();
+        ordered.verify(connection).createStatement();
+        ordered.verify(statement).execute(contains("DO $business_plan_schema$"));
+        ordered.verify(statement).close();
         ordered.verify(session).commit(true);
         ordered.verify(session).close();
         verify(session, never()).rollback(anyBoolean());
@@ -200,7 +208,7 @@ class SchemaPreparationTest {
             "TB_SL_OPP", "TB_SL_OPP_NEED", "TB_SL_TENT_ASGN", "TB_SL_RCMD_LOG", "TB_BL_RCPT",
             "TB_CO_PART_SETL_DTL", "TB_CL_CLOSE_CHK",
             "TB_CO_MON_PL", "TB_CO_PREV_ADJ", "TB_FI_ITEM", "TB_FI_CORP_TAX", "TB_FI_TAX_PAY", "TB_FI_LOAN",
-            "TB_FI_CARD", "TB_FI_CARD_MON", "TB_FI_CARD_PAY", "TB_FI_XFER");
+            "TB_FI_CARD", "TB_FI_CARD_MON", "TB_FI_CARD_PAY", "TB_FI_XFER", "TB_FI_BIZ_PLAN");
         assertThat(tables).isEqualTo(MigrationResources.tableNames());
         assertThat(tables).allMatch(name -> name.startsWith("TB_"));
         assertThat(tables).contains("TB_SY_CALC_RULE", "TB_SY_CHG_HIST", "TB_SY_CODE", "TB_SY_CODE_GRP",

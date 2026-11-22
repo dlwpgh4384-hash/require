@@ -22,6 +22,7 @@ import { FinanceItemWorkspaceProvider } from "../financeitems/FinanceItemWorkspa
 import { ProfitStructureWorkspaceProvider } from "../profitstructures/ProfitStructureWorkspace";
 import { OperatingProfitStatementWorkspaceProvider } from "../operatingprofitstatements/OperatingProfitStatementWorkspace";
 import { NetProfitStatementWorkspaceProvider } from "../netprofitstatements/NetProfitStatementWorkspace";
+import { BusinessPlanComparisonWorkspaceProvider } from "../commonops/BusinessPlanComparisonWorkspace";
 import { CodeWorkspaceProvider } from "../codegroups/CodeWorkspace";
 import { ClientPartWorkspaceProvider } from "../clients/ClientPartWorkspace";
 import { DeveloperWorkspaceProvider } from "../developers/DeveloperWorkspace";
@@ -109,50 +110,52 @@ function PreferenceNavigation() {
 export function CommonNavigationPage() {
   const preferences = useOptionalUserPreferences();
   return (
-    <UserWorkspaceProvider>
-      <RoleWorkspaceProvider>
-        <MenuWorkspaceProvider>
-          <CodeWorkspaceProvider>
-            <ClientPartWorkspaceProvider>
-              <DeveloperWorkspaceProvider>
-                <ProjectWorkspaceProvider>
-                  <AssignmentWorkspaceProvider>
-                    <WithdrawalWorkspaceProvider>
-                      <ProjectBoardWorkspaceProvider>
-                        <BillingWorkspaceProvider>
-                          <PartSettlementWorkspaceProvider>
-                            <FinanceItemWorkspaceProvider>
-                              <ProfitStructureWorkspaceProvider>
-                                <OperatingProfitStatementWorkspaceProvider>
-                                  <NetProfitStatementWorkspaceProvider>
-                                    {preferences ? (
-                                      <PreferenceNavigation />
-                                    ) : (
-                                      <NavigationRoot
-                                        tabs
-                                        renderScreen={renderScreen}
-                                        extensions={(context) => ({
-                                          screenActions: screenActions(
-                                            context.screenId,
-                                          ),
-                                        })}
-                                      />
-                                    )}
-                                  </NetProfitStatementWorkspaceProvider>
-                                </OperatingProfitStatementWorkspaceProvider>
-                              </ProfitStructureWorkspaceProvider>
-                            </FinanceItemWorkspaceProvider>
-                          </PartSettlementWorkspaceProvider>
-                        </BillingWorkspaceProvider>
-                      </ProjectBoardWorkspaceProvider>
-                    </WithdrawalWorkspaceProvider>
-                  </AssignmentWorkspaceProvider>
-                </ProjectWorkspaceProvider>
-              </DeveloperWorkspaceProvider>
-            </ClientPartWorkspaceProvider>
-          </CodeWorkspaceProvider>
-        </MenuWorkspaceProvider>
-      </RoleWorkspaceProvider>
-    </UserWorkspaceProvider>
+    <BusinessPlanComparisonWorkspaceProvider>
+      <UserWorkspaceProvider>
+        <RoleWorkspaceProvider>
+          <MenuWorkspaceProvider>
+            <CodeWorkspaceProvider>
+              <ClientPartWorkspaceProvider>
+                <DeveloperWorkspaceProvider>
+                  <ProjectWorkspaceProvider>
+                    <AssignmentWorkspaceProvider>
+                      <WithdrawalWorkspaceProvider>
+                        <ProjectBoardWorkspaceProvider>
+                          <BillingWorkspaceProvider>
+                            <PartSettlementWorkspaceProvider>
+                              <FinanceItemWorkspaceProvider>
+                                <ProfitStructureWorkspaceProvider>
+                                  <OperatingProfitStatementWorkspaceProvider>
+                                    <NetProfitStatementWorkspaceProvider>
+                                      {preferences ? (
+                                        <PreferenceNavigation />
+                                      ) : (
+                                        <NavigationRoot
+                                          tabs
+                                          renderScreen={renderScreen}
+                                          extensions={(context) => ({
+                                            screenActions: screenActions(
+                                              context.screenId,
+                                            ),
+                                          })}
+                                        />
+                                      )}
+                                    </NetProfitStatementWorkspaceProvider>
+                                  </OperatingProfitStatementWorkspaceProvider>
+                                </ProfitStructureWorkspaceProvider>
+                              </FinanceItemWorkspaceProvider>
+                            </PartSettlementWorkspaceProvider>
+                          </BillingWorkspaceProvider>
+                        </ProjectBoardWorkspaceProvider>
+                      </WithdrawalWorkspaceProvider>
+                    </AssignmentWorkspaceProvider>
+                  </ProjectWorkspaceProvider>
+                </DeveloperWorkspaceProvider>
+              </ClientPartWorkspaceProvider>
+            </CodeWorkspaceProvider>
+          </MenuWorkspaceProvider>
+        </RoleWorkspaceProvider>
+      </UserWorkspaceProvider>
+    </BusinessPlanComparisonWorkspaceProvider>
   );
 }

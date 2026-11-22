@@ -1,0 +1,65 @@
+.business-plan-comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+}
+.business-plan-comparison > *,
+.business-plan-chart-card {
+  min-width: 0;
+}
+.business-plan-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.business-plan-kpis {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.business-plan-chart-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.business-plan-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.business-plan-table {
+  min-width: 1050px;
+  font-variant-numeric: tabular-nums;
+}
+.business-plan-table th,
+.business-plan-table td {
+  padding: 12px;
+}
+.business-plan-table td.business-plan-current,
+.business-plan-table th.business-plan-current {
+  background: var(--primary-bg);
+}
+.business-plan-rate {
+  font-weight: 700;
+}
+.business-plan-under {
+  color: var(--ls-bad);
+}
+.business-plan-info {
+  border: 0;
+  padding: 0 2px;
+  background: transparent;
+  color: var(--primary-text);
+  cursor: pointer;
+}
+.business-plan-table [role="tooltip"] {
+  display: block;
+  white-space: normal;
+  font-size: 12px;
+  color: var(--text-sub);
+  max-width: 210px;
+}
+@media (max-width: 768px) {
+  .business-plan-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

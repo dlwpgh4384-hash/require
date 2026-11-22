@@ -12,7 +12,8 @@ export function createAppRouter() {
       ),
       children: [
         { path: "/", element: <CommonNavigationPage /> },
-        // UI-04, UI-32 and UI-07 (M019/G007) use screenRegistry inside the shared shell.
+        // UI-07 (M019/G007) and UI-08 (M020/G007) resolve through screenRegistry.
+        // Keep the shared screen route; feature pages own their API clients.
         { path: "/screens/:scrnId", element: <CommonNavigationPage /> },
         { path: "*", element: <CommonNavigationPage /> },
       ],

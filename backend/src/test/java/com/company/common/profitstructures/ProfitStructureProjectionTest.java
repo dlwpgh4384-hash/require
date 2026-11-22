@@ -62,7 +62,8 @@ class ProfitStructureProjectionTest {
             Statement jdbc=mock(Statement.class);when(jdbc.getResultSet()).thenReturn(jdbcRows);when(jdbc.getUpdateCount()).thenReturn(-1);
             var handler=new DefaultResultSetHandler(null,statement,null,null,statement.getBoundSql(new Query(2026,2)),RowBounds.DEFAULT);
             List<Object> actual=handler.handleResultSets(jdbc);assertThat(actual).hasSize(1);
-            assertThat(actual.get(0)).isEqualTo(mapping.getType().getDeclaredConstructors()[0].newInstance(expected.toArray()));
+            var parameterTypes = fields.stream().map(field -> field.getJavaType()).toArray(Class<?>[]::new);
+            assertThat(actual.get(0)).isEqualTo(mapping.getType().getDeclaredConstructor(parameterTypes).newInstance(expected.toArray()));
         }
     }
     @Test void billedTurnkeyAndEffectiveAcquisitionPartAreIndependentOfDistributionAndEmployee() throws Exception {

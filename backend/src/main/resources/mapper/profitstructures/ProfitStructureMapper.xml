@@ -20,6 +20,9 @@
       <arg column="migrated" javaType="java.lang.String"/>
       <arg column="fixed" javaType="java.lang.String"/>
       <arg column="modifiedAt" javaType="java.time.Instant"/>
+      <arg column="sellingAdministrativeInput" javaType="java.math.BigDecimal"/>
+      <arg column="indirectLaborCost" javaType="java.math.BigDecimal"/>
+      <arg column="internalResearchCost" javaType="java.math.BigDecimal"/>
     </constructor>
   </resultMap>
   <resultMap id="project" type="com.company.common.profitstructures.mapper.ProfitStructureRows$ProjectMonth">
@@ -71,7 +74,8 @@
       DRCT_EXPS_AMT AS "directExpense",SALES_COST_AMT AS "costOfSales",GROSS_PRFT_AMT AS "grossProfit",
       SGA_TOT_AMT AS "sga",PREV_ADJ_AMT AS "previousAdjustment",OPRT_PRFT_AMT AS "operatingProfit",
       NOPR_INCM_AMT AS "income",NOPR_EXPS_AMT AS "expense",CORP_TAX_AMT AS "tax",NET_PRFT_AMT AS "netProfit",
-      MIGR_YN AS "migrated",FIX_YN AS "fixed",MOD_DTTM AS "modifiedAt"
+      MIGR_YN AS "migrated",FIX_YN AS "fixed",MOD_DTTM AS "modifiedAt",
+      SGA_INPUT_AMT AS "sellingAdministrativeInput",INDRCT_LABOR_AMT AS "indirectLaborCost",RND_AMT AS "internalResearchCost"
     FROM TB_CO_MON_PL WHERE PL_YM <include refid="yearRange"/> ORDER BY PL_YM
   </select>
   <select id="projects" resultMap="project">

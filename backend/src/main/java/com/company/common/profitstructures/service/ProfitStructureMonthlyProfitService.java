@@ -54,9 +54,15 @@ public class ProfitStructureMonthlyProfitService {
             YearMonth month = YearMonth.of(year, m);
             String ym = key(month);
             var saved = fixed.get(ym);
-            boolean migrated = saved != null && "Y".equals(saved.migrated()) && year == 2025 && ym.compareTo(cashBase) < 0;
+            boolean migrated = saved != null && "Y".equals(saved.migrated()) && ym.compareTo(cashBase) < 0;
             if (migrated) {
                 result.put(ym, new Month(saved, List.of(), null, true, true, false));
+                continue;
+            }
+            if (ym.compareTo(cashBase) < 0) {
+                var missing = new Snapshot(ym, null, null, null, null, null, null, null,
+                    null, null, null, null, null, null, "N", "Y", null);
+                result.put(ym, new Month(missing, List.of(), null, false, true, false));
                 continue;
             }
             var amounts = new HashMap<String, ProjectAmounts>();
@@ -136,7 +142,7 @@ public class ProfitStructureMonthlyProfitService {
                 BigDecimal income = sum(monthFinance, "NOPR_IN"), expense = sum(monthFinance, "NOPR_OUT");
                 BigDecimal tax = taxes.get(ym), net = tax == null ? null : operating.add(income).subtract(expense).subtract(tax);
                 saved = new Snapshot(ym, revenue, allocated, idle, direct, cogs, gross, sga, adjustment, operating,
-                    income, expense, tax, net, "N", "N", null);
+                    income, expense, tax, net, "N", "N", null, sum(monthFinance, "SGA"), indirect, rnd);
             }
             result.put(ym, new Month(saved, List.copyOf(values), reference, available, false, !"Y".equals(saved.fixed())));
         }

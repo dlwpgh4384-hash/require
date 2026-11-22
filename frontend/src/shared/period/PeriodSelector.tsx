@@ -70,7 +70,8 @@ function MonthBox({
   const all: PeriodValue[] = [];
   for (const year of range(years.min, years.max)) {
     const months = monthRange(basis, options, year);
-    for (const month of range(months.min, months.max)) all.push({ year, month });
+    for (const month of range(months.min, months.max))
+      all.push({ year, month });
   }
   const key = (item: PeriodValue) => `${item.year}-${item.month}`;
   const index = all.findIndex((item) => key(item) === key(value));
@@ -164,7 +165,8 @@ function CumulativeBar({
   const change = (next: PeriodValue) => {
     if (!disabled && isAllowed(next, basis, options)) onChange(next);
   };
-  const setYear = (year: number) => change(withYear(value, year, basis, options));
+  const setYear = (year: number) =>
+    change(withYear(value, year, basis, options));
   return (
     <div
       className="period-cumulative-bar"
@@ -271,9 +273,12 @@ export function PeriodSelector({
   const change = (next: PeriodValue) => {
     if (!disabled && isAllowed(next, basis, options)) onChange(next);
   };
-  const setYear = (year: number) => change(withYear(value, year, basis, options));
+  const setYear = (year: number) =>
+    change(withYear(value, year, basis, options));
   const months =
-    options.kind === "year" ? undefined : monthRange(basis, options, value.year);
+    options.kind === "year"
+      ? undefined
+      : monthRange(basis, options, value.year);
   const monthLabel = options.kind === "yearCumulative" ? "누계 기준월" : "월";
   return (
     <div
@@ -337,7 +342,9 @@ export function PeriodSelector({
               data-testid="period-month-prev"
               aria-label={`이전 ${monthLabel}`}
               disabled={disabled || (value.month ?? 1) <= months.min}
-              onClick={() => change({ year: value.year, month: (value.month ?? 1) - 1 })}
+              onClick={() =>
+                change({ year: value.year, month: (value.month ?? 1) - 1 })
+              }
             >
               ‹
             </button>
@@ -371,14 +378,20 @@ export function PeriodSelector({
               data-testid="period-month-next"
               aria-label={`다음 ${monthLabel}`}
               disabled={disabled || (value.month ?? 12) >= months.max}
-              onClick={() => change({ year: value.year, month: (value.month ?? 12) + 1 })}
+              onClick={() =>
+                change({ year: value.year, month: (value.month ?? 12) + 1 })
+              }
             >
               ›
             </button>
           )}
         </div>
       )}
-      <span className="period-badges" aria-live="polite" data-testid="period-status">
+      <span
+        className="period-badges"
+        aria-live="polite"
+        data-testid="period-status"
+      >
         <span
           className={`period-badge${status.readOnly ? " is-locked" : ""}${status.yearBadge === "내년 · 계획" ? " is-plan" : ""}`}
           data-testid="period-year-badge"

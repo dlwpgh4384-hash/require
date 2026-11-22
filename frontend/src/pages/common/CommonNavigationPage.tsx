@@ -20,6 +20,7 @@ import { BillingWorkspaceProvider } from "../bills/BillingWorkspace";
 import { PartSettlementWorkspaceProvider } from "../partsettlements/PartSettlementWorkspace";
 import { FinanceItemWorkspaceProvider } from "../financeitems/FinanceItemWorkspace";
 import { ProfitStructureWorkspaceProvider } from "../profitstructures/ProfitStructureWorkspace";
+import { OperatingProfitStatementWorkspaceProvider } from "../operatingprofitstatements/OperatingProfitStatementWorkspace";
 import { CodeWorkspaceProvider } from "../codegroups/CodeWorkspace";
 import { ClientPartWorkspaceProvider } from "../clients/ClientPartWorkspace";
 import { DeveloperWorkspaceProvider } from "../developers/DeveloperWorkspace";
@@ -121,19 +122,21 @@ export function CommonNavigationPage() {
                           <PartSettlementWorkspaceProvider>
                             <FinanceItemWorkspaceProvider>
                               <ProfitStructureWorkspaceProvider>
-                              {preferences ? (
-                                <PreferenceNavigation />
-                              ) : (
-                                <NavigationRoot
-                                  tabs
-                                  renderScreen={renderScreen}
-                                  extensions={(context) => ({
-                                    screenActions: screenActions(
-                                      context.screenId,
-                                    ),
-                                  })}
-                                />
-                              )}
+                                <OperatingProfitStatementWorkspaceProvider>
+                                  {preferences ? (
+                                    <PreferenceNavigation />
+                                  ) : (
+                                    <NavigationRoot
+                                      tabs
+                                      renderScreen={renderScreen}
+                                      extensions={(context) => ({
+                                        screenActions: screenActions(
+                                          context.screenId,
+                                        ),
+                                      })}
+                                    />
+                                  )}
+                                </OperatingProfitStatementWorkspaceProvider>
                               </ProfitStructureWorkspaceProvider>
                             </FinanceItemWorkspaceProvider>
                           </PartSettlementWorkspaceProvider>

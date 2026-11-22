@@ -408,6 +408,9 @@ it("common B11 dialog inspects and applies through uploads only then reloads sam
   });
   fireEvent.click(screen.getByRole("button", { name: /^검사$/ }));
   expect(await screen.findByTestId("upload-result-dialog")).toBeVisible();
+  expect(screen.getByTestId("upload-result-dialog")).toHaveTextContent(
+    "빈칸은 값 없음으로 두고 화면에 「–」로 보입니다. 엑셀 값은 다시 계산하지 않습니다. 같은 연월을 다시 올리면 그 달을 덮어씁니다.",
+  );
   await waitFor(() => expect(screen.getByTestId("upload-apply")).toBeEnabled());
   const uploadCall = request.mock.calls.find(
     ([path]) => path === "/api/common/uploads",

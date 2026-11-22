@@ -36,7 +36,21 @@ public class OperatingProfitStatementUploadForm implements UploadForm {
     public List<String> headers() { return HEADERS; }
     public String templateFileName() { return "previous-profit-template.xlsx"; }
     public String templateNote() {
-        return "연월·매출·매출원가·판관비 합계·영업이익은 필수입니다. 나머지 열은 빈칸을 유지합니다. 시작월의 전년 1월부터 시작월 직전월까지 일부 달만 올려도 됩니다. 같은 연월은 덮어씁니다.";
+        return "연월·매출·매출원가·판관비 합계·영업이익은 필수입니다. 세부 줄은 있으면 적고, 빈칸은 화면에 「–」로 보입니다. 시작월의 전년 1월부터 시작월 직전월까지 일부 달만 올려도 됩니다. 같은 연월은 덮어씁니다.";
+    }
+    /** 시안 B.11 예시 오류 문구. */
+    private static final String REQUIRED = " (필수: 연월·매출·매출원가·판관비 합계·영업이익)";
+    private static String required(String column) {
+        char last = column.charAt(column.length() - 1);
+        boolean batchim = last >= '가' && last <= '힣' && (last - '가') % 28 != 0;
+        return column + (batchim ? "을" : "를") + " 입력해 주세요." + REQUIRED;
+    }
+    /** 시작월이 1월이면 「2025년(시작한 달 전) 달만 …」(시안), 아니면 범위를 적는다. */
+    private static String range(YearMonth min, YearMonth start) {
+        var last = start.minusMonths(1);
+        String span = start.getMonthValue() == 1 ? min.getYear() + "년"
+            : min.format(DateTimeFormatter.ofPattern("uuuu-MM")) + " ~ " + last.format(DateTimeFormatter.ofPattern("uuuu-MM"));
+        return span + "(시작한 달 전) 달만 올릴 수 있습니다.";
     }
     public void lock() { mapper.lockSources(); }
     private YearMonth start() {
@@ -46,7 +60,9 @@ public class OperatingProfitStatementUploadForm implements UploadForm {
     }
     private YearMonth parseMonth(String value) {
         String compact = value.trim().replace("-", "");
-        if (!compact.matches("[0-9]{4}(0[1-9]|1[0-2])")) throw new IllegalArgumentException("연월을 확인해 주세요.");
+        if (compact.isEmpty()) throw new IllegalArgumentException(required("연월"));
+        if (!compact.matches("[0-9]{4}(0[1-9]|1[0-2])"))
+            throw new IllegalArgumentException("연월 형식이 맞지 않습니다. YYYY-MM으로 적어 주세요.");
         return YearMonth.parse(compact, YM);
     }
     public Inspection inspect(List<TabularRow> rows, YearMonth ignored) {
@@ -65,12 +81,12 @@ public class OperatingProfitStatementUploadForm implements UploadForm {
                 var month = parseMonth(values.get(0));
                 if (counts.get(month) > 1) throw new IllegalArgumentException("같은 파일의 연월이 중복되었습니다.");
                 if (month.isBefore(min) || !month.isBefore(start))
-                    throw new IllegalArgumentException("시작월의 전년 1월부터 시작월 직전월까지만 올릴 수 있습니다.");
+                    throw new IllegalArgumentException(range(min, start));
                 var amounts = new BigDecimal[17];
                 for (column = 1; column < 17; column++) {
                     String text = values.get(column).trim().replace(",", "");
                     if (text.isEmpty()) {
-                        if (column <= 4) throw new IllegalArgumentException("필수 금액을 입력해 주세요.");
+                        if (column <= 4) throw new IllegalArgumentException(required(HEADERS.get(column)));
                         continue;
                     }
                     if (!text.matches("[+-]?[0-9]+")) throw new IllegalArgumentException("금액은 부호 있는 정수 원 단위로 입력해 주세요.");
@@ -91,6 +107,7 @@ public class OperatingProfitStatementUploadForm implements UploadForm {
             } catch (RuntimeException failure) {
                 int c = Math.min(column, 16);
                 String input = row.values().get(c);
+                if (input.isBlank()) input = "(빈칸)"; // 시안 오류 목록의 입력값 표기
                 issues.add(new Issue(row.rowNumber(), HEADERS.get(c), input.substring(0, Math.min(input.length(), 200)),
                     failure instanceof IllegalArgumentException ? failure.getMessage() : "입력값을 확인해 주세요.", "오류"));
             }

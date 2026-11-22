@@ -55,6 +55,16 @@ class OperatingProfitStatementUploadTest {
         assertThat(result.errorCount()).isEqualTo(1); assertThat(result.issues().get(0).column()).isEqualTo("연월");
         verifyNoInteractions(mapper);
     }
+    @Test void errorReasonsFollowMockupWording() {
+        var noRevenue=row(1,""); var noSga=row(3,""); noSga.set(0,"202502");
+        var result=inspect(bytes(List.of(row(0,"202603"),row(0,"2025.13"),noRevenue,noSga)));
+        assertThat(result.issues()).extracting(i->i.reason()).containsExactly(
+            "2025-01 ~ 2026-02(시작한 달 전) 달만 올릴 수 있습니다.",
+            "연월 형식이 맞지 않습니다. YYYY-MM으로 적어 주세요.",
+            "매출을 입력해 주세요. (필수: 연월·매출·매출원가·판관비 합계·영업이익)",
+            "판관비 합계를 입력해 주세요. (필수: 연월·매출·매출원가·판관비 합계·영업이익)");
+        assertThat(result.issues().get(2).inputValue()).isEqualTo("(빈칸)");
+    }
     @Test void currentYearPreStartMonthIsAllowedWithoutClosingRestrictions() {
         assertThat(inspect(bytes(List.of(row(0,"202602")))).errorCount()).isZero();
     }

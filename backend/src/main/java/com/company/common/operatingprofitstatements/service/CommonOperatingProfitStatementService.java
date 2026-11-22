@@ -41,6 +41,8 @@ public class CommonOperatingProfitStatementService {
         var source = new TreeMap<String, ProfitStructureMonthlyProfitService.Month>();
         source.putAll(monthly.year(filter.year(), end, basis.cashBaseYm()));
         source.putAll(monthly.year(filter.year() - 1, end == 1 ? 12 : end, basis.cashBaseYm()));
-        return new Response<>(true, Map.of(), OperatingProfitStatementProjection.of(filter, source));
+        // 시작한 달의 전년(이관 해)이 자료의 첫 해다. 그 해는 비교할 전년이 없다.
+        boolean firstYear = filter.year() <= Integer.parseInt(basis.cashBaseYm().substring(0, 4)) - 1;
+        return new Response<>(true, Map.of(), OperatingProfitStatementProjection.of(filter, source, firstYear));
     }
 }

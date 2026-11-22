@@ -206,7 +206,7 @@ function CumulativeBar({
           data-testid="period-month"
           aria-label="누계 기준월"
           value={month}
-          disabled={disabled || done}
+          disabled={disabled}
           onChange={(event) =>
             change({ year: value.year, month: Number(event.target.value) })
           }

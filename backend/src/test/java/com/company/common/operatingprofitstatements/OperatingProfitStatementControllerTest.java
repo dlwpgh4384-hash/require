@@ -125,7 +125,11 @@ class OperatingProfitStatementControllerTest {
         for(int i=0;i<2;i++) mvc.perform(query("","202501")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.provisional").value(false))
             .andExpect(jsonPath("$.data.numericTable.rows[3].values[0].value").isEmpty())
-            .andExpect(jsonPath("$.data.numericTable.rows[4].values[0].value").value(0));
+            .andExpect(jsonPath("$.data.numericTable.rows[4].values[0].value").value(0))
+            // 첫 해(이관 해)는 전년이 없어 전년 누계·전년 대비 열이 없다(시안·SFR-108-05).
+            .andExpect(jsonPath("$.data.numericTable.columns.length()").value(13))
+            .andExpect(jsonPath("$.data.numericTable.columns[12].label").value("누계"))
+            .andExpect(jsonPath("$.data.numericTable.rows[0].values.length()").value(13));
         assertThat(source.snapshots(new Query(2025,1))).isEqualTo(before);
         verifyNoInteractions(audit);
     }

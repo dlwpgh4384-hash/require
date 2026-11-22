@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Banner,
-  FormulaBox,
   KpiCard,
   KpiCards,
   MoneyUnitSelect,
@@ -25,7 +24,6 @@ import {
 } from "./operatingProfitStatements";
 import { OperatingProfitStatementTable } from "./OperatingProfitStatementTable";
 import { useOperatingProfitStatementTitleHost } from "./OperatingProfitStatementWorkspace";
-import { operatingProfitStatementFormulas } from "./operatingProfitStatementFormulas";
 import "./operatingProfitStatements.css";
 
 const options = {
@@ -33,6 +31,7 @@ const options = {
   allowBeforeStart: true,
   firstDataYear: 2025,
 } as const;
+/** 시안 yy()·delta(): 「▲ 5.2% 전년 같은 기간 대비」 — 화살표·숫자만 색, 줄면 빨강. */
 function Comparison({
   value,
   label,
@@ -41,23 +40,40 @@ function Comparison({
   label: string;
 }) {
   return value == null ? null : (
-    <span className={value < 0 ? "operating-bad" : "operating-good"}>
-      {value < 0 ? "▼" : "▲"} {Math.abs(value).toFixed(1)}% {label}
-    </span>
+    <>
+      <span className={value < 0 ? "operating-bad" : "operating-good"}>
+        {value < 0 ? "▼" : "▲"} {Math.abs(value).toFixed(1)}%
+      </span>{" "}
+      {label}
+    </>
   );
 }
-function MetricDescription({ metric }: { metric?: OperatingMetric }) {
+const YEAR = "전년 같은 기간 대비";
+/** 시안 UI-08 요약 4칸: 누계 3칸은 전년 같은 기간 대비, 기준월 칸은 전월 대비만. */
+function MetricDescription({
+  id,
+  metric,
+  rate,
+}: {
+  id: string;
+  metric?: OperatingMetric;
+  rate?: number | null;
+}) {
+  if (id === "base")
+    return (
+      <Comparison value={metric?.previousMonthChangePercent} label="전월 대비" />
+    );
+  const year = metric?.previousYearChangePercent;
+  if (id !== "operating") return <Comparison value={year} label={YEAR} />;
   return (
     <>
-      <Comparison
-        value={metric?.previousYearChangePercent}
-        label="전년 같은 기간 대비"
-      />
-      <br />
-      <Comparison
-        value={metric?.previousMonthChangePercent}
-        label="전월 대비"
-      />
+      이익률 {percentage(rate)}
+      {year != null && (
+        <>
+          {" · "}
+          <Comparison value={year} label={YEAR} />
+        </>
+      )}
     </>
   );
 }
@@ -149,7 +165,7 @@ export function OperatingProfitStatementPage() {
     }
   };
   const actions = (
-    <>
+    <div className="operating-title-buttons">
       <UploadActions
         formTypeCode="B11"
         targetName="전년 손익"
@@ -183,15 +199,21 @@ export function OperatingProfitStatementPage() {
       >
         엑셀 다운로드
       </button>
-    </>
+    </div>
   );
   const summary = data?.summary;
+  const year = filter?.year ?? data?.year;
+  const end = Number((filter?.baseMonth ?? data?.baseMonth ?? "").slice(4));
+  const monthName = year && end ? `${year}-${String(end).padStart(2, "0")}` : "";
   const cards: [string, OperatingMetric | undefined, string][] = [
     ["누계 매출", summary?.cumulativeRevenue, "revenue"],
     ["누계 매출총이익", summary?.cumulativeGrossProfit, "gross"],
-    ["누계 영업이익(이익률)", summary?.cumulativeOperatingProfit, "operating"],
-    ["기준월 영업이익", summary?.baseMonthOperatingProfit, "base"],
+    ["누계 영업이익", summary?.cumulativeOperatingProfit, "operating"],
+    [`${monthName} 영업이익`.trim(), summary?.baseMonthOperatingProfit, "base"],
   ];
+  // 첫 해(이관 해)는 서버가 전년 열을 주지 않는다. 시안 plTable의 PP(전년) 유무와 같다.
+  const compared =
+    data?.numericTable.columns.some((c) => c.label === "전년 대비") ?? false;
   return (
     <section
       ref={root}
@@ -256,24 +278,15 @@ export function OperatingProfitStatementPage() {
           {cards.map(([label, metric, id]) => (
             <KpiCard
               key={id}
-              label={
-                <>
-                  {label}
-                  {data?.provisional && " · 잠정"}
-                </>
-              }
+              label={label}
               value={formatKoreanMoney(metric?.amount)}
               testId={`operating-kpi-${id}`}
               description={
-                <>
-                  {id === "operating" && (
-                    <>
-                      영업이익률 {percentage(summary?.operatingProfitRate)}
-                      <br />
-                    </>
-                  )}
-                  <MetricDescription metric={metric} />
-                </>
+                <MetricDescription
+                  id={id}
+                  metric={metric}
+                  rate={summary?.operatingProfitRate}
+                />
               }
             />
           ))}
@@ -284,15 +297,25 @@ export function OperatingProfitStatementPage() {
         aria-label="영업이익 보고서"
         data-testid="operating-report-card"
       >
-        <div className="operating-report-heading">
-          <h2>영업이익표 · 1~12월</h2>
-          <MoneyUnitSelect
-            value={unit}
-            onChange={setUnit}
-            id="operating-money-unit"
-          />
+        <div className="ls-tbar">
+          <div className="ls-tl" data-testid="operating-table-caption">
+            {year && monthName
+              ? `${year}년 · ${monthName}까지 실적${compared ? ` · 전년 같은 기간(1~${end}월)과 비교` : ""}`
+              : null}
+          </div>
+          <div className="ls-tr">
+            <MoneyUnitSelect
+              value={unit}
+              onChange={setUnit}
+              id="operating-money-unit"
+            />
+          </div>
         </div>
-        <OperatingProfitStatementTable table={data?.numericTable} unit={unit} />
+        <OperatingProfitStatementTable
+          table={data?.numericTable}
+          unit={unit}
+          baseIndex={end ? end - 1 : undefined}
+        />
         {loading && (
           <p role="status" data-testid="operating-loading">
             자료를 불러오는 중입니다.
@@ -308,15 +331,12 @@ export function OperatingProfitStatementPage() {
               자료가 없습니다.
             </p>
           )}
-        <p className="ls-note">
-          엑셀 다운로드는 이 표와 같습니다. 시작 전 이관의 빈칸은 –로
-          표시합니다.
+        <p className="ls-note" data-testid="operating-note">
+          매출 인식: 턴키는 청구일, 월단위·파견은 귀속월 기준. 부가세 제외.
+          {compared &&
+            " 전년 대비는 같은 기간 누계끼리 비교하며, 비용 항목은 늘면 빨강으로 표시합니다."}
         </p>
       </section>
-      <FormulaBox
-        rows={operatingProfitStatementFormulas}
-        testId="operating-formulas"
-      />
       {notice && (
         <Toast
           message={notice.message}

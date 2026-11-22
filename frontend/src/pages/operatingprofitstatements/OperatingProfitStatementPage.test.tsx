@@ -217,14 +217,38 @@ it("renders exact provisional copy and server headers, row style, cost direction
   expect(screen.getByRole("columnheader", { name: /누계 잠정/ })).toBeVisible();
   const revenue = screen.getByTestId("operating-row-0"),
     cost = screen.getByTestId("operating-row-1");
-  expect(revenue).toHaveClass("operating-bold");
-  expect(cost).toHaveClass("operating-indent");
+  expect(revenue).toHaveClass("operating-b");
+  expect(within(cost).getAllByRole("cell")[0]).toHaveClass("operating-ind");
   expect(within(revenue).getByText("−5.2%")).toHaveClass("operating-bad");
-  expect(within(cost).getByText("3.1%")).toHaveClass("operating-bad");
+  expect(within(cost).getByText("+3.1%")).toHaveClass("operating-bad");
   expect(screen.getByText("+1.2%p")).toBeVisible();
-  expect(within(revenue).getAllByRole("cell")[2]).toHaveTextContent("–");
-  expect(screen.getAllByText(/▼ 5.2% 전년 같은 기간 대비/)).toHaveLength(4);
+  expect(within(revenue).getAllByRole("cell")[3]).toHaveTextContent("–");
+  // 시안: 누계 3칸은 전년 같은 기간 대비만, 기준월 칸은 전월 대비만(값이 없으면 비움). 이름에 「잠정」을 붙이지 않는다.
+  for (const id of ["revenue", "gross", "operating"])
+    expect(screen.getByTestId(`operating-kpi-${id}`)).toHaveTextContent(
+      "▼ 5.2% 전년 같은 기간 대비",
+    );
+  expect(screen.getByTestId("operating-kpi-operating")).toHaveTextContent(
+    "이익률 12.3% · ▼ 5.2% 전년 같은 기간 대비",
+  );
+  expect(screen.getByTestId("operating-kpi-base")).toHaveTextContent(
+    "2026-02 영업이익",
+  );
+  expect(screen.getByTestId("operating-kpi-base")).not.toHaveTextContent(
+    "전년",
+  );
+  expect(screen.getByTestId("operating-kpis")).not.toHaveTextContent("잠정");
   expect(screen.queryByText(/전월 대비/)).not.toBeInTheDocument();
+  expect(screen.getByTestId("operating-table-caption")).toHaveTextContent(
+    "2026년 · 2026-02까지 실적 · 전년 같은 기간(1~2월)과 비교",
+  );
+  expect(
+    screen.getByRole("columnheader", { name: /2월 작업중/ }),
+  ).toHaveClass("operating-cur");
+  expect(screen.getByTestId("operating-note")).toHaveTextContent(
+    "매출 인식: 턴키는 청구일, 월단위·파견은 귀속월 기준. 부가세 제외. 전년 대비는 같은 기간 누계끼리 비교하며, 비용 항목은 늘면 빨강으로 표시합니다.",
+  );
+  expect(screen.queryByTestId("operating-formulas")).not.toBeInTheDocument();
 });
 it("closed base removes provisional banner and markers", async () => {
   mount();
@@ -250,10 +274,11 @@ it("favorable cost decrease and sales increase are not red and adjustments retai
     ],
   });
   render(<OperatingProfitStatementTable table={table} unit="원" />);
-  expect(screen.getByText("5.2%")).not.toHaveClass("operating-bad");
+  expect(screen.getByText("+5.2%")).not.toHaveClass("operating-bad");
   expect(screen.getByText("−3.1%")).not.toHaveClass("operating-bad");
-  expect(screen.getByText("−100,000")).toBeVisible();
-  expect(screen.getByText("+100,000")).toBeVisible();
+  // 시안 money(): 음수는 빨간 −, 양수는 부호 없이.
+  expect(screen.getByText("−100,000")).toHaveClass("ls-neg");
+  expect(screen.getByText("100,000")).toBeVisible();
 });
 it("mobile keeps report and export with unchanged common upload hiding", async () => {
   vi.stubGlobal(
@@ -277,17 +302,44 @@ it("mobile keeps report and export with unchanged common upload hiding", async (
     "operating-table-scroll",
   );
 });
-it("previous year forces December and keeps month readonly down to 2025", async () => {
+it("previous year opens at December and still lets the month change down to 2025", async () => {
   mount();
   await ready();
   fireEvent.click(screen.getByTestId("period-year-prev"));
   await ready("202512");
-  expect(screen.getByTestId("period-month")).toBeDisabled();
+  // 시안: 지난 해도 누계 기준월 1~12월을 고를 수 있다.
+  expect(screen.getByTestId("period-month")).toBeEnabled();
   expect(screen.getByTestId("period-selector")).toHaveTextContent(
     "1~12월 누계",
   );
   expect(screen.getByTestId("period-selector")).toHaveTextContent("결산 완료");
   expect(screen.getByTestId("period-year-prev")).toBeDisabled();
+});
+it("first year without previous-year columns drops the comparison caption and note", async () => {
+  const original = request.getMockImplementation()!;
+  request.mockImplementation(async (path: string, init?: RequestInit) => {
+    const response = await original(path, init);
+    if (!String(path).includes("operating-profit-statements?year=2025"))
+      return response;
+    const body = await response.json();
+    body.data.numericTable.columns = body.data.numericTable.columns.slice(0, 13);
+    for (const row of body.data.numericTable.rows)
+      row.values = row.values.slice(0, 13);
+    return { ...response, json: async () => body };
+  });
+  mount();
+  await ready();
+  fireEvent.click(screen.getByTestId("period-year-prev"));
+  await ready("202512");
+  expect(screen.getByTestId("operating-table-caption")).toHaveTextContent(
+    /^2025년 · 2025-12까지 실적$/,
+  );
+  expect(
+    screen.queryByRole("columnheader", { name: "전년 누계" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByTestId("operating-note")).toHaveTextContent(
+    /^매출 인식: 턴키는 청구일, 월단위·파견은 귀속월 기준\. 부가세 제외\.$/,
+  );
 });
 it("empty data retains report header period controls upload controls and download", async () => {
   empty = true;

@@ -64,7 +64,7 @@ public class CommonNetProfitStatementService {
         var summary = new Summary(cumulative, ratio(cumulative, revenue), baseAmount,
             change(baseAmount, previous == null ? null : previous.values().netProfit()));
         boolean provisional = base != null && base.provisional();
-        boolean firstYear = filter.year() == Integer.parseInt(basis.cashBaseYm().substring(0, 4)) - 1;
+        boolean firstYear = filter.year() <= Integer.parseInt(basis.cashBaseYm().substring(0, 4)) - 1;
         boolean visible = ym.compareTo(basis.cashBaseYm()) >= 0;
         var table = OperatingProfitStatementProjection.netProfitTable(
             new OperatingProfitStatementContracts.Filter(filter.year(), ym), source, firstYear);

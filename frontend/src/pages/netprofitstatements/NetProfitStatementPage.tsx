@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useInRouterContext, useNavigate } from "react-router-dom";
 import {
   Banner,
   KpiCard,
   KpiCards,
-  Money,
   MoneyUnitSelect,
   DEFAULT_MONEY_UNIT,
   formatKoreanMoney,
@@ -32,10 +32,30 @@ const options = {
   firstDataYear: 2025,
 } as const;
 
+/** 시안 막대 색: 턴키 --c1, 월단위 --c3, 파견 --c2 */
+const barColor: Record<string, string> = {
+  TK: "var(--np-c1)",
+  MO: "var(--np-c3)",
+  DP: "var(--np-c2)",
+};
+
+/** 다른 화면(자금수지표)으로 가는 통로. 라우터 밖(단위 시험)에서는 아무것도 하지 않는다. */
+function useOpenScreen() {
+  const inRouter = useInRouterContext();
+  // 한 화면 안에서 라우터 유무는 바뀌지 않는다.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const navigate = inRouter ? useNavigate() : null;
+  return useCallback(
+    (id: string) => navigate?.(`/screens/${encodeURIComponent(id)}`),
+    [navigate],
+  );
+}
+
 // UI-09 / SFR-109: readonly statement and identical workbook.
 export function NetProfitStatementPage() {
   const period = useScreenPeriod("UI-09", options);
   const host = useNetProfitStatementTitleHost();
+  const openScreen = useOpenScreen();
   const [unit, setUnit] = useState<MoneyUnit>(DEFAULT_MONEY_UNIT);
   const [data, setData] = useState<NetProfitStatementResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -273,64 +293,88 @@ export function NetProfitStatementPage() {
           {compared &&
             " 전년 대비는 같은 기간 누계끼리 비교하며, 비용 항목은 늘면 빨강으로 표시합니다."}
         </p>
-        <p className="ls-note">내부 비용은 판관비(연구개발비)로 처리합니다.</p>
-        <p className="ls-note">
-          법인세는 월할 금액이며 실제 납부는 자금수지표(UI-21)에만 반영합니다.
+        <p className="ls-note" data-testid="net-profit-tax-note">
+          법인세는 연간 예상액을 달마다 나눈 금액(월할)입니다. 실제로 낸
+          법인세는{" "}
+          <a
+            href="/screens/UI-21"
+            data-testid="net-profit-link-UI-21"
+            onClick={(event) => {
+              event.preventDefault();
+              openScreen("UI-21");
+            }}
+          >
+            자금수지표
+          </a>
+          에만 잡힙니다. 내부(자체 개발) 비용은 판관비(연구개발비)로
+          처리합니다.
         </p>
       </section>
       {data && (
         <section
+          className="net-profit-card"
           aria-label="계약 유형별 기여도"
           data-testid="net-profit-contributions"
         >
-          <h3>계약 유형별 기여도 · 기준월 매출총이익</h3>
+          <div className="net-profit-card-h">
+            <h2>계약 유형별 기여도</h2>
+            {data.contributionVisible && (
+              <span className="ls-cap">{monthName} 매출총이익 기준</span>
+            )}
+          </div>
           {data.contributionVisible ? (
             <>
-              <div className="net-profit-contribution-grid">
-                {data.contributions.map((item) => (
-                  <article
-                    className="net-profit-contribution-card"
+              {data.contributions.map((item) => {
+                const deficit = item.amount != null && item.amount < 0;
+                const share = item.sharePercent ?? 0;
+                return (
+                  <div
+                    className="net-profit-bar"
                     key={item.contractTypeCode}
                     data-testid={`net-profit-contribution-${item.contractTypeCode.toLowerCase()}`}
                   >
-                    <h4>{item.contractTypeName}</h4>
+                    <span className="net-profit-bar-name">
+                      {item.contractTypeName}
+                    </span>
                     <div
-                      className={
-                        item.amount != null && item.amount < 0
-                          ? "operating-bad"
-                          : undefined
-                      }
+                      role="meter"
+                      aria-label={`${item.contractTypeName} 기여도`}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={deficit ? 0 : share}
+                      className="net-profit-track"
+                      data-testid={`net-profit-bar-${item.contractTypeCode.toLowerCase()}`}
                     >
-                      {item.amount != null && item.amount < 0 && "적자 "}
-                      <Money value={item.amount} unit={unit} />
-                    </div>
-                    {item.sharePercent != null && (
-                      <p>{percentage(item.sharePercent)}</p>
-                    )}
-                    {item.sharePercent != null && item.sharePercent > 0 && (
                       <div
-                        role="meter"
-                        aria-label={`${item.contractTypeName} 기여도`}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={item.sharePercent}
-                        className="net-profit-contribution-track"
-                        data-testid={`net-profit-bar-${item.contractTypeCode.toLowerCase()}`}
-                      >
-                        <div style={{ width: `${item.sharePercent}%` }} />
-                      </div>
-                    )}
-                  </article>
-                ))}
-              </div>
-              <p className="ls-note">
-                적자 유형은 기여도 비율에서 제외하고 금액만 표시합니다.
+                        style={{
+                          width: `${deficit ? 0 : share}%`,
+                          background:
+                            barColor[item.contractTypeCode] ?? "var(--np-c1)",
+                        }}
+                      />
+                    </div>
+                    <span
+                      className={`net-profit-bar-value${deficit ? " operating-bad" : ""}`}
+                    >
+                      {deficit
+                        ? `적자 · ${formatKoreanMoney(item.amount)}`
+                        : `${percentage(share)} · ${formatKoreanMoney(item.amount)}`}
+                    </span>
+                  </div>
+                );
+              })}
+              <p className="ls-note" data-testid="net-profit-contribution-note">
+                {data.contributions.some((c) => c.amount != null && c.amount < 0)
+                  ? "적자 유형은 비율에서 빼고 금액만 표시합니다. "
+                  : ""}
+                내부(자체 개발) 비용은 판관비(연구개발비)로 처리되어 여기에 넣지
+                않습니다.
               </p>
             </>
           ) : (
-            <p data-testid="net-profit-pre-start">
-              운영 시작 전에는 월별 손익만 이관되어 계약 유형별 기여도를
-              표시하지 않습니다.
+            <p className="net-profit-sub" data-testid="net-profit-pre-start">
+              {data.year}년은 월별 손익만 옮겨 와서 계약 유형별 기여도는 볼 수
+              없습니다.
             </p>
           )}
         </section>

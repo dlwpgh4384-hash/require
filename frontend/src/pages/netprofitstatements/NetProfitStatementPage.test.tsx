@@ -248,14 +248,13 @@ it("reuses table styles, current-month header, provisional copy and signed adjus
   expect(
     within(screen.getByTestId("operating-row-0")).getAllByRole("cell")[3],
   ).toHaveTextContent("–");
-  expect(
-    screen.getByText("내부 비용은 판관비(연구개발비)로 처리합니다."),
-  ).toBeVisible();
-  expect(
-    screen.getByText(
-      "법인세는 월할 금액이며 실제 납부는 자금수지표(UI-21)에만 반영합니다.",
-    ),
-  ).toBeVisible();
+  expect(screen.getByTestId("net-profit-tax-note")).toHaveTextContent(
+    "법인세는 연간 예상액을 달마다 나눈 금액(월할)입니다. 실제로 낸 법인세는 자금수지표에만 잡힙니다. 내부(자체 개발) 비용은 판관비(연구개발비)로 처리합니다.",
+  );
+  expect(screen.getByTestId("net-profit-link-UI-21")).toHaveAttribute(
+    "href",
+    "/screens/UI-21",
+  );
 });
 it("closed month removes provisional flags", async () => {
   mount();
@@ -274,7 +273,7 @@ it("shows gross-profit shares and losses in red without a loss bar", async () =>
     target: { value: "원" },
   });
   expect(screen.getByTestId("net-profit-contributions")).toHaveTextContent(
-    "기준월 매출총이익",
+    "2026-02 매출총이익 기준",
   );
   expect(screen.getByTestId("net-profit-bar-tk")).toHaveAttribute(
     "aria-valuenow",
@@ -284,15 +283,22 @@ it("shows gross-profit shares and losses in red without a loss bar", async () =>
     "aria-valuenow",
     "25",
   );
-  expect(screen.queryByTestId("net-profit-bar-dp")).not.toBeInTheDocument();
-  expect(screen.getByTestId("net-profit-contribution-dp")).toHaveTextContent(
-    "적자 −100,000",
+  expect(screen.getByTestId("net-profit-contribution-tk")).toHaveTextContent(
+    "75.0% · 90만 원",
+  );
+  // 적자 유형: 막대는 비우고(0) 빨간 「적자 · −금액」만
+  expect(screen.getByTestId("net-profit-bar-dp")).toHaveAttribute(
+    "aria-valuenow",
+    "0",
   );
   expect(
     within(screen.getByTestId("net-profit-contribution-dp")).getByText(
-      "−100,000",
+      "적자 · −10만 원",
     ),
-  ).toHaveClass("ls-neg");
+  ).toHaveClass("operating-bad");
+  expect(screen.getByTestId("net-profit-contribution-note")).toHaveTextContent(
+    "적자 유형은 비율에서 빼고 금액만 표시합니다. 내부(자체 개발) 비용은 판관비(연구개발비)로 처리되어 여기에 넣지 않습니다.",
+  );
 });
 it("all-loss operational months retain amounts and omit percentages and bars", async () => {
   losses = true;
@@ -301,7 +307,8 @@ it("all-loss operational months retain amounts and omit percentages and bars", a
   expect(screen.getByTestId("net-profit-contribution-tk")).toHaveTextContent(
     "적자",
   );
-  expect(screen.queryByRole("meter")).not.toBeInTheDocument();
+  for (const meter of screen.getAllByRole("meter"))
+    expect(meter).toHaveAttribute("aria-valuenow", "0");
   expect(screen.queryByTestId("net-profit-pre-start")).not.toBeInTheDocument();
 });
 it("prior year allows January and December, hides comparison columns and pre-start cards", async () => {
@@ -323,7 +330,9 @@ it("prior year allows January and December, hides comparison columns and pre-sta
   expect(screen.getByTestId("net-profit-table-caption")).not.toHaveTextContent(
     "전년",
   );
-  expect(screen.getByTestId("net-profit-pre-start")).toBeVisible();
+  expect(screen.getByTestId("net-profit-pre-start")).toHaveTextContent(
+    "2025년은 월별 손익만 옮겨 와서 계약 유형별 기여도는 볼 수 없습니다.",
+  );
   expect(
     screen.queryByTestId("net-profit-contribution-tk"),
   ).not.toBeInTheDocument();
@@ -432,9 +441,12 @@ it("zero contribution keeps zero amount without a visible bar", async () => {
   mount();
   await ready();
   expect(screen.getByTestId("net-profit-contribution-mo")).toHaveTextContent(
-    "0.0%",
+    "0.0% · 0만 원",
   );
-  expect(screen.queryByTestId("net-profit-bar-mo")).not.toBeInTheDocument();
+  expect(screen.getByTestId("net-profit-bar-mo")).toHaveAttribute(
+    "aria-valuenow",
+    "0",
+  );
 });
 it("stale period response cannot replace the selected prior year", async () => {
   const original = request.getMockImplementation()!;

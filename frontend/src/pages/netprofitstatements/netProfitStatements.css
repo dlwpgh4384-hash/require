@@ -1,0 +1,88 @@
+/* 시안 UI-09: 요약 2칸 · 계약 유형별 기여도 .card(.card-h·.bar·.track·.fill) · 막대 색 --c1·--c3·--c2 */
+.net-profit-statements-page {
+  --np-c1: #1d4ed8;
+  --np-c2: #f59e0b;
+  --np-c3: #10b981;
+}
+@media (prefers-color-scheme: dark) {
+  .net-profit-statements-page {
+    --np-c1: #60a5fa;
+    --np-c2: #fbbf24;
+    --np-c3: #34d399;
+  }
+}
+.net-profit-statements-page .ls-kpis {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.net-profit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px 24px;
+  border: 1px solid var(--divider, var(--border));
+  border-radius: 8px;
+  background: var(--surface);
+}
+.net-profit-card-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.net-profit-card-h h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.net-profit-card > p {
+  margin: 0;
+}
+.net-profit-sub {
+  color: var(--text-sub);
+}
+/* 시안 a{color:var(--primary-text)}: 밝은·어두운 화면 모두 테마 색 */
+.net-profit-link {
+  color: var(--primary-text);
+}
+.net-profit-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.net-profit-bar-name {
+  flex: none;
+  width: 60px;
+}
+.net-profit-track {
+  flex: 1;
+  min-width: 0;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--divider, var(--border));
+  overflow: hidden;
+}
+.net-profit-track > div {
+  height: 100%;
+  border-radius: 3px;
+}
+.net-profit-bar-value {
+  flex: none;
+  width: 140px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 767px) {
+  .net-profit-statements-page .ls-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .net-profit-card {
+    padding: 16px;
+  }
+  .net-profit-bar-value {
+    width: auto;
+  }
+}

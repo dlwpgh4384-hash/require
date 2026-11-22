@@ -76,7 +76,7 @@ function respond(failRead = false) {
       {
         menuId: "M021",
         upperMenuId: "G007",
-        menuNm: "재무상태표",
+        menuNm: "순이익표",
         scrnId: "UI-09",
         menuLvl: 2,
         sortOrd: 3,
@@ -213,6 +213,23 @@ function respond(failRead = false) {
           baseMonthOperatingProfit: metric,
         },
         numericTable: { columns: [], rows: [] },
+      });
+    }
+    if (url.startsWith("/api/common/net-profit-statements?")) {
+      return ok({
+        year: 2026,
+        baseMonth: "202602",
+        provisional: false,
+        provisionalNotice: null,
+        summary: {
+          cumulativeNetProfit: null,
+          netProfitRate: null,
+          baseMonthNetProfit: null,
+          previousMonthChangePercent: null,
+        },
+        numericTable: { columns: [], rows: [] },
+        contributionVisible: true,
+        contributions: [],
       });
     }
     throw new Error(`예상하지 않은 요청: ${url}`);
@@ -376,14 +393,30 @@ it("uses the UI-08 Excel client with only the current period and amount unit", a
   expect(router?.state.location.pathname).toBe("/screens/UI-08");
 });
 
-it.each(["UI-09"])(
-  "keeps %s a placeholder while M019 opens UI-07 without replacing preferences",
-  async (id) => {
+it.each(["/screens/UI-09", "/#UI-09"])(
+  "opens registered UI-09 at %s and preserves preferences on a UI-07 round trip",
+  async (path) => {
     const request = respond();
-    mount(`/screens/${id}`);
+    mount(path);
+    expect(await screen.findByTestId("net-profit-empty")).toBeVisible();
+    expect(screen.getAllByTestId("net-profit-statements-page")).toHaveLength(1);
     expect(
-      await screen.findByRole("region", { name: `${id} 본문` }),
-    ).toHaveTextContent("준비 중");
+      screen.getByRole("heading", { level: 1, name: "순이익표" }),
+    ).toBeVisible();
+    expect(screen.getByRole("link", { name: "순이익표" })).toHaveAttribute(
+      "href",
+      "/screens/UI-09",
+    );
+    expect(
+      within(screen.getByTestId("screen-actions")).getAllByRole("button", {
+        name: "엑셀 다운로드",
+      }),
+    ).toHaveLength(1);
+    expect(screen.getByTestId("net-profit-kpis").children).toHaveLength(2);
+    expect(request).toHaveBeenCalledWith(
+      "/api/common/net-profit-statements?year=2026&baseMonth=202602",
+      { signal: expect.any(AbortSignal) },
+    );
     expect(
       request.mock.calls.some(([url]) => url.includes("profit-structures")),
     ).toBe(false);
@@ -392,11 +425,16 @@ it.each(["UI-09"])(
     await ready();
     expect(screen.getByTestId("user-preferences")).toBe(preferences);
     await act(async () => {
-      await router!.navigate(`/screens/${id}`);
+      await router!.navigate("/screens/UI-09");
     });
+    expect(await screen.findByTestId("net-profit-empty")).toBeVisible();
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(screen.getAllByRole("banner")).toHaveLength(1);
+    expect(screen.getAllByTestId("net-profit-title-actions")).toHaveLength(1);
     expect(
-      screen.getByRole("region", { name: `${id} 본문` }),
-    ).toHaveTextContent("준비 중");
+      request.mock.calls.some(([url]) => /auth|permission/.test(url)),
+    ).toBe(false);
   },
 );
 

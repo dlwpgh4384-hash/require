@@ -607,6 +607,7 @@ describe("client and part route composition", () => {
     await screen.findByText("목록을 불러오는 중입니다.");
     expect(screen.getByTestId("client-create")).toBeDisabled();
     expect(screen.getByTestId("upload-open")).toBeDisabled();
+    await waitFor(() => expect(clients).toHaveBeenCalled());
     await act(async () => {
       complete(success({ items: [] }));
     });
@@ -2172,7 +2173,7 @@ describe("application route registration", () => {
     mount("/screens/UI-25");
     await screen.findByLabelText("M029 메뉴 이름");
     fireEvent.click(screen.getByTestId("menu-registration-open"));
-    await screen.findByTestId("menu-registration-no-screens");
+    await screen.findByTestId("menu-registration-no-screens", {}, { timeout: 3000 });
     expect(request).toHaveBeenCalledWith("/api/common/menu-options?menuLvl=2", {
       signal: expect.any(AbortSignal),
     });

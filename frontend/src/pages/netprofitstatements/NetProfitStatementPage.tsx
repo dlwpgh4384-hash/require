@@ -298,6 +298,7 @@ export function NetProfitStatementPage() {
           법인세는{" "}
           <a
             href="/screens/UI-21"
+            className="net-profit-link"
             data-testid="net-profit-link-UI-21"
             onClick={(event) => {
               event.preventDefault();

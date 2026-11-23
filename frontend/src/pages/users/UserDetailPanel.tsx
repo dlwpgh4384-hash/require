@@ -7,6 +7,7 @@ import {
   KeyValues,
   ListPager,
 } from "../../shared/list";
+import { ShellIcon } from "../../shared/layout/ShellIcon";
 import * as api from "./users";
 
 const message = (failure: unknown) =>
@@ -53,6 +54,8 @@ export function UserDetailPanel({
   const [tab, setTab] = useState("account");
   const [account, setAccount] = useState<api.UserAccount | null>(null);
   const [error, setError] = useState("");
+  /** 처리(초기화·잠금 해제·다시 사용) 실패 문구. 다시 읽어도 지우지 않는다. */
+  const [actionError, setActionError] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [changes, setChanges] = useState<api.UserChange[] | null>(null);
   const [logs, setLogs] = useState<api.UserPageResult<{
@@ -105,7 +108,7 @@ export function UserDetailPanel({
   ) => {
     if (!account || busy) return;
     setBusy(true);
-    setError("");
+    setActionError("");
     try {
       await work(account);
       setConfirm(null);
@@ -113,7 +116,10 @@ export function UserDetailPanel({
       onChanged(notice);
     } catch (failure) {
       setConfirm(null);
-      setError(message(failure));
+      setActionError(message(failure));
+      // 다른 사람이 먼저 바꿨으면(409) 최신 계정을 다시 읽어 다음 처리가 새 수정 시각을 쓰게 한다.
+      if (failure instanceof api.UserRequestError && failure.status === 409)
+        setAttempt((value) => value + 1);
     } finally {
       setBusy(false);
     }
@@ -224,6 +230,7 @@ export function UserDetailPanel({
       {account.userStatCd === "LOCK" && (
         <Banner
           kind="warn"
+          icon={<ShellIcon name="alert" size={16} />}
           action={
             <button
               type="button"
@@ -246,7 +253,7 @@ export function UserDetailPanel({
         </Banner>
       )}
       {stopped && (
-        <Banner kind="lock">
+        <Banner kind="lock" icon={<ShellIcon name="lock" size={16} />}>
           사용 중지된 계정입니다. 기록은 그대로 남아 있습니다.
         </Banner>
       )}
@@ -378,9 +385,9 @@ export function UserDetailPanel({
           <p role="status">계정 정보를 불러오는 중입니다.</p>
         )}
       </DetailPanel>
-      {error && account && (
+      {(error || actionError) && account && (
         <p role="alert" className="app-toast users-error-toast">
-          {error}
+          {actionError || error}
         </p>
       )}
       {confirm === "reset" && account && (

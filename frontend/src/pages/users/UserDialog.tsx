@@ -44,11 +44,14 @@ export function UserDialog({
   options,
   onClose,
   onSaved,
+  onConflict,
 }: {
   account: api.UserAccount | null;
   options: CommonUserOptionsResult;
   onClose: () => void;
   onSaved: (notice: string, account: api.UserAccount) => void;
+  /** 저장이 409(다른 사람이 먼저 바꿈)면 부른다. */
+  onConflict?: () => void;
 }) {
   const editing = account !== null;
   const initial = account ? fromAccount(account) : blank;
@@ -82,6 +85,9 @@ export function UserDialog({
   };
   const failure = (value: unknown) => {
     setError(message(value));
+    // 다른 사람이 먼저 바꿨으면(409) 화면이 목록·상세를 다시 읽는다. 창은 문구와 함께 남긴다.
+    if (value instanceof api.UserRequestError && value.status === 409)
+      onConflict?.();
     if (value instanceof api.UserRequestError)
       setErrors(
         Object.fromEntries(
@@ -108,10 +114,11 @@ export function UserDialog({
       : "";
   };
   const persist = async (confirmed: string[]) => {
+    // 확인 창에서 지우기로 한 담당 프로젝트는 빼고 보낸다(서버는 역할 없이 남은 프로젝트를 막음).
     const assignments = {
       roleCds: form.roleCds,
       headquarters: form.headquarters,
-      projectIds: form.projectIds,
+      projectIds: form.projectIds.filter((project) => !confirmed.includes(project)),
     };
     const result = account
       ? await api.putCommonUser(account.userId, {

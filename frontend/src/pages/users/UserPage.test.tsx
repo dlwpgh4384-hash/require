@@ -214,6 +214,10 @@ it("행을 누르면 오른쪽 상세 패널에 계정 정보·접근 기록·�
   expect(
     within(panel).getByText("비밀번호를 5번 틀려 잠겼습니다."),
   ).toBeInTheDocument();
+  // 시안 banner warn: 앞에 경고 아이콘
+  expect(
+    within(panel).getByTestId("banner-warn").querySelector("svg"),
+  ).not.toBeNull();
   expect(
     within(panel).getByText("이 프로젝트들의 PM으로 표시됩니다."),
   ).toBeInTheDocument();
@@ -482,11 +486,101 @@ it("중지 요청이 실패하면 행과 선택을 임의로 제거하지 않는
   fireEvent.click(screen.getByTestId("list-select-test"));
   fireEvent.click(screen.getByTestId("list-bulk-stop"));
   const confirm = await screen.findByTestId("user-stop-confirm");
+  const listReads = gets("users?").length;
   fireEvent.click(within(confirm).getByTestId("confirmation-proceed"));
-  expect(await screen.findByText("다시 불러와 주세요.")).toBeInTheDocument();
-  expect(screen.getByTestId("list-row-test")).toBeInTheDocument();
+  expect(await screen.findByTestId("user-warn-toast")).toHaveTextContent(
+    "다시 불러와 주세요.",
+  );
+  // 409면 목록을 다시 읽어 새 수정 시각을 받는다(선택은 그대로).
+  await waitFor(() => expect(gets("users?").length).toBeGreaterThan(listReads));
+  expect(await screen.findByTestId("list-row-test")).toBeInTheDocument();
   expect(screen.getByTestId("list-select-test")).toBeChecked();
   expect(writes()).toHaveLength(1);
+});
+
+it("상세 창 처리가 409면 문구를 남기고 계정을 다시 읽는다", async () => {
+  account = { ...account, userStatCd: "USE" };
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    url.endsWith("/password-reset") && init?.method === "PUT"
+      ? {
+          ok: false,
+          status: 409,
+          json: async () => ({
+            success: false,
+            message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+            errors: [{ field: "modDttm", message: "x" }],
+          }),
+        }
+      : base(url, init),
+  );
+  const accountReads = () =>
+    gets("/api/common/users/test").filter(
+      (url) => url === "/api/common/users/test",
+    ).length;
+  page();
+  fireEvent.click(await screen.findByTestId("list-row-test"));
+  const panel = await screen.findByTestId("user-detail");
+  await within(panel).findByText(account.email);
+  const reads = accountReads();
+  fireEvent.click(within(panel).getByTestId("user-password-reset"));
+  fireEvent.click(
+    within(await screen.findByTestId("user-reset-confirm")).getByTestId(
+      "confirmation-proceed",
+    ),
+  );
+  await waitFor(() => expect(accountReads()).toBeGreaterThan(reads));
+  expect(
+    await screen.findByText("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요."),
+  ).toBeInTheDocument();
+});
+
+it("역할을 바꿔 담당 프로젝트를 지우기로 하면 지운 프로젝트는 빼고 저장한다", async () => {
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    url.includes("change-impact")
+      ? response({
+          projectCount: 1,
+          projects: account.projects,
+          blockedUsers: [],
+        })
+      : base(url, init),
+  );
+  const onSaved = vi.fn();
+  render(
+    <UserDialog
+      account={account}
+      options={options}
+      onClose={vi.fn()}
+      onSaved={onSaved}
+    />,
+  );
+  const dialog = screen.getByTestId("user-dialog");
+  fireEvent.click(within(dialog).getByTestId("user-role-input-0"));
+  fireEvent.click(within(dialog).getByTestId("user-role-input-2"));
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  const confirm = await screen.findByTestId("inline-confirmation");
+  expect(confirm).toHaveTextContent("PM이 비게 됩니다.");
+  fireEvent.click(within(confirm).getByTestId("confirmation-proceed"));
+  await waitFor(() => expect(writes()).toHaveLength(1));
+  expect(
+    JSON.parse(String((writes()[0][1] as RequestInit).body)),
+  ).toMatchObject({
+    roleCds: ["EXEC"],
+    projectIds: [],
+    confirmedProjectIds: ["project-a"],
+  });
+  await waitFor(() => expect(onSaved).toHaveBeenCalled());
+});
+
+it("「사용 중지 포함」을 바꾸면 체크한 계정 선택을 푼다", async () => {
+  page();
+  await screen.findByTestId("list-row-test");
+  fireEvent.click(screen.getByTestId("list-select-test"));
+  expect(screen.getByTestId("list-count")).toHaveTextContent("1건 선택");
+  fireEvent.click(screen.getByTestId("user-include-stopped"));
+  expect(await screen.findByTestId("list-row-test")).toBeInTheDocument();
+  expect(screen.getByTestId("list-select-test")).not.toBeChecked();
 });
 
 it("서버가 막은 계정만 고르면 확인 창 없이 이유를 알린다", async () => {

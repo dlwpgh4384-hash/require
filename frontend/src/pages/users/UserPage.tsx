@@ -80,6 +80,7 @@ export function UserPage() {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [notice, setNotice] = useState("");
+  const [warning, setWarning] = useState("");
   const [highlight, setHighlight] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const root = useRef<HTMLElement>(null);
@@ -95,6 +96,11 @@ export function UserPage() {
   useEffect(() => {
     setPage(1);
   }, [presentation.pageSize, includeStopped]);
+  useEffect(() => {
+    // 「사용 중지 포함」을 바꾸면 조회 대상이 달라지므로 「조회된 N건 모두 선택」·체크를 푼다.
+    setSelected([]);
+    setAllResults(false);
+  }, [includeStopped]);
   useEffect(() => {
     const controller = new AbortController();
     setData(null);
@@ -235,7 +241,11 @@ export function UserPage() {
       );
     } catch (error) {
       setStopTarget(null);
-      setFailure(message(error));
+      if (error instanceof api.UserRequestError && error.status === 409) {
+        // 다른 사람이 먼저 바꿨으면 안내하고 목록을 다시 읽어 새 수정 시각을 받는다(선택은 그대로).
+        setWarning(message(error));
+        setRevision((value) => value + 1);
+      } else setFailure(message(error));
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -243,14 +253,24 @@ export function UserPage() {
   };
   const prepareResume = async () => {
     if (busyRef.current) return;
-    const targets = (await selectedUsers()).filter(
-      (item) => item.userStatCd === "STOP",
-    );
-    if (!targets.length) {
-      setNotice("고른 것 중 사용 중지된 계정이 없습니다.");
-      return;
+    busyRef.current = true;
+    setBusy(true);
+    setFailure("");
+    try {
+      const targets = (await selectedUsers()).filter(
+        (item) => item.userStatCd === "STOP",
+      );
+      if (!targets.length) {
+        setNotice("고른 것 중 사용 중지된 계정이 없습니다.");
+        return;
+      }
+      setResumeTarget(targets);
+    } catch (error) {
+      setFailure(message(error));
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
     }
-    setResumeTarget(targets);
   };
   const resume = async () => {
     if (!resumeTarget || busyRef.current) return;
@@ -438,6 +458,14 @@ export function UserPage() {
           testId="user-toast"
         />
       )}
+      {warning && (
+        <Toast
+          message={warning}
+          kind="warn"
+          onDismiss={() => setWarning("")}
+          testId="user-warn-toast"
+        />
+      )}
       {detailId && (
         <UserDetailPanel
           key={detailId}
@@ -465,7 +493,7 @@ export function UserPage() {
       {(registering || editing) &&
         (ready ? (
           <UserDialog
-            key={editing ? editing.userId : "create"}
+            key={editing ? `edit:${editing.userId}` : "create"}
             account={editing}
             options={options.data}
             onClose={() => {
@@ -479,6 +507,7 @@ export function UserPage() {
               reloadOptions();
               refresh(text);
             }}
+            onConflict={() => setRevision((value) => value + 1)}
           />
         ) : (
           <div role="status">선택 목록을 불러오는 중입니다.</div>

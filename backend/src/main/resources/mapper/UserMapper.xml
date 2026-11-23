@@ -50,16 +50,16 @@
   <select id="selectAccount" resultMap="account">
     SELECT <include refid="columns"/> FROM TB_SY_USER u WHERE u.user_id=#{id}
   </select>
-  <!-- SFR-010-03 정렬: sortKey·sortDir은 UserRequests.filter에서 정해진 값만 통과한다. 기본은 이름순. -->
+  <!-- SFR-010-03 정렬: sortKey·sortDir은 UserRequests.filter에서 정해진 값만 통과한다(글자 끼워 넣기 없이 DESC만 붙임). 기본은 이름순. -->
   <sql id="order">
     ORDER BY
     <choose>
-      <when test="sortKey == 'userId'">u.user_id ${sortDir}</when>
-      <when test="sortKey == 'name'">u.user_nm ${sortDir}, u.user_id</when>
+      <when test="sortKey == 'userId'">u.user_id <if test="sortDir == 'DESC'">DESC</if></when>
+      <when test="sortKey == 'name'">u.user_nm <if test="sortDir == 'DESC'">DESC</if>, u.user_id</when>
       <when test="sortKey == 'role'">(SELECT min(r.sort_ord) FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.role_id=ur.role_id
-        WHERE ur.user_id=u.user_id) ${sortDir} NULLS LAST, u.user_nm, u.user_id</when>
-      <when test="sortKey == 'state'">u.user_stat_cd ${sortDir}, u.user_nm, u.user_id</when>
-      <when test="sortKey == 'last'">u.last_login_dttm ${sortDir} NULLS LAST, u.user_nm, u.user_id</when>
+        WHERE ur.user_id=u.user_id) <if test="sortDir == 'DESC'">DESC</if> NULLS LAST, u.user_nm, u.user_id</when>
+      <when test="sortKey == 'state'">u.user_stat_cd <if test="sortDir == 'DESC'">DESC</if>, u.user_nm, u.user_id</when>
+      <when test="sortKey == 'last'">u.last_login_dttm <if test="sortDir == 'DESC'">DESC</if> NULLS LAST, u.user_nm, u.user_id</when>
       <otherwise>u.user_nm, u.user_id</otherwise>
     </choose>
   </sql>

@@ -20,7 +20,7 @@
 }
 .user-assignment-fields .ua-req::after {
   content: " *";
-  color: #dc2626;
+  color: var(--ls-bad); /* 시안 var(--bad): 어두운 화면에서도 맞는 빨강 */
 }
 .user-assignment-fields .ua-checks {
   display: flex;

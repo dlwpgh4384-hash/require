@@ -41,10 +41,11 @@ public final class RoleRules {
         name(name);
         // sourceRoleId가 없으면 「역할 추가」(시안), 있으면 「역할 복사」.
         String source = body.hasNonNull("sourceRoleId") ? text(body, "sourceRoleId") : null;
-        return new Copy(source, name, text(body, "dataScopeCd"));
+        // 시안처럼 앞뒤 빈칸을 떼고 저장·중복 확인한다(「 PM」이 다른 이름으로 들어가지 않게).
+        return new Copy(source, name.strip(), text(body, "dataScopeCd"));
     }
     public static Update update(JsonNode body) {
-        keys(body, Set.of("dataScopeCd", "snstvViewYn", "menuAuths", "confirmedAffectedUserIds"));
+        keys(body, Set.of("dataScopeCd", "snstvViewYn", "menuAuths", "confirmedAffectedUserIds", "modifiedAt"));
         String scope = text(body, "dataScopeCd");
         String sensitive = text(body, "snstvViewYn");
         flag(sensitive, "snstvViewYn");
@@ -66,7 +67,18 @@ public final class RoleRules {
                 throw RoleFailure.invalid("confirmedAffectedUserIds", "영향 사용자를 확인해 주세요.");
             confirmed.add(value.textValue());
         }
-        return new Update(scope, sensitive, List.copyOf(menus), List.copyOf(confirmed));
+        // FR-0106 동시 수정: 화면이 읽은 역할의 마지막 변경 시각. 보내지 않으면 확인하지 않는다.
+        java.time.Instant modifiedAt = null;
+        JsonNode read = body.get("modifiedAt");
+        if (read != null && !read.isNull()) {
+            if (!read.isTextual()) throw RoleFailure.invalid("modifiedAt", "수정 시각을 확인해 주세요.");
+            try {
+                modifiedAt = java.time.Instant.parse(read.textValue());
+            } catch (java.time.format.DateTimeParseException failure) {
+                throw RoleFailure.invalid("modifiedAt", "수정 시각을 확인해 주세요.");
+            }
+        }
+        return new Update(scope, sensitive, List.copyOf(menus), List.copyOf(confirmed), modifiedAt);
     }
     public static void matrix(String id, List<MenuAuth> current, List<MenuInput> next) {
         if (next == null) throw RoleFailure.invalid("menuAuths", "권한 표를 보내 주세요.");
@@ -76,7 +88,8 @@ public final class RoleRules {
                 throw RoleFailure.invalid("menuAuths", "메뉴를 중복 없이 보내 주세요.");
             menu.flags().forEach(value -> flag(value, "menuAuths"));
             if (id.equals("ADMIN") && menu.menuId().equals("M028") && !"Y".equals(menu.updateYn()))
-                throw RoleFailure.invalid("menuAuths", "시스템 관리자의 권한 메뉴 수정 권한은 해제할 수 없습니다.");
+                throw RoleFailure.invalid("menuAuths",
+                    "시스템 관리자의 권한 화면 「수정」을 빼면 권한을 고칠 사람이 없어집니다. 저장할 수 없습니다.");
             if (id.equals("SALES_LDR") && menu.menuId().equals("M024")
                 && menu.flags().subList(1, 7).stream().anyMatch("Y"::equals))
                 throw RoleFailure.invalid("menuAuths", "영업 파트장의 월 마감은 조회만 허용합니다.");

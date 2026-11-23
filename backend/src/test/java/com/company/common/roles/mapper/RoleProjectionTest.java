@@ -37,10 +37,12 @@ class RoleProjectionTest {
     @Test void roleProjectionPreservesExactIdentifiersScopeAndFlags() throws Exception {
         var config=configuration(); var row=new RoleRows.Role();
         materialize(config,"role",row,Map.of("role_id","R-123","role_nm","합성 역할",
-            "data_scope_cd","PART","snstv_view_yn","Y","use_yn","N"));
+            "data_scope_cd","PART","snstv_view_yn","Y","use_yn","N",
+            "modified_at",java.time.Instant.parse("2026-11-13T01:00:00.123456Z")));
         assertThat(row.value()).isEqualTo(new RoleContracts.Role("R-123","합성 역할","PART","Y","N",false));
         String query=config.getMappedStatement(RoleMapper.class.getName()+".selectRole").getBoundSql(Map.of("id","R-123")).getSql();
-        assertThat(query).contains("r.role_id", "r.role_nm", "r.data_scope_cd", "r.snstv_view_yn", "r.use_yn");
+        assertThat(query).contains("r.role_id", "r.role_nm", "r.data_scope_cd", "r.snstv_view_yn", "r.use_yn",
+            "COALESCE(r.mod_dttm, r.reg_dttm) AS modified_at");
     }
     @Test void everyActionMaterializesFromItsPhysicalColumn() throws Exception {
         var config=configuration(); var row=new RoleRows.Menu(); var labels=new LinkedHashMap<String,Object>();

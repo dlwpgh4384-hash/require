@@ -17,7 +17,9 @@ public final class RoleContracts {
             return new MenuInput(menuId, readYn, createYn, updateYn, deleteYn, uploadYn, downloadYn, cnfmYn);
         }
     }
-    public record Settings(Role role, List<MenuAuth> menuAuths, List<DataScope> dataScopes) {}
+    /** modifiedAt: FR-0106 동시 수정 확인용 역할 마지막 변경 시각(UTC). 저장할 때 그대로 돌려보낸다. */
+    public record Settings(Role role, List<MenuAuth> menuAuths, List<DataScope> dataScopes,
+        java.time.Instant modifiedAt) {}
     /** sourceRoleId가 없으면 「역할 추가」(모든 메뉴 권한 없음), 있으면 「역할 복사」. */
     public record Copy(String sourceRoleId, String roleName, String dataScopeCd) {}
     public record HistoryList(List<ChangeHistory> items) {}
@@ -28,7 +30,7 @@ public final class RoleContracts {
         }
     }
     public record Update(String dataScopeCd, String snstvViewYn,
-        List<MenuInput> menuAuths, List<String> confirmedAffectedUserIds) {}
+        List<MenuInput> menuAuths, List<String> confirmedAffectedUserIds, java.time.Instant modifiedAt) {}
     public record Impact(int headquartersUserCount, int projectUserCount,
         List<String> affectedUserIds, List<String> preservedPmUserIds) {}
     public record StopResult(String roleId, String useYn) {}

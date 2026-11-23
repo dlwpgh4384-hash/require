@@ -99,14 +99,15 @@ class CommonRoleControllerTest {
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("roleName"))
             .andExpect(jsonPath("$.errors[0].message").value("역할 이름을 넣어 주세요."));
     }
-    @Test void unicodeNameLimitCountsCodePointsAndPreservesAcceptedSpaces() throws Exception {
+    @Test void unicodeNameLimitCountsCodePointsAndTrimsOuterSpaces() throws Exception {
         // 시안 역할 이름 칸 maxlength 30(입력 규칙). DB 칸 크기는 그대로.
         mvc.perform(post("/api/common/roles").contentType("application/json").content(copy("😀".repeat(31))))
             .andExpect(status().isBadRequest());
         mvc.perform(post("/api/common/roles").contentType("application/json").content(copy("😀".repeat(30))))
             .andExpect(status().isOk());
-        mvc.perform(post("/api/common/roles").contentType("application/json").content(copy(" 합성 ")))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.data.role.roleName").value(" 합성 "));
+        // 시안처럼 앞뒤 빈칸은 떼고, 가운데 빈칸은 그대로 둔다.
+        mvc.perform(post("/api/common/roles").contentType("application/json").content(copy(" 합성 이름 ")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.role.roleName").value("합성 이름"));
     }
     @Test void businessDuplicateIncludesInactiveNamesWithoutChangingPermissions() throws Exception {
         var before = List.copyOf(data.menus.get("R-001"));
@@ -209,7 +210,8 @@ class CommonRoleControllerTest {
     @Test void businessAdminRecoveryFlagCannotBeRemoved() throws Exception {
         var body=update("ADMIN","PART","N"); ((ObjectNode)body.withArray("menuAuths").get(0)).put("updateYn","N");
         mvc.perform(put("/api/common/roles/ADMIN").contentType("application/json").content(body.toString()))
-            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false));
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.message").value("시스템 관리자의 권한 화면 「수정」을 빼면 권한을 고칠 사람이 없어집니다. 저장할 수 없습니다."));
         verify(mapper,never()).updateRole(anyString(),any());
         assertThat(data.roles.get("ADMIN").dataScopeCd).isEqualTo("ALL");
         assertThat(data.menus.get("ADMIN").get(0).updateYn).isEqualTo("Y");

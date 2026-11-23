@@ -1,5 +1,9 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { ConfirmDialog, Toast } from "../../shared/feedback/Dialog";
+import {
+  ConfirmDialog,
+  Toast,
+  type ToastKind,
+} from "../../shared/feedback/Dialog";
 import { feedbackMessages } from "../../shared/feedback/messages";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { getCommonUserOptions } from "../commonops/userOptions";
@@ -34,7 +38,12 @@ export function RolePage() {
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const root = useRef<HTMLElement>(null);
-  const [notice, setNotice] = useState("");
+  // 시안 toast(msg, kind): 저장·추가는 ok, 취소·바꾼 것 없음은 info, 동시 수정은 warn.
+  const [notice, setNoticeState] = useState<{ text: string; kind: ToastKind }>(
+    { text: "", kind: "ok" },
+  );
+  const setNotice = (text: string, kind: ToastKind = "ok") =>
+    setNoticeState({ text, kind });
   const [pending, setPending] = useState<(() => void) | null>(null);
   const [history, setHistory] = useState<api.RoleChange[] | null>(null);
   const [historyFailure, setHistoryFailure] = useState("");
@@ -142,6 +151,8 @@ export function RolePage() {
     const saved = await api.putCommonRole(selected, {
       ...draft,
       confirmedAffectedUserIds,
+      // FR-0106: 읽었을 때의 변경 시각. 그 사이 다른 사람이 저장했으면 서버가 409로 막는다.
+      modifiedAt: settings.modifiedAt ?? null,
     });
     setImpact(null);
     setSettings(saved);
@@ -158,7 +169,7 @@ export function RolePage() {
   const save = async (confirmed?: string[]) => {
     if (lock.current || !settings || !draft) return;
     if (!confirmed && !dirty) {
-      setNotice("바꾼 내용이 없습니다.");
+      setNotice("바꾼 내용이 없습니다.", "info");
       return;
     }
     lock.current = true;
@@ -176,8 +187,14 @@ export function RolePage() {
         else await persist([]);
       } else await persist([]);
     } catch (error) {
-      failed(error);
       setImpact(null);
+      if (error instanceof api.RoleRequestError && error.status === 409) {
+        // 다른 사람이 먼저 바꿨으면 안내하고 지금 값을 다시 읽는다(새 변경 시각을 받는다).
+        setNotice(error.message, "warn");
+        setRevision((value) => value + 1);
+        return;
+      }
+      failed(error);
       if (
         error instanceof api.RoleRequestError &&
         error.errors.some((item) => item.field === "confirmedAffectedUserIds")
@@ -198,13 +215,13 @@ export function RolePage() {
   const cancel = () => {
     if (!settings) return;
     if (!dirty) {
-      setNotice("바꾼 내용이 없습니다.");
+      setNotice("바꾼 내용이 없습니다.", "info");
       return;
     }
     // 「변경 내용을 버릴까요?」 확인(사용자 결정)은 그대로 두고, 되돌린 뒤 시안 알림을 띄운다.
     guard(() => {
       setDraft(api.roleDraft(settings));
-      setNotice("변경을 취소했습니다.");
+      setNotice("변경을 취소했습니다.", "info");
     });
   };
   const stop = async () => {
@@ -614,9 +631,10 @@ export function RolePage() {
           }}
         />
       )}
-      {notice && (
+      {notice.text && (
         <Toast
-          message={notice}
+          message={notice.text}
+          kind={notice.kind}
           testId="role-toast"
           onDismiss={() => setNotice("")}
         />

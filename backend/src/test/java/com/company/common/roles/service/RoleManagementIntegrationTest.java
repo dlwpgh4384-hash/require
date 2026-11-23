@@ -43,7 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnabledIfEnvironmentVariable(named = "NAVIGATION_TEST_DB_URL", matches = "jdbc:postgresql:.*")
 @WebMvcTest({CommonRoleController.class, CommonUserOptionsController.class})
 @ContextConfiguration(classes = {CommonRoleController.class, CommonRoleService.class,
-    RoleExceptionHandler.class, ApiExceptionHandler.class, CommonUserOptionsController.class,
+    RoleExceptionHandler.class, com.company.common.support.controller.CodeExceptionHandler.class,
+    ApiExceptionHandler.class, CommonUserOptionsController.class,
     CommonUserOptionsService.class, RoleManagementIntegrationTest.Persistence.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class RoleManagementIntegrationTest {
@@ -217,9 +218,34 @@ class RoleManagementIntegrationTest {
         var items = json.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8)).path("data").path("items");
         var names = new java.util.ArrayList<String>();
         items.forEach(item -> names.add(item.path("item").asText() + "|" + item.path("before").asText() + "|" + item.path("after").asText()));
-        assertThat(names).contains("데이터 범위|전체|담당 파트", "민감 항목|보기|안 보기", "대시보드 · 등록|없음|있음");
+        assertThat(names).contains("데이터 범위|전체|담당 파트", "민감 항목|봄|안 봄", "대시보드 · 등록|없음|있음");
         assertThat(items.get(0).path("changedAt").asText()).endsWith("Z");
         mvc.perform(get("/api/common/roles/missing/change-history")).andExpect(status().isNotFound());
+    }
+    @Test
+    @DisplayName("FR-0106: 읽은 modifiedAt으로 저장하면 200, 그 뒤 옛 modifiedAt으로 다시 저장하면 409이고 값은 그대로")
+    void staleModifiedAtIsRejectedWithConflictAndKeepsSettings() throws Exception {
+        var read = json.readTree(mvc.perform(get("/api/common/roles/EXEC")).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString()).path("data");
+        String token = read.path("modifiedAt").asText();
+        assertThat(token).endsWith("Z");
+        var first = update("EXEC", "PART", "Y", List.of()).put("modifiedAt", token);
+        mvc.perform(put("/api/common/roles/EXEC").contentType("application/json").content(first.toString()))
+            .andExpect(status().isOk());
+        long histories = count("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_key='EXEC'");
+        var stale = update("EXEC", "ALL", "N", List.of()).put("modifiedAt", token);
+        mvc.perform(put("/api/common/roles/EXEC").contentType("application/json").content(stale.toString()))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요."));
+        assertThat(text("SELECT data_scope_cd FROM TB_SY_ROLE WHERE role_id='EXEC'")).isEqualTo("PART");
+        assertThat(count("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_key='EXEC'")).isEqualTo(histories);
+    }
+    @Test void copyTrimsRoleNameSoPaddedDuplicateIsRejected() throws Exception {
+        assertThat(copy("  합성 빈칸  ","PM","PROJ")).isEqualTo("R-001");
+        assertThat(text("SELECT role_nm FROM TB_SY_ROLE WHERE role_id='R-001'")).isEqualTo("합성 빈칸");
+        mvc.perform(post("/api/common/roles").contentType("application/json")
+            .content(json.writeValueAsString(Map.of("sourceRoleId","PM","roleName"," 합성 빈칸","dataScopeCd","PROJ"))))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("roleName"));
     }
     @Test void inactiveNamesRemainUniqueAndMissingNameInsertsNothing() throws Exception {
         String id=copy("합성 추가","ADMIN","ALL");

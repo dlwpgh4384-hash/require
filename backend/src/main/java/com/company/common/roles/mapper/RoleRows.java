@@ -11,6 +11,8 @@ public final class RoleRows {
         public String dataScopeCd;
         public String snstvViewYn;
         public String useYn;
+        /** FR-0106 동시 수정: 마지막 변경 시각(MOD_DTTM, 없으면 REG_DTTM). */
+        public java.time.Instant modifiedAt;
         public RoleContracts.Role value() {
             return new RoleContracts.Role(roleId, roleName, dataScopeCd, snstvViewYn, useYn,
                 RoleRules.basic(roleId));

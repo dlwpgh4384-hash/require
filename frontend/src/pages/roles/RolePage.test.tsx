@@ -44,6 +44,7 @@ let failSave: boolean;
 let failCopy: boolean;
 let stopAssigned: boolean;
 let drift: boolean;
+let conflict: boolean;
 let failedImpact: boolean;
 let slowSettings: boolean;
 let release: (() => void) | undefined;
@@ -135,6 +136,7 @@ beforeEach(() => {
   failCopy = false;
   stopAssigned = false;
   drift = false;
+  conflict = false;
   failedImpact = false;
   slowSettings = false;
   release = undefined;
@@ -145,8 +147,8 @@ beforeEach(() => {
         {
           changedAt: "2026-11-13T01:00:00Z",
           item: "민감 항목",
-          before: "안 보기",
-          after: "보기",
+          before: "안 봄",
+          after: "봄",
           changedBy: "시스템 관리자",
         },
       ],
@@ -214,6 +216,22 @@ beforeEach(() => {
       return success({ roleId: id, useYn: "N" });
     }
     if (init?.method === "PUT") {
+      if (conflict)
+        return {
+          ok: false,
+          status: 409,
+          json: async () => ({
+            success: false,
+            meta: {},
+            message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+            errors: [
+              {
+                field: "modifiedAt",
+                message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+              },
+            ],
+          }),
+        };
       if (drift) {
         drift = false;
         impact = {
@@ -496,6 +514,8 @@ it("copy (시안): picks the role to copy, sends its scope and selects the new t
   expect(screen.queryByTestId("role-copy-scope")).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId("role-copy-save"));
   await screen.findByText("역할 이름을 넣어 주세요.");
+  // FR-0106: 첫 오류 칸으로 커서를 옮긴다.
+  expect(screen.getByTestId("role-copy-name")).toHaveFocus();
   expect(screen.getByTestId("role-copy-name")).toHaveAttribute(
     "maxLength",
     "30",
@@ -514,14 +534,15 @@ it("copy (시안): picks the role to copy, sends its scope and selects the new t
       "true",
     ),
   );
+  // 시안처럼 앞뒤 빈칸은 떼고 보낸다.
   expect(JSON.parse(writes("POST")[0][1].body)).toEqual({
     sourceRoleId: "PM",
-    roleName: " 합성 새 역할 ",
+    roleName: "합성 새 역할",
     dataScopeCd: "PROJ",
   });
   expect(screen.queryByTestId("role-copy-dialog")).not.toBeInTheDocument();
   expect(await screen.findByTestId("role-toast")).toHaveTextContent(
-    "「일반 사용자(PM)」을 복사해 「 합성 새 역할 」 역할을 만들었습니다.",
+    "「일반 사용자(PM)」을 복사해 「합성 새 역할」 역할을 만들었습니다.",
   );
 });
 it("add (시안): name and scope only, starts with every menu 「권한 없음」", async () => {
@@ -712,8 +733,35 @@ it("dirty cancel and role navigation use existing confirmation and notify the sh
   fireEvent.click(screen.getByTestId("role-cancel"));
   fireEvent.click(screen.getByTestId("confirmation-proceed"));
   expect(screen.getByTestId("role-sensitive")).toBeChecked();
-  expect(await screen.findByTestId("role-toast")).toHaveTextContent(
-    "변경을 취소했습니다.",
-  );
+  const cancelled = await screen.findByTestId("role-toast");
+  expect(cancelled).toHaveTextContent("변경을 취소했습니다.");
+  // 시안 permcancel: toast(..., 'info')
+  expect(cancelled).toHaveClass("app-toast-info");
   expect(writes()).toHaveLength(0);
+});
+it("FR-0106: 저장에 읽은 modifiedAt을 보내고, 409면 경고 알림 뒤 지금 값을 다시 읽는다", async () => {
+  conflict = true;
+  settings.get("ADMIN")!.modifiedAt = "2026-11-13T01:00:00.123456Z";
+  renderPage();
+  await loaded();
+  const reads = () =>
+    request.mock.calls.filter(
+      (call) => call[0] === "/api/common/roles/ADMIN" && !call[1]?.method,
+    ).length;
+  const before = reads();
+  fireEvent.click(screen.getByTestId("role-sensitive"));
+  fireEvent.click(screen.getByTestId("role-save"));
+  const toast = await screen.findByTestId("role-toast");
+  expect(toast).toHaveTextContent(
+    "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+  );
+  expect(toast).toHaveClass("app-toast-warn");
+  expect(JSON.parse(writes("PUT")[0][1].body).modifiedAt).toBe(
+    "2026-11-13T01:00:00.123456Z",
+  );
+  await waitFor(() => expect(reads()).toBeGreaterThan(before));
+  await waitFor(() =>
+    expect(screen.getByTestId("role-sensitive")).toBeChecked(),
+  );
+  expect(screen.queryByTestId("role-failure")).not.toBeInTheDocument();
 });

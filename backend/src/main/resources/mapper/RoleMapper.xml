@@ -7,6 +7,7 @@
     <result column="data_scope_cd" property="dataScopeCd" javaType="java.lang.String"/>
     <result column="snstv_view_yn" property="snstvViewYn" javaType="java.lang.String"/>
     <result column="use_yn" property="useYn" javaType="java.lang.String"/>
+    <result column="modified_at" property="modifiedAt" javaType="java.time.Instant"/>
   </resultMap>
   <resultMap id="menu" type="com.company.common.roles.mapper.RoleRows$Menu" autoMapping="false">
     <id column="menu_id" property="menuId" javaType="java.lang.String"/>
@@ -32,7 +33,8 @@
     <result column="part_id" property="partId" javaType="java.lang.String"/>
     <result column="proj_id" property="projId" javaType="java.lang.String"/>
   </resultMap>
-  <sql id="roleColumns">r.role_id, r.role_nm, r.data_scope_cd, r.snstv_view_yn, r.use_yn</sql>
+  <sql id="roleColumns">r.role_id, r.role_nm, r.data_scope_cd, r.snstv_view_yn, r.use_yn,
+    COALESCE(r.mod_dttm, r.reg_dttm) AS modified_at</sql>
   <select id="selectRoles" resultMap="role">
     SELECT <include refid="roleColumns"/> FROM TB_SY_ROLE r
     WHERE r.use_yn='Y' ORDER BY r.sort_ord, r.role_id

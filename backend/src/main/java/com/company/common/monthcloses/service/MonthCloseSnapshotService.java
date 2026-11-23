@@ -15,6 +15,7 @@ import java.time.YearMonth;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
+import static java.math.BigDecimal.ONE;
 import static java.math.BigDecimal.ZERO;
 
 @Service
@@ -40,6 +41,9 @@ public class MonthCloseSnapshotService {
         var assignmentRows = assignments.calculate(month, actor);
         String key = month.toString().replace("-", "");
         mapper.deleteOpenAssignments(key);
+        // Reopen turns every fixed row back to FIX_YN='N'; a leftover fixed row would otherwise be a duplicate key.
+        if (mapper.fixedAssignmentCount(key) > 0)
+            throw CodeFailure.invalid("source", "이 달에 이미 고정된 월별 투입이 남아 있습니다. 마감 해제 상태를 확인해 주세요.");
         for (var row : assignmentRows) affected(mapper.saveAssignment(row));
         var value = profits.year(month.getYear(), month.getMonthValue(), cashBase).get(key);
         if (value == null || value.values().tax() == null)
@@ -52,6 +56,8 @@ public class MonthCloseSnapshotService {
         var classes = sources.payrollClasses(query);
         var codes = sources.codes();
         mapper.deleteOpenCosts(key);
+        if (mapper.fixedCostCount(key) > 0)
+            throw CodeFailure.invalid("source", "이 달에 이미 고정된 원가 배분이 남아 있습니다. 마감 해제 상태를 확인해 주세요.");
         Rates rates = null;
         for (var original : people) {
             if (!PersonalCostProfitRules.employed(original, month)) continue;
@@ -72,12 +78,19 @@ public class MonthCloseSnapshotService {
                 original.managementNumber(), original.salesPartName());
             boolean leave = PersonalCostProfitRules.leaveAt(leaves.stream()
                 .filter(row -> row.developerId().equals(person.developerId())).toList(), month.atEndOfMonth());
+            // That person's month MM total (the same inputs the live calculation spreads).
+            BigDecimal worked = selected.stream().map(row -> row.mm()).filter(mm -> mm != null && mm.signum() > 0)
+                .reduce(ZERO, BigDecimal::add);
             for (var cost : PersonalCostProfitRules.live(person, pay, selected, key, rates, leave)) {
-                String category = "INDRCT".equals(classification) ? "INDRCT"
+                boolean indirect = "INDRCT".equals(classification);
+                String category = indirect ? "INDRCT"
                     : "IN".equals(cost.contractTypeCode()) ? "RND"
                     : "IDLE".equals(cost.projectId()) ? "IDLE"
                     : "PRE".equals(cost.inputTypeCode()) ? "PRE" : "ALLOC";
-                affected(mapper.saveCost(cost, category, person.salesPartId(), actor));
+                // DDL TB_CO_MON_COST: fixed rows use PROJ_ID = ASGN_ID = 'INDRCT' (MM 1.0) or 'IDLE' (1.0 − month MM, not below 0).
+                var row = !"IDLE".equals(cost.projectId()) ? cost
+                    : indirect ? fixedRow(cost, "INDRCT", ONE) : fixedRow(cost, "IDLE", ONE.subtract(worked).max(ZERO));
+                affected(mapper.saveCost(row, category, person.salesPartId(), actor));
             }
         }
         affected(mapper.saveProfit(value.values(), actor));
@@ -87,6 +100,11 @@ public class MonthCloseSnapshotService {
         mapper.unfixAssignments(month);
         mapper.unfixCosts(month);
         mapper.unfixProfit(month);
+    }
+    /** Idle or indirect staff line: no sales, team or project fees; only the labor cost is kept. */
+    private static Cost fixedRow(Cost cost, String code, BigDecimal mm) {
+        return new Cost(cost.yearMonth(), cost.developerId(), code, code, cost.projectName(), null, null,
+            mm, ZERO, cost.labor(), ZERO, ZERO, null);
     }
     private static BigDecimal rate(List<Code> rows, String code) {
         return rows.stream().filter(row -> code.equals(row.code())).map(Code::value)

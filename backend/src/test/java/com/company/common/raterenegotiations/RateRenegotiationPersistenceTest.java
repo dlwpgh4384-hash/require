@@ -92,6 +92,7 @@ class RateRenegotiationPersistenceTest {
         db = new JdbcTemplate(source);
         when(calendar.today()).thenReturn(LocalDate.of(2026, 2, 1));
         when(calendar.now()).thenReturn(Instant.parse("2026-02-01T00:00:00Z"));
+        when(calendar.firstOpenMonth(any(), any())).thenCallRealMethod();
         db.update("UPDATE TB_SY_OPER_STD SET STD_VAL=202602 WHERE STD_CD='CASH_BASE_YM'");
         db.update("DELETE FROM TB_CL_CLOSE");
         job = db.queryForObject("SELECT min(CODE) FROM TB_SY_CODE WHERE CODE_GRP_ID='JOB' AND USE_YN='Y' AND DEL_YN='N'", String.class);

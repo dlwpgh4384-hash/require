@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { MonthClosePage } from "../monthcloses/MonthClosePage";
+import { MonthCloseTitleActions } from "../monthcloses/MonthCloseWorkspace";
 import { CashFlowStatementPage } from "../cashflowstatements/CashFlowStatementPage";
 import { CashFlowStatementTitleActions } from "../cashflowstatements/CashFlowStatementWorkspace";
 import { BillingPage } from "../bills/BillingPage";
@@ -69,6 +70,7 @@ export const screenRegistry: readonly ScreenEntry[] = [
   {
     id: "UI-14",
     Page: () => <MonthClosePage />,
+    TitleActions: () => <MonthCloseTitleActions />,
     rootTestId: "month-close-page",
     hasInputs: false,
   },

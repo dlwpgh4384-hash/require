@@ -61,7 +61,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(CommonMonthCloseController.class)
 @ContextConfiguration(classes = {CommonMonthCloseController.class, CommonMonthCloseService.class,
     MonthCloseCheckService.class, MonthCloseSnapshotService.class, MonthCloseAssignmentService.class,
-    MonthClosePeriodService.class, MonthCloseCodes.class, MonthCloseDefinitions.class,
+    MonthClosePeriodService.class, MonthCloseCheckRecorder.class, MonthCloseCodes.class, MonthCloseDefinitions.class,
     CommonPartSettlementService.class, PartSettlementAutoConfirmService.class, PartSettlementDefinitions.class,
     PartSettlementCloseService.class, CalculationRuleService.class, CommonCodeService.class,
     AssignmentMonthRules.class, DeveloperManMonthRules.class, ProfitStructureMonthlyProfitService.class,
@@ -93,7 +93,8 @@ class MonthClosePersistenceTest {
         @Bean SqlSessionFactory sqlSessionFactory(DataSource source) throws Exception {
             var factory = new SqlSessionFactoryBean(); factory.setDataSource(source);
             String[] paths = {"mapper/monthcloses/MonthCloseMapper.xml", "mapper/assignments/AssignmentMapper.xml",
-                "mapper/profitstructures/ProfitStructureMapper.xml", "mapper/partsettlements/PartSettlementMapper.xml",
+                "mapper/profitstructures/ProfitStructureMapper.xml", "mapper/personalcostprofits/PersonalCostProfitMapper.xml",
+                "mapper/partsettlements/PartSettlementMapper.xml",
                 "mapper/PartSettlementCloseMapper.xml", "mapper/billchecks/BillCheckMapper.xml", "mapper/projects/ProjectMapper.xml",
                 "mapper/CodeGroupMapper.xml", "mapper/CalculationRuleMapper.xml", "mapper/UserPreferencePeriodSourceMapper.xml",
                 "mapper/UserMapper.xml", "mapper/common/BillingNumberMapper.xml"};
@@ -154,11 +155,62 @@ class MonthClosePersistenceTest {
             result.put(table, db.queryForObject("SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]'::jsonb)::text FROM " + table + " t", String.class));
         return result;
     }
-    @Test void recheckDoesNotStoreAnythingAndReferenceChecksAreAlwaysNormal() throws Exception {
-        var before = state(); var row = read("2026-01"); read("2026-01");
+    @Test void recheckStoresOnlyCheckResultsAndReferenceChecksAreAlwaysNormal() throws Exception {
+        var before = state(); var row = read("2026-01");
         assertThat(row.path("checks").size()).isEqualTo(6);
         assertThat(row.path("checks").get(0).path("status").asText()).isEqualTo("정상");
         assertThat(row.path("checks").get(3).path("status").asText()).isEqualTo("정상");
+        assertThat(row.path("reopenable").asBoolean()).isFalse();
+        assertThat(db.queryForList("SELECT CHK_ITEM_CD FROM TB_CL_CLOSE_CHK WHERE CLOSE_YM='202601' ORDER BY CHK_ITEM_CD", String.class))
+            .containsExactly("BILL", "BILL_MISS", "FI", "MM_OVER", "PAY", "SETL");
+        assertThat(db.queryForObject("SELECT CHK_STAT_CD FROM TB_CL_CLOSE_CHK WHERE CLOSE_YM='202601' AND CHK_ITEM_CD='SETL'", String.class)).isEqualTo("WARN");
+        assertThat(db.queryForObject("SELECT CHK_STAT_CD||':'||CHK_CNT||':'||COALESCE(LINK_SCRN_ID,'-')||':'||REG_USER_ID FROM TB_CL_CLOSE_CHK WHERE CLOSE_YM='202601' AND CHK_ITEM_CD='PAY'", String.class))
+            .isEqualTo("OK:1:-:admin");
+        assertThat(db.queryForObject("SELECT CLOSE_STAT_CD||':'||(MOD_DTTM IS NULL) FROM TB_CL_CLOSE WHERE CLOSE_YM='202601'", String.class)).isEqualTo("WORK:true");
+        var firstCheck = db.queryForObject("SELECT CHK_DTTM FROM TB_CL_CLOSE_CHK WHERE CLOSE_YM='202601' AND CHK_ITEM_CD='PAY'", java.sql.Timestamp.class);
+        var again = read("2026-01");
+        assertThat(again.path("modifiedAt").isNull()).isTrue();
+        assertThat(db.queryForObject("SELECT count(*) FROM TB_CL_CLOSE_CHK WHERE CLOSE_YM='202601'", Integer.class)).isEqualTo(6);
+        assertThat(db.queryForObject("SELECT CHK_DTTM FROM TB_CL_CLOSE_CHK WHERE CLOSE_YM='202601' AND CHK_ITEM_CD='PAY'", java.sql.Timestamp.class)).isAfter(firstCheck);
+        var after = state();
+        for (String table : List.of("TB_CL_CLOSE", "TB_CL_CLOSE_CHK")) { after.remove(table); before.remove(table); }
+        assertThat(after).isEqualTo(before);
+    }
+    @Test void closedFutureAndPreBaseMonthsNeverStoreCheckResults() throws Exception {
+        write("2026-01", "confirm", body(read("2026-01"), null));
+        String checks = state().get("TB_CL_CLOSE_CHK");
+        var january = read("2026-01");
+        assertThat(january.path("isClosed").asBoolean()).isTrue(); assertThat(january.path("reopenable").asBoolean()).isTrue();
+        var before = read("2025-12");
+        assertThat(before.path("isClosed").asBoolean()).isTrue(); assertThat(before.path("reopenable").asBoolean()).isFalse();
+        assertThat(before.path("totalCount").asInt()).isZero(); assertThat(before.path("checks").size()).isZero();
+        read("2026-05");
+        assertThat(state().get("TB_CL_CLOSE_CHK")).isEqualTo(checks);
+        assertThat(db.queryForObject("SELECT count(*) FROM TB_CL_CLOSE WHERE CLOSE_YM IN ('202512','202605')", Integer.class)).isZero();
+    }
+    @Test void fixedIdleAndIndirectRowsFollowTheDdlAndMatchTheLiveCost() throws Exception {
+        String job = db.queryForObject("SELECT min(CODE) FROM TB_SY_CODE WHERE CODE_GRP_ID='JOB' AND USE_YN='Y' AND DEL_YN='N'", String.class);
+        db.update("UPDATE TB_PJ_ASGN SET CTRT_MM=0.5 WHERE ASGN_ID='monthclose-asgn'");
+        db.update("INSERT INTO TB_HR_DEV(DEV_ID,MNG_NO,DEV_NM,EMP_TYPE_CD,JOB_CD,DRCT_CLS_CD,PART_ID,WORK_STAT_CD,REG_USER_ID) VALUES('monthclose-indirect','monthclose-indirect','마감 간접 인력','FT',?,'INDRCT','monthclose-part','IDLE','admin')", job);
+        db.update("INSERT INTO TB_HR_MON_PAY(PAY_YM,DEV_ID,PAY_AMT,ALWNC_AMT,INSR_CMPNY_AMT,RETIRE_RSV_AMT,EMP_TYPE_CD,DRCT_CLS_CD,REG_USER_ID) VALUES('202601','monthclose-indirect',3000000,0,0,0,'FT','INDRCT','admin')");
+        write("2026-01", "confirm", body(read("2026-01"), null));
+        assertThat(db.queryForObject("SELECT ASGN_ID||':'||trim_scale(ASGN_MM)||':'||COST_CLS_CD||':'||trim_scale(TEAM_EXPS_AMT)||':'||trim_scale(FREE_MM) FROM TB_CO_MON_COST WHERE COST_YM='202601' AND DEV_ID='monthclose-dev' AND PROJ_ID='IDLE'", String.class))
+            .isEqualTo("IDLE:0.5:IDLE:0:0");
+        assertThat(db.queryForObject("SELECT PROJ_ID||':'||ASGN_ID||':'||trim_scale(ASGN_MM)||':'||COST_CLS_CD||':'||trim_scale(TEAM_EXPS_AMT) FROM TB_CO_MON_COST WHERE COST_YM='202601' AND DEV_ID='monthclose-indirect'", String.class))
+            .isEqualTo("INDRCT:INDRCT:1:INDRCT:0");
+        assertThat(db.queryForObject("SELECT ASGN_MM FROM TB_CO_MON_COST WHERE COST_YM='202601' AND DEV_ID='monthclose-dev' AND PROJ_ID='monthclose-project'", java.math.BigDecimal.class))
+            .isEqualByComparingTo("0.5");
+
+        assertThat(db.queryForObject("SELECT sum(LABOR_ALLOC_AMT) FROM TB_CO_MON_COST WHERE COST_YM='202601' AND DEV_ID='monthclose-dev'", java.math.BigDecimal.class))
+            .isPositive();
+    }
+    @Test void leftoverFixedRowsAreAClearSourceErrorNotADuplicateKey() throws Exception {
+        var body = body(read("2026-01"), null);
+        db.update("INSERT INTO TB_PJ_ASGN_MON(ASGN_ID,INPUT_YM,DEV_ID,PROJ_ID,INPUT_DAY_CNT,MON_MM,APLY_UPRC,SALES_AMT,FIX_YN,REG_USER_ID) "
+            + "VALUES('monthclose-asgn','202601','monthclose-dev','monthclose-project',31,1,7000000,7000000,'Y','admin')");
+        var before = state();
+        mvc.perform(put(root("2026-01") + "/confirm").contentType("application/json").content(body))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("source"));
         assertThat(state()).isEqualTo(before);
     }
     @Test void confirmStoresSnapshotsServerActorWarningNamesAndSuccessLogAtomically() throws Exception {
@@ -194,6 +246,9 @@ class MonthClosePersistenceTest {
         assertThat(db.queryForObject("SELECT FIX_YN FROM TB_CO_MON_PL WHERE PL_YM='202602'", String.class)).isEqualTo("N");
         assertThat(db.queryForObject("SELECT CLOSE_STAT_CD FROM TB_CL_CLOSE WHERE CLOSE_YM='202602'", String.class)).isEqualTo("WORK");
         assertThat(db.queryForObject("SELECT ACT_RSN FROM TB_CL_CLOSE_HIST WHERE CLOSE_YM='202602' AND ACT_CD='OPEN'", String.class)).isEqualTo("수정 필요");
+        assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE SCRN_ID='UI-14' AND ACT_TYPE_CD='UNCLOSE' AND USER_ID='admin' AND TRGT_DESC='202602'", Integer.class)).isEqualTo(1);
+        assertThat(february.path("reopenable").asBoolean()).isTrue();
+        assertThat(read("2026-01").path("reopenable").asBoolean()).isTrue(); // January is the latest close again
         assertThat(db.queryForObject("SELECT REMAIN_CHK_CN FROM TB_CL_CLOSE_HIST WHERE CLOSE_YM='202602' AND ACT_CD='OPEN'", String.class)).isNull();
         db.update("UPDATE TB_PJ_ASGN SET BILL_UPRC=BILL_UPRC+1 WHERE ASGN_ID='monthclose-asgn'");
         var reclosed = write("2026-02", "confirm", body(reopened, null));
@@ -217,7 +272,8 @@ class MonthClosePersistenceTest {
     @ParameterizedTest @ValueSource(strings = {"confirm", "reopen"})
     void staleVersionProduces409AndNoSuccessfulHistory(String action) throws Exception {
         var row = action.equals("reopen") ? write("2026-01", "confirm", body(read("2026-01"), null)) : read("2026-01");
-        if (action.equals("confirm")) db.update("INSERT INTO TB_CL_CLOSE(CLOSE_YM,CLOSE_STAT_CD,REG_USER_ID,MOD_DTTM) VALUES('202601','WORK','admin',clock_timestamp())");
+        if (action.equals("confirm")) db.update("INSERT INTO TB_CL_CLOSE(CLOSE_YM,CLOSE_STAT_CD,REG_USER_ID,MOD_DTTM) VALUES('202601','WORK','admin',clock_timestamp()) "
+            + "ON CONFLICT(CLOSE_YM) DO UPDATE SET MOD_DTTM=clock_timestamp()");
         else db.update("UPDATE TB_CL_CLOSE SET MOD_DTTM=MOD_DTTM+interval '1 second' WHERE CLOSE_YM='202601'");
         var before = state();
         mvc.perform(put(root("2026-01") + "/" + action).contentType("application/json").content(body(row, "정정")))

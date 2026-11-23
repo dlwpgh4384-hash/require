@@ -8,6 +8,7 @@ import com.company.common.support.service.CodeFailure;
 import com.company.common.support.service.CurrentBusinessActor;
 import java.time.Instant;
 import java.time.YearMonth;
+import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -21,27 +22,47 @@ public class CommonMonthCloseService {
     private final PartSettlementAutoConfirmService settlements;
     private final CurrentBusinessActor actor;
     private final MonthClosePeriodService period;
+    private final MonthCloseCheckRecorder recorder;
     public CommonMonthCloseService(MonthCloseMapper mapper, MonthCloseCheckService checks,
         MonthCloseSnapshotService snapshots, PartSettlementAutoConfirmService settlements,
-        CurrentBusinessActor actor, MonthClosePeriodService period) {
+        CurrentBusinessActor actor, MonthClosePeriodService period, MonthCloseCheckRecorder recorder) {
         this.mapper = mapper;
         this.checks = checks;
         this.snapshots = snapshots;
         this.settlements = settlements;
         this.actor = actor;
         this.period = period;
+        this.recorder = recorder;
     }
+    private record View(MonthClose close, List<StoredCheck> stored, boolean recordable) {}
+    /** GET is also [다시 점검]: an open month's six results are saved to TB_CL_CLOSE_CHK in a separate transaction. */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public MonthClose getCommonMonthClose(String yearMonth) {
-        return read(MonthCloseRules.month(yearMonth));
+        var month = MonthCloseRules.month(yearMonth);
+        var view = view(month);
+        if (view.recordable()) recorder.record(period.db(month), view.stored(), actor.userId());
+        return view.close();
     }
-    private MonthClose read(YearMonth month) {
-        var row = mapper.selectHeader(period.db(month));
+    private MonthClose read(YearMonth month) { return view(month).close(); }
+    private View view(YearMonth month) {
+        String db = period.db(month);
+        var row = mapper.selectHeader(db);
+        YearMonth base = period.baseOrNull();
+        // Same judgement as UserPreferencePeriodBasis: months before CASH_BASE_YM are migrated, i.e. closed.
+        boolean implied = base != null && month.isBefore(base);
+        boolean stored = row != null && "CLOSE".equals(row.state());
+        boolean closed = implied || stored;
+        Instant modifiedAt = row == null ? null : row.modifiedAt();
+        Instant closedAt = stored ? row.closedAt() : null;
+        String closedBy = stored ? row.closedBy() : null;
+        if (implied)
+            return new View(new MonthClose(month.toString(), true, false, modifiedAt, closedAt, closedBy,
+                0, 0, List.of()), List.of(), false);
+        boolean reopenable = stored && Objects.equals(db, mapper.latestClosedMonth());
         var result = checks.calculate(month);
-        boolean closed = row != null && "CLOSE".equals(row.state());
-        return new MonthClose(month.toString(), closed, row == null ? null : row.modifiedAt(),
-            closed ? row.closedAt() : null, closed ? row.closedBy() : null,
-            result.checks().size(), result.remaining().size(), result.checks());
+        boolean recordable = !closed && base != null && !month.isAfter(period.currentMonth());
+        return new View(new MonthClose(month.toString(), closed, reopenable, modifiedAt, closedAt, closedBy,
+            result.checks().size(), result.remaining().size(), result.checks()), result.stored(), recordable);
     }
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public ReopenImpact getCommonMonthCloseReopenImpact(String yearMonth) {
@@ -63,23 +84,25 @@ public class CommonMonthCloseService {
         settlements.putCommonPartSettlementCloseConfirm(new CloseInput(yearMonth, targets.items()));
         affected(mapper.saveClose(new Mutation(period.db(month), "CLOSE", actor.userId(), input.modifiedAt())));
         affected(mapper.insertHistory(new History(period.db(month), "CLOSE", null, names, actor.userId())));
-        affected(mapper.insertAccess(period.db(month), actor.userId()));
+        affected(mapper.insertAccess(period.db(month), actor.userId(), "CLOSE"));
         return read(month);
     }
     @Transactional(rollbackFor = Exception.class)
     public MonthClose putCommonMonthCloseReopen(String yearMonth, ReopenInput input) {
         var month = MonthCloseRules.month(yearMonth);
+        // Role first: a non-administrator never takes the month locks or learns the current version.
+        if (!MonthCloseRules.canReopen(actor.roles()))
+            throw CodeFailure.invalid("reason", "시스템 관리자만 마감을 해제할 수 있습니다.");
         MonthCloseRules.reason(input.reason());
         period.lock();
         var old = current(month, input.modifiedAt());
-        if (!MonthCloseRules.canReopen(actor.roles()))
-            throw CodeFailure.invalid("reason", "시스템 관리자만 마감을 해제할 수 있습니다.");
-        if (old == null || !"CLOSE".equals(old.state())
+        if (old == null || !"CLOSE".equals(old.state()) || month.isBefore(period.base())
             || !Objects.equals(period.db(month), mapper.latestClosedMonth()))
             throw CodeFailure.invalid("yearMonth", "가장 최근 마감월만 해제할 수 있습니다.");
         snapshots.unfix(period.db(month));
         affected(mapper.saveClose(new Mutation(period.db(month), "WORK", actor.userId(), input.modifiedAt())));
         affected(mapper.insertHistory(new History(period.db(month), "OPEN", input.reason(), null, actor.userId())));
+        affected(mapper.insertAccess(period.db(month), actor.userId(), "UNCLOSE"));
         return read(month);
     }
     private Header current(YearMonth month, Instant version) {

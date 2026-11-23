@@ -50,6 +50,7 @@ class MonthCloseControllerTest {
     @MockBean BusinessCalendar calendar;
     @MockBean CurrentBusinessActor actor;
     @MockBean PlatformTransactionManager transactions;
+    @MockBean MonthCloseCheckRecorder recorder;
     static final Instant TOKEN = Instant.parse("2026-02-01T01:02:03.123456Z");
     static final String ROOT = "/api/common/month-closes/";
     Header saved;
@@ -83,7 +84,7 @@ class MonthCloseControllerTest {
             return 1;
         });
         when(mapper.insertHistory(any())).thenReturn(1);
-        when(mapper.insertAccess(any(), any())).thenReturn(1);
+        when(mapper.insertAccess(any(), any(), any())).thenReturn(1);
     }
     void closed() { saved = new Header("CLOSE", TOKEN, TOKEN, "관리자"); when(mapper.latestClosedMonth()).thenReturn("202601"); }
     String version() throws Exception {
@@ -94,12 +95,34 @@ class MonthCloseControllerTest {
     String reopenBody(String reason) throws Exception {
         return json.writeValueAsString(json.createObjectNode().put("modifiedAt", TOKEN.toString()).put("reason", reason));
     }
-    @Test void getAndRecheckAreReadOnlyAndExposeSixChecks() throws Exception {
+    @Test void getAndRecheckExposeSixChecksAndOnlyRecordCheckResults() throws Exception {
         for (int i = 0; i < 2; i++) mvc.perform(get(ROOT + "2026-01")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.totalCount").value(6)).andExpect(jsonPath("$.data.checks.length()").value(6))
-            .andExpect(jsonPath("$.data.attentionCount").value(1)).andExpect(jsonPath("$.data.modifiedAt").isEmpty());
+            .andExpect(jsonPath("$.data.attentionCount").value(1)).andExpect(jsonPath("$.data.modifiedAt").isEmpty())
+            .andExpect(jsonPath("$.data.reopenable").value(false));
+        verify(recorder, times(2)).record("202601", List.of(), "admin");
         verifyNoInteractions(snapshots, settlements, management);
         verify(mapper, never()).saveClose(any()); verify(mapper, never()).insertHistory(any());
+    }
+    @Test void monthsBeforeCashBaseAreImpliedClosedWithoutChecksOrReopen() throws Exception {
+        mvc.perform(get(ROOT + "2025-12")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.isClosed").value(true)).andExpect(jsonPath("$.data.reopenable").value(false))
+            .andExpect(jsonPath("$.data.totalCount").value(0)).andExpect(jsonPath("$.data.attentionCount").value(0))
+            .andExpect(jsonPath("$.data.checks").isEmpty());
+        verifyNoInteractions(checks, recorder);
+    }
+    @Test void closedAndFutureMonthsAreNeverRecorded() throws Exception {
+        closed();
+        mvc.perform(get(ROOT + "2026-01")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.isClosed").value(true)).andExpect(jsonPath("$.data.reopenable").value(true));
+        saved = null;
+        mvc.perform(get(ROOT + "2026-05")).andExpect(status().isOk()).andExpect(jsonPath("$.data.isClosed").value(false));
+        verifyNoInteractions(recorder);
+    }
+    @Test void olderClosedMonthIsNotReopenable() throws Exception {
+        closed(); when(mapper.latestClosedMonth()).thenReturn("202602");
+        mvc.perform(get(ROOT + "2026-01")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.isClosed").value(true)).andExpect(jsonPath("$.data.reopenable").value(false));
     }
     @Test void impactReadsOnlySelectedAndFollowingMonth() throws Exception {
         when(mapper.adjustmentCount("202612", "202701")).thenReturn(3);
@@ -119,7 +142,7 @@ class MonthCloseControllerTest {
         order.verify(settlements).putCommonPartSettlementCloseConfirm(argThat(input -> input.yearMonth().equals("2026-01") && input.items().size() == 1));
         order.verify(mapper).saveClose(argThat(input -> input.state().equals("CLOSE") && input.actor().equals("admin")));
         order.verify(mapper).insertHistory(new History("202601", "CLOSE", null, "영업 파트 정산", "admin"));
-        order.verify(mapper).insertAccess("202601", "admin");
+        order.verify(mapper).insertAccess("202601", "admin", "CLOSE");
         mvc.perform(get(ROOT + "2026-01")).andExpect(status().isOk()).andExpect(jsonPath("$.data.closedAt").value(TOKEN.toString()));
     }
     @ParameterizedTest @ValueSource(strings = {"2026-13", "2026-00", "202601"})
@@ -157,7 +180,8 @@ class MonthCloseControllerTest {
         verify(snapshots).unfix("202601"); verifyNoInteractions(settlements);
         verify(mapper).saveClose(new Mutation("202601", "WORK", "admin", TOKEN));
         verify(mapper).insertHistory(new History("202601", "OPEN", " 정정 사유 ", null, "admin"));
-        verify(mapper, never()).insertAccess(any(), any());
+        verify(mapper).insertAccess("202601", "admin", "UNCLOSE");
+        verify(mapper, never()).insertAccess(any(), any(), eq("CLOSE"));
     }
     @ParameterizedTest @ValueSource(strings = {"", " ", "\t\n", "　"})
     void blankReasonIsFieldErrorWithoutHistory(String reason) throws Exception {
@@ -177,7 +201,9 @@ class MonthCloseControllerTest {
         assertThat(MonthCloseRules.canReopen(Set.of("ADMIN"))).isTrue();
         assertThat(MonthCloseRules.canReopen(Set.of("FIN"))).isFalse();
         mvc.perform(put(ROOT + "2026-01/reopen").contentType("application/json").content(reopenBody("정정"))).andExpect(status().isBadRequest());
-        verifyNoInteractions(snapshots); verify(mapper, never()).saveClose(any());
+        verifyNoInteractions(snapshots, management); verify(mapper, never()).saveClose(any());
+        // The role is checked before the month locks and the version check.
+        verify(mapper, never()).lockSources(); verify(mapper, never()).selectHeader(any());
     }
     @Test void olderClosedMonthCannotBeReopened() throws Exception {
         closed(); when(mapper.latestClosedMonth()).thenReturn("202602");
@@ -188,6 +214,6 @@ class MonthCloseControllerTest {
         doThrow(new IllegalStateException("snapshot unavailable")).when(snapshots).freeze(any(), any(), any());
         mvc.perform(put(ROOT + "2026-01/confirm").contentType("application/json").content(version())).andExpect(status().is5xxServerError());
         verifyNoInteractions(settlements); verify(mapper, never()).saveClose(any()); verify(mapper, never()).insertHistory(any());
-        verify(mapper, never()).insertAccess(any(), any());
+        verify(mapper, never()).insertAccess(any(), any(), any());
     }
 }

@@ -84,7 +84,7 @@ it("reads only after menu availability and shows the warning next to the existin
   const badge = await screen.findByTestId("menu-badge-UI-14");
   expect(badge).toHaveTextContent("!");
   expect(badge).toHaveClass("nb", "warn");
-  expect(badge).toHaveAttribute("aria-label", "이번 달 미마감");
+  expect(badge).toHaveAttribute("aria-label", "점검 필요");
   expect(screen.getByRole("link", { name: "월 마감" })).toContainElement(badge);
   expect(request.mock.calls[0][0]).toBe("/api/common/menus");
   expect(badgeRequests()).toHaveLength(1);
@@ -203,6 +203,34 @@ it("ignores a stale warning response after a save-triggered refresh", async () =
   await act(async () => finish(success({ needsAttention: true })));
   expect(oldSignal.aborted).toBe(true);
   expect(screen.queryByTestId("menu-badge-UI-14")).not.toBeInTheDocument();
+});
+
+it("keeps the warning and unpaid count visible while a refresh is still pending", async () => {
+  body.data.push({
+    ...body.data[1],
+    menuId: "billing",
+    scrnId: "UI-13",
+    menuNm: "청구·입금",
+    sortOrd: 2,
+  });
+  body.meta.screenAccess.push({
+    scrnId: "UI-13",
+    available: true,
+    pcOnlyYn: "N",
+  });
+  mount();
+  await screen.findByTestId("menu-badge-UI-14");
+  expect(await screen.findByTestId("menu-badge-UI-13")).toHaveTextContent("7");
+  const implementation = request.getMockImplementation()!;
+  request.mockImplementation((url: string) =>
+    url === badgePath || url === unpaidPath
+      ? new Promise(() => {})
+      : implementation(url),
+  );
+  act(() => requestMenuBadgeRefresh());
+  await waitFor(() => expect(badgeRequests()).toHaveLength(2));
+  expect(screen.getByTestId("menu-badge-UI-14")).toBeInTheDocument();
+  expect(screen.getByTestId("menu-badge-UI-13")).toHaveTextContent("7");
 });
 
 it("rejects a numeric badge or error envelope instead of displaying a made-up warning", async () => {

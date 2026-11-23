@@ -24,8 +24,9 @@ export function useMenuBadgeCounts(
   }, []);
   useEffect(() => {
     // 메뉴를 다 읽은 뒤에만 읽는다(메뉴 읽기 실패·다시 시도와 섞이지 않게).
+    // 앞서 받은 값은 새 값이 올 때까지 그대로 둔다(화면을 옮길 때마다 배지가 깜빡이지 않게).
+    // 읽을 수 없을 때(메뉴 준비 전·메뉴 숨김)는 아래 반환에서 숨긴다.
     const controller = new AbortController();
-    setCounts({});
     const read = (screen: string, path: string, field: string) => {
       Promise.resolve()
         .then(() => fetch(path, { signal: controller.signal }))
@@ -80,7 +81,7 @@ export function MenuBadge({ scrnId }: { scrnId: string | null }) {
     return count === true ? (
       <span
         className="menu-nb nb warn"
-        aria-label="이번 달 미마감"
+        aria-label="점검 필요"
         data-testid="menu-badge-UI-14"
       >
         !

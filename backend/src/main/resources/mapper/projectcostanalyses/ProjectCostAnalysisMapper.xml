@@ -107,7 +107,7 @@
   </select>
   <select id="selectSnapshots" resultMap="snapshot">
     SELECT c.COST_YM AS "yearMonth", c.DEV_ID AS "developerId", c.PROJ_ID AS "projectId",
-      c.ASGN_ID AS "assignmentId", c.ASGN_MM+c.FREE_MM AS "mm", c.FREE_MM AS "freeMm",
+      c.ASGN_ID AS "assignmentId", c.ASGN_MM AS "mm", c.FREE_MM AS "freeMm",
       c.SALES_AMT AS "revenue", c.LABOR_ALLOC_AMT AS "labor", c.TEAM_EXPS_AMT AS "team",
       c.PROJ_EXPS_AMT AS "expense", c.CTRT_TYPE_CD AS "contractTypeCode"
     FROM TB_CO_MON_COST c WHERE c.COST_YM &lt;= <include refid="cutoff"/>

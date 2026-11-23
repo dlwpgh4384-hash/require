@@ -8,7 +8,9 @@ import com.company.common.commonops.service.MonthCloseReadService;
 import com.company.common.support.controller.ApiExceptionHandler;
 import com.company.common.support.controller.CodeExceptionHandler;
 import com.company.common.support.service.BusinessCalendar;
+import com.company.common.preferences.mapper.UserPreferencePeriodSourceMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -42,6 +44,7 @@ class MonthCloseReadControllerTest {
     @MockBean BusinessCalendar calendar;
     @MockBean MonthCloseCodes codes;
     @MockBean PlatformTransactionManager transactions;
+    @MockBean UserPreferencePeriodSourceMapper periods;
 
     @BeforeEach void setup() {
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
@@ -49,32 +52,43 @@ class MonthCloseReadControllerTest {
         when(calendar.currentMonth()).thenAnswer(call -> actual.currentMonth());
         when(calendar.toDatabaseMonth(any())).thenAnswer(call -> actual.toDatabaseMonth(call.getArgument(0)));
         when(calendar.fromDatabaseMonth(any())).thenAnswer(call -> actual.fromDatabaseMonth(call.getArgument(0)));
+        when(calendar.firstOpenMonth(any(), any())).thenAnswer(call -> actual.firstOpenMonth(call.getArgument(0), call.getArgument(1)));
+        when(periods.selectCashBaseYm()).thenReturn(new BigDecimal("202601"));
+        when(periods.selectClosedMonths()).thenReturn(List.of());
         when(codes.name("ACT", "CLOSE")).thenReturn("마감");
         when(codes.name("ACT", "OPEN")).thenReturn("해제");
         when(mapper.selectHistory(any())).thenReturn(List.of());
     }
 
-    @Test void anonymousBadgeUsesTheCurrentSeoulCalendarMonthNotThePreviousMonth() throws Exception {
+    @Test void badgeShowsWhileTheWorkingMonthIsBeforeTheSeoulCalendarMonth() throws Exception {
+        when(periods.selectClosedMonths()).thenReturn(List.of("202601", "202609"));
         mvc.perform(get(BADGE)).andExpect(status().isOk())
             .andExpect(content().contentTypeCompatibleWith("application/json"))
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.meta").isMap())
             .andExpect(jsonPath("$.data.needsAttention").value(true));
-        verify(mapper).isClosed("202611");
-        verifyNoMoreInteractions(mapper);
+        verifyNoInteractions(mapper);
     }
 
-    @Test void badgeHidesOnlyWhenTheActualCurrentMonthIsClosed() throws Exception {
-        when(mapper.isClosed("202611")).thenReturn(true);
+    @Test void badgeHidesWhenTheWorkingMonthIsTheCalendarMonth() throws Exception {
+        // Last close 2026-10 -> working month 2026-11 = calendar month (Seoul) -> nothing left to close.
+        when(periods.selectClosedMonths()).thenReturn(List.of("202609", "202610"));
         mvc.perform(get(BADGE)).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.needsAttention").value(false));
-        verify(mapper).isClosed("202611");
+        // Without any close the working month is CASH_BASE_YM itself.
+        when(periods.selectClosedMonths()).thenReturn(List.of());
+        when(periods.selectCashBaseYm()).thenReturn(new BigDecimal("202611"));
+        mvc.perform(get(BADGE)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.needsAttention").value(false));
+        when(periods.selectCashBaseYm()).thenReturn(null);
+        mvc.perform(get(BADGE)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.needsAttention").value(false));
     }
 
     @Test void badgeDoesNotAdoptCallerSelectedMonthOrRoleHeaders() throws Exception {
         mvc.perform(get(BADGE).param("yearMonth", "not-a-month").header("X-Role", "GUEST"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.needsAttention").value(true));
-        verify(mapper).isClosed("202611");
+        verifyNoInteractions(mapper);
     }
 
     @Test void historyWithoutMonthReturnsAllRowsAndStoredProcessorAndWarningSnapshot() throws Exception {
@@ -134,7 +148,7 @@ class MonthCloseReadControllerTest {
     }
 
     @Test void badgeFailureIsNotReportedAsClosed() throws Exception {
-        when(mapper.isClosed("202611")).thenThrow(new DataAccessResourceFailureException("private SQL details"));
+        when(periods.selectClosedMonths()).thenThrow(new DataAccessResourceFailureException("private SQL details"));
         mvc.perform(get(BADGE)).andExpect(status().isInternalServerError())
             .andExpect(jsonPath("$.success").value(false)).andExpect(jsonPath("$.data").doesNotExist());
     }

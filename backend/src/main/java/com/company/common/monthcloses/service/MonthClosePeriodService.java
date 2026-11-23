@@ -39,6 +39,15 @@ public class MonthClosePeriodService {
             throw CodeFailure.invalid("yearMonth", "자금수지 시작 월을 확인해 주세요.");
         }
     }
+    /** CASH_BASE_YM for read screens; null when it cannot be judged (reads then show no implied close). */
+    public YearMonth baseOrNull() {
+        try {
+            return base();
+        } catch (CodeFailure failure) {
+            return null;
+        }
+    }
+    public YearMonth currentMonth() { return calendar.currentMonth(); }
     public void confirmable(YearMonth month) {
         String latest = mapper.latestClosedMonth();
         MonthCloseRules.confirmable(month, calendar.firstOpenMonth(

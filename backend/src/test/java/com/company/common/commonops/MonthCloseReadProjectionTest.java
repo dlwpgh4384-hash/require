@@ -96,7 +96,7 @@ class MonthCloseReadProjectionTest {
         assertThat(filtered.getParameterMappings()).extracting(field -> field.getProperty()).containsExactly("month");
     }
 
-    @Test void onlyCloseStatusIsClosedAndEveryRegisteredStatementIsARead() throws Exception {
+    @Test void everyRegisteredStatementIsAReadAndClosedJudgementHasOneSource() throws Exception {
         var config = configuration();
         assertThat(MyBatisConfig.class.getAnnotation(MapperScan.class).basePackages())
             .contains(MonthCloseReadMapper.class.getPackageName());
@@ -104,8 +104,8 @@ class MonthCloseReadProjectionTest {
             assertThat(config.getMappedStatement(NS + method.getName()).getSqlCommandType())
                 .isEqualTo(SqlCommandType.SELECT);
         }
-        assertThat(config.getMappedStatement(NS + "isClosed").getBoundSql(java.util.Map.of("month", "202611")).getSql())
-            .contains("c.close_stat_cd = 'CLOSE'");
+        // The badge reads CASH_BASE_YM and closed months through UserPreferencePeriodSourceMapper, not its own query.
+        assertThat(config.hasStatement(NS + "isClosed")).isFalse();
     }
 
     @Test void bothServiceBoundariesAreReadOnlyRepeatableRead() throws Exception {

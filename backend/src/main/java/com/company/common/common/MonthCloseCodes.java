@@ -22,11 +22,6 @@ public class MonthCloseCodes {
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public List<Item> options(String groupId) {
-        return registered(groupId).stream().filter(item -> "Y".equals(item.useYn)).toList();
-    }
-
-    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public String name(String groupId, String code) {
         return registered(groupId).stream().filter(item -> Objects.equals(code, item.code))
             .map(item -> item.codeName).findFirst()

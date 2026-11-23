@@ -38,12 +38,11 @@ class MonthCloseCodesTest {
     @ValueSource(strings = {"CTRT_TYPE", "EMP_TYPE", "JOB", "INPUT_TYPE", "EXT_PSBL", "SGA_ITEM",
         "FIN_CLS", "CLOSE_STAT", "DRCT_CLS", "ASGN_STAT", "COST_CLS", "SETL_STAT", "ACT",
         "CHK_ITEM", "CHK_STAT"})
-    void optionsAndNamesComeFromExistingCodeService(String id) {
+    void namesComeFromExistingCodeService(String id) {
         group(id, List.of(row(id, "stored-code", "DB 표시명", "Y")));
-        assertThat(codes.options(id)).extracting(item -> item.code).containsExactly("stored-code");
         assertThat(codes.name(id, "stored-code")).isEqualTo("DB 표시명");
-        verify(mapper, times(2)).selectGroups();
-        verify(mapper, times(2)).selectCodes(id);
+        verify(mapper).selectGroups();
+        verify(mapper).selectCodes(id);
         verifyNoMoreInteractions(mapper);
         verifyNoInteractions(management);
     }
@@ -52,8 +51,8 @@ class MonthCloseCodesTest {
     void closeStatusAndHistoryActionAreIndependentDatabaseDomains() {
         group("CLOSE_STAT", List.of(row("CLOSE_STAT", "WORK", "작업중", "Y"),
             row("CLOSE_STAT", "CLOSE", "마감", "Y")));
-        assertThat(codes.options("CLOSE_STAT")).extracting(item -> item.code)
-            .containsExactly("WORK", "CLOSE");
+        assertThat(codes.name("CLOSE_STAT", "WORK")).isEqualTo("작업중");
+        assertThat(codes.name("CLOSE_STAT", "CLOSE")).isEqualTo("마감");
         assertThatThrownBy(() -> codes.name("CLOSE_STAT", "OPEN")).isInstanceOf(CodeFailure.class);
         group("ACT", List.of(row("ACT", "CLOSE", "마감", "Y"), row("ACT", "OPEN", "해제", "Y")));
         assertThat(codes.name("ACT", "OPEN")).isEqualTo("해제");
@@ -62,10 +61,9 @@ class MonthCloseCodesTest {
     }
 
     @Test
-    void historicalDisabledLabelRemainsVisibleButIsNotAnOption() {
+    void historicalDisabledLabelRemainsVisible() {
         var stored = row("ACT", "OPEN", "해제", "N");
         group("ACT", List.of(stored));
-        assertThat(codes.options("ACT")).isEmpty();
         assertThat(codes.name("ACT", "OPEN")).isEqualTo("해제");
         stored.codeName = "변경된 DB 표시명";
         assertThat(codes.name("ACT", "OPEN")).isEqualTo("변경된 DB 표시명");
@@ -82,8 +80,8 @@ class MonthCloseCodesTest {
 
     @Test
     void unapprovedGroupIsRejectedWithoutDatabaseAccess() {
-        assertThatThrownBy(() -> codes.options(null)).isInstanceOf(CodeFailure.class);
-        assertThatThrownBy(() -> codes.options("UNKNOWN")).isInstanceOf(CodeFailure.class);
+        assertThatThrownBy(() -> codes.name(null, "CLOSE")).isInstanceOf(CodeFailure.class);
+        assertThatThrownBy(() -> codes.name("UNKNOWN", "CLOSE")).isInstanceOf(CodeFailure.class);
         verifyNoInteractions(mapper, management);
     }
 }

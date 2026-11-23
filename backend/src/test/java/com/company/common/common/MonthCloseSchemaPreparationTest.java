@@ -77,7 +77,7 @@ class MonthCloseSchemaPreparationTest {
     }
 
     @Test
-    void historyUsesOriginalColumnsCompositeKeyAndNoSequenceOrForeignKey() throws Exception {
+    void historyUsesOriginalColumnsCompositeKeyDdlForeignKeyAndNoSequence() throws Exception {
         assertThat(text("SELECT count(*)::text FROM tb_cl_close_hist")).isEqualTo("0");
         assertThat(text("SELECT string_agg(column_name,',' ORDER BY ordinal_position) "
             + "FROM information_schema.columns WHERE table_schema=current_schema() "
@@ -86,8 +86,12 @@ class MonthCloseSchemaPreparationTest {
         assertThat(text("SELECT pg_get_constraintdef(oid) FROM pg_constraint "
             + "WHERE conrelid='tb_cl_close_hist'::regclass AND contype='p'"))
             .isEqualTo("PRIMARY KEY (close_ym, hist_sn)");
+        assertThat(text("SELECT conname || ':' || pg_get_constraintdef(oid) FROM pg_constraint "
+            + "WHERE conrelid='tb_cl_close_hist'::regclass AND contype='f'"))
+            .isEqualTo("fk_tb_cl_close_hist_01:FOREIGN KEY (close_ym) REFERENCES tb_cl_close(close_ym)");
         assertThat(text("SELECT count(*)::text FROM pg_constraint "
-            + "WHERE conrelid='tb_cl_close_hist'::regclass AND contype='f'")).isEqualTo("0");
+            + "WHERE conrelid='tb_cl_close_hist'::regclass AND contype='f'")).isEqualTo("1");
+        assertThat(text("SELECT col_description('tb_cl_close_hist'::regclass, 1)")).doesNotContain("미선언");
         assertThat(text("SELECT column_default FROM information_schema.columns "
             + "WHERE table_schema=current_schema() AND table_name='tb_cl_close_hist' AND column_name='hist_sn'"))
             .isNull();
@@ -112,6 +116,7 @@ class MonthCloseSchemaPreparationTest {
 
     @Test
     void historyReasonDatabaseBoundIsFiveHundredCharactersWithoutTruncation() throws Exception {
+        execute("INSERT INTO tb_cl_close(close_ym,close_stat_cd,reg_user_id) VALUES ('202601','CLOSE','admin')");
         try (var insert = database.prepareStatement("INSERT INTO tb_cl_close_hist "
                 + "(close_ym,hist_sn,act_cd,act_rsn,reg_user_id) VALUES ('202601',1,'OPEN',?,'admin')")) {
             insert.setString(1, "해".repeat(501));
@@ -124,7 +129,8 @@ class MonthCloseSchemaPreparationTest {
     @ValueSource(strings = {"ALTER COLUMN hist_sn TYPE NUMERIC(6)", "ALTER COLUMN act_rsn TYPE VARCHAR(501)",
         "ALTER COLUMN remain_chk_cn TYPE VARCHAR(501)", "ALTER COLUMN reg_user_id DROP NOT NULL",
         "ALTER COLUMN hist_sn SET DEFAULT 1", "ALTER COLUMN reg_dttm TYPE TIMESTAMP",
-        "ADD COLUMN generated_id BIGINT", "DROP CONSTRAINT pk_tb_cl_close_hist"})
+        "ADD COLUMN generated_id BIGINT", "DROP CONSTRAINT pk_tb_cl_close_hist",
+        "DROP CONSTRAINT fk_tb_cl_close_hist_01"})
     void incompatibleHistoryIsReportedWithoutChangingExistingShape(String change) throws Exception {
         execute("ALTER TABLE tb_cl_close_hist " + change);
         String before = shape();
@@ -137,6 +143,34 @@ class MonthCloseSchemaPreparationTest {
         execute("ALTER TABLE tb_cl_close_hist DROP CONSTRAINT pk_tb_cl_close_hist");
         execute("ALTER TABLE tb_cl_close_hist ADD CONSTRAINT pk_tb_cl_close_hist PRIMARY KEY(hist_sn,close_ym)");
         String before = shape();
+        assertThatThrownBy(preparation::prepare).hasMessageContaining("tb_cl_close_hist");
+        assertThat(shape()).isEqualTo(before);
+    }
+
+    @Test
+    void historyBuiltFromDdlWithSeparateForeignKeyIsAcceptedAndKeepsRows() throws Exception {
+        execute("DROP TABLE tb_cl_close_hist");
+        execute("CREATE TABLE TB_CL_CLOSE_HIST (CLOSE_YM CHAR(6) NOT NULL, HIST_SN NUMERIC(5) NOT NULL, "
+            + "ACT_CD VARCHAR(10) NOT NULL, ACT_RSN VARCHAR(500), REMAIN_CHK_CN VARCHAR(500), "
+            + "REG_USER_ID VARCHAR(30) NOT NULL, REG_DTTM TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL, "
+            + "CONSTRAINT PK_TB_CL_CLOSE_HIST PRIMARY KEY (CLOSE_YM, HIST_SN))");
+        execute("ALTER TABLE TB_CL_CLOSE_HIST ADD CONSTRAINT FK_TB_CL_CLOSE_HIST_01 "
+            + "FOREIGN KEY (CLOSE_YM) REFERENCES TB_CL_CLOSE (CLOSE_YM)");
+        execute("INSERT INTO tb_cl_close(close_ym,close_stat_cd,reg_user_id) VALUES ('202601','CLOSE','admin')");
+        execute("INSERT INTO tb_cl_close_hist(close_ym,hist_sn,act_cd,reg_user_id) VALUES ('202601',1,'CLOSE','admin')");
+        String before = snapshot() + shape();
+        preparation.prepare();
+        assertThat(snapshot() + shape()).isEqualTo(before);
+    }
+
+    @Test
+    void equivalentRenamedForeignKeyIsAcceptedButExtraForeignKeyIsRejected() throws Exception {
+        execute("ALTER TABLE tb_cl_close_hist RENAME CONSTRAINT fk_tb_cl_close_hist_01 TO owned_close_month");
+        String before = shape();
+        preparation.prepare();
+        assertThat(shape()).isEqualTo(before);
+        execute("ALTER TABLE tb_cl_close_hist ADD CONSTRAINT owned_extra FOREIGN KEY (close_ym) REFERENCES tb_cl_close(close_ym)");
+        before = shape();
         assertThatThrownBy(preparation::prepare).hasMessageContaining("tb_cl_close_hist");
         assertThat(shape()).isEqualTo(before);
     }
@@ -172,23 +206,20 @@ class MonthCloseSchemaPreparationTest {
         try (var session = factory.openSession()) {
             var codes = new MonthCloseCodes(new CommonCodeService(
                 session.getMapper(CodeGroupMapper.class), mock(UserMapper.class)));
-            var options = codes.options(groupId);
-            assertThat(options).isNotEmpty();
+            var stored = new java.util.ArrayList<String>();
             try (var query = database.prepareStatement("SELECT code,code_nm FROM tb_sy_code "
                     + "WHERE code_grp_id=? AND del_yn='N' AND use_yn='Y' ORDER BY sort_ord,code")) {
                 query.setString(1, groupId);
                 try (var rows = query.executeQuery()) {
-                    for (var option : options) {
-                        assertThat(rows.next()).isTrue();
-                        assertThat(option.code).isEqualTo(rows.getString(1));
-                        assertThat(option.codeName).isEqualTo(rows.getString(2));
+                    while (rows.next()) {
+                        stored.add(rows.getString(1));
+                        assertThat(codes.name(groupId, rows.getString(1))).isEqualTo(rows.getString(2));
                     }
-                    assertThat(rows.next()).isFalse();
                 }
             }
+            assertThat(stored).isNotEmpty();
             if (groupId.equals("CHK_ITEM")) {
-                assertThat(options).extracting(option -> option.code)
-                    .containsExactly("PAY", "MM_OVER", "BILL", "FI", "SETL", "BILL_MISS");
+                assertThat(stored).containsExactly("PAY", "MM_OVER", "BILL", "FI", "SETL", "BILL_MISS");
             }
         }
         assertThat(snapshot()).isEqualTo(before);

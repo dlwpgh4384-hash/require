@@ -7,6 +7,8 @@ export interface MonthCloseCheck {
 export interface MonthClose {
   yearMonth: string;
   isClosed: boolean;
+  /** 가장 최근에 마감한 달이라 해제할 수 있는지(서버 판단). 없으면 해제할 수 없다고 본다. */
+  reopenable?: boolean;
   modifiedAt: string | null;
   closedAt: string | null;
   closedBy: string | null;
@@ -31,13 +33,17 @@ export class MonthCloseRequestError extends Error {
     super(message);
   }
 }
+/** 409(동시 수정): 다른 사람이 먼저 마감·해제했다. */
+export const isMonthCloseConflict = (failure: unknown) =>
+  failure instanceof MonthCloseRequestError && failure.status === 409;
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { credentials: "same-origin", ...init });
-  const body = await response.json();
-  if (!response.ok || body.success === false)
+  // 프록시 오류 화면처럼 JSON이 아닌 응답도 공통 문구로 보인다.
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !body || body.success === false)
     throw new MonthCloseRequestError(
-      body.message ?? "월 마감을 처리하지 못했습니다.",
-      body.errors ?? [],
+      body?.message || "월 마감을 처리하지 못했습니다.",
+      body?.errors ?? [],
       response.status,
     );
   return body.data;

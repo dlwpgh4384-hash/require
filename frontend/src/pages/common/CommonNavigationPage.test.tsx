@@ -542,10 +542,14 @@ type Content = ReturnType<typeof within>;
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
   "UI-14": async (content) => {
     expect(await content.findByTestId("month-close-check-5")).toBeVisible();
-    expect(content.getByTestId("banner-warn")).toHaveTextContent(
-      "점검 6개 중 0개 확인 필요",
+    // 시안: 확인할 항목이 없으면 info 띠, [마감하기]는 제목줄 오른쪽에 있다.
+    expect(content.getByTestId("banner-info")).toHaveTextContent(
+      "점검 6개 중 0개를 확인해야 합니다.",
     );
-    expect(content.getByRole("button", { name: "마감하기" })).toBeEnabled();
+    const actions = within(screen.getByTestId("screen-actions"));
+    await waitFor(() =>
+      expect(actions.getByRole("button", { name: "마감하기" })).toBeEnabled(),
+    );
   },
   "UI-21": async (content) => {
     expect(await content.findByTestId("cash-flow-empty")).toBeVisible();
@@ -1411,11 +1415,15 @@ describe("common placeholder screen contract", () => {
     );
     await expectScreenContent("UI-15");
     expect(setItem).not.toHaveBeenCalled();
-    // 메뉴 옆 미수 건수(SFR-001-04)는 읽기 요청이라 목록에서 뺀다(아래에서 쓰기 없음은 따로 확인).
+    // 메뉴 옆 미수 건수(SFR-001-04)·월 마감 「!」 배지는 읽기 요청이라 목록에서 뺀다(아래에서 쓰기 없음은 따로 확인).
     expect(
       requests.mock.calls
         .map(([url]) => url)
-        .filter((url) => url !== "/api/common/bills/unpaid-count"),
+        .filter(
+          (url) =>
+            url !== "/api/common/bills/unpaid-count" &&
+            url !== "/api/common/month-close-badge",
+        ),
     ).toEqual([
       "/api/common/menus",
       "/api/common/clients?useYn=Y",

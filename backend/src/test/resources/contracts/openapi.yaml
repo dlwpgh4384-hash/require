@@ -16013,6 +16013,10 @@ components:
           pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
         isClosed:
           type: boolean
+          description: CASH_BASE_YM 이전 달은 옮겨 온 달이라 마감으로 본다(점검 목록 없음, totalCount 0).
+        reopenable:
+          type: boolean
+          description: TB_CL_CLOSE의 가장 최근 마감월일 때만 true. CASH_BASE_YM 이전 달은 false.
         modifiedAt:
           type: string
           format: date-time
@@ -16027,6 +16031,7 @@ components:
         totalCount:
           type: integer
           enum:
+          - 0
           - 6
         attentionCount:
           type: integer
@@ -16039,6 +16044,7 @@ components:
       required:
       - yearMonth
       - isClosed
+      - reopenable
       - modifiedAt
       - closedAt
       - closedBy
@@ -16126,7 +16132,7 @@ components:
       properties:
         needsAttention:
           type: boolean
-          description: 이번달 미마감이면 true; 현재 허용마감 상한을 지난달로 둔 것과 별개
+          description: 이번 달(작업 중인 달 = 마지막 마감월 다음 달, CASH_BASE_YM보다 앞서지 않음)이 실제 달력의 이번 달보다 앞이면 true(마감할 수 있는 달이 남음). 같으면 false
       required:
       - needsAttention
     ApiResponse:

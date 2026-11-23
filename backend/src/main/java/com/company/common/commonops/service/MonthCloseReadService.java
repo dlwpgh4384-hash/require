@@ -5,8 +5,10 @@ import com.company.common.commonops.dto.MonthCloseReadContracts.Badge;
 import com.company.common.commonops.dto.MonthCloseReadContracts.History;
 import com.company.common.commonops.dto.MonthCloseReadContracts.HistoryItem;
 import com.company.common.commonops.mapper.MonthCloseReadMapper;
+import com.company.common.preferences.mapper.UserPreferencePeriodSourceMapper;
 import com.company.common.support.service.BusinessCalendar;
 import com.company.common.support.service.CodeFailure;
+import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.Arrays;
 import java.util.List;
@@ -19,16 +21,37 @@ public class MonthCloseReadService {
     private final MonthCloseReadMapper mapper;
     private final BusinessCalendar calendar;
     private final MonthCloseCodes codes;
+    private final UserPreferencePeriodSourceMapper periods;
 
-    public MonthCloseReadService(MonthCloseReadMapper mapper, BusinessCalendar calendar, MonthCloseCodes codes) {
+    public MonthCloseReadService(MonthCloseReadMapper mapper, BusinessCalendar calendar, MonthCloseCodes codes,
+        UserPreferencePeriodSourceMapper periods) {
         this.mapper = mapper;
         this.calendar = calendar;
         this.codes = codes;
+        this.periods = periods;
     }
 
+    /**
+     * "This month" is the working month: the first open month (last close + 1, never before CASH_BASE_YM),
+     * as in UserPreferencePeriodBasis. The badge shows only while that month is before the calendar month,
+     * i.e. a closable month is still open.
+     */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Badge getCommonMonthCloseBadge() {
-        return new Badge(!mapper.isClosed(calendar.toDatabaseMonth(calendar.currentMonth())));
+        BigDecimal base = periods.selectCashBaseYm();
+        if (base == null) return new Badge(false);
+        YearMonth cashBase;
+        try {
+            cashBase = calendar.fromDatabaseMonth(base.toBigIntegerExact().toString());
+        } catch (ArithmeticException | IllegalArgumentException | java.time.DateTimeException failure) {
+            return new Badge(false);
+        }
+        YearMonth last = null;
+        for (String value : periods.selectClosedMonths()) {
+            YearMonth month = calendar.fromDatabaseMonth(value);
+            if (last == null || month.isAfter(last)) last = month;
+        }
+        return new Badge(calendar.firstOpenMonth(last, cashBase).isBefore(calendar.currentMonth()));
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)

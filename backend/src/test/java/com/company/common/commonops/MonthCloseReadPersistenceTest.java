@@ -82,7 +82,8 @@ class MonthCloseReadPersistenceTest {
             var factory = new SqlSessionFactoryBean();
             factory.setDataSource(source);
             factory.setMapperLocations(new ClassPathResource("mapper/monthcloses/MonthCloseReadMapper.xml"),
-                new ClassPathResource("mapper/CodeGroupMapper.xml"));
+                new ClassPathResource("mapper/CodeGroupMapper.xml"),
+                new ClassPathResource("mapper/UserPreferencePeriodSourceMapper.xml"));
             var config = new org.apache.ibatis.session.Configuration();
             config.setMapUnderscoreToCamelCase(false);
             config.setAutoMappingUnknownColumnBehavior(org.apache.ibatis.session.AutoMappingUnknownColumnBehavior.FAILING);
@@ -94,6 +95,9 @@ class MonthCloseReadPersistenceTest {
         }
         @Bean MonthCloseReadMapper monthCloseReadMapper(SqlSessionTemplate session) {
             return session.getMapper(MonthCloseReadMapper.class);
+        }
+        @Bean com.company.common.preferences.mapper.UserPreferencePeriodSourceMapper periodSourceMapper(SqlSessionTemplate session) {
+            return session.getMapper(com.company.common.preferences.mapper.UserPreferencePeriodSourceMapper.class);
         }
         @Bean CommonCodeService commonCodeService(SqlSessionTemplate session) {
             return new CommonCodeService(session.getMapper(CodeGroupMapper.class), mock(UserMapper.class));
@@ -122,6 +126,9 @@ class MonthCloseReadPersistenceTest {
     }
 
     private void history(String month, int sequence, String action, String reason, String names, String at) {
+        // FK_TB_CL_CLOSE_HIST_01: history rows belong to a TB_CL_CLOSE month.
+        db.update("INSERT INTO tb_cl_close(close_ym,close_stat_cd,reg_user_id) VALUES (?,'WORK','history-reader') "
+            + "ON CONFLICT (close_ym) DO NOTHING", month);
         db.update("INSERT INTO tb_cl_close_hist(close_ym,hist_sn,act_cd,act_rsn,remain_chk_cn,reg_user_id,reg_dttm) "
             + "VALUES (?,?,?,?,?,'history-reader',CAST(? AS timestamptz))", month, sequence, action, reason, names, at);
     }
@@ -162,20 +169,21 @@ class MonthCloseReadPersistenceTest {
         assertThat(persisted()).isEqualTo(before);
     }
 
-    @Test void currentMonthBadgeDistinguishesMissingCloseAndWorkRowsWithoutCreatingMetadata() throws Exception {
+    @Test void badgeFollowsTheWorkingMonthAndIgnoresWorkRowsWithoutCreatingMetadata() throws Exception {
+        // Seoul calendar month is 2026-11 and CASH_BASE_YM is 202601: 2026-01 is still open, so the badge shows.
         var before = persisted();
         mvc.perform(get("/api/common/month-close-badge")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.needsAttention").value(true));
         assertThat(persisted()).isEqualTo(before);
-        db.update("INSERT INTO tb_cl_close(close_ym,close_stat_cd,reg_user_id) VALUES ('202610','CLOSE','history-reader')");
+        db.update("INSERT INTO tb_cl_close(close_ym,close_stat_cd,reg_user_id) VALUES ('202609','CLOSE','history-reader')");
         mvc.perform(get("/api/common/month-close-badge")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.needsAttention").value(true));
-        db.update("INSERT INTO tb_cl_close(close_ym,close_stat_cd,reg_user_id) VALUES ('202611','CLOSE','history-reader')");
+        db.update("INSERT INTO tb_cl_close(close_ym,close_stat_cd,reg_user_id) VALUES ('202610','CLOSE','history-reader')");
         before = persisted();
         mvc.perform(get("/api/common/month-close-badge")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.needsAttention").value(false));
         assertThat(persisted()).isEqualTo(before);
-        db.update("UPDATE tb_cl_close SET close_stat_cd='WORK' WHERE close_ym='202611'");
+        db.update("UPDATE tb_cl_close SET close_stat_cd='WORK' WHERE close_ym='202610'");
         before = persisted();
         mvc.perform(get("/api/common/month-close-badge")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.needsAttention").value(true));

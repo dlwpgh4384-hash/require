@@ -6,6 +6,5 @@ import org.apache.ibatis.annotations.Param;
 
 @Mapper
 public interface MonthCloseReadMapper {
-    boolean isClosed(@Param("month") String month);
     List<MonthCloseHistoryRow> selectHistory(@Param("month") String month);
 }

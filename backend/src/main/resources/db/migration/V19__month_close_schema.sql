@@ -20,7 +20,8 @@ BEGIN
     PERFORM pg_advisory_xact_lock(734901, 1);
     relation := to_regclass(format('%I.%I', current_schema(), 'tb_cl_close_hist'));
     IF relation IS NULL THEN
-        EXECUTE definition;
+        EXECUTE left(definition, length(definition) - 1)
+            || ', CONSTRAINT FK_TB_CL_CLOSE_HIST_01 FOREIGN KEY (CLOSE_YM) REFERENCES TB_CL_CLOSE(CLOSE_YM))';
         relation := to_regclass(format('%I.%I', current_schema(), 'tb_cl_close_hist'));
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.oid = relation AND c.relkind = 'r') THEN
@@ -48,23 +49,34 @@ BEGIN
         || ':' || c.condeferrable::TEXT ORDER BY c.conname)
     INTO expected_constraints
     FROM pg_constraint c
-    WHERE c.conrelid = 'pg_temp.month_close_expected'::REGCLASS;
+    WHERE c.conrelid = 'pg_temp.month_close_expected'::REGCLASS AND c.contype IN ('p', 'c', 'u');
     SELECT array_agg(c.conname || ':' || pg_get_constraintdef(c.oid)
         || ':' || c.condeferrable::TEXT ORDER BY c.conname)
     INTO actual_constraints
     FROM pg_constraint c
-    WHERE c.conrelid = relation AND c.convalidated;
+    WHERE c.conrelid = relation AND c.contype IN ('p', 'c', 'u') AND c.convalidated;
     DROP TABLE pg_temp.month_close_expected;
     IF actual_columns IS DISTINCT FROM expected_columns
         OR actual_constraints IS DISTINCT FROM expected_constraints THEN
         RAISE EXCEPTION USING MESSAGE='tb_cl_close_hist: original columns, defaults, nullability or PK differ',
             ERRCODE='P0001';
     END IF;
+    -- An existing database may name the DDL foreign key differently; its definition must still match.
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint c
+        WHERE c.conrelid = relation AND c.contype = 'f' AND c.convalidated AND NOT c.condeferrable
+            AND c.confrelid = to_regclass(format('%I.%I', current_schema(), 'tb_cl_close'))
+            AND lower(pg_get_constraintdef(c.oid)) = 'foreign key (close_ym) references tb_cl_close(close_ym)'
+    ) OR (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = relation AND c.contype = 'f') <> 1 THEN
+        RAISE EXCEPTION USING MESSAGE='tb_cl_close_hist.FK_TB_CL_CLOSE_HIST_01: expected original foreign key only',
+            ERRCODE='P0001';
+    END IF;
 END
 $month_close_schema$;
 
 COMMENT ON TABLE TB_CL_CLOSE_HIST IS '월 마감 및 해제 이력. 처리 사유와 마감 직전 확인 필요 항목의 표시명을 보존한다.';
-COMMENT ON COLUMN TB_CL_CLOSE_HIST.CLOSE_YM IS 'TB_CL_CLOSE.CLOSE_YM 참조 의도 (FK 미선언)';
+COMMENT ON COLUMN TB_CL_CLOSE_HIST.CLOSE_YM IS 'TB_CL_CLOSE.CLOSE_YM 참조 (FK_TB_CL_CLOSE_HIST_01)';
 COMMENT ON COLUMN TB_CL_CLOSE_HIST.HIST_SN IS '마감연월별 처리 순번. 월 쓰기 잠금 안에서 애플리케이션이 부여한다.';
 COMMENT ON COLUMN TB_CL_CLOSE_HIST.ACT_CD IS 'CLOSE:마감|OPEN:해제';
 COMMENT ON COLUMN TB_CL_CLOSE_HIST.ACT_RSN IS '해제 사유';

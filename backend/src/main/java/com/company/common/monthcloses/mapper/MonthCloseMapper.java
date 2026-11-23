@@ -16,7 +16,12 @@ public interface MonthCloseMapper {
     int adjustmentCount(@Param("month") String month, @Param("next") String next);
     int saveClose(Mutation mutation);
     int insertHistory(History history);
-    int insertAccess(@Param("month") String month, @Param("actor") String actor);
+    int insertAccess(@Param("month") String month, @Param("actor") String actor, @Param("action") String action);
+    int insertWorkMonth(@Param("month") String month, @Param("actor") String actor);
+    int saveChecks(@Param("month") String month, @Param("checks") java.util.List<StoredCheck> checks,
+        @Param("actor") String actor);
+    int fixedAssignmentCount(@Param("month") String month);
+    int fixedCostCount(@Param("month") String month);
     int saveAssignment(MonthWrite row);
     int deleteOpenAssignments(@Param("month") String month);
     int deleteOpenCosts(@Param("month") String month);

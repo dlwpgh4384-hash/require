@@ -16,8 +16,21 @@ import org.springframework.stereotype.Service;
 public class UserPreferencePeriodBasis {
     private static final DateTimeFormatter YM = DateTimeFormatter.ofPattern("uuuuMM");
     private final UserPreferencePeriodSourceMapper mapper;
+    private final BusinessCalendar calendar;
 
-    public UserPreferencePeriodBasis(UserPreferencePeriodSourceMapper mapper) { this.mapper = mapper; }
+    public UserPreferencePeriodBasis(UserPreferencePeriodSourceMapper mapper) { this(mapper, new BusinessCalendar()); }
+
+    public UserPreferencePeriodBasis(UserPreferencePeriodSourceMapper mapper, BusinessCalendar calendar) {
+        this.mapper = mapper;
+        this.calendar = java.util.Objects.requireNonNull(calendar);
+    }
+
+    /** Uses the application's calendar (and its Clock) whenever one is registered. */
+    @org.springframework.beans.factory.annotation.Autowired
+    public UserPreferencePeriodBasis(UserPreferencePeriodSourceMapper mapper,
+        org.springframework.beans.factory.ObjectProvider<BusinessCalendar> calendar) {
+        this(mapper, calendar.getIfAvailable(BusinessCalendar::new));
+    }
 
     public Map<String, Object> metadata() {
         BigDecimal base = mapper.selectCashBaseYm();
@@ -31,8 +44,7 @@ public class UserPreferencePeriodBasis {
                 YearMonth month = parse(value);
                 if (last == null || month.isAfter(last)) last = month;
             }
-            String latest = new BusinessCalendar()
-                .firstOpenMonth(last, cashMonth).format(YM);
+            String latest = calendar.firstOpenMonth(last, cashMonth).format(YM);
             return Map.of("periodBasis", new Basis(latest, cash, closed));
         } catch (IllegalArgumentException | java.time.DateTimeException | ArithmeticException failure) {
             return missing();

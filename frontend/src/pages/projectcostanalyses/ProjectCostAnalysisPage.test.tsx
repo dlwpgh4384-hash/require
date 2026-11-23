@@ -497,6 +497,61 @@ it("failed request is not an empty result and retries the same conditions", asyn
   fireEvent.click(screen.getByRole("button", { name: /다시 시도/ }));
   await ready();
 });
+it("excel success uses the mockup words with the count; failure warns without hiding the list", async () => {
+  vi.stubGlobal(
+    "URL",
+    Object.assign(URL, { createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() }),
+  );
+  show();
+  await ready();
+  const list = screen.getByTestId("project-cost-list");
+  fireEvent.click(within(list).getByRole("button", { name: /엑셀/ }));
+  expect(await screen.findByTestId("app-toast")).toHaveTextContent(
+    "엑셀 파일을 만들었습니다 (조회 결과 1건)",
+  );
+  const base = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) =>
+    String(input).includes("/excel")
+      ? { ok: false, status: 500, json: async () => ({}) }
+      : base(input, init),
+  );
+  fireEvent.click(within(list).getByRole("button", { name: /엑셀/ }));
+  await waitFor(() =>
+    expect(screen.getByTestId("app-toast")).toHaveClass("app-toast-warn"),
+  );
+  expect(screen.queryByTestId("list-error")).not.toBeInTheDocument();
+  expect(within(list).getByRole("cell", { name: "프로젝트 알파" })).toBeVisible();
+});
+it("a chosen project that is not in the month falls back to 전체 like the mockup", async () => {
+  show();
+  await ready();
+  fireEvent.change(screen.getByRole("combobox", { name: "프로젝트명" }), { target: { value: "P" } });
+  const base = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) =>
+    String(input).includes("projectId=P")
+      ? {
+          ok: false,
+          status: 400,
+          json: async () => ({
+            success: false,
+            message: "고른 달의 프로젝트에서 선택해 주세요.",
+            errors: [{ field: "projectId", message: "고른 달의 프로젝트에서 선택해 주세요." }],
+            meta: {},
+          }),
+        }
+      : base(input, init),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "조회" }));
+  await waitFor(() => {
+    const calls = listCalls().map((url) => url.searchParams.get("projectId"));
+    expect(calls.lastIndexOf("P")).toBeGreaterThan(0);
+    expect(calls.length - 1).toBeGreaterThan(calls.lastIndexOf("P"));
+    expect(calls.at(-1)).toBeNull();
+  });
+  await ready();
+  expect(screen.getByRole("combobox", { name: "프로젝트명" })).toHaveValue("");
+  expect(screen.queryByText("고른 달의 프로젝트에서 선택해 주세요.")).not.toBeInTheDocument();
+});
 it("field errors focus the filter, and period errors focus the month box", async () => {
   show();
   await ready();

@@ -67,8 +67,8 @@ public final class ProjectCostAnalysisRules {
     }
     public static BigDecimal historicAmount(Project p, List<History> history, String code,
         LocalDate cutoff, BigDecimal current) {
-        boolean evidenced = history.stream().anyMatch(h -> h.projectId().equals(p.projectId()) && h.itemCode().equals(code));
-        if (!evidenced && p.modifiedDate() != null && p.modifiedDate().isAfter(cutoff)) return null;
+        // 금액을 바꾸면 늘 변경 이력(AMT·BUDGET·TEAM·PEXP)이 남으므로, 이력이 없으면 지금 값이 그때 값이다
+        // (이름·영업 파트만 고쳐 수정 시각이 바뀌어도 지난달 금액을 비우지 않는다).
         String text = history(p, history, code, cutoff, current == null ? null : current.toPlainString());
         if (text == null || text.isBlank()) return null;
         try { return new BigDecimal(text); }

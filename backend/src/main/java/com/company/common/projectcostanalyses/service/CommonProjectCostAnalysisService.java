@@ -97,12 +97,14 @@ public class CommonProjectCostAnalysisService {
         }
         Map<String, BigDecimal> reference = turnkey ? reference(p, a, population, months, cost) : Map.of();
         List<CommonProjectCostAnalysisMonthlyCost> items = new ArrayList<>();
+        // 작업중 달에 급여가 없으면 그 달 마진율은 「–」(목록 월간 마진과 같은 규칙, 2026-11-20 결정 ⑧)
+        String unpaid = population.notice() == null ? null : population.cutoff().format(YM);
         for (String month : months.subList(Math.max(0, months.size() - 12), months.size())) {
             BigDecimal sales = internal || turnkey ? null : revenue.get(month);
             BigDecimal ref = turnkey ? reference.get(month) : null;
             BigDecimal basis = turnkey ? ref : sales;
             items.add(new CommonProjectCostAnalysisMonthlyCost(month, mm.get(month), cost.get(month), sales, ref,
-                internal || basis == null || basis.signum() == 0 ? null : rate(basis, cost.get(month))));
+                internal || month.equals(unpaid) || basis == null || basis.signum() == 0 ? null : rate(basis, cost.get(month))));
         }
         return new CommonProjectCostAnalysisMonthlyCosts(items);
     }

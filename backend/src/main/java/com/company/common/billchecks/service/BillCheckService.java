@@ -204,7 +204,9 @@ public class BillCheckService {
         }
         var amounts=rules.amounts(supply,input.vatRate());
         if (amounts.totalAmount().compareTo(receipts)<0)
-            throw CodeFailure.invalid("supplyAmount","합계가 이미 받은 금액("+receipts.toPlainString()+"원)보다 작습니다.");
+            // 청구 [수정]과 같은 문구(천 단위 쉼표, 시안 won())
+            throw CodeFailure.invalid("supplyAmount","합계가 이미 받은 금액("
+                +new java.text.DecimalFormat("#,##0").format(receipts)+"원)보다 작습니다.");
         rules.balance(amounts.totalAmount(),receipts);
         var write=new Write(id,order,input,amounts,receipts,actor.userId());
         int changed="CORRECTION".equals(action)?mapper.correct(write):mapper.insert(write);

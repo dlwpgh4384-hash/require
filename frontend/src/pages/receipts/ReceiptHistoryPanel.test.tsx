@@ -81,6 +81,7 @@ it("사유 없이는 보내지 않고, 사유와 수정 시각을 보내 취소�
   expect(screen.getByText("2026-10-20 · 400,000원 입금을 취소합니다. 미수금이 그만큼 다시 늘어납니다.")).toBeVisible();
   fireEvent.click(screen.getByTestId("receipt-cancel-confirm"));
   expect(screen.getByTestId("receipt-cancel-error")).toHaveTextContent("취소 사유를 입력해 주세요.");
+  await waitFor(() => expect(screen.getByTestId("receipt-cancel-reason")).toHaveFocus());
   expect(request).not.toHaveBeenCalled();
   fireEvent.change(screen.getByTestId("receipt-cancel-reason"), { target: { value: "  금액 정정 " } });
   fireEvent.click(screen.getByTestId("receipt-cancel-confirm"));

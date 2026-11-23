@@ -365,6 +365,7 @@ it("[청구 취소]는 사유와 수정 시각을 보내고 시안 알림을 띄
   expect(dialog).toHaveTextContent("시험 프로젝트 · B-202611-001 (3차, 2026-11, 합계 1,100,000원)을 취소합니다.");
   fireEvent.click(within(dialog).getByTestId("bill-cancel-confirm"));
   expect(within(dialog).getByTestId("bill-cancel-error")).toHaveTextContent("취소 사유를 입력해 주세요.");
+  await waitFor(() => expect(within(dialog).getByTestId("bill-cancel-reason")).toHaveFocus());
   fireEvent.change(within(dialog).getByTestId("bill-cancel-reason"), { target: { value: "두 번 등록" } });
   fireEvent.click(within(dialog).getByTestId("bill-cancel-confirm"));
   expect(await screen.findByTestId("bill-toast")).toHaveTextContent("B-202611-001 청구를 취소했습니다. 기록은 남습니다.");

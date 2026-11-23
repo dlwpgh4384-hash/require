@@ -125,11 +125,13 @@ it("rejects zero with the exact message and writes nothing", () => {
   expect(screen.getByText("입금액을 입력해 주세요.")).toBeVisible();
   expect(request).not.toHaveBeenCalled();
 });
-it("rejects overpayment without automatically allocating it to another bill", () => {
+it("rejects overpayment without automatically allocating it to another bill", async () => {
   open();
   fireEvent.change(amount(), { target: { value: "15001" } });
   fireEvent.click(screen.getByRole("button", { name: /^저장$/ }));
   expect(screen.getByText("입금액이 미수금보다 큽니다.")).toBeVisible();
+  // 첫 오류 칸으로 간다(00-1 FR-0106)
+  await waitFor(() => expect(amount()).toHaveFocus());
   expect(amount("current-year")).toHaveValue("30,000");
   expect(request).not.toHaveBeenCalled();
 });

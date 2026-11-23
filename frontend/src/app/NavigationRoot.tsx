@@ -212,14 +212,6 @@ export function NavigationRoot({
   const seen = useRef<Record<string, number>>({});
   const tick = useRef(0);
   const autoOpened = useRef(false);
-  // 메뉴에 청구·입금(UI-13)이 보일 때만 미수 건수를 읽는다(메뉴가 없으면 셀 필요가 없다).
-  const billingMenuShown =
-    state.status === "ready" &&
-    state.response.data.some((item) => item.scrnId === "UI-13") &&
-    state.response.meta.screenAccess.some(
-      (access) => access.scrnId === "UI-13" && access.available,
-    );
-  const badges = useMenuBadgeCounts(location.pathname, billingMenuShown);
   useEffect(() => {
     const refresh = () => setAttempt((value) => value + 1);
     window.addEventListener(MENU_REFRESH_EVENT, refresh);
@@ -274,6 +266,17 @@ export function NavigationRoot({
   }
   raw.filter((item) => !item.upperMenuId).forEach(include);
   const items = raw.filter((item) => visible.has(item.menuId));
+  const badgeMenuShown = (id: string) =>
+    items.some(
+      (item) =>
+        item.scrnId === id &&
+        !raw.some((child) => child.upperMenuId === item.menuId),
+    );
+  const badges = useMenuBadgeCounts(
+    location.pathname,
+    badgeMenuShown("UI-13"),
+    badgeMenuShown("UI-14"),
+  );
   const first = items
     .filter(
       (item) =>
@@ -545,9 +548,10 @@ export function NavigationRoot({
   // 휴대폰: PC에서 열어 둔 탭은 숨긴 채 남기되(입력 보존), 휴대폰에서 못 여는 화면(PC 전용 등)은 그리지 않는다.
   const panelIds = tabsOn
     ? tabList
-    : [...tabList, ...(current && !tabList.includes(current) ? [current] : [])].filter(
-        (id) => openable(id),
-      );
+    : [
+        ...tabList,
+        ...(current && !tabList.includes(current) ? [current] : []),
+      ].filter((id) => openable(id));
   const showPanels =
     keepMounted &&
     !!current &&
@@ -580,20 +584,20 @@ export function NavigationRoot({
       <NavigationState kind={raw.length ? "no-screen" : "empty"} compact />
     ) : (
       <MenuBadgeContext.Provider value={badges}>
-      <MenuBranches
-        items={items}
-        parent={null}
-        open={open}
-        current={shown}
-        toggle={(id) =>
-          setOpen((previous) => {
-            const next = new Set(previous);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-          })
-        }
-      />
+        <MenuBranches
+          items={items}
+          parent={null}
+          open={open}
+          current={shown}
+          toggle={(id) =>
+            setOpen((previous) => {
+              const next = new Set(previous);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              return next;
+            })
+          }
+        />
       </MenuBadgeContext.Provider>
     );
   const available = (id: string) => openable(id);

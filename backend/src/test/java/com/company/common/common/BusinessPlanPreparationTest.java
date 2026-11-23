@@ -31,7 +31,7 @@ class BusinessPlanPreparationTest {
     }
 
     @Test
-    void explicitPreparationExecutesPackagedBusinessPlanSchemaLastBeforeCommit() throws Exception {
+    void explicitPreparationExecutesPackagedBusinessPlanSchemaBeforeCommit() throws Exception {
         preparation.prepare();
         var resources = ArgumentCaptor.forClass(String.class);
         int count = new PathMatchingResourcePatternResolver()
@@ -39,10 +39,12 @@ class BusinessPlanPreparationTest {
         verify(statement, times(count)).execute(resources.capture());
         String businessPlan = new ClassPathResource("db/migration/V18__business_plan_schema.sql")
             .getContentAsString(StandardCharsets.UTF_8);
-        assertThat(resources.getAllValues().get(count - 1)).isEqualTo(businessPlan);
+        assertThat(resources.getAllValues()).containsOnlyOnce(businessPlan);
         var ordered = inOrder(statement, session);
-        ordered.verify(statement).execute(businessPlan);
-        ordered.verify(statement).close();
+        for (String sql : resources.getAllValues()) {
+            ordered.verify(statement).execute(sql);
+            ordered.verify(statement).close();
+        }
         ordered.verify(session).commit(true);
         ordered.verify(session).close();
         verify(session, never()).rollback(anyBoolean());

@@ -1,0 +1,102 @@
+/* 시안 UI-14 월 마감: .content(간격 24) · .card · .checks/.chk-i · .twrap.free · .t 값 그대로. 색은 공통 변수만 쓴다(다크 모드). */
+.month-close-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  min-width: 0;
+  max-width: 100%;
+}
+.month-close-page > * {
+  min-width: 0;
+}
+/* 공통 기간 줄의 아래 여백(16px) 대신 시안처럼 간격 24만 둔다. */
+.month-close-page > .period-selector {
+  margin-bottom: 0;
+}
+/* 시안 작은 단추(.btn-sm) 높이 28px: 앱 공통 button 최소 높이 36px을 이 화면 작은 단추에서만 푼다 */
+.month-close-page .ls-btn-sm {
+  min-height: 28px;
+}
+/* 화면 틀 밖에서 그릴 때(제목줄 자리가 없을 때) 단추 줄 */
+.month-close-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.month-close-actions .ls-btn svg,
+.month-close-page .ls-b svg {
+  flex: none;
+}
+/* .card */
+.month-close-card {
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.month-close-card h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+/* .checks / .chk-i */
+.month-close-checks {
+  display: flex;
+  flex-direction: column;
+}
+.month-close-chk {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--divider);
+}
+.month-close-chk:last-child {
+  border-bottom: 0;
+}
+.month-close-chk-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.month-close-ok {
+  color: var(--ls-ok);
+}
+.month-close-warn {
+  color: var(--ls-warn);
+}
+.month-close-ok svg,
+.month-close-warn svg {
+  display: block;
+}
+/* .twrap.free: 높이 제한 없음 */
+.month-close-twrap {
+  max-height: none;
+  min-height: 0;
+  max-width: 100%;
+}
+.month-close-page .ls-t td.month-close-wrap {
+  white-space: normal;
+  min-width: 160px;
+  overflow-wrap: anywhere;
+}
+.month-close-reason {
+  width: 100%;
+  box-sizing: border-box;
+  height: auto;
+  min-height: 80px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+@media (max-width: 600px) {
+  .month-close-card {
+    padding: 16px;
+  }
+}

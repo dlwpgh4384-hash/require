@@ -56,6 +56,7 @@ class CommonRateRenegotiationControllerTest {
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         when(calendar.today()).thenReturn(TODAY);
         when(calendar.now()).thenReturn(Instant.parse("2026-02-01T00:00:00Z"));
+        when(calendar.firstOpenMonth(any(), any())).thenCallRealMethod();
         when(periods.selectCashBaseYm()).thenReturn(n("202602"));
         when(periods.selectClosedMonths()).thenReturn(List.of());
         var standard = new CalculationStandardRow();

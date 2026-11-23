@@ -142,10 +142,12 @@
       AND (s.END_DT IS NULL OR s.END_DT &gt;= make_date(#{year},1,1))
   </select>
   <select id="selectCosts" resultMap="cost">
-    SELECT c.COST_YM AS "yearMonth",c.DEV_ID AS "developerId",c.PROJ_ID AS "projectId",
-      c.ASGN_ID AS "assignmentId",COALESCE(p.PROJ_NM,'남는 몫(대기 원가)') AS "projectName",
+    SELECT c.COST_YM AS "yearMonth",c.DEV_ID AS "developerId",
+      CASE WHEN c.PROJ_ID='INDRCT' THEN 'IDLE' ELSE c.PROJ_ID END AS "projectId",
+      CASE WHEN c.ASGN_ID='INDRCT' THEN 'IDLE' ELSE c.ASGN_ID END AS "assignmentId",
+      COALESCE(p.PROJ_NM,'남는 몫(대기 원가)') AS "projectName",
       j.CODE_NM AS "jobName",c.CTRT_TYPE_CD AS "contractTypeCode",
-      c.ASGN_MM+c.FREE_MM AS "mm",c.SALES_AMT AS "revenue",c.LABOR_ALLOC_AMT AS "labor",
+      CASE WHEN c.PROJ_ID IN ('IDLE','INDRCT') THEN 0 ELSE c.ASGN_MM END AS "mm",c.SALES_AMT AS "revenue",c.LABOR_ALLOC_AMT AS "labor",
       c.TEAM_EXPS_AMT AS "team",c.PROJ_EXPS_AMT AS "expense",a.INPUT_TYPE_CD AS "inputTypeCode"
     FROM TB_CO_MON_COST c LEFT JOIN TB_PJ_PROJ p ON p.PROJ_ID=c.PROJ_ID
     LEFT JOIN TB_PJ_ASGN a ON a.ASGN_ID=c.ASGN_ID

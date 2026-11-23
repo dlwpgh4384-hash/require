@@ -80,8 +80,8 @@ function respond(developerId = "DEV-selected", available = true) {
       {
         menuId: "M024",
         upperMenuId: "G008",
-        menuNm: "월 마감",
-        scrnId: "UI-14",
+        menuNm: "인력 수요 예측",
+        scrnId: "UI-17",
         menuLvl: 2,
         sortOrd: 1,
         pcOnlyYn: "N",
@@ -91,7 +91,7 @@ function respond(developerId = "DEV-selected", available = true) {
     meta: {
       screenAccess: [
         { scrnId: "UI-19", available, pcOnlyYn: "N" },
-        { scrnId: "UI-14", available: true, pcOnlyYn: "N" },
+        { scrnId: "UI-17", available: true, pcOnlyYn: "N" },
       ],
     },
   };
@@ -276,11 +276,11 @@ it.each(["/screens/UI-19", "/#UI-19"])(
   },
 );
 
-it("M016 opens UI-19 in the existing preference provider while UI-14 stays a placeholder", async () => {
+it("M016 opens UI-19 in the existing preference provider while UI-17 stays a placeholder", async () => {
   const { request, developer } = respond();
-  mount("/screens/UI-14");
+  mount("/screens/UI-17");
   expect(
-    await screen.findByRole("region", { name: "UI-14 본문" }),
+    await screen.findByRole("region", { name: "UI-17 본문" }),
   ).toHaveTextContent("준비 중");
   const preferences = screen.getByTestId("user-preferences");
   expect(
@@ -292,9 +292,9 @@ it("M016 opens UI-19 in the existing preference provider while UI-14 stays a pla
   expect(router?.state.location.pathname).toBe("/screens/UI-19");
   expect(screen.getByTestId("user-preferences")).toBe(preferences);
   await act(async () => {
-    await router!.navigate("/screens/UI-14");
+    await router!.navigate("/screens/UI-17");
   });
-  expect(screen.getByRole("region", { name: "UI-14 본문" })).toHaveTextContent(
+  expect(screen.getByRole("region", { name: "UI-17 본문" })).toHaveTextContent(
     "준비 중",
   );
   expect(

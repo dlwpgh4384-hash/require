@@ -432,6 +432,35 @@ function respond(body: ShellMenuResponse) {
         meta: {},
         data: { items: [], totalCount: 0, banner: null },
       };
+    if (url.startsWith("/api/common/month-closes/"))
+      return {
+        success: true,
+        meta: {},
+        data: {
+          yearMonth: "2026-02",
+          isClosed: false,
+          modifiedAt: null,
+          closedAt: null,
+          closedBy: null,
+          totalCount: 6,
+          attentionCount: 0,
+          checks: [
+            "급여 업로드",
+            "MM 1.0 초과자",
+            "세금계산서 번호 미입력",
+            "재무 항목",
+            "영업 파트 정산",
+            "청구 누락 점검",
+          ].map((name) => ({
+            name,
+            status: "정상",
+            description: "조회 결과",
+            targetScreenId: null,
+          })),
+        },
+      };
+    if (url.startsWith("/api/common/month-close-history"))
+      return { success: true, meta: {}, data: { items: [] } };
     if (url.startsWith("/api/common/withdrawals/tentative-assignments?"))
       return { success: true, meta: {}, data: { items: [] } };
     return body;
@@ -451,7 +480,8 @@ function respond(body: ShellMenuResponse) {
               url.endsWith("/UI-08") ||
               url.endsWith("/UI-09") ||
               url.endsWith("/UI-18") ||
-              url.endsWith("/UI-21")
+              url.endsWith("/UI-21") ||
+              url.endsWith("/UI-14")
                 ? {
                     periodBasis: {
                       latestYm: "202602",
@@ -510,6 +540,17 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-14": async (content) => {
+    expect(await content.findByTestId("month-close-check-5")).toBeVisible();
+    // 시안: 확인할 항목이 없으면 info 띠, [마감하기]는 제목줄 오른쪽에 있다.
+    expect(content.getByTestId("banner-info")).toHaveTextContent(
+      "점검 6개 중 0개를 확인해야 합니다.",
+    );
+    const actions = within(screen.getByTestId("screen-actions"));
+    await waitFor(() =>
+      expect(actions.getByRole("button", { name: "마감하기" })).toBeEnabled(),
+    );
+  },
   "UI-21": async (content) => {
     expect(await content.findByTestId("cash-flow-empty")).toBeVisible();
     expect(content.getByTestId("period-selector")).toHaveAttribute(
@@ -788,7 +829,11 @@ describe("common placeholder screen contract", () => {
         rootTestId: "cash-flow-statements-page",
         hasInputs: false,
       });
-      expect(findScreen("UI-14")).toBeUndefined();
+      expect(findScreen("UI-14")).toMatchObject({
+        id: "UI-14",
+        rootTestId: "month-close-page",
+        hasInputs: false,
+      });
     } finally {
       view.unmount();
       router.dispose();
@@ -1370,11 +1415,15 @@ describe("common placeholder screen contract", () => {
     );
     await expectScreenContent("UI-15");
     expect(setItem).not.toHaveBeenCalled();
-    // 메뉴 옆 미수 건수(SFR-001-04)는 읽기 요청이라 목록에서 뺀다(아래에서 쓰기 없음은 따로 확인).
+    // 메뉴 옆 미수 건수(SFR-001-04)·월 마감 「!」 배지는 읽기 요청이라 목록에서 뺀다(아래에서 쓰기 없음은 따로 확인).
     expect(
       requests.mock.calls
         .map(([url]) => url)
-        .filter((url) => url !== "/api/common/bills/unpaid-count"),
+        .filter(
+          (url) =>
+            url !== "/api/common/bills/unpaid-count" &&
+            url !== "/api/common/month-close-badge",
+        ),
     ).toEqual([
       "/api/common/menus",
       "/api/common/clients?useYn=Y",

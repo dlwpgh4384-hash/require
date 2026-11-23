@@ -24,6 +24,7 @@ import type { CodeHistoryItem } from "../pages/commonops/codeHistory";
 import type { RateRenegotiationResult } from "../pages/raterenegotiations/rateRenegotiations";
 import type { BusinessPlanComparisonResult } from "../pages/commonops/businessPlanComparisons";
 import type { CashFlowStatementResult } from "../pages/cashflowstatements/cashFlowStatements";
+import type { MonthClose } from "../pages/monthcloses/monthCloses";
 
 let router: ReturnType<typeof createAppRouter> | undefined;
 
@@ -622,6 +623,200 @@ function respondWithCashFlowStatements(available = true) {
   return { request, list, download };
 }
 
+function respondWithMonthCloses(available = true) {
+  const menus = response();
+  menus.data.push(
+    {
+      ...menus.data[0],
+      menuId: "G008",
+      menuNm: "마감",
+      scrnId: null,
+      sortOrd: 2,
+    },
+    {
+      ...menus.data[0],
+      menuId: "M024",
+      upperMenuId: "G008",
+      menuNm: "월 마감",
+      scrnId: "UI-14",
+      menuLvl: 2,
+      pcOnlyYn: "Y",
+    },
+  );
+  menus.meta.screenAccess.push({ scrnId: "UI-14", available, pcOnlyYn: "Y" });
+  const result: MonthClose = {
+    yearMonth: "2026-10",
+    isClosed: false,
+    modifiedAt: null,
+    closedAt: null,
+    closedBy: null,
+    totalCount: 6,
+    attentionCount: 0,
+    checks: [
+      ["급여 업로드", "UI-02"],
+      ["MM 1.0 초과자", "UI-12"],
+      ["세금계산서 번호 미입력", "UI-13"],
+      ["재무 항목", "UI-10"],
+      ["영업 파트 정산", "UI-19"],
+      ["청구 누락 점검", "UI-13"],
+    ].map(([name, targetScreenId]) => ({
+      name,
+      targetScreenId,
+      status: "정상",
+      description: "점검 완료",
+    })),
+  };
+  const success = (data: unknown) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      success: true,
+      meta: {},
+      data: structuredClone(data),
+    }),
+  });
+  const list = vi.fn(async () => success(result));
+  const history = vi.fn(async () => success({ items: [] }));
+  const request = vi.fn(async (url: string, _init?: RequestInit) => {
+    if (url === "/api/common/menus")
+      return { ok: true, status: 200, json: async () => menus };
+    if (url === "/api/common/month-closes/2026-10") return list();
+    if (url === "/api/common/month-close-history")
+      return history();
+    if (url === "/api/common/month-close-badge")
+      return success({ needsAttention: true });
+    if (url.startsWith("/api/common/user-preferences/")) {
+      const preference = preferenceResponse(url);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ...preference,
+          data: url.endsWith("/PERIOD/UI-14")
+            ? {
+                ...preference.data,
+                found: true,
+                prefVal: JSON.stringify({ year: 2026, month: 10 }),
+              }
+            : preference.data,
+          meta: {
+            periodBasis: {
+              latestYm: "202611",
+              cashBaseYm: "202601",
+              closedMonths: [],
+            },
+          },
+        }),
+      };
+    }
+    throw new Error(`예상하지 않은 요청: ${url}`);
+  });
+  vi.stubGlobal("fetch", request);
+  return { request, list, history };
+}
+
+describe("month close route composition", () => {
+  it.each(["/screens/UI-14", "/#UI-14"])(
+    "%s resolves the registered page and its public clients in one shell",
+    async (path) => {
+      const { request } = respondWithMonthCloses();
+      mount(path);
+      await screen.findByTestId("month-close-check-5");
+      expect(await screen.findByText("마감 이력 없음")).toBeVisible();
+      expect(screen.getAllByTestId("month-close-page")).toHaveLength(1);
+      expect(screen.getAllByTestId(/^month-close-check-\d+$/)).toHaveLength(6);
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+        "월 마감",
+      );
+      expect(screen.getByRole("combobox", { name: "조회 월" })).toHaveValue(
+        "2026-10",
+      );
+      expect(request).toHaveBeenCalledWith("/api/common/month-closes/2026-10", {
+        credentials: "same-origin",
+        signal: expect.any(AbortSignal),
+      });
+      expect(request).toHaveBeenCalledWith(
+        "/api/common/month-close-history",
+        {
+          credentials: "same-origin",
+          signal: expect.any(AbortSignal),
+        },
+      );
+      expect(await screen.findByTestId("menu-badge-UI-14")).toHaveTextContent(
+        "!",
+      );
+      expect(request).toHaveBeenCalledWith("/api/common/month-close-badge", {
+        signal: expect.any(AbortSignal),
+      });
+      expect(
+        request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
+      ).toBe(false);
+      expect(
+        request.mock.calls.some(
+          ([url, init]) => url.includes("/month-closes/") && init?.method,
+        ),
+      ).toBe(false);
+      expect(router?.state.location.pathname).toBe("/screens/UI-14");
+      expectSingleShell();
+    },
+  );
+
+  it("M024 under G008 opens UI-14 without replacing the preference shell", async () => {
+    respondWithMonthCloses();
+    mount("/screens/ADDED");
+    await screen.findByRole("region", { name: "ADDED 본문" });
+    const preferences = screen.getByTestId("user-preferences");
+    fireEvent.click(screen.getByTestId("menu-toggle-g008"));
+    fireEvent.click(screen.getByRole("link", { name: "월 마감" }));
+    await screen.findByTestId("month-close-check-5");
+    expect(router?.state.location.pathname).toBe("/screens/UI-14");
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
+    expectSingleShell();
+  });
+
+  it("the existing unavailable-screen guard prevents month detail and history reads", async () => {
+    const { list, history } = respondWithMonthCloses(false);
+    mount("/screens/UI-14");
+    expect(await screen.findByText("사용할 수 없는 화면입니다")).toBeVisible();
+    expect(screen.queryByTestId("month-close-page")).not.toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
+    expect(history).not.toHaveBeenCalled();
+    expectSingleShell();
+  });
+
+  it("mobile direct entry retains the existing PC-only gate before feature reads", async () => {
+    const { list, history } = respondWithMonthCloses();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query === "(max-width: 767px)",
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    mount("/screens/UI-14");
+    expect(await screen.findByText("PC에서 이용해 주세요")).toBeVisible();
+    expect(screen.queryByTestId("month-close-page")).not.toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
+    expect(history).not.toHaveBeenCalled();
+    expectSingleShell();
+  });
+
+  it("a routed read failure retries the same selected month without replacing the shell", async () => {
+    const { list } = respondWithMonthCloses();
+    list.mockRejectedValueOnce(new Error("점검 조회 실패"));
+    mount("/screens/UI-14");
+    fireEvent.click(await screen.findByTestId("month-close-retry"));
+    await screen.findByTestId("month-close-check-5");
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(router?.state.location.pathname).toBe("/screens/UI-14");
+    expect(screen.getByRole("combobox", { name: "조회 월" })).toHaveValue(
+      "2026-10",
+    );
+    expectSingleShell();
+  });
+});
+
 describe("cash flow statement route composition", () => {
   it.each(["/screens/UI-21", "/#UI-21"])(
     "%s resolves UI-21 through the public year-only client in one shell",
@@ -680,7 +875,7 @@ describe("cash flow statement route composition", () => {
     );
     mount("/screens/UI-21");
     await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
-    expect(screen.getByTestId("cash-flow-loading")).toBeVisible();
+    expect(await screen.findByTestId("cash-flow-loading")).toBeVisible();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "자금수지표",
     );
@@ -3146,7 +3341,11 @@ describe("application route registration", () => {
       mount(path);
       await waitFor(() =>
         expect(
-          request.mock.calls.filter(([url]) => url !== "/api/common/menus" && url !== "/api/common/bills/unpaid-count"),
+          request.mock.calls.filter(
+            ([url]) =>
+              url !== "/api/common/menus" &&
+              url !== "/api/common/bills/unpaid-count",
+          ),
         ).toHaveLength(5),
       );
       await act(async () => {});
@@ -3159,7 +3358,9 @@ describe("application route registration", () => {
       expect(screen.getAllByTestId("user-preferences")).toHaveLength(1);
       expectSingleShell();
       const preferenceCalls = request.mock.calls.filter(
-        ([url]) => url !== "/api/common/menus" && url !== "/api/common/bills/unpaid-count",
+        ([url]) =>
+          url !== "/api/common/menus" &&
+          url !== "/api/common/bills/unpaid-count",
       );
       expect(preferenceCalls.map(([url]) => url).sort()).toEqual([
         "/api/common/user-preferences/DENSE/GLOBAL",
@@ -3222,7 +3423,8 @@ describe("application route registration", () => {
     await act(async () => {});
     const provider = screen.getByTestId("user-preferences");
     const reads = request.mock.calls.filter(
-      ([url]) => url !== "/api/common/menus" && url !== "/api/common/bills/unpaid-count",
+      ([url]) =>
+        url !== "/api/common/menus" && url !== "/api/common/bills/unpaid-count",
     ).length;
     await act(async () => {
       await router!.navigate("/unregistered/path");
@@ -3230,7 +3432,11 @@ describe("application route registration", () => {
     expect(await screen.findByText("없는 화면입니다")).toBeVisible();
     expect(screen.getByTestId("user-preferences")).toBe(provider);
     expect(
-      request.mock.calls.filter(([url]) => url !== "/api/common/menus" && url !== "/api/common/bills/unpaid-count"),
+      request.mock.calls.filter(
+        ([url]) =>
+          url !== "/api/common/menus" &&
+          url !== "/api/common/bills/unpaid-count",
+      ),
     ).toHaveLength(reads);
     expectSingleShell();
   });

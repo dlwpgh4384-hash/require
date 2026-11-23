@@ -10083,6 +10083,7 @@ paths:
       description: 현재 고정 admin·UI-22 전 로그인/메뉴권한 미연결. 원문23/133행을 보존하며 인증정의·가짜403을 추가하지 않는다. SQL/식 공백은 OQ-DATA/CALC-019의 물리매핑/절대수치에만
         제한한다.
       x-related-requirements:
+      - REQ-1290
       - REQ-840
       - REQ-870
       - REQ-871
@@ -10234,6 +10235,8 @@ paths:
       description: 현재 고정 admin·UI-22 전 로그인/메뉴권한 미연결. 원문23/133행을 보존하며 인증정의·가짜403을 추가하지 않는다. SQL/식 공백은 OQ-DATA/CALC-019의 물리매핑/절대수치에만
         제한한다.
       x-related-requirements:
+      - REQ-1286
+      - REQ-1280
       - REQ-877
       parameters:
       - name: yearMonth
@@ -10288,6 +10291,8 @@ paths:
       description: 현재 고정 admin·UI-22 전 로그인/메뉴권한 미연결. 원문23/133행을 보존하며 인증정의·가짜403을 추가하지 않는다. SQL/식 공백은 OQ-DATA/CALC-019의 물리매핑/절대수치에만
         제한한다.
       x-related-requirements:
+      - REQ-1286
+      - REQ-1306
       - REQ-840
       - REQ-868
       - REQ-869
@@ -10301,7 +10306,7 @@ paths:
       x-business-rules:
       - 점검과 같은 대상:HQ제외·그달기준존재·사용중 또는 그달뒤중지(변경이력).
       - 미확정만 자동확정·기확정 snapshot은 그대로·확정자는 마감실행자·표시는 마감 시 자동 확정.
-      - 직접확정과 같은월말소속복원/EMP_TYPE_CD/PROJ_NM_LIST 저장. 대상/버전재검증 실패시 이 호출의 부분정산저장없음; 전체 월마감 트랜잭션은 OQ-STATE-019.
+      - 직접확정과 같은월말소속복원/EMP_TYPE_CD/PROJ_NM_LIST 저장. 대상/버전재검증 실패시 이 호출의 부분정산저장없음; 전체 월마감은 SPEC-REQUEST.md:113에 따라 동일 transaction·일부 실패시 전부 rollback.
       x-side-effects:
       - 대상미확정 정산과 인력snapshot을 저장·확정자=마감자·마감 시 자동 확정 표시. 기존 마감점검 결합/저장흐름은 보존.
       x-required-tests:
@@ -10311,7 +10316,7 @@ paths:
       - 'business: HQ 또는 그달 기준없는 파트를 요청 items에 섞음 -> 400·제외대상 snapshot 추가0·유효대상까지 부분저장하지 않음'
       - 'side-effect: 자동확정 성공후 상세 조회 -> 각 TB_CO_PART_SETL_DTL 월말소속/EMP_TYPE_CD/PROJ_NM_LIST snapshot과 confirmedBy/confirmedAt
         존재·confirmationNote=마감 시 자동 확정'
-      - 'concurrency: 대상중 하나 modifiedAt이 점검후 갱신됨 -> 409·이 호출이 만드는 정산/header·detail 부분변경0; 기존 월마감 전체 실패경계는 OQ-STATE-019'
+      - 'concurrency: 대상중 하나 modifiedAt이 점검후 갱신됨 -> 409·이 호출이 만드는 정산/header·detail 부분변경0; 기존 월마감 전체 실패도 전부 rollback'
       x-state-transitions:
       - 대상 미확정 -> 마감시자동확정
       - 대상 기확정 -> 확정snapshot보존
@@ -11594,6 +11599,311 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/month-closes/{yearMonth}:
+    get:
+      operationId: getCommonMonthClose
+      summary: 월 마감 안내·점검 조회
+      security: []
+      x-related-requirements:
+      - REQ-1259
+      - REQ-1279
+      - REQ-1280
+      - REQ-1281
+      - REQ-1282
+      parameters:
+      - name: yearMonth
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+      description: 현재 고정 개발 admin·로그인/메뉴권한 검사는 UI-22 후속. 원문25행에 따라 scheme은 추가하지 않으며 표준 충돌 OQ-AUTH-014를 보존한다.
+      responses:
+        '200':
+          description: 공개 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonMonthClose'
+                  required:
+                  - data
+        '400':
+          description: yearMonth 형식/필수·대상월/업무 조건 오류; errors[].field에 해당 입력명
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-pagination-filtering:
+        pagination: 고정6항목·분할없음
+        filtering: path yearMonth
+        ordering: 급여·MM초과·번호미입력·재무·영업파트·청구누락 순서
+      x-side-effects:
+      - 업무/CHK_DTTM/마감 상태 저장0; 다시 점검도 동일 GET 재계산
+  /api/common/month-closes/{yearMonth}/confirm:
+    put:
+      operationId: putCommonMonthCloseConfirm
+      summary: 월 마감 확정
+      security: []
+      x-related-requirements:
+      - REQ-1284
+      - REQ-1285
+      - REQ-1286
+      - REQ-1287
+      - REQ-1288
+      - REQ-1289
+      - REQ-1299
+      - REQ-1305
+      - REQ-1306
+      - REQ-1272
+      parameters:
+      - name: yearMonth
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+      description: 현재 고정 개발 admin·로그인/메뉴권한 검사는 UI-22 후속. 원문25행에 따라 scheme은 추가하지 않으며 표준 충돌 OQ-AUTH-014를 보존한다.
+      responses:
+        '200':
+          description: 공개 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonMonthClose'
+                  required:
+                  - data
+        '400':
+          description: yearMonth 형식/필수·대상월/업무 조건 오류; errors[].field에 해당 입력명
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: modifiedAt 불일치; 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict()·전체 변경0
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonMonthCloseConfirmInput'
+      x-business-rules:
+      - CASH_BASE_YM부터 지난달까지 첫 미마감월만 순차 확정; 이번달/미래월 제외
+      - 확인 필요가 남아도 마감 허용·마감 전 잔여 이름을 자동정산보다 먼저 보관
+      - HQ제외·그달기준존재·사용중또는그달뒤중지 대상 미확정만 자동확정·확정자=마감자
+      - 월별투입·원가배분·손익·법인세월할 FIX_YN=Y; 전체 성공만 commit
+      - modifiedAt 불일치409·실패 일부 유지 금지
+      x-side-effects:
+      - TB_CL_CLOSE CLOSE/처리자/시각·월 snapshot·TB_CO_PART_SETL/DTL 자동확정·TB_CL_CLOSE_HIST 잔여 이름·TB_SY_ACCS_LOG를 동일 transaction
+        저장
+      - selectClosedMonths/UserPreferencePeriodBasis 재조회에 마감 즉시 반영; 기존 메뉴 배지 requestMenuBadgeRefresh()
+      x-required-tests:
+      - 'happy: 첫 미마감 과거월·확인필요 잔여·최신 modifiedAt 마감 -> 200·TB_CL_CLOSE.CLOSE_STAT_CD=CLOSE·동일월 재조회 closedBy/closedAt 존재'
+      - 'auth: 현재 고정admin이 인증헤더 없이 마감 -> 200·CLOSE_USER_ID가 실행자; 로그인/메뉴권한을 여기 새403으로 만들지 않음'
+      - 'validation: yearMonth=2026-13 마감 -> 400 errors[].field=yearMonth·TB_CL_CLOSE 변경0'
+      - 'business: 앞선 미마감이 있는데 뒤월 확정 -> 400·뒤월 FIX_YN과 TB_CL_CLOSE/정산 불변'
+      - 'side-effect: 자동확정 전 정산 확인필요였던 월 마감 후 history GET -> 해당 항목 이름 유지·TB_SY_ACCS_LOG 마감 기록·정산 m=0/마감 시 자동 확정'
+      - 'atomicity: snapshot 저장 뒤 정산확정 또는 이력 저장 실패 주입 -> 실패응답·TB_CL_CLOSE/고정값/정산/이력/성공접근기록 전부 호출 전 값'
+      - 'concurrency: 조회 뒤 modifiedAt이 바뀐 상태로 마감 -> 409·지정 충돌문구·성공 이력 추가0'
+      - 'period: CASH_BASE_YM 이전·이번달·미래월 각각 마감 -> 400·마감상태 불변'
+      - 'sequential: 앞선 달부터 성공 마감 후 다음 과거월 마감 -> 200·다음월 CLOSE·앞선 snapshot 불변'
+      x-state-transitions:
+      - 허용기간 첫 미마감·최신버전 -> CLOSE·FIX_YN=Y·미확정파트자동확정
+      - 마감/순서밖/범위밖/stale -> 거부·무변경
+  /api/common/month-closes/{yearMonth}/reopen-impact:
+    get:
+      operationId: getCommonMonthCloseReopenImpact
+      summary: 마감 해제 조정 건수 조회
+      security: []
+      x-related-requirements:
+      - REQ-1301
+      parameters:
+      - name: yearMonth
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+      description: 현재 고정 개발 admin·로그인/메뉴권한 검사는 UI-22 후속. 원문25행에 따라 scheme은 추가하지 않으며 표준 충돌 OQ-AUTH-014를 보존한다.
+      responses:
+        '200':
+          description: 공개 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonMonthCloseReopenImpact'
+                  required:
+                  - data
+        '400':
+          description: yearMonth 형식/필수·대상월/업무 조건 오류; errors[].field에 해당 입력명
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-side-effects:
+      - TB_CO_PREV_ADJ 건수 읽기만; 조정 삭제/상계/해제 없음
+  /api/common/month-closes/{yearMonth}/reopen:
+    put:
+      operationId: putCommonMonthCloseReopen
+      summary: 최근 월 마감 해제
+      security: []
+      x-related-requirements:
+      - REQ-1292
+      - REQ-1293
+      - REQ-1294
+      - REQ-1295
+      - REQ-1296
+      - REQ-1298
+      - REQ-1300
+      - REQ-1306
+      - REQ-1272
+      parameters:
+      - name: yearMonth
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+      description: 현재 고정 개발 admin·로그인/메뉴권한 검사는 UI-22 후속. 원문25행에 따라 scheme은 추가하지 않으며 표준 충돌 OQ-AUTH-014를 보존한다.
+      responses:
+        '200':
+          description: 공개 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonMonthClose'
+                  required:
+                  - data
+        '400':
+          description: yearMonth 형식/필수·대상월/업무 조건 오류; errors[].field에 해당 입력명
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: modifiedAt 불일치; 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict()·전체 변경0
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonMonthCloseReopenInput'
+      x-business-rules:
+      - 가장 최근 CLOSE 달만·시스템 관리자만 정책 허용; 현재 고정admin·인증 enforcement는 UI-22 후속
+      - reason 필수 공백 금지·최신 modifiedAt 재검증
+      - 선택월 고정만 해제·정산 확정 유지·법인세 미마감월끼리 식-31 재분배
+      - 관련 처리 일부 실패 시 전체 transaction rollback; 해제 후 상태 코드는 DML 대조 OQ-DATA-014
+      x-side-effects:
+      - TB_CL_CLOSE_HIST에 해제/사유/처리자/시각 기록·remainingChecks 빈배열; 정산 확정/기확정 금액 불변
+      - TB_PJ_ASGN_MON·TB_CO_MON_COST·TB_CO_MON_PL의 해당월 고정 해제·다른마감월 불변
+      x-required-tests:
+      - 'happy: 최신 마감월·유효 reason·최신 modifiedAt으로 해제 -> 200·getCommonMonthClose.isClosed=false·해제월 고정 해제·TB_CO_PART_SETL 확정
+        유지'
+      - 'auth: 현재 고정admin이 인증헤더 없이 해제 -> 200; 정책함수 비관리자 입력 -> 해제거부·TB_CL_CLOSE 변경0; HTTP403 연결은 UI-22 후속이며 현재 값으로 추측하지 않음'
+      - 'validation: reason이 공백인 해제 요청 -> 400 errors[].field=reason·TB_CL_CLOSE_HIST 추가0'
+      - 'business: 더 최근 CLOSE 월이 있는 과거월 해제 -> 400·과거/최신 TB_CL_CLOSE와 FIX_YN 불변'
+      - 'side-effect: 정상 해제 뒤 getCommonMonthCloseHistory -> 해제/동일reason/처리자/시각·remainingChecks=[] 행 존재'
+      - 'atomicity: 월고정 해제 후 이력 저장 실패 주입 -> 실패응답·TB_CL_CLOSE와 모든 snapshot·정산·이력은 호출 전 값'
+      - 'concurrency: 해제 대상 modifiedAt 갱신 뒤 이전시각 제출 -> 409·사유이력 추가0·마감상태 유지'
+      - 'sequential: 해제 후 원천변경·다시 마감 -> 새 FIX_YN=Y snapshot·다른마감월 snapshot 불변'
+      x-state-transitions:
+      - 최신마감·관리자·유효사유 -> 해당월 미마감/고정해제·정산확정유지
+      - 과거마감/사유누락/비관리자정책 -> 거부·기존상태유지
+  /api/common/month-close-history:
+    get:
+      operationId: getCommonMonthCloseHistory
+      summary: 월 마감 이력 조회
+      security: []
+      x-related-requirements:
+      - REQ-1297
+      description: 현재 고정 개발 admin·로그인/메뉴권한 검사는 UI-22 후속. 원문25행에 따라 scheme은 추가하지 않으며 표준 충돌 OQ-AUTH-014를 보존한다.
+      responses:
+        '200':
+          description: 공개 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonMonthCloseHistory'
+                  required:
+                  - data
+        '400':
+          description: yearMonth 형식/필수·대상월/업무 조건 오류; errors[].field에 해당 입력명
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: yearMonth
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+      x-pagination-filtering:
+        pagination: 전체 이력; 서버 페이지 입력 신설 없음
+        filtering: 선택 yearMonth 생략시 전체; 잘못된 월400
+        ordering: 기존 이력 시각 순서; 동시각 tie-break는 원문 키 대조 OQ-DATA-014
+      x-aiops-query-role:
+        entity: TB_CL_CLOSE_HIST
+        result_path:
+        - data
+        - items
+  /api/common/month-close-badge:
+    get:
+      operationId: getCommonMonthCloseBadge
+      summary: 월 마감 메뉴 경고 조회
+      security: []
+      x-related-requirements:
+      - REQ-1273
+      description: 현재 고정 개발 admin·로그인/메뉴권한 검사는 UI-22 후속. 원문25행에 따라 scheme은 추가하지 않으며 표준 충돌 OQ-AUTH-014를 보존한다.
+      responses:
+        '200':
+          description: 공개 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonMonthCloseBadge'
+                  required:
+                  - data
+      x-open-question: 'OQ-API-014: 호출자 입력 없는 이번달 배지 읽기의 정정 가능한 4xx 근거 미제공. 인프라 예외로 위장하지 않는다.'
+
 components:
   schemas:
     CommonFinanceItem:
@@ -15677,6 +15987,154 @@ components:
             $ref: '#/components/schemas/CommonCashFlowWarning'
         numericTable:
           $ref: '#/components/schemas/CommonCashFlowNumericTable'
+    CommonMonthCloseCheck:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          description: 정상/확인 필요 표시명; 저장 코드는 기존 CHK_STAT 대조
+        description:
+          type: string
+        targetScreenId:
+          type: string
+          nullable: true
+          description: 원문/기존 바인딩이 확인된 UI-12·13·19 등만; 미확정 매핑 OQ-UI-014
+      required:
+      - name
+      - status
+      - description
+    CommonMonthClose:
+      type: object
+      properties:
+        yearMonth:
+          type: string
+          pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+        isClosed:
+          type: boolean
+          description: CASH_BASE_YM 이전 달은 옮겨 온 달이라 마감으로 본다(점검 목록 없음, totalCount 0).
+        reopenable:
+          type: boolean
+          description: TB_CL_CLOSE의 가장 최근 마감월일 때만 true. CASH_BASE_YM 이전 달은 false.
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        closedAt:
+          type: string
+          format: date-time
+          nullable: true
+        closedBy:
+          type: string
+          nullable: true
+        totalCount:
+          type: integer
+          enum:
+          - 0
+          - 6
+        attentionCount:
+          type: integer
+          minimum: 0
+          maximum: 6
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonMonthCloseCheck'
+      required:
+      - yearMonth
+      - isClosed
+      - reopenable
+      - modifiedAt
+      - closedAt
+      - closedBy
+      - totalCount
+      - attentionCount
+      - checks
+    CommonMonthCloseConfirmInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - modifiedAt
+    CommonMonthCloseReopenInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        reason:
+          type: string
+          minLength: 1
+          pattern: .*\S.*
+          description: 공백만 금지; 최대 길이는 원문 DDL 대조 OQ-INPUT-014
+      required:
+      - modifiedAt
+      - reason
+    CommonMonthCloseReopenImpact:
+      type: object
+      properties:
+        yearMonth:
+          type: string
+          pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+        previousAdjustmentCount:
+          type: integer
+          minimum: 0
+      required:
+      - yearMonth
+      - previousAdjustmentCount
+    CommonMonthCloseHistoryItem:
+      type: object
+      properties:
+        yearMonth:
+          type: string
+          pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+        action:
+          type: string
+          enum:
+          - 마감
+          - 해제
+          description: 표시명; 물리 ACT/CLOSE_STAT 코드는 원문 대조
+        processor:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          nullable: true
+        remainingChecks:
+          type: array
+          items:
+            type: string
+      required:
+      - yearMonth
+      - action
+      - processor
+      - occurredAt
+      - reason
+      - remainingChecks
+    CommonMonthCloseHistory:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonMonthCloseHistoryItem'
+      required:
+      - items
+    CommonMonthCloseBadge:
+      type: object
+      properties:
+        needsAttention:
+          type: boolean
+          description: 이번 달(작업 중인 달 = 마지막 마감월 다음 달, CASH_BASE_YM보다 앞서지 않음)이 실제 달력의 이번 달보다 앞이면 true(마감할 수 있는 달이 남음). 같으면 false
+      required:
+      - needsAttention
     ApiResponse:
       type: object
       required: [success, meta]
@@ -19816,6 +20274,73 @@ x-requirement-context:
 
 
 x-uncovered-requirements:
+- canonical_id: REQ-1260
+  status: data-constraint
+  evidence: DB 식 정의 사용 — 사용 CALC_ID 정의를 DB에서 읽으며 정의 누락을 임의 수식으로 대체하지 않는다.
+- canonical_id: REQ-1261
+  status: data-constraint
+  evidence: 기존 공통코드 사용 — sql/DML_BaseData.sql과 화면 표시/저장 코드가 일치하며 임의 enum을 만들지 않는다.
+- canonical_id: REQ-1262
+  status: out-of-scope
+  evidence: 로그인·메뉴 권한 후속 — 인증 헤더 없이 개발 화면/API를 사용할 수 있고 신규 로그인 화면·메뉴 권한 middleware는 없다.
+- canonical_id: REQ-1263
+  status: non-functional
+  evidence: 공백 검사 — 후속 구현 저장소에서 git diff --cached --check 종료0·출력 없음.
+- canonical_id: REQ-1264
+  status: non-functional
+  evidence: 레코드 생성자 호환 — 레코드 변경에 대한 전체 호출 컴파일이 통과하며 보조 생성자로 검사기를 우회하지 않는다.
+- canonical_id: REQ-1265
+  status: non-functional
+  evidence: 기존 서버 설정 유지 — 일반 기동에서 Flyway가 실행되지 않고 인증 필수가 되지 않는다.
+- canonical_id: REQ-1266
+  status: non-functional
+  evidence: 인증 정의 금지 — 병합 후보 OpenAPI에 인증 정의와 최상위 security가 없다. 생성 표준과 충돌은 OQ-AUTH-014 리뷰로 남긴다.
+- canonical_id: REQ-1267
+  status: non-functional
+  evidence: 기존 API·수동 계약 보존 — baseline 모든 path/schema가 병합 결과에 있고 수동 계약 원본이 보존된다.
+- canonical_id: REQ-1268
+  status: non-functional
+  evidence: 개발 화면 등록과 공통 시험 동기화 — MenuRegistrationControllerTest·MenuRegistrationProjectionTest·CommonNavigationPage.test.tsx의
+    UI-14와 기존 UI-12 뒤 UI-05 및 끝 UI-18/UI-21 순서가 유지된다.
+- canonical_id: REQ-1269
+  status: data-constraint
+  evidence: 마감 이력만 비파괴 준비 — --prepare-schema에서만 CREATE TABLE IF NOT EXISTS가 실행되며 재실행 시 기존 표·자료가 보존된다.
+- canonical_id: REQ-1270
+  status: non-functional
+  evidence: 준비 파일 시험 목록 추가 — 준비 자원 목록의 마지막 두 항목이 V18__business_plan_schema.sql과 V19__month_close_schema.sql이다.
+- canonical_id: REQ-1271
+  status: data-constraint
+  evidence: 마감 판정 단일 원천 — 마감/해제 후 기존 기간 원천 재조회가 새 상태를 반환하며 시작월 이전 달은 계속 마감이다.
+- canonical_id: REQ-1274
+  status: non-functional
+  evidence: 공통 UI 부품 재사용 — 아이콘 prop과 화면 root 범위가 연결되며 마감 확인·해제 사유 창은 공통 Dialog/ConfirmDialog다.
+- canonical_id: REQ-1275
+  status: non-functional
+  evidence: 비동기 화면 시험 대기 — 지연 응답 fixture에서 자료 전 단추 비활성·완료 후 활성임을 기다려 시험한다.
+- canonical_id: REQ-1276
+  status: non-functional
+  evidence: 실제 DB 시험 이름 보존 — 실제 PostgreSQL fixture와 mapper를 대조하고 비밀 환경값을 문서/로그에 남기지 않는다.
+- canonical_id: REQ-1277
+  status: non-functional
+  evidence: 지정 회귀 시험 실행 — 후속 구현 시험 보고서에 지정 세 시험과 영향 시험 각각의 실제 결과가 있다.
+- canonical_id: REQ-1278
+  status: screen-only
+  evidence: PC 전용 화면 폭 안전 — 두 viewport의 document.scrollWidth<=clientWidth이며 375px는 기존 PC 전용 안내를 유지한다.
+- canonical_id: REQ-1283
+  status: screen-only
+  evidence: UI-14 M25-427의 로컬 기존 화면 이동이 소유하며 HTTP 저장/신규 업무 operation이 아니다.
+- canonical_id: REQ-1291
+  status: covered
+  evidence: 기존 월쓰기 공통 마감 guard가 모든 입력/수정/삭제/업로드를 최종 거부한다. 읽기 getCommonMonthClose는 쓰기 거부 연산을 대신하지 않는다. UI-13 예외 충돌만 OQ-COMPAT-014다.
+- canonical_id: REQ-1302
+  status: screen-only
+  evidence: PC 전용·사용자 목적 — PC 재무/관리자 목적이 화면 계약에 보존되고 375px 직접 진입은 기존 PC 전용 안내다.
+- canonical_id: REQ-1303
+  status: data-constraint
+  evidence: 월 마감 저장 경계 — 마감/해제 diff는 지정 저장/기존 고정 매핑 범위이고 별도 월마감 결과표를 신설하지 않는다.
+- canonical_id: REQ-1304
+  status: data-constraint
+  evidence: 조회 원천 구조 보존 — 점검 GET 후 원천 값/행수 불변이고 이들 표에 새 DDL/컬럼이 없다.
 - canonical_id: REQ-1215
   status: data-constraint
   evidence: 'DB 식 읽기 — UI-21 데이터 소비 계약: 식-00 공통 원칙과 식-05·06·44·45·46·47·48·49·50·51·52를 TB_SY_CALC_RULE.CALC_ID로

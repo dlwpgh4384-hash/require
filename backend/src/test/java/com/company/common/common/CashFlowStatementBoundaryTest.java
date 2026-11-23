@@ -78,10 +78,11 @@ class CashFlowStatementBoundaryTest {
         assertThat(columns.path("items").path("properties").has("warning")).isTrue();
     }
 
-    @Test void noCashMigrationIsAddedToTheExistingEighteenPackagedResources() throws Exception {
+    @Test void noCashMigrationIsAddedToTheExistingNineteenPackagedResources() throws Exception {
         var resources = new PathMatchingResourcePatternResolver().getResources("classpath*:db/migration/V*__*.sql");
+        // V19 is the month close history table (UI-14), not a cash flow migration.
         assertThat(Arrays.stream(resources).map(resource -> resource.getFilename()).toList())
-            .hasSize(18).doesNotContain("V19__cash_flow_schema.sql", "V20__cash_flow_schema.sql",
+            .hasSize(19).contains("V19__month_close_schema.sql").doesNotContain("V19__cash_flow_schema.sql", "V20__cash_flow_schema.sql",
                 "V21__cash_flow_schema.sql");
     }
 

@@ -163,6 +163,22 @@ class PersonalCostProfitPersistenceTest {
         assertThat(after.path("totalCost").decimalValue()).isGreaterThan(before.path("totalCost").decimalValue());
         assertThat(after.path("totalCost").decimalValue()).isLessThan(new BigDecimal("999999"));
     }
+    @Test void closedIdleAndIndirectRowsKeepTheLiveMmAndFreeMmIsNotCountedTwice() throws Exception {
+        var before=read("연누계",null).path("items").get(0);
+        // DDL: free rows carry FREE_MM = ASGN_MM; fixed idle rows carry 1.0 - month MM, indirect rows 1.0 (both shown as the idle line, MM 0).
+        db.update("UPDATE TB_CO_MON_COST SET FREE_MM=ASGN_MM WHERE ASGN_ID='personal-free'");
+        db.update("INSERT INTO TB_CO_MON_COST(COST_YM,DEV_ID,PROJ_ID,ASGN_ID,ASGN_MM,FREE_MM,SALES_AMT,LABOR_ALLOC_AMT,TEAM_EXPS_AMT,PROJ_EXPS_AMT,DRCT_EXPS_AMT,COST_CLS_CD,FIX_YN,REG_USER_ID) VALUES('202601','personal-a','IDLE','IDLE',0.25,0,0,0,0,0,0,'IDLE','Y','admin')");
+        var after=read("연누계",null).path("items").get(0);
+        assertThat(after.path("mm").decimalValue()).isEqualByComparingTo(before.path("mm").decimalValue());
+        assertThat(after.path("allocations").get(0).path("mm")).isEqualTo(before.path("allocations").get(0).path("mm"));
+        var idle=after.path("allocations").get(after.path("allocations").size()-1);
+        assertThat(idle.path("assignmentId").asText()).isEqualTo("IDLE");
+        assertThat(idle.path("mm").decimalValue()).isEqualByComparingTo("0");
+        db.update("UPDATE TB_CO_MON_COST SET PROJ_ID='INDRCT',ASGN_ID='INDRCT',ASGN_MM=1,COST_CLS_CD='INDRCT' WHERE ASGN_ID='IDLE'");
+        var indirect=read("연누계",null).path("items").get(0);
+        assertThat(indirect.path("mm").decimalValue()).isEqualByComparingTo(before.path("mm").decimalValue());
+        assertThat(indirect.path("allocations").get(indirect.path("allocations").size()-1).path("assignmentId").asText()).isEqualTo("IDLE");
+    }
     @Test void literalSubstringReturnsEveryMatchingPersonWithoutSqlWildcardInterpretation() throws Exception {
         person("personal-b","검색%동일", "CT"); person("personal-c","검색다름", "CT");
         assertThat(read("연누계","%동일").path("items")).hasSize(2);

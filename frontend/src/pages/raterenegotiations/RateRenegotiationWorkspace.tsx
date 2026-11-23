@@ -47,8 +47,11 @@ const moneyKeys = new Set<string>([
 ]);
 const kebab = (key: string) =>
   key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+/** 시안 pct(): 소수 한 자리 %, 음수는 「−」. */
 const percent = (value: number | null | undefined) =>
-  value == null ? "–" : `${value.toFixed(1)}%`;
+  value == null || !Number.isFinite(value)
+    ? "–"
+    : `${value < 0 ? "−" : ""}${Math.abs(value).toFixed(1)}%`;
 const plain = (value: number | null | undefined) =>
   value == null ? "–" : String(Number(value));
 /** 시안 갱신 시점 이름: 3·6개월 안, 12개월은 「1년 안」 */
@@ -250,6 +253,8 @@ export function RateRenegotiationWorkspace() {
       return row.requiredIncreaseRate > 0
         ? percent(row.requiredIncreaseRate)
         : "–";
+    // 시안 mmf(): MM은 소수 둘째 자리
+    if (key === "monthlyMm") return Number(row.monthlyMm).toFixed(2);
     return row[key];
   };
   const columns: ListColumn<RateRenegotiationRow>[] =

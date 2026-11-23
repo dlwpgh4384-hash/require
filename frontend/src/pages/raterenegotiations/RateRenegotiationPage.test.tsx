@@ -403,3 +403,12 @@ it("shows the management number under the name, the type badge and a project lin
   ).not.toBeNull();
   expect(screen.getByTestId("rate-project-assignment-a")).toHaveTextContent("업무 시스템");
 });
+it("shows MM with two decimals and a negative profit rate with the mockup minus sign", async () => {
+  result.items[0].profitRate = -5;
+  result.summary.averageProfitRate = -5;
+  mount();
+  await ready();
+  expect(screen.getByTestId("list-cell-assignment-a-monthlyMm")).toHaveTextContent(/^0\.50$/);
+  expect(screen.getByTestId("list-cell-assignment-a-profitRate")).toHaveTextContent("−5.0%");
+  expect(screen.getByTestId("rate-average")).toHaveTextContent("−5.0%");
+});

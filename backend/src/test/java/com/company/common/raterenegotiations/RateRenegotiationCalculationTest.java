@@ -27,6 +27,14 @@ class RateRenegotiationCalculationTest {
         assertThat(row.annualProfitIncrease()).isEqualByComparingTo("600000");
         assertThat(RateRenegotiationRules.targetAnnual(row, n("1"))).isEqualByComparingTo("1920000");
     }
+    @Test void targetBelowCurrentPriceNeverReducesTheTargetSumOrShowsANegativeRate() {
+        // 목표 이익률 10%, 이익률 12%: 목표 단가 98만 < 현재 단가 100만 → 시안 Math.max(0, …)
+        var row = RateRenegotiationRules.row(info("A", 30), n("1"), n("880000"),
+            n("10"), n("5"), TODAY);
+        assertThat(row.targetUnitPrice()).isEqualByComparingTo("980000");
+        assertThat(row.requiredIncreaseRate()).isEqualByComparingTo("0");
+        assertThat(RateRenegotiationRules.targetAnnual(row, n("1"))).isEqualByComparingTo("0");
+    }
     @ParameterizedTest
     @CsvSource({"-1,0", "0,0", "5,5", "50,50", "51,50"})
     void clampsInclusiveAssumption(String input, String expected) {

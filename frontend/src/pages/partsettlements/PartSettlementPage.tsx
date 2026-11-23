@@ -90,6 +90,8 @@ export function PartSettlementPage() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
+  /** 탭 목록을 받은 다시 읽기 번호: 다시 읽기 뒤 탭을 받았을 때만 상세를 한 번 읽는다. */
+  const [tabsRevision, setTabsRevision] = useState(0);
   const [developerId, setDeveloperId] = useState<string | null>(null);
   const [pending, setPending] = useState<(() => void) | null>(null);
   const [page, setPage] = useState(1);
@@ -143,6 +145,7 @@ export function PartSettlementPage() {
       .then((response) => {
         if (controller.signal.aborted) return;
         setTabs(response.data);
+        setTabsRevision(revision);
         const items = response.data.items ?? [];
         setPartId((previous) =>
           items.some((item) => item.partId === previous)
@@ -193,8 +196,9 @@ export function PartSettlementPage() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-    // revision: 다시 읽기(409·재시도)는 탭 응답이 빨라 tabsReady가 그대로여도 상세를 다시 읽는다.
-  }, [yearMonth, partId, tabsReady, view, revision]);
+    // 다시 읽기(409·재시도): revision이 아니라 탭을 받은 뒤의 tabsRevision으로 다시 읽는다.
+    // (탭 응답이 빨라 tabsReady가 그대로여도 다시 읽고, 탭을 받기 전에 곧 취소될 상세 요청은 보내지 않는다.)
+  }, [yearMonth, partId, tabsReady, view, tabsRevision]);
   const locked =
     !detail || detail.confirmed || detail.closed || busy || loading;
   const cardReadOnly = !detail || detail.confirmed || detail.closed;

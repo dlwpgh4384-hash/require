@@ -160,7 +160,8 @@ export function MenuPage() {
       return;
     }
     // 시안 SFR-125-06: 시스템 메뉴는 화면에서 막지 않고 저장할 때 알림으로 거부한다(서버도 막는다).
-    const off = draft.filter(
+    // 바꾼 줄만 본다(DB에 이미 꺼진 시스템 메뉴가 있어도 다른 줄 저장은 막지 않는다).
+    const off = changed.filter(
       (row) => row.menuLvl === 2 && row.lockYn === "Y" && row.useYn === "N",
     );
     if (off.length) {

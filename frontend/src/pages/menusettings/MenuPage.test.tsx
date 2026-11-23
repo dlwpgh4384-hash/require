@@ -334,6 +334,15 @@ it("잠금 메뉴 사용은 체크 가능하고 저장 때 시안 알림으로 �
   expect(writes()).toHaveLength(0);
   expect(screen.getByLabelText("M004 사용")).not.toBeChecked();
 });
+it("리뷰: DB에 이미 꺼진 시스템 메뉴가 있어도 바꾸지 않았으면 다른 줄 저장은 막지 않는다", async () => {
+  rows = rows.map((row) => (row.menuId === "M004" ? { ...row, useYn: "N" } : row));
+  await mount();
+  fireEvent.click(screen.getByLabelText("M003 사용"));
+  await save();
+  expect(screen.queryByText(/시스템 메뉴라 끌 수 없습니다/)).toBeNull();
+  const body: MenuSettingsInput = JSON.parse(String(writes()[0][1].body));
+  expect(body.items.map((row) => row.menuId)).toEqual(["M003"]);
+});
 it("서버 거부(400)는 문구를 보이고 draft 보존", async () => {
   await mount();
   failPut = true;

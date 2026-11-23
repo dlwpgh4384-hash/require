@@ -15,7 +15,7 @@ import {
   type MoneyUnit,
 } from "../../shared/list/moneyUnit";
 import type { ListColumn, ListSort } from "../../shared/list/listTypes";
-import { Toast } from "../../shared/feedback/Dialog";
+import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { getCommonCodes } from "../codegroups/codeGroups";
 import { ProjectRequestError, typeLabel } from "../projects/projects";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
@@ -75,7 +75,7 @@ export function ProjectCostAnalysisPage() {
   const [unit, setUnit] = useState<MoneyUnit>(DEFAULT_MONEY_UNIT);
   const [selected, setSelected] = useState<Row>();
   const [downloading, setDownloading] = useState(false);
-  const [toast, setToast] = useState<{ kind: "ok" | "warn"; message: string } | null>(null);
+  const [toast, setToast] = useState<{ kind: ToastKind; message: string } | null>(null);
   const form = useRef<HTMLElement>(null);
   const periodBox = useRef<HTMLDivElement>(null);
   const request = selectedPeriod && {
@@ -132,6 +132,7 @@ export function ProjectCostAnalysisPage() {
         if (next.projectId && request.projectId) {
           setDraft((current) => ({ ...current, projectId: "" }));
           setFilter((current) => ({ ...current, projectId: "" }));
+          setToast({ kind: "info", message: "고른 프로젝트가 이 달에 없어 전체로 조회했습니다." });
           return;
         }
         setData(undefined);

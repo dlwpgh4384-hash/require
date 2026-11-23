@@ -361,6 +361,58 @@ it("[수정]은 「사용자 수정」 창에서 아이디를 잠그고 이름·
   );
 });
 
+it("리뷰: 수정 저장이 409면 입력은 남기고 창의 수정 시각을 새로 읽어 다시 저장할 수 있다", async () => {
+  const newer = "2026-01-03T00:00:00.000001Z";
+  const base = request.getMockImplementation()!;
+  let conflict = true;
+  request.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (conflict && url === "/api/common/users/test" && init?.method === "PUT") {
+      conflict = false;
+      account = { ...account, modDttm: newer };
+      return {
+        ok: false,
+        status: 409,
+        json: async () => ({
+          success: false,
+          message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+          errors: [],
+        }),
+      };
+    }
+    return base(url, init);
+  });
+  page();
+  fireEvent.click(await screen.findByTestId("list-row-test"));
+  const panel = await screen.findByTestId("user-detail");
+  fireEvent.click(await within(panel).findByTestId("user-edit"));
+  const dialog = await screen.findByTestId("user-dialog");
+  fireEvent.change(within(dialog).getByTestId("user-name-input"), {
+    target: { value: "바꾼 이름" },
+  });
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  expect(
+    await within(dialog).findByText("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요."),
+  ).toBeInTheDocument();
+  expect(within(dialog).getByTestId("user-name-input")).toHaveValue("바꾼 이름");
+  // 새 계정(새 수정 시각)을 읽을 때까지 기다린다.
+  await waitFor(() =>
+    expect(
+      request.mock.calls.filter(
+        (call: unknown[]) =>
+          call[0] === "/api/common/users/test" &&
+          !(call[1] as RequestInit | undefined)?.method,
+      ).length,
+    ).toBeGreaterThan(1),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  fireEvent.click(within(screen.getByTestId("user-dialog")).getByTestId("user-save"));
+  await waitFor(() => expect(writes()).toHaveLength(2));
+  expect(JSON.parse(String((writes()[1][1] as RequestInit).body))).toMatchObject({
+    name: "바꾼 이름",
+    modDttm: newer,
+  });
+});
+
 it("체크하면 「N건 선택」과 일괄 [사용 중지]가 나오고, 확인 창은 시안 문구를 쓴다", async () => {
   page();
   await screen.findByTestId("list-row-test");

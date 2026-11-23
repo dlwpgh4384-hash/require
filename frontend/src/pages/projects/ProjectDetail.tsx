@@ -164,7 +164,8 @@ export function ProjectDetail({
     setScreenDirty(dirtyScreenId, planDirty);
     return () => setScreenDirty(dirtyScreenId, false);
   }, [dirtyScreenId, planDirty, setScreenDirty]);
-  const load = async () => {
+  /** keepPlan: 저장하지 않은 인원 계획 입력이 있으면 그 입력은 지우지 않고 나머지(기본 정보 등)만 다시 읽는다. */
+  const load = async (keepPlan = false) => {
     const version = ++loadVersion.current;
     setError("");
     try {
@@ -183,10 +184,12 @@ export function ProjectDetail({
       setExpenses(e.items);
       setParts(s.items);
       setHistory(h.items);
-      setJobs(m.items);
-      setPlanText({});
       setPlanAllowed(m.canSave);
-      setPlanDirty(false);
+      if (!keepPlan) {
+        setJobs(m.items);
+        setPlanText({});
+        setPlanDirty(false);
+      }
     } catch (reason) {
       if (version === loadVersion.current) setError(api.projectFailure(reason));
     }
@@ -289,7 +292,7 @@ export function ProjectDetail({
         onClose();
         return;
       }
-      await load();
+      await load(planDirty);
       onChanged?.(message, kind);
     } catch (e) {
       setModalError(api.projectFailure(e));
@@ -300,7 +303,8 @@ export function ProjectDetail({
         setTab("basic");
       }
       // FR-0106: 그 사이 다른 사람이 바꿨으면(409) 최신 값(수정 시각 포함)을 다시 읽는다.
-      if (api.isProjectConflict(e)) await load();
+      // 저장하지 않은 인원 계획 입력은 지우지 않는다.
+      if (api.isProjectConflict(e)) await load(planDirty);
     } finally {
       setBusy(false);
     }

@@ -11,6 +11,7 @@ import "@testing-library/jest-dom/vitest";
 import { DeveloperPage } from "./DeveloperPage";
 import { DeveloperForm } from "./DeveloperForm";
 import { DeveloperDetail } from "./DeveloperDetail";
+import { DetailPanel } from "../../shared/list/DetailPanel";
 import { requestDeveloperAction } from "./developerRequest";
 import {
   developerPayload,
@@ -900,6 +901,28 @@ it("리뷰: 보이는 개발자 폼은 Ctrl+S로 저장한다", async () => {
     expect(screen.getByTestId("developer-area-2")).toHaveValue("1168010100"),
   );
   fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+  await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+});
+it("리뷰: 다른 숨은 탭에 상세 패널이 열려 있어도 보이는 개발자 폼은 Ctrl+S로 저장한다", async () => {
+  const saved = vi.fn();
+  render(
+    <>
+      <div hidden>
+        <DetailPanel title="숨은 탭 상세" onClose={vi.fn()} />
+      </div>
+      <DeveloperForm developer={row} options={options} onSaved={saved} onCancel={vi.fn()} />
+    </>,
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("developer-area-2")).toHaveValue("1168010100"),
+  );
+  screen.getByTestId("developer-name").focus();
+  // fireEvent가 false를 돌려주면 브라우저 기본 동작(페이지 저장)을 막은 것이다.
+  const notPrevented = fireEvent.keyDown(screen.getByTestId("developer-name"), {
+    key: "s",
+    ctrlKey: true,
+  });
+  expect(notPrevented).toBe(false);
   await waitFor(() => expect(saved).toHaveBeenCalledOnce());
 });
 it("리뷰: 409이면 입력을 지우지 않고 [최신 버전 불러오기]로 새 수정 시각을 받아 다시 저장한다(FR-0106)", async () => {

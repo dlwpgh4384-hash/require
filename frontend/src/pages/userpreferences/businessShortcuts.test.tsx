@@ -59,4 +59,22 @@ describe("common business shortcuts", () => {
     fireEvent.keyDown(window, { key: "Enter" });
     expect(search).toHaveBeenCalledTimes(1);
   });
+
+  it("an open dialog inside a hidden tab does not block Ctrl+S on the visible tab", () => {
+    const save = vi.fn();
+    render(
+      <>
+        <div hidden>
+          <section role="dialog" aria-label="숨은 탭 상세" />
+        </div>
+        <Screen hidden={false} onSave={save} />
+      </>,
+    );
+    const notPrevented = fireEvent.keyDown(screen.getByLabelText("보이는 칸"), {
+      key: "s",
+      ctrlKey: true,
+    });
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(notPrevented).toBe(false);
+  });
 });

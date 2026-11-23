@@ -551,6 +551,11 @@ it("a chosen project that is not in the month falls back to 전체 like the mock
   await ready();
   expect(screen.getByRole("combobox", { name: "프로젝트명" })).toHaveValue("");
   expect(screen.queryByText("고른 달의 프로젝트에서 선택해 주세요.")).not.toBeInTheDocument();
+  // 리뷰: 전체로 되돌린 까닭을 info 알림으로 알린다.
+  expect(screen.getByTestId("app-toast")).toHaveTextContent(
+    "고른 프로젝트가 이 달에 없어 전체로 조회했습니다.",
+  );
+  expect(screen.getByTestId("app-toast")).toHaveClass("app-toast-info");
 });
 it("field errors focus the filter, and period errors focus the month box", async () => {
   show();

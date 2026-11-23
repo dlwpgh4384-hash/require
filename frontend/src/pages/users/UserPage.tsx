@@ -507,7 +507,19 @@ export function UserPage() {
               reloadOptions();
               refresh(text);
             }}
-            onConflict={() => setRevision((value) => value + 1)}
+            onConflict={() => {
+              setRevision((value) => value + 1);
+              // 409: 열린 수정 창의 버전(modDttm)을 새로 읽은 계정으로 바꾼다(입력은 그대로, 창 key 같음).
+              const target = editing?.userId;
+              if (!target) return;
+              api.getCommonUser(target).then(
+                (latest) =>
+                  setEditing((current) =>
+                    current && current.userId === latest.userId ? latest : current,
+                  ),
+                () => undefined,
+              );
+            }}
           />
         ) : (
           <div role="status">선택 목록을 불러오는 중입니다.</div>

@@ -322,7 +322,10 @@ export function DeveloperForm({
   currentSave.current = save;
   // 공통 기능 Ctrl+S: 공통 단축키 훅(숨은 화면 탭이면 넘김)
   const saveShortcut = useCallback(() => void currentSave.current(), []);
-  usePreferenceBusinessShortcuts({ onSave: saveShortcut, scope: formRef }, !leaving);
+  usePreferenceBusinessShortcuts(
+    { onSave: saveShortcut, scope: formRef, dialogTarget: formRef },
+    !leaving,
+  );
   const conflict = error instanceof DeveloperRequestError && error.status === 409;
   const reloadVersion = () => {
     if (!developer) return;

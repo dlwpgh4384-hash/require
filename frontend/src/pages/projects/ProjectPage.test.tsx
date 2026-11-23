@@ -691,6 +691,53 @@ it("budget 409 reloads the project so the next save sends the new modifiedAt", a
   expect(body(writes()[1]).modifiedAt).toBe("2026-11-14T03:00:00Z");
 });
 
+it("리뷰: 409로 다시 읽어도 저장하지 않은 인원 계획 입력은 지우지 않는다", async () => {
+  const original = request.getMockImplementation()!;
+  let conflicted = false;
+  request.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (init?.method === "PUT" && url.endsWith("/budget") && !conflicted) {
+      conflicted = true;
+      row.modifiedAt = "2026-11-14T03:00:00Z";
+      return {
+        ok: false,
+        status: 409,
+        json: async () => ({
+          success: false,
+          message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+          errors: [],
+        }),
+      };
+    }
+    return original(url, init);
+  });
+  shell();
+  const detail = await openDetail();
+  fireEvent.click(await detail.findByTestId("project-detail-tab-plan"));
+  fireEvent.change(await detail.findByTestId("project-job-mm-be"), {
+    target: { value: "2.5" },
+  });
+  fireEvent.click(detail.getByTestId("project-detail-tab-basic"));
+  fireEvent.click(await detail.findByTestId("project-budget-change"));
+  const dialog = within(await screen.findByTestId("project-command-dialog"));
+  fireEvent.change(dialog.getByTestId("project-budget-value"), {
+    target: { value: "900000" },
+  });
+  fireEvent.click(dialog.getByTestId("project-command-save"));
+  expect(await dialog.findByTestId("project-command-error")).toHaveTextContent(
+    "다른 사람이 먼저 바꿨습니다.",
+  );
+  await waitFor(() =>
+    expect(dialog.getByTestId("project-command-save")).toBeEnabled(),
+  );
+  // 기본 정보는 새로 읽었다(다음 저장이 새 수정 시각을 보냄).
+  fireEvent.click(dialog.getByTestId("project-command-save"));
+  await waitFor(() => expect(writes()).toHaveLength(2));
+  expect(body(writes()[1]).modifiedAt).toBe("2026-11-14T03:00:00Z");
+  fireEvent.click(detail.getByTestId("project-detail-tab-plan"));
+  expect(await detail.findByTestId("project-job-mm-be")).toHaveValue("2.5");
+  expect(detail.getByText("저장하지 않은 변경이 있습니다")).toBeVisible();
+});
+
 it("a failed 진행으로 closes the confirm and shows the error on the basic tab", async () => {
   const original = request.getMockImplementation()!;
   request.mockImplementation(async (url: string, init?: RequestInit) =>

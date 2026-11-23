@@ -335,9 +335,10 @@ export function usePreferenceBusinessShortcuts(
       if (event.defaultPrevented) return;
       if (handlers.scope?.current?.closest("[hidden]")) return;
       const save = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s";
-      const dialogs = document.querySelectorAll(
-        '[role="dialog"], [role="alertdialog"]',
-      );
+      // 숨은 화면 탭 안에 열려 있는 대화상자(상세 패널)는 세지 않는다(보이는 탭 Ctrl+S가 막히지 않게).
+      const dialogs = Array.from(
+        document.querySelectorAll('[role="dialog"], [role="alertdialog"]'),
+      ).filter((dialog) => !dialog.closest("[hidden]"));
       const scope = handlers.dialogTarget?.current;
       if (scope?.closest("[hidden]")) return;
       if (dialogs.length) {

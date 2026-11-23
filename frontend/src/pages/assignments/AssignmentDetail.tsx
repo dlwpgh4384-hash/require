@@ -2,7 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge, Banner, DetailPanel, KeyValues } from "../../shared/list";
 import { Dialog, type ToastKind } from "../../shared/feedback/Dialog";
-import { focusFirstError } from "../../shared/feedback/messages";
+import {
+  feedbackMessages,
+  focusFirstError,
+} from "../../shared/feedback/messages";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { formatDateTime, koreanToday } from "../../shared/time";
 import { getCommonCodes } from "../codegroups/codeGroups";
@@ -28,6 +31,7 @@ import {
   assignmentPriceEditable,
   getCommonAssignment,
   getCommonAssignmentHistory,
+  isAssignmentConflict,
   mmf,
   postCommonAssignmentChange,
   postCommonAssignmentHistoryCorrection,
@@ -48,6 +52,17 @@ type Change = {
 };
 const digits = (value: string) => value.replace(/[^0-9]/g, "");
 const MONTH_TYPES = ["UPRC", "RATE"];
+/** 서버 칸 이름 → 변경 기록·정정 창 칸(오류를 그 칸 밑에 보인다). newEndDate는 종류에 따라 다르다. */
+const modalField: Record<string, string> = {
+  effectiveDate: "date",
+  newBillingPrice: "to",
+  newMonthlyMm: "to",
+  newExtensionPossibilityCode: "to",
+  newInputTypeCode: "to",
+  correctedValue: "to",
+  changeTypeCode: "type",
+  reasonCode: "reason",
+};
 /** 무상지원·대체투입은 투입 구분 변경으로 바꾸지 않는다(2026-10-26 결정). */
 const KIND_LOCK = ["FREE", "SUB"];
 const DATE_LABEL: Record<string, string> = {
@@ -229,9 +244,30 @@ export function AssignmentDetail({
     onChanged(message);
   };
   const fail = (e: unknown) => {
+    // FR-0106: 다른 사람이 먼저 바꿨으면(409) 창을 닫고 상세·목록을 다시 읽는다(옛 수정 시각으로 다시 보내지 않게).
+    if (isAssignmentConflict(e)) {
+      closeModal();
+      setRevision((r) => r + 1);
+      onChanged(
+        e instanceof Error && e.message ? e.message : feedbackMessages.conflict,
+        "warn",
+      );
+      return;
+    }
     setModalError(projectFailure(e));
-    if (e instanceof ProjectRequestError)
-      setErrors(Object.fromEntries(e.errors.map((f) => [f.field, f.message])));
+    if (e instanceof ProjectRequestError && e.errors.length) {
+      // 서버 칸 이름을 작은 창 칸으로 바꿔 그 칸 밑에 보이고 첫 오류 칸으로 간다.
+      const key = (field: string) =>
+        field === "newEndDate"
+          ? change?.type === "EARLY"
+            ? "date"
+            : "to"
+          : (modalField[field] ?? field);
+      setErrors(
+        Object.fromEntries(e.errors.map((f) => [key(f.field), f.message])),
+      );
+      window.setTimeout(() => focusFirstError(modalBody.current), 0);
+    }
   };
   const monthType = (t: string) => MONTH_TYPES.includes(t);
   /** 시안 U(a,m)·rateAt(a,m): 고른 달(YYYY-MM)에 적용되는 청구 단가·계약 월 MM. 그 달 값이 없으면 지금 값. */
@@ -973,7 +1009,6 @@ export function AssignmentDetail({
                 }}
               />,
             )}
-            {errors.correctedValue && fieldError("correctedValue")}
             {fc(
               "assignment-correction-reason",
               "reason",

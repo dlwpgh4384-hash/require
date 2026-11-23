@@ -1051,3 +1051,42 @@ it("date helpers distinguish first open, project change and recommendation", () 
   expect(assignmentPriceEditable(["PM"])).toBe(false);
   expect(assignmentPriceEditable(["SALES_LDR"])).toBe(true);
 });
+
+it("a 409 on bulk cancel or bulk extension toasts and reloads the list, and cancel sends once on double click", async () => {
+  writeFailure = { status: 409, message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요." };
+  page();
+  fireEvent.click(await screen.findByTestId("list-select-A-0001"));
+  await waitFor(() => expect(listReads()).toBe(1));
+  fireEvent.click(screen.getByTestId("list-bulk-cancel"));
+  const button = within(screen.getByRole("alertdialog")).getByRole("button", { name: "배정 취소" });
+  fireEvent.click(button);
+  fireEvent.click(button);
+  expect(await screen.findByTestId("assignment-toast")).toHaveTextContent("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.");
+  expect(writes()).toHaveLength(1);
+  await waitFor(() => expect(listReads()).toBe(2));
+  fireEvent.click(await screen.findByTestId("list-select-A-0001"));
+  writeFailure = { status: 409, message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요." };
+  fireEvent.click(screen.getByTestId("list-bulk-extension"));
+  fireEvent.click(screen.getByTestId("assignment-bulk-save"));
+  await waitFor(() => expect(listReads()).toBe(3));
+  expect(screen.queryByTestId("assignment-bulk-dialog")).not.toBeInTheDocument();
+});
+
+it("a 409 on a change closes the dialog, reloads the detail and tells the page; server field errors go under the fields", async () => {
+  const onChanged = vi.fn();
+  inRouter(<AssignmentDetail id={row.assignmentId} roles={["FIN"]} readOnly={false} onClose={vi.fn()} onChanged={onChanged} />);
+  await openHistory();
+  fireEvent.click(await screen.findByTestId("assignment-change-open"));
+  fireEvent.change(screen.getByTestId("assignment-change-type"), { target: { value: "EXTP" } });
+  fireEvent.change(screen.getByTestId("assignment-change-extension"), { target: { value: "H" } });
+  writeFailure = { status: 400, message: "입력값을 확인해 주세요.", errors: [{ field: "reasonCode", message: "변경 사유를 골라 주세요." }] };
+  fireEvent.click(screen.getByTestId("assignment-change-save"));
+  expect(await within(screen.getByTestId("assignment-change-field-reason")).findByRole("alert")).toHaveTextContent("변경 사유를 골라 주세요.");
+  const reads = () => request.mock.calls.filter(([u, init]) => String(u) === "/api/common/assignments/A-0001" && !(init as RequestInit | undefined)?.method).length;
+  const before = reads();
+  writeFailure = { status: 409, message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요." };
+  fireEvent.click(screen.getByTestId("assignment-change-save"));
+  await waitFor(() => expect(onChanged).toHaveBeenCalledWith("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.", "warn"));
+  expect(screen.queryByTestId("assignment-change-dialog")).not.toBeInTheDocument();
+  await waitFor(() => expect(reads()).toBeGreaterThan(before));
+});

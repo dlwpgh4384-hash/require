@@ -359,7 +359,9 @@ export function AssignmentPage({
       );
     } catch (reason) {
       setBulk(false);
-      toast(projectFailure(reason), "warn");
+      // 다른 사람이 먼저 바꿨으면(409) 목록을 다시 읽어 새 수정 시각을 받는다.
+      if (isAssignmentConflict(reason)) conflict(reason);
+      else toast(projectFailure(reason), "warn");
     } finally {
       setBusy(false);
     }
@@ -379,6 +381,9 @@ export function AssignmentPage({
     return () => window.removeEventListener("keydown", handler);
   }, [bulk]);
   const cancelAssignments = async () => {
+    // 확인 창 단추는 보내는 동안 막히지 않으므로 두 번 눌러도 한 번만 보낸다.
+    if (busyRef.current) return;
+    busyRef.current = true;
     const count = targets.length;
     setBusy(true);
     try {
@@ -389,12 +394,15 @@ export function AssignmentPage({
       );
     } catch (reason) {
       setCancelling(false);
-      toast(projectFailure(reason), "warn");
+      if (isAssignmentConflict(reason)) conflict(reason);
+      else toast(projectFailure(reason), "warn");
     } finally {
       setBusy(false);
     }
   };
   const dropCandidate = async (c: AssignmentCandidate) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       await postCommonAssignmentCandidateRemove(c);

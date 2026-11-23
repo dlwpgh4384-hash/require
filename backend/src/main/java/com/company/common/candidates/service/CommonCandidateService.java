@@ -104,7 +104,7 @@ public class CommonCandidateService {
             id = "C" + UUID.randomUUID().toString().replace("-", "").substring(0, 19);
         } while (mapper.insertCandidate(new Write(id, in, calendar.today())) == 0);
         skills(id, in);
-        mapper.insertContact(new ContactWrite(id, "BEFORE", "시스템이 등록", calendar.today(), "SYSTEM"));
+        mapper.insertContact(new ContactWrite(id, "BEFORE", "등록", calendar.today(), "SYSTEM"));
         return detail(require(id, false));
     }
     @Transactional
@@ -136,7 +136,7 @@ public class CommonCandidateService {
     private record Ranked(Match match, int distance, java.math.BigDecimal sequence) {}
     public Items<Match> getCommonCandidateMatches(String id) {
         var candidate = require(id, false);
-        var terms = calculations.terms("OS".equals(candidate.employeeTypeCode()));
+        var terms = calculations.terms("OS".equals(candidate.employeeTypeCode()), calendar.currentMonth());
         var grades = codes.selectable("GRADE").stream().map(c -> c.code).toList();
         int ownGrade = grades.indexOf(candidate.gradeCode());
         var available = YearMonth.from(candidate.availableDate());
@@ -150,7 +150,7 @@ public class CommonCandidateService {
             int grade = grades.indexOf(seat.gradeCode());
             var match = new Match(seat.opportunityId(), seat.opportunityName(), seat.winningProbability(),
                 name("JOB", seat.jobCode()), Objects.requireNonNullElse(name("GRADE", seat.gradeCode()), "–"),
-                start.toString(), seat.slotMonthlyRate(), profit, CandidateCalculationRules.lowMargin(profit));
+                start.toString(), seat.slotMonthlyRate(), profit, terms.lowMargin(profit), terms.lowMarginRate());
             ranked.add(new Ranked(match, ownGrade < 0 || grade < 0 ? Integer.MAX_VALUE : Math.abs(ownGrade - grade), seat.sequence()));
         }
         ranked.sort(Comparator.comparingInt(Ranked::distance)

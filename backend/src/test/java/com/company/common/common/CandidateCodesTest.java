@@ -35,7 +35,7 @@ class CandidateCodesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"EMP_TYPE", "JOB", "GRADE", "CNTC_STAT", "CAND_SRC", "SRC"})
+    @ValueSource(strings = {"EMP_TYPE", "JOB", "GRADE", "CNTC_STAT", "CAND_SRC"})
     void namesAndOptionsUseExistingDatabaseCodesWithoutNewEnums(String id) {
         group(id, List.of(row(id, "stored-code", "DB 표시명", "Y")));
         assertThat(codes.name(id, "stored-code")).isEqualTo("DB 표시명");
@@ -70,6 +70,8 @@ class CandidateCodesTest {
     void unknownOrNullGroupIsRejectedBeforeDatabaseRead() {
         assertThatThrownBy(() -> codes.name(null, "code")).isInstanceOf(CodeFailure.class);
         assertThatThrownBy(() -> codes.selectable("UNKNOWN")).isInstanceOf(CodeFailure.class);
+        // 후보 출처는 CAND_SRC. 인원 계획 출처 SRC는 이 화면에서 쓰지 않는다.
+        assertThatThrownBy(() -> codes.selectable("SRC")).isInstanceOf(CodeFailure.class);
         verifyNoInteractions(mapper, management);
     }
 }

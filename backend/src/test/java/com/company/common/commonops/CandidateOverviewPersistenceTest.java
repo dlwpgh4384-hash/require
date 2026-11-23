@@ -108,7 +108,10 @@ class CandidateOverviewPersistenceTest {
         candidate("after-start", "ITVW", "2027-02-02", "2027-01-01");
         candidate("hold", "HOLD", "2026-11-01", "2026-11-01");
         candidate("contract", "CTRT", "2026-11-01", "2026-11-01");
+        int total = db.queryForObject("SELECT COUNT(*) FROM TB_HR_CAND", Integer.class);
+        assertThat(total).isGreaterThanOrEqualTo(5);
         mvc.perform(get("/api/common/candidate-summary")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.totalCount").value(total))
             .andExpect(jsonPath("$.data.activeCount").value(3))
             .andExpect(jsonPath("$.data.interviewScheduledCount").value(1))
             .andExpect(jsonPath("$.data.availableByNextMonthCount").value(1))

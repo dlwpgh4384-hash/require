@@ -5,6 +5,7 @@ import com.company.common.commonops.mapper.CandidateOverviewMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -36,12 +37,32 @@ public class CandidateResumeExtractionService {
     public ResumeExtraction postCommonCandidateResumeExtraction(MultipartFile file) {
         String text = documents.read(file);
         var fields = new LinkedHashMap<String, ResumeField>();
-        for (var label : mapper.dictionary("RSM_LABEL")) {
+        // 긴 이름표부터 본다(「기술스택」을 「기술」보다, 「소속업체」를 「소속」보다 먼저).
+        var labels = mapper.dictionary("RSM_LABEL").stream()
+            .filter(label -> LABELS.containsKey(label.target()) && label.name() != null && !label.name().isBlank())
+            .sorted(Comparator.comparingInt((CandidateOverviewMapper.Dictionary label) -> label.name().strip().length()).reversed())
+            .toList();
+        var names = labels.stream().map(label -> label.name().strip()).toList();
+        for (var label : labels) {
             String field = LABELS.get(label.target());
-            if (field == null || label.name() == null || label.name().isBlank()) continue;
-            var pattern = Pattern.compile("(?im)^\\h*" + Pattern.quote(label.name()) + "\\h*[:：=]?\\h*(.+)$");
+            // 이름표는 줄 처음이나 표 칸(탭) 처음에 있고, 바로 뒤에 글자·숫자가 붙지 않아야 한다. 값은 그 칸(탭 전)까지.
+            var pattern = Pattern.compile("(?imu)(?:^|\\t)[\\h&&[^\\t]]*" + Pattern.quote(label.name().strip())
+                + "(?![\\p{L}\\p{N}])\\h*[:：=]?\\h*([^\\t\\r\\n]*)");
             var match = pattern.matcher(text);
-            if (match.find()) add(fields, field, match.group(1).strip(), match.group().strip());
+            while (match.find()) {
+                String value = match.group(1).strip();
+                String source = match.group().strip();
+                // 값 칸이 비어 다음 칸의 이름표를 값으로 잡은 경우(「성명 | (빈칸) | 연락처」)는 이 줄을 쓰지 않는다.
+                if (isLabel(value, names)) continue;
+                // 이름표 칸에 값이 없으면(표에서 값이 다음 줄·다음 칸) 다음 빈칸 아닌 조각을 쓴다. 그 조각이 다른 이름표면 쓰지 않는다.
+                if (value.isEmpty()) {
+                    value = following(text, match.end(), names);
+                    source = source + " " + value;
+                }
+                if (value.isEmpty()) continue;
+                add(fields, field, value, source.strip());
+                break;
+            }
         }
         if (!fields.containsKey("phone")) {
             var phone = PHONE.matcher(text);
@@ -55,7 +76,7 @@ public class CandidateResumeExtractionService {
         for (var keyword : mapper.dictionary("RSM_JOB_KW")) {
             if (keyword.name() == null || keyword.name().isBlank() || keyword.target() == null
                 || jobs.stream().noneMatch(job -> job.code().equals(keyword.target()))) continue;
-            var match = Pattern.compile("(?iu)" + Pattern.quote(keyword.name())).matcher(text);
+            var match = keywordPattern(keyword.name().strip()).matcher(text);
             if (match.find()) {
                 String field = !fields.containsKey("primaryJobCode") ? "primaryJobCode" : "secondaryJobCode";
                 if (fields.values().stream().noneMatch(row -> row.field().endsWith("JobCode") && row.value().equals(keyword.target())))
@@ -73,7 +94,35 @@ public class CandidateResumeExtractionService {
         var years = Pattern.compile("경력\\h*[:：]?\\h*([0-9]{1,2}(?:\\.[0-9])?)\\h*년").matcher(text);
         if (years.find()) career = new BigDecimal(years.group(1));
         return new ResumeExtraction(CandidateResumeDocumentReader.safeName(file.getOriginalFilename()),
-            List.copyOf(fields.values()), career, true);
+            List.copyOf(fields.values()), career);
+    }
+
+    /** 영문·숫자로 시작하거나 끝나는 단어(PM·PL 등)는 앞뒤에 영문·숫자가 붙으면 다른 낱말로 본다(development·deploy·template). */
+    static Pattern keywordPattern(String keyword) {
+        String start = keyword.isEmpty() || !isAsciiWord(keyword.charAt(0)) ? "" : "(?<![A-Za-z0-9])";
+        String end = keyword.isEmpty() || !isAsciiWord(keyword.charAt(keyword.length() - 1)) ? "" : "(?![A-Za-z0-9])";
+        return Pattern.compile("(?iu)" + start + Pattern.quote(keyword) + end);
+    }
+
+    private static boolean isAsciiWord(char c) {
+        return c < 128 && Character.isLetterOrDigit(c);
+    }
+
+    /** 이름표 뒤 다음 조각(탭·줄바꿈으로 나뉜 첫 빈칸 아닌 것). 다른 이름표로 시작하면 빈 값. */
+    private static String following(String text, int from, List<String> labels) {
+        for (String part : text.substring(from).split("[\\t\\r\\n]+", 8)) {
+            String value = part.strip();
+            if (value.isEmpty()) continue;
+            return isLabel(value, labels) ? "" : value;
+        }
+        return "";
+    }
+
+    /** value가 사전의 이름표로 시작하고 바로 뒤에 글자·숫자가 붙지 않으면 이름표로 본다. */
+    private static boolean isLabel(String value, List<String> labels) {
+        String lower = value.toLowerCase(Locale.ROOT);
+        return labels.stream().map(name -> name.toLowerCase(Locale.ROOT)).anyMatch(name -> lower.startsWith(name)
+            && (lower.length() == name.length() || !Character.isLetterOrDigit(lower.codePointAt(name.length()))));
     }
 
     private void add(Map<String, ResumeField> fields, String field, String raw, String source) {

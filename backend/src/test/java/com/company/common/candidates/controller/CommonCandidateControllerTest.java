@@ -95,7 +95,7 @@ class CommonCandidateControllerTest {
                 old.desiredMonthlyRate(), old.availableDate(), w.status(), today, old.sourceCode(), old.memo(), old.registeredAt(),
                 now.plusSeconds(++version), old.companyName(), old.privacyAgreementUserName())); return 1;
         });
-        when(calculations.terms(anyBoolean())).thenReturn(new CandidateCalculationRules.Terms(BigDecimal.valueOf(100), BigDecimal.valueOf(100000)));
+        when(calculations.terms(anyBoolean(), any())).thenReturn(new CandidateCalculationRules.Terms(BigDecimal.valueOf(100), BigDecimal.valueOf(100000), BigDecimal.valueOf(15)));
         when(mapper.selectSeats(anyString())).thenReturn(List.of());
     }
     CandidateRow apply(Write w, CandidateRow old) {
@@ -137,7 +137,7 @@ class CommonCandidateControllerTest {
     @Test void creationAddsExactlyOneSystemRegistrationContact() throws Exception {
         String id = create();
         mvc.perform(get("/api/common/candidates/{id}/contacts", id)).andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.items.length()").value(1)).andExpect(jsonPath("$.data.items[0].memo").value("시스템이 등록"))
+            .andExpect(jsonPath("$.data.items.length()").value(1)).andExpect(jsonPath("$.data.items[0].memo").value("등록"))
             .andExpect(jsonPath("$.data.items[0].systemRecord").value(true)).andExpect(jsonPath("$.data.items[0].recordedBy").value("SYSTEM"));
     }
     @ParameterizedTest @ValueSource(strings = {"name", "skills", "phone", "email", "memo", "desiredMonthlyRate", "homeAddress", "primaryJobCode"})
@@ -321,7 +321,8 @@ class CommonCandidateControllerTest {
             new Seat("unpriced", BigDecimal.ONE, "미정", BigDecimal.TEN, "DEV", "MID", "202612", BigDecimal.ONE, null));
         when(mapper.selectSeats("DEV")).thenReturn(seats);
         mvc.perform(get("/api/common/candidates/{id}/matches", id)).andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.items.length()").value(1)).andExpect(jsonPath("$.data.items[0].expectedProfitRate").value(17.5));
+            .andExpect(jsonPath("$.data.items.length()").value(1)).andExpect(jsonPath("$.data.items[0].expectedProfitRate").value(17.5))
+            .andExpect(jsonPath("$.data.items[0].lowMargin").value(false)).andExpect(jsonPath("$.data.items[0].lowMarginRate").value(15));
         mvc.perform(post("/api/common/candidates/{id}/contacts", id).contentType("application/json").content(contact("HOLD").toString())).andExpect(status().isOk());
         var b = input(); b.put("modifiedAt", rows.get(id).modifiedAt().toString()); b.put("desiredMonthlyRate", 6000000);
         mvc.perform(put("/api/common/candidates/{id}", id).contentType("application/json").content(b.toString())).andExpect(status().isOk());

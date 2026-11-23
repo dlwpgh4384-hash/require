@@ -29,7 +29,7 @@ public final class CandidateContracts {
         Instant recordedAt, String recordedBy, boolean systemRecord) {}
     public record Match(String opportunityId, String opportunityName, BigDecimal winningProbability,
         String jobName, String gradeName, String startMonth, BigDecimal slotMonthlyRate,
-        BigDecimal expectedProfitRate, boolean lowMargin) {}
+        BigDecimal expectedProfitRate, boolean lowMargin, BigDecimal lowMarginRate) {}
     public record Write(String candidateId, Input input, LocalDate today) {}
     public record ContactWrite(String candidateId, String status, String memo, LocalDate today, String actor) {}
 }

@@ -37,7 +37,7 @@ class CandidateOverviewMappingTest {
         return config;
     }
     @Test void everyProjectionUsesActualConstructorMaterializationWithoutDatabase() throws Exception {
-        materialize("summary", new Summary(9, 3, 4, 2));
+        materialize("summary", new Summary(12, 9, 3, 4, 2));
         materialize("activeCandidates", new CandidateCount("DEV", LocalDate.of(2027,1,2)));
         materialize("dictionary", new Dictionary("RSM_LABEL", "label", "희망금액", "WANT"));
         materialize("companies", new Company("company", "협력사"));
@@ -82,10 +82,13 @@ class CandidateOverviewMappingTest {
     }
     @Test void aggregateAndCountQueriesExcludeBothTerminalStatusesAndUseStrictOverdueBoundary() throws Exception {
         var config = configuration();
-        var dates = new Dates(LocalDate.of(2026,12,31), LocalDate.of(2027,1,1), LocalDate.of(2026,12,1));
+        var dates = new Dates(LocalDate.of(2027,1,1), LocalDate.of(2026,12,1));
         String summary = config.getMappedStatement(NS + "summary").getBoundSql(dates).getSql();
         String counts = config.getMappedStatement(NS + "activeCandidates").getBoundSql(Map.of()).getSql();
         assertThat(summary).contains("CNTC_STAT_CD NOT IN ('HOLD','CTRT')", "LAST_CNTC_DT < ?", "INPUT_PSBL_DT <= ?");
+        // 전체 수(totalCount)만 보류·계약 완료를 포함하고, 진행 중·투입 가능·연락 안 함 셋은 진행 중 조건을 각각 건다(면접 예정은 상태 자체로 진행 중).
+        assertThat(summary).contains("COUNT(*)::int AS \"totalCount\"").doesNotContainPattern("FROM TB_HR_CAND\\s+WHERE");
+        assertThat(summary.split("CNTC_STAT_CD NOT IN \\('HOLD','CTRT'\\)", -1)).hasSize(4);
         assertThat(counts).contains("CNTC_STAT_CD NOT IN ('HOLD','CTRT')");
     }
 }

@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
 public class CandidateCodes {
-    private static final Set<String> GROUPS = Set.of("EMP_TYPE", "JOB", "GRADE", "CNTC_STAT", "CAND_SRC", "SRC");
+    private static final Set<String> GROUPS = Set.of("EMP_TYPE", "JOB", "GRADE", "CNTC_STAT", "CAND_SRC");
     private final CommonCodeService codes;
 
     public CandidateCodes(CommonCodeService codes) {

@@ -22,21 +22,17 @@ export function CandidateTitleActions() {
   const context = useContext(CandidateWorkspaceContext);
   return <div ref={context.setHost} data-testid="candidate-title-actions" />;
 }
+/** 화면 뿌리(screen-body)는 CandidatePage 하나만 둔다(겹쳐 감싸지 않는다). */
 export function CandidateWorkspace() {
   const context = useContext(CandidateWorkspaceContext);
   return (
-    <div
-      className="screen-body candidate-workspace"
-      data-testid="candidate-workspace"
-      data-screen-id="UI-33"
-    >
-      <CandidatePage
-        renderActions={
-          context.host
-            ? (actions) => createPortal(actions, context.host!)
-            : undefined
-        }
-      />
-    </div>
+    <CandidatePage
+      testId="candidate-workspace"
+      renderActions={
+        context.host
+          ? (actions) => createPortal(actions, context.host!)
+          : undefined
+      }
+    />
   );
 }

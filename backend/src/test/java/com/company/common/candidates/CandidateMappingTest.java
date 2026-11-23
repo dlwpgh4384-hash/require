@@ -18,6 +18,15 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class CandidateMappingTest {
+    /** 등록 시각은 DB 기본값에 맡기지 않고 clock_timestamp()로 직접 넣는다. */
+    @ParameterizedTest
+    @ValueSource(strings = {"insertCandidate", "insertSkill", "insertContact"})
+    void insertsWriteRegistrationTimeExplicitly(String operation) throws Exception {
+        String xml = new ClassPathResource("mapper/candidates/CandidateMapper.xml").getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        var block = java.util.regex.Pattern.compile("<insert id=\"" + operation + "\">(.*?)</insert>", java.util.regex.Pattern.DOTALL).matcher(xml);
+        assertThat(block.find()).isTrue();
+        assertThat(block.group(1)).contains("reg_dttm").contains("clock_timestamp()");
+    }
     @ParameterizedTest
     @ValueSource(strings = {"selectCandidates", "selectCandidate", "lockCandidate", "selectContacts", "selectArea", "selectSeats"})
     void explicitConstructorsMaterializeEveryFieldThroughRealMyBatis(String operation) throws Exception {

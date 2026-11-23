@@ -1,5 +1,6 @@
 package com.company.common.support.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -65,9 +66,15 @@ public class ApiExceptionHandler {
         return of(HttpStatus.BAD_REQUEST, "입력 형식을 확인해 주세요.", List.of(new FieldError("body", "입력 형식을 확인해 주세요.")));
     }
 
+    /** 이력서 꺼내기 주소. 크기 초과 문구만 이력서용으로 바꾸고, 다른 업로드(엑셀)는 그대로 둔다. */
+    static final String RESUME_PATH = "/api/common/candidate-resume-extractions";
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<Error> uploadTooLarge(MaxUploadSizeExceededException failure) {
-        String message = "10,000,000 bytes 이하의 엑셀 파일을 선택해 주세요.";
+    public ResponseEntity<Error> uploadTooLarge(MaxUploadSizeExceededException failure, HttpServletRequest request) {
+        String path = request == null ? null : request.getRequestURI();
+        String message = path != null && path.endsWith(RESUME_PATH)
+            ? "10MB 이하 파일만 올릴 수 있습니다."
+            : "10,000,000 bytes 이하의 엑셀 파일을 선택해 주세요.";
         return of(HttpStatus.BAD_REQUEST, message, List.of(new FieldError("file", message)));
     }
 

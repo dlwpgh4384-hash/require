@@ -2,15 +2,17 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.company.common.commonops.mapper.CandidateOverviewMapper">
   <resultMap id="summary" type="com.company.common.commonops.dto.CandidateOverviewContracts$Summary"><constructor>
+    <arg column="totalCount" javaType="_int"/>
     <arg column="activeCount" javaType="_int"/><arg column="interviewScheduledCount" javaType="_int"/>
     <arg column="availableByNextMonthCount" javaType="_int"/><arg column="overdueContactCount" javaType="_int"/>
   </constructor></resultMap>
   <select id="summary" resultMap="summary">
-    SELECT COUNT(*)::int AS "activeCount",
+    SELECT COUNT(*)::int AS "totalCount",
+      COUNT(*) FILTER (WHERE CNTC_STAT_CD NOT IN ('HOLD','CTRT'))::int AS "activeCount",
       COUNT(*) FILTER (WHERE CNTC_STAT_CD='ITVW')::int AS "interviewScheduledCount",
-      COUNT(*) FILTER (WHERE INPUT_PSBL_DT &lt;= #{nextMonth})::int AS "availableByNextMonthCount",
-      COUNT(*) FILTER (WHERE LAST_CNTC_DT &lt; #{overdueBefore})::int AS "overdueContactCount"
-    FROM TB_HR_CAND WHERE CNTC_STAT_CD NOT IN ('HOLD','CTRT')
+      COUNT(*) FILTER (WHERE CNTC_STAT_CD NOT IN ('HOLD','CTRT') AND INPUT_PSBL_DT &lt;= #{nextMonth})::int AS "availableByNextMonthCount",
+      COUNT(*) FILTER (WHERE CNTC_STAT_CD NOT IN ('HOLD','CTRT') AND LAST_CNTC_DT &lt; #{overdueBefore})::int AS "overdueContactCount"
+    FROM TB_HR_CAND
   </select>
   <resultMap id="candidateCount" type="com.company.common.commonops.mapper.CandidateOverviewMapper$CandidateCount"><constructor>
     <arg column="jobCode" javaType="string"/><arg column="availableDate" javaType="java.time.LocalDate"/>

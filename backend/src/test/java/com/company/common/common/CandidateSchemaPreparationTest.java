@@ -227,7 +227,7 @@ class CandidateSchemaPreparationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"EMP_TYPE", "JOB", "GRADE", "CNTC_STAT", "CAND_SRC", "SRC"})
+    @ValueSource(strings = {"EMP_TYPE", "JOB", "GRADE", "CNTC_STAT", "CAND_SRC"})
     void commonCodeNamesAndOptionsFollowPreparedBaseData(String groupId) throws Exception {
         String before = snapshot();
         try (var session = factory.openSession()) {

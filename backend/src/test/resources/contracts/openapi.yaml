@@ -12686,6 +12686,10 @@ components:
     CommonCandidateSummary:
       type: object
       properties:
+        totalCount:
+          type: integer
+          minimum: 0
+          description: 보류·계약 완료까지 모든 후보 수(나머지 값은 진행 중 후보만)
         activeCount:
           type: integer
           minimum: 0
@@ -12699,6 +12703,7 @@ components:
           type: integer
           minimum: 0
       required:
+      - totalCount
       - activeCount
       - interviewScheduledCount
       - availableByNextMonthCount
@@ -12808,7 +12813,10 @@ components:
           type: number
         lowMargin:
           type: boolean
-          description: 예상 이익률15% 미만
+          description: 예상 이익률이 lowMarginRate 미만(같으면 아님)
+        lowMarginRate:
+          type: number
+          description: 빨강 기준 이익률(%). 이번 달 적용 운영 기준값 QUOTE_APRV_RT(처음 15)
       required:
       - opportunityId
       - opportunityName
@@ -12819,6 +12827,7 @@ components:
       - slotMonthlyRate
       - expectedProfitRate
       - lowMargin
+      - lowMarginRate
     CommonCandidateMatchList:
       type: object
       properties:

@@ -156,7 +156,7 @@ class CandidatePersistenceTest {
             .andExpect(status().isOk());
         mvc.perform(get("/api/common/candidates/{id}/matches", id)).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.items[0].expectedProfitRate").value(11.25))
-            .andExpect(jsonPath("$.data.items[0].lowMargin").value(true));
+            .andExpect(jsonPath("$.data.items[0].lowMargin").value(true)).andExpect(jsonPath("$.data.items[0].lowMarginRate").value(15));
         assertThat(db.queryForObject("SELECT last_cntc_dt FROM TB_HR_CAND WHERE cand_id=?", java.sql.Date.class, id)).isEqualTo(last);
         db.update("UPDATE TB_HR_CAND SET cntc_stat_cd='CTRT' WHERE cand_id=?", id);
         mvc.perform(get("/api/common/candidates/{id}/matches", id)).andExpect(status().isOk())

@@ -8,7 +8,7 @@ import org.apache.ibatis.annotations.Param;
 
 @Mapper
 public interface CandidateOverviewMapper {
-    record Dates(LocalDate today, LocalDate nextMonth, LocalDate overdueBefore) {}
+    record Dates(LocalDate nextMonth, LocalDate overdueBefore) {}
     record CandidateCount(String jobCode, LocalDate availableDate) {}
     record Dictionary(String groupId, String code, String name, String target) {}
     record Company(String id, String name) {}

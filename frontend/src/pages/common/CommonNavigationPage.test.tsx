@@ -554,9 +554,19 @@ type Content = ReturnType<typeof within>;
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
   "UI-33": async (content) => {
-    await waitFor(() =>
-      expect(content.getAllByText("조회된 자료가 없습니다.")).toHaveLength(2),
-    );
+    // 시안 빈 문구: 부족 직무 카드와 공통 목록.
+    expect(
+      await content.findByText("부족이 예상되는 직무가 없습니다."),
+    ).toBeVisible();
+    expect(
+      await content.findByText("조건에 맞는 결과가 없습니다."),
+    ).toBeVisible();
+    // 화면 뿌리(screen-body)는 하나만 둔다.
+    const root = content.getByTestId("candidate-workspace");
+    expect(root).toHaveClass("screen-body");
+    expect(root.querySelectorAll(".screen-body")).toHaveLength(0);
+    expect(root.querySelectorAll("[data-screen-id='UI-33']")).toHaveLength(0);
+    expect(content.queryByRole("heading", { name: "외부 인력 후보" })).toBeNull();
     const actions = within(screen.getByTestId("screen-actions"));
     await waitFor(() =>
       expect(actions.getByTestId("candidate-register")).toBeEnabled(),

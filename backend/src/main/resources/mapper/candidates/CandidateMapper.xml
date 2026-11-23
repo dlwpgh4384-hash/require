@@ -86,7 +86,7 @@
   <insert id="insertCandidate">
     INSERT INTO TB_HR_CAND(cand_id,cand_nm,emp_type_cd,blng_clnt_id,telno,email_addr,
       prvc_agre_yn,prvc_agre_dt,prvc_agre_user_id,job_cd,sub_job_cd,grade_cd,home_area_cd,
-      home_addr,hope_uprc,input_psbl_dt,cntc_stat_cd,last_cntc_dt,cand_src_cd,memo_cn,reg_user_id)
+      home_addr,hope_uprc,input_psbl_dt,cntc_stat_cd,last_cntc_dt,cand_src_cd,memo_cn,reg_user_id,reg_dttm)
     VALUES(#{candidateId},#{input.name},#{input.employeeTypeCode},#{input.companyId,jdbcType=VARCHAR},
       #{input.phone,jdbcType=VARCHAR},#{input.email,jdbcType=VARCHAR},
       CASE WHEN #{input.privacyAgreement} THEN 'Y' ELSE 'N' END,
@@ -95,7 +95,7 @@
       #{input.primaryJobCode},#{input.secondaryJobCode,jdbcType=VARCHAR},#{input.gradeCode},
       #{input.homeAreaCode,jdbcType=VARCHAR},#{input.homeAddress,jdbcType=VARCHAR},
       #{input.desiredMonthlyRate},#{input.availableDate},'BEFORE',#{today},#{input.sourceCode},
-      #{input.memo,jdbcType=VARCHAR},'admin')
+      #{input.memo,jdbcType=VARCHAR},'admin',clock_timestamp())
     ON CONFLICT ON CONSTRAINT PK_TB_HR_CAND DO NOTHING
   </insert>
   <update id="updateCandidate">
@@ -112,7 +112,7 @@
   </update>
   <delete id="deleteSkills">DELETE FROM TB_HR_CAND_SKILL WHERE cand_id=#{id}</delete>
   <insert id="insertSkill">
-    INSERT INTO TB_HR_CAND_SKILL(cand_id,skill_nm,sort_ord,reg_user_id) VALUES(#{id},#{name},#{sort},'admin')
+    INSERT INTO TB_HR_CAND_SKILL(cand_id,skill_nm,sort_ord,reg_user_id,reg_dttm) VALUES(#{id},#{name},#{sort},'admin',clock_timestamp())
   </insert>
   <select id="selectSkills" resultType="string">
     SELECT s.skill_nm FROM TB_HR_CAND_SKILL s WHERE s.cand_id=#{id} ORDER BY s.sort_ord,s.skill_nm

@@ -72,7 +72,7 @@ class CommonCandidateOverviewControllerTest {
     @Test void publicExtractionNormalizesMoneyWithoutWritingCandidateConsentOrUpload() throws Exception {
         var result = extract("이름: 김개발\n희망금액: 650만원\n01012345678\nUSER@EXAMPLE.COM\n주소: 서울특별시 강남구 역삼동")
             .andExpect(status().isOk()).andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.reviewRequired").value(true)).andReturn();
+            .andExpect(jsonPath("$.data.reviewRequired").doesNotExist()).andReturn();
         var fields = json.readTree(result.getResponse().getContentAsByteArray()).path("data").path("fields");
         assertThat(fields.findValuesAsText("value")).contains("6500000", "010-1234-5678", "user@example.com", "1168000000", "서울 강남구");
         assertThat(fields.findValuesAsText("field")).doesNotContain("privacyAgreement", "privacyAgreementUserId", "gradeCode");
@@ -112,14 +112,65 @@ class CommonCandidateOverviewControllerTest {
     void imagesAndUnapprovedFormatsAreFileErrorsBeforeDatabaseRead(String extension) throws Exception {
         mvc.perform(multipart("/api/common/candidate-resume-extractions").file(new MockMultipartFile(
             "file", "resume." + extension, "application/octet-stream", new byte[]{1,2,3})))
-            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("file"));
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("file"))
+            .andExpect(jsonPath("$.errors[0].message").value(CandidateResumeDocumentReader.TYPE_MESSAGE));
         verifyNoInteractions(mapper, forecast);
     }
 
     @Test void oversizedFileIsFileErrorBeforeDatabaseRead() throws Exception {
         mvc.perform(multipart("/api/common/candidate-resume-extractions").file(new MockMultipartFile(
             "file", "resume.txt", "text/plain", new byte[CandidateResumeDocumentReader.MAX_BYTES + 1])))
-            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("file"));
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("file"))
+            .andExpect(jsonPath("$.errors[0].message").value("10MB 이하 파일만 올릴 수 있습니다."));
+        verifyNoInteractions(mapper);
+    }
+
+    @Test void labelsNeedABoundaryAndLongerLabelsWin() throws Exception {
+        when(mapper.dictionary("RSM_LABEL")).thenReturn(List.of(
+            new Dictionary("RSM_LABEL", "a", "이름", "NAME"), new Dictionary("RSM_LABEL", "b", "기술", "SKILL"),
+            new Dictionary("RSM_LABEL", "c", "기술스택", "SKILL"), new Dictionary("RSM_LABEL", "d", "소속", "VNDR"),
+            new Dictionary("RSM_LABEL", "e", "소속업체", "VNDR")));
+        var result = extract("이름표기: 틀린값\n기술 자격: 정보처리기사\n기술스택: Java, SQL\n소속업체: 등록업체\n이름: 홍길동")
+            .andExpect(status().isOk()).andReturn();
+        var fields = json.readTree(result.getResponse().getContentAsByteArray()).path("data").path("fields");
+        var values = new java.util.HashMap<String, String>();
+        fields.forEach(row -> values.put(row.path("field").asText(), row.path("value").asText()));
+        assertThat(values).containsEntry("name", "홍길동").containsEntry("skills", "Java,SQL").containsEntry("companyId", "vendor");
+    }
+
+    @Test void tableCellsOnOneLineAndEmptyLabelCellsUseTheNextPiece() throws Exception {
+        var result = extract("이름\t홍길동\t희망금액\t650만원\n주소\n서울특별시 강남구 역삼동\n소속:\n이름: 다른값")
+            .andExpect(status().isOk()).andReturn();
+        var fields = json.readTree(result.getResponse().getContentAsByteArray()).path("data").path("fields");
+        var values = new java.util.HashMap<String, String>();
+        fields.forEach(row -> values.put(row.path("field").asText(), row.path("value").asText()));
+        assertThat(values).containsEntry("name", "홍길동").containsEntry("desiredMonthlyRate", "6500000")
+            .containsEntry("homeAddress", "서울 강남구").doesNotContainKey("companyId");
+    }
+
+    @Test void latinJobKeywordsMatchWholeWordsOnly() throws Exception {
+        when(mapper.dictionary("JOB")).thenReturn(List.of(new Dictionary("JOB", "PM", "PM", null), new Dictionary("JOB", "DEV", "개발", null)));
+        when(mapper.dictionary("RSM_JOB_KW")).thenReturn(List.of(new Dictionary("RSM_JOB_KW", "pm", "PM", "PM"),
+            new Dictionary("RSM_JOB_KW", "dev", "개발", "DEV")));
+        var none = extract("web development, deploy template").andExpect(status().isOk()).andReturn();
+        assertThat(json.readTree(none.getResponse().getContentAsByteArray()).path("data").path("fields").findValuesAsText("field"))
+            .doesNotContain("primaryJobCode");
+        var found = extract("개발자 경력, 최근 PM/PL 수행").andExpect(status().isOk()).andReturn();
+        var fields = json.readTree(found.getResponse().getContentAsByteArray()).path("data").path("fields");
+        assertThat(fields.findValuesAsText("value")).contains("PM", "DEV");
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"", "text/plain; charset=UTF-8", "application/x-unknown"})
+    void contentTypeParametersAndEmptyTypesRelyOnTheExtension(String type) throws Exception {
+        mvc.perform(multipart("/api/common/candidate-resume-extractions").file(new MockMultipartFile(
+            "file", "resume.txt", type, "희망금액: 650만원".getBytes(StandardCharsets.UTF_8))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.fields[0].value").value("6500000"));
+    }
+
+    @Test void imageContentTypeIsRejectedEvenWithTextExtension() throws Exception {
+        mvc.perform(multipart("/api/common/candidate-resume-extractions").file(new MockMultipartFile(
+            "file", "resume.txt", "image/png; name=scan", new byte[]{1,2,3})))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].message").value(CandidateResumeDocumentReader.TYPE_MESSAGE));
         verifyNoInteractions(mapper);
     }
 
@@ -145,12 +196,13 @@ class CommonCandidateOverviewControllerTest {
     }
 
     @Test void summaryUsesKoreanNextMonthStartAndStrictThirtyDayBoundary() throws Exception {
-        when(mapper.summary(any())).thenReturn(new Summary(7, 2, 3, 1));
+        when(mapper.summary(any())).thenReturn(new Summary(10, 7, 2, 3, 1));
         mvc.perform(get("/api/common/candidate-summary")).andExpect(status().isOk())
             .andExpect(response("GET", "/api/common/candidate-summary"))
+            .andExpect(jsonPath("$.data.totalCount").value(10))
             .andExpect(jsonPath("$.data.activeCount").value(7)).andExpect(jsonPath("$.data.interviewScheduledCount").value(2))
             .andExpect(jsonPath("$.data.availableByNextMonthCount").value(3)).andExpect(jsonPath("$.data.overdueContactCount").value(1));
-        verify(mapper).summary(new Dates(LocalDate.of(2026,12,31), LocalDate.of(2027,1,1), LocalDate.of(2026,12,1)));
+        verify(mapper).summary(new Dates(LocalDate.of(2027,1,1), LocalDate.of(2026,12,1)));
         verifyNoInteractions(forecast);
     }
 

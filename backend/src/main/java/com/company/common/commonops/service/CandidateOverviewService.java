@@ -38,7 +38,7 @@ public class CandidateOverviewService {
 
     public Summary getCommonCandidateSummary() {
         var today = calendar.today();
-        return mapper.summary(new Dates(today, YearMonth.from(today).plusMonths(1).atDay(1), today.minusDays(30)));
+        return mapper.summary(new Dates(YearMonth.from(today).plusMonths(1).atDay(1), today.minusDays(30)));
     }
 
     public Shortages getCommonCandidateShortages() {

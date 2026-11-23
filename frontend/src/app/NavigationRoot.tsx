@@ -212,7 +212,14 @@ export function NavigationRoot({
   const seen = useRef<Record<string, number>>({});
   const tick = useRef(0);
   const autoOpened = useRef(false);
-  const badges = useMenuBadgeCounts(location.pathname, state.status === "ready");
+  // 메뉴에 청구·입금(UI-13)이 보일 때만 미수 건수를 읽는다(메뉴가 없으면 셀 필요가 없다).
+  const billingMenuShown =
+    state.status === "ready" &&
+    state.response.data.some((item) => item.scrnId === "UI-13") &&
+    state.response.meta.screenAccess.some(
+      (access) => access.scrnId === "UI-13" && access.available,
+    );
+  const badges = useMenuBadgeCounts(location.pathname, billingMenuShown);
   useEffect(() => {
     const refresh = () => setAttempt((value) => value + 1);
     window.addEventListener(MENU_REFRESH_EVENT, refresh);

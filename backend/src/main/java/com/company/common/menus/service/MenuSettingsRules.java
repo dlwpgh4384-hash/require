@@ -69,7 +69,7 @@ public final class MenuSettingsRules {
     }
 
     public static Input parse(JsonNode body) {
-        object(body, Set.of("items", "movedMenuIds"));
+        object(body, Set.of("items", "movedMenuIds", "modifiedAt"));
         if (!body.path("items").isArray()) throw invalid("items");
         if (!body.path("movedMenuIds").isArray()) throw invalid("movedMenuIds");
         var items = new ArrayList<Update>();
@@ -84,7 +84,13 @@ public final class MenuSettingsRules {
         }
         var moved = new ArrayList<String>();
         for (var value : body.get("movedMenuIds")) moved.add(text(value, "movedMenuIds"));
-        var input = new Input(items, moved);
+        java.time.Instant version = null;
+        boolean check = body.has("modifiedAt");
+        if (check && !body.get("modifiedAt").isNull()) {
+            try { version = java.time.Instant.parse(text(body.get("modifiedAt"), "modifiedAt")); }
+            catch (java.time.format.DateTimeParseException failure) { throw invalid("modifiedAt"); }
+        }
+        var input = new Input(items, moved, check, version);
         validate(input);
         return input;
     }

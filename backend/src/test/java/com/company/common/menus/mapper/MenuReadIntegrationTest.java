@@ -187,7 +187,7 @@ class MenuReadIntegrationTest {
     void actualSqlReadFailureProducesSanitized500WithoutCreatingTables() throws Exception {
         execute("DROP TABLE tb_sy_menu");
         mvc.perform(get("/api/common/menus")).andExpect(status().isInternalServerError())
-            .andExpect(content().json("{\"success\":false,\"meta\":{}}", true));
+            .andExpect(content().json("{\"success\":false,\"meta\":{},\"message\":\"처리하지 못했습니다. 잠시 후 다시 시도해 주세요.\",\"errors\":[]}", true));
         try (var result = database.createStatement().executeQuery("SELECT to_regclass('tb_sy_menu')")) {
             result.next(); assertThat(result.getString(1)).isNull();
         }

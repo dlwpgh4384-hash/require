@@ -60,6 +60,8 @@ export function MenuPage() {
   const [refreshPending, setRefreshPending] = useState(false);
   const root = useRef<HTMLElement>(null);
   const lock = useRef(false);
+  /** 마지막으로 읽은 메뉴 표 수정 시각(저장 때 보내 동시 수정을 확인한다, FR-0106). */
+  const version = useRef<string | null>(null);
   const dragged = useRef<string | null>(null);
   const setDirty = useScreenDirty();
   const workspace = useMenuWorkspace();
@@ -89,6 +91,7 @@ export function MenuPage() {
     void api.getCommonMenuSettings(controller.signal).then(
       (result) => {
         if (controller.signal.aborted) return;
+        version.current = result.modifiedAt ?? null;
         setSnapshot(result.items);
         setDraft(result.items);
         setMoved([]);
@@ -107,6 +110,7 @@ export function MenuPage() {
   }, [errors, badNames]);
   const refresh = async () => {
     const result = await api.getCommonMenuSettings();
+    version.current = result.modifiedAt ?? null;
     setSnapshot(result.items);
     setDraft(result.items);
     setMoved([]);
@@ -151,9 +155,11 @@ export function MenuPage() {
         movedMenuIds: moved.filter((id) =>
           changed.some((row) => row.menuId === id),
         ),
+        modifiedAt: version.current,
       };
       const result = await api.putCommonMenuSettings(input);
       saved = true;
+      version.current = result.modifiedAt ?? null;
       setSnapshot(result.items);
       setDraft(result.items);
       setMoved([]);

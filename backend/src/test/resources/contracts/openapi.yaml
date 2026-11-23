@@ -1579,6 +1579,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 조회한 뒤 다른 사람이 메뉴를 바꿈(modifiedAt 불일치). 아무것도 바꾸지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/common/menu-options:
     get:
       operationId: getCommonMenuOptions
@@ -16595,11 +16601,17 @@ components:
       type: object
       required:
       - items
+      - modifiedAt
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/CommonMenuSettingItem'
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 메뉴 표 전체의 마지막 수정 시각(UTC). 저장 때 그대로 보내 동시 수정을 확인한다(FR-0106).
     CommonMenuUpdateItem:
       type: object
       required:
@@ -16654,6 +16666,11 @@ components:
             maxLength: 20
           uniqueItems: true
           description: 이번 편집에서 사용자가 직접 드래그한 메뉴 ID. 밀린 형제 행은 포함하지 않는다. 직접 이동하지 않았다면 빈 배열이다.
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 조회 때 받은 메뉴 표 수정 시각. 그 뒤 다른 저장이 있으면 409(FR-0106).
       additionalProperties: false
     CommonMenuGroupCreateInput:
       type: object

@@ -18,6 +18,9 @@
       use_yn, pc_only_yn, lock_yn, icon_nm
     FROM TB_SY_MENU ORDER BY sort_ord, menu_id
   </select>
+  <select id="selectVersion" resultType="java.time.Instant">
+    SELECT max(COALESCE(mod_dttm, reg_dttm)) FROM TB_SY_MENU
+  </select>
   <update id="updateSetting">
     UPDATE TB_SY_MENU SET menu_nm=#{menuNm}, upper_menu_id=#{upperMenuId,jdbcType=VARCHAR},
       sort_ord=#{sortOrd}, use_yn=#{useYn}, pc_only_yn=#{pcOnlyYn},

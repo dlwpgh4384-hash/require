@@ -2651,6 +2651,8 @@ describe("application route registration", () => {
         },
       ],
       movedMenuIds: [],
+      // 조회 응답에 수정 시각이 없으면 null을 그대로 보낸다(FR-0106 동시 수정 확인).
+      modifiedAt: null,
     });
     await waitFor(() =>
       expect(screen.getByTestId("screen-tab-ui-25")).toHaveTextContent(

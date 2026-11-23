@@ -40,7 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnabledIfEnvironmentVariable(named = "NAVIGATION_TEST_DB_URL", matches = "jdbc:postgresql:.*")
 @WebMvcTest({CommonMenuSettingsController.class, CommonMenuController.class})
 @ContextConfiguration(classes = {CommonMenuSettingsController.class, CommonMenuSettingsService.class,
-    MenuSettingsExceptionHandler.class, ApiExceptionHandler.class, CommonMenuController.class,
+    MenuSettingsExceptionHandler.class, ApiExceptionHandler.class, com.company.common.support.controller.CodeExceptionHandler.class, CommonMenuController.class,
     CommonMenuService.class, MenuExceptionHandler.class, MenuSettingsIntegrationTest.Persistence.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class MenuSettingsIntegrationTest {
@@ -125,6 +125,28 @@ class MenuSettingsIntegrationTest {
         return text("SELECT jsonb_build_array("
             + "(SELECT jsonb_agg(to_jsonb(m) ORDER BY m.menu_id) FROM TB_SY_MENU m),"
             + "(SELECT jsonb_agg(to_jsonb(h) ORDER BY h.hist_id) FROM TB_SY_CHG_HIST h))::text");
+    }
+
+    @Test
+    @DisplayName("FR-0106: 읽은 뒤 다른 저장이 있으면 오래된 modifiedAt 저장은 409이고 아무것도 바꾸지 않는다")
+    void staleMenuVersionIsRejectedWithoutChanges() throws Exception {
+        String read = com.jayway.jsonpath.JsonPath.read(mvc.perform(get("/api/common/menu-settings")).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString(), "$.data.modifiedAt");
+        var first = json.createObjectNode();
+        first.putArray("items").add(item("M028").put("menuNm", "먼저 바꾼 이름"));
+        first.putArray("movedMenuIds");
+        first.put("modifiedAt", read);
+        mvc.perform(put("/api/common/menu-settings").contentType("application/json").content(first.toString()))
+            .andExpect(status().isOk());
+        var before = snapshot();
+        var stale = json.createObjectNode();
+        stale.putArray("items").add(item("M028").put("menuNm", "늦게 바꾼 이름"));
+        stale.putArray("movedMenuIds");
+        stale.put("modifiedAt", read);
+        mvc.perform(put("/api/common/menu-settings").contentType("application/json").content(stale.toString()))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.errors[0].field").value("modifiedAt"));
+        assertThat(snapshot()).isEqualTo(before);
+        assertThat(text("SELECT menu_nm FROM TB_SY_MENU WHERE menu_id='M028'")).isEqualTo("먼저 바꾼 이름");
     }
 
     @Test

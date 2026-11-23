@@ -47,13 +47,17 @@ public class CommonMenuSettingsService {
             }
         }
         rows.stream().filter(row -> !seen.contains(row.menuId())).forEach(ordered::add);
-        return new Result(ordered.stream().filter(row -> menuLvl == null || row.menuLvl() == menuLvl).toList());
+        return new Result(ordered.stream().filter(row -> menuLvl == null || row.menuLvl() == menuLvl).toList(),
+            mapper.selectVersion());
     }
 
     @Transactional
     public Result putCommonMenuSettings(Input input) {
         management.lockManagement();
         MenuSettingsRules.validate(input);
+        // FR-0106: 읽은 뒤 다른 사람이 메뉴를 바꿨으면(등록·순서·이름 포함) 덮어쓰지 않는다.
+        if (input.checkVersion() && !Objects.equals(mapper.selectVersion(), input.modifiedAt()))
+            throw com.company.common.support.service.CodeFailure.conflict();
         Map<String, Item> current = new LinkedHashMap<>();
         mapper.selectSettings().forEach(row -> current.put(row.menuId, row.value()));
         Map<String, Item> next = new LinkedHashMap<>(current);

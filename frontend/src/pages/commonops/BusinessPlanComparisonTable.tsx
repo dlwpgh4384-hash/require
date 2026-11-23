@@ -118,7 +118,11 @@ export function BusinessPlanComparisonTable({
               </th>
               {months.map((month) => {
                 const value = month[row.field];
-                const noTarget = row.rate && month.revenueTarget === 0;
+                // 시안: 기준월 뒤 달은 도움말 없는 「–」, 지난 달만 「목표 없음」
+                const noTarget =
+                  row.rate &&
+                  month.yearMonth <= baseMonth &&
+                  month.revenueTarget === 0;
                 // 시안: 달성률 100% 미만, 차이(이익률)는 실적 이익률이 목표보다 낮으면 빨강
                 const under =
                   !noTarget &&

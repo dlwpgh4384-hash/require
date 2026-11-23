@@ -296,16 +296,15 @@ it("uses common year bounds and loads changed year without a month argument", as
   expect(paths).toContain("/api/common/cash-flow-statements?year=2025");
   expect(paths.every((path) => !path.includes("baseMonth"))).toBe(true);
 });
-it("shows all chronological warning banners with focusable header explanations and UI-13 handoff", async () => {
+// 46번 점검(2026-11-23): 시안처럼 부족한 달을 띠 하나에 묶고 예상 잔액은 첫 부족 달 값, [미수금 보기]는 단추.
+it("shows one warning banner listing shortage months with focusable header explanations and UI-13 handoff", async () => {
   open();
   await screen.findByTestId("cash-flow-table");
-  expect(screen.getAllByTestId("banner-bad")).toHaveLength(2);
-  expect(screen.getByTestId("cash-flow-warning-202611")).toHaveTextContent(
-    "2026-11",
-  );
-  expect(screen.getByTestId("cash-flow-warning-202612")).toHaveTextContent(
-    "예상 잔액 9.0억 원",
-  );
+  expect(screen.getAllByTestId("banner-bad")).toHaveLength(1);
+  const banner = screen.getByTestId("cash-flow-warning");
+  expect(within(banner).getByText("2026-11, 2026-12").tagName).toBe("STRONG");
+  expect(banner).toHaveTextContent("예상 잔액 9.0억 원");
+  expect(within(banner).getByRole("button", { name: "미수금 보기" })).toHaveClass("ls-btn", "ls-btn-sm");
   expect(
     screen.getByRole("img", { name: "11월 자금 부족 예상" }),
   ).toHaveAttribute("tabindex", "0");
@@ -314,7 +313,7 @@ it("shows all chronological warning banners with focusable header explanations a
   expect(
     document.getElementById(icon.getAttribute("aria-describedby")!),
   ).toHaveTextContent("예상 잔액 9.0억 원 · 최소 운영자금 10.0억 원");
-  fireEvent.click(screen.getByTestId("cash-flow-receivables-202611"));
+  fireEvent.click(screen.getByTestId("cash-flow-receivables"));
   expect(screen.getByTestId("current-location")).toHaveTextContent(
     "/screens/UI-13",
   );
@@ -332,7 +331,8 @@ it("retains chart table and unit selector with dashes when no data", async () =>
   empty = true;
   open();
   const table = await screen.findByTestId("cash-flow-table");
-  expect(within(table).getAllByText("–")).toHaveLength(225);
+  // 15줄 × 15칸, 「수입」·「지출」 묶음 줄은 시안처럼 빈칸(46번 점검)
+  expect(within(table).getAllByText("–")).toHaveLength(13 * 15);
   expect(screen.getByTestId("cash-flow-balance-chart")).toBeInTheDocument();
   expect(screen.getByTestId("money-unit")).toBeVisible();
   expect(screen.getByText("단위: 백만 원 · 부가세 포함")).toBeVisible();
@@ -357,12 +357,15 @@ it("connects forecast to the last actual point and passes raw won to the guide",
   expect(series[1].values[8]).toBeNull();
   open();
   await screen.findByTestId("cash-flow-table");
-  expect(screen.getByText("최소 운영자금")).toBeVisible();
-  const paths = screen
-    .getByTestId("cash-flow-balance-chart")
-    .querySelectorAll("path");
-  expect(paths).toHaveLength(3);
+  // 시안 lineChart guide: 가는 점선(5 4)과 글자, 범례에는 없음(46번 점검)
+  const chart = screen.getByTestId("cash-flow-balance-chart");
+  expect(within(chart as unknown as HTMLElement).getByText("최소 운영자금")).toBeInTheDocument();
+  const paths = chart.querySelectorAll("path");
+  expect(paths).toHaveLength(2);
   expect(paths[1]).toHaveAttribute("stroke-dasharray", "6 4");
+  expect(chart.querySelector('line[stroke-dasharray="5 4"]')).not.toBeNull();
+  expect(screen.getByText("월말 잔액(실적)")).toBeVisible();
+  expect(screen.queryAllByText("최소 운영자금")).toHaveLength(1);
 });
 it("keeps existing guide-less line chart rendering unchanged", () => {
   const props = {
@@ -379,8 +382,9 @@ it("keeps existing guide-less line chart rendering unchanged", () => {
       guide={{ name: "기준", values: [1000000000, 1000000000] }}
     />,
   );
-  expect(container.querySelectorAll("path")).toHaveLength(2);
-  expect(screen.getByText("기준")).toBeVisible();
+  expect(container.querySelectorAll("path")).toHaveLength(1);
+  expect(container.querySelector('line[stroke-dasharray="5 4"]')).not.toBeNull();
+  expect(screen.getByText("기준")).toBeInTheDocument();
 });
 it("renders errors and field validation then retries", async () => {
   failure = true;

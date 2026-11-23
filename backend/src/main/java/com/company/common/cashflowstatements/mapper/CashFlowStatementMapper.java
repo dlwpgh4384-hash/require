@@ -15,5 +15,8 @@ public interface CashFlowStatementMapper {
     List<CashContribution> miscellaneousIncome();
     List<Pay> payroll(@Param("end") String end);
     List<String> activeDevelopers();
+    /** 개발자 풀 월 급여·지급액(그 달에 맞는 이력). 급여를 한 번도 올리지 않은 사람의 예상 급여에 쓴다. */
+    List<PoolPay> poolPays(@Param("month") String month);
+    record PoolPay(String developerId, BigDecimal amount) {}
     int insertAccess(@Param("userId") String userId, @Param("target") String target);
 }

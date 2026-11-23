@@ -173,10 +173,28 @@ export function LineChart({
             {label}
           </text>
         ))}
-        {[
-          ...series,
-          ...(guide ? [{ ...guide, color: chartColor.c6, dash: true }] : []),
-        ].map((item) => {
+        {/* 시안 lineChart guide: 가는 수평 점선(--c6, 5 4)과 오른쪽 위 글자. 계열·범례에는 넣지 않는다(46번 점검 2026-11-23). */}
+        {guide &&
+          (() => {
+            const level = numbers(guide.values)[0];
+            if (level === undefined) return null;
+            return (
+              <g data-testid={testId ? `${testId}-guide` : undefined}>
+                <line
+                  x1={PL}
+                  x2={W - PR}
+                  y1={y(level)}
+                  y2={y(level)}
+                  style={{ stroke: chartColor.c6 }}
+                  strokeDasharray="5 4"
+                />
+                <text className="ax" x={W - PR} y={y(level) - 6} textAnchor="end">
+                  {guide.name}
+                </text>
+              </g>
+            );
+          })()}
+        {series.map((item) => {
           const points = item.values
             .map((value, index) =>
               value == null || !Number.isFinite(value)
@@ -206,12 +224,7 @@ export function LineChart({
         })}
       </svg>
       <ChartLegend
-        items={[
-          ...series.map(({ name, color, dash }) => ({ name, color, dash })),
-          ...(guide
-            ? [{ name: guide.name, color: chartColor.c6, dash: true }]
-            : []),
-        ]}
+        items={series.map(({ name, color, dash }) => ({ name, color, dash }))}
       />
     </>
   );

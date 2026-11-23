@@ -38,8 +38,10 @@ public final class CashFlowStatementProjection {
         var values = new ArrayList<BigDecimal>();
         months.forEach(m -> values.add(amount.apply(m)));
         for (int[] range : List.of(new int[]{0, 6}, new int[]{6, 12}, new int[]{0, 12})) {
-            BigDecimal value = endpoint == 1 ? values.get(range[0])
-                : endpoint == 2 ? values.get(range[1] - 1) : sum(values.subList(range[0], range[1]));
+            // 식-52: 기간 전월이월금 = 기간 안에서 잔액이 있는 첫 달 값(시작 월이 해 중간이면 그 달), 이월금 = 잔액이 있는 마지막 달 값(46번 점검 2026-11-23).
+            var part = values.subList(range[0], range[1]);
+            BigDecimal value = endpoint == 1 ? part.stream().filter(Objects::nonNull).findFirst().orElse(null)
+                : endpoint == 2 ? part.stream().filter(Objects::nonNull).reduce((x, y) -> y).orElse(null) : sum(part);
             values.add(value);
         }
         return new NumericRow(label, style, values);

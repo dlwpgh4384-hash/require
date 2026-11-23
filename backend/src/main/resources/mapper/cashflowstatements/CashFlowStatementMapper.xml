@@ -37,6 +37,17 @@
       INCM_TAX_AMT AS "incomeTax",REAL_PAY_AMT AS "netPay",VNDR_SPLY_AMT AS "vendorSupply"
     FROM TB_HR_MON_PAY WHERE PAY_YM &lt;= #{end} ORDER BY PAY_YM,DEV_ID
   </select>
+  <resultMap id="poolPay" type="com.company.common.cashflowstatements.mapper.CashFlowStatementMapper$PoolPay">
+    <constructor>
+      <arg column="developerId" javaType="java.lang.String"/>
+      <arg column="amount" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <select id="poolPays" resultMap="poolPay">
+    SELECT p.DEV_ID AS "developerId",p.MON_PAY_AMT AS "amount" FROM TB_HR_DEV_PRC p
+    WHERE p.MON_PAY_AMT IS NOT NULL AND p.APLY_BGN_YM &lt;= #{month}
+      AND (p.APLY_END_YM IS NULL OR p.APLY_END_YM &gt;= #{month})
+  </select>
   <select id="activeDevelopers" resultType="java.lang.String">
     SELECT DEV_ID FROM TB_HR_DEV WHERE USE_YN='Y'
   </select>

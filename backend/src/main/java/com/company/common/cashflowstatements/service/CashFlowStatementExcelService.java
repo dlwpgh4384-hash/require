@@ -45,7 +45,9 @@ public class CashFlowStatementExcelService {
         var rows = table.rows().stream().map(line -> {
             List<String> cells = new ArrayList<>();
             cells.add(line.label());
-            line.values().forEach(value -> cells.add(value == null ? "–" : value.toPlainString()));
+            // 「수입」·「지출」 묶음 줄은 화면·시안처럼 빈칸(B.4 화면과 같은 내용, 46번 점검)
+            boolean group = "group".equals(line.style());
+            line.values().forEach(value -> cells.add(group ? "" : value == null ? "–" : value.toPlainString()));
             return cells;
         }).toList();
         var now = calendar.now();

@@ -57,25 +57,29 @@ public class CommonCashFlowStatementService {
         YearMonth base = null;
         if (baseYm != null) {
             try { base = YearMonth.parse(baseYm.toBigIntegerExact().toString(), YM); }
-            catch (RuntimeException invalid) { throw CodeFailure.invalid("standardCode", "자금 시작월을 확인해 주세요."); }
+            // 시작 월 값이 잘못되면 값이 없을 때처럼 잔액만 비우고 수입·지출은 보여 준다(46번 점검 2026-11-23).
+            catch (RuntimeException invalid) { base = null; }
         }
         if (base == null) balance = null;
         var closed = new HashSet<>(periods.selectClosedMonths());
+        // 시작 월(CASH_BASE_YM) 전 달은 옮겨 온 달이라 마감으로 본다(2026-10-31 C16, 기간 기준과 같은 규칙).
+        final YearMonth startMonth = base;
+        java.util.function.Predicate<String> isClosed = ym -> closed.contains(ym)
+            || (startMonth != null && YearMonth.parse(ym, YM).isBefore(startMonth));
         var flows = new TreeMap<String, Map<String, BigDecimal>>();
         for (var row : finance.cashContributions()) {
             if ("OTHER_INCOME".equals(row.category())) continue;
-            if ("CORPORATE_TAX".equals(row.category()) && !(row.yearMonth().endsWith("03") || row.yearMonth().endsWith("08"))) continue;
             add(flows, row.yearMonth(), row.category(), row.amount());
         }
         for (var row : source.miscellaneousIncome()) add(flows, row.yearMonth(), "OTHER_INCOME", row.amount());
         for (var row : source.receipts()) {
-            if ("REMAINDER".equals(row.category()) && closed.contains(row.yearMonth())) continue;
+            if ("REMAINDER".equals(row.category()) && isClosed.test(row.yearMonth())) continue;
             add(flows, row.yearMonth(), "CASH_SALES", row.amount());
         }
         YearMonth first = YearMonth.of(filter.year(), 1);
         YearMonth start = base != null && balance != null && base.isBefore(first) ? base : first;
         YearMonth last = YearMonth.of(filter.year(), 12);
-        payroll(flows, new PayrollPeriod(start.minusMonths(1), last, now), closed, rules);
+        payroll(flows, new PayrollPeriod(start.minusMonths(1), last, now), isClosed, rules);
         var months = new ArrayList<Month>();
         var warnings = new ArrayList<Warning>();
         for (YearMonth month = start; !month.isAfter(last); month = month.plusMonths(1)) {
@@ -99,7 +103,7 @@ public class CommonCashFlowStatementService {
             BigDecimal closing = supported ? opening.add(z(income)).subtract(z(expense)) : null;
             if (supported) balance = closing;
             if (month.getYear() != filter.year()) continue;
-            var result = new Month(key, closed.contains(key), opening, closing, cash, misc, loan, income,
+            var result = new Month(key, isClosed.test(key), opening, closing, cash, misc, loan, income,
                 regular, contract, vendor, unpaid, overhead, tax, expense);
             months.add(result);
             if (!result.closed() && closing != null && closing.compareTo(minimum) < 0)
@@ -128,8 +132,12 @@ public class CommonCashFlowStatementService {
     }
 
     private record PayrollPeriod(YearMonth first, YearMonth last, YearMonth now) {}
+    /**
+     * 급여 지출(식-48). 올린 급여는 그대로 쓰고, 마감 안 한 달 가운데 「이번 달 이후」이거나 「지난달인데 급여를 아직 안 올린 달」은
+     * 사람마다 가장 최근에 올린 급여로 예상한다. 한 번도 올리지 않은 사람은 개발자 풀 월 급여·지급액으로 예상한다(46번 점검 2026-11-23).
+     */
     private void payroll(Map<String, Map<String, BigDecimal>> flows, PayrollPeriod period,
-        Set<String> closed, PaymentRules rules) {
+        java.util.function.Predicate<String> isClosed, PaymentRules rules) {
         YearMonth first = period.first(), last = period.last(), now = period.now();
         var stored = source.payroll(last.format(YM));
         var byMonth = new HashMap<String, Map<String, Pay>>();
@@ -139,21 +147,42 @@ public class CommonCashFlowStatementService {
         var latest = new HashMap<String, Pay>();
         for (var pay : stored) if (pay.yearMonth().compareTo(first.format(YM)) < 0)
             latest.merge(pay.developerId(), pay, (a, b) -> a.yearMonth().compareTo(b.yearMonth()) > 0 ? a : b);
+        var withholdingRates = new HashMap<YearMonth, BigDecimal>();
         for (YearMonth month = first; !month.isAfter(last); month = month.plusMonths(1)) {
             String key = month.format(YM);
             var uploaded = byMonth.getOrDefault(key, Map.of());
             for (var pay : uploaded.values()) { payment(flows, pay, rules); latest.put(pay.developerId(), pay); }
-            if (month.isBefore(now) || closed.contains(key)) continue;
+            // 급여 업로드는 그 달 전체를 한 파일로 바꾸므로, 지난달에 업로드가 있으면 빠진 사람은 실제로 안 준 것으로 본다.
+            if (isClosed.test(key) || (month.isBefore(now) && !uploaded.isEmpty())) continue;
+            Map<String, BigDecimal> pool = null;
             for (var person : persons) {
-                var basis = latest.get(person.developerId());
-                if (basis == null || uploaded.containsKey(person.developerId()) || !active.contains(person.developerId())
+                if (uploaded.containsKey(person.developerId()) || !active.contains(person.developerId())
                     || (person.joinDate() != null && YearMonth.from(person.joinDate()).isAfter(month))
                     || (person.retireDate() != null && YearMonth.from(person.retireDate()).isBefore(month))) continue;
-                payment(flows, forecast(person, basis, month, rules), rules);
+                var basis = latest.get(person.developerId());
+                if (basis == null) {
+                    if (pool == null) {
+                        pool = new HashMap<>();
+                        for (var row : source.poolPays(key)) pool.put(row.developerId(), row.amount());
+                    }
+                    var amount = pool.get(person.developerId());
+                    if (amount == null) continue;
+                    basis = new Pay(key, person.developerId(), person.employeeTypeCode(), amount, ZERO, ZERO, ZERO, ZERO,
+                        ZERO, ZERO, null, "OS".equals(person.employeeTypeCode()) ? amount : ZERO);
+                }
+                BigDecimal rate = null;
+                if ("CT".equals(person.employeeTypeCode())) {
+                    rate = withholdingRates.computeIfAbsent(month, m -> {
+                        var standard = calculations.effectiveStandard("WTHLD_RT", m);
+                        return standard == null ? null : standard.value();
+                    });
+                }
+                payment(flows, forecast(person, basis, month, rate, rules), rules);
             }
         }
     }
-    private Pay forecast(Person person, Pay basis, YearMonth month, PaymentRules rules) {
+    /** 예상 급여. 계약직 원천세는 운영 기준값 WTHLD_RT, 프리랜서는 식-49 비율(명세)로 계산한다. */
+    private static Pay forecast(Person person, Pay basis, YearMonth month, BigDecimal withholdingRate, PaymentRules rules) {
         String type = person.employeeTypeCode();
         boolean employee = "FT".equals(type) || "CT".equals(type);
         BigDecimal allowance = z(basis.allowance());
@@ -162,8 +191,8 @@ public class CommonCashFlowStatementService {
         BigDecimal self = employee ? z(basis.personalInsurance()) : ZERO;
         BigDecimal tax = employee ? z(basis.incomeTax()) : ZERO;
         BigDecimal withholding = "FL".equals(type) ? rules.freelancerWithholding(salary, allowance)
-            : "CT".equals(type) ? salary.add(allowance).multiply(calculations.effectiveStandard("WTHLD_RT", month).value())
-                .movePointLeft(2).setScale(0, RoundingMode.DOWN) : ZERO;
+            : "CT".equals(type) && withholdingRate != null
+                ? salary.add(allowance).multiply(withholdingRate).movePointLeft(2).setScale(0, RoundingMode.DOWN) : ZERO;
         return new Pay(month.format(YM), person.developerId(), type, salary, allowance, company, ZERO, self,
             withholding, tax, salary.add(allowance).subtract(self).subtract(withholding).subtract(tax), z(basis.vendorSupply()));
     }
@@ -171,8 +200,9 @@ public class CommonCashFlowStatementService {
         BigDecimal amount;
         String category;
         switch (pay.employeeTypeCode()) {
-            case "FT" -> { category = "REGULAR"; amount = pay.netPay(); }
-            case "CT" -> { category = "CONTRACT"; amount = pay.netPay(); }
+            case "FT" -> { category = "REGULAR"; amount = netPay(pay); }
+            case "CT" -> { category = "CONTRACT"; amount = netPay(pay); }
+            // 프리랜서 지급액은 식-49(급여+수당에서 원천 3.3%를 뺀 금액) 그대로
             case "FL" -> { category = "CONTRACT"; amount = rules.freelancerPayment(z(pay.salary()), z(pay.allowance())); }
             case "OS" -> { category = "VENDOR"; amount = rules.vendorPayment(z(pay.vendorSupply())); }
             default -> throw CodeFailure.invalid("code", "급여 직원 구분을 확인해 주세요.");
@@ -180,6 +210,12 @@ public class CommonCashFlowStatementService {
         add(flows, pay.yearMonth(), category, amount);
         BigDecimal deduction = z(pay.companyInsurance()).add(z(pay.personalInsurance())).add(z(pay.withholdingTax())).add(z(pay.incomeTax()));
         add(flows, YearMonth.parse(pay.yearMonth(), YM).plusMonths(1).format(YM), "EXPENSE", deduction);
+    }
+    /** 실지급액(급여 업로드가 저장한 값). 비어 있으면 업로드와 같은 식으로 계산한다: 급여+수당−본인 보험−원천세−근로소득세. */
+    private static BigDecimal netPay(Pay pay) {
+        if (pay.netPay() != null) return pay.netPay();
+        return z(pay.salary()).add(z(pay.allowance())).subtract(z(pay.personalInsurance()))
+            .subtract(z(pay.withholdingTax())).subtract(z(pay.incomeTax()));
     }
     private static BigDecimal z(BigDecimal amount) { return amount == null ? ZERO : amount; }
     private static BigDecimal value(Map<String, BigDecimal> values, String category, boolean populated) {

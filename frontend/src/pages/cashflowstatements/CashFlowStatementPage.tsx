@@ -7,6 +7,7 @@ import {
   DEFAULT_MONEY_UNIT,
   formatMoney,
   formatKoreanMoney,
+  isNegativeMoney,
   type MoneyUnit,
 } from "../../shared/list";
 import { Toast } from "../../shared/feedback/Dialog";
@@ -39,12 +40,12 @@ export function cashFlowBalanceSeries(
   );
   return [
     {
-      name: "실적",
+      name: "월말 잔액(실적)",
       color: chartColor.c1,
       values: data.months.map((m) => (m.closed ? m.closingBalance : null)),
     },
     {
-      name: "예정",
+      name: "월말 잔액(예정)",
       color: chartColor.c1,
       dash: true,
       values: data.months.map((m, index) =>
@@ -53,6 +54,12 @@ export function cashFlowBalanceSeries(
     },
   ];
 }
+/** 시안 ic('warn',18) */
+const warnIcon = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01" />
+  </svg>
+);
 function useOpenReceivables() {
   const inRouter = useInRouterContext();
   // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -97,6 +104,9 @@ export function CashFlowStatementPage() {
     generation.current++;
     setData(null);
     setNotice(null);
+    // 해가 정해지지 않으면 이전 요청의 「불러오는 중」·오류를 남기지 않는다(46번 점검 2026-11-23).
+    setLoading(false);
+    setError("");
     if (year === undefined) return;
     const controller = new AbortController();
     setLoading(true);
@@ -207,11 +217,11 @@ export function CashFlowStatementPage() {
                 period.setFallbackYear(Number(event.target.value))
               }
             >
+              {/* 기간 기준을 못 받았을 때의 대신 고르기: 올해부터 10년 전까지만(46번 점검). */}
               {Array.from(
-                { length: period.fallback.currentYear },
-                (_, i) => i + 1,
+                { length: Math.min(10, period.fallback.currentYear) },
+                (_, i) => period.fallback!.currentYear - i,
               )
-                .reverse()
                 .map((value) => (
                   <option key={value} value={value}>
                     {value}년
@@ -265,30 +275,33 @@ export function CashFlowStatementPage() {
               </span>
             </Banner>
           )}
-        <div className="cash-flow-warnings">
-          {data?.warnings.map((warning) => (
-            <div
-              key={warning.yearMonth}
-              data-testid={`cash-flow-warning-${warning.yearMonth}`}
-            >
-              <Banner kind="bad">
-                {warning.yearMonth.slice(0, 4)}-{warning.yearMonth.slice(4)}{" "}
-                월말 잔액이 최소 운영자금(
-                {formatKoreanMoney(warning.minimumCash)})보다 적을 것으로
-                예상됩니다. 예상 잔액{" "}
-                {formatKoreanMoney(warning.expectedBalance)}.{" "}
+        {/* 시안: 부족한 달을 띠 하나에 묶고(굵게), 예상 잔액은 첫 부족 달 값, [미수금 보기]는 작은 단추(46번 점검 2026-11-23). */}
+        {data && data.warnings.length > 0 && (
+          <div data-testid="cash-flow-warning">
+            <Banner
+              kind="bad"
+              icon={warnIcon}
+              action={
                 <button
                   type="button"
-                  className="cash-flow-link"
-                  data-testid={`cash-flow-receivables-${warning.yearMonth}`}
+                  className="ls-btn ls-btn-sm"
+                  data-testid="cash-flow-receivables"
                   onClick={openReceivables}
                 >
                   미수금 보기
                 </button>
-              </Banner>
-            </div>
-          ))}
-        </div>
+              }
+            >
+              <strong>
+                {data.warnings
+                  .map((w) => `${w.yearMonth.slice(0, 4)}-${w.yearMonth.slice(4)}`)
+                  .join(", ")}
+              </strong>{" "}
+              월말 잔액이 최소 운영자금({formatKoreanMoney(data.warnings[0].minimumCash)})보다 적을 것으로
+              예상됩니다. 예상 잔액 {formatKoreanMoney(data.warnings[0].expectedBalance)}.
+            </Banner>
+          </div>
+        )}
         <article className="profit-card" data-testid="cash-flow-balance-card">
           <div className="profit-card-h">
             <h2>월말 잔액 흐름</h2>
@@ -385,13 +398,16 @@ export function CashFlowStatementPage() {
                     data-testid={`cash-flow-row-${rowIndex}`}
                   >
                     <th scope="row">{row.label}</th>
-                    {row.values.map((value, index) => (
+                    {/* 시안: 「수입」·「지출」 묶음 줄은 빈칸 */}
+                    {row.style === "group" ? (
+                      <td colSpan={row.values.length} />
+                    ) : row.values.map((value, index) => (
                       <td
                         key={index}
                         className={[
                           columns[index]?.actual === false ? "is-forecast" : "",
                           selected === index ? "is-selected" : "",
-                          value !== null && value < 0 ? "is-negative" : "",
+                          isNegativeMoney(value, unit) ? "is-negative" : "",
                         ]
                           .filter(Boolean)
                           .join(" ")}
@@ -404,6 +420,9 @@ export function CashFlowStatementPage() {
               </tbody>
             </table>
           </div>
+          <p className="ls-note" data-testid="cash-flow-note">
+            마감한 달은 실적, 마감 전 달은 예정(보조 글자색)입니다. 수입은 청구·입금과 재무 항목에서, 지출은 급여 업로드(정규직·계약직·프리랜서, 4대보험·원천세는 다음 달), 외주 원가 + 부가세, 재무 항목(판관비·영업외비용, 법인카드 대금, 계좌이체 지출)에서 바로 계산합니다. 법인카드 대금과 계좌이체 지출(구분 「계좌이체」)은 제경비에, 계좌이체 지출 구분 「특별비」는 미지급 인건비에 들어가고 손익에는 들어가지 않습니다. 지급은 모두 냈다고 보고, 안 맞는 금액은 재무 항목에 행을 추가해 맞춥니다.
+          </p>
         </article>
       </>
       {notice && (

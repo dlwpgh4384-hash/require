@@ -49,6 +49,22 @@ class ProfitStructureMonthlyProfitTest {
         var values=service.year(2026,2,"202601").get("202602").values();
         assertThat(values.allocatedCost()).isZero();assertThat(values.sga()).isEqualByComparingTo("200");
     }
+    @Test void allowanceRatesComeOnlyFromTheAllowanceCodeGroup() {
+        var p=person();
+        var leader=new com.company.common.personalcostprofits.mapper.PersonalCostProfitRows.Person(p.developerId(),p.developerName(),p.affiliationId(),p.affiliationName(),
+            "TEAM",p.positionName(),p.employeeTypeCode(),p.employeeTypeName(),p.joinDate(),p.retireDate(),p.jobCode(),p.jobName(),p.gradeCode(),p.gradeName(),
+            p.salesPartId(),p.directClassCode(),p.managementNumber(),p.salesPartName());
+        when(mapper.people(any())).thenReturn(List.of(leader));
+        when(mapper.projects(any())).thenReturn(List.of(project("202602","P","MO","C1")));
+        when(mapper.assignments(any())).thenReturn(List.of(assignment()));
+        var expected=service.year(2026,2,"202601").get("202602").values().allocatedCost();
+        var other=codes().stream().map(c->new com.company.common.personalcostprofits.mapper.PersonalCostProfitRows.Code("OTHER",c.code(),c.name(),n("999999"))).toList();
+        when(mapper.codes()).thenReturn(other);
+        assertThat(service.year(2026,2,"202601").get("202602").values().allocatedCost()).isLessThan(expected);
+        var mixed=new java.util.ArrayList<>(other);mixed.addAll(codes());
+        when(mapper.codes()).thenReturn(mixed);
+        assertThat(service.year(2026,2,"202601").get("202602").values().allocatedCost()).isEqualByComparingTo(expected);
+    }
     @Test void unknownImportedTaxDoesNotBecomeZeroInOpenMonthAllocation() {
         when(mapper.snapshots(any())).thenReturn(List.of(migrated("202501")));
         when(mapper.annualTax("2025")).thenReturn(n("120"));

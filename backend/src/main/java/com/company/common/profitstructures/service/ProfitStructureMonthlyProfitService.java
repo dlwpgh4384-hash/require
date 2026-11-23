@@ -152,7 +152,7 @@ public class ProfitStructureMonthlyProfitService {
         return rows.stream().filter(row -> category.equals(row.category())).map(Amount::amount).reduce(ZERO, BigDecimal::add);
     }
     private static BigDecimal rate(List<Code> rows, String code) {
-        return rows.stream().filter(row -> code.equals(row.code())).map(Code::value).filter(Objects::nonNull).findFirst().orElse(ZERO);
+        return rows.stream().filter(row -> "ALWNC".equals(row.groupCode()) && code.equals(row.code())).map(Code::value).filter(Objects::nonNull).findFirst().orElse(ZERO);
     }
     private static BigDecimal zero(BigDecimal value) { return value == null ? ZERO : value; }
 }

@@ -324,6 +324,8 @@ export function usePreferenceBusinessShortcuts(
     onPreviousPage?: () => void;
     onNextPage?: () => void;
     dialogTarget?: RefObject<HTMLElement>;
+    /** 화면 뿌리. 숨은 탭 안이면 키를 막지 않고 그냥 넘긴다(보이는 탭이 받게, 00-1 코드 리뷰 2026-11-23). */
+    scope?: RefObject<HTMLElement>;
   },
   enabled = true,
 ) {
@@ -331,6 +333,8 @@ export function usePreferenceBusinessShortcuts(
     if (!enabled) return;
     const keydown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
+      if (handlers.scope?.current?.closest("[hidden]")) return;
+      const save = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s";
       const dialogs = document.querySelectorAll(
         '[role="dialog"], [role="alertdialog"]',
       );
@@ -345,30 +349,32 @@ export function usePreferenceBusinessShortcuts(
           (active instanceof Element && active.closest('[role="alertdialog"]'))
         )
           return;
-        if (
-          event.ctrlKey &&
-          event.key.toLowerCase() === "s" &&
-          handlers.onSave
-        ) {
+        if (save && handlers.onSave) {
           event.preventDefault();
           handlers.onSave();
         }
         return;
       }
       const target = event.target;
-      if (
+      // 입력칸에서는 Ctrl/Cmd+S만 받는다(입력 중에도 저장). Enter·Ctrl+화살표는 입력칸 동작에 맡긴다.
+      const editing =
         target instanceof Element &&
-        target.matches("input,select,textarea,[contenteditable='true']")
-      )
-        return;
+        target.matches("input,select,textarea,[contenteditable='true']");
+      // 단추·링크·탭에서 누른 Enter는 그 단추가 받는다(조회로 가로채지 않는다).
+      const control =
+        target instanceof Element &&
+        !!target.closest(
+          "button,a[href],summary,[role='button'],[role='tab'],[role='checkbox'],[role='menuitem'],[role='link']",
+        );
+      if (editing && !save) return;
       const handler =
-        event.ctrlKey && event.key.toLowerCase() === "s"
+        save
           ? handlers.onSave
           : event.ctrlKey && event.key === "ArrowLeft"
             ? handlers.onPreviousPage
             : event.ctrlKey && event.key === "ArrowRight"
               ? handlers.onNextPage
-              : !event.ctrlKey && event.key === "Enter"
+              : !event.ctrlKey && !event.metaKey && event.key === "Enter" && !control
                 ? handlers.onSearch
                 : undefined;
       if (handler) {

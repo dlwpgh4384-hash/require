@@ -300,6 +300,7 @@ export function CodePage({
     }
   };
   usePreferenceBusinessShortcuts({
+    scope: root,
     onSave: () => {
       if (tab === "codes" && !root.current?.closest("[hidden]") && !modal)
         void save();

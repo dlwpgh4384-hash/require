@@ -182,6 +182,7 @@ export function OperatingStandardsPanel({
   };
   // 공통 기능 FR-0104: Ctrl+S = 저장(이 탭이 보일 때, 창이 없을 때)
   usePreferenceBusinessShortcuts({
+    scope: root,
     onSave: () => {
       if (root.current?.closest("[hidden]") || confirmSave || historyCode)
         return;

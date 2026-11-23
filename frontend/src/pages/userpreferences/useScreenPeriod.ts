@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   isAllowed,
   latestPeriod,
@@ -6,7 +6,7 @@ import {
   type PeriodOptions,
   type PeriodValue,
 } from "../../shared/period/periodRules";
-import { getCommonUserPreference, putCommonUserPreference } from "./userPreferences";
+import { createPreferenceSaver, getCommonUserPreference } from "./userPreferences";
 
 type State =
   | { status: "loading" }
@@ -34,19 +34,14 @@ function parseSaved(value: string | null): PeriodValue | null {
  */
 export function useScreenPeriod(screenId: string, options: PeriodOptions) {
   const [state, setState] = useState<State>({ status: "loading" });
-  const token = useRef<string | null>(null);
+  // 화면마다 따로 차례로 저장한다(빨리 두 번 바꿔도 두 번째가 남고, 다른 화면의 수정 시각과 섞이지 않는다).
+  const saver = useMemo(() => createPreferenceSaver("PERIOD", screenId), [screenId]);
   const optionsKey = JSON.stringify(options);
   const save = useCallback(
     async (value: PeriodValue) => {
-      const result = await putCommonUserPreference(
-        "PERIOD",
-        screenId,
-        JSON.stringify(value),
-        token.current,
-      );
-      token.current = result.data.modDttm;
+      await saver.save(JSON.stringify(value));
     },
-    [screenId],
+    [saver],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -65,7 +60,7 @@ export function useScreenPeriod(screenId: string, options: PeriodOptions) {
           });
           return;
         }
-        token.current = response.data.modDttm;
+        saver.setToken(response.data.modDttm);
         const saved = parseSaved(response.data.prefVal);
         const value =
           saved && isAllowed(saved, basis, current) ? saved : latestPeriod(basis, current.kind);

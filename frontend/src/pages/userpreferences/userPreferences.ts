@@ -102,6 +102,40 @@ export function putCommonUserPreference(
   });
 }
 
+/**
+ * 같은 설정(type·key)을 하나씩 차례로 저장한다(00-1 코드 리뷰 2026-11-23).
+ * 앞 저장이 받은 수정 시각을 다음 저장에 쓰고, 409이면 한 번 다시 읽어 그 시각으로 다시 저장한다.
+ * 빨리 연달아 바꿔도 마지막 값이 저장되고, 409를 조용히 버려 옛 값이 남는 일이 없다.
+ */
+export function createPreferenceSaver(type: PreferenceType, key: string) {
+  let token: string | null = null;
+  let chain: Promise<unknown> = Promise.resolve();
+  const put = async (prefVal: string) => {
+    try {
+      const result = await putCommonUserPreference(type, key, prefVal, token);
+      token = result.data.modDttm;
+      return result;
+    } catch (failure) {
+      if (!(failure instanceof UserPreferenceRequestError) || failure.status !== 409) throw failure;
+      token = (await getCommonUserPreference(type, key)).data.modDttm;
+      const result = await putCommonUserPreference(type, key, prefVal, token);
+      token = result.data.modDttm;
+      return result;
+    }
+  };
+  return {
+    /** 읽어 온 수정 시각을 알려 준다(저장 중이면 저장 결과가 더 새것이라 무시). */
+    setToken(value: string | null) {
+      token = value;
+    },
+    save(prefVal: string): Promise<UserPreferenceResponse> {
+      const next = chain.then(() => put(prefVal));
+      chain = next.catch(() => undefined);
+      return next;
+    },
+  };
+}
+
 export function preferenceScreenIds(value: string | null): string[] {
   if (value === null) return [];
   const parsed: unknown = JSON.parse(value);

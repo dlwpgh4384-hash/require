@@ -167,10 +167,10 @@ public class DeveloperUploadForm implements UploadForm {
     }
     /** 업로드 날짜 칸 공통 규칙(SFR-012-03): YYYY-MM-DD·YYYY.MM.DD·YYYY/MM/DD. 프로젝트·투입 업로드도 쓴다. */
     public static LocalDate parseDate(String text) {
-        var m = java.util.regex.Pattern.compile("([0-9]{2}|[0-9]{4})\\s*[-./]\\s*([0-9]{1,2})\\s*[-./]\\s*([0-9]{1,2})\\.?").matcher(text);
+        // 연도는 네 자리만 받는다(SFR-012-03). 두 자리(예: 10/1/26)는 날짜를 잘못 읽을 수 있어 형식 오류로 돌려준다.
+        var m = java.util.regex.Pattern.compile("([0-9]{4})\\s*[-./]\\s*([0-9]{1,2})\\s*[-./]\\s*([0-9]{1,2})\\.?").matcher(text);
         if (!m.matches()) return null;
         int year = Integer.parseInt(m.group(1));
-        if (m.group(1).length() == 2) year += 2000;
         try { return LocalDate.of(year, Integer.parseInt(m.group(2)), Integer.parseInt(m.group(3))); }
         catch (RuntimeException failure) { return null; }
     }

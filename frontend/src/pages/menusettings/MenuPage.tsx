@@ -189,6 +189,7 @@ export function MenuPage() {
     }
   };
   usePreferenceBusinessShortcuts({
+    scope: root,
     onSave: () => {
       if (!root.current?.closest("[hidden]")) void save();
     },

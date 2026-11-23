@@ -138,6 +138,7 @@ export function UserPage() {
     registering || !!detailId || !!editing || !!stopTarget || !!resumeTarget;
   usePreferenceBusinessShortcuts(
     {
+      scope: root,
       onSearch: () => {
         if (!root.current?.closest("[hidden]")) search();
       },

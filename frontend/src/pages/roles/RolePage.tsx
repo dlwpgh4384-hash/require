@@ -245,6 +245,7 @@ export function RolePage() {
   // 00-1 공통 단축키: Ctrl+S = 저장(창이 열려 있거나 다른 탭이면 쓰지 않는다).
   usePreferenceBusinessShortcuts(
     {
+      scope: root,
       onSave: () => {
         if (!root.current?.closest("[hidden]")) void save();
       },

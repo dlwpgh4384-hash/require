@@ -82,6 +82,55 @@ class UploadWorkbookServiceTest {
     private byte[] template() {
         return workbooks.template("거래처", headers, "admin", Instant.EPOCH);
     }
+    // 00-1 코드 리뷰(2026-11-23): 날짜 서식 칸은 화면 서식(10/1/26)이 아니라 실제 날짜로, 연월 서식은 YYYY-MM으로, 큰 수는 지수 모양 없이 읽는다.
+    @Test void dateFormattedCellsAreReadAsIsoDatesAndLargeNumbersStayPlain() throws Exception {
+        try (var workbook = new XSSFWorkbook()) {
+            var sheet = workbook.createSheet("데이터");
+            var head = sheet.createRow(0);
+            List.of("이름", "입사일", "연월", "금액").forEach(name -> head.createCell(head.getPhysicalNumberOfCells()).setCellValue(name));
+            var dateStyle = workbook.createCellStyle();
+            dateStyle.setDataFormat((short) 14);
+            var monthStyle = workbook.createCellStyle();
+            monthStyle.setDataFormat(workbook.createDataFormat().getFormat("yyyy-mm"));
+            var row = sheet.createRow(1);
+            row.createCell(0).setCellValue("홍길동");
+            var date = row.createCell(1);
+            date.setCellValue(java.time.LocalDate.of(2026, 10, 1));
+            date.setCellStyle(dateStyle);
+            var month = row.createCell(2);
+            month.setCellValue(java.time.LocalDate.of(2026, 1, 1));
+            month.setCellStyle(monthStyle);
+            row.createCell(3).setCellValue(150_000_000_000d);
+            var parsed = workbooks.readTabular("날짜.xlsx", bytes(workbook), List.of("이름", "입사일", "연월", "금액"));
+            assertThat(parsed).hasSize(1);
+            assertThat(parsed.get(0).values()).containsExactly("홍길동", "2026-10-01", "2026-01", "150000000000");
+        }
+    }
+    @Test void uploadDatesNeedFourDigitYears() {
+        assertThat(com.company.common.developers.service.DeveloperUploadForm.parseDate("26-10-01")).isNull();
+        assertThat(com.company.common.developers.service.DeveloperUploadForm.parseDate("2026.10.01"))
+            .isEqualTo(java.time.LocalDate.of(2026, 10, 1));
+    }
+    // 00-1 코드 리뷰(2026-11-23): 값이 있는 줄이 너무 많으면 통째로 열기 전에 거절하고, 서식만 칠한 빈 줄은 세지 않는다.
+    @Test void rowGuardRejectsTooManyValueRowsButIgnoresStyledEmptyRows() throws Exception {
+        try (var workbook = new XSSFWorkbook()) {
+            var sheet = workbook.createSheet("데이터");
+            sheet.createRow(0).createCell(0).setCellValue("이름");
+            for (int i = 1; i <= UploadWorkbookService.ROW_GUARD + 1; i++) sheet.createRow(i).createCell(0).setCellValue("사람" + i);
+            byte[] many = bytes(workbook);
+            assertThatThrownBy(() -> workbooks.readTabular("많음.xlsx", many, List.of("이름")))
+                .isInstanceOf(CodeFailure.class).hasMessageContaining("5,000행");
+        }
+        try (var workbook = new XSSFWorkbook()) {
+            var sheet = workbook.createSheet("데이터");
+            sheet.createRow(0).createCell(0).setCellValue("이름");
+            for (int i = 1; i <= 3; i++) sheet.createRow(i).createCell(0).setCellValue("사람" + i);
+            var style = workbook.createCellStyle();
+            style.setDataFormat((short) 3);
+            for (int i = 4; i < 30_000; i++) sheet.createRow(i).createCell(0).setCellStyle(style);
+            assertThat(workbooks.readTabular("서식.xlsx", bytes(workbook), List.of("이름"))).hasSize(3);
+        }
+    }
     private byte[] bytes(XSSFWorkbook workbook) throws Exception {
         try (var output = new ByteArrayOutputStream()) { workbook.write(output); return output.toByteArray(); }
     }

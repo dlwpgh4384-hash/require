@@ -43,6 +43,7 @@ let tabs: PartSettlementTabs;
 let detail: PartSettlement;
 let failed: boolean;
 let validation: { field: string; message: string } | null;
+let putStatus: number;
 const ok = (data: unknown, meta: unknown = {}) => ({
   ok: true,
   status: 200,
@@ -84,6 +85,7 @@ const secondRow: PartSettlementRow = {
 beforeEach(() => {
   failed = false;
   validation = null;
+  putStatus = 400;
   dirty.mockClear();
   detail = {
     partId: "A",
@@ -144,7 +146,7 @@ beforeEach(() => {
       if (validation)
         return {
           ok: false,
-          status: 400,
+          status: putStatus,
           json: async () => ({
             success: false,
             message: validation?.message,
@@ -408,8 +410,10 @@ it("monthly table shows mockup columns, code names, notes and plain column sums"
 it("null options keep conditions, toolbar and table headers", async () => {
   tabs.items = null;
   mount();
-  await screen.findByText(
-    "맡은 영업 파트가 없습니다. 본사(직접 영업)는 파트 이익금 정산 대상이 아닙니다.",
+  const empty = await screen.findByTestId("part-settlement-no-parts");
+  expect(within(empty).getByText("맡은 영업 파트가 없습니다.")).toBeVisible();
+  expect(empty).toHaveTextContent(
+    "본사(직접 영업)는 파트 이익금 정산 대상이 아닙니다. 영업 파트의 파트장은 기준정보 › 거래처·영업 파트의 영업 파트 탭에서 정합니다.",
   );
   expect(screen.getByTestId("part-settlement-conditions")).toBeVisible();
   expect(screen.getByRole("columnheader", { name: "이름" })).toBeVisible();
@@ -493,6 +497,50 @@ it("server field validation stays under the card and focuses it", async () => {
   );
   await waitFor(() => expect(input).toHaveFocus());
   expect(input).toHaveValue("50,000");
+});
+
+it("409 on confirm warns with the common wording and reloads the settlement", async () => {
+  putStatus = 409;
+  validation = {
+    field: "modifiedAt",
+    message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+  };
+  mount();
+  await ready();
+  const reads = () =>
+    fetcher.mock.calls.filter(([url, init]) =>
+      String(url).endsWith("/A/2026-02") && !init?.method,
+    ).length;
+  const before = reads();
+  fireEvent.click(titleBar().getByRole("button", { name: "정산 확정" }));
+  fireEvent.click(
+    within(screen.getByTestId("part-settlement-confirm-dialog")).getByRole(
+      "button",
+      { name: "확정하기" },
+    ),
+  );
+  expect(await screen.findByTestId("part-settlement-toast")).toHaveTextContent(
+    "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+  );
+  await waitFor(() => expect(reads()).toBeGreaterThan(before));
+});
+
+it("a server error without a screen field (closed month) is shown as a notice", async () => {
+  validation = {
+    field: "yearMonth",
+    message: "마감된 달은 변경할 수 없습니다. 정정 금액은 다음 달에 반영해 주세요.",
+  };
+  mount();
+  await ready();
+  fireEvent.change(screen.getByTestId("part-settlement-card"), {
+    target: { value: "50000" },
+  });
+  fireEvent.keyDown(screen.getByTestId("part-settlement-card"), {
+    key: "Enter",
+  });
+  expect(await screen.findByTestId("part-settlement-toast")).toHaveTextContent(
+    "마감된 달은 변경할 수 없습니다.",
+  );
 });
 
 it("confirm asks first, then locks the card and shows the lock banner", async () => {

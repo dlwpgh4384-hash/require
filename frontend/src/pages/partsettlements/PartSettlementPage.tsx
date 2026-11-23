@@ -29,7 +29,7 @@ import { formatDateTime } from "../../shared/time";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
 import { DeveloperDetail } from "../developers/DeveloperDetail";
 import { getCommonCodes } from "../codegroups/codeGroups";
-import { ProjectRequestError } from "../projects/projects";
+import { ProjectRequestError, isProjectConflict } from "../projects/projects";
 import * as api from "./partSettlements";
 import { usePartSettlementTitleHost } from "./PartSettlementWorkspace";
 import { PartSettlementTrend, NoteText, mmText } from "./PartSettlementTrend";
@@ -44,8 +44,9 @@ const message = (error: unknown) =>
   error instanceof Error
     ? error.message
     : "파트 이익금을 불러오지 못했습니다. 다시 시도해 주세요.";
-const noParts =
-  "맡은 영업 파트가 없습니다. 본사(직접 영업)는 파트 이익금 정산 대상이 아닙니다.";
+/** 시안 빈 안내: 굵은 한 줄 + 흐린 설명(파트장 정하는 곳까지). */
+const noPartsDetail =
+  "본사(직접 영업)는 파트 이익금 정산 대상이 아닙니다. 영업 파트의 파트장은 기준정보 › 거래처·영업 파트의 영업 파트 탭에서 정합니다.";
 const won = (value: number) => value.toLocaleString("ko-KR");
 /** 법인카드 칸: 숫자만이면 천 단위 쉼표를 붙여 보인다(시안 toLocaleString). */
 const withCommas = (value: string) =>
@@ -96,6 +97,9 @@ export function PartSettlementPage() {
   const cardRef = useRef<HTMLInputElement>(null);
   const reasonRef = useRef<HTMLTextAreaElement>(null);
   const saving = useRef(false);
+  // 저장 뒤 다시 읽은 기간 추이가 늦게 와도, 그 사이 바꾼 파트·달·보기를 덮지 않게 지금 값을 둔다.
+  const current = useRef("");
+  current.current = `${partId}|${yearMonth}|${view}`;
   const setDirty = useScreenDirty();
   const cardChanged = !!detail && card !== String(detail.corpCardAmount);
   // 저장 중(칸을 벗어나 저장이 시작된 뒤)에는 나가기 확인을 묻지 않는다.
@@ -189,19 +193,34 @@ export function PartSettlementPage() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [yearMonth, partId, tabsReady, view]);
+    // revision: 다시 읽기(409·재시도)는 탭 응답이 빨라 tabsReady가 그대로여도 상세를 다시 읽는다.
+  }, [yearMonth, partId, tabsReady, view, revision]);
   const locked =
     !detail || detail.confirmed || detail.closed || busy || loading;
   const cardReadOnly = !detail || detail.confirmed || detail.closed;
   // 칸 오류는 칸 아래에, 그 밖(409 등)은 알림으로 보인다.
+  // 409(FR-0106)는 알리고 다시 읽는다. 칸이 없는 오류(마감된 달 등)도 알림으로 보인다.
   const failure = (cause: unknown, focus: boolean) => {
-    if (cause instanceof ProjectRequestError && cause.errors.length) {
+    if (isProjectConflict(cause)) {
+      toast(message(cause), "warn");
+      setConfirmOpen(false);
+      setCancelOpen(false);
+      setReason("");
+      retry();
+      return;
+    }
+    const shown =
+      cause instanceof ProjectRequestError
+        ? cause.errors.filter(
+            (item) =>
+              item.field === "corpCardAmount" || item.field === "cancelReason",
+          )
+        : [];
+    if (shown.length) {
       setFieldErrors(
-        Object.fromEntries(
-          cause.errors.map((item) => [item.field, item.message]),
-        ),
+        Object.fromEntries(shown.map((item) => [item.field, item.message])),
       );
-      const first = cause.errors[0]?.field;
+      const first = shown[0]?.field;
       if (focus && first === "corpCardAmount") cardRef.current?.focus();
       if (first === "cancelReason") reasonRef.current?.focus();
       return;
@@ -253,11 +272,15 @@ export function PartSettlementPage() {
       setDetail(result.data);
       setCard(String(result.data.corpCardAmount));
       // 기간 추이를 보고 있으면 맨 아래 파트 이익금(법인카드 차감)도 새 값으로 다시 읽는다.
-      if (view === "trend")
+      if (view === "trend") {
+        const asked = `${partId}|${yearMonth}|trend`;
         void api
           .getCommonPartSettlementTrends(partId, yearMonth)
-          .then((response) => setTrend(response.data))
+          .then((response) => {
+            if (current.current === asked) setTrend(response.data);
+          })
           .catch(() => undefined);
+      }
       setCancelOpen(false);
       setReason("");
       toast(
@@ -536,7 +559,12 @@ export function PartSettlementPage() {
         ))}
       </div>
       {tabs && !(tabs.items ?? []).length && (
-        <p data-testid="part-settlement-no-parts">{tabs.notice ?? noParts}</p>
+        <div className="ls-empty" data-testid="part-settlement-no-parts">
+          <p>
+            <strong>맡은 영업 파트가 없습니다.</strong>
+          </p>
+          <p className="part-settlement-sub">{noPartsDetail}</p>
+        </div>
       )}
       {error && (
         <p role="alert" data-testid="part-settlement-error">

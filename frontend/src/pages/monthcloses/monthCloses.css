@@ -9,6 +9,14 @@
 .month-close-page > * {
   min-width: 0;
 }
+/* 공통 기간 줄의 아래 여백(16px) 대신 시안처럼 간격 24만 둔다. */
+.month-close-page > .period-selector {
+  margin-bottom: 0;
+}
+/* 시안 작은 단추(.btn-sm) 높이 28px: 앱 공통 button 최소 높이 36px을 이 화면 작은 단추에서만 푼다 */
+.month-close-page .ls-btn-sm {
+  min-height: 28px;
+}
 /* 화면 틀 밖에서 그릴 때(제목줄 자리가 없을 때) 단추 줄 */
 .month-close-actions {
   display: flex;

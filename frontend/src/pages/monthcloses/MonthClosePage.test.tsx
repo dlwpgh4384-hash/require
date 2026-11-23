@@ -473,6 +473,38 @@ it("closed state exposes only reopen, and non-admin policy hides it", async () =
     screen.queryByRole("button", { name: "다시 점검" }),
   ).not.toBeInTheDocument();
 });
+it("a closed month shows every check as 확인 완료 except payroll, with no 확인하기 (mockup closeItems)", async () => {
+  closeRow();
+  mount();
+  await ready();
+  const payroll = row.checks.findIndex((check) => check.name === "급여 업로드");
+  row.checks.forEach((check, index) => {
+    const line = screen.getByTestId(`month-close-check-${index}`);
+    expect(line).toHaveTextContent(
+      index === payroll ? check.description : "확인 완료",
+    );
+    expect(line).not.toHaveTextContent("확인 필요");
+  });
+  expect(
+    screen.queryByRole("button", { name: "확인하기" }),
+  ).not.toBeInTheDocument();
+});
+it("history reads every month, not only the selected one (mockup)", async () => {
+  mount();
+  await ready();
+  await waitFor(() =>
+    expect(
+      fetcher.mock.calls.some(
+        ([url]) => String(url) === "/api/common/month-close-history",
+      ),
+    ).toBe(true),
+  );
+  expect(
+    fetcher.mock.calls.some(([url]) =>
+      String(url).includes("month-close-history?"),
+    ),
+  ).toBe(false);
+});
 it("a closed month that is not the most recent one hides reopen and says why", async () => {
   closeRow();
   row.reopenable = false;

@@ -165,7 +165,7 @@ export function MonthClosePage({
     if (!month || mobile) return;
     const controller = new AbortController();
     setHistory((previous) => ({ ...previous, loading: true, error: "" }));
-    getCommonMonthCloseHistory(month, controller.signal)
+    getCommonMonthCloseHistory(undefined, controller.signal)
       .then((value) => {
         if (!controller.signal.aborted)
           setHistory({ value: value.items, loading: false, error: "" });
@@ -391,7 +391,7 @@ export function MonthClosePage({
       ref={root}
       data-testid="month-close-page"
       data-screen-id="UI-14"
-      className="month-close-page"
+      className="screen-body month-close-page"
     >
       {titleActions}
       <PeriodSelector
@@ -452,7 +452,18 @@ export function MonthClosePage({
         <section className="month-close-card" aria-label="마감 점검">
           <h2>마감 점검</h2>
           <div className="month-close-checks">
-            {row.checks.map((check, index) => {
+            {row.checks.map((original, index) => {
+              // 시안 closeItems(closed): 마감한 달은 모두 정상·「확인 완료」(급여 업로드만 건수), [확인하기] 없음
+              const check = row.isClosed
+                ? {
+                    ...original,
+                    status: "정상",
+                    description:
+                      original.name === "급여 업로드"
+                        ? original.description
+                        : "확인 완료",
+                  }
+                : original;
               const warn = check.status === WARN;
               return (
                 <div
@@ -620,7 +631,11 @@ export function MonthClosePage({
               placeholder="예: 9월 청구 누락 2건 반영"
               value={reason}
               disabled={busy}
-              onChange={(event) => setReason(event.target.value)}
+              onChange={(event) => {
+                setReason(event.target.value);
+                // 공통 규칙: 고치기 시작하면 칸 아래 오류를 지운다
+                if (event.target.value.trim()) setReasonError("");
+              }}
               aria-invalid={!!reasonError}
               aria-describedby="month-close-reason-error"
             />

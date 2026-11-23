@@ -61,6 +61,10 @@ class MonthCloseChecksTest {
         assertThat(result.checks()).extracting(Check::targetScreenId).containsExactly(null, "UI-12", "UI-13", null, "UI-19", "UI-13");
         assertThat(result.checks().get(0).description()).isEqualTo("0명 업로드 완료");
         assertThat(result.checks().get(3).description()).isEqualTo("0건 입력");
+        assertThat(result.checks().get(1).description()).endsWith("명 — 확인 필요");
+        assertThat(result.checks().get(2).description()).endsWith("건 — 계산서 번호를 아직 안 넣은 청구");
+        assertThat(result.checks().get(4).description()).contains("개 파트 중 ").endsWith("개 미확정");
+        assertThat(result.checks().get(5).description()).endsWith("건 — 투입 대비 청구 확인");
         verify(mapper).selectCounts("202601"); verifyNoMoreInteractions(mapper);
     }
 }

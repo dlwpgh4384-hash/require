@@ -75,12 +75,15 @@ export const putCommonMonthCloseReopen = (
   modifiedAt: string | null,
   reason: string,
 ) => write(month, "reopen", { modifiedAt, reason });
+// 시안 UI-14 마감 이력 표는 고른 달과 상관없이 모든 달의 이력을 보여 준다(month를 주면 그 달만).
 export const getCommonMonthCloseHistory = (
-  month: string,
+  month?: string,
   signal?: AbortSignal,
 ) =>
   request<{ items: MonthCloseHistoryItem[] }>(
-    `/api/common/month-close-history?${new URLSearchParams({ yearMonth: month })}`,
+    month
+      ? `/api/common/month-close-history?${new URLSearchParams({ yearMonth: month })}`
+      : "/api/common/month-close-history",
     { signal },
   );
 export const canReopenMonthClose = (roles: readonly string[]) =>

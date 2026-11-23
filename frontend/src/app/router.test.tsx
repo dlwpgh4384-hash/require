@@ -681,7 +681,7 @@ function respondWithMonthCloses(available = true) {
     if (url === "/api/common/menus")
       return { ok: true, status: 200, json: async () => menus };
     if (url === "/api/common/month-closes/2026-10") return list();
-    if (url === "/api/common/month-close-history?yearMonth=2026-10")
+    if (url === "/api/common/month-close-history")
       return history();
     if (url === "/api/common/month-close-badge")
       return success({ needsAttention: true });
@@ -736,7 +736,7 @@ describe("month close route composition", () => {
         signal: expect.any(AbortSignal),
       });
       expect(request).toHaveBeenCalledWith(
-        "/api/common/month-close-history?yearMonth=2026-10",
+        "/api/common/month-close-history",
         {
           credentials: "same-origin",
           signal: expect.any(AbortSignal),

@@ -146,18 +146,26 @@ export function ManpowerComparisonPage() {
     return () => abort.abort();
   }, [applied, revision]);
 
-  const changeYear = (year: number) =>
+  // 시안 기간 줄: 연도를 바꾸면 그 해로 바로 다시 조회한다(다른 연도 화면과 같음). 조회한 조건은 두고,
+  // 그 해에 걸치지 않는 프로젝트 선택만 푼다. 아직 [조회]하지 않은 조건은 입력 칸에만 남는다.
+  const keepProject = (projectId: string | undefined, year: number) =>
+    projectId &&
+    projects.some((p) => p.projectId === projectId && overlaps(p, year))
+      ? projectId
+      : undefined;
+  const changeYear = (year: number) => {
     setDraft((previous) => ({
       ...previous,
       year,
-      projectId:
-        previous.projectId &&
-        projects.some(
-          (p) => p.projectId === previous.projectId && overlaps(p, year),
-        )
-          ? previous.projectId
-          : undefined,
+      projectId: keepProject(previous.projectId, year),
     }));
+    setApplied((previous) => ({
+      ...previous,
+      year,
+      projectId: keepProject(previous.projectId, year),
+    }));
+    setPage(1);
+  };
   const search = () => {
     setApplied({ ...draft });
     setPage(1);

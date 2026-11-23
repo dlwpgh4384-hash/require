@@ -612,6 +612,27 @@ it("duplicate save is disabled until its promise resolves", async () => {
   resolve?.(ok({ assignment: null }));
   await waitFor(() => expect(save).toBeEnabled());
 });
+it("a 409 on tentative save keeps the message and reloads the cards", async () => {
+  let gets = 0;
+  request.mockImplementation(async (_url: string, init?: RequestInit) => {
+    if (init?.method === "PUT")
+      return {
+        ok: false,
+        status: 409,
+        json: async () => ({ success: false, message: "남은 자리가 없습니다. 다시 불러와 주세요.", errors: [] }),
+      };
+    gets += 1;
+    return ok(gets === 1 ? recommendations : { ...recommendations, items: [] });
+  });
+  drawer();
+  fireEvent.click(await screen.findByTestId("withdrawal-reserve-opp-1"));
+  expect(await screen.findByTestId("withdrawal-recommendation-error")).toHaveTextContent(
+    "남은 자리가 없습니다. 다시 불러와 주세요.",
+  );
+  expect(await screen.findByTestId("withdrawal-recommendation-empty")).toBeInTheDocument();
+  expect(screen.getByTestId("withdrawal-recommendation-error")).toBeInTheDocument();
+  expect(gets).toBe(2);
+});
 it("no matching seat keeps the drawer frame, count 0, empty mockup text and score note", async () => {
   request.mockResolvedValue(
     ok({ items: [], shortages: [], target: { ...target(), skills: [] } }),

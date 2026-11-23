@@ -80,6 +80,15 @@
 .menu-settings-child .ls-in {
   width: 200px;
 }
+/* 시안 tr.muted: 사용 안 하는 메뉴 줄은 회색·취소선(이름 칸과 마지막 칸은 취소선 없음). */
+.menu-settings-muted td {
+  color: var(--text-sub);
+  text-decoration: line-through;
+}
+.menu-settings-muted td:nth-child(2),
+.menu-settings-muted td:last-child {
+  text-decoration: none;
+}
 .menu-settings-name {
   display: inline-flex;
   align-items: center;

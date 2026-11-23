@@ -97,12 +97,13 @@ export function MenuRegistrationDialog({
     setBusy(true);
     setFailure("");
     try {
+      // 시안: 앞뒤 공백은 빼고 등록한다.
       const input: api.MenuCreateInput =
         level === 1
-          ? { menuLvl: 1, menuNm: name }
+          ? { menuLvl: 1, menuNm: name.trim() }
           : {
               menuLvl: 2,
-              menuNm: name,
+              menuNm: name.trim(),
               upperMenuId: parent,
               scrnId: screenId,
               pcOnlyYn: pcOnly ? "Y" : "N",

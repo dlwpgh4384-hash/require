@@ -73,16 +73,23 @@ export function menuTree(rows: MenuSettingItem[]) {
   ];
 }
 
-/** 대메뉴 위에 서브메뉴를 놓으면 그 묶음 끝, 메뉴 위에 놓으면 그 메뉴 바로 앞. */
+/**
+ * 시안 menuDrop: 대메뉴 위에 서브메뉴를 놓으면 그 묶음 끝, 메뉴 위에 놓으면 그 메뉴 자리.
+ * 같은 묶음에서 위로 끌면 놓은 줄 앞, 아래로 끌면 놓은 줄 뒤. 묶음을 메뉴 줄에 놓으면 그 메뉴의 묶음 자리.
+ */
 export function moveMenu(
   rows: MenuSettingItem[],
   sourceId: string,
   targetId: string,
 ): MenuSettingItem[] {
   const source = rows.find((row) => row.menuId === sourceId);
-  const target = rows.find((row) => row.menuId === targetId);
-  if (!source || !target || sourceId === targetId) return rows;
-  if (source.menuLvl === 1 && target.menuLvl !== 1) return rows;
+  let target = rows.find((row) => row.menuId === targetId);
+  if (source?.menuLvl === 1 && target && target.menuLvl !== 1)
+    target = rows.find(
+      (row) => row.menuLvl === 1 && row.menuId === target?.upperMenuId,
+    );
+  if (!source || !target || sourceId === target.menuId) return rows;
+  const targetKey = target.menuId;
   const parent =
     source.menuLvl === 1
       ? null
@@ -96,7 +103,14 @@ export function moveMenu(
   const siblings = rows
     .filter((row) => row.menuId !== sourceId && row.upperMenuId === parent)
     .sort(menuOrder);
-  const index = siblings.findIndex((row) => row.menuId === targetId);
+  let index = siblings.findIndex((row) => row.menuId === targetKey);
+  if (index >= 0 && parent === source.upperMenuId) {
+    const before = rows
+      .filter((row) => row.upperMenuId === parent)
+      .sort(menuOrder)
+      .map((row) => row.menuId);
+    if (before.indexOf(sourceId) < before.indexOf(targetKey)) index += 1;
+  }
   siblings.splice(index < 0 ? siblings.length : index, 0, {
     ...source,
     upperMenuId: parent,

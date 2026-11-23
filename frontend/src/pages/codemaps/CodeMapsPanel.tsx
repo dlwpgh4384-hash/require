@@ -3,6 +3,7 @@ import {
   Dialog,
   InlineConfirmation,
   Toast,
+  type ToastKind,
 } from "../../shared/feedback/Dialog";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { useCodeWorkspace } from "../codegroups/CodeWorkspace";
@@ -45,6 +46,12 @@ export function CodeMapsPanel({
   const [optionRevision, setOptionRevision] = useState(0);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [noticeKind, setNoticeKind] = useState<ToastKind>("ok");
+  /** 시안 알림 종류: 완료는 ok, 안내는 info. */
+  const notify = (text: string, kind: ToastKind = "ok") => {
+    setNotice(text);
+    setNoticeKind(kind);
+  };
   const [closing, setClosing] = useState(false);
   /** 시안: 추가 창은 첫 그룹이 골라진 채로 열린다. 그 값은 바꾼 것으로 보지 않는다. */
   const [presetGroup, setPresetGroup] = useState("");
@@ -197,14 +204,19 @@ export function CodeMapsPanel({
     setDialogFailure("");
     let saved = false;
     try {
-      if (dialog === "add") await api.postCommonCodeMap(draft);
+      // 시안: 엑셀 표기는 앞뒤 빈칸을 뺀 값으로 넣는다(검사도 같은 값).
+      if (dialog === "add")
+        await api.postCommonCodeMap({
+          ...draft,
+          excelText: draft.excelText.trim(),
+        });
       else await api.postCommonCodeMapDelete(selected);
       saved = true;
       setDialog(null);
       setDraft(empty());
-      setNotice(
+      notify(
         dialog === "add"
-          ? `「${draft.excelText}」 표기를 추가했습니다.`
+          ? `「${draft.excelText.trim()}」 표기를 추가했습니다.`
           : `표기 ${selected.length}건을 지웠습니다.`,
       );
       await refresh();
@@ -229,11 +241,14 @@ export function CodeMapsPanel({
   };
   const open = (kind: "add" | "delete") => {
     if (dirty) {
-      setNotice("저장하지 않은 변경을 먼저 저장하거나 취소해 주세요.");
+      notify(
+        "저장하지 않은 변경이 있습니다. 먼저 [저장]이나 [취소]를 눌러 주세요.",
+        "info",
+      );
       return;
     }
     if (kind === "delete" && !selected.length) {
-      setNotice("지울 표기를 골라 주세요.");
+      notify("지울 표기를 골라 주세요.", "info");
       return;
     }
     setDraft(empty());
@@ -564,6 +579,7 @@ export function CodeMapsPanel({
           message={notice}
           onDismiss={() => setNotice("")}
           testId="code-map-toast"
+          kind={noticeKind}
         />
       )}
     </section>

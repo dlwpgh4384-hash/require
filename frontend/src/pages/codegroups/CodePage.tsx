@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Dialog, Toast } from "../../shared/feedback/Dialog";
+import { Dialog, Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { usePreferenceBusinessShortcuts } from "../userpreferences/UserPreferenceTools";
 import { useCodeWorkspace } from "./CodeWorkspace";
@@ -53,6 +53,9 @@ const systemFirst = (rows: api.CodeGroup[]) => [
 ];
 const message = (error: unknown) =>
   error instanceof Error ? error.message : "공통코드를 처리하지 못했습니다.";
+/** 시안: 저장 안 한 변경이 있을 때 [삭제]·[코드 추가] 등을 누르면 알림(info). */
+const DIRTY_FIRST =
+  "저장하지 않은 변경이 있습니다. 먼저 [저장]이나 [취소]를 눌러 주세요.";
 
 /** UI-27 / SCR-UI-27. PC 전용 직접 주소 제한은 기존 NavigationRoot가 소유한다. */
 export function CodePage({
@@ -74,6 +77,12 @@ export function CodePage({
   const [busy, setBusy] = useState(false);
   const [refreshPending, setRefreshPending] = useState(false);
   const [notice, setNotice] = useState("");
+  const [noticeKind, setNoticeKind] = useState<ToastKind>("ok");
+  /** 시안 알림 종류: 완료는 ok, 안내·검사 결과는 info, 동시 수정은 warn. */
+  const notify = (text: string, kind: ToastKind = "ok") => {
+    setNotice(text);
+    setNoticeKind(kind);
+  };
   const [modal, setModal] = useState<"group" | "code" | "delete" | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<api.CodeItem | null>(null);
   const [newGroup, setNewGroup] = useState({ groupId: "", groupName: "" });
@@ -189,7 +198,7 @@ export function CodePage({
     )
       return;
     if (dirty) {
-      setFailure("먼저 변경 내용을 저장하거나 취소해 주세요.");
+      notify(DIRTY_FIRST, "info");
       return;
     }
     setNewGroup({ groupId: "", groupName: "" });
@@ -258,14 +267,14 @@ export function CodePage({
   const save = async () => {
     if (lock.current || !snapshot || !group || refreshPending) return;
     if (!dirty) {
-      setNotice("바꾼 내용이 없습니다.");
+      notify("바꾼 내용이 없습니다.", "info");
       return;
     }
     // 시안: 표 저장 검사는 알림 한 줄(「코드 이름은 비울 수 없습니다.」 또는 「코드 · 오류」).
     const problem = api.codeTableError(changed, groupId);
     setErrors({});
     if (problem) {
-      setNotice(problem);
+      notify(problem, "info");
       return;
     }
     lock.current = true;
@@ -281,12 +290,22 @@ export function CodePage({
       setHistoryRevision((value) => value + 1);
       api.notifyCodeOptionsChanged(groupId);
       await refresh(groupId);
-      setNotice(
+      notify(
         numeric
           ? "수당코드를 저장했습니다."
           : `공통코드 ${count}건을 저장했습니다. 선택 목록에 바로 반영됩니다.`,
       );
     } catch (error) {
+      if (
+        !saved &&
+        error instanceof api.CodeRequestError &&
+        error.status === 409
+      ) {
+        // FR-0106: 다른 사람이 먼저 바꿨으면 안내하고 지금 값을 다시 읽는다(새 변경 시각을 받는다).
+        notify(error.message, "warn");
+        setRevision((value) => value + 1);
+        return;
+      }
       setFailure(
         saved
           ? "저장은 완료되었으나 다시 읽지 못했습니다. 재조회해 주세요."
@@ -311,18 +330,24 @@ export function CodePage({
     // 시안: 그룹 ID·코드는 대문자로 바꿔 읽는다.
     const groupInput = {
       groupId: newGroup.groupId.trim().toUpperCase(),
-      groupName: newGroup.groupName,
+      groupName: newGroup.groupName.trim(),
     };
     const newCodeId = newCode.code.trim().toUpperCase();
+    // 시안: 코드는 대문자, 이름은 앞뒤 빈칸을 뺀 값으로 보낸다.
+    const codeInput: api.CodeInput = {
+      ...newCode,
+      code: newCodeId,
+      codeName: newCode.codeName.trim(),
+    };
     const invalid: Record<string, string> = {};
     if (modal === "code") {
       if (numeric) {
         // 시안 「수당코드 추가」 문구.
         if (!newCode.code.trim() || !newCode.codeName.trim())
           invalid.code = "코드와 이름을 넣어 주세요.";
-        else if (!/^[A-Za-z0-9_]{1,20}$/.test(newCode.code))
+        else if (!/^[A-Za-z0-9_]{1,20}$/.test(newCodeId))
           invalid.code = "코드는 영문 대문자·숫자·_ 로 넣어 주세요.";
-      } else Object.assign(invalid, api.validateCode(newCode, groupId));
+      } else Object.assign(invalid, api.validateCode(codeInput, groupId));
       if (!invalid.code && snapshot?.some((row) => row.code === newCodeId))
         invalid.code = "이미 있는 코드입니다.";
     }
@@ -335,7 +360,7 @@ export function CodePage({
       if (!newGroup.groupName.trim() || [...newGroup.groupName].length > 30)
         invalid.groupName = "그룹 이름을 넣어 주세요.";
       else if (
-        groups?.some((row) => row.groupName === newGroup.groupName.trim())
+        groups?.some((row) => row.groupName === groupInput.groupName)
       )
         invalid.groupName = "이미 있는 그룹입니다.";
     }
@@ -349,17 +374,17 @@ export function CodePage({
     // 시안 완료 알림 문구
     const done =
       modal === "group"
-        ? `「${newGroup.groupName}」 그룹을 추가했습니다. [코드 추가]로 코드를 넣으세요.`
+        ? `「${groupInput.groupName}」 그룹을 추가했습니다. [코드 추가]로 코드를 넣으세요.`
         : modal === "code"
           ? numeric
-            ? `${newCode.codeName.trim()}을 추가했습니다.`
-            : `「${newCode.codeName}」 코드를 추가했습니다.`
+            ? `${codeInput.codeName}을 추가했습니다.`
+            : `「${codeInput.codeName}」 코드를 추가했습니다.`
           : `「${deleteTarget?.codeName ?? ""}」 코드를 삭제했습니다.`;
     try {
       if (modal === "group") {
         const result = await api.postCommonCodeGroup(groupInput);
         selected = result.groupId;
-      } else if (modal === "code") await api.postCommonCode(groupId, newCode);
+      } else if (modal === "code") await api.postCommonCode(groupId, codeInput);
       else if (deleteTarget)
         await api.postCommonCodeDelete(groupId, deleteTarget.code);
       committed = true;
@@ -368,7 +393,7 @@ export function CodePage({
       await refresh(selected);
       setGroupId(selected);
       setModal(null);
-      setNotice(done);
+      notify(done);
     } catch (error) {
       if (committed) {
         setModal(null);
@@ -382,7 +407,7 @@ export function CodePage({
         // 시안: 쓴 코드는 창 없이 알림으로 「이름」은(는) 사용된 코드라 삭제할 수 없습니다. 사용을 끄세요.
         if (modal === "delete" && deleteTarget && text.startsWith("사용된 코드")) {
           setModal(null);
-          setNotice(`「${deleteTarget.codeName}」은(는) ${text}`);
+          notify(`「${deleteTarget.codeName}」은(는) ${text}`, "info");
         } else {
           setModalFailure(text);
           setErrors(errorFields(error));
@@ -393,6 +418,15 @@ export function CodePage({
       setBusy(false);
     }
   };
+  // 공통: 창의 첫 오류 칸으로 커서를 옮긴다.
+  useEffect(() => {
+    if (!modal || !Object.keys(errors).length) return;
+    document
+      .querySelector(`[data-testid="code-${modal}-dialog"] .field-error`)
+      ?.closest("label")
+      ?.querySelector<HTMLElement>("input, select")
+      ?.focus();
+  }, [errors, modal]);
   const fieldError = (field: string) =>
     errors[field] && (
       <span className="field-error" role="alert">
@@ -632,6 +666,10 @@ export function CodePage({
                           <tr
                             key={row.code}
                             data-testid={`code-row-${row.code.toLowerCase()}`}
+                            // 시안: 사용을 끈 줄은 흐리게(tr.muted).
+                            className={
+                              !numeric && row.useYn !== "Y" ? "muted" : undefined
+                            }
                           >
                             <td>{row.code}</td>
                             {numeric ? (
@@ -749,9 +787,7 @@ export function CodePage({
                                   aria-label={`${row.code} 삭제`}
                                   onClick={() => {
                                     if (dirty) {
-                                      setFailure(
-                                        "먼저 변경 내용을 저장하거나 취소해 주세요.",
-                                      );
+                                      notify(DIRTY_FIRST, "info");
                                       return;
                                     }
                                     setDeleteTarget(row);
@@ -811,7 +847,10 @@ export function CodePage({
               disabled={busy || refreshPending}
               onClick={() => {
                 // 시안 [취소] 알림.
-                setNotice(dirty ? "변경을 취소했습니다." : "바꾼 내용이 없습니다.");
+                notify(
+                  dirty ? "변경을 취소했습니다." : "바꾼 내용이 없습니다.",
+                  "info",
+                );
                 discard();
               }}
             >
@@ -835,7 +874,7 @@ export function CodePage({
             disabled={busy}
             onClick={() => {
               if (dirty) {
-                setFailure("먼저 변경 내용을 저장하거나 취소해 주세요.");
+                notify(DIRTY_FIRST, "info");
                 return;
               }
               setBusy(true);
@@ -1102,6 +1141,7 @@ export function CodePage({
         <Toast
           message={notice}
           testId="code-toast"
+          kind={noticeKind}
           onDismiss={() => setNotice("")}
         />
       )}

@@ -185,6 +185,20 @@ it("adds from actual group options, refreshes the list and notifies history cons
   await waitFor(() => expect(changed).toHaveBeenCalledTimes(1));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
+it("sends the trimmed excel text, the same value it checked (시안)", async () => {
+  render(<CodeMapsPanel />);
+  await openAdd();
+  fireEvent.change(screen.getByTestId("code-map-text"), {
+    target: { value: "  계약직  " },
+  });
+  await chooseTarget();
+  fireEvent.click(screen.getByTestId("code-map-submit"));
+  await waitFor(() => expect(writes()).toHaveLength(1));
+  expect(JSON.parse(String(writes()[0][1].body)).excelText).toBe("계약직");
+  expect(await screen.findByTestId("code-map-toast")).toHaveTextContent(
+    "「계약직」 표기를 추가했습니다.",
+  );
+});
 it("validates required text without posting", async () => {
   render(<CodeMapsPanel />);
   await openAdd();
@@ -356,8 +370,9 @@ it("dirty parent blocks destructive confirmation and requests", async () => {
   fireEvent.click(screen.getByTestId("code-map-delete"));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(screen.getByTestId("code-map-toast")).toHaveTextContent(
-    "먼저 저장하거나 취소",
+    "저장하지 않은 변경이 있습니다. 먼저 [저장]이나 [취소]를 눌러 주세요.",
   );
+  expect(screen.getByTestId("code-map-toast")).toHaveClass("app-toast-info");
   expect(writes()).toHaveLength(0);
 });
 it("requires a selected row before opening deletion", async () => {

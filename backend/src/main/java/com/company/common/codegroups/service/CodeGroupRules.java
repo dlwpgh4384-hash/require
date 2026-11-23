@@ -105,10 +105,17 @@ public final class CodeGroupRules {
             if (field.equals("estimateUnitPrice") || field.equals("weight")) {
                 var number = number(body, field, null);
                 if (number == null) throw invalid(field);
+                String label = field.equals("weight") ? "비중(%)" : "견적 기준 단가(원)";
+                // 시안 addChk: 숫자 칸은 0 이상, 비중은 100 이하.
+                if (number.signum() < 0) throw new CodeFailure(field, label + "은(는) 숫자로 넣어 주세요.");
+                if (field.equals("weight") && number.compareTo(BigDecimal.valueOf(100)) > 0)
+                    throw new CodeFailure(field, label + "은(는) 100 이하로 넣어 주세요.");
                 value = number.toPlainString();
             } else value = text(body, field, 100, true);
             if (field.equals("targetField") && !Set.of("NAME", "TEL", "MAIL", "ADDR", "SKILL", "WANT", "FROM", "VNDR").contains(value))
                 throw new CodeFailure(field, "넣을 칸은 NAME·TEL·MAIL·ADDR·SKILL·WANT·FROM·VNDR 중 하나로 넣어 주세요.");
+            if (field.equals("bankCode") && !value.matches("[0-9]{3}"))
+                throw new CodeFailure(field, "은행 코드는 숫자 3자리로 넣어 주세요.");
             if (field.equals("estimateUnitPrice") || field.equals("contractTypes")) row.addVal2 = value;
             else row.addVal1 = value;
         }

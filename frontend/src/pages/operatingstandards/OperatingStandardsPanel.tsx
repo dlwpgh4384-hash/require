@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Dialog, Toast } from "../../shared/feedback/Dialog";
+import { Dialog, Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { koreanThisMonth } from "../../shared/time";
 import { Banner } from "../../shared/list";
@@ -36,6 +36,12 @@ export function OperatingStandardsPanel({
   const [failure, setFailure] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState("");
+  const [noticeKind, setNoticeKind] = useState<ToastKind>("ok");
+  /** 시안 알림 종류: 완료는 ok, 안내는 info, 동시 수정은 warn. */
+  const notify = (text: string, kind: ToastKind = "ok") => {
+    setNotice(text);
+    setNoticeKind(kind);
+  };
   const [busy, setBusy] = useState(false);
   const [refreshPending, setRefreshPending] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -138,13 +144,24 @@ export function OperatingStandardsPanel({
       setConfirmSave(false);
       // 시안: 운영 기준값 n건을 저장했습니다(2026-11부터 적용).
       const start = changes.find((row) => row.effectiveMonth)?.effectiveMonth;
-      setNotice(
+      notify(
         changes.some((row) => row.action === "delete")
           ? "운영 기준값 이력을 지웠습니다."
           : `운영 기준값 ${changes.length}건을 저장했습니다${start ? `(${start}부터 적용)` : ""}.`,
       );
       await refresh();
     } catch (error) {
+      if (
+        !saved &&
+        error instanceof api.OperatingStandardsRequestError &&
+        error.status === 409
+      ) {
+        // FR-0106: 다른 사람이 먼저 바꿨으면 창을 닫고 안내한 뒤 지금 값을 다시 읽는다.
+        setConfirmSave(false);
+        notify(error.message, "warn");
+        setRevision((old) => old + 1);
+        return;
+      }
       if (saved) {
         setRefreshPending(true);
         setFailure(
@@ -166,7 +183,7 @@ export function OperatingStandardsPanel({
   };
   const openSave = () => {
     if (!changed.length) {
-      setNotice("바꾼 내용이 없습니다.");
+      notify("바꾼 내용이 없습니다.", "info");
       return;
     }
     const invalid = api.validateOperatingChanges(
@@ -196,7 +213,7 @@ export function OperatingStandardsPanel({
   };
   /** 시안 [취소] 알림. */
   const cancel = () => {
-    setNotice(dirty ? "변경을 취소했습니다." : "바꾼 내용이 없습니다.");
+    notify(dirty ? "변경을 취소했습니다." : "바꾼 내용이 없습니다.", "info");
     discard();
   };
   const blocked = busy || refreshPending;
@@ -619,6 +636,7 @@ export function OperatingStandardsPanel({
         <Toast
           message={notice}
           testId="operating-toast"
+          kind={noticeKind}
           onDismiss={() => setNotice("")}
         />
       )}

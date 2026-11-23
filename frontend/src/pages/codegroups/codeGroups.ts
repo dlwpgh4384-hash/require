@@ -87,6 +87,8 @@ export type ExtraField = {
   numeric?: boolean;
   /** 금액(원): 콤마를 넣어 보이고 숫자만 받는다(SFR-006-02). */
   money?: boolean;
+  /** 시안 ADDL max: 이 값보다 크면 오류(비중 100). */
+  max?: number;
   /** 시안 UI-27 표 아래 안내·추가 창 도움말 문구. */
   help: string;
 };
@@ -101,7 +103,7 @@ export function codeExtraFields(groupId: string): ExtraField[] {
       return [{ key: "requiredJobs", label: "필요한 직무", help: "직무 코드, 쉼표로 구분 (AI 추천 스킬 점수 식-70)" }];
     case "PROJ_STEP":
       return [
-        { key: "weight", label: "비중(%)", numeric: true, help: "진척률 계산에 쓰는 단계 비중" },
+        { key: "weight", label: "비중(%)", numeric: true, max: 100, help: "진척률 계산에 쓰는 단계 비중" },
         { key: "contractTypes", label: "적용 계약유형", help: "계약유형 코드, 쉼표로 구분" },
       ];
     case "BANK":
@@ -142,8 +144,17 @@ export function validateCode(
     errors.codeName = "이름을 넣어 주세요.";
   for (const field of codeExtraFields(groupId)) {
     const value = input[field.key];
-    if (value === undefined || value === null || String(value).trim() === "")
+    const text =
+      value === undefined || value === null ? "" : String(value).trim();
+    if (text === "")
       errors[field.key] = `「${extraName(field.label)}」 칸을 채워 주세요.`;
+    // 시안 addChk: 숫자 칸은 0 이상 정수, 비중은 100 이하, 은행 코드는 숫자 3자리.
+    else if (field.numeric && !/^\d+$/.test(text.replace(/,/g, "")))
+      errors[field.key] = `${field.label}은(는) 숫자로 넣어 주세요.`;
+    else if (field.max !== undefined && Number(text) > field.max)
+      errors[field.key] = `${field.label}은(는) ${field.max} 이하로 넣어 주세요.`;
+    else if (field.key === "bankCode" && !/^\d{3}$/.test(text))
+      errors[field.key] = "은행 코드는 숫자 3자리로 넣어 주세요.";
   }
   if (
     input.targetField &&

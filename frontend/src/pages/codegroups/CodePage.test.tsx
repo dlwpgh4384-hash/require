@@ -232,9 +232,11 @@ it("dirty 삭제는 API와 확인창 없이 안내하고 변경을 유지한다"
     target: { value: "미저장" },
   });
   fireEvent.click(screen.getByLabelText("ONE 삭제"));
-  expect(
-    screen.getByText("먼저 변경 내용을 저장하거나 취소해 주세요."),
-  ).toBeInTheDocument();
+  // 시안: info 알림 「저장하지 않은 변경이 있습니다. 먼저 [저장]이나 [취소]를 눌러 주세요.」
+  expect(screen.getByTestId("code-toast")).toHaveTextContent(
+    "저장하지 않은 변경이 있습니다. 먼저 [저장]이나 [취소]를 눌러 주세요.",
+  );
+  expect(screen.getByTestId("code-toast")).toHaveClass("app-toast-info");
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(writes()).toHaveLength(0);
   expect(screen.getByLabelText("ONE 이름")).toHaveValue("미저장");
@@ -702,4 +704,95 @@ it("그룹·코드·수당코드 추가 창의 입력 칸 안내 글은 시안�
   dialog = within(screen.getByRole("dialog"));
   expect(dialog.getByLabelText("새 코드")).toHaveAttribute("placeholder", "예: NIGHT_FEE");
   expect(dialog.getByLabelText("새 코드 이름")).toHaveAttribute("placeholder", "예: 야근 수당(월)");
+});
+
+// FR-0106: 저장 409는 경고 알림 뒤 지금 값을 다시 읽는다(roles와 같은 방식).
+it("코드 저장이 409면 경고 알림을 띄우고 지금 값을 다시 읽는다", async () => {
+  await ready();
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (path: string, init?: RequestInit) =>
+    init?.method === "PUT"
+      ? {
+          ok: false,
+          status: 409,
+          json: async () => ({
+            success: false,
+            message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+          }),
+        }
+      : base(path, init),
+  );
+  fireEvent.change(screen.getByLabelText("ONE 이름"), {
+    target: { value: "늦은 이름" },
+  });
+  fireEvent.click(screen.getByTestId("code-save"));
+  const toast = await screen.findByTestId("code-toast");
+  expect(toast).toHaveTextContent("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.");
+  expect(toast).toHaveClass("app-toast-warn");
+  await waitFor(() =>
+    expect(screen.getByLabelText("ONE 이름")).toHaveValue("첫 이름"),
+  );
+  expect(screen.queryByTestId("code-failure")).not.toBeInTheDocument();
+});
+it("사용을 끈 줄은 시안처럼 흐리게(muted) 보인다", async () => {
+  await ready();
+  expect(screen.getByTestId("code-row-two")).toHaveClass("muted");
+  expect(screen.getByTestId("code-row-one")).not.toHaveClass("muted");
+  fireEvent.click(screen.getByLabelText("ONE 사용"));
+  expect(screen.getByTestId("code-row-one")).toHaveClass("muted");
+});
+it("바꾼 내용 없음·취소 알림은 info 종류다(시안)", async () => {
+  await ready();
+  fireEvent.click(screen.getByTestId("code-save"));
+  expect(await screen.findByTestId("code-toast")).toHaveClass("app-toast-info");
+});
+it("코드 추가는 앞뒤 빈칸을 뺀 코드·이름을 보내고 첫 오류 칸에 커서를 둔다", async () => {
+  await ready();
+  fireEvent.click(screen.getByTestId("code-add"));
+  fireEvent.click(screen.getByTestId("code-dialog-submit"));
+  await waitFor(() => expect(screen.getByLabelText("새 코드")).toHaveFocus());
+  fireEvent.change(screen.getByLabelText("새 코드"), {
+    target: { value: " cloud " },
+  });
+  fireEvent.change(screen.getByLabelText("새 코드 이름"), {
+    target: { value: " 클라우드 " },
+  });
+  fireEvent.click(screen.getByTestId("code-dialog-submit"));
+  await waitFor(() => expect(writes()).toHaveLength(1));
+  expect(JSON.parse(String(writes()[0][1].body))).toMatchObject({
+    code: "CLOUD",
+    codeName: "클라우드",
+  });
+  expect(await screen.findByTestId("code-toast")).toHaveTextContent(
+    "「클라우드」 코드를 추가했습니다.",
+  );
+});
+it("추가값 숫자·비중 100 이하·은행 코드 3자리를 시안 문구로 검사한다", async () => {
+  rows.PROJ_STEP = [
+    { code: "TK_KICK", codeName: "착수", sortOrd: 1, useYn: "Y", weight: 5, contractTypes: "TK" },
+  ];
+  rows.BANK = [
+    { code: "KB", codeName: "국민", sortOrd: 1, useYn: "Y", bankCode: "004" },
+  ];
+  await ready();
+  await selectGroup("PROJ_STEP");
+  fireEvent.change(await screen.findByLabelText("TK_KICK 비중(%)"), {
+    target: { value: "120" },
+  });
+  fireEvent.click(screen.getByTestId("code-save"));
+  expect(await screen.findByTestId("code-toast")).toHaveTextContent(
+    "TK_KICK · 비중(%)은(는) 100 이하로 넣어 주세요.",
+  );
+  fireEvent.click(screen.getByTestId("code-cancel"));
+  await selectGroup("BANK");
+  fireEvent.change(await screen.findByLabelText("KB 은행 코드"), {
+    target: { value: "4" },
+  });
+  fireEvent.click(screen.getByTestId("code-save"));
+  await waitFor(() =>
+    expect(screen.getByTestId("code-toast")).toHaveTextContent(
+      "KB · 은행 코드는 숫자 3자리로 넣어 주세요.",
+    ),
+  );
+  expect(writes()).toHaveLength(0);
 });

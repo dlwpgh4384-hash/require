@@ -27,6 +27,16 @@ export const projectIssueAudit = (issue: api.ProjectIssue) =>
     ? ` · ${formatMonthDay(issue.updatedAt)} ${issue.updatedByName ?? issue.updatedBy ?? ""} 고침`
     : "");
 
+/** 칸 이름 → 입력 칸 id(첫 오류 칸으로 커서를 옮길 때). */
+const FIELD_IDS: Partial<Record<keyof api.ProjectIssueInput, string>> = {
+  projectId: "project-issue-project",
+  title: "project-issue-title",
+  dueDate: "project-issue-due-date",
+  importanceCode: "project-issue-importance",
+  statusCode: "project-issue-status",
+  actionText: "project-issue-action",
+};
+
 // UI-31-M3 / SCR-UI-31: 이슈 등록·수정·종료(시안 issueModal). 프로젝트와 담당자(등록한 로그인 계정)는 고치지 않는다.
 export function ProjectIssueDialog({
   issue,
@@ -36,6 +46,7 @@ export function ProjectIssueDialog({
   statuses,
   onClose,
   onSaved,
+  onConflict,
   dirtyScreenId = "UI-31",
 }: {
   issue?: api.ProjectIssue;
@@ -45,6 +56,8 @@ export function ProjectIssueDialog({
   statuses: CodeItem[];
   onClose: () => void;
   onSaved: (issue: api.ProjectIssue, created: boolean) => void | Promise<void>;
+  /** 저장이 409(다른 사람이 먼저 고침)면 부른다. 없으면 창 안에 안내만 띄운다. */
+  onConflict?: (message: string) => void;
   dirtyScreenId?: string;
 }) {
   const [initial] = useState<api.ProjectIssueInput>(() => ({
@@ -62,6 +75,7 @@ export function ProjectIssueDialog({
   const [values, setValues] = useState(initial);
   const [error, setError] = useState("");
   const [errorField, setErrorField] = useState("");
+  const [focusRequest, setFocusRequest] = useState(0);
   const [busy, setBusy] = useState(false);
   const [discard, setDiscard] = useState(false);
   const pending = useRef(false);
@@ -92,7 +106,14 @@ export function ProjectIssueDialog({
   const fail = (field: keyof api.ProjectIssueInput, message: string) => {
     setErrorField(field);
     setError(message);
+    setFocusRequest((value) => value + 1);
   };
+  // FR-0106: 오류가 난 첫 칸으로 커서를 옮긴다(저장 중에는 칸이 잠겨 있으므로 잠금이 풀린 뒤).
+  useEffect(() => {
+    if (!focusRequest || busy || !errorField) return;
+    const id = FIELD_IDS[errorField as keyof api.ProjectIssueInput];
+    if (id) document.getElementById(id)?.focus();
+  }, [focusRequest, busy, errorField]);
   const save = async () => {
     if (pending.current) return;
     // 시안 issueModal 검사 문구
@@ -122,7 +143,21 @@ export function ProjectIssueDialog({
         : await api.postCommonProjectBoardIssue(body);
       await onSaved(saved, !issue);
     } catch (reason) {
-      setError(api.projectIssueFailure(reason));
+      const message = api.projectIssueFailure(reason);
+      // FR-0106: 그 사이 다른 사람이 고쳤으면(409) 창을 닫고 목록을 다시 읽게 한다(옛 수정 시각으로 다시 보내지 않게).
+      if (
+        onConflict &&
+        reason instanceof api.ProjectIssueRequestError &&
+        reason.status === 409
+      )
+        return onConflict(message);
+      // 서버가 알려 준 칸 오류는 그 칸에 표시한다.
+      const field =
+        reason instanceof api.ProjectIssueRequestError
+          ? reason.errors.find((e) => e.field in FIELD_IDS)?.field
+          : undefined;
+      if (field) fail(field as keyof api.ProjectIssueInput, message);
+      else setError(message);
     } finally {
       pending.current = false;
       setBusy(false);

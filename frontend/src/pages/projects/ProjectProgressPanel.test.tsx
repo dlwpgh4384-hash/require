@@ -224,19 +224,12 @@ it("operational memo hides progress, shows the auto note and needs one text", as
   expect(writes()).toHaveLength(0);
 });
 
-it("memo edit sends modifiedAt and uses the edit toast; 409 keeps the dialog with the message", async () => {
+it("memo edit sends modifiedAt and uses the edit toast", async () => {
   render(<ProjectProgressPanel {...props} />);
   fireEvent.click(await screen.findByTestId("project-memo-edit-1"));
   const dialog = within(await screen.findByTestId("project-memo-dialog"));
   expect(dialog.getByText("주간 메모 수정", { selector: "h2" })).toBeVisible();
   expect(dialog.getByText("진행 프로젝트 · 2026-10-15 작성")).toBeVisible();
-  writeStatus = 409;
-  fireEvent.click(dialog.getByTestId("project-progress-save"));
-  expect(await dialog.findByRole("alert")).toHaveTextContent(
-    "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
-  );
-  expect(screen.getByTestId("project-memo-dialog")).toBeVisible();
-  writeStatus = 200;
   fireEvent.click(dialog.getByTestId("project-progress-save"));
   await waitFor(() => expect(changed).toHaveBeenCalledWith("주간 메모를 고쳤습니다."));
   const [url, init] = writes().at(-1)!;
@@ -247,6 +240,49 @@ it("memo edit sends modifiedAt and uses the edit toast; 409 keeps the dialog wit
     actualProgress: 10,
     modifiedAt: "2026-10-15T16:00:00.123456Z",
   });
+});
+
+it("memo edit 409 closes the dialog, reloads and the next edit sends the new modifiedAt", async () => {
+  render(<ProjectProgressPanel {...props} />);
+  fireEvent.click(await screen.findByTestId("project-memo-edit-1"));
+  const dialog = within(await screen.findByTestId("project-memo-dialog"));
+  writeStatus = 409;
+  // 그 사이 다른 사람이 고친 값(다시 읽으면 새 수정 시각이 온다)
+  memos = [{ ...memos[0], workDone: "남이 고친 작업", modifiedAt: "2026-11-14T09:00:00Z" }];
+  fireEvent.click(dialog.getByTestId("project-progress-save"));
+  await waitFor(() =>
+    expect(screen.queryByTestId("project-memo-dialog")).not.toBeInTheDocument(),
+  );
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+  );
+  expect(await screen.findByText("남이 고친 작업")).toBeVisible();
+  expect(changed).not.toHaveBeenCalled();
+  writeStatus = 200;
+  fireEvent.click(screen.getByTestId("project-memo-edit-1"));
+  const again = within(await screen.findByTestId("project-memo-dialog"));
+  fireEvent.click(again.getByTestId("project-progress-save"));
+  await waitFor(() => expect(changed).toHaveBeenCalledWith("주간 메모를 고쳤습니다."));
+  expect(JSON.parse(String(writes().at(-1)![1].body)).modifiedAt).toBe(
+    "2026-11-14T09:00:00Z",
+  );
+});
+
+it("a failed [완료] keeps the server message visible after reloading", async () => {
+  render(<ProjectProgressPanel {...props} />);
+  fireEvent.click(await screen.findByTestId("project-stage-complete-2"));
+  const confirm = within(await screen.findByTestId("project-stage-complete-confirm"));
+  writeStatus = 400;
+  fireEvent.click(confirm.getByRole("button", { name: "완료 처리" }));
+  await waitFor(() =>
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+    ),
+  );
+  // 다시 읽기가 끝난 뒤에도 문구가 남아 있다(예전에는 다시 읽기가 문구를 지웠다)
+  await waitFor(() => expect(screen.getByTestId("project-stage-complete-2")).toBeEnabled());
+  expect(screen.getByRole("alert")).toHaveTextContent("다른 사람이 먼저 바꿨습니다.");
+  expect(changed).not.toHaveBeenCalled();
 });
 
 it("stage plan edits end dates only; starts follow the previous end and the first/last are fixed", async () => {

@@ -70,16 +70,16 @@ public class CommonProjectBoardService {
 
     private record Evaluated(ProjectBoardSource source, Row row, long high) {}
 
-    /**
-     * 현황판 조회. 먼저 현황판에 나오는데 단계가 없는 프로젝트에 기본 단계를 만든다(프로젝트마다 따로 저장, 여러 번 불러도 한 벌).
-     * 그다음 한 읽기 묶음(반복 읽기)에서 표를 계산한다. 신호등은 저장하지 않고 볼 때마다 계산한다.
-     */
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     /** 현황판 엑셀을 받으면 접근 기록(DNLD)을 남긴다(SFR-011-03, 이슈 엑셀과 같은 방식). */
     public void recordExcelDownload(String userId, int count) {
         mapper.insertAccess(userId, "UI-31 현황판 " + count + "건");
     }
 
+    /**
+     * 현황판 조회. 먼저 현황판에 나오는데 단계가 없는 프로젝트에 기본 단계를 만든다(프로젝트마다 따로 저장, 여러 번 불러도 한 벌).
+     * 그다음 한 읽기 묶음(반복 읽기)에서 표를 계산한다. 신호등은 저장하지 않고 볼 때마다 계산한다.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Result getCommonProjectBoard(Filter filter) {
         validate(filter);
         stages.ensureMissingStages();

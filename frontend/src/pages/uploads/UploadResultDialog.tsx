@@ -9,6 +9,7 @@ import {
   postCommonUploadApply,
   uploadFailure,
   UploadRequestError,
+  type ClosedMonthPolicy,
   type UploadResult,
 } from "./uploads";
 import "./upload.css";
@@ -21,6 +22,7 @@ export function UploadResultDialog({
   onApplied,
   targetName = "거래처",
   notes = [],
+  beforeApply,
 }: {
   uploadId: string;
   /** 시안 제목 「엑셀 업로드 결과 · 거래처」 */
@@ -29,7 +31,15 @@ export function UploadResultDialog({
   notes?: string[];
   initialResult?: UploadResult;
   onClose: () => void;
-  onApplied: () => void;
+  /** 반영된 결과를 받는다(B.10 결과 창). 다른 화면은 인자를 쓰지 않아도 된다. */
+  onApplied: (result: UploadResult) => void;
+  /**
+   * B.10: [반영] 전에 확인창을 띄운다. false면 반영 요청을 보내지 않고(취소),
+   * 고른 값은 반영 요청에 더한다. 주지 않으면 지금과 같다.
+   */
+  beforeApply?: (
+    result: UploadResult,
+  ) => Promise<{ closedMonthPolicy?: ClosedMonthPolicy } | false>;
 }) {
   const [result, setResult] = useState<UploadResult | null>(
     initialResult || null,
@@ -93,14 +103,20 @@ export function UploadResultDialog({
     setError("");
     setFields([]);
     try {
-      const next = await postCommonUploadApply(uploadId, result.modifiedAt);
+      const choice = beforeApply ? await beforeApply(result) : {};
+      if (choice === false) return;
+      const next = await postCommonUploadApply(
+        uploadId,
+        result.modifiedAt,
+        choice.closedMonthPolicy,
+      );
       setResult(next);
       setPage(0);
       if (next.errorCount === 0) {
         setApplied(true);
         if (!notified.current) {
           notified.current = true;
-          onApplied();
+          onApplied(next);
         }
       }
     } catch (reason) {

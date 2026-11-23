@@ -1,4 +1,7 @@
+/* 시안 차트 색: 막대 --c1 파랑, 목표 점선 --c6 회색 (공용 차트가 --pf-c* 를 읽음) */
 .business-plan-comparison {
+  --pf-c1: #1d4ed8;
+  --pf-c6: #6b7280;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
@@ -22,6 +25,11 @@
   border: 1px solid var(--border);
   border-radius: 8px;
 }
+/* 공통 도구 줄(.ls-tbar)의 -12px 아래 여백이 표를 덮지 않게: 시안처럼 제목 아래 10px */
+.business-plan-chart-card .ls-tbar,
+.business-plan-months .ls-tbar {
+  margin-bottom: 10px;
+}
 .business-plan-table-scroll {
   max-width: 100%;
   overflow-x: auto;
@@ -30,9 +38,11 @@
   min-width: 1050px;
   font-variant-numeric: tabular-nums;
 }
+/* 시안 .t: 칸 높이 40, 안쪽 여백 0 12px */
 .business-plan-table th,
 .business-plan-table td {
-  padding: 12px;
+  height: 40px;
+  padding: 0 12px;
 }
 .business-plan-table td.business-plan-current,
 .business-plan-table th.business-plan-current {
@@ -47,6 +57,9 @@
 .business-plan-info {
   border: 0;
   padding: 0 2px;
+  /* 앱 공통 「버튼 최소 36px」을 풀어 줄 높이를 시안 40px로 */
+  min-height: 0;
+  height: auto;
   background: transparent;
   color: var(--primary-text);
   cursor: pointer;
@@ -57,6 +70,12 @@
   font-size: 12px;
   color: var(--text-sub);
   max-width: 210px;
+}
+@media (prefers-color-scheme: dark) {
+  .business-plan-comparison {
+    --pf-c1: #60a5fa;
+    --pf-c6: #9ca3af;
+  }
 }
 @media (max-width: 768px) {
   .business-plan-kpis {

@@ -47,9 +47,11 @@ public class CommonUploadService {
         return form;
     }
     public String templateFileName(String formTypeCode) { return form(formTypeCode).templateFileName(); }
-    public byte[] getCommonUploadTemplate(String formTypeCode) {
+    public byte[] getCommonUploadTemplate(String formTypeCode) { return getCommonUploadTemplate(formTypeCode, null); }
+    /** year: 연 양식(B.10)만 줄을 미리 채운다. 다른 양식은 받지 않으면 지금과 같다. */
+    public byte[] getCommonUploadTemplate(String formTypeCode, Integer year) {
         UploadForm form = form(formTypeCode);
-        return workbooks.tabularFile(form.headers(), java.util.Collections.emptyList(), form.templateNote());
+        return workbooks.tabularFile(form.headers(), form.templateRows(year), form.templateNote());
     }
     /** yearMonth: 한 달 양식(B.1 급여)만, YYYY-MM. */
     public static YearMonth month(String value) {
@@ -145,7 +147,7 @@ public class CommonUploadService {
         var rows = workbooks.readTabular(upload.fileName, files.read(id), form.headers());
         var inspection = form.inspect(rows, month);
         boolean applied = inspection.errorCount() == 0;
-        Map<Integer, String> assigned = applied ? form.apply(inspection, month, id) : Map.of();
+        Map<Integer, String> assigned = applied ? form.apply(inspection, month, id, input.closedMonthPolicy()) : Map.of();
         mapper.deleteIssues(id);
         issues(id, inspection.issues());
         if (mapper.completeUpload(new Completion(id, inspection, applied)) != 1)
@@ -189,8 +191,13 @@ public class CommonUploadService {
         return Long.parseLong(value);
     }
     public static Apply parseApply(JsonNode body) {
-        com.company.common.clients.service.ClientRules.object(body, Set.of("modifiedAt"));
-        return new Apply(com.company.common.clients.service.ClientRules.token(body));
+        com.company.common.clients.service.ClientRules.object(body, Set.of("modifiedAt", "closedMonthPolicy"));
+        var token = com.company.common.clients.service.ClientRules.token(body);
+        var choice = body.get("closedMonthPolicy");
+        if (choice == null || choice.isNull()) return new Apply(token);
+        if (!choice.isTextual() || !Set.of(UploadForm.KEEP_CLOSED, UploadForm.REPLACE_CLOSED).contains(choice.textValue()))
+            throw CodeFailure.invalid("closedMonthPolicy", "마감한 달 목표 처리 방법을 확인해 주세요.");
+        return new Apply(token, choice.textValue());
     }
     private boolean primaryKeyCollision(Throwable failure) {
         for (var cause = failure; cause != null; cause = cause.getCause()) {

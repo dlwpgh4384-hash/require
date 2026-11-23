@@ -166,13 +166,13 @@ it("renders three same-period summary cards with actual/target amounts and signe
     "90.5%",
   );
   expect(screen.getByTestId("business-plan-kpi-revenue")).toHaveTextContent(
-    "실적 181만 원 / 목표 200만 원",
+    "181만 원 / 목표 200만 원",
   );
   expect(screen.getByTestId("business-plan-kpi-profit")).toHaveTextContent(
-    "-50.1%",
+    "−50.1%",
   );
   expect(screen.getByTestId("business-plan-kpi-profit")).toHaveTextContent(
-    "실적 −50만 원 / 목표 100만 원",
+    "−50만 원 / 목표 100만 원",
   );
   expect(screen.getByTestId("business-plan-kpi-base")).toHaveTextContent(
     "2026-11 매출 달성률",
@@ -204,7 +204,7 @@ it("shows exactly six monthly rows and twelve month columns without cumulative c
   );
   expect(
     screen.getByTestId("business-plan-profitRateDifference-202611"),
-  ).toHaveTextContent("-76.3%p");
+  ).toHaveTextContent("−76.3%p");
   expect(screen.getByTestId("business-plan-revenueActual-202611")).toHaveClass(
     "business-plan-current",
   );
@@ -262,10 +262,10 @@ it("opens the requested four source tooltips without a calculation-method box", 
   mount();
   await ready();
   for (const [id, text] of [
-    ["M25-405", "목표 업로드 사업계획 엑셀"],
-    ["M25-406", "영업이익표 매출액(투입 기준, 청구 금액 아님)"],
-    ["M25-407", "목표 업로드 사업계획 엑셀"],
-    ["M25-408", "영업이익표 영업이익"],
+    ["M25-405", "[목표 업로드]로 올린 사업계획 엑셀의 그 달 매출 목표"],
+    ["M25-406", "영업이익표의 그 달 매출액과 같음"],
+    ["M25-407", "[목표 업로드]로 올린 사업계획 엑셀의 그 달 영업이익 목표"],
+    ["M25-408", "영업이익표의 그 달 영업이익과 같음"],
   ]) {
     fireEvent.click(screen.getByTestId(id));
     expect(screen.getByRole("tooltip")).toHaveTextContent(text);
@@ -342,11 +342,13 @@ it("shows closed-month banner and carries only the source month in React Router 
     target: { value: "10" },
   });
   await ready("202610");
-  expect(
-    screen.getByText(
-      "2026-10는 마감되었습니다. 고칠 내용은 다음 달 전월 조정으로 입력하세요.",
-    ),
-  ).toBeVisible();
+  // 시안 lockBanner: 기준월만 굵게(<strong>2026-10</strong>는 마감되었습니다. …)
+  expect(screen.getByTestId("banner-lock")).toHaveTextContent(
+    "2026-10는 마감되었습니다. 고칠 내용은 다음 달 전월 조정으로 입력하세요.",
+  );
+  expect(screen.getByTestId("banner-lock").querySelector("strong")).toHaveTextContent(
+    "2026-10",
+  );
   fireEvent.click(screen.getByTestId("M25-398"));
   expect(screen.getByTestId("location")).toHaveTextContent(
     '"pathname":"/screens/UI-10"',
@@ -395,4 +397,102 @@ it("opens the common B10 file dialog without writing business data", async () =>
   expect(
     request.mock.calls.some(([path]) => path === "/api/common/uploads"),
   ).toBe(false);
+});
+
+/** SFR-118-04 목표 업로드(B.10): 공통 업로드 검사 → (마감한 달 목표가 바뀌면 확인창) → 반영 → 결과 창. */
+function uploadFlow(issues: { row: number; column: string; inputValue: string; reason: string; severity: "경고" }[]) {
+  const checked = {
+    uploadId: "31",
+    modifiedAt: null,
+    statusName: "검사 완료",
+    successCount: 12 - issues.length,
+    warningCount: issues.length,
+    errorCount: 0,
+    issues,
+  };
+  const original = request.getMockImplementation()!;
+  request.mockImplementation(async (path: string, init?: RequestInit) => {
+    if (path === "/api/common/uploads" && init?.method === "POST") return ok(checked);
+    if (path === "/api/common/uploads/31") return ok(checked);
+    if (path === "/api/common/uploads/31/apply")
+      return ok({ ...checked, statusName: "반영 완료" });
+    if (path.startsWith("/api/common/code-groups/") || path.includes("UPLD_STAT"))
+      return ok({ items: [{ code: "APPLIED", codeName: "반영 완료" }] });
+    return original(path, init);
+  });
+}
+const applies = () =>
+  request.mock.calls.filter(([path]) => path === "/api/common/uploads/31/apply");
+async function checkFile() {
+  mount();
+  await ready();
+  fireEvent.click(screen.getByTestId("M25-400"));
+  fireEvent.change(screen.getByTestId("upload-file"), {
+    target: { files: [new File(["x"], "plan.xlsx")] },
+  });
+  fireEvent.click(screen.getByTestId("upload-check"));
+  await screen.findByTestId("upload-result-dialog");
+  await waitFor(() => expect(screen.getByTestId("upload-apply")).toBeEnabled());
+}
+const changed = {
+  row: 2,
+  column: "연월",
+  inputValue: "2026-10",
+  reason: "마감한 달 목표가 지금 목표와 다릅니다.",
+  severity: "경고" as const,
+};
+const empty = (month: string, row: number) => ({
+  row,
+  column: "연월",
+  inputValue: month,
+  reason: "목표가 빈 달 — 오류 없이 0(목표 없음)으로 올립니다.",
+  severity: "경고" as const,
+});
+it("asks with the mockup's three choices when a closed month target changes and cancel writes nothing", async () => {
+  uploadFlow([changed]);
+  await checkFile();
+  fireEvent.click(screen.getByTestId("upload-apply"));
+  const dialog = await screen.findByTestId("business-plan-closed-confirm");
+  expect(dialog).toHaveTextContent("목표 업로드 · 마감한 달 목표가 바뀝니다");
+  expect(dialog).toHaveTextContent("마감한 달(10월)의 목표가 지금 목표와 다릅니다.");
+  expect(within(dialog).getAllByRole("button").map((b) => b.textContent)).toEqual(
+    expect.arrayContaining(["취소", "마감한 달은 두기", "전체 변경"]),
+  );
+  fireEvent.click(screen.getByTestId("business-plan-closed-cancel"));
+  await waitFor(() => expect(screen.queryByTestId("business-plan-closed-confirm")).toBeNull());
+  expect(applies()).toHaveLength(0);
+});
+it("sends keep with the common apply request and shows the result with empty months", async () => {
+  uploadFlow([changed, empty("2026-11", 12), empty("2026-12", 13)]);
+  await checkFile();
+  fireEvent.click(screen.getByTestId("upload-apply"));
+  fireEvent.click(await screen.findByTestId("business-plan-closed-keep"));
+  await waitFor(() => expect(applies()).toHaveLength(1));
+  expect(JSON.parse(String(applies()[0][1]?.body))).toEqual({
+    modifiedAt: null,
+    closedMonthPolicy: "keep",
+  });
+  const done = await screen.findByTestId("business-plan-upload-done");
+  expect(done).toHaveTextContent("마감 안 된 달 목표만 새 파일대로 바꿨습니다. 마감한 10월은 그대로 두었습니다.");
+  expect(done).toHaveTextContent("목표가 빈 달: 11월, 12월 — 오류 없이 0(목표 없음)으로 올렸습니다.");
+});
+it("sends replace for 전체 변경", async () => {
+  uploadFlow([changed]);
+  await checkFile();
+  fireEvent.click(screen.getByTestId("upload-apply"));
+  fireEvent.click(await screen.findByTestId("business-plan-closed-replace"));
+  await waitFor(() => expect(applies()).toHaveLength(1));
+  expect(JSON.parse(String(applies()[0][1]?.body)).closedMonthPolicy).toBe("replace");
+  expect(await screen.findByTestId("business-plan-upload-done")).toHaveTextContent(
+    "1~12월 목표를 새 파일대로 바꿨습니다. 마감한 달 달성률도 새 목표로 계산합니다.",
+  );
+});
+it("uploads unchanged closed months without the confirm dialog or a choice value", async () => {
+  uploadFlow([]);
+  await checkFile();
+  fireEvent.click(screen.getByTestId("upload-apply"));
+  await waitFor(() => expect(applies()).toHaveLength(1));
+  expect(JSON.parse(String(applies()[0][1]?.body))).toEqual({ modifiedAt: null });
+  expect(screen.queryByTestId("business-plan-closed-confirm")).toBeNull();
+  expect(await screen.findByTestId("business-plan-upload-done")).not.toHaveTextContent("목표가 빈 달");
 });

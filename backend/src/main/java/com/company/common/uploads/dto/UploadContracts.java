@@ -26,7 +26,10 @@ public final class UploadContracts {
             this(uploadId, modifiedAt, statusName, successCount, warningCount, errorCount, issues, plannedDevelopers, yearMonth, null, null);
         }
     }
-    public record Apply(Instant modifiedAt) {}
+    /** closedMonthPolicy: B.10 마감한 달 목표가 바뀐 파일에서 고른 값(keep 마감한 달은 두기 / replace 전체 변경). 다른 양식은 생략. */
+    public record Apply(Instant modifiedAt, String closedMonthPolicy) {
+        public Apply(Instant modifiedAt) { this(modifiedAt, null); }
+    }
     /** records: 양식별 반영할 줄(거래처 Input 등). assigned: 행번호별 붙을 번호(B.8). */
     public record Inspection(List<?> records, List<Issue> issues, int successCount,
         int warningCount, int errorCount, int totalCount, java.util.Map<Integer, String> assigned) {

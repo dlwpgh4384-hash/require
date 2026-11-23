@@ -16,4 +16,17 @@
       AND PLAN_YM BETWEEN (CAST(#{year} AS text) || '01') AND (CAST(#{year} AS text) || '12')
     ORDER BY PLAN_YM
   </select>
+  <update id="lockTargets">
+    LOCK TABLE TB_FI_BIZ_PLAN, TB_CL_CLOSE IN SHARE ROW EXCLUSIVE MODE
+  </update>
+  <insert id="upsertTarget">
+    INSERT INTO TB_FI_BIZ_PLAN(PLAN_YM, PART_ID, SALES_TGT_AMT, OPRT_PRFT_TGT_AMT, UPLD_ID, REG_USER_ID, REG_DTTM)
+    VALUES(#{yearMonth}, 'ALL', #{revenueTarget}, #{operatingProfitTarget}, #{uploadId}, #{userId}, clock_timestamp())
+    ON CONFLICT (PLAN_YM, PART_ID) DO UPDATE SET
+      SALES_TGT_AMT = EXCLUDED.SALES_TGT_AMT,
+      OPRT_PRFT_TGT_AMT = EXCLUDED.OPRT_PRFT_TGT_AMT,
+      UPLD_ID = EXCLUDED.UPLD_ID,
+      MOD_USER_ID = #{userId},
+      MOD_DTTM = clock_timestamp()
+  </insert>
 </mapper>

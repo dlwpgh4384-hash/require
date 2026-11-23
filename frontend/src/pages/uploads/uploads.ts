@@ -72,14 +72,20 @@ export function postCommonUpload(
   }
   return request<UploadResult>(root, { method: "POST", body });
 }
+/** B.10 마감한 달 목표가 바뀐 파일에서 고른 값: keep 마감한 달은 두기, replace 전체 변경. */
+export type ClosedMonthPolicy = "keep" | "replace";
 export const postCommonUploadApply = (
   uploadId: string,
   modifiedAt: string | null,
+  /** 주지 않으면 지금과 같은 요청을 보낸다. */
+  closedMonthPolicy?: ClosedMonthPolicy,
 ) =>
   request<UploadResult>(`${root}/${encodeURIComponent(uploadId)}/apply`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ modifiedAt }),
+    body: JSON.stringify(
+      closedMonthPolicy ? { modifiedAt, closedMonthPolicy } : { modifiedAt },
+    ),
   });
 export const uploadFailure = (reason: unknown) =>
   reason instanceof Error

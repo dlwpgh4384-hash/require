@@ -10,14 +10,14 @@ import {
   formatKoreanMoney,
   type MoneyUnit,
 } from "../../shared/list";
-import { Toast } from "../../shared/feedback/Dialog";
+import { Dialog, Toast } from "../../shared/feedback/Dialog";
 import { useViewport } from "../../shared/layout/useViewport";
 import { PeriodSelector } from "../../shared/period/PeriodSelector";
 import { isAllowed } from "../../shared/period/periodRules";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
 import { UploadDialog } from "../uploads/UploadDialog";
 import { UploadResultDialog } from "../uploads/UploadResultDialog";
-import type { UploadResult } from "../uploads/uploads";
+import type { ClosedMonthPolicy, UploadResult } from "../uploads/uploads";
 import {
   BarChart,
   chartColor,
@@ -27,8 +27,24 @@ import { ProjectRequestError } from "../projects/projects";
 import {
   getCommonBusinessPlanComparisons,
   downloadBusinessPlanTemplate,
+  CLOSED_CHANGED_REASON,
+  EMPTY_TARGET_REASON,
+  monthSpan,
+  planUploadMessage,
   type BusinessPlanComparisonResult,
 } from "./businessPlanComparisons";
+
+/** 시안 ic('info',16)·ic('warn',16) */
+const infoIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" />
+  </svg>
+);
+const warnIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01" />
+  </svg>
+);
 import {
   BusinessPlanComparisonTable,
   comparisonPercent,
@@ -63,6 +79,16 @@ export function BusinessPlanComparisonPage() {
     message: string;
     kind: "ok" | "warn" | "info";
   } | null>(null);
+  const [confirm, setConfirm] = useState<{
+    year: string;
+    resolve: (
+      value: { closedMonthPolicy?: ClosedMonthPolicy } | false,
+    ) => void;
+  } | null>(null);
+  const [done, setDone] = useState<{ message: string; empty: string[] } | null>(
+    null,
+  );
+  const policy = useRef<ClosedMonthPolicy | undefined>(undefined);
   const root = useRef<HTMLElement>(null);
   const state = period.state;
   const filter = useMemo(
@@ -155,6 +181,19 @@ export function BusinessPlanComparisonPage() {
         disabled={!filter || downloading}
         onClick={() => void template()}
       >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+        </svg>
         양식 내려받기
       </button>
       <button
@@ -164,10 +203,46 @@ export function BusinessPlanComparisonPage() {
         disabled={!filter}
         onClick={() => setUpload(true)}
       >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 20V9M7 14l5-5 5 5M5 4h14" />
+        </svg>
         목표 업로드
       </button>
     </div>
   );
+  /** 그해 마감한 달(YYYYMM): 월 마감(TB_CL_CLOSE)과 같은 기간 기준. */
+  const closedOf = (year: string) =>
+    state.status === "ready"
+      ? state.basis.closedMonths.filter((m) => m.startsWith(year)).sort()
+      : [];
+  const beforeApply = (
+    checked: UploadResult,
+  ): Promise<{ closedMonthPolicy?: ClosedMonthPolicy } | false> => {
+    policy.current = undefined;
+    const changed = checked.issues.find(
+      (i) => i.reason === CLOSED_CHANGED_REASON,
+    );
+    if (!changed) return Promise.resolve({});
+    return new Promise((resolve) =>
+      setConfirm({ year: changed.inputValue.slice(0, 4), resolve }),
+    );
+  };
+  const choose = (value: ClosedMonthPolicy | false) => {
+    if (!confirm) return;
+    policy.current = value || undefined;
+    confirm.resolve(value ? { closedMonthPolicy: value } : false);
+    setConfirm(null);
+  };
   const summary = data?.summary;
   const monthLabel = data
     ? `${data.baseMonth.slice(0, 4)}-${data.baseMonth.slice(4)}`
@@ -242,12 +317,12 @@ export function BusinessPlanComparisonPage() {
                 </button>
               }
             >
-              {monthLabel}는 마감되었습니다. 고칠 내용은 다음 달 전월 조정으로
-              입력하세요.
+              <strong>{monthLabel}</strong>는 마감되었습니다. 고칠 내용은 다음
+              달 전월 조정으로 입력하세요.
             </Banner>
           )}
           {!data.hasTargets && (
-            <Banner kind="info" icon={null}>
+            <Banner kind="warn" icon={infoIcon}>
               {data.year}년 사업계획 목표가 아직 없습니다. [목표 업로드]로 올려
               주세요.
             </Banner>
@@ -267,7 +342,7 @@ export function BusinessPlanComparisonPage() {
                   summary?.cumulativeRevenueAchievementRate,
                 )}
                 testId="business-plan-kpi-revenue"
-                description={`실적 ${formatKoreanMoney(summary?.cumulativeRevenueActual)} / 목표 ${formatKoreanMoney(summary?.cumulativeRevenueTarget)}`}
+                description={`${formatKoreanMoney(summary?.cumulativeRevenueActual)} / 목표 ${formatKoreanMoney(summary?.cumulativeRevenueTarget)}`}
               />
               <KpiCard
                 label="누계 영업이익 달성률"
@@ -275,7 +350,7 @@ export function BusinessPlanComparisonPage() {
                   summary?.cumulativeOperatingProfitAchievementRate,
                 )}
                 testId="business-plan-kpi-profit"
-                description={`실적 ${formatKoreanMoney(summary?.cumulativeOperatingProfitActual)} / 목표 ${formatKoreanMoney(summary?.cumulativeOperatingProfitTarget)}`}
+                description={`${formatKoreanMoney(summary?.cumulativeOperatingProfitActual)} / 목표 ${formatKoreanMoney(summary?.cumulativeOperatingProfitTarget)}`}
               />
               <KpiCard
                 label={`${monthLabel} 매출 달성률`}
@@ -308,13 +383,20 @@ export function BusinessPlanComparisonPage() {
                 },
               ]}
               guide={{
-                name: "매출 목표",
-                values: data.months.map((m) => m.revenueTarget),
+                name: "목표",
+                // 목표 0 = 목표 없음: 그 달은 점선을 그리지 않는다.
+                values: data.months.map((m) =>
+                  m.revenueTarget ? m.revenueTarget : null,
+                ),
               }}
               testId="business-plan-chart"
             />
           </section>
-          <section data-testid="business-plan-months" aria-label="월별 달성률">
+          <section
+            className="business-plan-months"
+            data-testid="business-plan-months"
+            aria-label="월별 달성률"
+          >
             <div className="ls-tbar">
               <strong>월별 달성률</strong>
               <span data-action-id="M25-397">
@@ -367,11 +449,110 @@ export function BusinessPlanComparisonPage() {
             setResult(null);
             setRevision((v) => v + 1);
           }}
-          onApplied={() => {
+          beforeApply={beforeApply}
+          onApplied={(applied) => {
+            const year = (
+              applied.issues.find((i) => i.reason === CLOSED_CHANGED_REASON)
+                ?.inputValue ?? ""
+            ).slice(0, 4);
+            setResult(null);
+            setDone({
+              message: planUploadMessage(
+                policy.current,
+                closedOf(year || String(filter?.year ?? "")),
+              ),
+              empty: applied.issues
+                .filter((i) => i.reason === EMPTY_TARGET_REASON)
+                .map((i) => i.inputValue),
+            });
             setRevision((v) => v + 1);
-            setNotice({ message: "사업계획 목표를 반영했습니다.", kind: "ok" });
           }}
         />
+      )}
+      {confirm && (
+        <Dialog
+          title="목표 업로드 · 마감한 달 목표가 바뀝니다"
+          testId="business-plan-closed-confirm"
+          closable
+          onClose={() => choose(false)}
+        >
+          <div className="upload-mb">
+            <p>
+              올린 파일에서{" "}
+              <strong>마감한 달({monthSpan(closedOf(confirm.year))})</strong>의
+              목표가 지금 목표와 다릅니다.
+            </p>
+            <p className="upload-sub">
+              마감한 달 목표를 바꾸면 지난 달성률이 달라집니다. 실적은 바뀌지
+              않고, 업로드 기록에 남습니다. 마감한 달 목표가 그대로인 파일은 이
+              창 없이 바로 올라갑니다.
+            </p>
+          </div>
+          <footer className="upload-mf">
+            <span />
+            <div className="upload-mf-r">
+              <button
+                type="button"
+                className="ls-btn"
+                data-testid="business-plan-closed-cancel"
+                onClick={() => choose(false)}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="ls-btn"
+                data-testid="business-plan-closed-keep"
+                onClick={() => choose("keep")}
+              >
+                마감한 달은 두기
+              </button>
+              <button
+                type="button"
+                className="ls-btn ls-btn-p"
+                data-testid="business-plan-closed-replace"
+                onClick={() => choose("replace")}
+              >
+                전체 변경
+              </button>
+            </div>
+          </footer>
+        </Dialog>
+      )}
+      {done && (
+        <Dialog
+          title="목표 업로드 결과"
+          testId="business-plan-upload-done"
+          closable
+          onClose={() => setDone(null)}
+        >
+          <div className="upload-mb">
+            <p>{done.message}</p>
+            {done.empty.length > 0 && (
+              <Banner kind="warn" icon={warnIcon}>
+                목표가 빈 달:{" "}
+                <strong>
+                  {done.empty.map((m) => `${Number(m.slice(5))}월`).join(", ")}
+                </strong>{" "}
+                — 오류 없이 0(목표 없음)으로 올렸습니다. 이 달의 달성률은
+                「–」로 보입니다.
+              </Banner>
+            )}
+          </div>
+          <footer className="upload-mf">
+            <span />
+            <div className="upload-mf-r">
+              <button
+                type="button"
+                className="ls-btn ls-btn-p"
+                data-testid="business-plan-upload-done-close"
+                onClick={() => setDone(null)}
+              >
+                닫기
+              </button>
+            </div>
+          </footer>
+        </Dialog>
       )}
       {notice && (
         <Toast

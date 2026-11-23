@@ -20,8 +20,9 @@ public class CommonUploadController {
     public CommonUploadController(CommonUploadService service) { this.service = service; }
 
     @GetMapping("/api/common/uploads/templates/{formTypeCode}")
-    public ResponseEntity<byte[]> getCommonUploadTemplate(@PathVariable String formTypeCode) {
-        return download(service.getCommonUploadTemplate(formTypeCode), service.templateFileName(formTypeCode));
+    public ResponseEntity<byte[]> getCommonUploadTemplate(@PathVariable String formTypeCode,
+        @RequestParam(required = false) Integer year) {
+        return download(service.getCommonUploadTemplate(formTypeCode, year), service.templateFileName(formTypeCode));
     }
     @PostMapping(value = "/api/common/uploads", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Response<UploadContracts.Result> postCommonUpload(@RequestParam String formTypeCode,

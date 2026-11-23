@@ -31,6 +31,7 @@ import { MenuWorkspaceProvider } from "../menusettings/MenuWorkspace";
 import { RoleWorkspaceProvider } from "../roles/RoleWorkspace";
 import { UserWorkspaceProvider } from "../users/UserWorkspace";
 import { MonthCloseWorkspaceProvider } from "../monthcloses/MonthCloseWorkspace";
+import { CandidateWorkspaceProvider } from "../candidates/CandidateWorkspace";
 
 // 만든 화면은 화면 목록(screenRegistry) 한 곳에서 고른다. 없으면 「준비 중」.
 const renderScreen = (scrnId: string) => {
@@ -131,19 +132,21 @@ export function CommonNavigationPage() {
                                     <OperatingProfitStatementWorkspaceProvider>
                                       <NetProfitStatementWorkspaceProvider>
                                         <MonthCloseWorkspaceProvider>
-                                          {preferences ? (
-                                            <PreferenceNavigation />
-                                          ) : (
-                                            <NavigationRoot
-                                              tabs
-                                              renderScreen={renderScreen}
-                                              extensions={(context) => ({
-                                                screenActions: screenActions(
-                                                  context.screenId,
-                                                ),
-                                              })}
-                                            />
-                                          )}
+                                          <CandidateWorkspaceProvider>
+                                            {preferences ? (
+                                              <PreferenceNavigation />
+                                            ) : (
+                                              <NavigationRoot
+                                                tabs
+                                                renderScreen={renderScreen}
+                                                extensions={(context) => ({
+                                                  screenActions: screenActions(
+                                                    context.screenId,
+                                                  ),
+                                                })}
+                                              />
+                                            )}
+                                          </CandidateWorkspaceProvider>
                                         </MonthCloseWorkspaceProvider>
                                       </NetProfitStatementWorkspaceProvider>
                                     </OperatingProfitStatementWorkspaceProvider>

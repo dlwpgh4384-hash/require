@@ -1,5 +1,9 @@
 import type { ReactElement } from "react";
 import { MonthClosePage } from "../monthcloses/MonthClosePage";
+import {
+  CandidateWorkspace,
+  CandidateTitleActions,
+} from "../candidates/CandidateWorkspace";
 import { MonthCloseTitleActions } from "../monthcloses/MonthCloseWorkspace";
 import { CashFlowStatementPage } from "../cashflowstatements/CashFlowStatementPage";
 import { CashFlowStatementTitleActions } from "../cashflowstatements/CashFlowStatementWorkspace";
@@ -67,6 +71,13 @@ export interface ScreenEntry {
  * 공통 화면 틀 시험도 여기서 만든 화면과 「준비 중」 화면을 나눈다. 새 화면은 여기에 한 줄만 더한다.
  */
 export const screenRegistry: readonly ScreenEntry[] = [
+  {
+    id: "UI-33",
+    Page: () => <CandidateWorkspace />,
+    TitleActions: () => <CandidateTitleActions />,
+    rootTestId: "candidate-workspace",
+    hasInputs: false,
+  },
   {
     id: "UI-14",
     Page: () => <MonthClosePage />,

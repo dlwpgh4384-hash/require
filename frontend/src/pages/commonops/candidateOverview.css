@@ -1,0 +1,39 @@
+.candidate-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  color: var(--text);
+}
+.candidate-overview-shortages,
+.candidate-resume-import {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+.candidate-overview .ls-twrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.candidate-overview .ls-btn-sm {
+  min-height: 28px;
+}
+.candidate-resume-import input {
+  display: block;
+  max-width: 100%;
+}
+.candidate-resume-import p,
+.candidate-resume-import li {
+  color: var(--text-sub);
+}
+.candidate-resume-import [role="alert"] {
+  color: var(--ls-bad);
+}
+@media (max-width: 600px) {
+  .candidate-overview .ls-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

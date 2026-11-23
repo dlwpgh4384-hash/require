@@ -1,0 +1,167 @@
+.candidate-workspace,
+.candidate-page {
+  min-width: 0;
+  max-width: 100%;
+}
+.candidate-page {
+  display: grid;
+  gap: 16px;
+}
+.candidate-heading,
+.candidate-detail header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.candidate-actions,
+.candidate-form footer,
+.candidate-contact-form footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.candidate-summary,
+.candidate-shortages,
+.candidate-list,
+.candidate-detail {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+.candidate-summary dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  gap: 12px;
+}
+.candidate-summary dd {
+  font-size: 24px;
+  margin: 8px 0 0;
+  font-weight: 600;
+}
+.candidate-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+.candidate-filters label,
+.candidate-field,
+.candidate-contact-form {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.candidate-page select,
+.candidate-form input:not([type="checkbox"]),
+.candidate-form select,
+.candidate-form textarea,
+.candidate-contact-form select,
+.candidate-contact-form textarea {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 8px;
+}
+.candidate-filters select {
+  width: auto;
+}
+.candidate-name {
+  border: none;
+  background: none;
+  color: var(--primary-text);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+}
+.candidate-chip {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 5px;
+  margin: 2px;
+}
+.candidate-warning {
+  font-weight: 600;
+}
+.candidate-page .ls-twrap {
+  max-width: 100%;
+  overflow: auto;
+}
+.candidate-page .ls-btn-sm {
+  min-height: 28px;
+}
+.candidate-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+.candidate-span {
+  grid-column: 1 / -1;
+}
+.candidate-field small,
+.candidate-contact-list small,
+.candidate-info small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.candidate-form,
+.candidate-contact-form {
+  min-width: 0;
+  max-width: 100%;
+}
+.app-dialog:has(.candidate-form) {
+  width: min(860px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+}
+.candidate-info {
+  display: grid;
+  grid-template-columns: minmax(80px, auto) minmax(0, 1fr);
+  gap: 8px 16px;
+}
+.candidate-info dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.candidate-contact-list {
+  padding-left: 20px;
+}
+.candidate-contact-list li {
+  padding: 10px 0;
+  overflow-wrap: anywhere;
+}
+.candidate-resume {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .candidate-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .candidate-summary dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .candidate-filters label {
+    flex: 1 1 140px;
+  }
+  .candidate-filters select {
+    width: 100%;
+  }
+  .candidate-info {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .candidate-info dt {
+    font-weight: 600;
+  }
+}

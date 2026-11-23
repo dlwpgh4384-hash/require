@@ -8,8 +8,8 @@ spring:
     name: navigation-shell
   servlet:
     multipart:
-      max-file-size: 10000000B
-      max-request-size: 11000000B
+      max-file-size: 10485760B
+      max-request-size: 11534336B
   # 내 PC 개발 DB 기본값(2026-11-16 사용자 결정, 개발 기간 시험용). 환경 변수 DB_URL·DB_USER·DB_PASSWORD가 있으면 그것을 쓴다
   # (미리보기는 docker가 환경 변수를 넣으므로 이 값을 쓰지 않는다). 운영 전에 기본값은 지운다.
   datasource:

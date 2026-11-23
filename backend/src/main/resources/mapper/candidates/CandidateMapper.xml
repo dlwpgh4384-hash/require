@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.candidates.mapper.CandidateMapper">
+  <resultMap id="candidate" type="com.company.common.candidates.mapper.CandidateRows$CandidateRow" autoMapping="false">
+    <constructor>
+      <idArg column="cand_id" javaType="string"/>
+      <arg column="cand_nm" javaType="string"/>
+      <arg column="emp_type_cd" javaType="string"/>
+      <arg column="blng_clnt_id" javaType="string"/>
+      <arg column="telno" javaType="string"/>
+      <arg column="email_addr" javaType="string"/>
+      <arg column="prvc_agre_yn" javaType="string"/>
+      <arg column="prvc_agre_dt" javaType="java.time.LocalDate"/>
+      <arg column="prvc_agre_user_id" javaType="string"/>
+      <arg column="job_cd" javaType="string"/>
+      <arg column="sub_job_cd" javaType="string"/>
+      <arg column="grade_cd" javaType="string"/>
+      <arg column="home_area_cd" javaType="string"/>
+      <arg column="home_addr" javaType="string"/>
+      <arg column="hope_uprc" javaType="java.math.BigDecimal"/>
+      <arg column="input_psbl_dt" javaType="java.time.LocalDate"/>
+      <arg column="cntc_stat_cd" javaType="string"/>
+      <arg column="last_cntc_dt" javaType="java.time.LocalDate"/>
+      <arg column="cand_src_cd" javaType="string"/>
+      <arg column="memo_cn" javaType="string"/>
+      <arg column="reg_dttm" javaType="java.time.Instant"/>
+      <arg column="mod_dttm" javaType="java.time.Instant"/>
+      <arg column="company_name" javaType="string"/>
+      <arg column="consent_user_name" javaType="string"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="contact" type="com.company.common.candidates.mapper.CandidateRows$ContactRow" autoMapping="false">
+    <constructor>
+      <arg column="cntc_stat_cd" javaType="string"/>
+      <arg column="cntc_memo" javaType="string"/>
+      <arg column="reg_dttm" javaType="java.time.Instant"/>
+      <arg column="reg_user_id" javaType="string"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="area" type="com.company.common.candidates.mapper.CandidateRows$Area" autoMapping="false">
+    <constructor><arg column="area_cd" javaType="string"/><arg column="address" javaType="string"/></constructor>
+  </resultMap>
+  <resultMap id="seat" type="com.company.common.candidates.mapper.CandidateRows$Seat" autoMapping="false">
+    <constructor>
+      <arg column="opp_id" javaType="string"/>
+      <arg column="need_sn" javaType="java.math.BigDecimal"/>
+      <arg column="opp_nm" javaType="string"/>
+      <arg column="win_prbl_rt" javaType="java.math.BigDecimal"/>
+      <arg column="job_cd" javaType="string"/>
+      <arg column="grade_cd" javaType="string"/>
+      <arg column="bgn_ym" javaType="string"/>
+      <arg column="prd_mcnt" javaType="java.math.BigDecimal"/>
+      <arg column="expct_uprc" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <sql id="columns">
+    c.cand_id,c.cand_nm,c.emp_type_cd,c.blng_clnt_id,c.telno,c.email_addr,c.prvc_agre_yn,
+    c.prvc_agre_dt,c.prvc_agre_user_id,c.job_cd,c.sub_job_cd,c.grade_cd,c.home_area_cd,
+    c.home_addr,c.hope_uprc,c.input_psbl_dt,c.cntc_stat_cd,c.last_cntc_dt,c.cand_src_cd,
+    c.memo_cn,c.reg_dttm,c.mod_dttm,b.clnt_nm AS company_name,
+    COALESCE(u.user_nm,c.prvc_agre_user_id) AS consent_user_name
+  </sql>
+  <sql id="joins">
+    LEFT JOIN TB_BS_CLNT b ON b.clnt_id=c.blng_clnt_id
+    LEFT JOIN TB_SY_USER u ON u.user_id=c.prvc_agre_user_id
+  </sql>
+  <select id="selectCandidates" resultMap="candidate">
+    SELECT <include refid="columns"/> FROM TB_HR_CAND c <include refid="joins"/>
+    <where>
+      <if test="filter.jobCode != null">AND c.job_cd=#{filter.jobCode}</if>
+      <if test="filter.gradeCode != null">AND c.grade_cd=#{filter.gradeCode}</if>
+      <if test="filter.employeeTypeCode != null">AND c.emp_type_cd=#{filter.employeeTypeCode}</if>
+      <if test="filter.contactStatusCode != null">AND c.cntc_stat_cd=#{filter.contactStatusCode}</if>
+      <if test="availableThrough != null">AND c.input_psbl_dt &lt;= #{availableThrough}</if>
+    </where>
+    ORDER BY CASE WHEN c.cntc_stat_cd IN ('HOLD','CTRT') THEN 1 ELSE 0 END,
+      c.input_psbl_dt,c.cand_id
+  </select>
+  <select id="selectCandidate" resultMap="candidate">
+    SELECT <include refid="columns"/> FROM TB_HR_CAND c <include refid="joins"/> WHERE c.cand_id=#{id}
+  </select>
+  <select id="lockCandidate" resultMap="candidate">
+    SELECT <include refid="columns"/> FROM TB_HR_CAND c <include refid="joins"/>
+    WHERE c.cand_id=#{id} FOR UPDATE OF c
+  </select>
+  <insert id="insertCandidate">
+    INSERT INTO TB_HR_CAND(cand_id,cand_nm,emp_type_cd,blng_clnt_id,telno,email_addr,
+      prvc_agre_yn,prvc_agre_dt,prvc_agre_user_id,job_cd,sub_job_cd,grade_cd,home_area_cd,
+      home_addr,hope_uprc,input_psbl_dt,cntc_stat_cd,last_cntc_dt,cand_src_cd,memo_cn,reg_user_id)
+    VALUES(#{candidateId},#{input.name},#{input.employeeTypeCode},#{input.companyId,jdbcType=VARCHAR},
+      #{input.phone,jdbcType=VARCHAR},#{input.email,jdbcType=VARCHAR},
+      CASE WHEN #{input.privacyAgreement} THEN 'Y' ELSE 'N' END,
+      CASE WHEN #{input.privacyAgreement} THEN #{today} ELSE NULL END,
+      CASE WHEN #{input.privacyAgreement} THEN 'admin' ELSE NULL END,
+      #{input.primaryJobCode},#{input.secondaryJobCode,jdbcType=VARCHAR},#{input.gradeCode},
+      #{input.homeAreaCode,jdbcType=VARCHAR},#{input.homeAddress,jdbcType=VARCHAR},
+      #{input.desiredMonthlyRate},#{input.availableDate},'BEFORE',#{today},#{input.sourceCode},
+      #{input.memo,jdbcType=VARCHAR},'admin')
+    ON CONFLICT ON CONSTRAINT PK_TB_HR_CAND DO NOTHING
+  </insert>
+  <update id="updateCandidate">
+    UPDATE TB_HR_CAND SET cand_nm=#{input.name},emp_type_cd=#{input.employeeTypeCode},
+      blng_clnt_id=#{input.companyId,jdbcType=VARCHAR},telno=#{input.phone,jdbcType=VARCHAR},
+      email_addr=#{input.email,jdbcType=VARCHAR},prvc_agre_yn=CASE WHEN #{input.privacyAgreement} THEN 'Y' ELSE 'N' END,
+      prvc_agre_dt=CASE WHEN prvc_agre_dt IS NULL AND #{input.privacyAgreement} THEN #{today} ELSE prvc_agre_dt END,
+      prvc_agre_user_id=CASE WHEN prvc_agre_dt IS NULL AND #{input.privacyAgreement} THEN 'admin' ELSE prvc_agre_user_id END,
+      job_cd=#{input.primaryJobCode},sub_job_cd=#{input.secondaryJobCode,jdbcType=VARCHAR},grade_cd=#{input.gradeCode},
+      home_area_cd=#{input.homeAreaCode,jdbcType=VARCHAR},home_addr=#{input.homeAddress,jdbcType=VARCHAR},
+      hope_uprc=#{input.desiredMonthlyRate},input_psbl_dt=#{input.availableDate},cand_src_cd=#{input.sourceCode},
+      memo_cn=#{input.memo,jdbcType=VARCHAR},mod_user_id='admin',
+      mod_dttm=GREATEST(clock_timestamp(),mod_dttm+INTERVAL '1 microsecond') WHERE cand_id=#{candidateId}
+  </update>
+  <delete id="deleteSkills">DELETE FROM TB_HR_CAND_SKILL WHERE cand_id=#{id}</delete>
+  <insert id="insertSkill">
+    INSERT INTO TB_HR_CAND_SKILL(cand_id,skill_nm,sort_ord,reg_user_id) VALUES(#{id},#{name},#{sort},'admin')
+  </insert>
+  <select id="selectSkills" resultType="string">
+    SELECT s.skill_nm FROM TB_HR_CAND_SKILL s WHERE s.cand_id=#{id} ORDER BY s.sort_ord,s.skill_nm
+  </select>
+  <insert id="insertContact">
+    INSERT INTO TB_HR_CAND_CNTC(cand_id,cntc_sn,cntc_stat_cd,cntc_memo,cntc_dt,reg_user_id,reg_dttm)
+    SELECT #{candidateId},COALESCE(MAX(h.cntc_sn),0)+1,#{status},#{memo},#{today},#{actor},clock_timestamp()
+    FROM TB_HR_CAND_CNTC h WHERE h.cand_id=#{candidateId}
+  </insert>
+  <update id="updateContact">
+    UPDATE TB_HR_CAND SET cntc_stat_cd=#{status},last_cntc_dt=#{today},mod_user_id='admin',
+      mod_dttm=GREATEST(clock_timestamp(),mod_dttm+INTERVAL '1 microsecond') WHERE cand_id=#{candidateId}
+  </update>
+  <select id="selectContacts" resultMap="contact">
+    SELECT h.cntc_stat_cd,h.cntc_memo,h.reg_dttm,h.reg_user_id FROM TB_HR_CAND_CNTC h
+    WHERE h.cand_id=#{id} ORDER BY h.reg_dttm DESC,h.cntc_sn DESC
+  </select>
+  <select id="selectableCompany" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_BS_CLNT b WHERE b.clnt_id=#{id} AND b.use_yn='Y' AND b.clnt_type_cd IN ('VNDR','BOTH'))
+  </select>
+  <select id="selectArea" resultMap="area">
+    SELECT a.area_cd,concat_ws(' ',a.sido_nm,a.sgg_nm,a.emd_nm) AS address
+    FROM TB_SY_ADM_AREA a WHERE a.area_cd=#{code} AND a.use_yn='Y'
+  </select>
+  <select id="selectSeats" resultMap="seat">
+    SELECT o.opp_id,n.need_sn,o.opp_nm,o.win_prbl_rt,n.job_cd,n.grade_cd,n.bgn_ym,n.prd_mcnt,n.expct_uprc
+    FROM TB_SL_OPP o JOIN TB_SL_OPP_NEED n ON n.opp_id=o.opp_id
+    WHERE o.opp_stat_cd='ING' AND n.job_cd=#{jobCode} AND n.prd_mcnt &gt; 0
+      AND n.need_cnt &gt; 0 AND n.expct_uprc &gt; 0 ORDER BY o.opp_id,n.need_sn
+  </select>
+  <select id="allowance" resultType="java.math.BigDecimal">
+    SELECT c.code_val FROM TB_SY_CODE c WHERE c.code_grp_id='ALWNC' AND c.code=#{code}
+      AND c.use_yn='Y' AND c.del_yn='N'
+  </select>
+</mapper>

@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState, type InputHTMLAttributes, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { Dialog } from "../../shared/feedback/Dialog";
+import { Banner } from "../../shared/list";
+import { usePreferenceBusinessShortcuts } from "../userpreferences/UserPreferenceTools";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { useScreenTitleOverride } from "../../shared/layout/ScreenTitleOverride";
 import {
   DeveloperRequestError,
   developerFailure,
   directLabel,
+  getCommonDeveloper,
   getCommonDeveloperAreas,
   postCommonDeveloper,
   putCommonDeveloper,
@@ -79,6 +82,8 @@ export function DeveloperForm({
   const saving = useRef(false);
   const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  /** FR-0106: 저장 때 돌려보낼 수정 시각. 409 뒤 [최신 버전 불러오기]로 새로 받는다(입력은 그대로). */
+  const version = useRef(developer?.modifiedAt ?? null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const formRef = useRef<HTMLElement>(null);
   const [areas, setAreas] = useState<DeveloperArea[][]>([[], [], []]);
@@ -301,7 +306,7 @@ export function DeveloperForm({
     setError(null);
     try {
       const saved = developer
-        ? await putCommonDeveloper(developer.developerId, payload(), developer.modifiedAt ?? null)
+        ? await putCommonDeveloper(developer.developerId, payload(), version.current)
         : await postCommonDeveloper(payload());
       original.current = JSON.stringify(draft);
       setDirty("UI-02", false);
@@ -315,17 +320,19 @@ export function DeveloperForm({
   };
   const currentSave = useRef(save);
   currentSave.current = save;
-  useEffect(() => {
-    // 공통 기능: Ctrl+S로 저장
-    const handler = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        void currentSave.current();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
+  // 공통 기능 Ctrl+S: 공통 단축키 훅(숨은 화면 탭이면 넘김)
+  const saveShortcut = useCallback(() => void currentSave.current(), []);
+  usePreferenceBusinessShortcuts({ onSave: saveShortcut, scope: formRef }, !leaving);
+  const conflict = error instanceof DeveloperRequestError && error.status === 409;
+  const reloadVersion = () => {
+    if (!developer) return;
+    getCommonDeveloper(developer.developerId)
+      .then((latest) => {
+        version.current = latest.modifiedAt ?? null;
+        setError(null);
+      })
+      .catch((reason) => setError(reason));
+  };
   const textInput = (key: "name" | "managementNumber" | "skills", max: number, extra?: Partial<InputHTMLAttributes<HTMLInputElement>>) => (
     <input
       id={`developer-${key}`}
@@ -381,11 +388,16 @@ export function DeveloperForm({
     );
   return (
     <section ref={formRef} className="developer-form" data-testid="developer-form" data-screen-id="UI-02">
-      <div className="ls-banner ls-banner-info developer-form-banner" role="status">
-        <span>
-          보유 스킬·거주지는 이 화면에서만 입력합니다(「내 정보」에서는 고치지 않음). 거주지는 시·도, 시·군·구, 동까지 받습니다(번지는 받지 않음). 연락처는 받지 않습니다.
-        </span>
-      </div>
+      <Banner
+        kind="info"
+        icon={
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" />
+          </svg>
+        }
+      >
+        보유 스킬·거주지는 이 화면에서만 입력합니다(「내 정보」에서는 고치지 않음). 거주지는 시·도, 시·군·구, 동까지 받습니다(번지는 받지 않음). 연락처는 받지 않습니다.
+      </Banner>
       <section className="developer-card">
         <h2>기본 정보</h2>
         <div className="developer-fgrid">
@@ -507,9 +519,14 @@ export function DeveloperForm({
       </section>
       {(areaError || error != null) && (
         <div role="alert" className="developer-error">
-          {areaError || (error instanceof DeveloperRequestError && error.status === 409
+          {areaError || (conflict
             ? "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요."
             : developerFailure(error))}
+          {!areaError && conflict && developer && (
+            <button type="button" data-testid="developer-version-refresh" onClick={reloadVersion}>
+              최신 버전 불러오기 (입력 유지)
+            </button>
+          )}
           {areaError && (
             <button type="button" data-testid="developer-area-retry" onClick={() => setAreaRevision((v) => v + 1)}>
               다시 시도

@@ -319,8 +319,11 @@ public class CommonDeveloperService {
         lock(); var changed=new ArrayList<String>(); var rejected=new ArrayList<UseIssue>();
         for (String id : input.developerIds().stream().distinct().sorted().toList()) {
             Developer d=require(id); refresh(d,false); String reason=null;
+            // 이미 그 상태면 바꾸지 않는다(같은 값의 변경 이력을 남기지 않음, 시안 「이미 사용 중지된 개발자입니다.」)
+            if (input.useYn().equals(d.useYn)) continue;
+            // SFR-102-08·시안 devStop 문구
             if ("N".equals(input.useYn()) && mapper.selectAssignments(id).stream().anyMatch(a -> !a.endDate.isBefore(calendar.today())))
-                reason="진행 중인 투입이 남아 있습니다. 변경 기록의 조기 철수로 먼저 배정을 끝내세요.";
+                reason="투입 중인 배정이 있어 중지할 수 없습니다. 먼저 투입 배정의 [변경 기록]에서 조기 철수로 배정을 끝내 주세요.";
             if ("Y".equals(input.useYn()) && DeveloperBusinessPolicy.retired(d.retirementDate,calendar.today()))
                 reason="퇴사한 개발자는 다시 사용할 수 없습니다. 새로 등록하세요.";
             if (reason!=null) { rejected.add(new UseIssue(id,d.name,reason)); continue; }

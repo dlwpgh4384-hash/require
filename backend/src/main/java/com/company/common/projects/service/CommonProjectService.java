@@ -245,7 +245,7 @@ public class CommonProjectService implements org.springframework.context.Applica
         mapper.insertProject(new Write(p, actor.userId()));
         mapper.insertPart(new PartWrite(p.projectId, db(YearMonth.from(p.startDate)),
             internal(p) ? null : input.salesPartId(), null, actor.userId()));
-        history(p.projectId, "CTRT", "계약", null, p.projectName);
+        history(p.projectId, "CTRT", "계약", null, p.contractAmount);
         activated(p.projectId);
         return getCommonProject(p.projectId);
     }
@@ -271,8 +271,8 @@ public class CommonProjectService implements org.springframework.context.Applica
         change(id, "ETC", "견적 금액", old.estimateAmount, p.estimateAmount);
         change(id, "AMT", "계약금액", old.contractAmount, p.contractAmount);
         change(id, "BUDGET", "예산(목표원가)", old.budgetAmount, p.budgetAmount);
-        change(id, "TEAM", "팀비", old.teamExpenseAmount, p.teamExpenseAmount);
-        change(id, "PEXP", "프로젝트경비", old.projectExpenseAmount, p.projectExpenseAmount);
+        change(id, "TEAM", "팀비(월)", old.teamExpenseAmount, p.teamExpenseAmount);
+        change(id, "PEXP", "프로젝트경비(월)", old.projectExpenseAmount, p.projectExpenseAmount);
         change(id, "ETC", "특징", old.feature, p.feature);
         mapper.updateProject(new Write(p, actor.userId()));
         return getCommonProject(id);
@@ -287,9 +287,13 @@ public class CommonProjectService implements org.springframework.context.Applica
         if (before instanceof BigDecimal a && after instanceof BigDecimal b && a.compareTo(b) == 0) return;
         if (!Objects.equals(before, after)) history(id, code, name, before, after);
     }
+    /** 이력 값: 금액은 지수 표기 없이 숫자 그대로(원가 분석이 다시 숫자로 읽고, 화면이 「1,000 원」으로 보인다). */
+    private static String text(Object value) {
+        return value == null ? null : value instanceof BigDecimal b ? b.toPlainString() : value.toString();
+    }
     private void history(String id, String code, String name, Object before, Object after) {
-        mapper.insertHistory(new Audit(id, code, name, before == null ? null : before.toString(),
-            after == null ? null : after.toString(), actor.userId()));
+        mapper.insertHistory(new Audit(id, code, name, text(before),
+            text(after), actor.userId()));
     }
     public Items<History> getCommonProjectChangeHistory(String id) { require(id); return new Items<>(mapper.histories(id)); }
     public Items<SalesPart> getCommonProjectSalesParts(String id) { require(id); return new Items<>(mapper.salesParts(id, currentMonth())); }
@@ -401,7 +405,7 @@ public class CommonProjectService implements org.springframework.context.Applica
     public Project postCommonProjectStart(String id) {
         var p = locked(id); writable(p);
         if (!"PRE".equals(p.statusCode)) throw ProjectRules.invalid("projectId");
-        mapper.start(id);
+        mapper.start(id, actor.userId());
         activated(id);
         return getCommonProject(id);
     }

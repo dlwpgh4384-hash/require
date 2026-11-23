@@ -58,11 +58,11 @@
   <insert id="insertProject">
     INSERT INTO TB_PJ_PROJ (PROJ_ID, PROJ_NM, CUST_CLNT_ID, CTRT_TYPE_CD, PROJ_STAT_CD,
       CTRT_BGN_DT, CTRT_END_DT, WORK_PLC_ADDR, EST_AMT, ORGNL_CTRT_AMT, CTRT_AMT, BDGT_AMT,
-      BDGT_MANUAL_YN, TEAM_EXPS_AMT, PROJ_EXPS_AMT, FEATURE_CN, REG_USER_ID)
+      BDGT_MANUAL_YN, TEAM_EXPS_AMT, PROJ_EXPS_AMT, FEATURE_CN, REG_USER_ID, REG_DTTM)
     VALUES (#{project.projectId}, #{project.projectName}, #{project.customerId}, #{project.contractTypeCode},
       #{project.statusCode}, #{project.startDate}, #{project.endDate}, #{project.workplace},
       #{project.estimateAmount}, #{project.originalContractAmount}, #{project.contractAmount}, #{project.budgetAmount},
-      #{project.budgetManualYn}, #{project.teamExpenseAmount}, #{project.projectExpenseAmount}, #{project.feature}, #{actor})
+      #{project.budgetManualYn}, #{project.teamExpenseAmount}, #{project.projectExpenseAmount}, #{project.feature}, #{actor}, clock_timestamp())
   </insert>
   <update id="updateProject">
     UPDATE TB_PJ_PROJ SET PROJ_NM=#{project.projectName}, CUST_CLNT_ID=#{project.customerId},
@@ -74,9 +74,9 @@
     WHERE PROJ_ID=#{project.projectId}
   </update>
   <insert id="insertHistory">
-    INSERT INTO TB_PJ_PROJ_CHG (PROJ_ID, HIST_SN, CHG_ITEM_CD, CHG_ITEM_NM, BFR_VAL, AFT_VAL, CHG_DT, REG_USER_ID)
+    INSERT INTO TB_PJ_PROJ_CHG (PROJ_ID, HIST_SN, CHG_ITEM_CD, CHG_ITEM_NM, BFR_VAL, AFT_VAL, CHG_DT, REG_USER_ID, REG_DTTM)
     SELECT #{projectId}, COALESCE(MAX(HIST_SN),0)+1, #{code}, #{name}, #{beforeValue}, #{afterValue},
-      (clock_timestamp() AT TIME ZONE 'Asia/Seoul')::date, #{actor}
+      (clock_timestamp() AT TIME ZONE 'Asia/Seoul')::date, #{actor}, clock_timestamp()
     FROM TB_PJ_PROJ_CHG WHERE PROJ_ID=#{projectId}
   </insert>
   <select id="histories" resultType="com.company.common.projects.dto.ProjectContracts$History">
@@ -95,8 +95,8 @@
     WHERE h.PROJ_ID=#{id} ORDER BY h.APLY_BGN_YM ASC
   </select>
   <insert id="insertPart">
-    INSERT INTO TB_PJ_PROJ_PART (PROJ_ID,APLY_BGN_YM,PART_ID,CHG_RSN,REG_USER_ID)
-    VALUES (#{projectId},#{month},#{partId},#{reason},#{actor})
+    INSERT INTO TB_PJ_PROJ_PART (PROJ_ID,APLY_BGN_YM,PART_ID,CHG_RSN,REG_USER_ID,REG_DTTM)
+    VALUES (#{projectId},#{month},#{partId},#{reason},#{actor},clock_timestamp())
   </insert>
   <delete id="deleteOpenParts">
     DELETE FROM TB_PJ_PROJ_PART h WHERE h.PROJ_ID=#{id} AND h.APLY_BGN_YM &gt; #{closed}
@@ -149,10 +149,10 @@
     FROM TB_PJ_ASGN WHERE PROJ_ID=#{id} AND ASGN_STAT_CD!='CNCL' ORDER BY ASGN_ID FOR UPDATE
   </select>
   <insert id="assignmentHistory">
-    INSERT INTO TB_PJ_ASGN_HIST (ASGN_ID,HIST_SN,ASGN_CHG_TYPE_CD,APLY_DT,BFR_VAL,AFT_VAL,ASGN_CHG_RSN_CD,CHG_MEMO,REG_USER_ID)
+    INSERT INTO TB_PJ_ASGN_HIST (ASGN_ID,HIST_SN,ASGN_CHG_TYPE_CD,APLY_DT,BFR_VAL,AFT_VAL,ASGN_CHG_RSN_CD,CHG_MEMO,REG_USER_ID,REG_DTTM)
     SELECT a.ASGN_ID,(SELECT COALESCE(MAX(h.HIST_SN),0)+1 FROM TB_PJ_ASGN_HIST h WHERE h.ASGN_ID=a.ASGN_ID),
       #{kind},#{today},CASE WHEN #{kind}='EARLY' THEN '종료 '||a.INPUT_END_DT::text ELSE a.INPUT_BGN_DT::text||' ~ '||a.INPUT_END_DT::text END,
-      CASE WHEN #{kind}='EARLY' THEN '철수 '||#{today}::text ELSE '배정 취소' END,'ETC',#{memo},#{actor}
+      CASE WHEN #{kind}='EARLY' THEN '철수 '||#{today}::text ELSE '배정 취소' END,'ETC',#{memo},#{actor},clock_timestamp()
     FROM TB_PJ_ASGN a WHERE a.ASGN_ID=#{assignmentId}
   </insert>
   <update id="changeAssignment">
@@ -169,7 +169,7 @@
     SELECT ASGN_ID AS "assignmentId", DEV_ID AS "developerId", INPUT_BGN_DT AS "startDate", INPUT_END_DT AS "endDate"
     FROM TB_PJ_ASGN WHERE PROJ_ID=#{id} AND ASGN_STAT_CD!='CNCL' ORDER BY ASGN_ID
   </select>
-  <update id="start">UPDATE TB_PJ_PROJ SET PROJ_STAT_CD='ING' WHERE PROJ_ID=#{id} AND PROJ_STAT_CD='PRE'</update>
+  <update id="start">UPDATE TB_PJ_PROJ SET PROJ_STAT_CD='ING', MOD_USER_ID=#{actor}, MOD_DTTM=clock_timestamp() WHERE PROJ_ID=#{id} AND PROJ_STAT_CD='PRE'</update>
   <select id="roles" resultType="string">
     SELECT ur.ROLE_ID FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.ROLE_ID=ur.ROLE_ID
     WHERE ur.USER_ID=#{userId} AND r.USE_YN='Y'
@@ -190,8 +190,8 @@
     LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='JOB' AND c.CODE=j.JOB_CD ORDER BY c.SORT_ORD,j.JOB_CD
   </select>
   <insert id="savePlan">
-    INSERT INTO TB_PJ_MNPW_PLAN (PROJ_ID,JOB_CD,PLAN_MM,SRC_CD,REG_USER_ID)
-    VALUES (#{projectId},#{job.jobCode},#{job.plannedMm},'MANUAL',#{actor})
+    INSERT INTO TB_PJ_MNPW_PLAN (PROJ_ID,JOB_CD,PLAN_MM,SRC_CD,REG_USER_ID,REG_DTTM)
+    VALUES (#{projectId},#{job.jobCode},#{job.plannedMm},'MANUAL',#{actor},clock_timestamp())
     ON CONFLICT (PROJ_ID,JOB_CD) DO UPDATE SET PLAN_MM=EXCLUDED.PLAN_MM,SRC_CD='MANUAL',
       MOD_USER_ID=EXCLUDED.REG_USER_ID,MOD_DTTM=clock_timestamp()
   </insert>
@@ -206,8 +206,8 @@
     SELECT COALESCE(MAX(EXPS_SN),0)+1 FROM TB_PJ_DRCT_EXPS WHERE PROJ_ID=#{id} AND EXPS_YM=#{month}
   </select>
   <insert id="insertExpense">
-    INSERT INTO TB_PJ_DRCT_EXPS (PROJ_ID,EXPS_YM,EXPS_SN,DRCT_EXPS_ITEM_CD,EXPS_AMT,RMRK,REG_USER_ID)
-    VALUES (#{key.projectId},#{key.month},#{key.sequence},#{input.itemCode},#{input.amount},#{input.memo},#{actor})
+    INSERT INTO TB_PJ_DRCT_EXPS (PROJ_ID,EXPS_YM,EXPS_SN,DRCT_EXPS_ITEM_CD,EXPS_AMT,RMRK,REG_USER_ID,REG_DTTM)
+    VALUES (#{key.projectId},#{key.month},#{key.sequence},#{input.itemCode},#{input.amount},#{input.memo},#{actor},clock_timestamp())
   </insert>
   <delete id="deleteExpense">
     DELETE FROM TB_PJ_DRCT_EXPS WHERE PROJ_ID=#{projectId} AND EXPS_YM=#{month} AND EXPS_SN=#{sequence}
@@ -319,7 +319,7 @@
   </select>
   <delete id="deleteDistribution">DELETE FROM TB_PJ_TK_DSTRB WHERE PROJ_ID=#{id} AND DSTRB_STEP_CD=#{stage}</delete>
   <insert id="insertDistribution">
-    INSERT INTO TB_PJ_TK_DSTRB(PROJ_ID,DSTRB_STEP_CD,ROW_SN,DSTRB_YM,ROW_TYPE_CD,DEV_ID,ITEM_NM,DSTRB_AMT,REG_USER_ID,UPLD_ID)
-    VALUES(#{projectId},#{stage},#{row},#{month},#{type},#{developerId},#{itemName},#{amount},#{actor},#{uploadId})
+    INSERT INTO TB_PJ_TK_DSTRB(PROJ_ID,DSTRB_STEP_CD,ROW_SN,DSTRB_YM,ROW_TYPE_CD,DEV_ID,ITEM_NM,DSTRB_AMT,REG_USER_ID,UPLD_ID,REG_DTTM)
+    VALUES(#{projectId},#{stage},#{row},#{month},#{type},#{developerId},#{itemName},#{amount},#{actor},#{uploadId},clock_timestamp())
   </insert>
 </mapper>

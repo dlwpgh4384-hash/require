@@ -48,7 +48,7 @@ public interface ProjectMapper {
     void assignmentHistory(AssignmentWrite write);
     void changeAssignment(AssignmentWrite write);
     void lose(LossWrite write);
-    void start(String id);
+    void start(@Param("id") String id, @Param("actor") String actor);
     List<String> roles(String userId);
     List<String> projectScopes(String userId);
     List<Manpower> manpower(String id);

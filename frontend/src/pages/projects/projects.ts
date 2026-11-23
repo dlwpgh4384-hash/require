@@ -163,10 +163,15 @@ export class ProjectRequestError extends Error {
   constructor(
     message: string,
     public errors: { field: string; message: string }[] = [],
+    /** HTTP 상태(409면 그 사이 다른 사람이 바꾼 것, FR-0106). 모르면 0. */
+    public status = 0,
   ) {
     super(message);
   }
 }
+/** FR-0106: 다른 사람이 먼저 바꿔 저장이 막혔는지(409). */
+export const isProjectConflict = (error: unknown) =>
+  error instanceof ProjectRequestError && error.status === 409;
 const root = "/api/common/projects";
 export async function projectRequest<T>(
   path: string,
@@ -178,6 +183,7 @@ export async function projectRequest<T>(
     throw new ProjectRequestError(
       body.message || "프로젝트를 처리하지 못했습니다.",
       body.errors || [],
+      response.status,
     );
   return body.data as T;
 }

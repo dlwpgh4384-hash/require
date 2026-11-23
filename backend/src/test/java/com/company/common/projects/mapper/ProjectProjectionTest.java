@@ -83,4 +83,13 @@ class ProjectProjectionTest {
         var write=new Write(new Project(),"admin");
         assertThat(c.getMappedStatement(ProjectMapper.class.getName()+".updateProject").getBoundSql(write).getSql()).doesNotContain("TB_CO_MON_COST","TB_SL_OPTY");
     }
+    @Test void everyWriteStampsClockTimestampNotTransactionTime() throws Exception {
+        var c=config();
+        for (String name : List.of("insertProject","insertHistory","insertPart","savePlan","insertExpense","assignmentHistory","insertDistribution","start","lose","updateProject","changeAssignment")) {
+            String sql=c.getMappedStatement(ProjectMapper.class.getName()+"."+name).getSqlSource().getBoundSql(Map.of("kind","EARLY")).getSql();
+            assertThat(sql).as(name).contains("clock_timestamp()").doesNotContainIgnoringCase("now()").doesNotContain("CURRENT_TIMESTAMP");
+        }
+        String start=c.getMappedStatement(ProjectMapper.class.getName()+".start").getSqlSource().getBoundSql(Map.of("id","P-1","actor","admin")).getSql();
+        assertThat(start).contains("MOD_USER_ID=?", "MOD_DTTM=clock_timestamp()");
+    }
 }

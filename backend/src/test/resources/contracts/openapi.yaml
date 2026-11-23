@@ -16105,6 +16105,12 @@ components:
         operatingRate:
           type: number
           description: 가동률·식-96
+        operatingMonths:
+          type: integer
+          description: 가동률 도움말·투입된 달 수(식-96)
+        employedMonths:
+          type: integer
+          description: 가동률 도움말·재직한 달 수(식-96)
         mm:
           type: number
           description: MM

@@ -267,6 +267,33 @@ class CommonPersonalCostProfitControllerTest {
             .andExpect(status().isOk());
         verify(mapper).selectPeople(argThat(f -> CommonPersonalCostProfitService.SELF_AFFILIATION.equals(f.affiliationId())));
     }
+    // 식-96 칸 도움말(시안 wr "N달 ÷ M달"): 투입된 달·재직한 달 수를 같이 준다
+    @Test void operatingRateCarriesMonthCountsForTheHint() throws Exception {
+        mvc.perform(request("")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].operatingMonths").value(2))
+            .andExpect(jsonPath("$.data.items[0].employedMonths").value(2))
+            .andExpect(jsonPath("$.data.items[0].operatingRate").value(100.0));
+    }
+    // 직무·등급별 인당 공헌이익: 직무 줄은 공통코드 정렬 순서(시안 JOBS), 코드 글자 순이 아니다
+    @Test void contributionsFollowJobCodeSortOrder() throws Exception {
+        var codes = new java.util.ArrayList<>(codes());
+        codes.add(0, new Code("JOB", "PM", "PM·사업관리", null));
+        when(mapper.selectCodes()).thenReturn(codes);
+        var a = PersonalCostProfitTestSources.person("A");
+        var pm = new Person("B", "박B", a.affiliationId(), a.affiliationName(), a.positionCode(), a.positionName(),
+            a.employeeTypeCode(), a.employeeTypeName(), a.joinDate(), a.retireDate(), "PM", "PM·사업관리",
+            a.gradeCode(), a.gradeName(), a.salesPartId(), a.directClassCode(), "K-B", a.salesPartName());
+        when(mapper.selectPeople(any())).thenReturn(List.of(a, pm));
+        mvc.perform(request("")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.contributions[0].jobCode").value("PM"))
+            .andExpect(jsonPath("$.data.contributions[1].jobCode").value("BE"));
+    }
+    @Test void nameLongerThanDeveloperNameColumnIsRejected() throws Exception {
+        mvc.perform(request("").param("name", "가".repeat(51))).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("name"))
+            .andExpect(jsonPath("$.errors[0].message").value("이름은 50자 이내로 입력해 주세요."));
+        mvc.perform(request("").param("name", "가".repeat(50))).andExpect(status().isOk());
+    }
     @Test void allocationsAreOnePerAssignmentSummedOverMonthsAndAveragedLikeTheParent() throws Exception {
         when(periods.selectClosedMonths()).thenReturn(List.of("202601", "202602"));
         when(mapper.selectCosts(any())).thenReturn(List.of(

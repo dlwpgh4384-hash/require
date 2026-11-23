@@ -220,6 +220,9 @@ public class CommonPersonalCostProfitService {
             row.put("employeeTypeName", a.person.employeeTypeName());
             row.put("joinDate", a.person.joinDate());
             row.put("operatingRate", percent(BigDecimal.valueOf(a.operating), BigDecimal.valueOf(a.employed)));
+            // 식-96 칸 도움말 「투입된 달 ÷ 재직한 달」(시안 wr: "9달 ÷ 10달")
+            row.put("operatingMonths", a.operating);
+            row.put("employedMonths", a.employed);
             row.put("profitRate", number(row, "unitPrice").signum() == 0 ? null
                 : percent(number(row, "operatingProfit"), number(row, "unitPrice")));
             row.put("mmOverOne", a.over);
@@ -230,7 +233,7 @@ public class CommonPersonalCostProfitService {
             new BigDecimal[]{employedCount, operatingCount, earningCount}, filter);
         sum(totals, leaveTotals);
         return new Calculation(new Result(items, summary, PersonalCostProfitColumnPolicy.project(totals, columns),
-            contributions(visible)), columns, PersonalCostProfitColumnPolicy.project(leaveTotals, columns));
+            contributions(visible, codes)), columns, PersonalCostProfitColumnPolicy.project(leaveTotals, columns));
     }
 
     private static final class Aggregate {
@@ -283,7 +286,8 @@ public class CommonPersonalCostProfitService {
         if (f.view() != null && !Set.of("전체", "적자만", "동시 투입·1.0 초과만").contains(f.view())) {
             throw CodeFailure.invalid("view", "등록된 보기를 선택해 주세요.");
         }
-        if (f.name() != null && f.name().length() > 100) throw CodeFailure.invalid("name", "이름은 100자 이내로 입력해 주세요.");
+        // TB_HR_DEV.DEV_NM VARCHAR(50)
+        if (f.name() != null && f.name().length() > 50) throw CodeFailure.invalid("name", "이름은 50자 이내로 입력해 주세요.");
         if (f.columns() != null && f.columns().stream().anyMatch(c -> !PersonalCostProfitColumnPolicy.KEYS.contains(c))) {
             throw CodeFailure.invalid("columns", "등록된 열을 선택해 주세요.");
         }
@@ -325,12 +329,17 @@ public class CommonPersonalCostProfitService {
         summary.put("earningRate", percent(earning, employed));
         return summary;
     }
-    private static List<Map<String, Object>> contributions(List<Aggregate> people) {
-        Map<String, List<Aggregate>> grouped = new TreeMap<>();
-        for (var a : people) if (a.person.gradeName() != null
-            && Set.of("초급", "중급", "고급", "특급").contains(a.person.gradeName())) {
-            grouped.computeIfAbsent(a.person.jobCode() + ":" + a.person.gradeCode(), key -> new ArrayList<>()).add(a);
-        }
+    private static List<Map<String, Object>> contributions(List<Aggregate> people, List<Code> codes) {
+        // 직무 줄은 공통코드 JOB 정렬 순서(시안 JOBS 순서), 같은 직무 안은 GRADE 정렬 순서. 코드에 없으면 뒤로
+        Comparator<String> byJob = order(codes, "JOB");
+        Comparator<String> byGrade = order(codes, "GRADE");
+        Map<String, List<Aggregate>> grouped = new LinkedHashMap<>();
+        people.stream().filter(a -> a.person.gradeName() != null
+                && Set.of("초급", "중급", "고급", "특급").contains(a.person.gradeName()))
+            .sorted(Comparator.comparing((Aggregate a) -> a.person.jobCode(), byJob)
+                .thenComparing(a -> a.person.gradeCode(), byGrade))
+            .forEach(a -> grouped.computeIfAbsent(a.person.jobCode() + ":" + a.person.gradeCode(),
+                key -> new ArrayList<>()).add(a));
         return grouped.values().stream().map(group -> {
             var p = group.get(0).person;
             Map<String, Object> row = new LinkedHashMap<>();
@@ -341,5 +350,13 @@ public class CommonPersonalCostProfitService {
                 .reduce(ZERO, BigDecimal::add), BigDecimal.valueOf(group.size()), 0));
             return row;
         }).toList();
+    }
+    /** selectCodes가 SORT_ORD 순서로 주는 그 그룹 코드의 순서. 없는 코드는 맨 뒤(코드 글자 순). */
+    private static Comparator<String> order(List<Code> codes, String group) {
+        List<String> ordered = codes.stream().filter(c -> group.equals(c.groupCode())).map(Code::code).toList();
+        return Comparator.<String>comparingInt(code -> {
+            int index = ordered.indexOf(code);
+            return index < 0 ? Integer.MAX_VALUE : index;
+        }).thenComparing(Comparator.nullsLast(Comparator.<String>naturalOrder()));
     }
 }

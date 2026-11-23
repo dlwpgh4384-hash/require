@@ -285,7 +285,20 @@ function PersonalCostProfitContent({
       case "joinDate":
         return row.joinDate ?? dash;
       case "operatingRate":
-        return rateText(row.operatingRate);
+        // 시안 wr(): 칸에 마우스를 올리면 「9달 ÷ 10달」(식-96), 재직한 달이 0이면 –
+        return row.employedMonths === 0 ? (
+          dash
+        ) : (
+          <span
+            title={
+              row.employedMonths == null
+                ? undefined
+                : `${row.operatingMonths ?? 0}달 ÷ ${row.employedMonths}달`
+            }
+          >
+            {rateText(row.operatingRate)}
+          </span>
+        );
       case "mm":
         return projectsOf(row).length ? (
           <>
@@ -414,14 +427,18 @@ function PersonalCostProfitContent({
   );
   const years = yearRange(basis, { kind: "year" });
   const download = async () => {
+    if (downloading) return;
     setDownloading(true);
     try {
       const count = await getCommonPersonalCostProfitsExcel({
         ...applied,
         columns: columnState.visible.map((column) => column.key),
       });
+      setNoticeKind("ok");
       setNotice(`엑셀 파일을 만들었습니다 (조회 결과 ${count}건)`);
     } catch (reason) {
+      // 실패는 다른 화면처럼 주의(warn) 알림으로 보인다
+      setNoticeKind("warn");
       setNotice(projectFailure(reason));
     } finally {
       setDownloading(false);

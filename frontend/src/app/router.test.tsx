@@ -3021,6 +3021,8 @@ describe("application route registration", () => {
       dataScopeCd: "ALL",
       snstvViewYn: "N",
       confirmedAffectedUserIds: [],
+      // FR-0106: 읽은 시각을 함께 보낸다(목 응답에 시각이 없어 null)
+      modifiedAt: null,
       menuAuths: [
         {
           menuId: "M028",

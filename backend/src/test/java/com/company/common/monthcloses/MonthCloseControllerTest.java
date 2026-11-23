@@ -177,7 +177,7 @@ class MonthCloseControllerTest {
         closed();
         mvc.perform(put(ROOT + "2026-01/reopen").contentType("application/json").content(reopenBody(" 정정 사유 ")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.isClosed").value(false));
-        verify(snapshots).unfix("202601"); verifyNoInteractions(settlements);
+        verify(snapshots).unfix("202601", "admin"); verifyNoInteractions(settlements);
         verify(mapper).saveClose(new Mutation("202601", "WORK", "admin", TOKEN));
         verify(mapper).insertHistory(new History("202601", "OPEN", " 정정 사유 ", null, "admin"));
         verify(mapper).insertAccess("202601", "admin", "UNCLOSE");

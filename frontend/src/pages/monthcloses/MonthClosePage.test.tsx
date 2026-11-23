@@ -587,6 +587,10 @@ it("blank reason is focused and never sent", async () => {
   mount();
   const dialog = await openReopen();
   const submit = await readySubmit(dialog);
+  // 오류가 없을 때는 없는 오류 칸을 가리키지 않는다.
+  expect(within(dialog).getByLabelText("해제 사유 *")).not.toHaveAttribute(
+    "aria-describedby",
+  );
   fireEvent.change(within(dialog).getByLabelText("해제 사유 *"), {
     target: { value: "   " },
   });
@@ -595,6 +599,9 @@ it("blank reason is focused and never sent", async () => {
     await within(dialog).findByText("해제 사유를 입력해 주세요."),
   ).toBeInTheDocument();
   expect(within(dialog).getByLabelText("해제 사유 *")).toHaveFocus();
+  expect(within(dialog).getByLabelText("해제 사유 *")).toHaveAccessibleDescription(
+    "해제 사유를 입력해 주세요.",
+  );
   expect(writes()).toHaveLength(0);
 });
 it("server field failure retains reopen reason and focuses the field", async () => {

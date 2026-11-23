@@ -99,7 +99,7 @@ public class CommonMonthCloseService {
         if (old == null || !"CLOSE".equals(old.state()) || month.isBefore(period.base())
             || !Objects.equals(period.db(month), mapper.latestClosedMonth()))
             throw CodeFailure.invalid("yearMonth", "가장 최근 마감월만 해제할 수 있습니다.");
-        snapshots.unfix(period.db(month));
+        snapshots.unfix(period.db(month), actor.userId());
         affected(mapper.saveClose(new Mutation(period.db(month), "WORK", actor.userId(), input.modifiedAt())));
         affected(mapper.insertHistory(new History(period.db(month), "OPEN", input.reason(), null, actor.userId())));
         affected(mapper.insertAccess(period.db(month), actor.userId(), "UNCLOSE"));

@@ -28,7 +28,7 @@ public interface MonthCloseMapper {
     int saveCost(@Param("row") Cost row, @Param("classification") String classification,
         @Param("partId") String partId, @Param("actor") String actor);
     int saveProfit(@Param("row") Snapshot row, @Param("actor") String actor);
-    int unfixAssignments(@Param("month") String month);
-    int unfixCosts(@Param("month") String month);
-    int unfixProfit(@Param("month") String month);
+    int unfixAssignments(@Param("month") String month, @Param("actor") String actor);
+    int unfixCosts(@Param("month") String month, @Param("actor") String actor);
+    int unfixProfit(@Param("month") String month, @Param("actor") String actor);
 }

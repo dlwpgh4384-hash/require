@@ -637,7 +637,9 @@ export function MonthClosePage({
                 if (event.target.value.trim()) setReasonError("");
               }}
               aria-invalid={!!reasonError}
-              aria-describedby="month-close-reason-error"
+              aria-describedby={
+                reasonError ? "month-close-reason-error" : undefined
+              }
             />
             {reasonError && (
               <span

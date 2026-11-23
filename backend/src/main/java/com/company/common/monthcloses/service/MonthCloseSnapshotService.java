@@ -95,11 +95,11 @@ public class MonthCloseSnapshotService {
         }
         affected(mapper.saveProfit(value.values(), actor));
     }
-    public void unfix(String month) {
+    public void unfix(String month, String actor) {
         definitions.definitions();
-        mapper.unfixAssignments(month);
-        mapper.unfixCosts(month);
-        mapper.unfixProfit(month);
+        mapper.unfixAssignments(month, actor);
+        mapper.unfixCosts(month, actor);
+        mapper.unfixProfit(month, actor);
     }
     /** Idle or indirect staff line: no sales, team or project fees; only the labor cost is kept. */
     private static Cost fixedRow(Cost cost, String code, BigDecimal mm) {

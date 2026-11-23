@@ -240,7 +240,11 @@ class MonthClosePersistenceTest {
         var january = db.queryForMap("SELECT * FROM TB_CO_MON_PL WHERE PL_YM='202601'");
         var february = write("2026-02", "confirm", body(read("2026-02"), null));
         String settlements = state().get("TB_CO_PART_SETL");
+        var fixedAt = db.queryForObject("SELECT MOD_DTTM FROM TB_CO_MON_PL WHERE PL_YM='202602'", java.time.OffsetDateTime.class);
         var reopened = write("2026-02", "reopen", body(february, "수정 필요"));
+        // Unfixing is a change: MOD_USER_ID / MOD_DTTM are refreshed on the unfixed rows.
+        assertThat(db.queryForObject("SELECT MOD_DTTM FROM TB_CO_MON_PL WHERE PL_YM='202602'", java.time.OffsetDateTime.class)).isAfter(fixedAt);
+        assertThat(db.queryForObject("SELECT MOD_USER_ID FROM TB_CO_MON_PL WHERE PL_YM='202602'", String.class)).isEqualTo("admin");
         assertThat(reopened.path("isClosed").asBoolean()).isFalse();
         assertThat(state().get("TB_CO_PART_SETL")).isEqualTo(settlements);
         assertThat(db.queryForObject("SELECT FIX_YN FROM TB_CO_MON_PL WHERE PL_YM='202602'", String.class)).isEqualTo("N");

@@ -36,6 +36,11 @@ public class CommonBillController {
                 .filename(file.fileName(),StandardCharsets.UTF_8).build().toString())
             .header("X-Total-Count",Integer.toString(file.count())).body(file.bytes());
     }
+    /** 메뉴 옆 미수 건수 배지(SFR-001-04). */
+    @GetMapping("/unpaid-count")
+    public Response<UnpaidCount> getCommonBillUnpaidCount() {
+        return Response.of(service.getCommonBillUnpaidCount());
+    }
     @GetMapping("/{billId}")
     public Response<Detail> getCommonBill(@PathVariable String billId) {
         return Response.of(service.getCommonBill(billId));

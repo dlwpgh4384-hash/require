@@ -31,6 +31,7 @@ public interface BillMapper {
     boolean resent(@Param("id") String id, @Param("step") int step);
     boolean automaticallySent(@Param("id") String id, @Param("step") int step);
     List<String> outstandingIds();
+    int unpaidCount();
     int notification(Notice notice);
     int history(Delivery delivery);
 }

@@ -131,6 +131,10 @@
   color: var(--ls-info);
 }
 /* .tabs: 시안처럼 좌우 24 */
+/* 시안 .content > .tabs: 좌우 여백 없이 왼쪽에 붙인다 */
+.ls-tabs.fin-tabs {
+  padding: 0;
+}
 .fin-tabs .ls-tb {
   display: inline-flex;
   align-items: center;

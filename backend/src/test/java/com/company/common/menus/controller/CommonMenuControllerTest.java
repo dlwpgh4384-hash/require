@@ -86,7 +86,8 @@ class CommonMenuControllerTest {
         when(mapper.selectCandidates()).thenThrow(new DataAccessResourceFailureException("private connection SQL"));
         mvc.perform(get("/api/common/menus")).andExpect(status().isInternalServerError())
             .andExpect(content().contentTypeCompatibleWith("application/json"))
-            .andExpect(content().json("{\"success\":false,\"meta\":{}}", true));
+            .andExpect(content().json("{\"success\":false,\"meta\":{},\"message\":\"처리하지 못했습니다. 잠시 후 다시 시도해 주세요.\",\"errors\":[]}", true))
+            .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("private"))));
     }
 
     @Test

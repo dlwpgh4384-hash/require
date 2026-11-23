@@ -817,3 +817,21 @@ a.header-brand:focus-visible {
 .page-title .title-back + .title-stack {
   margin-left: -4px;
 }
+/* 시안 .nb: 메뉴 글자 오른쪽 끝의 미수 건수(0이면 그리지 않음). 접힌 메뉴에서는 숨긴다. */
+.menu-nb {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--ls-bad-bg, #fef2f2);
+  color: var(--ls-bad, #b91c1c);
+  font-size: 12px;
+  font-weight: 600;
+  flex: none;
+}
+.sidebar.is-collapsed .menu-nb {
+  display: none;
+}

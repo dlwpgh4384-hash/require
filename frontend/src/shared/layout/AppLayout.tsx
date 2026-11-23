@@ -6,7 +6,7 @@ import { useViewport } from "./useViewport";
 import {
   BackToListButton,
   ScreenTitleOverrideProvider,
-  type ScreenTitleOverride,
+  useScreenTitleOverrides,
 } from "./ScreenTitleOverride";
 import "./shell.css";
 
@@ -57,8 +57,8 @@ export function AppLayout({
   const { mobile, tablet } = useViewport();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [localFolded, setLocalFolded] = useState<boolean | null>(null);
-  const [override, setOverride] = useState<ScreenTitleOverride | null>(null);
-  const form = override && override.screenId === screenId ? override : null;
+  const overrides = useScreenTitleOverrides();
+  const form = overrides.get(screenId);
   useEffect(() => {
     setMobileOpen(false);
     setLocalFolded(null);
@@ -94,7 +94,7 @@ export function AppLayout({
     }
   };
   return (
-    <ScreenTitleOverrideProvider value={setOverride}>
+    <ScreenTitleOverrideProvider value={overrides.set}>
     <div
       data-testid="app-layout"
       className={`app-layout${mobile ? " is-mobile" : tablet ? " is-tablet" : ""}`}

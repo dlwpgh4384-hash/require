@@ -30,8 +30,11 @@ export function Dialog({
     openDialogs.push(me);
     const caller = document.activeElement as HTMLElement | null;
     const first =
-      panel.current?.querySelector<HTMLElement>("input,select") ??
-      panel.current?.querySelector<HTMLElement>("button,[tabindex='0']");
+      // 여러 줄 입력칸(사유 등)도 첫 입력칸으로 본다(00-1 코드 리뷰 2026-11-23).
+      panel.current?.querySelector<HTMLElement>(
+        "input:not(:disabled),select:not(:disabled),textarea:not(:disabled)",
+      ) ??
+      panel.current?.querySelector<HTMLElement>("button,a[href],[tabindex='0']");
     (first ?? panel.current)?.focus();
     const keydown = (event: KeyboardEvent) => {
       if (openDialogs[openDialogs.length - 1] !== me) return;
@@ -43,7 +46,7 @@ export function Dialog({
       if (event.key === "Tab") {
         const controls = [
           ...(panel.current?.querySelectorAll<HTMLElement>(
-            "button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex='0']",
+            "button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex='0']",
           ) ?? []),
         ];
         const index = controls.indexOf(document.activeElement as HTMLElement);

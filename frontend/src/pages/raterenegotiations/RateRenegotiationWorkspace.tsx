@@ -298,7 +298,7 @@ export function RateRenegotiationWorkspace() {
       {data && (data.salaryEstimatedDeveloperIds ?? []).length > 0 && (
         <div data-testid="rate-salary-estimated">
           <Banner kind="warn">
-            {`${data.baseYearMonth} 급여 업로드 전: ${(data.salaryEstimatedDeveloperIds ?? []).length}명은 개발자 풀 월 급여로 계산한 값입니다.`}
+            {`${Number(data.baseYearMonth.slice(-2))}월 급여 업로드 전: ${(data.salaryEstimatedDeveloperIds ?? []).length}명은 개발자 풀 월 급여로 계산한 값입니다.`}
           </Banner>
         </div>
       )}

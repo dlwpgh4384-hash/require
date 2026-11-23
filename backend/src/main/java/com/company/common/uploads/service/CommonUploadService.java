@@ -25,6 +25,8 @@ import static com.company.common.uploads.dto.UploadContracts.*;
 /** SFR-012 공통 업로드: 양식(UploadForm)마다 열 규칙만 다르고 검사 기록·결과·반영 흐름은 같다. */
 @Service
 public class CommonUploadService {
+    /** 양식 설명 시트에 붙이는 예시 줄 안내. */
+    static final String EXAMPLE_NOTE = "데이터 첫 줄은 적는 법을 보여 주는 예시입니다. 지우고 자기 자료를 적어 올려 주세요.";
     private static final DateTimeFormatter DB_MONTH = DateTimeFormatter.ofPattern("uuuuMM");
     private final UploadMapper mapper;
     private final Map<String, UploadForm> forms;
@@ -51,7 +53,10 @@ public class CommonUploadService {
     /** year: 연 양식(B.10)만 줄을 미리 채운다. 다른 양식은 받지 않으면 지금과 같다. */
     public byte[] getCommonUploadTemplate(String formTypeCode, Integer year) {
         UploadForm form = form(formTypeCode);
-        return workbooks.tabularFile(form.headers(), form.templateRows(year), form.templateNote());
+        var rows = form.templateRows(year);
+        if (rows.isEmpty() && !form.exampleRow().isEmpty())
+            return workbooks.tabularFile(form.headers(), List.of(form.exampleRow()), form.templateNote() + " " + EXAMPLE_NOTE);
+        return workbooks.tabularFile(form.headers(), rows, form.templateNote());
     }
     /** yearMonth: 한 달 양식(B.1 급여)만, YYYY-MM. */
     public static YearMonth month(String value) {
@@ -154,9 +159,12 @@ public class CommonUploadService {
             throw new IllegalStateException("반영 결과를 기록하지 못했습니다.");
         return result(require(mapper.selectUpload(id)), applied ? assigned : inspection.assigned());
     }
+    /** 검사 기록 칸 길이(TB_SY_UPLD_ERR: 열 이름 50·입력값 200·사유 300)에 맞춰 자른다. 양식마다 자르지 않아도 500이 나지 않게 한 곳에서 지킨다. */
     private void issues(long id, List<Issue> issues) {
         int sequence = 0;
-        for (var issue : issues) {
+        for (var raw : issues) {
+            var issue = new Issue(raw.row(), clip(raw.column(), 50), clip(raw.inputValue(), 200),
+                clip(raw.reason(), 300), raw.severity());
             if (mapper.insertIssue(new IssueWrite(id, ++sequence, issue)) != 1)
                 throw new IllegalStateException("행 결과를 기록하지 못했습니다.");
         }
@@ -180,6 +188,10 @@ public class CommonUploadService {
     private static List<PlannedProject> projectAssignments(Map<Integer, String> assigned) {
         return assigned.entrySet().stream().sorted(Map.Entry.comparingByKey())
             .map(e -> new PlannedProject(e.getKey(), e.getValue())).toList();
+    }
+    private static String clip(String value, int limit) {
+        if (value == null || value.codePointCount(0, value.length()) <= limit) return value;
+        return value.substring(0, value.offsetByCodePoints(0, limit));
     }
     private UploadRows.Upload require(UploadRows.Upload row) {
         if (row == null) throw CodeFailure.invalid("uploadId", "업로드 결과를 찾을 수 없습니다.");

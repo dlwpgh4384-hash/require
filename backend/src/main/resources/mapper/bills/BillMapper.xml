@@ -205,6 +205,10 @@
   <select id="outstandingIds" resultType="string">
     SELECT BILL_ID FROM TB_BL_BILL WHERE CNCL_YN='N' AND UNPAID_AMT&gt;0 ORDER BY BILL_ID
   </select>
+  <!-- 메뉴 배지(SFR-001-04): 취소 안 된 청구 중 미수가 남은 건수, 연도 구분 없음 -->
+  <select id="unpaidCount" resultType="int">
+    SELECT count(*) FROM TB_BL_BILL WHERE CNCL_YN='N' AND UNPAID_AMT&gt;0
+  </select>
   <insert id="notification">
     INSERT INTO TB_SY_NOTI(RCVR_USER_ID,NOTI_TYPE_CD,NOTI_CN,LINK_SCRN_ID,LINK_KEY,
       SEND_MTHD_CD,NOTI_DTTM,REG_USER_ID,REG_DTTM)

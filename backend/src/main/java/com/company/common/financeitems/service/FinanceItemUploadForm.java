@@ -27,6 +27,7 @@ public class FinanceItemUploadForm implements UploadForm {
     public List<String> headers() { return HEADERS; }
     public String templateNote() { return "B.2 재무 항목. 세부 항목*·금액*은 필수입니다. 연월은 화면에서 선택합니다. 부가세 공백은 0입니다."; }
     public String templateFileName() { return "finance-items-template.xlsx"; }
+    public List<String> exampleRow() { return List.of("판관비", "임대료", "본사 사무실 임대료", "5000000", "500000", "2026-01-25", "Y", ""); }
     public boolean monthly() { return true; }
     public void lock() { mapper.lockSources(); }
     public void checkMonth(YearMonth month) {

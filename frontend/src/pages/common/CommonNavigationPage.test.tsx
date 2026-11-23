@@ -1370,7 +1370,12 @@ describe("common placeholder screen contract", () => {
     );
     await expectScreenContent("UI-15");
     expect(setItem).not.toHaveBeenCalled();
-    expect(requests.mock.calls.map(([url]) => url)).toEqual([
+    // 메뉴 옆 미수 건수(SFR-001-04)는 읽기 요청이라 목록에서 뺀다(아래에서 쓰기 없음은 따로 확인).
+    expect(
+      requests.mock.calls
+        .map(([url]) => url)
+        .filter((url) => url !== "/api/common/bills/unpaid-count"),
+    ).toEqual([
       "/api/common/menus",
       "/api/common/clients?useYn=Y",
       "/api/common/code-groups/CLNT_TYPE/codes",

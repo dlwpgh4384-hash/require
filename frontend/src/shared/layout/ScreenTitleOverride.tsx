@@ -1,5 +1,7 @@
 import {
   createContext,
+  useCallback,
+  useState,
   useContext,
   useEffect,
   useRef,
@@ -16,8 +18,31 @@ export interface ScreenTitleOverride {
   onBack: () => void;
 }
 
-type Setter = (value: ScreenTitleOverride | null) => void;
+/**
+ * 화면별로 따로 둔다(탭마다 폼이 열려 있어도 서로 덮지 않게). owner는 그 폼 하나를 가리켜,
+ * 닫힐 때 자기가 건 것만 지운다(같은 화면의 다른 폼 것은 남긴다).
+ */
+type Setter = (screenId: string, owner: symbol, value: Omit<ScreenTitleOverride, "screenId"> | null) => void;
 const OverrideContext = createContext<Setter>(() => {});
+
+/** AppLayout이 쓰는 화면별 제목 바꾸기 저장소. */
+export function useScreenTitleOverrides() {
+  const [map, setMap] = useState<Record<string, { owner: symbol; title: string; onBack: () => void }>>({});
+  const set = useCallback<Setter>((screenId, owner, value) => {
+    setMap((current) => {
+      if (value) return { ...current, [screenId]: { owner, ...value } };
+      if (current[screenId]?.owner !== owner) return current;
+      const next = { ...current };
+      delete next[screenId];
+      return next;
+    });
+  }, []);
+  const get = (screenId: string | undefined): ScreenTitleOverride | null => {
+    const value = screenId ? map[screenId] : undefined;
+    return value && screenId ? { screenId, title: value.title, onBack: value.onBack } : null;
+  };
+  return { set, get };
+}
 
 export const ScreenTitleOverrideProvider = OverrideContext.Provider;
 
@@ -30,10 +55,12 @@ export function useScreenTitleOverride(
   const set = useContext(OverrideContext);
   const back = useRef(onBack);
   back.current = onBack;
+  const owner = useRef(Symbol("screen-title-override"));
   useEffect(() => {
     if (!title) return;
-    set({ screenId, title, onBack: () => back.current() });
-    return () => set(null);
+    const mine = owner.current;
+    set(screenId, mine, { title, onBack: () => back.current() });
+    return () => set(screenId, mine, null);
   }, [set, screenId, title]);
 }
 

@@ -4,6 +4,8 @@ import com.company.common.preferences.service.UserPreferenceFailure;
 
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @org.springframework.core.annotation.Order(0)
 @RestControllerAdvice(assignableTypes = CommonUserPreferenceController.class)
 public class UserPreferenceExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(UserPreferenceExceptionHandler.class);
     public record FieldError(String field, String message) {}
     public record UserPreferenceError(boolean success, Map<String, Object> meta,
         String message, List<FieldError> errors) {}
@@ -34,6 +37,8 @@ public class UserPreferenceExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<UserPreferenceError> failed(Exception failure) {
+        // 원인(SQL 등)은 응답에 넣지 않고 서버 기록에만 남긴다(00-1 코드 리뷰 2026-11-23).
+        log.error("화면 설정 처리 실패", failure);
         return ResponseEntity.internalServerError().body(new UserPreferenceError(false, Map.of(),
             "설정을 저장하거나 불러오지 못했습니다. 다시 시도해 주세요.", List.of()));
     }

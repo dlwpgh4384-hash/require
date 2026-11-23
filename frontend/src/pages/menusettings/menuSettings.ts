@@ -13,9 +13,12 @@ export interface MenuUpdateItem {
 export interface MenuSettingsInput {
   items: MenuUpdateItem[];
   movedMenuIds: string[];
+  /** 조회 때 받은 메뉴 표 수정 시각. 그 뒤 다른 저장이 있으면 409(FR-0106). */
+  modifiedAt?: string | null;
 }
 export interface MenuSettingsResult {
   items: MenuSettingItem[];
+  modifiedAt?: string | null;
 }
 
 async function settingsRequest(
@@ -26,7 +29,7 @@ async function settingsRequest(
   if (!response.ok || body.success !== true)
     throw new MenuRegistrationRequestError(
       response.status,
-      response.status === 400 && typeof body.message === "string"
+      (response.status === 400 || response.status === 409) && typeof body.message === "string"
         ? body.message
         : "메뉴를 처리하지 못했습니다. 다시 시도해 주세요.",
       response.status === 400 && Array.isArray(body.errors) ? body.errors : [],

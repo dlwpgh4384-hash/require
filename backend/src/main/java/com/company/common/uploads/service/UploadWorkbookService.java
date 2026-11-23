@@ -11,7 +11,9 @@ import java.util.Locale;
 import java.util.zip.ZipInputStream;
 import org.apache.poi.openxml4j.opc.TargetMode;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +35,7 @@ public class UploadWorkbookService {
             throw invalid();
         }
         inspectXml(bytes);
+        guardRowCount(bytes);
         try (var workbook = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
             if (workbook.isMacroEnabled() || workbook.getNumberOfSheets() == 0) throw invalid();
             for (var relationship : workbook.getPackage().getRelationships()) {
@@ -62,11 +65,49 @@ public class UploadWorkbookService {
                 if (row.getLastCellNum() > headers.size()) throw invalid();
                 var values = new ArrayList<String>();
                 for (int column = 0; column < headers.size(); column++) {
-                    values.add(formatter.formatCellValue(row.getCell(column)));
+                    values.add(cellText(formatter, row.getCell(column)));
                 }
                 if (values.stream().anyMatch(value -> !value.isBlank())) result.add(new InputRow(index + 1, values));
             }
             return List.copyOf(result);
+        } catch (CodeFailure failure) {
+            throw failure;
+        } catch (Exception failure) {
+            throw invalid();
+        }
+    }
+
+    /** 통째로 읽기 전 줄 수 상한(값이 있는 줄 기준). 머리·안내 줄(최대 20줄)을 넉넉히 더한 값이고 정확한 5,000행 검사는 읽은 뒤에 한다. */
+    static final int ROW_GUARD = 5_000 + 20;
+
+    /**
+     * 첫 시트를 흘려 읽으며 값이 있는 줄만 센다(메모리를 거의 쓰지 않음). 상한을 넘으면 통째로 열기 전에 거절한다.
+     * 서식만 칠한 빈 줄(열 전체 서식 등)은 세지 않아 멀쩡한 파일을 막지 않는다(00-1 코드 리뷰 2026-11-23).
+     */
+    static void guardRowCount(byte[] bytes) {
+        try (var pkg = org.apache.poi.openxml4j.opc.OPCPackage.open(new ByteArrayInputStream(bytes))) {
+            var sheets = (org.apache.poi.xssf.eventusermodel.XSSFReader.SheetIterator)
+                new org.apache.poi.xssf.eventusermodel.XSSFReader(pkg).getSheetsData();
+            if (!sheets.hasNext()) return;
+            try (var sheet = sheets.next()) {
+                var factory = javax.xml.stream.XMLInputFactory.newFactory();
+                factory.setProperty(javax.xml.stream.XMLInputFactory.SUPPORT_DTD, false);
+                factory.setProperty(javax.xml.stream.XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+                var reader = factory.createXMLStreamReader(sheet);
+                int rows = 0;
+                boolean value = false;
+                while (reader.hasNext()) {
+                    int event = reader.next();
+                    if (event == javax.xml.stream.XMLStreamConstants.START_ELEMENT) {
+                        String name = reader.getLocalName();
+                        if ("row".equals(name)) value = false;
+                        else if ("v".equals(name) || "is".equals(name)) value = true;
+                    } else if (event == javax.xml.stream.XMLStreamConstants.END_ELEMENT
+                        && "row".equals(reader.getLocalName()) && value && ++rows > ROW_GUARD) {
+                        throw CodeFailure.invalid("file", "5,000행 이하의 파일을 선택해 주세요.");
+                    }
+                }
+            }
         } catch (CodeFailure failure) {
             throw failure;
         } catch (Exception failure) {
@@ -130,6 +171,7 @@ public class UploadWorkbookService {
             || !fileName.toLowerCase(Locale.ROOT).endsWith(".xlsx") || bytes == null || bytes.length < 4
             || bytes.length > 10_000_000 || bytes[0] != 'P' || bytes[1] != 'K') throw invalid();
         inspectXml(bytes);
+        guardRowCount(bytes);
         try (var workbook = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
             if (workbook.isMacroEnabled() || workbook.getNumberOfSheets() == 0) throw invalid();
             for (var part : workbook.getPackage().getParts()) {
@@ -161,7 +203,7 @@ public class UploadWorkbookService {
                 var formulas = new ArrayList<Integer>();
                 for (int index = 0; index < headers.size(); index++) {
                     var cell = row.getCell(columns.get(headers.get(index)));
-                    values.add(formatter.formatCellValue(cell));
+                    values.add(cellText(formatter, cell));
                 }
                 if (values.stream().allMatch(String::isBlank)) continue;
                 result.add(new com.company.common.uploads.dto.UploadWorkbookContracts.TabularRow(
@@ -174,6 +216,32 @@ public class UploadWorkbookService {
         } catch (Exception failure) {
             throw invalid();
         }
+    }
+
+    /**
+     * 칸 글자(SFR-012-03). 날짜 서식 칸은 화면 서식(예: 한국 엑셀 기본 m/d/yy → 「10/1/26」) 대신 실제 날짜 값을 YYYY-MM-DD로,
+     * 지수 모양(1E+11)으로 나올 큰 숫자는 원래 숫자 그대로 읽는다. 그 밖의 칸은 지금처럼 화면에 보이는 글자로 읽는다.
+     */
+    static String cellText(DataFormatter formatter, Cell cell) {
+        if (cell == null) return "";
+        var type = cell.getCellType() == CellType.FORMULA ? cell.getCachedFormulaResultType() : cell.getCellType();
+        if (type == CellType.NUMERIC) {
+            if (DateUtil.isCellDateFormatted(cell)) {
+                var value = cell.getLocalDateTimeCellValue();
+                if (value != null) {
+                    // 연월만 보이는 서식(예: yyyy-mm)은 연월 칸(B.10·B.11 연월)이라 YYYY-MM으로 준다.
+                    String pattern = cell.getCellStyle().getDataFormatString();
+                    boolean hasDay = pattern != null && pattern.toLowerCase(Locale.ROOT)
+                        .replaceAll("\"[^\"]*\"|\\[[^]]*]", "").contains("d");
+                    return hasDay ? value.toLocalDate().toString() : java.time.YearMonth.from(value).toString();
+                }
+            }
+            String shown = formatter.formatCellValue(cell);
+            if (shown.matches("[-+]?[0-9.,]*[eE][-+]?[0-9]+"))
+                return java.math.BigDecimal.valueOf(cell.getNumericCellValue()).stripTrailingZeros().toPlainString();
+            return shown;
+        }
+        return formatter.formatCellValue(cell);
     }
 
     private static CodeFailure invalid() {

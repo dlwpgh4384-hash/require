@@ -64,6 +64,13 @@
   justify-content: flex-end;
   margin-top: 24px;
 }
+/* 시안 창 아래 단추 .btn 36px. 창이 상세 칸(.ls-drawer) 안에 그려져도 줄어들지 않게 한다. */
+.app-dialog .app-actions button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  font-weight: 500;
+}
 .app-danger {
   background: #b91c1c;
   color: white;

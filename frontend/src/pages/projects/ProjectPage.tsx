@@ -458,6 +458,7 @@ export function ProjectPage() {
       {unassigned > 0 && (
         <Banner
           kind="warn"
+          icon={warnIcon(18)}
           action={
             <button
               type="button"
@@ -475,7 +476,6 @@ export function ProjectPage() {
             </button>
           }
         >
-          {warnIcon(18)}
           <span data-testid="project-unassigned-banner">
             영업 파트가 없는 프로젝트가 <strong>{unassigned}건</strong>{" "}
             있습니다. 파트를 정해야 파트별 실적·권한·정산에 들어갑니다.

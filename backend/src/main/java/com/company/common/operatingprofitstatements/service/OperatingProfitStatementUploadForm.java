@@ -35,6 +35,7 @@ public class OperatingProfitStatementUploadForm implements UploadForm {
     public String screenId() { return "UI-08"; }
     public List<String> headers() { return HEADERS; }
     public String templateFileName() { return "previous-profit-template.xlsx"; }
+    public List<String> exampleRow() { return List.of("2025-01", "500000000", "400000000", "50000000", "50000000", "", "", "", "", "", "", "", "", "", "", "", ""); }
     public String templateNote() {
         return "연월·매출·매출원가·판관비 합계·영업이익은 필수입니다. 세부 줄은 있으면 적고, 빈칸은 화면에 「–」로 보입니다. 시작월의 전년 1월부터 시작월 직전월까지 일부 달만 올려도 됩니다. 같은 연월은 덮어씁니다.";
     }

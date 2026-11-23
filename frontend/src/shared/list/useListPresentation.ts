@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOptionalUserPreferences } from "../../pages/userpreferences/UserPreferencesProvider";
 import {
   getCommonUserPreference,
-  putCommonUserPreference,
+  createPreferenceSaver,
 } from "../../pages/userpreferences/userPreferences";
 import { DEFAULT_PAGE_SIZE, type ListColumn } from "./listTypes";
 
@@ -61,7 +61,9 @@ export function useListColumns<T>(screenId: string, columns: ListColumn<T>[]) {
     .filter((column) => column.hiddenByDefault && !column.required)
     .map((column) => column.key);
   const [hidden, setHidden] = useState<string[]>(defaults);
-  const [token, setToken] = useState<string | null>(null);
+  // 열 설정은 차례로 저장한다(빨리 두 열을 꺼도 두 번째가 남게). 읽기 전에 바꿨으면 늦게 온 읽은 값으로 덮지 않는다(00-1 코드 리뷰 2026-11-23).
+  const saver = useMemo(() => createPreferenceSaver("COLS", screenId), [screenId]);
+  const touched = useRef(false);
   const preferences = useOptionalUserPreferences();
   useEffect(() => {
     if (!preferences) return;
@@ -69,7 +71,8 @@ export function useListColumns<T>(screenId: string, columns: ListColumn<T>[]) {
     getCommonUserPreference("COLS", screenId, controller.signal).then(
       (result) => {
         if (controller.signal.aborted) return;
-        setToken(result.data.modDttm);
+        saver.setToken(result.data.modDttm);
+        if (touched.current) return;
         if (result.data.found && result.data.prefVal) {
           try {
             const value: unknown = JSON.parse(result.data.prefVal);
@@ -83,13 +86,12 @@ export function useListColumns<T>(screenId: string, columns: ListColumn<T>[]) {
       () => undefined,
     );
     return () => controller.abort();
-  }, [preferences, screenId]);
+  }, [preferences, screenId, saver]);
   const persist = (next: string[]) => {
+    touched.current = true;
     setHidden(next);
     if (!preferences) return;
-    void putCommonUserPreference("COLS", screenId, JSON.stringify(next), token)
-      .then((result) => setToken(result.data.modDttm))
-      .catch(() => undefined);
+    void saver.save(JSON.stringify(next)).catch(() => undefined);
   };
   const required = new Set(
     columns.filter((column) => column.required).map((column) => column.key),

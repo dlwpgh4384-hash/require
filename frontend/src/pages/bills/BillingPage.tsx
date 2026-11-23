@@ -48,6 +48,7 @@ import {
 } from "./bills";
 import "../projects/projects.css";
 import "./bills.css";
+import { requestMenuBadgeRefresh } from "../../app/menuBadges";
 
 const svg = (d: string, size = 16) => (
   <svg
@@ -104,7 +105,11 @@ export function BillingPage() {
   const presentation = useListPresentation();
   const current = year === currentYear;
   const readOnly = !current || !!data?.readOnly;
-  const changed = () => setRevision((value) => value + 1);
+  // 저장·입금·취소 뒤 메뉴 옆 미수 건수도 다시 읽는다(SFR-001-04).
+  const changed = () => {
+    setRevision((value) => value + 1);
+    requestMenuBadgeRefresh();
+  };
   const toast = (message: string, kind: ToastKind = "ok") => {
     setNoticeKind(kind);
     setNotice(message);

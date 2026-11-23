@@ -453,6 +453,11 @@ public class CommonProjectService implements org.springframework.context.Applica
         var headers = new ArrayList<>(List.of("구분", "관리번호", "이름", "항목명"));
         for (YearMonth m = YearMonth.from(p.startDate); !m.isAfter(YearMonth.from(p.endDate)); m = m.plusMonths(1)) headers.add(m.toString());
         headers.add("합계");
-        return excel.write("배분표", headers, List.of(), actor.userId(), calendar.now());
+        // 데이터 첫 줄 예시(사용자 요청 2026-11-23): 사람 한 줄, 달마다 500만 원. 올리는 사람이 지우고 쓴다.
+        var example = new ArrayList<>(List.of("사람", "K-0001", "홍길동", ""));
+        int months = headers.size() - 5;
+        for (int i = 0; i < months; i++) example.add("5000000");
+        example.add(Long.toString(5_000_000L * months));
+        return excel.write("배분표", headers, List.of(example), actor.userId(), calendar.now());
     }
 }

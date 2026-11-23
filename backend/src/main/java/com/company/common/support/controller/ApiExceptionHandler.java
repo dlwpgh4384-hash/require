@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -67,6 +68,13 @@ public class ApiExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Error> uploadTooLarge(MaxUploadSizeExceededException failure) {
         String message = "10,000,000 bytes 이하의 엑셀 파일을 선택해 주세요.";
+        return of(HttpStatus.BAD_REQUEST, message, List.of(new FieldError("file", message)));
+    }
+
+    /** 깨진 파일 첨부 요청(경계 문자열 오류 등)은 서버 오류가 아니라 잘못된 파일로 본다(00-1 코드 리뷰 2026-11-23). 크기 초과는 위에서 따로 받는다. */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<Error> brokenMultipart(MultipartException failure) {
+        String message = "파일을 읽지 못했습니다. 다시 선택해 주세요.";
         return of(HttpStatus.BAD_REQUEST, message, List.of(new FieldError("file", message)));
     }
 

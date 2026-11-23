@@ -507,6 +507,8 @@ export function ListView<T>(props: ListViewProps<T>) {
                       tabIndex={props.onRowClick ? 0 : undefined}
                       onClick={() => props.onRowClick?.(row)}
                       onKeyDown={(event) => {
+                        // 줄 자신에서 누른 Enter만 상세를 연다. 칸 안 단추·체크 칸의 Enter는 그 단추가 받는다(00-1 코드 리뷰 2026-11-23).
+                        if (event.target !== event.currentTarget) return;
                         if (event.key === "Enter" && props.onRowClick) {
                           event.preventDefault();
                           event.stopPropagation();
@@ -603,6 +605,10 @@ export function ListPager({
   onPageSize: (size: number) => void;
 }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
+  // 건수를 바꾸거나 다시 읽어 전체가 줄어 지금 쪽이 끝 쪽을 넘으면 끝 쪽으로 맞춘다(00-1 코드 리뷰 2026-11-23).
+  useEffect(() => {
+    if (total > 0 && page > pages) onPage(pages);
+  }, [total, page, pages, onPage]);
   const from = total ? (page - 1) * pageSize + 1 : 0;
   const to = Math.min(total, page * pageSize);
   const start = Math.floor((page - 1) / 10) * 10 + 1;

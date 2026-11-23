@@ -138,6 +138,35 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (url.startsWith("/api/common/cash-flow-statements?")) {
+      return {
+        success: true,
+        meta: {},
+        data: {
+          year: 2026,
+          minimumCash: 1000000000,
+          warnings: [],
+          months: Array.from({ length: 12 }, (_, i) => ({
+            yearMonth: `2026${String(i + 1).padStart(2, "0")}`,
+            closed: false,
+            openingBalance: null,
+            closingBalance: null,
+            cashSales: null,
+            miscIncome: null,
+            loan: null,
+            incomeTotal: null,
+            regularPayroll: null,
+            contractFreelancePayroll: null,
+            outsourcing: null,
+            unpaidPayroll: null,
+            overhead: null,
+            corporateTaxPayment: null,
+            expenseTotal: null,
+          })),
+          numericTable: { columns: [], rows: [] },
+        },
+      };
+    }
     if (url.startsWith("/api/common/business-plan-comparisons?")) {
       return {
         success: true,
@@ -421,7 +450,8 @@ function respond(body: ShellMenuResponse) {
               url.endsWith("/UI-07") ||
               url.endsWith("/UI-08") ||
               url.endsWith("/UI-09") ||
-              url.endsWith("/UI-18")
+              url.endsWith("/UI-18") ||
+              url.endsWith("/UI-21")
                 ? {
                     periodBasis: {
                       latestYm: "202602",
@@ -480,6 +510,20 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-21": async (content) => {
+    expect(await content.findByTestId("cash-flow-empty")).toBeVisible();
+    expect(content.getByTestId("period-selector")).toHaveAttribute(
+      "data-kind",
+      "year",
+    );
+    expect(content.getByTestId("cash-flow-table")).toBeVisible();
+    expect(content.queryByRole("textbox")).not.toBeInTheDocument();
+    const actions = within(screen.getByTestId("screen-actions"));
+    expect(
+      actions.getAllByRole("button", { name: "엑셀 다운로드" }),
+    ).toHaveLength(1);
+    expect(content.queryByTestId("cash-flow-excel")).not.toBeInTheDocument();
+  },
   "UI-18": async (content) => {
     expect(await content.findByTestId("business-plan-empty")).toBeVisible();
     expect(content.getByTestId("period-selector")).toHaveAttribute(
@@ -739,7 +783,12 @@ describe("common placeholder screen contract", () => {
       fireEvent.click(screen.getByTestId("upload-cancel"));
       expect(screen.queryByTestId("upload-dialog")).not.toBeInTheDocument();
       expect(router.state.location.pathname).toBe("/screens/UI-10");
-      expect(findScreen("UI-21")).toBeUndefined();
+      expect(findScreen("UI-21")).toMatchObject({
+        id: "UI-21",
+        rootTestId: "cash-flow-statements-page",
+        hasInputs: false,
+      });
+      expect(findScreen("UI-14")).toBeUndefined();
     } finally {
       view.unmount();
       router.dispose();

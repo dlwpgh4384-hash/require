@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { CashFlowStatementWorkspaceProvider } from "../cashflowstatements/CashFlowStatementWorkspace";
 import { NavigationRoot, type ShellMenuItem } from "../../app/NavigationRoot";
 import { useViewport } from "../../shared/layout/useViewport";
 import {
@@ -110,52 +111,54 @@ function PreferenceNavigation() {
 export function CommonNavigationPage() {
   const preferences = useOptionalUserPreferences();
   return (
-    <BusinessPlanComparisonWorkspaceProvider>
-      <UserWorkspaceProvider>
-        <RoleWorkspaceProvider>
-          <MenuWorkspaceProvider>
-            <CodeWorkspaceProvider>
-              <ClientPartWorkspaceProvider>
-                <DeveloperWorkspaceProvider>
-                  <ProjectWorkspaceProvider>
-                    <AssignmentWorkspaceProvider>
-                      <WithdrawalWorkspaceProvider>
-                        <ProjectBoardWorkspaceProvider>
-                          <BillingWorkspaceProvider>
-                            <PartSettlementWorkspaceProvider>
-                              <FinanceItemWorkspaceProvider>
-                                <ProfitStructureWorkspaceProvider>
-                                  <OperatingProfitStatementWorkspaceProvider>
-                                    <NetProfitStatementWorkspaceProvider>
-                                      {preferences ? (
-                                        <PreferenceNavigation />
-                                      ) : (
-                                        <NavigationRoot
-                                          tabs
-                                          renderScreen={renderScreen}
-                                          extensions={(context) => ({
-                                            screenActions: screenActions(
-                                              context.screenId,
-                                            ),
-                                          })}
-                                        />
-                                      )}
-                                    </NetProfitStatementWorkspaceProvider>
-                                  </OperatingProfitStatementWorkspaceProvider>
-                                </ProfitStructureWorkspaceProvider>
-                              </FinanceItemWorkspaceProvider>
-                            </PartSettlementWorkspaceProvider>
-                          </BillingWorkspaceProvider>
-                        </ProjectBoardWorkspaceProvider>
-                      </WithdrawalWorkspaceProvider>
-                    </AssignmentWorkspaceProvider>
-                  </ProjectWorkspaceProvider>
-                </DeveloperWorkspaceProvider>
-              </ClientPartWorkspaceProvider>
-            </CodeWorkspaceProvider>
-          </MenuWorkspaceProvider>
-        </RoleWorkspaceProvider>
-      </UserWorkspaceProvider>
-    </BusinessPlanComparisonWorkspaceProvider>
+    <CashFlowStatementWorkspaceProvider>
+      <BusinessPlanComparisonWorkspaceProvider>
+        <UserWorkspaceProvider>
+          <RoleWorkspaceProvider>
+            <MenuWorkspaceProvider>
+              <CodeWorkspaceProvider>
+                <ClientPartWorkspaceProvider>
+                  <DeveloperWorkspaceProvider>
+                    <ProjectWorkspaceProvider>
+                      <AssignmentWorkspaceProvider>
+                        <WithdrawalWorkspaceProvider>
+                          <ProjectBoardWorkspaceProvider>
+                            <BillingWorkspaceProvider>
+                              <PartSettlementWorkspaceProvider>
+                                <FinanceItemWorkspaceProvider>
+                                  <ProfitStructureWorkspaceProvider>
+                                    <OperatingProfitStatementWorkspaceProvider>
+                                      <NetProfitStatementWorkspaceProvider>
+                                        {preferences ? (
+                                          <PreferenceNavigation />
+                                        ) : (
+                                          <NavigationRoot
+                                            tabs
+                                            renderScreen={renderScreen}
+                                            extensions={(context) => ({
+                                              screenActions: screenActions(
+                                                context.screenId,
+                                              ),
+                                            })}
+                                          />
+                                        )}
+                                      </NetProfitStatementWorkspaceProvider>
+                                    </OperatingProfitStatementWorkspaceProvider>
+                                  </ProfitStructureWorkspaceProvider>
+                                </FinanceItemWorkspaceProvider>
+                              </PartSettlementWorkspaceProvider>
+                            </BillingWorkspaceProvider>
+                          </ProjectBoardWorkspaceProvider>
+                        </WithdrawalWorkspaceProvider>
+                      </AssignmentWorkspaceProvider>
+                    </ProjectWorkspaceProvider>
+                  </DeveloperWorkspaceProvider>
+                </ClientPartWorkspaceProvider>
+              </CodeWorkspaceProvider>
+            </MenuWorkspaceProvider>
+          </RoleWorkspaceProvider>
+        </UserWorkspaceProvider>
+      </BusinessPlanComparisonWorkspaceProvider>
+    </CashFlowStatementWorkspaceProvider>
   );
 }

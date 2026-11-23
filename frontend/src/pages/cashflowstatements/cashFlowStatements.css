@@ -1,0 +1,124 @@
+.cash-flow-statements-page {
+  --pf-c1: #1d4ed8;
+  --pf-c6: #6b7280;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  max-width: 100%;
+}
+@media (prefers-color-scheme: dark) {
+  .cash-flow-statements-page {
+    --pf-c1: #60a5fa;
+    --pf-c6: #9ca3af;
+  }
+}
+.cash-flow-statements-page > * {
+  min-width: 0;
+}
+.cash-flow-statements-page .ls-tbar {
+  margin-bottom: 0;
+}
+.cash-flow-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.cash-flow-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cash-flow-warnings:empty {
+  display: none;
+}
+.cash-flow-link {
+  color: var(--primary-text);
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.cash-flow-statements-page .ls-twrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.cash-flow-table {
+  min-width: 1740px;
+  width: 100%;
+}
+.cash-flow-table th,
+.cash-flow-table td {
+  height: 40px;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+.cash-flow-table td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cash-flow-table th:first-child {
+  min-width: 224px;
+  text-align: left;
+}
+.cash-flow-table thead th {
+  text-align: center;
+}
+.cash-flow-table small {
+  display: block;
+  color: var(--text-sub);
+  font-weight: normal;
+}
+
+.cash-flow-row-bold {
+  font-weight: 700;
+}
+.cash-flow-row-group {
+  background: var(--surface-alt, var(--surface));
+  font-weight: 700;
+}
+.cash-flow-row-indent th:first-child {
+  padding-left: 24px;
+  font-weight: normal;
+}
+.cash-flow-table .is-forecast {
+  color: var(--text-sub);
+}
+.cash-flow-table .is-selected {
+  background: color-mix(in srgb, var(--pf-c1) 9%, transparent);
+}
+.cash-flow-table .is-negative,
+.cash-flow-field-error {
+  color: var(--ls-bad);
+}
+.cash-flow-year {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cash-flow-warning-icon {
+  position: relative;
+  display: inline-block;
+  margin-left: 4px;
+}
+.cash-flow-tooltip {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 5;
+  padding: 8px;
+  color: var(--text-main);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: normal;
+}
+.cash-flow-warning-icon:hover .cash-flow-tooltip,
+.cash-flow-warning-icon:focus .cash-flow-tooltip {
+  display: block;
+}
+@media (max-width: 720px) {
+  .cash-flow-statements-page {
+    gap: 16px;
+  }
+}

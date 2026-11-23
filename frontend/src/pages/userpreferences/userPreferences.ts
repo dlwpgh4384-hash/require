@@ -22,7 +22,11 @@ export interface PeriodBasis {
 }
 export interface UserPreferenceResponse {
   success: true;
-  meta: { periodBasis?: PeriodBasis | null; periodBasisError?: string };
+  meta: {
+    periodBasis?: PeriodBasis | null;
+    periodBasisError?: string;
+    currentYearMonth?: string;
+  };
   data: UserPreferenceResult;
 }
 export const preferenceConflict =

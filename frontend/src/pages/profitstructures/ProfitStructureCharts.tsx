@@ -1,5 +1,9 @@
 import { formatKoreanMoney } from "../../shared/list";
-import type { Amount, ProfitCompositionRow, ProfitWaterfall } from "./profitStructures";
+import type {
+  Amount,
+  ProfitCompositionRow,
+  ProfitWaterfall,
+} from "./profitStructures";
 import { percentage } from "./profitStructureFormulas";
 
 /** 시안 차트 색(--c1 파랑 · --c2 주황 · --c3 초록 · --c4 보라 · --c6 회색). 값은 profitStructures.css. */
@@ -47,17 +51,21 @@ export function axisScale(values: number[], headroom = 1.05) {
     high: Math.max(size, Math.ceil(top / size) * size),
   });
   // 바닥·천장을 간격 단위로 올리고 내리면 칸이 늘 수 있으므로, 6칸 안에 들 때까지 다음 깔끔한 간격으로 넓힌다.
-  while ((fit(step).high - fit(step).low) / step > MAX_STEPS + 1e-9) step = niceMax(step * 1.0001);
+  while ((fit(step).high - fit(step).low) / step > MAX_STEPS + 1e-9)
+    step = niceMax(step * 1.0001);
   const { low, high } = fit(step);
   const ticks: number[] = [];
-  for (let value = low; value <= high + step / 2; value += step) ticks.push(Math.round(value / step) * step);
+  for (let value = low; value <= high + step / 2; value += step)
+    ticks.push(Math.round(value / step) * step);
   return { low, high, ticks };
 }
 /** 백만 원 단위 눈금 글자(시안 Math.round(v/1e6).toLocaleString). */
 const million = (value: number) =>
   (Math.round(value / 1e6) + 0).toLocaleString("ko-KR"); // + 0: 「-0」을 「0」으로
 const numbers = (values: Amount[]) =>
-  values.filter((value): value is number => value != null && Number.isFinite(value));
+  values.filter(
+    (value): value is number => value != null && Number.isFinite(value),
+  );
 
 /** 시안 legend(): 색 칸 + 이름. 점선 계열은 가는 줄. */
 export function ChartLegend({
@@ -123,19 +131,27 @@ export function LineChart({
   series,
   labels,
   height = 220,
+  guide,
   testId,
 }: {
   series: ChartSeries[];
   labels: string[];
   height?: number;
+  guide?: { name: string; values: Amount[] } | null;
   testId?: string;
 }) {
   const H = height;
   const values = series.flatMap((item) => numbers(item.values));
-  const { low, high, ticks } = axisScale(values);
-  const y = (value: number) => PT + (H - PT - PB) * (1 - (value - low) / (high - low));
+  const { low, high, ticks } = axisScale([
+    ...values,
+    ...(guide ? numbers(guide.values) : []),
+  ]);
+  const y = (value: number) =>
+    PT + (H - PT - PB) * (1 - (value - low) / (high - low));
   const x = (index: number) =>
-    PL + (W - PL - PR) * (labels.length === 1 ? 0.5 : index / Math.max(1, labels.length - 1));
+    PL +
+    (W - PL - PR) *
+      (labels.length === 1 ? 0.5 : index / Math.max(1, labels.length - 1));
   return (
     <>
       <svg
@@ -147,14 +163,43 @@ export function LineChart({
       >
         <Grid ticks={ticks} y={y} />
         {labels.map((label, index) => (
-          <text key={`${label}-${index}`} className="ax" x={x(index)} y={H - 8} textAnchor="middle">
+          <text
+            key={`${label}-${index}`}
+            className="ax"
+            x={x(index)}
+            y={H - 8}
+            textAnchor="middle"
+          >
             {label}
           </text>
         ))}
+        {/* 시안 lineChart guide: 가는 수평 점선(--c6, 5 4)과 오른쪽 위 글자. 계열·범례에는 넣지 않는다(46번 점검 2026-11-23). */}
+        {guide &&
+          (() => {
+            const level = numbers(guide.values)[0];
+            if (level === undefined) return null;
+            return (
+              <g data-testid={testId ? `${testId}-guide` : undefined}>
+                <line
+                  x1={PL}
+                  x2={W - PR}
+                  y1={y(level)}
+                  y2={y(level)}
+                  style={{ stroke: chartColor.c6 }}
+                  strokeDasharray="5 4"
+                />
+                <text className="ax" x={W - PR} y={y(level) - 6} textAnchor="end">
+                  {guide.name}
+                </text>
+              </g>
+            );
+          })()}
         {series.map((item) => {
           const points = item.values
             .map((value, index) =>
-              value == null || !Number.isFinite(value) ? null : [x(index), y(value)],
+              value == null || !Number.isFinite(value)
+                ? null
+                : [x(index), y(value)],
             )
             .filter((point): point is number[] => point !== null);
           if (!points.length) return null;
@@ -168,12 +213,19 @@ export function LineChart({
                 strokeWidth={2.2}
                 strokeDasharray={item.dash ? "6 4" : undefined}
               />
-              <circle cx={end[0]} cy={end[1]} r={4} style={{ fill: item.color }} />
+              <circle
+                cx={end[0]}
+                cy={end[1]}
+                r={4}
+                style={{ fill: item.color }}
+              />
             </g>
           );
         })}
       </svg>
-      <ChartLegend items={series.map(({ name, color, dash }) => ({ name, color, dash }))} />
+      <ChartLegend
+        items={series.map(({ name, color, dash }) => ({ name, color, dash }))}
+      />
     </>
   );
 }
@@ -196,14 +248,17 @@ export function BarChart({
   const values = series.flatMap((item) => numbers(item.values));
   const guideValues = guide ? numbers(guide.values) : [];
   const { low, high, ticks } = axisScale([...values, ...guideValues]);
-  const y = (value: number) => PT + (H - PT - PB) * (1 - (value - low) / (high - low));
+  const y = (value: number) =>
+    PT + (H - PT - PB) * (1 - (value - low) / (high - low));
   const gw = (W - PL - PR) / Math.max(1, labels.length);
   const bw = Math.min(22, (gw - 12) / Math.max(1, series.length));
   const center = (index: number) => PL + gw * index + gw / 2;
   const guidePoints = guide
     ? guide.values
         .map((value, index) =>
-          value == null || !Number.isFinite(value) ? null : [center(index), y(value)],
+          value == null || !Number.isFinite(value)
+            ? null
+            : [center(index), y(value)],
         )
         .filter((point): point is number[] => point !== null)
     : [];
@@ -219,7 +274,12 @@ export function BarChart({
         <Grid ticks={ticks} y={y} />
         {labels.map((label, index) => (
           <g key={`${label}-${index}`}>
-            <text className="ax" x={center(index)} y={H - 8} textAnchor="middle">
+            <text
+              className="ax"
+              x={center(index)}
+              y={H - 8}
+              textAnchor="middle"
+            >
               {label}
             </text>
             {series.map((item, j) => {
@@ -257,7 +317,9 @@ export function BarChart({
       <ChartLegend
         items={[
           ...series.map(({ name, color }) => ({ name, color })),
-          ...(guide ? [{ name: guide.name, color: chartColor.c6, dash: true }] : []),
+          ...(guide
+            ? [{ name: guide.name, color: chartColor.c6, dash: true }]
+            : []),
         ]}
       />
     </>
@@ -300,7 +362,10 @@ export function StackChart({
           const cx = PL + gw * index + gw / 2;
           let acc = 0;
           return (
-            <g key={`${label}-${index}`} data-testid={testId ? `${testId}-bar` : undefined}>
+            <g
+              key={`${label}-${index}`}
+              data-testid={testId ? `${testId}-bar` : undefined}
+            >
               <text className="ax" x={cx} y={H - 8} textAnchor="middle">
                 {label}
               </text>
@@ -333,17 +398,27 @@ export function StackChart({
 
 type StepKind = "base" | "delta" | "sub";
 /** 시안 UI-07 waterfall 9단계: 이름(줄바꿈 \n), 값, 종류(base·sub=합계 단계, delta=더하거나 빼는 항목). */
-export function waterfallSteps(w: ProfitWaterfall): { label: string; value: Amount; kind: StepKind }[] {
+export function waterfallSteps(
+  w: ProfitWaterfall,
+): { label: string; value: Amount; kind: StepKind }[] {
   const minus = (value: Amount) => (value == null ? null : -value);
   return [
     { label: "매출", value: w.revenue, kind: "base" },
     { label: "매출원가", value: minus(w.costOfSales), kind: "delta" },
     { label: "매출\n총이익", value: w.grossProfit, kind: "sub" },
-    { label: "판관비", value: minus(w.sellingAdministrativeExpense), kind: "delta" },
+    {
+      label: "판관비",
+      value: minus(w.sellingAdministrativeExpense),
+      kind: "delta",
+    },
     { label: "전월 조정", value: w.previousAdjustment, kind: "delta" },
     { label: "영업이익", value: w.operatingProfit, kind: "sub" },
     { label: "영업외\n손익", value: w.nonOperatingProfitLoss, kind: "delta" },
-    { label: "법인세\n(월할)", value: minus(w.monthlyCorporateTax), kind: "delta" },
+    {
+      label: "법인세\n(월할)",
+      value: minus(w.monthlyCorporateTax),
+      kind: "delta",
+    },
     { label: "당기\n순이익", value: w.netProfit, kind: "sub" },
   ];
 }
@@ -373,12 +448,15 @@ export function WaterfallChart({ waterfall }: { waterfall: ProfitWaterfall }) {
   const values = bars.flatMap((bar) => [bar.a, bar.b]);
   const scale = axisScale(values, 1.08);
   const { low, high } = scale;
-  const y = (value: number) => pt + (H - pt - pb) * (1 - (value - low) / (high - low));
+  const y = (value: number) =>
+    pt + (H - pt - pb) * (1 - (value - low) / (high - low));
   const gw = (VW - pl - pr) / bars.length,
     bw = Math.min(56, gw * 0.62);
   const ticks = <Grid ticks={scale.ticks} y={y} left={pl} right={VW - pr} />;
   const won = (value: Amount) =>
-    value == null ? "–" : `${(Math.round(value) + 0).toLocaleString("ko-KR")}원`;
+    value == null
+      ? "–"
+      : `${(Math.round(value) + 0).toLocaleString("ko-KR")}원`;
   return (
     <>
       <svg
@@ -427,13 +505,24 @@ export function WaterfallChart({ waterfall }: { waterfall: ProfitWaterfall }) {
                   strokeDasharray="3 3"
                 />
               )}
-              <text className="ax profit-wf-value" x={cx} y={top - 6} textAnchor="middle">
+              <text
+                className="ax profit-wf-value"
+                x={cx}
+                y={top - 6}
+                textAnchor="middle"
+              >
                 {bar.value == null
                   ? "–"
                   : `${bar.kind === "delta" && bar.value > 0 ? "+" : ""}${million(bar.value)}`}
               </text>
               {bar.label.split("\n").map((line, j) => (
-                <text key={line} className="ax" x={cx} y={H - pb + 16 + j * 13} textAnchor="middle">
+                <text
+                  key={line}
+                  className="ax"
+                  x={cx}
+                  y={H - pb + 16 + j * 13}
+                  textAnchor="middle"
+                >
                   {line}
                 </text>
               ))}
@@ -464,13 +553,22 @@ export function MixRows({
   return (
     <div className="profit-mix" data-testid={testId}>
       {rows.map((row, index) => (
-        <div key={`${row.name}-${index}`} data-testid={testId ? `${testId}-row` : undefined}>
+        <div
+          key={`${row.name}-${index}`}
+          data-testid={testId ? `${testId}-row` : undefined}
+        >
           <div className="profit-mix-line">
             <span>{row.name}</span>
             <span className="profit-tnum">
               {formatKoreanMoney(row.revenue)}{" "}
               <span className="ls-cap">({percentage(row.share)})</span> · 이익률{" "}
-              <span className={row.profitRate != null && row.profitRate < 0 ? "ls-neg" : undefined}>
+              <span
+                className={
+                  row.profitRate != null && row.profitRate < 0
+                    ? "ls-neg"
+                    : undefined
+                }
+              >
                 {percentage(row.profitRate)}
               </span>
             </span>
@@ -478,7 +576,9 @@ export function MixRows({
           <div className="profit-track">
             <div
               className="profit-fill"
-              style={{ width: `${(Math.max(0, row.revenue ?? 0) / max) * 100}%` }}
+              style={{
+                width: `${(Math.max(0, row.revenue ?? 0) / max) * 100}%`,
+              }}
             />
           </div>
         </div>

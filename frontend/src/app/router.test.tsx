@@ -23,6 +23,7 @@ import type { OperatingStandard } from "../pages/operatingstandards/operatingSta
 import type { CodeHistoryItem } from "../pages/commonops/codeHistory";
 import type { RateRenegotiationResult } from "../pages/raterenegotiations/rateRenegotiations";
 import type { BusinessPlanComparisonResult } from "../pages/commonops/businessPlanComparisons";
+import type { CashFlowStatementResult } from "../pages/cashflowstatements/cashFlowStatements";
 
 let router: ReturnType<typeof createAppRouter> | undefined;
 
@@ -493,6 +494,337 @@ function respondWithClientParts() {
   vi.stubGlobal("fetch", request);
   return { request, clients, parts, success };
 }
+
+function respondWithCashFlowStatements(available = true) {
+  const menus = response();
+  menus.data.push(
+    {
+      ...menus.data[0],
+      menuId: "G007",
+      menuNm: "재무·자금",
+      scrnId: null,
+      sortOrd: 2,
+    },
+    {
+      ...menus.data[0],
+      menuId: "M023",
+      upperMenuId: "G007",
+      menuNm: "자금수지표",
+      scrnId: "UI-21",
+      menuLvl: 2,
+    },
+  );
+  menus.meta.screenAccess.push({ scrnId: "UI-21", available, pcOnlyYn: "N" });
+  const result: CashFlowStatementResult = {
+    year: 2026,
+    minimumCash: 1000000000,
+    months: Array.from({ length: 12 }, (_, index) => ({
+      yearMonth: `2026${String(index + 1).padStart(2, "0")}`,
+      closed: index < 10,
+      openingBalance: null,
+      closingBalance: null,
+      cashSales: null,
+      miscIncome: null,
+      loan: null,
+      incomeTotal: null,
+      regularPayroll: null,
+      contractFreelancePayroll: null,
+      outsourcing: null,
+      unpaidPayroll: null,
+      overhead: null,
+      corporateTaxPayment: null,
+      expenseTotal: null,
+    })),
+    warnings: [],
+    numericTable: {
+      columns: [
+        ...Array.from({ length: 12 }, (_, index) => ({
+          label: `${index + 1}월`,
+          actual: index < 10,
+          warning: false,
+        })),
+        ...["상반기", "하반기", "연간"].map((label) => ({
+          label,
+          actual: null,
+          warning: false,
+        })),
+      ],
+      rows: [
+        "전월이월금",
+        "수입",
+        "현금매출",
+        "잡수익",
+        "대여금",
+        "수입 합계",
+        "지출",
+        "인건비(정규직)",
+        "인건비(계약직·프리랜서)",
+        "용역비(외주)",
+        "미지급 인건비",
+        "제경비",
+        "법인세 납부",
+        "지출 합계",
+        "이월금",
+      ].map((label, index) => ({
+        label,
+        style: [1, 6].includes(index)
+          ? "group"
+          : [0, 5, 13, 14].includes(index)
+            ? "bold"
+            : "indent",
+        values: Array.from({ length: 15 }, () => null),
+      })),
+    },
+  };
+  const success = (data: unknown) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ success: true, meta: {}, data }),
+  });
+  const list = vi.fn(async () => success(result));
+  const download = vi.fn(async () => ({
+    ok: true,
+    status: 200,
+    headers: new Headers({
+      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent("자금수지표.xlsx")}`,
+    }),
+    blob: async () => new Blob(),
+    json: async () => ({
+      success: false,
+      message: "다운로드 실패",
+      errors: [],
+    }),
+  }));
+  const request = vi.fn(async (url: string, _init?: RequestInit) => {
+    if (url === "/api/common/menus")
+      return { ok: true, status: 200, json: async () => menus };
+    if (url.startsWith("/api/common/cash-flow-statements/excel?"))
+      return download();
+    if (url.startsWith("/api/common/cash-flow-statements?")) return list();
+    if (url.startsWith("/api/common/user-preferences/"))
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ...preferenceResponse(url),
+          meta: {
+            periodBasis: {
+              latestYm: "202611",
+              cashBaseYm: "202501",
+              closedMonths: ["202610"],
+            },
+          },
+        }),
+      };
+    throw new Error(`예상하지 않은 요청: ${url}`);
+  });
+  vi.stubGlobal("fetch", request);
+  return { request, list, download };
+}
+
+describe("cash flow statement route composition", () => {
+  it.each(["/screens/UI-21", "/#UI-21"])(
+    "%s resolves UI-21 through the public year-only client in one shell",
+    async (path) => {
+      const { request } = respondWithCashFlowStatements();
+      mount(path);
+      expect(await screen.findByTestId("cash-flow-empty")).toBeVisible();
+      expect(screen.getAllByTestId("cash-flow-statements-page")).toHaveLength(
+        1,
+      );
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+        "자금수지표",
+      );
+      expect(screen.getByTestId("period-selector")).toHaveAttribute(
+        "data-kind",
+        "year",
+      );
+      expect(screen.queryByTestId("period-month")).not.toBeInTheDocument();
+      expect(screen.getByTestId("cash-flow-balance-chart")).toBeVisible();
+      expect(
+        within(screen.getByTestId("cash-flow-table")).getAllByRole("row"),
+      ).toHaveLength(16);
+      for (const header of within(
+        screen.getByTestId("cash-flow-table"),
+      ).getAllByRole("columnheader")) {
+        expect(within(header).queryByRole("button")).not.toBeInTheDocument();
+      }
+      const actions = within(screen.getByTestId("screen-actions"));
+      expect(actions.getAllByTestId("cash-flow-excel")).toHaveLength(1);
+      await waitFor(() =>
+        expect(actions.getByTestId("cash-flow-excel")).toBeEnabled(),
+      );
+      expect(request).toHaveBeenCalledWith(
+        "/api/common/cash-flow-statements?year=2026",
+        {
+          signal: expect.any(AbortSignal),
+        },
+      );
+      expect(
+        request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
+      ).toBe(false);
+      expect(router?.state.location.pathname).toBe("/screens/UI-21");
+      expectSingleShell();
+    },
+  );
+
+  it("a pending public read keeps the routed report shell and disables title export", async () => {
+    const { request, list, download } = respondWithCashFlowStatements();
+    const result = await list.getMockImplementation()!();
+    let complete!: (value: typeof result) => void;
+    list.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve;
+        }),
+    );
+    mount("/screens/UI-21");
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("cash-flow-loading")).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "자금수지표",
+    );
+    expect(screen.getByTestId("period-selector")).toHaveAttribute(
+      "data-kind",
+      "year",
+    );
+    expect(screen.getByTestId("cash-flow-balance-chart")).toBeVisible();
+    const table = screen.getByTestId("cash-flow-table-pending");
+    expect(table).toHaveAttribute("aria-busy", "true");
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(16);
+    expect(screen.getByTestId("money-unit")).toBeVisible();
+    expect(screen.queryByTestId("cash-flow-empty")).not.toBeInTheDocument();
+    const button = within(screen.getByTestId("screen-actions")).getByTestId(
+      "cash-flow-excel",
+    );
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(download).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledWith(
+      "/api/common/cash-flow-statements?year=2026",
+      { signal: expect.any(AbortSignal) },
+    );
+    expectSingleShell();
+    await act(async () => {
+      complete(result);
+    });
+    expect(await screen.findByTestId("cash-flow-empty")).toBeVisible();
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(router?.state.location.pathname).toBe("/screens/UI-21");
+    expectSingleShell();
+  });
+
+  it("M023 under G007 opens UI-21 without replacing preferences", async () => {
+    const { list } = respondWithCashFlowStatements();
+    mount("/screens/ADDED");
+    await screen.findByRole("region", { name: "ADDED 본문" });
+    const preferences = screen.getByTestId("user-preferences");
+    fireEvent.click(screen.getByTestId("menu-toggle-g007"));
+    fireEvent.click(screen.getByRole("link", { name: "자금수지표" }));
+    expect(await screen.findByTestId("cash-flow-empty")).toBeVisible();
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(router?.state.location.pathname).toBe("/screens/UI-21");
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
+    expectSingleShell();
+  });
+
+  it("an unavailable UI-21 stays behind the existing screen guard", async () => {
+    const { list, download } = respondWithCashFlowStatements(false);
+    mount("/screens/UI-21");
+    expect(await screen.findByText("사용할 수 없는 화면입니다")).toBeVisible();
+    expect(
+      screen.queryByTestId("cash-flow-statements-page"),
+    ).not.toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
+    expect(download).not.toHaveBeenCalled();
+    expectSingleShell();
+  });
+
+  it("a failed routed read disables export and retries the same public client", async () => {
+    const { list } = respondWithCashFlowStatements();
+    list.mockRejectedValueOnce(new Error("조회 실패"));
+    mount("/screens/UI-21");
+    await screen.findByTestId("cash-flow-error");
+    expect(screen.queryByTestId("cash-flow-empty")).not.toBeInTheDocument();
+    expect(screen.getByTestId("cash-flow-excel")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("cash-flow-retry"));
+    expect(await screen.findByTestId("cash-flow-empty")).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByTestId("cash-flow-excel")).toBeEnabled(),
+    );
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(router?.state.location.pathname).toBe("/screens/UI-21");
+    expectSingleShell();
+  });
+
+  it.each([true, false])(
+    "title export uses the local client and reports success=%s",
+    async (succeeds) => {
+      const { request, download } = respondWithCashFlowStatements();
+      const created = vi.fn(() => "blob:cash-flow");
+      const revoked = vi.fn();
+      vi.stubGlobal(
+        "URL",
+        class extends URL {
+          static createObjectURL = created;
+          static revokeObjectURL = revoked;
+        },
+      );
+      const click = vi
+        .spyOn(HTMLAnchorElement.prototype, "click")
+        .mockImplementation(() => undefined);
+      if (!succeeds)
+        download.mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          headers: new Headers(),
+          blob: async () => new Blob(),
+          json: async () => ({
+            success: false,
+            message: "다운로드 실패",
+            errors: [],
+          }),
+        });
+      mount("/screens/UI-21");
+      await screen.findByTestId("cash-flow-table");
+      fireEvent.change(screen.getByTestId("money-unit"), {
+        target: { value: "원" },
+      });
+      const button = within(screen.getByTestId("screen-actions")).getByTestId(
+        "cash-flow-excel",
+      );
+      await waitFor(() => expect(button).toBeEnabled());
+      // Complete delayed URL cleanup before afterEach restores the URL global.
+      vi.useFakeTimers();
+      try {
+        await act(async () => {
+          fireEvent.click(button);
+        });
+        expect(screen.getByTestId("cash-flow-toast")).toHaveTextContent(
+          succeeds
+            ? "엑셀 파일을 내려받았습니다."
+            : "엑셀 파일을 받지 못했습니다. 다시 시도해 주세요.",
+        );
+        expect(request).toHaveBeenCalledWith(
+          `/api/common/cash-flow-statements/excel?${new URLSearchParams({ year: "2026", amountUnit: "원" })}`,
+        );
+        expect(download).toHaveBeenCalledTimes(1);
+        expect(click).toHaveBeenCalledTimes(succeeds ? 1 : 0);
+        expect(created).toHaveBeenCalledTimes(succeeds ? 1 : 0);
+        expect(revoked).not.toHaveBeenCalled();
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1000);
+        });
+        expect(revoked).toHaveBeenCalledTimes(succeeds ? 1 : 0);
+        if (succeeds) expect(revoked).toHaveBeenCalledWith("blob:cash-flow");
+        expect(router?.state.location.pathname).toBe("/screens/UI-21");
+        expectSingleShell();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+});
 
 function respondWithBusinessPlanComparisons(available = true) {
   const menus = response();

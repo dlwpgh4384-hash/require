@@ -1,0 +1,39 @@
+.month-close-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+  max-width: 100%;
+}
+.month-close-page > *,
+.month-close-page section {
+  min-width: 0;
+}
+.month-close-table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.month-close-page table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.month-close-page th,
+.month-close-page td {
+  text-align: left;
+  padding: 12px;
+  border-bottom: 1px solid var(--line, #e5e7eb);
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+.month-close-page thead {
+  background: var(--bg-subtle, #f6f7f9);
+}
+.month-close-page textarea {
+  width: 100%;
+  min-height: 96px;
+  box-sizing: border-box;
+}
+.month-close-page .app-actions {
+  flex-wrap: wrap;
+}

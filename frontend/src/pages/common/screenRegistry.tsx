@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import { MonthClosePage } from "../monthcloses/MonthClosePage";
 import { CashFlowStatementPage } from "../cashflowstatements/CashFlowStatementPage";
 import { CashFlowStatementTitleActions } from "../cashflowstatements/CashFlowStatementWorkspace";
 import { BillingPage } from "../bills/BillingPage";
@@ -65,6 +66,12 @@ export interface ScreenEntry {
  * 공통 화면 틀 시험도 여기서 만든 화면과 「준비 중」 화면을 나눈다. 새 화면은 여기에 한 줄만 더한다.
  */
 export const screenRegistry: readonly ScreenEntry[] = [
+  {
+    id: "UI-14",
+    Page: () => <MonthClosePage />,
+    rootTestId: "month-close-page",
+    hasInputs: false,
+  },
   {
     id: "UI-21",
     Page: () => <CashFlowStatementPage />,

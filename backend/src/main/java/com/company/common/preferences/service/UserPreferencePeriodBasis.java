@@ -1,6 +1,7 @@
 package com.company.common.preferences.service;
 
 import com.company.common.preferences.mapper.UserPreferencePeriodSourceMapper;
+import com.company.common.support.service.BusinessCalendar;
 
 import java.math.BigDecimal;
 import java.time.YearMonth;
@@ -30,7 +31,8 @@ public class UserPreferencePeriodBasis {
                 YearMonth month = parse(value);
                 if (last == null || month.isAfter(last)) last = month;
             }
-            String latest = (last == null ? cashMonth : last.plusMonths(1)).format(YM);
+            String latest = new BusinessCalendar()
+                .firstOpenMonth(last, cashMonth).format(YM);
             return Map.of("periodBasis", new Basis(latest, cash, closed));
         } catch (IllegalArgumentException | java.time.DateTimeException | ArithmeticException failure) {
             return missing();

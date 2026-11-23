@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.monthcloses.mapper.MonthCloseMapper">
+  <resultMap id="header" type="com.company.common.monthcloses.dto.MonthCloseContracts$Header" autoMapping="false">
+    <constructor>
+      <arg column="state" javaType="java.lang.String"/>
+      <arg column="modifiedAt" javaType="java.time.Instant"/>
+      <arg column="closedAt" javaType="java.time.Instant"/>
+      <arg column="closedBy" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="counts" type="com.company.common.monthcloses.dto.MonthCloseContracts$Counts" autoMapping="false">
+    <constructor>
+      <arg column="payroll" javaType="_int"/>
+      <arg column="invoices" javaType="_int"/>
+      <arg column="finance" javaType="_int"/>
+    </constructor>
+  </resultMap>
+  <update id="lockSources">
+    LOCK TABLE TB_SY_OPER_STD, TB_CL_CLOSE, TB_CO_PART_SETL, TB_BS_PART, TB_BS_PART_STD,
+      TB_SY_USER, TB_SY_USER_ROLE, TB_SY_ROLE, TB_HR_DEV, TB_PJ_PROJ, TB_PJ_PROJ_PART,
+      TB_SY_CHG_HIST, TB_HR_MON_PAY, TB_HR_DEV_PRC, TB_PJ_ASGN, TB_PJ_ASGN_MON,
+      TB_PJ_ASGN_HIST, TB_PJ_TK_DSTRB, TB_CO_MON_COST, TB_CO_PART_SETL_DTL,
+      TB_SY_CODE, TB_SY_CALC_RULE, TB_HR_DEV_STAT, TB_BL_BILL, TB_PJ_DRCT_EXPS,
+      TB_FI_ITEM, TB_FI_CORP_TAX, TB_CO_PREV_ADJ, TB_CO_MON_PL, TB_CL_CLOSE_HIST
+      IN SHARE ROW EXCLUSIVE MODE NOWAIT
+  </update>
+  <select id="selectHeader" resultMap="header">
+    SELECT c.CLOSE_STAT_CD AS "state", c.MOD_DTTM AS "modifiedAt", c.CLOSE_DTTM AS "closedAt",
+      COALESCE(u.USER_NM, c.CLOSE_USER_ID) AS "closedBy"
+    FROM TB_CL_CLOSE c LEFT JOIN TB_SY_USER u ON u.USER_ID = c.CLOSE_USER_ID
+    WHERE c.CLOSE_YM = #{month}
+  </select>
+  <select id="latestClosedMonth" resultType="string">
+    SELECT max(CLOSE_YM) FROM TB_CL_CLOSE WHERE CLOSE_STAT_CD = 'CLOSE'
+  </select>
+  <select id="selectCounts" resultMap="counts">
+    SELECT (SELECT count(*)::int FROM TB_HR_MON_PAY WHERE PAY_YM = #{month}) AS "payroll",
+      (SELECT count(*)::int FROM TB_BL_BILL WHERE BILL_YM = #{month} AND CNCL_YN = 'N'
+        AND (TAX_INVC_NO IS NULL OR btrim(TAX_INVC_NO) = '')) AS "invoices",
+      (SELECT count(*)::int FROM TB_FI_ITEM WHERE FIN_YM = #{month}) AS "finance"
+  </select>
+  <select id="adjustmentCount" resultType="int">
+    SELECT count(*)::int FROM TB_CO_PREV_ADJ WHERE APLY_YM = #{next} AND TRGT_YM = #{month}
+  </select>
+  <insert id="saveClose">
+    INSERT INTO TB_CL_CLOSE(CLOSE_YM, CLOSE_STAT_CD, CLOSE_USER_ID, CLOSE_DTTM,
+      REG_USER_ID, REG_DTTM, MOD_USER_ID, MOD_DTTM)
+    VALUES(#{month}, #{state}, #{actor}, clock_timestamp(), #{actor}, clock_timestamp(), #{actor}, clock_timestamp())
+    ON CONFLICT(CLOSE_YM) DO UPDATE SET CLOSE_STAT_CD = excluded.CLOSE_STAT_CD,
+      CLOSE_USER_ID = CASE WHEN excluded.CLOSE_STAT_CD = 'CLOSE' THEN excluded.CLOSE_USER_ID ELSE NULL END,
+      CLOSE_DTTM = CASE WHEN excluded.CLOSE_STAT_CD = 'CLOSE' THEN excluded.CLOSE_DTTM ELSE NULL END,
+      MOD_USER_ID = excluded.MOD_USER_ID,
+      MOD_DTTM = GREATEST(clock_timestamp(), COALESCE(TB_CL_CLOSE.MOD_DTTM, TB_CL_CLOSE.REG_DTTM) + interval '1 microsecond')
+    WHERE TB_CL_CLOSE.MOD_DTTM IS NOT DISTINCT FROM #{version,jdbcType=TIMESTAMP_WITH_TIMEZONE}
+  </insert>
+  <insert id="insertHistory">
+    INSERT INTO TB_CL_CLOSE_HIST(CLOSE_YM, HIST_SN, ACT_CD, ACT_RSN, REMAIN_CHK_CN, REG_USER_ID, REG_DTTM)
+    SELECT #{month}, COALESCE(max(HIST_SN), 0) + 1, #{action}, #{reason,jdbcType=VARCHAR},
+      #{remaining,jdbcType=VARCHAR}, #{actor}, clock_timestamp()
+    FROM TB_CL_CLOSE_HIST WHERE CLOSE_YM = #{month}
+  </insert>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG(USER_ID, ACT_TYPE_CD, SCRN_ID, TRGT_DESC, ACT_DTTM, REG_USER_ID, REG_DTTM)
+    VALUES(#{actor}, 'CLOSE', 'UI-14', #{month}, clock_timestamp(), #{actor}, clock_timestamp())
+  </insert>
+  <delete id="deleteOpenAssignments">
+    DELETE FROM TB_PJ_ASGN_MON WHERE INPUT_YM = #{month} AND FIX_YN = 'N'
+  </delete>
+  <insert id="saveAssignment">
+    INSERT INTO TB_PJ_ASGN_MON(ASGN_ID, INPUT_YM, DEV_ID, PROJ_ID, INPUT_DAY_CNT, MON_MM,
+      APLY_UPRC, SALES_AMT, FIX_YN, REG_USER_ID, MOD_USER_ID, MOD_DTTM)
+    VALUES(#{assignmentId}, #{month}, #{developerId}, #{projectId}, #{days}, #{mm}, #{price},
+      #{sales}, 'Y', #{actor}, #{actor}, clock_timestamp())
+  </insert>
+  <delete id="deleteOpenCosts">
+    DELETE FROM TB_CO_MON_COST WHERE COST_YM = #{month} AND FIX_YN = 'N'
+  </delete>
+  <insert id="saveCost">
+    INSERT INTO TB_CO_MON_COST(COST_YM, DEV_ID, PROJ_ID, ASGN_ID, ASGN_MM, FREE_MM, SALES_AMT,
+      LABOR_ALLOC_AMT, TEAM_EXPS_AMT, PROJ_EXPS_AMT, DRCT_EXPS_AMT, COST_CLS_CD, CTRT_TYPE_CD,
+      PART_ID, FIX_YN, REG_USER_ID, MOD_USER_ID, MOD_DTTM)
+    VALUES(#{row.yearMonth}, #{row.developerId}, #{row.projectId}, #{row.assignmentId}, #{row.mm},
+      CASE WHEN #{row.inputTypeCode,jdbcType=VARCHAR} = 'FREE' THEN #{row.mm} ELSE 0 END,
+      #{row.revenue}, #{row.labor}, #{row.team}, #{row.expense}, #{row.team} + #{row.expense},
+      #{classification}, #{row.contractTypeCode,jdbcType=VARCHAR}, #{partId,jdbcType=VARCHAR},
+      'Y', #{actor}, #{actor}, clock_timestamp())
+  </insert>
+  <insert id="saveProfit">
+    INSERT INTO TB_CO_MON_PL(PL_YM, SALES_AMT, ALLOC_COST_AMT, IDLE_COST_AMT, DRCT_EXPS_AMT,
+      SALES_COST_AMT, GROSS_PRFT_AMT, SGA_INPUT_AMT, INDRCT_LABOR_AMT, RND_AMT, SGA_TOT_AMT,
+      PREV_ADJ_AMT, OPRT_PRFT_AMT, NOPR_INCM_AMT, NOPR_EXPS_AMT, CORP_TAX_AMT, NET_PRFT_AMT,
+      MIGR_YN, FIX_YN, REG_USER_ID, MOD_USER_ID, MOD_DTTM)
+    VALUES(#{row.month}, #{row.revenue}, #{row.allocatedCost}, #{row.idleCost}, #{row.directExpense},
+      #{row.costOfSales}, #{row.grossProfit}, #{row.sellingAdministrativeInput}, #{row.indirectLaborCost},
+      #{row.internalResearchCost}, #{row.sga}, #{row.previousAdjustment}, #{row.operatingProfit},
+      #{row.income}, #{row.expense}, #{row.tax}, #{row.netProfit}, 'N', 'Y', #{actor}, #{actor}, clock_timestamp())
+    ON CONFLICT(PL_YM) DO UPDATE SET SALES_AMT = excluded.SALES_AMT,
+      ALLOC_COST_AMT = excluded.ALLOC_COST_AMT, IDLE_COST_AMT = excluded.IDLE_COST_AMT,
+      DRCT_EXPS_AMT = excluded.DRCT_EXPS_AMT, SALES_COST_AMT = excluded.SALES_COST_AMT,
+      GROSS_PRFT_AMT = excluded.GROSS_PRFT_AMT, SGA_INPUT_AMT = excluded.SGA_INPUT_AMT,
+      INDRCT_LABOR_AMT = excluded.INDRCT_LABOR_AMT, RND_AMT = excluded.RND_AMT,
+      SGA_TOT_AMT = excluded.SGA_TOT_AMT, PREV_ADJ_AMT = excluded.PREV_ADJ_AMT,
+      OPRT_PRFT_AMT = excluded.OPRT_PRFT_AMT, NOPR_INCM_AMT = excluded.NOPR_INCM_AMT,
+      NOPR_EXPS_AMT = excluded.NOPR_EXPS_AMT, CORP_TAX_AMT = excluded.CORP_TAX_AMT,
+      NET_PRFT_AMT = excluded.NET_PRFT_AMT, MIGR_YN = 'N', FIX_YN = 'Y',
+      MOD_USER_ID = excluded.MOD_USER_ID, MOD_DTTM = clock_timestamp()
+    WHERE TB_CO_MON_PL.FIX_YN = 'N'
+  </insert>
+  <update id="unfixAssignments">UPDATE TB_PJ_ASGN_MON SET FIX_YN = 'N' WHERE INPUT_YM = #{month} AND FIX_YN = 'Y'</update>
+  <update id="unfixCosts">UPDATE TB_CO_MON_COST SET FIX_YN = 'N' WHERE COST_YM = #{month} AND FIX_YN = 'Y'</update>
+  <update id="unfixProfit">UPDATE TB_CO_MON_PL SET FIX_YN = 'N' WHERE PL_YM = #{month} AND FIX_YN = 'Y'</update>
+</mapper>

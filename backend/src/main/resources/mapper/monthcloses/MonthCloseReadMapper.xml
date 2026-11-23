@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.commonops.mapper.MonthCloseReadMapper">
+  <resultMap id="history"
+             type="com.company.common.commonops.mapper.MonthCloseHistoryRow"
+             autoMapping="false">
+    <constructor>
+      <arg column="month" javaType="java.lang.String"/>
+      <arg column="actionCode" javaType="java.lang.String"/>
+      <arg column="processor" javaType="java.lang.String"/>
+      <arg column="occurredAt" javaType="java.time.Instant"/>
+      <arg column="reason" javaType="java.lang.String"/>
+      <arg column="remainingNames" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <select id="isClosed" resultType="boolean">
+    SELECT EXISTS (
+      SELECT 1
+      FROM TB_CL_CLOSE c
+      WHERE c.close_ym = #{month} AND c.close_stat_cd = 'CLOSE'
+    )
+  </select>
+  <select id="selectHistory" resultMap="history">
+    SELECT h.close_ym AS "month", h.act_cd AS "actionCode",
+           COALESCE(u.user_nm, h.reg_user_id) AS "processor",
+           h.reg_dttm AS "occurredAt", h.act_rsn AS "reason",
+           h.remain_chk_cn AS "remainingNames"
+    FROM TB_CL_CLOSE_HIST h
+    LEFT JOIN TB_SY_USER u ON u.user_id = h.reg_user_id
+    <where>
+      <if test="month != null">h.close_ym = #{month}</if>
+    </where>
+    ORDER BY h.reg_dttm DESC, h.close_ym DESC, h.hist_sn DESC
+  </select>
+</mapper>

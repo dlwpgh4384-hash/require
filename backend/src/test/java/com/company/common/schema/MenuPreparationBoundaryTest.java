@@ -35,7 +35,8 @@ class MenuPreparationBoundaryTest {
         "V11__developer_pool_schema.sql", "V12__project_operations_schema.sql",
         "V13__assignment_candidate_sources.sql", "V14__recommendation_log_schema.sql",
         "V15__billing_receipt_schema.sql", "V16__part_settlement_schema.sql",
-        "V17__finance_items_schema.sql", "V18__business_plan_schema.sql");
+        "V17__finance_items_schema.sql", "V18__business_plan_schema.sql",
+        "V19__month_close_schema.sql");
     private final SqlSessionFactory factory = mock(SqlSessionFactory.class);
     private final SqlSession session = mock(SqlSession.class);
     private final Connection connection = mock(Connection.class);
@@ -92,7 +93,7 @@ class MenuPreparationBoundaryTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17})
+    @ValueSource(ints = {5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19})
     void permissionPreparationFailureRollsBackTheWholePreparation(int failingResource) throws Exception {
         int[] executions = {0};
         when(statement.execute(anyString())).thenAnswer(call -> {
@@ -126,7 +127,7 @@ class MenuPreparationBoundaryTest {
             "TB_SL_OPP", "TB_SL_OPP_NEED", "TB_SL_TENT_ASGN", "TB_SL_RCMD_LOG", "TB_BL_RCPT",
             "TB_CO_PART_SETL_DTL", "TB_CL_CLOSE_CHK", "TB_CO_MON_PL", "TB_CO_PREV_ADJ",
             "TB_FI_ITEM", "TB_FI_CORP_TAX", "TB_FI_TAX_PAY", "TB_FI_LOAN", "TB_FI_CARD",
-            "TB_FI_CARD_MON", "TB_FI_CARD_PAY", "TB_FI_XFER", "TB_FI_BIZ_PLAN");
+            "TB_FI_CARD_MON", "TB_FI_CARD_PAY", "TB_FI_XFER", "TB_FI_BIZ_PLAN", "TB_CL_CLOSE_HIST");
     }
 
     @Test

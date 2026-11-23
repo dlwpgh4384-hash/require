@@ -832,6 +832,10 @@ a.header-brand:focus-visible {
   font-weight: 600;
   flex: none;
 }
+.menu-nb.warn {
+  background: var(--ls-warn-bg, #fffbeb);
+  color: var(--ls-warn, #b45309);
+}
 .sidebar.is-collapsed .menu-nb {
   display: none;
 }

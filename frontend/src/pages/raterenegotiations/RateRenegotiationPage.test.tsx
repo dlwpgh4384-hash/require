@@ -377,7 +377,7 @@ it("shows how many people were calculated from the developer pool salary before 
   mount();
   await ready();
   expect(screen.getByTestId("rate-salary-estimated")).toHaveTextContent(
-    "2026-02 급여 업로드 전: 1명은 개발자 풀 월 급여로 계산한 값입니다.",
+    "2월 급여 업로드 전: 1명은 개발자 풀 월 급여로 계산한 값입니다.",
   );
 });
 it("keeps an emptied assumption box empty without querying 0 and restores it on blur", async () => {

@@ -3144,7 +3144,7 @@ describe("application route registration", () => {
       mount(path);
       await waitFor(() =>
         expect(
-          request.mock.calls.filter(([url]) => url !== "/api/common/menus"),
+          request.mock.calls.filter(([url]) => url !== "/api/common/menus" && url !== "/api/common/bills/unpaid-count"),
         ).toHaveLength(5),
       );
       await act(async () => {});
@@ -3157,7 +3157,7 @@ describe("application route registration", () => {
       expect(screen.getAllByTestId("user-preferences")).toHaveLength(1);
       expectSingleShell();
       const preferenceCalls = request.mock.calls.filter(
-        ([url]) => url !== "/api/common/menus",
+        ([url]) => url !== "/api/common/menus" && url !== "/api/common/bills/unpaid-count",
       );
       expect(preferenceCalls.map(([url]) => url).sort()).toEqual([
         "/api/common/user-preferences/DENSE/GLOBAL",
@@ -3220,7 +3220,7 @@ describe("application route registration", () => {
     await act(async () => {});
     const provider = screen.getByTestId("user-preferences");
     const reads = request.mock.calls.filter(
-      ([url]) => url !== "/api/common/menus",
+      ([url]) => url !== "/api/common/menus" && url !== "/api/common/bills/unpaid-count",
     ).length;
     await act(async () => {
       await router!.navigate("/unregistered/path");
@@ -3228,7 +3228,7 @@ describe("application route registration", () => {
     expect(await screen.findByText("없는 화면입니다")).toBeVisible();
     expect(screen.getByTestId("user-preferences")).toBe(provider);
     expect(
-      request.mock.calls.filter(([url]) => url !== "/api/common/menus"),
+      request.mock.calls.filter(([url]) => url !== "/api/common/menus" && url !== "/api/common/bills/unpaid-count"),
     ).toHaveLength(reads);
     expectSingleShell();
   });

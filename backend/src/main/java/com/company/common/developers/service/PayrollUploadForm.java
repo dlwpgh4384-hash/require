@@ -43,6 +43,7 @@ public class PayrollUploadForm implements UploadForm {
     @Override public String screenId() { return "UI-02"; }
     @Override public List<String> headers() { return HEADERS; }
     @Override public String templateFileName() { return "payroll-template.xlsx"; }
+    @Override public List<String> exampleRow() { return List.of("K-0001", "홍길동", "4000000", "", "", "120000", ""); }
     @Override public boolean monthly() { return true; }
     @Override public String templateNote() {
         return "B.1 월별 급여. 연월은 올릴 때 고릅니다(엑셀 칸 아님). 관리번호 필수, 이름은 확인용. "

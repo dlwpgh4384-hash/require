@@ -416,7 +416,7 @@ export function ProjectCostAnalysisPage() {
   return (
     <section
       ref={form}
-      className="project-cost-analysis-page"
+      className="screen-body project-cost-analysis-page"
       data-testid="project-cost-analysis-page"
       data-screen-id="UI-04"
       aria-label="프로젝트 원가 분석"
@@ -482,6 +482,7 @@ export function ProjectCostAnalysisPage() {
         <ListFilter label="프로젝트명" htmlFor="project-cost-project">
           <select
             id="project-cost-project"
+            className="ls-in"
             name="projectId"
             value={draft.projectId}
             onChange={(event) => setDraft({ ...draft, projectId: event.target.value })}
@@ -498,6 +499,7 @@ export function ProjectCostAnalysisPage() {
         <ListFilter label="계약유형" htmlFor="project-cost-type">
           <select
             id="project-cost-type"
+            className="ls-in"
             name="contractTypeCode"
             value={draft.contractTypeCode}
             onChange={(event) => setDraft({ ...draft, contractTypeCode: event.target.value })}
@@ -514,6 +516,7 @@ export function ProjectCostAnalysisPage() {
         <ListFilter label="상태" htmlFor="project-cost-status">
           <select
             id="project-cost-status"
+            className="ls-in"
             name="projectStatus"
             value={draft.projectStatus}
             onChange={(event) => setDraft({ ...draft, projectStatus: event.target.value })}
@@ -530,6 +533,7 @@ export function ProjectCostAnalysisPage() {
         <ListFilter label="보기" htmlFor="project-cost-alert">
           <select
             id="project-cost-alert"
+            className="ls-in"
             name="alertOnly"
             value={draft.alertOnly}
             onChange={(event) => setDraft({ ...draft, alertOnly: event.target.value })}
@@ -542,7 +546,7 @@ export function ProjectCostAnalysisPage() {
       {optionError && (
         <p role="alert">
           {optionError}
-          <button type="button" onClick={() => setOptionsRetry((value) => value + 1)}>
+          <button type="button" className="ls-btn ls-btn-sm" onClick={() => setOptionsRetry((value) => value + 1)}>
             조건 다시 시도
           </button>
         </p>

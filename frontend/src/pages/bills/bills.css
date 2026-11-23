@@ -20,6 +20,7 @@
   padding: 0 10px;
   border: 0;
   border-bottom: 2px solid transparent;
+  border-radius: 0;
   background: none;
   color: var(--text-sub);
   font: inherit;
@@ -27,6 +28,10 @@
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+}
+/* 시안 .tabs .tb: 마우스를 올려도 바탕색 없음 */
+.bill-tab:hover {
+  background: none;
 }
 .bill-tab.on {
   color: var(--primary-text);

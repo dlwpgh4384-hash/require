@@ -117,9 +117,11 @@
 .year-bar-arrow:hover:not(:disabled) {
   background: var(--ls-head-bg);
 }
+/* 시안 .ibtn:disabled: 바탕 없이 글자만 흐리게(앱 전체 button:disabled의 흰 바탕을 덮는다) */
 .year-bar-arrow:disabled {
   color: var(--text-dis);
   cursor: default;
+  background: none;
 }
 .year-bar-cap {
   font-size: 12px;

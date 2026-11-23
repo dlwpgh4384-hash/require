@@ -35,6 +35,7 @@ public class ClientUploadRules implements UploadForm {
     @Override public String screenId() { return "UI-15"; }
     @Override public List<String> headers() { return HEADERS; }
     @Override public String templateFileName() { return "client-template.xlsx"; }
+    @Override public List<String> exampleRow() { return List.of("고객사", "가온은행", "123-81-12345", "홍길동", "", "김담당", "02-1234-5678", "tax@example.com", "", "", ""); }
     @Override public String templateNote() {
         return "B.7 신규 이관 전용. 구분·상호·사업자등록번호 필수. 고객사/고객·협력은 이메일, "
             + "협력사/고객·협력은 은행·계좌번호·예금주 필수. 코드·코드 이름 사용 가능, 대응 표기는 경고로 표시합니다. "

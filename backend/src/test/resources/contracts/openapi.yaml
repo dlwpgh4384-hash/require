@@ -8104,6 +8104,28 @@ paths:
         - projectId
         - billMonth
         ordering: 청구 목록은 청구일 최신순; 발송 이력은 날짜순; 그 밖 동순위는 OQ-QUERY-013.
+  /api/common/bills/unpaid-count:
+    get:
+      operationId: getCommonBillUnpaidCount
+      summary: 메뉴 배지용 미수 청구 건수
+      security: []
+      x-related-requirements:
+      - SFR-001-04
+      description: 개발 단계 CurrentBusinessActor=admin·무인증. 취소 안 된 청구 중 미수 잔액이 남은 건수(연도 구분 없음). 0이면 화면이 배지를 숨긴다. 데이터 범위는 UI-22 후속이다.
+      responses:
+        '200':
+          description: 미수 청구 건수
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBillUnpaidCount'
   /api/common/bills/{billId}:
     get:
       operationId: getCommonBill
@@ -13347,6 +13369,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommonBillingDunningRow'
+    CommonBillUnpaidCount:
+      type: object
+      required:
+      - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
     CommonBillingDunningSendResult:
       type: object
       required:

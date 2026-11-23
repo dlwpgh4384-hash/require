@@ -74,7 +74,7 @@
     FROM TB_BS_PART p LEFT JOIN LATERAL (
       SELECT x.* FROM TB_BS_PART_STD x WHERE x.part_id=p.part_id AND x.aply_bgn_ym &lt;= #{month}
         AND (x.aply_end_ym IS NULL OR x.aply_end_ym &gt;= #{month}) ORDER BY x.aply_bgn_ym DESC LIMIT 1
-    ) s ON true LEFT JOIN TB_SY_USER u ON u.user_id=s.part_ldr_user_id ORDER BY p.part_id
+    ) s ON true LEFT JOIN TB_SY_USER u ON u.user_id=s.part_ldr_user_id ORDER BY p.part_nm, p.part_id
   </select>
   <select id="selectHeader" resultMap="header">
     SELECT s.setl_stat_cd,s.cnfm_user_id,u.user_nm AS cnfm_user_nm,s.cnfm_dttm,s.cncl_rsn,s.corp_card_amt,s.part_prft_amt,s.mod_dttm

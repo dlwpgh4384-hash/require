@@ -167,7 +167,8 @@ describe("shared navigation composition", () => {
     expect(group).toHaveAttribute("aria-expanded", "false");
     expect(storage).not.toHaveBeenCalled();
     for (const call of requests.mock.calls) {
-      expect(call[0]).toBe("/api/common/menus");
+      // 메뉴와 메뉴 옆 미수 건수(SFR-001-04)만 읽는다.
+      expect(["/api/common/menus", "/api/common/bills/unpaid-count"]).toContain(call[0]);
       expect(call[1]).not.toHaveProperty("body");
       expect(call[1]).not.toHaveProperty("method");
     }
@@ -254,5 +255,37 @@ describe("shared navigation composition", () => {
     expect(
       screen.queryByRole("button", { name: "메뉴 닫기" }),
     ).not.toBeInTheDocument();
+  });
+});
+describe("menu badge (SFR-001-04)", () => {
+  function billing(count: number) {
+    const body = fixture();
+    body.data[1] = { ...body.data[1], menuNm: "청구·입금", scrnId: "UI-13" };
+    body.meta.screenAccess = [{ scrnId: "UI-13", available: true, pcOnlyYn: "N" }];
+    const request = vi.fn(async (url: string) =>
+      url === "/api/common/bills/unpaid-count"
+        ? { ok: true, json: async () => ({ success: true, meta: {}, data: { count } }) }
+        : { ok: true, json: async () => body },
+    );
+    vi.stubGlobal("fetch", request);
+    return request;
+  }
+  it("shows the unpaid bill count next to 청구·입금 after the menus load", async () => {
+    const request = billing(10);
+    mount("/screens/UI-13");
+    const badge = await screen.findByTestId("menu-badge-UI-13");
+    expect(badge).toHaveTextContent("10");
+    expect(badge).toHaveAttribute("aria-label", "미수 10건");
+    expect(screen.getByRole("link", { name: "청구·입금" })).toContainElement(badge);
+    expect(request.mock.calls[0][0]).toBe("/api/common/menus");
+  });
+  it("hides the badge when nothing is unpaid", async () => {
+    const request = billing(0);
+    mount("/screens/UI-13");
+    await screen.findByRole("link", { name: "청구·입금" });
+    await waitFor(() =>
+      expect(request.mock.calls.some(([url]) => url === "/api/common/bills/unpaid-count")).toBe(true),
+    );
+    expect(screen.queryByTestId("menu-badge-UI-13")).not.toBeInTheDocument();
   });
 });

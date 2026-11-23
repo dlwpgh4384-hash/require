@@ -295,6 +295,9 @@ export function BillCheckForm({
               />
               <span className="bill-sub">원</span>
             </div>
+            <small>
+              월단위·파견은 그 달 투입 MM × 청구 단가 합계(식-02)로 채웁니다. 턴키는 직접 넣으세요.
+            </small>
           </div>
           <div className="bill-fc">
             <label htmlFor="bill-check-vat-rate">
@@ -312,6 +315,9 @@ export function BillCheckForm({
               />
               <span className="bill-sub">%</span>
             </div>
+            <small>
+              기본 10%. 면세·영세율은 0. 부가세 금액은 저장할 때 공급가 × 세율(원 단위 버림)로 계산합니다.
+            </small>
           </div>
           <div className="bill-fc">
             <label htmlFor="bill-check-bill-date">
@@ -342,6 +348,7 @@ export function BillCheckForm({
               onChange={(e) => change("payDueDate", e.target.value)}
             />
             {dateError("payDueDate")}
+            <small>기본은 청구월 다음 달 25일. 연체와 미수 알림이 이 날짜부터 셉니다.</small>
           </div>
           <div className="bill-fc">
             <label htmlFor="bill-check-tax-number">세금계산서 번호</label>
@@ -354,6 +361,9 @@ export function BillCheckForm({
               disabled={!initial || saving}
               onChange={(e) => change("taxInvoiceNo", e.target.value)}
             />
+            <small>
+              계산서를 아직 안 끊었으면 비워 두세요. 비어 있으면 “번호 미입력”으로 표시되고 월 마감 점검에 잡힙니다.
+            </small>
           </div>
           {!initial && !error && (
             <p role="status">등록 정보를 불러오는 중입니다.</p>

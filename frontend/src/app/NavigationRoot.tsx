@@ -18,6 +18,7 @@ import {
 import { ConfirmDialog } from "../shared/feedback/Dialog";
 import { feedbackMessages } from "../shared/feedback/messages";
 import { MENU_REFRESH_EVENT } from "./menuRefresh";
+import { MenuBadge, MenuBadgeContext, useMenuBadgeCounts } from "./menuBadges";
 
 export interface ShellMenuItem {
   menuId: string;
@@ -156,6 +157,7 @@ function MenuBranches({
                 >
                   <NavigationMenuIcon name={item.iconNm} />
                   <span className="menu-label">{item.menuNm}</span>
+                  <MenuBadge scrnId={item.scrnId} />
                 </Link>
               )}
               {group && (
@@ -210,6 +212,7 @@ export function NavigationRoot({
   const seen = useRef<Record<string, number>>({});
   const tick = useRef(0);
   const autoOpened = useRef(false);
+  const badges = useMenuBadgeCounts(location.pathname, state.status === "ready");
   useEffect(() => {
     const refresh = () => setAttempt((value) => value + 1);
     window.addEventListener(MENU_REFRESH_EVENT, refresh);
@@ -552,6 +555,7 @@ export function NavigationRoot({
     ) : !first ? (
       <NavigationState kind={raw.length ? "no-screen" : "empty"} compact />
     ) : (
+      <MenuBadgeContext.Provider value={badges}>
       <MenuBranches
         items={items}
         parent={null}
@@ -566,6 +570,7 @@ export function NavigationRoot({
           })
         }
       />
+      </MenuBadgeContext.Provider>
     );
   const available = (id: string) => openable(id);
   const shownAvailable = state.status === "ready" && !!access?.available;

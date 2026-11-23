@@ -495,11 +495,14 @@ export function ProjectCostAnalysisDetail({
                 <strong>{item.causeName}</strong>
                 <span>{item.amount ? formatKoreanMoney(item.amount) : "없음"}</span>
               </div>
-              <div className="project-cost-track">
-                <div
-                  className={`project-cost-fill${red && index === 0 && item.amount > 0 ? " is-bad" : " is-grey"}`}
-                  style={{ width: `${(item.amount / top) * 100}%` }}
-                />
+              {/* 시안 .bar > .track: 세로로 쌓이는 칸 안에 막대를 바로 두면 flex:1 때문에 높이가 0이 된다 */}
+              <div className="project-cost-bar">
+                <div className="project-cost-track">
+                  <div
+                    className={`project-cost-fill${red && index === 0 && item.amount > 0 ? " is-bad" : " is-grey"}`}
+                    style={{ width: `${(item.amount / top) * 100}%` }}
+                  />
+                </div>
               </div>
               <div className="ls-cap">{item.description}</div>
               {item.amount > 0 && (

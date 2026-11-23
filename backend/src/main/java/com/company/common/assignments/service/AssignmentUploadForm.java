@@ -36,6 +36,7 @@ public class AssignmentUploadForm implements UploadForm {
     public List<String> headers() { return HEADERS; }
     public String templateNote() { return "B.5 새 배정 등록 전용. 월 MM은 비우면 1.0입니다. 월단위·파견 청구 단가는 비우면 개발자 월 단가를 사용합니다. 기존 배정을 변경하거나 조기 철수하지 않습니다."; }
     public String templateFileName() { return "assignment-template.xlsx"; }
+    public List<String> exampleRow() { return List.of("P-0001", "K-0001", "백엔드 개발", "2026-01-01", "2026-12-31", "1.0", "7000000", "신규", "", "보통"); }
     public void lock() { assignments.lockSources(); }
     public record UploadRow(int number,ObjectNode body,String extension) {}
     public Inspection inspect(List<TabularRow> rows,YearMonth ignored) {

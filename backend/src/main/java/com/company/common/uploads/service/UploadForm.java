@@ -43,6 +43,8 @@ public interface UploadForm {
             throw com.company.common.support.service.CodeFailure.invalid("closedMonthPolicy", "이 양식은 마감한 달 목표 선택을 받지 않습니다.");
         return apply(inspection, month, uploadId);
     }
+    /** 양식 내려받기의 데이터 첫 줄 예시(사용자 요청 2026-11-23). 올리는 사람이 지우고 쓴다. 미리 채울 줄이 있는 양식은 쓰지 않는다. */
+    default List<String> exampleRow() { return List.of(); }
     /** 양식 내려받기에 미리 채울 줄. 연 양식(B.10)만 연도를 받아 1~12월 줄을 채운다. */
     default List<List<String>> templateRows(Integer year) {
         if (year != null)

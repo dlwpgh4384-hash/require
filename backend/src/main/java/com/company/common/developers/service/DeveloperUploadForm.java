@@ -41,6 +41,7 @@ public class DeveloperUploadForm implements UploadForm {
     @Override public String screenId() { return "UI-02"; }
     @Override public List<String> headers() { return HEADERS; }
     @Override public String templateFileName() { return "developer-template.xlsx"; }
+    @Override public List<String> exampleRow() { return List.of("", "홍길동", "정규직", "자사", "중급", "백엔드 개발", "", "팀원", "직접", "영업1파트", "2026-01-02", "6000000", "4000000", "Java,Spring", "서울특별시", "강남구", "역삼동"); }
     @Override public String templateNote() {
         return "B.8 개발자 새로 등록 전용(이미 있는 사람을 고치는 건 화면에서, 휴직·퇴사는 [근무 상태 이력]에서). "
             + "이름·직원구분·소속·주 직무·직접/간접·영업 파트 필수. 관리번호를 비우면 반영할 때 K-nnnn이 붙습니다. "

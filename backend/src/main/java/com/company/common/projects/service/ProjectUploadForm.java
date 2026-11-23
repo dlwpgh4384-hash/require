@@ -29,6 +29,7 @@ public class ProjectUploadForm implements UploadForm {
     public String screenId() { return "UI-01"; }
     public List<String> headers() { return HEADERS; }
     public String templateFileName() { return "project-template.xlsx"; }
+    public List<String> exampleRow() { return List.of("", "가온은행 차세대 여신", "가온은행", "턴키", "2026-01-01", "2026-12-31", "영업1파트", "서울 중구", "진행", "1200000000", "1000000000", "", "50000", "50000", ""); }
     public String templateNote() { return "B.9 신규 등록 전용. 프로젝트ID를 비우면 P-nnnn 자동 발급. 고객사는 상호 또는 사업자번호. 상태는 진행/수주예정. 내부는 고객사·파트·근무지 생략. 상태를 비우면 진행. 금액은 원 단위 숫자(쉼표 가능)."; }
     public void lock() { mapper.lockSources(); }
     public record Row(int rowNumber, String id, Input input) {}

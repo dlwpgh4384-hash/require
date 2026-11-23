@@ -25,6 +25,8 @@ import static com.company.common.uploads.dto.UploadContracts.*;
 /** SFR-012 공통 업로드: 양식(UploadForm)마다 열 규칙만 다르고 검사 기록·결과·반영 흐름은 같다. */
 @Service
 public class CommonUploadService {
+    /** 양식 설명 시트에 붙이는 예시 줄 안내. */
+    static final String EXAMPLE_NOTE = "데이터 첫 줄은 적는 법을 보여 주는 예시입니다. 지우고 자기 자료를 적어 올려 주세요.";
     private static final DateTimeFormatter DB_MONTH = DateTimeFormatter.ofPattern("uuuuMM");
     private final UploadMapper mapper;
     private final Map<String, UploadForm> forms;
@@ -51,7 +53,10 @@ public class CommonUploadService {
     /** year: 연 양식(B.10)만 줄을 미리 채운다. 다른 양식은 받지 않으면 지금과 같다. */
     public byte[] getCommonUploadTemplate(String formTypeCode, Integer year) {
         UploadForm form = form(formTypeCode);
-        return workbooks.tabularFile(form.headers(), form.templateRows(year), form.templateNote());
+        var rows = form.templateRows(year);
+        if (rows.isEmpty() && !form.exampleRow().isEmpty())
+            return workbooks.tabularFile(form.headers(), List.of(form.exampleRow()), form.templateNote() + " " + EXAMPLE_NOTE);
+        return workbooks.tabularFile(form.headers(), rows, form.templateNote());
     }
     /** yearMonth: 한 달 양식(B.1 급여)만, YYYY-MM. */
     public static YearMonth month(String value) {

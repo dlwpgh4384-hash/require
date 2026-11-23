@@ -40,4 +40,6 @@ public final class BillContracts {
     public record DunningHistory(int step, LocalDate sentDate, String recipientDescription,
         String sendMethodCode, boolean resend) {}
     public record SendResult(String billId, DunningHistory history) {}
+    /** 메뉴 배지: 미수가 남은 청구 건수(SFR-001-04). */
+    public record UnpaidCount(int count) {}
 }

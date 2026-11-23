@@ -52,6 +52,17 @@ function useOpenScreen() {
 }
 
 // UI-09 / SFR-109: readonly statement and identical workbook.
+/** 시안 ic('down',16)·ic('info',16) */
+const downloadIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+  </svg>
+);
+const infoIcon = (
+  <svg className="ls-banner-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" />
+  </svg>
+);
 export function NetProfitStatementPage() {
   const period = useScreenPeriod("UI-09", options);
   const host = useNetProfitStatementTitleHost();
@@ -147,12 +158,12 @@ export function NetProfitStatementPage() {
   const actions = (
     <button
       type="button"
-      className="ls-btn ls-btn-sm"
+      className="ls-btn"
       data-testid="net-profit-excel"
       disabled={downloading || loading || !data || !!error}
       onClick={() => void download()}
     >
-      엑셀 다운로드
+      {downloadIcon} 엑셀 다운로드
     </button>
   );
   const end = Number(filter?.baseMonth.slice(4));
@@ -200,7 +211,7 @@ export function NetProfitStatementPage() {
       {error && (
         <Banner
           kind="warn"
-          icon={null}
+          icon={infoIcon}
           action={
             <button
               type="button"
@@ -216,7 +227,7 @@ export function NetProfitStatementPage() {
         </Banner>
       )}
       {data?.provisionalNotice && (
-        <Banner kind="warn" icon={null}>
+        <Banner kind="warn" icon={infoIcon}>
           {data.provisionalNotice}
         </Banner>
       )}

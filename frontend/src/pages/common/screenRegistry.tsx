@@ -16,6 +16,8 @@ import { CodeMapsPanel } from "../codemaps/CodeMapsPanel";
 import { OperatingStandardsPanel } from "../operatingstandards/OperatingStandardsPanel";
 import { CodeHistoryPanel } from "../commonops/CodeHistoryPanel";
 import { ManpowerComparisonPage } from "../commonops/ManpowerComparisonPage";
+import { BusinessPlanComparisonPage } from "../commonops/BusinessPlanComparisonPage";
+import { BusinessPlanComparisonTitleActions } from "../commonops/BusinessPlanComparisonWorkspace";
 import { PersonalCostProfitPage } from "../personalcostprofits/PersonalCostProfitPage";
 import { ProjectCostAnalysisPage } from "../projectcostanalyses/ProjectCostAnalysisPage";
 import { RateRenegotiationPage } from "../raterenegotiations/RateRenegotiationPage";
@@ -61,6 +63,13 @@ export interface ScreenEntry {
  * 공통 화면 틀 시험도 여기서 만든 화면과 「준비 중」 화면을 나눈다. 새 화면은 여기에 한 줄만 더한다.
  */
 export const screenRegistry: readonly ScreenEntry[] = [
+  {
+    id: "UI-18",
+    Page: () => <BusinessPlanComparisonPage />,
+    TitleActions: () => <BusinessPlanComparisonTitleActions />,
+    rootTestId: "business-plan-comparison-page",
+    hasInputs: false,
+  },
   {
     id: "UI-09",
     Page: () => <NetProfitStatementPage />,

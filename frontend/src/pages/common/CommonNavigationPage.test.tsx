@@ -138,6 +138,37 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (url.startsWith("/api/common/business-plan-comparisons?")) {
+      return {
+        success: true,
+        meta: {},
+        data: {
+          year: 2026,
+          baseMonth: "202602",
+          baseMonthClosed: false,
+          hasTargets: false,
+          summary: {
+            cumulativeRevenueAchievementRate: null,
+            cumulativeRevenueActual: null,
+            cumulativeRevenueTarget: 0,
+            cumulativeOperatingProfitAchievementRate: null,
+            cumulativeOperatingProfitActual: null,
+            cumulativeOperatingProfitTarget: 0,
+            baseMonthRevenueAchievementRate: null,
+            baseMonthRevenueTarget: 0,
+          },
+          months: Array.from({ length: 12 }, (_, index) => ({
+            yearMonth: `2026${String(index + 1).padStart(2, "0")}`,
+            revenueTarget: 0,
+            revenueActual: null,
+            operatingProfitTarget: 0,
+            operatingProfitActual: null,
+            achievementRate: null,
+            profitRateDifference: null,
+          })),
+        },
+      };
+    }
     if (url.startsWith("/api/common/net-profit-statements?")) {
       return {
         success: true,
@@ -389,7 +420,8 @@ function respond(body: ShellMenuResponse) {
               url.endsWith("/UI-10") ||
               url.endsWith("/UI-07") ||
               url.endsWith("/UI-08") ||
-              url.endsWith("/UI-09")
+              url.endsWith("/UI-09") ||
+              url.endsWith("/UI-18")
                 ? {
                     periodBasis: {
                       latestYm: "202602",
@@ -448,6 +480,22 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-18": async (content) => {
+    expect(await content.findByTestId("business-plan-empty")).toBeVisible();
+    expect(content.getByTestId("period-selector")).toHaveAttribute(
+      "data-variant",
+      "cumulativeBar",
+    );
+    expect(content.getByTestId("business-plan-kpis").children).toHaveLength(3);
+    const actions = within(screen.getByTestId("screen-actions"));
+    expect(
+      actions.getByRole("button", { name: "양식 내려받기" }),
+    ).toBeEnabled();
+    expect(actions.getByRole("button", { name: "목표 업로드" })).toBeEnabled();
+    expect(content.queryByTestId("M25-399")).not.toBeInTheDocument();
+    expect(content.queryByTestId("M25-400")).not.toBeInTheDocument();
+    expect(content.queryByRole("textbox")).not.toBeInTheDocument();
+  },
   "UI-09": async (content) => {
     expect(await content.findByTestId("period-selector")).toBeVisible();
     expect(await content.findByTestId("net-profit-empty")).toBeVisible();

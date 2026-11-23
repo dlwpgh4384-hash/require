@@ -33,4 +33,20 @@ public interface UploadForm {
     void lock();
     /** 오류가 없을 때만 불린다. 호출자의 전량 반영 트랜잭션에 참여한다. 반영으로 붙은 관리번호 등을 행번호별로 돌려준다. */
     java.util.Map<Integer, String> apply(Inspection inspection, YearMonth month, long uploadId);
+    /** B.10 마감한 달 목표 처리 값: 마감한 달은 두기 / 전체 변경. */
+    String KEEP_CLOSED = "keep";
+    String REPLACE_CLOSED = "replace";
+    /** 반영 요청의 선택 값(closedMonthPolicy)을 받는 양식만 재정의한다. 값을 주지 않으면 지금과 같다. */
+    default java.util.Map<Integer, String> apply(Inspection inspection, YearMonth month, long uploadId,
+            String closedMonthPolicy) {
+        if (closedMonthPolicy != null)
+            throw com.company.common.support.service.CodeFailure.invalid("closedMonthPolicy", "이 양식은 마감한 달 목표 선택을 받지 않습니다.");
+        return apply(inspection, month, uploadId);
+    }
+    /** 양식 내려받기에 미리 채울 줄. 연 양식(B.10)만 연도를 받아 1~12월 줄을 채운다. */
+    default List<List<String>> templateRows(Integer year) {
+        if (year != null)
+            throw com.company.common.support.service.CodeFailure.invalid("year", "이 양식은 연도를 받지 않습니다.");
+        return List.of();
+    }
 }

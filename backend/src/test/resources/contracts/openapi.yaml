@@ -12,6 +12,8 @@ info:
 x-design-status: clarification_required
 x-test-status: not_run
 x-open-questions:
+  - 'OQ-AUTH-018: 원문25행의 securitySchemes 금지와 생성 지시의 재사용 scheme 요구 충돌; 기준선 무인증을 유지한 후보이며 reviewer가 적용 표준을 결정한다.'
+  - 'OQ-UPLOAD-018: B10 중복연월/누락월/음수목표/파일용량과 마감경합 정책은 미제공; 임의값으로 확정하지 않는다.'
   - 'OQ-001: Java21/Boot3.5.x와 고정 Java17/Boot3.3.x 충돌 해소 승인 없음.'
   - 'OQ-002: 원문 최상위 메뉴 배열·[]와 ApiResponse 봉투의 충돌 보존. data 배열로 변경하는 원문 계약 승인은 별도 확인 필요.'
   - 'OQ-003: 휴대폰 폭 수치는 원문 미제공. cost의767px 이하는 설계 제안이며 사용자 승인 수치가 아님.'
@@ -3013,6 +3015,7 @@ paths:
       summary: 공통 업무 엑셀 양식
       security: []
       x-related-requirements:
+      - REQ-1197
       - REQ-326
       - REQ-301
       - REQ-399
@@ -3032,6 +3035,13 @@ paths:
         B11은지난해/마감업로드금지의예외이며다른양식은변경없다. 같은연월반영은그달원값만덮어쓴다. 선택공백은null/「–」·명시0은0·엑셀재계산없음. UI-22전관리자버튼은항상보이며인증연결없음. OQ-AUTH-008
         충돌보존.
       parameters:
+      - name: year
+        in: query
+        required: false
+        description: B10 선택연도; B10은 2026년부터 사용하며 미지정 기본 선택은 기존 공통 양식 동작을 보존한다.
+        schema:
+          type: integer
+          minimum: 2026
       - name: formTypeCode
         in: path
         required: true
@@ -3042,6 +3052,10 @@ paths:
         pagination: 전체 조회 후 useListPresentation으로 화면 건수/밀도 적용
         filtering: 명시 query와 path 식별자만 적용; 추가 필터 추정 금지
         ordering: 시안 기준. 거래처 신규 등록 직후 맨 위 강조, 동순위는 기존 mapper 대조
+      x-b10-workbook-contract:
+        formTypeCode: B10
+        columns: [연월, 매출 목표, 영업이익 목표]
+        months: 선택연도 1~12월 12줄; 금액 빈칸0
       responses:
         '200':
           description: 엑셀 파일
@@ -3084,6 +3098,10 @@ paths:
       summary: 공통 업무 엑셀 검사
       security: []
       x-related-requirements:
+      - REQ-1187
+      - REQ-1199
+      - REQ-1201
+      - REQ-1200
       - REQ-327
       - REQ-328
       - REQ-302
@@ -3118,6 +3136,8 @@ paths:
         B11은지난해/마감업로드금지의예외이며다른양식은변경없다. 같은연월반영은그달원값만덮어쓴다. 선택공백은null/「–」·명시0은0·엑셀재계산없음. UI-22전관리자버튼은항상보이며인증연결없음. OQ-AUTH-008
         충돌보존.
       x-business-rules:
+      - "B10: 한 해 연월/매출목표/영업이익목표를 읽고 빈칸은 오류 아닌0·실적쓰기없음"
+      - "B10: TB_CL_CLOSE 마감월과 기존 ALL목표 차이를 비교; 차이있음은 closedTargetChanges=true·반영선택전목표불변"
       - B.7 신규 이관만; 구분별 필수·코드 이름·사업자번호 중복 검사
       - TB_SY_CODE_MAP 매핑은 경고; 이 검사 단계는 거래처 등록 없음
       - 코드 이름·엑셀 표기 대응표로 읽고 기존번호/파일중복/형식 오류는 행 오류, 같은 이름+입사일은 기존 K-nnnn 포함 경고이며 반영 가능이다.
@@ -3139,16 +3159,23 @@ paths:
       - 'B11 전용: 마감/지난해차단예외; 기존B1등다른양식금지는유지'
       - 'B11 전용: 검사만손익쓰기0; 동일파일재검사오류0반영·동월원값교체·파일외월보존·수식재계산없음'
       x-side-effects:
+      - "B10: 기존 TB_SY_UPLD 검사 결과/빈목표월 안내만 기록; TB_FI_BIZ_PLAN과TB_CO_MON_PL불변"
       - TB_SY_UPLD 검사완료·TB_SY_UPLD_ERR 행 오류/경고 기록; TB_BS_CLNT 쓰기0
       - B.8/B.1 검사 결과만 TB_SY_UPLD/TB_SY_UPLD_ERR에 저장. TB_HR_DEV/TB_HR_MON_PAY는 무변경.
       - B.9/B.6는 TB_SY_UPLD·TB_SY_UPLD_ERR 검사만 저장·프로젝트/배분표 업무0쓰기
       - B.5 검사만 TB_SY_UPLD/TB_SY_UPLD_ERR 저장·TB_PJ_ASGN/HIST 쓰기0.
       - 'B11 검사: TB_SY_UPLD/TB_SY_UPLD_ERR 결과만기록·TB_CO_MON_PL불변'
       x-state-transitions:
+      - "B10 검사전 -> 공통검사결과·빈목표월/마감차이확인가능; 목표변경0"
       - 업로드 없음 -> 검사완료 기록
       - B.5 검사 -> 검사완료·배정0쓰기
       - B11 업로드없음 -> 공통검사완료·손익무변경
       x-required-tests:
+      - "happy: B10 한해유효파일검사 -> 200 uploadId로결과GET가능·기존 TB_FI_BIZ_PLAN목표불변이다."
+      - "auth: 개발무인증B10검사 -> 200 공통검사결과·신규401/403없음(OQ-AUTH-018)."
+      - "validation: B10 multipart file누락 -> 400 ApiError의file필드오류·목표/실적불변이다."
+      - "business: 3월/4월목표공백 B10검사 -> 공백행오류0·emptyTargetMonths에3/4가있고 closedTargetChanges는마감원천과일치한다."
+      - "side-effect: B10 검사완료후 getCommonUpload -> TB_SY_UPLD검사결과/빈목표월조회·목표쓰기0이다."
       - 'happy: 유효 B.7 파일 검사 -> GET 결과 successCount와 uploadId·TB_BS_CLNT 증가0'
       - 'auth: 무인증 파일 검사 -> 200 admin 기록·로그인 이동0'
       - 'validation: 고객사 이메일 빈 행 -> 결과 issues에 행/이메일열/필수 오류·errorCount 증가'
@@ -3173,6 +3200,10 @@ paths:
       - 'validation: B11영업이익필수칸공백파일검사 -> 200 issues에해당행/영업이익열오류·errorCount증가·손익무변경이다.'
       - 'business: B11허용구간밖연월1행검사 -> 결과연월열오류·TB_CO_MON_PL모든행유지이다.'
       - 'side-effect: B11선택공백/수식캐시행검사 -> TB_SY_UPLD결과와issues재조회가능·선택공백허용·수식저장값해석이다.'
+      x-b10-workbook-contract:
+        formTypeCode: B10
+        columns: [연월, 매출 목표, 영업이익 목표]
+        months: 선택연도 1~12월 12줄; 금액 빈칸0
       responses:
         '200':
           description: 조회 또는 저장 결과
@@ -3252,6 +3283,8 @@ paths:
       summary: 엑셀 검사 결과 조회
       security: []
       x-related-requirements:
+      - REQ-1200
+      - REQ-1201
       - REQ-327
       - REQ-346
       - REQ-400
@@ -3373,6 +3406,13 @@ paths:
       summary: 검사한 업무 엑셀 반영
       security: []
       x-related-requirements:
+      - REQ-1198
+      - REQ-1202
+      - REQ-1203
+      - REQ-1204
+      - REQ-1205
+      - REQ-1199
+      - REQ-1188
       - REQ-343
       - REQ-328
       - REQ-346
@@ -3414,6 +3454,9 @@ paths:
           type: string
           minLength: 1
       x-business-rules:
+      - "B10: 마감목표변경시 replace는1~12월전체·keep은미마감월만반영; 실적불변"
+      - "B10: 마감목표동일이면전용확인없음; 취소는호출없음·값생략은종전공통동작보존"
+      - "B10: 목표빈칸0·PART_ID=ALL만; 마감판정 TB_CL_CLOSE·목표잠금컬럼신설없음"
       - 보관한 동일 파일 재검사; 오류1건이면 전량 차단·부분 반영 금지
       - 경고만 있으면 전량 신규 등록·자동ID·사용 상태; 중복번호는 갱신하지 않음
       - 검사완료 결과 닫기는 반영 아님; 재반영/이미 반영 상태 허용정책은 OQ-UPLOAD-015
@@ -3435,18 +3478,27 @@ paths:
       - 'B11 전용: 마감/지난해차단예외; 기존B1등다른양식금지는유지'
       - 'B11 전용: 검사만손익쓰기0; 동일파일재검사오류0반영·동월원값교체·파일외월보존·수식재계산없음'
       x-side-effects:
+      - "B10: TB_FI_BIZ_PLAN 선택대상목표와TB_SY_UPLD반영결과저장·TB_CO_MON_PL쓰기0"
       - 오류0건일 때만 TB_BS_CLNT 전량과 TB_SY_UPLD 결과 저장; 실패면 거래처 전체 rollback
       - 'B.8: TB_HR_DEV/PRC/SKILL 신규 전량. B.1: 선택월 TB_HR_MON_PAY 전체 삭제+새행 저장을 한 트랜잭션으로 처리. 다른월 보존. 오류1건이면 기존 월 전체 보존.'
       - B.9 프로젝트·파트첫줄·계약첫줄을 원자저장; B.6 선택단계 배분행 교체와 TB_SY_UPLD.TRGT_DSTRB_STEP_CD 스냅샷 보존
       - B.5 반영 시 TB_PJ_ASGN 각1건·TB_PJ_ASGN_HIST 투입각1줄·TB_SY_UPLD 결과; 기존 계약상 인력 기간 불변.
       - 'B11 반영: 파일내허용연월 TB_CO_MON_PL원값/null과TB_SY_UPLD반영결과저장·파일외월/다른업무표불변'
       x-state-transitions:
+      - "B10 검사완료 -> replace 전체연간목표갱신 또는 keep 미마감목표갱신·공통반영결과; 취소는검사완료유지/목표불변"
       - 검사완료·오류0 -> 반영 결과; 오류 있음 -> 검사완료·거래처0행
       - B.1 검사완료 -> 미마감/오류0 전제 월 전체 교체; 반영 직전 마감 또는 행 오류 -> 기존월 유지
       - B.9 검사완료 -> 신규 프로젝트; B.6 검사완료 -> 선택 단계 배분행 교체·옛 업로드 단계 불변
       - B.5 오류0 검사완료 -> 신규 유효 배정; 원배정 상태/기간 유지
       - B11 오류0검사완료 -> 허용연월원값반영·공통반영결과; 오류존재 -> 업무전량보존
       x-required-tests:
+      - "happy: 유효B10/closedMonthPolicy=replace반영 -> 200 뒤비교GET의12월목표가파일값·실적은기존값이다."
+      - "auth: 인증헤더없는개발B10반영 -> 200·TB_SY_UPLD결과조회가능; 신규역할거부없음(OQ-AUTH-018)."
+      - "validation: closedMonthPolicy=unknown반영 -> 400 ApiError.errors[].field=closedMonthPolicy·목표전량불변이다."
+      - "business: 마감월변경파일을keep으로반영 -> TB_CL_CLOSE마감월목표는보존·미마감월목표만갱신·다른PART_ID불변이다."
+      - "side-effect: B10 반영후업로드결과GET/비교GET -> TB_SY_UPLD반영결과와TB_FI_BIZ_PLAN목표일치·TB_CO_MON_PL전후snapshot동일이다."
+      - "cancel: 마감변경확인창취소 -> apply호출0회·목표재조회기존값이다."
+      - "unchanged: 마감월목표가같은재업로드 -> 전용세선택확인없이공통반영·미마감목표만파일차이를반영한다."
       - 'happy: 오류0·경고만 있는 동일 파일 반영 -> getCommonClients에 전체 신규 거래처·useYn=Y'
       - 'auth: 무인증 반영 -> 200·업로드 처리자 admin; 인증 scheme 없음'
       - 'validation: modifiedAt 누락 -> 400 errors.modifiedAt·거래처 추가0'
@@ -11305,6 +11357,81 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+  /api/common/business-plan-comparisons:
+    get:
+      operationId: getCommonBusinessPlanComparisons
+      summary: 사업계획 대비 실적 조회
+      security: []
+      x-related-requirements:
+      - REQ-1165
+      - REQ-1181
+      - REQ-1183
+      - REQ-1184
+      - REQ-1185
+      - REQ-1189
+      - REQ-1190
+      - REQ-1191
+      - REQ-1192
+      - REQ-1193
+      - REQ-1194
+      - REQ-1195
+      - REQ-1207
+      - REQ-1208
+      parameters:
+      - name: year
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 2026
+      - name: baseMonth
+        in: query
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{4}(0[1-9]|1[0-2])$
+        description: 선택연도와 동일 YYYYMM; 지난 해도 1~12월 허용
+      x-pagination-filtering:
+        pagination: 1~12월 전체; 페이지 구분 없음
+        filtering: year/baseMonth만; PART_ID=ALL 서버 고정
+        ordering: 1월~12월
+      x-aiops-query-role:
+        entity: TB_FI_BIZ_PLAN
+        result_path:
+        - data
+      x-business-rules:
+      - year(…) 매출·영업이익 직접 재사용; ratio로 식-30·36; 월 실적 계산 복제 없음
+      - 목표0월 실적도 누계 포함; 목표합≤0 달성률null·양수목표 적자실적은음수
+      - 미래월 실적null; 월목표0 두비율null·목표없음/빨강아님; 연간목표없음 요약비율null
+      - 2026년부터·지난해기준월1~12 허용; 공통기간 잠금변경없음
+      x-side-effects:
+      - 목표/월손익/마감/접근기록 INSERT/UPDATE/DELETE 없음
+      x-required-tests:
+      - 'happy: 2026/202611 ALL목표 fixture GET -> 200 summary와 months12개 및 UI-08 동일 매출/영업이익이다.'
+      - 'auth: 인증헤더 없는 개발 GET -> 200 비교결과·신규 로그인/권한검사없음(OQ-AUTH-018).'
+      - 'validation: baseMonth=202613 또는year와불일치 -> 400 ApiError.errors[].field=baseMonth·업무값불변이다.'
+      - 'business: ALL목표0월에실적존재 GET -> 그월achievementRate/profitRateDifference=null·그실적은누계분자에포함된다.'
+      - 'side-effect: 마감고정·미마감fixture GET 전후 -> TB_FI_BIZ_PLAN/TB_CO_MON_PL/TB_CL_CLOSE 값과행수가동일하다.'
+      responses:
+        '200':
+          description: 선택연도 요약·12개월 목표와 동일원천 실적
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonBusinessPlanComparisonResult'
+        '400':
+          description: year/baseMonth 필수·형식·연도 정합·2026년 이전 오류; 해당 필드 사유
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
     CommonFinanceItem:
@@ -15098,6 +15225,120 @@ components:
           description: 성공 시 대상미확정0; 전체월마감 실패경계 OQ-STATE-019
       additionalProperties: false
 
+    CommonBusinessPlanComparisonMonth:
+      type: object
+      required:
+      - yearMonth
+      - revenueTarget
+      - revenueActual
+      - operatingProfitTarget
+      - operatingProfitActual
+      - achievementRate
+      - profitRateDifference
+      properties:
+        yearMonth:
+          type: string
+          pattern: ^[0-9]{4}(0[1-9]|1[0-2])$
+        revenueTarget:
+          type: number
+          nullable: false
+          description: 매출 목표; 빈칸0
+        revenueActual:
+          type: number
+          nullable: true
+          description: year(…) 매출액; 미래월 null
+        operatingProfitTarget:
+          type: number
+          nullable: false
+          description: 영업이익 목표; 빈칸0
+        operatingProfitActual:
+          type: number
+          nullable: true
+          description: year(…) 영업이익; 미래월 null
+        achievementRate:
+          type: number
+          nullable: true
+          description: 매출 달성률; 목표0/없음 null
+        profitRateDifference:
+          type: number
+          nullable: true
+          description: 실제/목표 영업이익률 차이 %p; 목표0/없음 null
+      additionalProperties: false
+    CommonBusinessPlanComparisonSummary:
+      type: object
+      required:
+      - cumulativeRevenueAchievementRate
+      - cumulativeRevenueActual
+      - cumulativeRevenueTarget
+      - cumulativeOperatingProfitAchievementRate
+      - cumulativeOperatingProfitActual
+      - cumulativeOperatingProfitTarget
+      - baseMonthRevenueAchievementRate
+      - baseMonthRevenueTarget
+      properties:
+        cumulativeRevenueAchievementRate:
+          type: number
+          nullable: true
+          description: 누계 매출 달성률
+        cumulativeRevenueActual:
+          type: number
+          nullable: true
+          description: 누계 매출 실적
+        cumulativeRevenueTarget:
+          type: number
+          nullable: true
+          description: 누계 매출 목표
+        cumulativeOperatingProfitAchievementRate:
+          type: number
+          nullable: true
+          description: 누계 영업이익 달성률
+        cumulativeOperatingProfitActual:
+          type: number
+          nullable: true
+          description: 누계 영업이익 실적
+        cumulativeOperatingProfitTarget:
+          type: number
+          nullable: true
+          description: 누계 영업이익 목표
+        baseMonthRevenueAchievementRate:
+          type: number
+          nullable: true
+          description: 기준월 매출 달성률
+        baseMonthRevenueTarget:
+          type: number
+          nullable: true
+          description: 기준월 매출 목표
+      additionalProperties: false
+    CommonBusinessPlanComparisonResult:
+      type: object
+      required:
+      - year
+      - baseMonth
+      - baseMonthClosed
+      - hasTargets
+      - summary
+      - months
+      properties:
+        year:
+          type: integer
+          minimum: 2026
+        baseMonth:
+          type: string
+        baseMonthClosed:
+          type: boolean
+          description: UI-10 동일 TB_CL_CLOSE 판정
+        hasTargets:
+          type: boolean
+          description: 선택 연도 ALL 목표 행 존재
+        summary:
+          $ref: '#/components/schemas/CommonBusinessPlanComparisonSummary'
+        months:
+          type: array
+          minItems: 12
+          maxItems: 12
+          items:
+            $ref: '#/components/schemas/CommonBusinessPlanComparisonMonth'
+      additionalProperties: false
     ApiResponse:
       type: object
       required: [success, meta]
@@ -16771,6 +17012,16 @@ components:
       - errorCount
       - issues
       properties:
+        emptyTargetMonths:
+          type: array
+          description: B10 목표 빈칸 월 목록; 결과에 목표가 빈 달 문구로 표시
+          items:
+            type: integer
+            minimum: 1
+            maximum: 12
+        closedTargetChanges:
+          type: boolean
+          description: B10 파일이 TB_CL_CLOSE 마감월 목표를 변경하는지; true면 세 선택 확인
         uploadId:
           type: string
         modifiedAt:
@@ -16815,6 +17066,10 @@ components:
       required:
       - modifiedAt
       properties:
+        closedMonthPolicy:
+          type: string
+          enum: [replace, keep]
+          description: B10 마감 목표 변경 확인 선택; replace=전체 변경, keep=마감한 달은 두기. 생략은 종전 동작이며 다른 양식은 불변. 취소는 반영 요청을 보내지 않는다.
         modifiedAt:
           type: string
           format: date-time
@@ -19212,6 +19467,78 @@ x-requirement-context:
 
 
 x-uncovered-requirements:
+- canonical_id: REQ-1166
+  status: data-constraint
+  evidence: 'DB 계산식 원천: CALC_ID 조회로 식-00·식-30·식-36을 읽으며 조회 전후 식 정의가 같다.'
+- canonical_id: REQ-1167
+  status: data-constraint
+  evidence: '공통코드 원천: B10은 기존 FORM_TYPE 값이며 UPLD_STAT 표시명은 DB와 같고 새 코드 seed를 발명하지 않는다.'
+- canonical_id: REQ-1168
+  status: out-of-scope
+  evidence: '로그인·메뉴 권한 후속: UI-18 진입·업로드에서 신규 로그인 화면·메뉴 권한 검사 호출이 없다.'
+- canonical_id: REQ-1169
+  status: out-of-scope
+  evidence: '조회·업로드 범위: UI-18에는 목표 직접 수정 폼·보고서 엑셀 다운로드 CTA가 없고 양식 내려받기는 유지된다.'
+- canonical_id: REQ-1170
+  status: non-functional
+  evidence: 'Flyway 비활성 보존: 일반 서버 기동 설정에서 spring.flyway.enabled가 false이며 자동 migration이 실행되지 않는다.'
+- canonical_id: REQ-1171
+  status: non-functional
+  evidence: '개발 무인증 보존: 인증 헤더 없는 UI-18 조회가 개발 모드에서 200이며 auth.required=false다.'
+- canonical_id: REQ-1172
+  status: non-functional
+  evidence: '인증 선언 금지: 유효 OpenAPI에 세 인증 선언이 없고 변경 연산 security=[]를 유지한다.'
+- canonical_id: REQ-1173
+  status: non-functional
+  evidence: '수동 빌드 설정 보존: 구현 전후 세 파일의 지정 포트·설정·COPY 줄이 동일하다.'
+- canonical_id: REQ-1174
+  status: non-functional
+  evidence: '기존 API·수동 계약 보존: 기존 paths/methods/schema가 삭제되지 않고 manual 제공 뒤 내용도 전후 동일하다.'
+- canonical_id: REQ-1175
+  status: non-functional
+  evidence: '신규 schema 유일성: CommonBusinessPlanComparison 계열 새 schema 키가 기존  schema 키와 겹치지 않는다.'
+- canonical_id: REQ-1176
+  status: screen-only
+  evidence: '화면 등록·탐색 시험 동기화: 두 등록부에서 UI-18을 조회하고 세 시험의 UI-18 메뉴·주소 진입 기대가 일치한다.'
+- canonical_id: REQ-1177
+  status: non-functional
+  evidence: '기존 시험·공통 설정 보존: 기존 시험 경로와 setupFiles 설정이 남고 공통 대기가 3초다.'
+- canonical_id: REQ-1178
+  status: non-functional
+  evidence: '비동기 시험 안정성: 지연 fixture 시험이 호출 확인 waitFor 뒤 resolve하며 짧은 timeout·호출 순서 의존 단언이 없다.'
+- canonical_id: REQ-1179
+  status: non-functional
+  evidence: '실제 DB 시험 계약: 세 환경 변수로 실행한 DB 시험 fixture의 컬럼과 원문 DDL이 일치한다.'
+- canonical_id: REQ-1180
+  status: out-of-scope
+  evidence: '연결·파일 범위 한정: 다른 미개발 메뉴 본문은 바뀌지 않으며 신규 파일 casefold 충돌이 없다.'
+- canonical_id: REQ-1182
+  status: non-functional
+  evidence: '공통 비율 계산 재사용: UI-18의 비율 경로가 기존 ratio를 호출하고 별도 나눗셈 구현이 없다.'
+- canonical_id: REQ-1186
+  status: screen-only
+  evidence: UI-10 전월 조정 초안/포커스 인계 M25-398; 자동 저장 요청 없음
+- canonical_id: REQ-1196
+  status: screen-only
+  evidence: UI-18 출처 도움말 M25-405~408의 로컬 표시; 서버 호출/업무 쓰기 없음
+- canonical_id: REQ-1206
+  status: data-constraint
+  evidence: '마감 판정 원천: TB_CL_CLOSE 상태가 선택 분기를 결정하고 TB_FI_BIZ_PLAN에 새 잠금 필드가 없다.'
+- canonical_id: REQ-1209
+  status: out-of-scope
+  evidence: '파트별 행 제외: 화면·양식·API에 파트 선택과 파트별 보고서 행이 없다.'
+- canonical_id: REQ-1210
+  status: non-functional
+  evidence: '공통 틀·테마 재사용: 화면 제목이 공통 제목줄 한 번만 보이고 어두운 테마에서도 링크·글자가 보이며 공통 부품을 복제하지 않는다.'
+- canonical_id: REQ-1211
+  status: non-functional
+  evidence: '1440px 가로 넘침 제한: 1440px에서 document.scrollWidth가 clientWidth 이하이고 표 내부는 가로 이동 가능하다.'
+- canonical_id: REQ-1212
+  status: non-functional
+  evidence: '최종 사용자 범위: 설명·UI 소유는 세 역할을 보존하며 현재 개발 HTTP에 신규 역할 차단은 없다.'
+- canonical_id: REQ-1213
+  status: data-constraint
+  evidence: '저장·조회 표 경계: B10 반영 전후 목표/업로드 결과만 바뀌고 월별손익 실적 snapshot은 동일하다.'
 - canonical_id: REQ-1127
   status: data-constraint
   evidence: DB 식 소비：TB_SY_CALC_RULE에서 지정 CALC_ID와 식-00을 읽으며 식 정의나 계산 상수를 새로 저장하지 않는다.

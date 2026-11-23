@@ -99,6 +99,8 @@
   position: relative;
   display: inline-block;
   margin-left: 4px;
+  color: var(--ls-bad);
+  vertical-align: middle;
 }
 .cash-flow-tooltip {
   display: none;

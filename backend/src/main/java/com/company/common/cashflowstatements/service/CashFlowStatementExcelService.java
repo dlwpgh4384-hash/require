@@ -78,7 +78,8 @@ public class CashFlowStatementExcelService {
                         return created;
                     });
                     cell.setCellStyle(style);
-                    if (c == 0) continue;
+                    // 묶음 줄은 위 rows에서 넣은 빈칸을 그대로 둔다(「–」로 덮지 않음)
+                    if (c == 0 || "group".equals(line.style())) continue;
                     BigDecimal value = line.values().get(c - 1);
                     if (value == null) cell.setCellValue("–");
                     else cell.setCellValue(value.divide(divisor, 0, value.signum() < 0 ? RoundingMode.HALF_DOWN : RoundingMode.HALF_UP).doubleValue());

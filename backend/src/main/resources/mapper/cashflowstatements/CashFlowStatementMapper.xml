@@ -47,6 +47,7 @@
     SELECT p.DEV_ID AS "developerId",p.MON_PAY_AMT AS "amount" FROM TB_HR_DEV_PRC p
     WHERE p.MON_PAY_AMT IS NOT NULL AND p.APLY_BGN_YM &lt;= #{month}
       AND (p.APLY_END_YM IS NULL OR p.APLY_END_YM &gt;= #{month})
+    ORDER BY p.DEV_ID,p.APLY_BGN_YM
   </select>
   <select id="activeDevelopers" resultType="java.lang.String">
     SELECT DEV_ID FROM TB_HR_DEV WHERE USE_YN='Y'

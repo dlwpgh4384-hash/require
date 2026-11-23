@@ -54,10 +54,17 @@ export function cashFlowBalanceSeries(
     },
   ];
 }
-/** 시안 ic('warn',18) */
-const warnIcon = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+/** 시안 ic('warn',size) */
+const warnSvg = (size: number) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01" />
+  </svg>
+);
+const warnIcon = warnSvg(18);
+/** 시안 ic('down',16) */
+const downloadIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
   </svg>
 );
 function useOpenReceivables() {
@@ -171,7 +178,7 @@ export function CashFlowStatementPage() {
       disabled={downloading || loading || !data || !!error}
       onClick={() => void download()}
     >
-      <span aria-hidden="true">⇩ </span>엑셀 다운로드
+      {downloadIcon} 엑셀 다운로드
     </button>
   );
   const columns = data?.numericTable.columns ?? [
@@ -367,7 +374,7 @@ export function CashFlowStatementPage() {
                             aria-label={`${column.label} 자금 부족 예상`}
                             aria-describedby={`cash-flow-warning-detail-${warning.yearMonth}`}
                           >
-                            ⚠
+                            {warnSvg(14)}
                             <span
                               className="cash-flow-tooltip"
                               role="tooltip"

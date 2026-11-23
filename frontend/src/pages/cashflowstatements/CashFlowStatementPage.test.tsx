@@ -310,6 +310,12 @@ it("shows one warning banner listing shortage months with focusable header expla
   ).toHaveAttribute("tabindex", "0");
   const icon = screen.getByRole("img", { name: "11월 자금 부족 예상" });
   expect(icon).toHaveClass("cash-flow-warning-icon");
+  // 시안 ic('warn',14)·ic('down',16): 글자(⚠·⇩) 대신 그림 아이콘
+  expect(icon.querySelector("svg")).toHaveAttribute("width", "14");
+  expect(icon).not.toHaveTextContent("⚠");
+  const excel = screen.getByTestId("cash-flow-excel");
+  expect(excel.querySelector("svg")).not.toBeNull();
+  expect(excel).not.toHaveTextContent("⇩");
   expect(
     document.getElementById(icon.getAttribute("aria-describedby")!),
   ).toHaveTextContent("예상 잔액 9.0억 원 · 최소 운영자금 10.0억 원");

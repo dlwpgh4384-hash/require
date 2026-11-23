@@ -215,6 +215,7 @@ export function FinanceCardSection({
                     className="ls-in ls-in-sm"
                     aria-label="카드 이름"
                     placeholder="예: 영업 4팀 카드"
+                    maxLength={100}
                     style={{ width: 170 }}
                     disabled={disabled}
                     value={name}

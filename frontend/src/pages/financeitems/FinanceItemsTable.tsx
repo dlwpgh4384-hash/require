@@ -124,6 +124,7 @@ export function FinanceItemsTable({
                           aria-label="세부 항목"
                           data-testid={`finance-item-name-${index}`}
                           list="finance-sga-options"
+                          maxLength={50}
                           style={{ width: 140 }}
                           ref={register(key("itemName"))}
                           aria-invalid={!!fields[key("itemName")] || undefined}

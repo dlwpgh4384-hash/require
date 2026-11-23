@@ -419,6 +419,8 @@ export function FinanceItemPage() {
   saveRef.current = save;
   const closedRef = useRef(closed);
   closedRef.current = closed;
+  const monthRef = useRef(month);
+  monthRef.current = month;
   // 시안 keydown: Ctrl+S는 이 달이 마감 전이면 저장한다(창이 떠 있으면 창이 받는다).
   useEffect(() => {
     if (mobile) return;
@@ -448,12 +450,15 @@ export function FinanceItemPage() {
   };
   async function loadPrevious() {
     if (!draft) return;
+    const requested = month;
     const previousMonth = dash(addMonth(month, -1));
     try {
       const result = await api.getCommonFinancePreviousItems(
         month,
         draft.items,
       );
+      // 응답 전에 다른 달로 옮겼으면 옛 달 결과를 버린다.
+      if (monthRef.current !== requested) return;
       if (!result.count) {
         notify(`${previousMonth}에서 가져올 새 항목이 없습니다.`, "info");
         return;
@@ -465,6 +470,7 @@ export function FinanceItemPage() {
         destructive: false,
         action: () => {
           change((data) => {
+            if (data.yearMonth !== requested) return;
             data.items.push(
               ...result.items.map((row) => ({
                 ...row,

@@ -206,7 +206,7 @@
 }
 .fin-draft,
 .fin-warn-text {
-  color: #b45309;
+  color: var(--ls-warn, #b45309);
 }
 .fin-help-i {
   cursor: help;

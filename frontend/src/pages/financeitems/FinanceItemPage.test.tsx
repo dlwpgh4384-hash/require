@@ -661,3 +661,46 @@ it("negative tax warning and the tax row jumps to the annual estimate", async ()
   fireEvent.click(screen.getByTestId("finance-tax-focus"));
   expect(screen.getByLabelText("연간 예상 법인세")).toHaveFocus();
 });
+it("drops a previous-items answer that arrives after moving to another month", async () => {
+  vi.mocked(api.getCommonFinanceItems).mockImplementation(async (key) =>
+    key === "202602" ? structuredClone(data) : month(key, true),
+  );
+  await open();
+  let answer: (value: { items: FinanceItem[]; count: number }) => void = () => undefined;
+  vi.mocked(api.getCommonFinancePreviousItems).mockReturnValue(
+    new Promise((resolve) => {
+      answer = resolve;
+    }),
+  );
+  fireEvent.click(screen.getByTestId("finance-previous"));
+  fireEvent.click(screen.getByTestId("finance-month-202601"));
+  await waitFor(() =>
+    expect(api.getCommonFinanceItems).toHaveBeenLastCalledWith(
+      "202601",
+      expect.anything(),
+    ),
+  );
+  await screen.findByTestId("finance-adjust-closed");
+  answer({
+    count: 1,
+    items: [item({ itemId: null, itemName: "지난달", amount: 42 })],
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(screen.queryByText("2026-01 항목을 불러올까요?")).toBeNull();
+  expect(screen.queryByRole("alertdialog")).toBeNull();
+});
+it("text inputs stop at the DDL lengths", async () => {
+  data.items = [item()];
+  await open();
+  expect(screen.getByTestId("finance-item-name-0")).toHaveAttribute("maxLength", "50");
+  fireEvent.click(screen.getByTestId("finance-tab-1"));
+  const card = within(screen.getByTestId("finance-card-card"));
+  expect(card.getByLabelText("카드 이름")).toHaveAttribute("maxLength", "100");
+  const transfer = within(screen.getByTestId("finance-transfer-card"));
+  expect(transfer.getByLabelText("내용")).toHaveAttribute("maxLength", "100");
+  expect(transfer.getByLabelText("받는 곳")).toHaveAttribute("maxLength", "100");
+  expect(transfer.getByLabelText("메모")).toHaveAttribute("maxLength", "200");
+  const loan = within(screen.getByTestId("finance-loan-card"));
+  expect(loan.getByLabelText("상대")).toHaveAttribute("maxLength", "100");
+  expect(loan.getByLabelText("메모")).toHaveAttribute("maxLength", "200");
+});

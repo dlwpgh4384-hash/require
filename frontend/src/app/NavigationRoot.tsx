@@ -392,13 +392,23 @@ export function NavigationRoot({
     tabList,
   ]);
 
-  // 휴대폰↔PC로 폭이 바뀌면 화면 상태를 다시 맞춘다(처음 그릴 때는 그대로 둔다).
+  // 휴대폰↔PC로 폭이 바뀌어도 열린 탭과 지금 화면을 버리지 않는다(저장 안 한 입력을 지킨다, 00 코드 리뷰 2026-11-23).
+  // 휴대폰에서는 탭 줄만 숨기고 PC 전용 화면은 그리지 않는다. PC로 돌아오면 휴대폰에서 연 화면을 탭에 붙인다.
   const previousTabsOn = useRef(tabsOn);
   useEffect(() => {
     if (previousTabsOn.current === tabsOn) return;
     previousTabsOn.current = tabsOn;
-    if (!tabsOn) setTabList((list) => (list.length ? [] : list));
-    setCurrent(null);
+    if (!tabsOn || !current) return;
+    setTabList((list) => {
+      if (list.includes(current)) return list;
+      if (list.length < MAX_TABS) return [...list, current];
+      // 탭이 꽉 찼으면 저장 안 한 입력이 없는 가장 오래된 탭 하나를 비운다(없으면 잠깐 한도를 넘긴다).
+      const victim = list
+        .filter((id) => id !== DASHBOARD_SCREEN && !dirty.has(id))
+        .sort((a, b) => (seen.current[a] ?? 0) - (seen.current[b] ?? 0))[0];
+      return [...list.filter((id) => id !== victim), current];
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabsOn]);
 
   // 새로고침·창 닫기: 미저장 입력이 있으면 브라우저 기본 경고를 띄운다.
@@ -461,6 +471,8 @@ export function NavigationRoot({
     } else if (item.kind === "leave") {
       if (proceed) {
         clearDirty(item.previous);
+        // PC에서 열어 둔 탭이면 휴대폰에서 버린 입력이 숨은 채 남지 않게 닫는다.
+        setTabList((list) => list.filter((id) => id !== item.previous));
         activate(item.target);
       } else go(item.previous, true);
     }
@@ -530,7 +542,12 @@ export function NavigationRoot({
     );
   else if (!keepMounted) routeBody = screenBody(access.scrnId);
 
-  const panelIds = tabsOn ? tabList : current ? [current] : [];
+  // 휴대폰: PC에서 열어 둔 탭은 숨긴 채 남기되(입력 보존), 휴대폰에서 못 여는 화면(PC 전용 등)은 그리지 않는다.
+  const panelIds = tabsOn
+    ? tabList
+    : [...tabList, ...(current && !tabList.includes(current) ? [current] : [])].filter(
+        (id) => openable(id),
+      );
   const showPanels =
     keepMounted &&
     !!current &&

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -34,12 +35,16 @@ function menus(): ShellMenuResponse {
   };
 }
 let mobile = false;
+let mediaListeners = new Set<() => void>();
 beforeEach(() => {
   mobile = false;
+  mediaListeners = new Set();
   vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
-    matches: mobile && query.includes("max-width: 767px"),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
+    get matches() {
+      return mobile && query.includes("max-width: 767px");
+    },
+    addEventListener: (_event: string, callback: () => void) => mediaListeners.add(callback),
+    removeEventListener: (_event: string, callback: () => void) => mediaListeners.delete(callback),
   })));
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => menus() }));
 });
@@ -136,6 +141,29 @@ describe("screen tabs (FR-0103)", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));
     await waitFor(() => expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/S1"));
     expect(screen.getByLabelText("S1 입력")).toHaveValue("값");
+  });
+
+  // 00 코드 리뷰(2026-11-23): 폭이 768px을 넘나들어도 열린 탭과 저장 안 한 입력이 확인 없이 사라지지 않는다.
+  it("keeps open tabs and unsaved input when the width crosses the phone breakpoint", async () => {
+    const width = (isMobile: boolean) =>
+      act(() => {
+        mobile = isMobile;
+        mediaListeners.forEach((listener) => listener());
+      });
+    mount();
+    await openScreen("S1");
+    fireEvent.change(await screen.findByLabelText("S1 입력"), { target: { value: "S1 값" } });
+    await openScreen("S2");
+    fireEvent.change(await screen.findByLabelText("S2 입력"), { target: { value: "S2 값" } });
+    width(true);
+    expect(screen.queryByTestId("screen-tab-list")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("S2 입력")).toHaveValue("S2 값");
+    width(false);
+    await waitFor(() => expect(tabs().getAllByRole("tab")).toHaveLength(3));
+    expect(screen.getByLabelText("S2 입력")).toHaveValue("S2 값");
+    fireEvent.click(tabs().getByRole("tab", { name: /화면 S1/ }));
+    expect(screen.getByLabelText("S1 입력")).toHaveValue("S1 값");
+    expect(screen.getByTestId("screen-tab-s1")).toHaveTextContent("●");
   });
 
   it("opens a shared #UI address and the logo returns to the dashboard", async () => {

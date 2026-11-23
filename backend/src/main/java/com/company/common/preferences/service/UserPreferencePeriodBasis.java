@@ -42,9 +42,11 @@ public class UserPreferencePeriodBasis {
         return YearMonth.parse(value, YM);
     }
 
-    private static Map<String, Object> missing() {
+    private Map<String, Object> missing() {
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("periodBasis", null);
+        String current = mapper.selectCurrentKoreanMonth();
+        if (current != null) meta.put("currentYearMonth", current);
         meta.put("periodBasisError", "기간 기준을 확인할 수 없습니다. 운영 기준값을 확인해 주세요.");
         return meta;
     }

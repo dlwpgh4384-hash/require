@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.cashflowstatements.mapper.CashFlowStatementMapper">
+  <resultMap id="contribution" type="com.company.common.financeitems.dto.FinanceItemContracts$CashContribution">
+    <constructor>
+      <arg column="yearMonth" javaType="java.lang.String"/>
+      <arg column="category" javaType="java.lang.String"/>
+      <arg column="amount" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <select id="currentMonth" resultType="java.lang.String">
+    SELECT to_char(current_timestamp AT TIME ZONE 'Asia/Seoul','YYYYMM')
+  </select>
+  <select id="immediateStandard" resultType="java.math.BigDecimal">
+    SELECT STD_VAL FROM TB_SY_OPER_STD WHERE STD_CD=#{code}
+      AND APLY_BGN_YM &lt;= to_char(current_timestamp AT TIME ZONE 'Asia/Seoul','YYYYMM')
+    ORDER BY APLY_BGN_YM DESC LIMIT 1
+  </select>
+  <select id="receipts" resultMap="contribution">
+    SELECT to_char(r.RCPT_DT,'YYYYMM') AS "yearMonth",'RECEIPT' AS "category",sum(r.RCPT_AMT) AS "amount"
+    FROM TB_BL_RCPT r JOIN TB_BL_BILL b ON b.BILL_ID=r.BILL_ID
+    WHERE r.CNCL_YN='N' AND b.CNCL_YN='N' GROUP BY to_char(r.RCPT_DT,'YYYYMM')
+    UNION ALL
+    SELECT to_char(b.PAY_DUE_DT,'YYYYMM') AS "yearMonth",'REMAINDER' AS "category",sum(b.UNPAID_AMT) AS "amount"
+    FROM TB_BL_BILL b WHERE b.CNCL_YN='N' AND b.UNPAID_AMT &gt; 0
+    GROUP BY to_char(b.PAY_DUE_DT,'YYYYMM')
+  </select>
+  <select id="miscellaneousIncome" resultMap="contribution">
+    SELECT COALESCE(to_char(IO_DT,'YYYYMM'),FIN_YM) AS "yearMonth",'OTHER_INCOME' AS "category",
+      sum(AMT+VAT_AMT) AS "amount" FROM TB_FI_ITEM WHERE FIN_CLS_CD='NOPR_IN'
+    GROUP BY COALESCE(to_char(IO_DT,'YYYYMM'),FIN_YM)
+  </select>
+  <select id="payroll" resultMap="com.company.common.personalcostprofits.mapper.PersonalCostProfitMapper.pay">
+    SELECT PAY_YM AS "yearMonth",DEV_ID AS "developerId",EMP_TYPE_CD AS "employeeTypeCode",
+      PAY_AMT AS "salary",ALWNC_AMT AS "allowance",INSR_CMPNY_AMT AS "companyInsurance",
+      RETIRE_RSV_AMT AS "retirementReserve",INSR_SELF_AMT AS "personalInsurance",WTHLD_TAX_AMT AS "withholdingTax",
+      INCM_TAX_AMT AS "incomeTax",REAL_PAY_AMT AS "netPay",VNDR_SPLY_AMT AS "vendorSupply"
+    FROM TB_HR_MON_PAY WHERE PAY_YM &lt;= #{end} ORDER BY PAY_YM,DEV_ID
+  </select>
+  <select id="activeDevelopers" resultType="java.lang.String">
+    SELECT DEV_ID FROM TB_HR_DEV WHERE USE_YN='Y'
+  </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES(#{userId},'DNLD','UI-21',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
+</mapper>

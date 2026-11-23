@@ -1,4 +1,6 @@
 import type { ReactElement } from "react";
+import { CashFlowStatementPage } from "../cashflowstatements/CashFlowStatementPage";
+import { CashFlowStatementTitleActions } from "../cashflowstatements/CashFlowStatementWorkspace";
 import { BillingPage } from "../bills/BillingPage";
 import { BillingTitleActions } from "../bills/BillingWorkspace";
 import { ProjectPage } from "../projects/ProjectPage";
@@ -63,6 +65,13 @@ export interface ScreenEntry {
  * 공통 화면 틀 시험도 여기서 만든 화면과 「준비 중」 화면을 나눈다. 새 화면은 여기에 한 줄만 더한다.
  */
 export const screenRegistry: readonly ScreenEntry[] = [
+  {
+    id: "UI-21",
+    Page: () => <CashFlowStatementPage />,
+    TitleActions: () => <CashFlowStatementTitleActions />,
+    rootTestId: "cash-flow-statements-page",
+    hasInputs: false,
+  },
   {
     id: "UI-18",
     Page: () => <BusinessPlanComparisonPage />,

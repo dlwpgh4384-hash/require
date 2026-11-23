@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.company.common.preferences.mapper.UserPreferencePeriodSourceMapper">
+  <select id="selectCurrentKoreanMonth" resultType="java.lang.String">
+    SELECT to_char(current_timestamp AT TIME ZONE 'Asia/Seoul','YYYYMM')
+  </select>
   <select id="selectCashBaseYm" resultType="java.math.BigDecimal">
     SELECT std_val
     FROM TB_SY_OPER_STD

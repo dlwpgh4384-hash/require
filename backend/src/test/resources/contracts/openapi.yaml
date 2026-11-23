@@ -11432,6 +11432,140 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/cash-flow-statements:
+    get:
+      operationId: getCommonCashFlowStatements
+      summary: 자금수지표 연간 조회
+      security: []
+      parameters:
+      - name: year
+        in: query
+        required: true
+        schema:
+          type: integer
+        description: 기존 PeriodSelector·useScreenPeriod 허용 연도; 새 연도 범위/누계기준월 없음
+      x-related-requirements:
+      - REQ-1214
+      - REQ-1231
+      - REQ-1232
+      - REQ-1233
+      - REQ-1234
+      - REQ-1238
+      - REQ-1239
+      - REQ-1240
+      - REQ-1241
+      - REQ-1242
+      - REQ-1243
+      - REQ-1244
+      - REQ-1245
+      - REQ-1246
+      - REQ-1247
+      - REQ-1248
+      - REQ-1249
+      - REQ-1251
+      - REQ-1254
+      - REQ-1255
+      x-pagination-filtering:
+        pagination: 한 연도 12개월과 상반기·하반기·연간 전체; 페이지 분할 없음
+        filtering: year만; 월·검색·정렬·columns 필터 추가 없음
+        ordering: 1~12월 뒤 상반기·하반기·연간; 원문 행 순서
+      x-aiops-query-role:
+        entity: TB_BL_RCPT
+        result_path:
+        - data
+      x-business-rules:
+      - 'REQ-1243: 입금일 월에 실제 받은 금액을, 입금 예정일 월에 남은 UNPAID_AMT만 반영한다. 미마감월은 두 원천을 합산한 한 금액, 마감월은 그 달 실제 입금만이다. 예정일이
+        지난 미수금은 예정일을 고치기 전 미래월로 자동 이월하지 않는다(SPEC-REQUEST.md:118–125).'
+      - 'REQ-1239: 예정 달 월말 잔액이 MIN_CASH보다 작을 때만 부족으로 판정한다. 초기 기준은 10억이며 운영 기준값을 읽는다. 마감한 달은 경고하지 않는다. 기초잔액 미설정 또는
+        시작월 이전처럼 잔액 근거가 없으면 수입/지출만 조회하고 잔액과 경고를 계산하지 않는다(120–121행).'
+      - 'REQ-1248: 급여 월의 4대보험 회사+본인·원천세·근로소득세는 다음달 제경비에 넣는다.'
+      - 'REQ-1254: 일반 수입/지출 행은 기간 합계, 전월이월금은 기간 첫 값, 이월금은 기간 끝 값이다. 잔액을 월별로 더하지 않는다.'
+      x-side-effects:
+      - 원천 표·TB_SY_OPER_STD·급여·계산식·손익 값/행수 무변경; 결과 저장/감사행 생성 없음. 공통 설정 저장은 별도 기존 API.
+      x-required-tests:
+      - 'happy: 원천 입출금과 기초잔액을 둔 연도로 GET -> 200 months 12개·numericTable 15열, 원천 월합계와 같다.'
+      - 'auth: UI-22 전 인증 헤더 없이 같은 연도로 GET -> 200; 신규401/403 검사 없음. scheme 표준 충돌은 OQ-AUTH-021.'
+      - 'validation: year 누락 또는 정수 아닌 year로 GET -> 400 ApiError.errors[].field=year·원천 행수 불변.'
+      - 'business: 마감월에 미수잔액이 있는 연도로 GET -> 그 월 cashSales는 입금일 실제액만; 지난예정 미수의 미래 기여0.'
+      - 'side-effect: 조회 전후 TB_BL_RCPT·TB_BL_BILL·TB_HR_MON_PAY·TB_FI_ITEM을 읽기 -> 값/행수 동일·새 자금결과표 없음.'
+      - 'boundary: MIN_CASH=10억에서 예정잔액 미만/동일 및 마감월을 각각 조회 -> 미만 예정월만 warnings에 있고 동일/마감은 없다.'
+      - 'base: 기초잔액 미설정 또는 시작월 이전 연도 조회 -> 수입/지출은 반환, 근거없는 openingBalance/closingBalance=null·해당 warnings 없음.'
+      - 'payroll: 10월 정규직 급여와11월 현재 프리랜서·미업로드 fixture 조회 -> 10월 REAL_PAY_AMT는 정규직,11월은 최근급여/수당−3.3% 규칙;10월 공제는11월
+        overhead.'
+      - 'receipt: 일부수납과 남은 미수잔액을 다른 입금/예정월로 GET -> 받은액은 입금월·잔액만 예정월, 청구총액 중복0.'
+      responses:
+        '200':
+          description: 조회 연도 월별 입출금·잔액·부족 예정·동일 표; 계산 근거 없는 잔액은 null
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCashFlowStatementResult'
+        '400':
+          description: year 누락/형식/공통 허용기간 오류; ApiError.errors[].field=year
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/cash-flow-statements/excel:
+    get:
+      operationId: getCommonCashFlowStatementsExcel
+      summary: 자금수지표 엑셀 다운로드
+      security: []
+      parameters:
+      - name: year
+        in: query
+        required: true
+        schema:
+          type: integer
+        description: 기존 PeriodSelector·useScreenPeriod 허용 연도; 새 연도 범위/누계기준월 없음
+      - name: amountUnit
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - 원
+          - 천 원
+          - 백만 원
+        description: 기존 MoneyUnitSelect 선택값
+      x-related-requirements:
+      - REQ-1235
+      - REQ-1257
+      x-pagination-filtering:
+        pagination: 선택연도 전체 12개월/반기/연간 파일; 분할 없음
+        filtering: year·amountUnit만; 화면과 같은 원천 projection
+      x-business-rules:
+      - UI-09 ExcelExportService·ExcelFile 재사용·파일이름 자금수지표·화면 동일 행열/단위
+      - 전월이월금/이월금은 기간 첫/끝값이며 잔액을 월합하지 않는다.
+      x-side-effects:
+      - 원천/결과 저장 없음; 기존 UI-09 다운로드 helper 부수효과는 실제 코드 대조 OQ-EXPORT-021·새 감사 정책 없음.
+      x-required-tests:
+      - 'happy: year=2026·amountUnit=원으로 GET -> 200 실제xlsx를 열면 자금수지표 행열/단위가 같은 연도 화면과 같다.'
+      - 'auth: 인증 헤더 없이 다운로드 GET -> 파일수신; UI-22 전 신규 역할거부 없음(OQ-AUTH-021).'
+      - 'validation: amountUnit 누락/지원하지 않는 값으로 GET -> 400 errors[].field=amountUnit·파일생성 성공으로 위장하지 않는다.'
+      - 'business: 기초미설정 연도의 엑셀 GET -> 입출금은 있고 잔액은 –이며 화면과 같은 null 의미다.'
+      - 'side-effect: 파일을 받은 뒤 원천 TB_FI_ITEM·TB_FI_XFER·TB_FI_LOAN 읽기 -> 값/행수 불변; 별도 자금수지 저장행 없음.'
+      responses:
+        '200':
+          description: 자금수지표 XLSX; 화면과 동일 줄·열·단위
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: year 누락/형식/기존 기간 오류 또는 amountUnit 누락/허용값 오류; 해당 field 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
     CommonFinanceItem:
@@ -15339,6 +15473,174 @@ components:
           items:
             $ref: '#/components/schemas/CommonBusinessPlanComparisonMonth'
       additionalProperties: false
+    CommonCashFlowWarning:
+      type: object
+      required:
+      - yearMonth
+      - expectedBalance
+      - minimumCash
+      properties:
+        yearMonth:
+          type: string
+          pattern: ^[0-9]{4}(0[1-9]|1[0-2])$
+        expectedBalance:
+          type: number
+        minimumCash:
+          type: number
+    CommonCashFlowMonth:
+      type: object
+      required:
+      - yearMonth
+      - closed
+      - openingBalance
+      - closingBalance
+      - cashSales
+      - miscIncome
+      - loan
+      - incomeTotal
+      - regularPayroll
+      - contractFreelancePayroll
+      - outsourcing
+      - unpaidPayroll
+      - overhead
+      - corporateTaxPayment
+      - expenseTotal
+      properties:
+        yearMonth:
+          type: string
+          pattern: ^[0-9]{4}(0[1-9]|1[0-2])$
+        closed:
+          type: boolean
+        openingBalance:
+          type: number
+          nullable: true
+          description: 부가세 포함 원 단위; 근거 없는 잔액/자료 없음은 null. 원단위 처리는 DB 식-00.
+        closingBalance:
+          type: number
+          nullable: true
+          description: 부가세 포함 원 단위; 근거 없는 잔액/자료 없음은 null. 원단위 처리는 DB 식-00.
+        cashSales:
+          type: number
+          nullable: true
+          description: 부가세 포함 원 단위; 근거 없는 잔액/자료 없음은 null. 원단위 처리는 DB 식-00.
+        miscIncome:
+          type: number
+          nullable: true
+          description: 부가세 포함 원 단위; 근거 없는 잔액/자료 없음은 null. 원단위 처리는 DB 식-00.
+        loan:
+          type: number
+          nullable: true
+          description: 부가세 포함 원 단위; 근거 없는 잔액/자료 없음은 null. 원단위 처리는 DB 식-00.
+        incomeTotal:
+          type: number
+          nullable: true
+          description: 부가세 포함 원 단위; 근거 없는 잔액/자료 없음은 null. 원단위 처리는 DB 식-00.
+        regularPayroll:
+          type: number
+          nullable: true
+          description: 부가세 포함 원 단위; 근거 없는 잔액/자료 없음은 null. 원단위 처리는 DB 식-00.
+        contractFreelancePayroll:
+          type: number
+          nullable: true
+          description: 부가세 포함 원 단위; 근거 없는 잔액/자료 없음은 null. 원단위 처리는 DB 식-00.
+        outsourcing:
+          type: number
+          nullable: true
+          description: 부가세 포함 원 단위; 근거 없는 잔액/자료 없음은 null. 원단위 처리는 DB 식-00.
+        unpaidPayroll:
+          type: number
+          nullable: true
+          description: 부가세 포함 원 단위; 근거 없는 잔액/자료 없음은 null. 원단위 처리는 DB 식-00.
+        overhead:
+          type: number
+          nullable: true
+          description: 부가세 포함 원 단위; 근거 없는 잔액/자료 없음은 null. 원단위 처리는 DB 식-00.
+        corporateTaxPayment:
+          type: number
+          nullable: true
+          description: 부가세 포함 원 단위; 근거 없는 잔액/자료 없음은 null. 원단위 처리는 DB 식-00.
+        expenseTotal:
+          type: number
+          nullable: true
+          description: 부가세 포함 원 단위; 근거 없는 잔액/자료 없음은 null. 원단위 처리는 DB 식-00.
+    CommonCashFlowNumericRow:
+      type: object
+      required:
+      - label
+      - style
+      - values
+      properties:
+        label:
+          type: string
+        style:
+          type: string
+          enum:
+          - bold
+          - group
+          - indent
+          - plain
+        values:
+          type: array
+          items:
+            type: number
+            nullable: true
+            description: 부가세 포함 원 단위; 근거 없는 잔액/자료 없음은 null. 원단위 처리는 DB 식-00.
+          minItems: 15
+          maxItems: 15
+    CommonCashFlowNumericTable:
+      type: object
+      required:
+      - columns
+      - rows
+      properties:
+        columns:
+          type: array
+          items:
+            type: object
+            required:
+            - label
+            - actual
+            - warning
+            properties:
+              label:
+                type: string
+              actual:
+                type: boolean
+                nullable: true
+              warning:
+                type: boolean
+          minItems: 15
+          maxItems: 15
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCashFlowNumericRow'
+    CommonCashFlowStatementResult:
+      type: object
+      required:
+      - year
+      - minimumCash
+      - months
+      - warnings
+      - numericTable
+      properties:
+        year:
+          type: integer
+        minimumCash:
+          type: number
+          description: TB_SY_OPER_STD.MIN_CASH 운영값; 원문 최초10억
+        months:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCashFlowMonth'
+          minItems: 12
+          maxItems: 12
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCashFlowWarning'
+        numericTable:
+          $ref: '#/components/schemas/CommonCashFlowNumericTable'
     ApiResponse:
       type: object
       required: [success, meta]
@@ -19467,6 +19769,81 @@ x-requirement-context:
 
 
 x-uncovered-requirements:
+- canonical_id: REQ-1215
+  status: data-constraint
+  evidence: 'DB 식 읽기 — UI-21 데이터 소비 계약: 식-00 공통 원칙과 식-05·06·44·45·46·47·48·49·50·51·52를 TB_SY_CALC_RULE.CALC_ID로
+    읽는다. 표의 식 이름만으로 수식을 재정의하지 않는다.'
+- canonical_id: REQ-1216
+  status: data-constraint
+  evidence: '공통코드 원천 — UI-21 데이터 소비 계약: EMP_TYPE·SGA_ITEM·FIN_CLS·DRCT_CLS·PAY_TYPE·IO·XFER_CLS는 sql/DML_BaseData.sql의
+    기존 값을 읽고 새 코드 enum을 만들지 않는다.'
+- canonical_id: REQ-1217
+  status: out-of-scope
+  evidence: 인증·메뉴권한 후속 — 로그인과 메뉴 권한 검사는 UI-22 후속 작업이며 이번 UI-21에 연결하지 않는다.
+- canonical_id: REQ-1218
+  status: out-of-scope
+  evidence: 업로드·입력·저장 제외 — 조회와 B.4 다운로드만 제공하고 업로드·업무 입력·새 저장 표를 만들지 않는다.
+- canonical_id: REQ-1219
+  status: non-functional
+  evidence: 개발 서버 설정 유지 — 일반 기동에서 Flyway 실행과 로그인 요구가 발생하지 않는다.
+- canonical_id: REQ-1220
+  status: non-functional
+  evidence: 인증 정의 금지 — effective OpenAPI에 인증 scheme과 최상위 security가 없는 후보임을 구조 검사한다.
+- canonical_id: REQ-1221
+  status: non-functional
+  evidence: 기존 인프라 파일 보존 — 구현 diff에서 지정 세 설정에 변경이 없다.
+- canonical_id: REQ-1222
+  status: non-functional
+  evidence: 시험용 기존 API 보존 — effective OpenAPI는 모든 baseline 경로/schema를 포함하고 CommonCashFlow 계열 신규 이름은 중복이 없다.
+- canonical_id: REQ-1223
+  status: non-functional
+  evidence: 화면목록 연동 회귀 — 세 시험에서 UI-21의 개발 화면 연결이 일치하며 앞 화면 시험 파일은 원위치에 남는다.
+- canonical_id: REQ-1224
+  status: non-functional
+  evidence: 공통 시험 설정 유지 — 공통 setup 연결과 3초 기다림이 유지된 상태로 새 UI-21 시험이 실행된다.
+- canonical_id: REQ-1225
+  status: non-functional
+  evidence: 신규 V migration 금지 — 이번 결과는 신규 V 파일0개이고 기존 schema 준비 목록 회귀가 통과한다.
+- canonical_id: REQ-1226
+  status: non-functional
+  evidence: 비동기 화면시험 안정성 — 지연응답 완료 전 실제 호출을 기다리는 시험 및 router.test.tsx 활성화 대기 시험이 순서 의존 없이 통과한다.
+- canonical_id: REQ-1227
+  status: non-functional
+  evidence: 실제 DB 시험 계약 — 별도 실제 PostgreSQL 시험에서 DDL과 mapper가 일치하며 비밀값은 산출물에 포함되지 않는다.
+- canonical_id: REQ-1228
+  status: non-functional
+  evidence: 앞 화면 연동 회귀 — 세 기존 회귀 시험 결과를 새 시험 결과와 함께 보관하며 미실행을 성공으로 보고하지 않는다.
+- canonical_id: REQ-1229
+  status: non-functional
+  evidence: UI-21 한정 파일 경계 — 개발 화면 추가는 UI-21 하나이며 case-fold 파일명 충돌이 없다.
+- canonical_id: REQ-1230
+  status: data-constraint
+  evidence: '원천 직접 합산·재사용 — UI-21 데이터 소비 계약: 청구·입금·재무 항목·급여의 저장 원천을 매월 합산하고 같은 읽기 mapper는 재사용한다. 원천 화면 코드·저장 방식을
+    변경하지 않는다.'
+- canonical_id: REQ-1236
+  status: non-functional
+  evidence: 공통 틀·테마·행높이 — 두 테마에서 본문 제목 중복0·표행40px·도구줄과 차트/표 겹침0이며 기존 공통 formatter와 단위 선택이 같다.
+- canonical_id: REQ-1237
+  status: non-functional
+  evidence: 1440px 폭 경계 — 1440px에서 document 가로 overflow가 없고 1~12월/3합계열은 표 컨테이너 안에서만 스크롤한다.
+- canonical_id: REQ-1250
+  status: data-constraint
+  evidence: '손익 중복 반영 금지 — UI-21 데이터 소비 계약: 원가에 이미 들어간 카드·이체 지출은 현금 유출로만 반영하고 손익에 다시 넣지 않는다.'
+- canonical_id: REQ-1252
+  status: data-constraint
+  evidence: '급여 직원구분 스냅샷 — UI-21 데이터 소비 계약: 급여가 저장된 달은 TB_HR_MON_PAY.EMP_TYPE_CD로 정규직/계약직·프리랜서/외주를 나누고 미업로드 미래달만
+    현재 개발자 풀 구분을 쓴다.'
+- canonical_id: REQ-1253
+  status: data-constraint
+  evidence: '미래 급여 기준액 재사용 — UI-21 데이터 소비 계약: 급여 미업로드 미래월은 최근 업로드 급여·수당을 기초로 예정액을 계산한다. 최신 명확화127행에 따라 과거 실지급액을
+    그대로 복사하지 않는다. 현재 직원구분에 맞춰 지급 예정액과 관련 공제를 다시 계산하며 변경 전 월 보험·근로소득세는 다음달 제경비에 유지한다(126–127행).'
+- canonical_id: REQ-1256
+  status: covered
+  evidence: 기존 putCommonOperatingStandards의 UI-27 시작월 마감 잠금과 getCommonOperatingStandards 재조회로 두 값 무변경 검증; 해당 operation을
+    이번 delta에서 수정하지 않는다.
+- canonical_id: REQ-1258
+  status: non-functional
+  evidence: 사용자 범위 — 화면 안내/설계에 세 사용자 목적이 보존되고 이번 개발 API에 임의 역할 enum/403 정책이 없다.
 - canonical_id: REQ-1166
   status: data-constraint
   evidence: 'DB 계산식 원천: CALC_ID 조회로 식-00·식-30·식-36을 읽으며 조회 전후 식 정의가 같다.'

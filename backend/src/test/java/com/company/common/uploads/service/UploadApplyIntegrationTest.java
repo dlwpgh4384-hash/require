@@ -244,8 +244,8 @@ class UploadApplyIntegrationTest {
         var executor=java.util.concurrent.Executors.newFixedThreadPool(2);
         try {
             var tasks=List.<java.util.concurrent.Callable<UploadContracts.Result>>of(
-                () -> service.postCommonUploadApply(id,new UploadContracts.Apply(null)),
-                () -> service.postCommonUploadApply(id,new UploadContracts.Apply(null)));
+                () -> service.postCommonUploadApply(id,new UploadContracts.Apply(null, null)),
+                () -> service.postCommonUploadApply(id,new UploadContracts.Apply(null, null)));
             for(var future:executor.invokeAll(tasks)) assertThat(future.get().errorCount()).isZero();
         } finally { executor.shutdownNow(); }
         assertThat(count("TB_BS_CLNT")).isEqualTo(2);

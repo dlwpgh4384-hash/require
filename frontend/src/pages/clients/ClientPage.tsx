@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Dialog, Toast } from "../../shared/feedback/Dialog";
+import { Dialog, Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
   ListFilter,
@@ -52,11 +52,19 @@ export function ClientPage({
   const [filter, setFilter] = useState(emptyFilter);
   const [applied, setApplied] = useState(emptyFilter);
   const [error, setError] = useState("");
-  const [toast, setToast] = useState<{ message: string; kind: "ok" | "info" } | null>(null);
+  const [toast, setToast] = useState<{ message: string; kind: ToastKind } | null>(null);
   // 시안: 같은 상호 안내는 저장 알림과 따로 한 장 더 뜬다(안내).
   const [warning, setWarning] = useState("");
-  const setNotice = (message: string, kind: "ok" | "info" = "ok") =>
+  const setNotice = (message: string, kind: ToastKind = "ok") =>
     setToast(message ? { message, kind } : null);
+  /** FR-0106: 다른 사람이 먼저 바꿨으면(409) 경고 알림을 띄우고 목록을 다시 읽는다(새 수정 시각을 받는다). */
+  const reloadOnConflict = (reason: unknown) => {
+    if (!(reason instanceof ClientRequestError) || reason.status !== 409) return false;
+    setNotice(reason.message, "warn");
+    // 열린 상세는 key에 revision이 있어 같이 다시 읽는다.
+    setRevision((value) => value + 1);
+    return true;
+  };
   const [revision, setRevision] = useState(0);
   const [form, setForm] = useState<{ client: Client | null } | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -247,11 +255,13 @@ export function ClientPage({
         [{ clientId: client.clientId, modifiedAt: client.modifiedAt }],
         "Y",
       );
-      if (result.failed.length) setError(result.failed.map((item) => item.reason).join(" "));
+      // 다시 읽기(revision)가 화면 오류 글을 지우므로 못 한 이유는 알림으로 보인다.
+      if (result.failed.length) setNotice(result.failed.map((item) => item.reason).join(" "), "warn");
       else setNotice("다시 사용합니다.");
       setRevision((value) => value + 1);
     } catch (reason) {
-      setError(reason instanceof ClientRequestError ? reason.message : "변경하지 못했습니다.");
+      if (!reloadOnConflict(reason))
+        setError(reason instanceof ClientRequestError ? reason.message : "변경하지 못했습니다.");
     } finally {
       setBusy(false);
     }
@@ -275,7 +285,8 @@ export function ClientPage({
       setDetail(null);
       setRevision((value) => value + 1);
     } catch (reason) {
-      setError(reason instanceof ClientRequestError ? reason.message : "변경하지 못했습니다.");
+      if (!reloadOnConflict(reason))
+        setError(reason instanceof ClientRequestError ? reason.message : "변경하지 못했습니다.");
       setPending(null);
     } finally {
       setBusy(false);

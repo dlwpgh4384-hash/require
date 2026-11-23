@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Toast } from "../../shared/feedback/Dialog";
+import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
   Banner,
@@ -74,7 +74,8 @@ export function PartPage() {
     "standards" | "rename" | "stop" | null
   >(null);
   const [adding, setAdding] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [notice, setNoticeState] = useState<{ text: string; kind: ToastKind }>({ text: "", kind: "ok" });
+  const setNotice = (text: string, kind: ToastKind = "ok") => setNoticeState({ text, kind });
   const [menu, setMenu] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [options, setOptions] = useState<api.PartOptions | null>(null);
@@ -156,13 +157,21 @@ export function PartPage() {
     setPage(1);
     setNotice(message ?? "저장했습니다.");
   };
+  const resuming = useRef(false);
   const resume = async (part: api.Part) => {
+    if (resuming.current) return;
+    resuming.current = true;
     try {
       await api.putCommonPartResume(part.partId, part.modifiedAt);
       setRevision((value) => value + 1);
       setNotice(`${part.partName}을 다시 사용합니다.`);
     } catch (failure) {
-      setNotice(api.partErrorMessage(failure));
+      // 실패는 저장 완료(ok)가 아니라 경고 알림. 409(FR-0106)는 지금 값을 다시 읽는다.
+      setNotice(api.partErrorMessage(failure), "warn");
+      if (failure instanceof api.PartRequestError && failure.status === 409)
+        setRevision((value) => value + 1);
+    } finally {
+      resuming.current = false;
     }
   };
   const closeCreate = () => {
@@ -380,9 +389,10 @@ export function PartPage() {
           onSaved={saved}
         />
       )}
-      {notice && (
+      {notice.text && (
         <Toast
-          message={notice}
+          message={notice.text}
+          kind={notice.kind}
           onDismiss={() => setNotice("")}
           testId="part-saved-toast"
         />

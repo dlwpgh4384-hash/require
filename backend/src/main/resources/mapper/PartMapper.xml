@@ -112,6 +112,13 @@
       AND NOT EXISTS (SELECT 1 FROM TB_CL_CLOSE c
         WHERE c.close_ym=s.setl_ym AND c.close_stat_cd='CLOSE')
   </select>
+  <select id="selectConfirmedMonths" resultType="java.lang.String">
+    SELECT DISTINCT s.setl_ym FROM TB_CO_PART_SETL s
+    WHERE s.part_id=#{id} AND s.setl_ym &gt;= #{month} AND s.setl_stat_cd IN ('CNFM','AUTO')
+      AND NOT EXISTS (SELECT 1 FROM TB_CL_CLOSE c
+        WHERE c.close_ym=s.setl_ym AND c.close_stat_cd='CLOSE')
+    ORDER BY s.setl_ym
+  </select>
   <select id="selectHistory" resultMap="history">
     SELECT h.reg_dttm,h.chg_item_nm,h.bfr_val,h.aft_val,
       COALESCE(u.user_nm,h.reg_user_id) AS changed_by

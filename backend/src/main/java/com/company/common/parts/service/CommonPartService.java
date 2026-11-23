@@ -154,7 +154,7 @@ public class CommonPartService {
     @Transactional
     public Items<Standard> putCommonPartStandards(String id, StandardInput input) {
         lock();
-        current(id, input.modifiedAt());
+        var master = current(id, input.modifiedAt());
         validate(input.values());
         calculations.definition("식-00");
         calculations.definition("식-45");
@@ -171,8 +171,16 @@ public class CommonPartService {
             || before.salesExpense.compareTo(input.values().salesExpense()) != 0;
         if (amountChanged) {
             String confirmed = mapper.selectLastConfirmed(id, month);
-            if (confirmed != null) throw invalid("effectiveMonth", "확정 정산을 취소하거나 "
-                + fromDb(confirmed).plusMonths(1) + " 이후를 선택해 주세요.");
+            if (confirmed != null) {
+                // 시안·SFR-115-11 문구: 「10월 영업1파트 정산이 확정돼 있어 … 적용 시작월을 2026-11 이후로 고르세요.」
+                var months = mapper.selectConfirmedMonths(id, month);
+                if (months == null || months.isEmpty()) months = List.of(confirmed);
+                throw invalid("effectiveMonth", String.join("·", months.stream()
+                    .map(value -> fromDb(value).getMonthValue() + "월").toList()) + " " + master.partName
+                    + " 정산이 확정돼 있어 이익 배분율·공통관리비를 " + publicMonth(month)
+                    + "부터 바꿀 수 없습니다. 영업 파트 이익금에서 확정을 취소한 뒤 바꾸거나, 적용 시작월을 "
+                    + fromDb(confirmed).plusMonths(1) + " 이후로 고르세요.");
+            }
         }
         var next = rows.stream().filter(row -> row.month.compareTo(month) > 0)
             .min(Comparator.comparing(row -> row.month)).orElse(null);

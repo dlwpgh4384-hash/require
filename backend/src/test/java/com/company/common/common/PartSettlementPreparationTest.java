@@ -149,6 +149,9 @@ class PartSettlementPreparationTest {
             assertThat(mapper.selectLastConfirmed(partId, "202611")).isEqualTo("202611");
             assertThat(mapper.selectLastConfirmed(partId, "202612")).isNull();
             assertThat(mapper.selectLastConfirmed("absent-part", "202611")).isNull();
+            // 시안 확정 안내 문구에 쓰는 달 목록도 같은 조건이다.
+            assertThat(mapper.selectConfirmedMonths(partId, "202610")).containsExactly("202611");
+            assertThat(mapper.selectConfirmedMonths(partId, "202612")).isEmpty();
         }
     }
 

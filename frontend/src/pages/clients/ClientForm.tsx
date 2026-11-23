@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { Dialog } from "../../shared/feedback/Dialog";
+import { usePreferenceBusinessShortcuts } from "../userpreferences/UserPreferenceTools";
 import { DetailPanel } from "../../shared/list/DetailPanel";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { useScreenTitleOverride } from "../../shared/layout/ScreenTitleOverride";
@@ -175,16 +176,12 @@ export function ClientForm({
   };
   const currentSubmit = useRef(submit);
   currentSubmit.current = submit;
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        currentSubmit.current();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
+  // FR-0104 Ctrl+S: 공통 단축키 훅(숨은 화면 탭이면 넘김, 수정은 상세 패널 안에서만 받음).
+  const saveShortcut = useCallback(() => currentSubmit.current(), []);
+  usePreferenceBusinessShortcuts(
+    { onSave: saveShortcut, scope: formRef, dialogTarget: client ? formRef : undefined },
+    !leaving && !confirm,
+  );
   const message = (field: string) =>
     error?.errors
       .filter((item) => item.field === field)

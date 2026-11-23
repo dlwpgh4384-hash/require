@@ -247,7 +247,8 @@ class CommonPartControllerTest {
         data.confirmed = "202610";
         mvc.perform(put("/api/common/parts/part-a/standards").contentType("application/json")
             .content(values("2026-10", "45").toString())).andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("2026-11")));
+            .andExpect(jsonPath("$.message").value("10월 기존 파트 정산이 확정돼 있어 이익 배분율·공통관리비를 2026-10부터 "
+                + "바꿀 수 없습니다. 영업 파트 이익금에서 확정을 취소한 뒤 바꾸거나, 적용 시작월을 2026-11 이후로 고르세요."));
         noWrites(); assertThat(data.rows).hasSize(1);
     }
     @Test void confirmedMonthAllowsLeaderOnlyChange() throws Exception {

@@ -24,7 +24,6 @@ const screens = [
 ];
 /** 아직 만들지 않은 화면(화면 목록에 없음): 메뉴에는 있고 본문은 공통 「준비 중」. */
 const pending = [
-  { id: "UI-28", menuId: "M009", parent: "G004", title: "인력 운영 보드" },
   { id: "UI-17", menuId: "M010", parent: "G004", title: "인력 수요 예측" },
 ];
 const menuScreens = [...screens, ...pending];
@@ -188,7 +187,7 @@ describe("withdrawal route composition", () => {
     },
   );
 
-  // 인력 운영 보드·인력 수요 예측은 아직 만들지 않았다: 메뉴를 누르면 공통 「준비 중」이 보이고 가배정 자료를 읽지 않는다.
+  // 인력 수요 예측은 아직 만들지 않았다: 공통 「준비 중」이 보이고 가배정 자료를 읽지 않는다.
   it.each(pending)(
     "$id is not registered yet and shows the common placeholder",
     async (entry) => {
@@ -215,10 +214,10 @@ describe("withdrawal route composition", () => {
     });
     const preferences = screen.getByTestId("user-preferences");
     await act(async () => {
-      await router!.navigate("/screens/UI-28");
+      await router!.navigate("/screens/UI-17");
     });
     const placeholder = await screen.findByRole("region", {
-      name: "UI-28 본문",
+      name: "UI-17 본문",
     });
     expect(placeholder).toHaveTextContent("준비 중");
     expect(screen.getByTestId("list-download")).not.toBeVisible();

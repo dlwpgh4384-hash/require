@@ -133,7 +133,9 @@ class SalesPipelinePersistenceTest {
     @Test void pipelineExcludesClosedRowsAndFourteenDaysIsNotStale() throws Exception {
         db.update("INSERT INTO TB_SL_OPP SELECT 'pipeline-stopped',opp_nm,cust_clnt_id,part_id,sales_step_cd,win_prbl_rt,prbl_manual_yn,expct_amt,bgn_plan_ym,ctrt_type_cd,expct_prd_mcnt,next_todo_cn,next_todo_ddln_dt,work_plc_addr,rmrk,'STOP',expct_prft_rt,aprv_stat_cd,aprv_prft_rt,CURRENT_DATE,lose_rsn_cd,lose_memo,proj_id,reg_user_id,reg_dttm,mod_user_id,mod_dttm FROM TB_SL_OPP WHERE opp_id='pipeline-ongoing'");
         mvc.perform(get("/api/common/sales-pipeline")).andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.summary.ongoingCount").value(1)).andExpect(jsonPath("$.data.summary.staleCount").value(0));
+            .andExpect(jsonPath("$.data.summary.ongoingCount").value(1)).andExpect(jsonPath("$.data.summary.staleCount").value(0))
+            // 종료 탭 건수는 사용 중지를 빼고 센다(종료 목록 기본 조회와 같은 수).
+            .andExpect(jsonPath("$.data.summary.closedCount").value(0));
         mvc.perform(get("/api/common/sales-pipeline/closed")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items.length()").value(0));
         mvc.perform(get("/api/common/sales-pipeline/closed").param("includeStopped", "true")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.items[0].result").value("STOP"));

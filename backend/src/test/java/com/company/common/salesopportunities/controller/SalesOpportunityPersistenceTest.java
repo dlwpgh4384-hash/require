@@ -48,6 +48,7 @@ class SalesOpportunityPersistenceTest {
     @Autowired ObjectMapper json;
     @Autowired DataSource source;
     @Autowired OpportunityDatabase owned;
+    @Autowired SalesOpportunityMapper mapper;
     @MockBean SalesOpportunityCalculations calculations;
     @MockBean SalesOpportunityProjects projects;
     @MockBean SalesPipelineCodes codes;
@@ -130,6 +131,27 @@ class SalesOpportunityPersistenceTest {
         assertThat(db.queryForObject("SELECT aprv_stat_cd FROM TB_SL_OPP WHERE opp_id=?", String.class, id)).isEqualTo("WAIT");
         assertThat(db.queryForObject("SELECT count(*) FROM TB_SL_APRV_HIST WHERE opp_id=? AND aprv_act_cd='REJ'", Integer.class, id)).isZero();
     }
+    @Test void handedOffDeveloperStaysOnOneOpportunityAfterWinSoWithdrawalListHasOneOpportunity() throws Exception {
+        db.update("INSERT INTO TB_HR_DEV(dev_id,mng_no,dev_nm,emp_type_cd,grade_cd,job_cd,drct_cls_cd,part_id,work_stat_cd,reg_user_id) VALUES('test-dev','test-dev','시험 개발자','EMP','MD','BE','DIRECT','test-sales','WORK','admin')");
+        var first = input(); ((ObjectNode)first.path("needs").get(0)).putArray("tentativeDeveloperIds").add("test-dev");
+        var won = json.readTree(mvc.perform(post("/api/common/sales-opportunities").contentType("application/json").content(first.toString())).andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("data").path("opportunityId").asText();
+        // 수주 처리 뒤 모습: 기회는 수주, 가배정은 투입 배정 후보(CNVT)
+        db.update("UPDATE TB_SL_TENT_ASGN SET tent_stat_cd='CNVT',proc_dttm=clock_timestamp() WHERE opp_id=?", won);
+        db.update("UPDATE TB_SL_OPP SET opp_stat_cd='WIN',rslt_dt=DATE '2026-11-15' WHERE opp_id=?", won);
+        var other = create();
+        var edit = input(); edit.put("modifiedAt", version(other).path("modifiedAt").asText());
+        ((ObjectNode)edit.path("needs").get(0)).put("needSn", 1).putArray("tentativeDeveloperIds").add("test-dev");
+        mvc.perform(put("/api/common/sales-opportunities/{id}", other).contentType("application/json").content(edit.toString()))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("투입 배정으로 넘긴 후보입니다. 투입 상세에서 확인해 주세요."));
+        mvc.perform(put("/api/common/sales-opportunities/{id}/tentative-assignment", other).contentType("application/json")
+            .content(version(other).put("developerId", "test-dev").put("needSn", 1).put("startMonth", "2026-11").toString())).andExpect(status().isConflict());
+        mvc.perform(post("/api/common/sales-opportunities/tentative-assignment-check").contentType("application/json")
+            .content("{\"developerId\":\"test-dev\",\"startMonth\":\"2026-11\"}")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.warnings[0].message").value("투입 배정으로 넘긴 후보입니다. 투입 상세에서 확인해 주세요."));
+        // 철수 리스트(UI-05)가 읽는 ACT·CNVT 가배정은 계속 한 기회에만 있다.
+        assertThat(db.queryForObject("SELECT COUNT(DISTINCT opp_id) FROM TB_SL_TENT_ASGN WHERE dev_id='test-dev' AND tent_stat_cd IN ('ACT','CNVT')", Integer.class)).isEqualTo(1);
+        assertThat(db.queryForObject("SELECT tent_stat_cd FROM TB_SL_TENT_ASGN WHERE dev_id='test-dev'", String.class)).isEqualTo("CNVT");
+    }
     @Test void stopAndResumeKeepPhysicalRowAndClearResultDate() throws Exception {
         var id = create();
         mvc.perform(post("/api/common/sales-opportunities/{id}/stop", id).contentType("application/json").content(version(id).toString())).andExpect(status().isOk());
@@ -137,5 +159,55 @@ class SalesOpportunityPersistenceTest {
         mvc.perform(post("/api/common/sales-opportunities/{id}/resume", id).contentType("application/json").content(version(id).toString())).andExpect(status().isOk());
         assertThat(db.queryForObject("SELECT opp_stat_cd FROM TB_SL_OPP WHERE opp_id=?", String.class, id)).isEqualTo("ING");
         assertThat(db.queryForObject("SELECT rslt_dt FROM TB_SL_OPP WHERE opp_id=?", LocalDate.class, id)).isNull();
+    }
+    // --- 점검 고침 2(UI-29) ---
+    void developer(String id) {
+        db.update("INSERT INTO TB_HR_DEV(dev_id,mng_no,dev_nm,emp_type_cd,grade_cd,job_cd,drct_cls_cd,part_id,work_stat_cd,reg_user_id) VALUES(?,?,'시험 개발자','EMP','MD','BE','DIRECT','test-sales','WORK','admin')", id, id);
+    }
+    void pay(String month, String developer) {
+        db.update("INSERT INTO TB_HR_MON_PAY(pay_ym,dev_id,pay_amt,alwnc_amt,insr_cmpny_amt,retire_rsv_amt,emp_type_cd,drct_cls_cd,reg_user_id) VALUES(?,?,5000000,0,0,0,'EMP','DIRECT','admin')", month, developer);
+    }
+    void cost(String month, String developer, long labor) {
+        db.update("INSERT INTO TB_CO_MON_COST(cost_ym,dev_id,proj_id,asgn_id,asgn_mm,free_mm,sales_amt,labor_alloc_amt,team_exps_amt,proj_exps_amt,drct_exps_amt,cost_cls_cd,reg_user_id) VALUES(?,?,'test-project','test-asgn',1,0,0,?,0,0,0,'ASGN','admin')", month, developer, labor);
+    }
+    @Test void monthlyCostUsesTheLatestPayMonthThatAlreadyHasMonthlyCost() {
+        developer("test-dev-a"); developer("test-dev-b");
+        for (var dev : List.of("test-dev-a", "test-dev-b")) { pay("202610", dev); pay("202611", dev); }
+        cost("202610", "test-dev-a", 6800000); cost("202610", "test-dev-b", 7000000);
+        // 11월 급여는 올라왔지만 11월 월 원가는 아직 없다 → 10월 원가 평균(690만 원)으로 계산한다.
+        assertThat(mapper.monthlyCost("BE", "MD")).isEqualByComparingTo("6900000");
+        cost("202611", "test-dev-a", 7200000); cost("202611", "test-dev-b", 7400000);
+        assertThat(mapper.monthlyCost("BE", "MD")).isEqualByComparingTo("7300000");
+    }
+    @Test void opportunityIdsAreNextONumberSkippingOtherFormats() throws Exception {
+        assertThat(create()).isEqualTo("O-0001");
+        for (var other : List.of("O-0041", "Olegacy0000000000001", "O-99999"))
+            db.update("INSERT INTO TB_SL_OPP SELECT (jsonb_populate_record(NULL::TB_SL_OPP, to_jsonb(o) || jsonb_build_object('opp_id', ?::text))).* FROM TB_SL_OPP o WHERE o.opp_id='O-0001'", other);
+        assertThat(create()).isEqualTo("O-0042");
+    }
+    @Test void blankUnitPriceStaysBlankInTheNeedRow() throws Exception {
+        var id = create();
+        assertThat(db.queryForObject("SELECT expct_uprc FROM TB_SL_OPP_NEED WHERE opp_id=? AND need_sn=1", BigDecimal.class, id)).isNull();
+    }
+    @Test void savingDoesNotOverwriteTheReservationStartMonthSetByWithdrawalList() throws Exception {
+        developer("test-dev");
+        var first = input(); ((ObjectNode)first.path("needs").get(0)).putArray("tentativeDeveloperIds").add("test-dev");
+        var id = json.readTree(mvc.perform(post("/api/common/sales-opportunities").contentType("application/json").content(first.toString())).andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("data").path("opportunityId").asText();
+        db.update("UPDATE TB_SL_TENT_ASGN SET bgn_ym='202612' WHERE opp_id=?", id);
+        var tentative = db.queryForObject("SELECT tent_id FROM TB_SL_TENT_ASGN WHERE opp_id=?", Long.class, id);
+        var edit = input().put("opportunityName", "고친 기회"); edit.put("modifiedAt", version(id).path("modifiedAt").asText());
+        ((ObjectNode)edit.path("needs").get(0)).put("needSn", 1).putArray("tentativeDeveloperIds").add("test-dev");
+        mvc.perform(put("/api/common/sales-opportunities/{id}", id).contentType("application/json").content(edit.toString())).andExpect(status().isOk());
+        assertThat(db.queryForList("SELECT tent_id FROM TB_SL_TENT_ASGN WHERE opp_id=? AND tent_stat_cd='ACT'", Long.class, id)).containsExactly(tentative);
+        assertThat(db.queryForObject("SELECT bgn_ym FROM TB_SL_TENT_ASGN WHERE tent_id=?", String.class, tentative)).isEqualTo("202612");
+    }
+    @Test void approvalWithoutStoredProfitRateIsBadRequestAndWritesNoHistory() throws Exception {
+        var id = create();
+        db.update("UPDATE TB_SL_OPP SET expct_prft_rt=NULL WHERE opp_id=?", id);
+        var count = db.queryForObject("SELECT count(*) FROM TB_SL_APRV_HIST WHERE opp_id=?", Integer.class, id);
+        mvc.perform(put("/api/common/sales-opportunities/{id}/approve", id).contentType("application/json").content(version(id).toString()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("예상 이익률을 다시 계산해 저장한 뒤 승인해 주세요."));
+        assertThat(db.queryForObject("SELECT count(*) FROM TB_SL_APRV_HIST WHERE opp_id=?", Integer.class, id)).isEqualTo(count);
+        assertThat(db.queryForObject("SELECT aprv_stat_cd FROM TB_SL_OPP WHERE opp_id=?", String.class, id)).isEqualTo("WAIT");
     }
 }

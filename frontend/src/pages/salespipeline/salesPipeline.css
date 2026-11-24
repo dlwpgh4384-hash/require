@@ -1,0 +1,241 @@
+/* 시안 UI-29 영업 파이프라인: .content(간격 24, 휴대폰 16) · .kpis · .tabs · .kanban · .kcol · .opp · .card · .g2 */
+.sales-pipeline {
+  /* 시안 차트 색 --c1(파랑)·--c3(초록). 공통 차트(ProfitStructureCharts)가 읽는 이름으로 둔다. */
+  --pf-c1: #1d4ed8;
+  --pf-c3: #10b981;
+  --pf-c6: #6b7280;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+  .sales-pipeline {
+    --pf-c1: #60a5fa;
+    --pf-c3: #34d399;
+    --pf-c6: #9ca3af;
+  }
+}
+.sales-pipeline > *,
+.sales-panel > * {
+  min-width: 0;
+}
+.sales-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+.sales-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.sales-stop-check {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin-right: 8px;
+  font-size: 14px;
+}
+.sales-error {
+  margin: 0;
+  color: var(--ls-bad);
+}
+/* 시안 .content > .tabs: 바깥 여백 없이, 아래 내용과 -8px */
+.ls-tabs.sales-tabs {
+  padding: 0;
+  margin-bottom: -8px;
+}
+.sales-tabs .ls-tb {
+  white-space: nowrap;
+}
+.sales-panel > .ls-note {
+  margin: 0;
+}
+/* 시안 .kanban: 네 칸, 좁으면 칸 안에서만 가로로 밀어 본다(화면 바깥은 넘치지 않음). */
+.sales-kanban {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(230px, 1fr));
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  max-width: 100%;
+  min-width: 0;
+}
+.sales-kcol {
+  background: var(--ls-head-bg);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 240px;
+  min-width: 0;
+}
+.sales-kcol.is-drop {
+  outline: 2px dashed var(--primary-text);
+  outline-offset: -2px;
+}
+.sales-kh {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sales-kh h2 {
+  margin: 0;
+  font-size: 14px;
+}
+.sales-kp {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-sub);
+}
+.sales-ksum {
+  font-size: 12px;
+  color: var(--text-sub);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sales-kempty {
+  padding: 8px;
+  margin: 0;
+}
+.sales-opp {
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: grab;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sales-opp:active {
+  cursor: grabbing;
+}
+.sales-opp:hover {
+  border-color: var(--border);
+}
+.sales-opp.is-hl {
+  outline: 2px solid var(--ls-warn);
+  outline-offset: 1px;
+}
+.sales-nm {
+  font-weight: 600;
+}
+.sales-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sales-line b {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sales-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.sales-chips .ls-chip {
+  margin: 0;
+}
+.sales-overdue,
+.sales-bad {
+  color: var(--ls-bad);
+}
+.sales-sub {
+  color: var(--text-sub);
+}
+.sales-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.sales-badges .ls-b + .ls-b {
+  margin-left: 0;
+}
+.sales-card-foot {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.sales-card-foot .ls-btn,
+.sales-card-foot select {
+  min-height: 28px;
+}
+.sales-card-foot select {
+  min-width: 0;
+}
+/* 시안 .card · .card-h · .g2 */
+.sales-card {
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.sales-card h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.sales-card .ls-note {
+  margin: 0;
+}
+.sales-card-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sales-g2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+/* 시안 .twrap.free: 카드 안 표는 높이 제한 없이 */
+.sales-card .ls-twrap {
+  max-height: none;
+  min-height: 0;
+}
+.sales-month-table td,
+.sales-month-table th {
+  white-space: nowrap;
+}
+/* 시안 toast(): 알림은 쌓여 보인다. 저장 알림 아래에 승인 대기 안내 한 장 더. */
+.app-toast[data-testid="sales-pipeline-toast-next"] {
+  top: calc(124px + env(safe-area-inset-top, 0px));
+}
+@media (max-width: 1279px) {
+  .sales-g2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 767px) {
+  .sales-pipeline,
+  .sales-panel {
+    gap: 16px;
+  }
+  .sales-kanban {
+    grid-template-columns: repeat(4, minmax(240px, 82vw));
+  }
+  .sales-card {
+    padding: 16px;
+  }
+  .sales-actions {
+    justify-content: flex-start;
+  }
+}

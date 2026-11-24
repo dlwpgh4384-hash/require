@@ -1,7 +1,7 @@
 package com.company.common.salespipeline;
 
 import com.company.common.salespipeline.dto.SalesPipelineContracts.ClosedFilter;
-import com.company.common.salespipeline.mapper.SalesPipelineRows.MonthQuery;
+import com.company.common.salespipeline.mapper.SalesPipelineRows.MonthWindow;
 import java.sql.Types;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -20,7 +20,7 @@ import static org.mockito.Mockito.*;
 
 class SalesPipelineMappingTest {
     @ParameterizedTest
-    @ValueSource(strings = {"ongoing", "requiredJobs", "jobs", "closed", "revenue", "projectDemand"})
+    @ValueSource(strings = {"ongoing", "requiredJobs", "jobs", "closed", "revenues", "opportunityRevenues", "supply", "extensions", "opportunityDemand", "projectDemand", "candidates"})
     void everyProjectionMaterializesThroughRealMyBatis(String operation) throws Exception {
         var configuration = new Configuration();
         configuration.setMapUnderscoreToCamelCase(false);
@@ -61,7 +61,7 @@ class SalesPipelineMappingTest {
             }).when(mappedRows).getObject(anyString(), eq(java.time.LocalDate.class));
             Statement jdbc = mock(Statement.class); when(jdbc.getResultSet()).thenReturn(mappedRows); when(jdbc.getUpdateCount()).thenReturn(-1);
             Object parameter = operation.equals("closed") ? new ClosedFilter("WIN", false)
-                : operation.equals("revenue") || operation.equals("projectDemand") ? new MonthQuery("BE", "202612", java.time.LocalDate.of(2026, 12, 1), java.time.LocalDate.of(2026, 12, 31), java.time.LocalDate.of(2026, 12, 1))
+                : java.util.Set.of("revenues", "opportunityRevenues", "supply", "extensions", "opportunityDemand", "projectDemand").contains(operation) ? java.util.Map.of("months", List.of(new MonthWindow("202612", java.time.LocalDate.of(2026, 12, 1), java.time.LocalDate.of(2026, 12, 31))), "horizonStart", java.time.LocalDate.of(2026, 12, 1))
                 : java.util.Map.of("id", "opportunity");
             var handler = new DefaultResultSetHandler(null, statement, null, null, statement.getBoundSql(parameter), RowBounds.DEFAULT);
             List<Object> actual = handler.handleResultSets(jdbc);

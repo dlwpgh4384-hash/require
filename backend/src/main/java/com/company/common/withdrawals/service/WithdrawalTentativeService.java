@@ -34,10 +34,23 @@ public class WithdrawalTentativeService {
         return new TentativeResult(view(source, one(mapper.reservations(source.developerId()))));
     }
 
+    /**
+     * 보여 줄 다음 배정 하나를 고른다. 목록·조회에서 쓰므로 한 사람 때문에 목록 전체가 실패하지 않게 한다:
+     * 여러 기회에 걸쳐 있으면 진행 중(ACT) 가배정을 먼저, 그중 가장 최근 가배정의 기회를 쓴다.
+     * 여러 줄이면 막는 것은 저장(save)이 따로 409로 한다.
+     */
     static Reservation one(List<Reservation> current) {
-        if (current.stream().map(Reservation::opportunityId).distinct().count() > 1)
-            throw new CodeFailure(409, "needSn", "여러 기회에 가배정이 있습니다. 기존 배정을 확인해 주세요.");
-        return current.stream().min(Comparator.comparingInt(Reservation::needSn)).orElse(null);
+        var pool = current.stream().anyMatch(r -> "ACT".equals(r.statusCode()))
+            ? current.stream().filter(r -> "ACT".equals(r.statusCode())).toList() : current;
+        String opportunityId = pool.stream().max(Comparator.comparingLong(WithdrawalTentativeService::order))
+            .map(Reservation::opportunityId).orElse(null);
+        return pool.stream().filter(r -> Objects.equals(opportunityId, r.opportunityId()))
+            .min(Comparator.comparingInt(Reservation::needSn)).orElse(null);
+    }
+
+    private static long order(Reservation reservation) {
+        try { return Long.parseLong(reservation.tentativeId()); }
+        catch (NumberFormatException exception) { return Long.MIN_VALUE; }
     }
 
     public TentativeAssignment view(Source source, Reservation reservation) {

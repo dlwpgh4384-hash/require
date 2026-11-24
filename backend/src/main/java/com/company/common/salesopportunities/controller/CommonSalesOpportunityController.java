@@ -49,6 +49,10 @@ public class CommonSalesOpportunityController {
     public Response<Warnings> postCommonSalesOpportunityTentativeAssignmentCheck(@PathVariable String opportunityId, @RequestBody JsonNode body) {
         return Response.of(service.check(opportunityId, SalesOpportunityRules.tentative(body)));
     }
+    @PostMapping(value = "/tentative-assignment-check", consumes = "application/json")
+    public Response<Warnings> postCommonSalesOpportunityDraftTentativeAssignmentCheck(@RequestBody JsonNode body) {
+        return Response.of(service.check(SalesOpportunityRules.developerCheck(body)));
+    }
     @PutMapping(value = "/{opportunityId}/tentative-assignment", consumes = "application/json")
     public Response<Opportunity> putCommonSalesOpportunityTentativeAssignment(@PathVariable String opportunityId, @RequestBody JsonNode body) {
         return Response.of(service.tentative(opportunityId, SalesOpportunityRules.tentative(body)));

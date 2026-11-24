@@ -18,7 +18,7 @@ import static org.mockito.Mockito.*;
 
 class SalesOpportunityMappingTest {
     @ParameterizedTest
-    @ValueSource(strings = {"select", "lock", "needs", "history", "reservations", "developerReservations"})
+    @ValueSource(strings = {"select", "lock", "needs", "history", "reservations", "developerReservations", "developersReservations", "developerConversions"})
     void everyProjectionMaterializesThroughProductionConstructorMappings(String operation) throws Exception {
         var configuration = new Configuration();
         configuration.setMapUnderscoreToCamelCase(false);
@@ -63,7 +63,7 @@ class SalesOpportunityMappingTest {
                 var day = rows.getDate((String) call.getArgument(0)); return day == null ? null : day.toLocalDate();
             }).when(mappedRows).getObject(anyString(), eq(java.time.LocalDate.class));
             Statement jdbc = mock(Statement.class); when(jdbc.getResultSet()).thenReturn(mappedRows); when(jdbc.getUpdateCount()).thenReturn(-1);
-            var parameter = java.util.Map.of("id", "opportunity", "developerId", "developer");
+            var parameter = java.util.Map.of("id", "opportunity", "developerId", "developer", "ids", List.of("developer"));
             var handler = new DefaultResultSetHandler(null, statement, null, null, statement.getBoundSql(parameter), RowBounds.DEFAULT);
             List<Object> actual = handler.handleResultSets(jdbc);
             assertThat(actual).hasSize(1);

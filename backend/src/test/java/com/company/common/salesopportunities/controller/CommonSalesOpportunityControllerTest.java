@@ -61,7 +61,7 @@ class CommonSalesOpportunityControllerTest {
             var values = switch ((String) call.getArgument(0)) {
                 case "SALES_STEP" -> List.of("FIND", "PROP", "NEGO", "PRE");
                 case "JOB" -> List.of("BE", "PM"); case "GRADE" -> List.of("HIGH");
-                case "CTRT_TYPE" -> List.of("TK", "MO"); case "LOSE_RSN" -> List.of("PRICE", "TECH", "SCHED", "CANCEL", "ETC");
+                case "CTRT_TYPE" -> List.of("TK", "MO", "DP", "IN"); case "LOSE_RSN" -> List.of("PRICE", "TECH", "SCHED", "CANCEL", "ETC");
                 default -> List.<String>of();
             };
             return values.stream().map(code -> { var item = new Item(); item.code = code; item.codeName = code; item.useYn = "Y"; return item; }).toList();
@@ -76,11 +76,15 @@ class CommonSalesOpportunityControllerTest {
         when(mapper.history(anyString())).thenAnswer(c -> List.copyOf(histories.getOrDefault(c.getArgument(0), List.of())));
         when(mapper.reservations(anyString())).thenAnswer(c -> reservations.stream().filter(r -> r.opportunityId().equals(c.getArgument(0)) && Set.of("ACT", "CNVT").contains(r.status())).toList());
         when(mapper.developerReservations(anyString())).thenAnswer(c -> reservations.stream().filter(r -> r.developerId().equals(c.getArgument(0)) && "ACT".equals(r.status())).toList());
+        when(mapper.developerConversions(anyString())).thenAnswer(c -> reservations.stream().filter(r -> r.developerId().equals(c.getArgument(0)) && "CNVT".equals(r.status())).toList());
+        when(mapper.developersReservations(anyCollection())).thenAnswer(c -> { Collection<String> ids = c.getArgument(0); return reservations.stream().filter(r -> ids.contains(r.developerId()) && "ACT".equals(r.status())).toList(); });
         when(mapper.confirmedMm(anyString(), anyString())).thenReturn(BigDecimal.ZERO);
         when(calculations.price(any())).thenAnswer(c -> ((Need) c.getArgument(0)).estimatedUnitPrice() == null ? new BigDecimal("10000000") : ((Need) c.getArgument(0)).estimatedUnitPrice());
         when(calculations.stageProbability(anyString())).thenAnswer(c -> new BigDecimal(switch ((String)c.getArgument(0)) { case "PROP" -> "30"; case "NEGO" -> "60"; case "PRE" -> "90"; default -> "10"; }));
         when(calculations.evaluate(anyList())).thenReturn(evaluation("14"));
         when(mapper.insert(any())).thenAnswer(c -> { Write w = c.getArgument(0); headers.put(w.id(), header(w.id(), w.input(), "ING", w.approval(), w.manualYn(), w.profit(), null, null)); return 1; });
+        when(mapper.nextOpportunityNumber()).thenAnswer(c -> headers.keySet().stream().filter(k -> k.matches("O-[0-9]{4}"))
+            .mapToInt(k -> Integer.parseInt(k.substring(2))).max().orElse(0) + 1);
         when(mapper.update(any())).thenAnswer(c -> { Write w = c.getArgument(0); var old = headers.get(w.id()); headers.put(w.id(), header(w.id(), w.input(), old.status(), w.approval(), w.manualYn(), w.profit(), old.approvedProfitRate(), old.projectId())); return 1; });
         when(mapper.insertNeed(any())).thenAnswer(c -> { NeedWrite w = c.getArgument(0); needs.computeIfAbsent(w.id(), k -> new ArrayList<>()).add(needRow(w.need())); return 1; });
         when(mapper.updateNeed(any())).thenAnswer(c -> { NeedWrite w = c.getArgument(0); needs.get(w.id()).removeIf(n -> n.needSn().equals(w.need().needSn())); needs.get(w.id()).add(needRow(w.need())); return 1; });
@@ -197,5 +201,203 @@ class CommonSalesOpportunityControllerTest {
     ObjectNode winBody(String id) { return version(id).put("contractAmount", 60000000).put("contractTypeCode", "TK").put("contractStartDate", "2026-11-01").put("contractEndDate", "2027-04-30").put("projectStatusCode", "ING"); }
     @ParameterizedTest @ValueSource(strings = {"WAIT", "REJ"})
     void publicWinAllowsPendingOrRejectedAndHandsOffCandidates(String approval) throws Exception { var id = create(); state(id, "ING", approval, "PROP", "N"); reserve(id, 1); postAction(id, "win", winBody(id), 200); mvc.perform(get(root + "/" + id)).andExpect(jsonPath("$.data.projectId").value("project")).andExpect(jsonPath("$.data.opportunityStatusCode").value("WIN")); assertThat(reservations).allMatch(r -> "CNVT".equals(r.status())); verify(mapper).manpower(any()); verify(mapper, never()).releaseAll(eq(id), anyString()); }
+    // --- 점검 고침(UI-29) ---
+    ObjectNode body(String stage, Object probability) throws Exception { var b = valid().put("stageCode", stage); if (probability == null) b.remove("winningProbability"); else b.put("winningProbability", new BigDecimal(probability.toString())); return b; }
+    void createBody(ObjectNode b, int expected) throws Exception { mvc.perform(post(root).contentType("application/json").content(b.toString())).andExpect(status().is(expected)); }
+    @ParameterizedTest @ValueSource(strings = {"NEGO", "PRE"})
+    void pendingQuoteCannotBeCreatedAtNegotiationOrAbove(String stage) throws Exception {
+        mvc.perform(post(root).contentType("application/json").content(body(stage, 60).toString())).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("stageCode")).andExpect(jsonPath("$.message").value("「새 기회」은 견적 승인 전이라 협상 단계로 옮길 수 없습니다."));
+        verify(mapper, never()).insert(any()); verify(mapper, never()).insertNeed(any());
+    }
+    @Test void quoteAboveThresholdMayBeCreatedAtNegotiation() throws Exception { when(calculations.evaluate(anyList())).thenReturn(evaluation("30")); createBody(body("NEGO", 60), 200); }
+    @Test void editThatTurnsQuotePendingCannotMoveOrStayAtNegotiation() throws Exception {
+        when(calculations.evaluate(anyList())).thenReturn(evaluation("30"));
+        var id = create(); assertThat(headers.get(id).approvalStatus()).isEqualTo("NONE");
+        when(calculations.evaluate(anyList())).thenReturn(evaluation("14"));
+        var before = headers.get(id);
+        mvc.perform(put(root + "/" + id).contentType("application/json").content(update(id).put("stageCode", "NEGO").toString())).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("stageCode"));
+        assertThat(headers.get(id)).isEqualTo(before); verify(mapper, never()).update(any());
+        when(calculations.evaluate(anyList())).thenReturn(evaluation("30"));
+        mvc.perform(put(root + "/" + id).contentType("application/json").content(update(id).put("stageCode", "NEGO").toString())).andExpect(status().isOk());
+        assertThat(headers.get(id).stageCode()).isEqualTo("NEGO");
+    }
+    @Test void missingOrZeroProbabilityOnCreateIsStageDefaultAndNotManual() throws Exception {
+        when(calculations.evaluate(anyList())).thenReturn(evaluation("30"));
+        for (Object probability : new Object[] {null, 0}) {
+            var response = mvc.perform(post(root).contentType("application/json").content(body("PROP", probability).toString())).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            var id = json.readTree(response).path("data").path("opportunityId").asText();
+            assertThat(headers.get(id).winningProbability()).isEqualByComparingTo("30"); assertThat(headers.get(id).manualYn()).isEqualTo("N");
+        }
+    }
+    @Test void probabilityEqualToStageDefaultIsNotManualAndOtherValueIs() throws Exception {
+        when(calculations.evaluate(anyList())).thenReturn(evaluation("30"));
+        var same = json.readTree(mvc.perform(post(root).contentType("application/json").content(body("PROP", 30).toString())).andReturn().getResponse().getContentAsString()).path("data").path("opportunityId").asText();
+        assertThat(headers.get(same).manualYn()).isEqualTo("N");
+        var other = json.readTree(mvc.perform(post(root).contentType("application/json").content(body("PROP", 45).toString())).andReturn().getResponse().getContentAsString()).path("data").path("opportunityId").asText();
+        assertThat(headers.get(other).manualYn()).isEqualTo("Y"); assertThat(headers.get(other).winningProbability()).isEqualByComparingTo("45");
+    }
+    @Test void editStageChangeUsesNewDefaultUnlessProbabilityWasManual() throws Exception {
+        when(calculations.evaluate(anyList())).thenReturn(evaluation("30"));
+        var id = create();
+        mvc.perform(put(root + "/" + id).contentType("application/json").content(update(id).put("stageCode", "PROP").toString())).andExpect(status().isOk());
+        assertThat(headers.get(id).winningProbability()).isEqualByComparingTo("30"); assertThat(headers.get(id).manualYn()).isEqualTo("N");
+        state(id, "ING", "NONE", "PROP", "Y");
+        mvc.perform(put(root + "/" + id).contentType("application/json").content(update(id).put("stageCode", "NEGO").put("winningProbability", 30).toString())).andExpect(status().isOk());
+        assertThat(headers.get(id).winningProbability()).isEqualByComparingTo("30"); assertThat(headers.get(id).manualYn()).isEqualTo("Y");
+        var b = update(id).put("stageCode", "PRE"); b.remove("winningProbability");
+        mvc.perform(put(root + "/" + id).contentType("application/json").content(b.toString())).andExpect(status().isOk());
+        assertThat(headers.get(id).winningProbability()).isEqualByComparingTo("90"); assertThat(headers.get(id).manualYn()).isEqualTo("N");
+    }
+    @Test void internalContractTypeIsRejectedOnCreateEditAndWin() throws Exception {
+        createBody(valid().put("contractTypeCode", "IN"), 400);
+        verify(mapper, never()).insert(any());
+        var id = create();
+        mvc.perform(put(root + "/" + id).contentType("application/json").content(update(id).put("contractTypeCode", "IN").toString()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("contractTypeCode"));
+        mvc.perform(post(root + "/" + id + "/win").contentType("application/json").content(winBody(id).put("contractTypeCode", "IN").toString()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("contractTypeCode"));
+        verify(projects, never()).create(any(), any());
+        for (String type : List.of("TK", "MO", "DP")) createBody(valid().put("contractTypeCode", type), 200);
+    }
+    void handOff(String id) { reservations.add(new Reservation(++sequence, id, headers.get(id).opportunityName(), 1, "developer", "202611", "CNVT")); }
+    @Test void handedOffCandidateCannotBeTentativelyAssignedToAnotherOpportunity() throws Exception {
+        var won = create(); handOff(won); state(won, "WIN", "NONE", "PRE", "N"); clearInvocations(mapper);
+        var b = valid(); ((ObjectNode)b.path("needs").get(0)).putArray("tentativeDeveloperIds").add("developer");
+        mvc.perform(post(root).contentType("application/json").content(b.toString())).andExpect(status().isConflict())
+            .andExpect(jsonPath("$.errors[0].field").value("needs[0].tentativeDeveloperIds"))
+            .andExpect(jsonPath("$.message").value("투입 배정으로 넘긴 후보입니다. 투입 상세에서 확인해 주세요."));
+        verify(mapper, never()).insert(any());
+        var id = create();
+        mvc.perform(put(root + "/" + id + "/tentative-assignment").contentType("application/json").content(tentativeBody(id).toString())).andExpect(status().isConflict())
+            .andExpect(jsonPath("$.errors[0].field").value("developerId"));
+        var edit = update(id); ((ObjectNode)edit.path("needs").get(0)).putArray("tentativeDeveloperIds").add("developer");
+        mvc.perform(put(root + "/" + id).contentType("application/json").content(edit.toString())).andExpect(status().isConflict());
+        verify(mapper, never()).tentative(any());
+        assertThat(reservations).singleElement().satisfies(r -> assertThat(r.status()).isEqualTo("CNVT"));
+        mvc.perform(post(root + "/" + id + "/tentative-assignment-check").contentType("application/json").content(tentativeBody(id).toString())).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.warnings[0].message").value("투입 배정으로 넘긴 후보입니다. 투입 상세에서 확인해 주세요."));
+    }
+    @Test void draftCheckWarnsForNewOpportunityWithoutNeedSnOrWrites() throws Exception {
+        var other = create(); reserve(other, 1); when(mapper.confirmedMm("developer", "202612")).thenReturn(new BigDecimal("1.0")); clearInvocations(mapper, projects);
+        mvc.perform(post(root + "/tentative-assignment-check").contentType("application/json").content("{\"developerId\":\"developer\",\"startMonth\":\"2026-12\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.warnings.length()").value(2))
+            .andExpect(jsonPath("$.data.warnings[0].needSn").value(org.hamcrest.Matchers.nullValue()))
+            .andExpect(jsonPath("$.data.warnings[0].message").value("「새 기회」에 가배정되어 있습니다. 저장하면 이 기회로 옮깁니다."))
+            .andExpect(jsonPath("$.data.warnings[1].message").value("해당 월에 1.0 MM 이상 확정 투입되어 있습니다."));
+        verify(mapper, never()).tentative(any()); verify(mapper, never()).touch(anyString(), anyString()); verify(projects, never()).lockSources();
+    }
+    @Test void draftCheckForNewLineOfSavedOpportunityWarnsSameOpportunityAsTwoLines() throws Exception {
+        var id = create(); reserve(id, 1);
+        mvc.perform(post(root + "/tentative-assignment-check").contentType("application/json").content("{\"opportunityId\":\"" + id + "\",\"developerId\":\"developer\",\"startMonth\":\"2026-11\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.warnings.length()").value(2))
+            .andExpect(jsonPath("$.data.warnings[0].message").value("같은 사람이 두 줄에 있습니다.")).andExpect(jsonPath("$.data.warnings[1].needSn").value(1));
+    }
+    @Test void draftCheckValidatesDeveloperMonthAndOpportunity() throws Exception {
+        mvc.perform(post(root + "/tentative-assignment-check").contentType("application/json").content("{\"developerId\":\"missing\",\"startMonth\":\"2026-12\"}")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("developerId"));
+        mvc.perform(post(root + "/tentative-assignment-check").contentType("application/json").content("{\"developerId\":\"developer\"}")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("startMonth"));
+        mvc.perform(post(root + "/tentative-assignment-check").contentType("application/json").content("{\"developerId\":\"developer\",\"startMonth\":\"2026-12\",\"needSn\":1}")).andExpect(status().isBadRequest());
+        mvc.perform(post(root + "/tentative-assignment-check").contentType("application/json").content("{\"opportunityId\":\"missing\",\"developerId\":\"developer\",\"startMonth\":\"2026-12\"}")).andExpect(status().isNotFound());
+    }
+    @Test void manpowerPlanAboveColumnLimitIsValidationNotServerError() throws Exception {
+        var id = create(); when(mapper.manpowerPlans(id)).thenReturn(List.of(new BigDecimal("9999.99"), new BigDecimal("10000.00")));
+        var before = headers.get(id);
+        mvc.perform(post(root + "/" + id + "/win").contentType("application/json").content(winBody(id).toString())).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("needs"));
+        verify(projects, never()).create(any(), any()); verify(mapper, never()).manpower(any()); assertThat(headers.get(id)).isEqualTo(before);
+        when(mapper.manpowerPlans(id)).thenReturn(List.of(new BigDecimal("9999.99")));
+        postAction(id, "win", winBody(id), 200);
+    }
+    @Test void statusOnlyActionsLockOnlyTheOpportunityRow() throws Exception {
+        var id = create(); clearInvocations(mapper, projects);
+        putAction(id, "approve", version(id), 200);
+        putAction(id, "stage", version(id).put("stageCode", "NEGO"), 200);
+        postAction(id, "stop", version(id), 200);
+        postAction(id, "resume", version(id), 200);
+        postAction(id, "lose", version(id).put("lossReasonCode", "PRICE"), 200);
+        verify(projects, never()).lockSources(); verify(mapper, never()).lockDevelopers(any()); verify(mapper, never()).lockOpportunities(any());
+        verify(mapper, atLeast(5)).lock(id);
+    }
+    @Test void tentativeLocksProjectsThenThatPersonThenTouchedOpportunitiesInIdOrder() throws Exception {
+        var old = create(); var id = create(); reserve(old, 1); clearInvocations(mapper, projects);
+        putAction(id, "tentative-assignment", tentativeBody(id), 200);
+        var order = inOrder(projects, mapper);
+        order.verify(projects).lockSources(); order.verify(mapper).lockDevelopers(new TreeSet<>(Set.of("developer")));
+        order.verify(mapper).lockOpportunities(new TreeSet<>(Set.of(old, id))); order.verify(mapper).lock(id); order.verify(mapper).tentative(any());
+    }
+    // --- 점검 고침 2(UI-29) ---
+    @Test void newOpportunityIdsAreSequentialONumbersInsideTheLock() throws Exception {
+        assertThat(create()).isEqualTo("O-0001");
+        headers.put("Olegacy0123456789012", headers.get("O-0001"));
+        assertThat(create()).isEqualTo("O-0002");
+        var order = inOrder(projects, mapper);
+        order.verify(projects).lockSources(); order.verify(mapper).nextOpportunityNumber(); order.verify(mapper).insert(any());
+        when(mapper.nextOpportunityNumber()).thenReturn(10000); clearInvocations(mapper);
+        mvc.perform(post(root).contentType("application/json").content(valid().toString())).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("opportunityId"));
+        verify(mapper, never()).insert(any());
+    }
+    @Test void blankUnitPriceIsStoredBlankAndOnlyTheCalculationUsesTheJobPrice() throws Exception {
+        var id = create();
+        assertThat(needs.get(id).get(0).estimatedUnitPrice()).isNull();
+        mvc.perform(get(root + "/" + id)).andExpect(jsonPath("$.data.needs[0].estimatedUnitPrice").value(org.hamcrest.Matchers.nullValue()));
+        verify(calculations).evaluate(argThat(list -> list.size() == 1 && list.get(0).estimatedUnitPrice() == null));
+        var body = valid(); ((ObjectNode)body.path("needs").get(0)).put("estimatedUnitPrice", 8000000);
+        var priced = json.readTree(mvc.perform(post(root).contentType("application/json").content(body.toString())).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString()).path("data").path("opportunityId").asText();
+        assertThat(needs.get(priced).get(0).estimatedUnitPrice()).isEqualByComparingTo("8000000");
+    }
+    @Test void savingKeepsAnUnchangedReservationAndItsStartMonth() throws Exception {
+        var b = valid(); ((ObjectNode)b.path("needs").get(0)).putArray("tentativeDeveloperIds").add("developer");
+        var id = json.readTree(mvc.perform(post(root).contentType("application/json").content(b.toString())).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString()).path("data").path("opportunityId").asText();
+        // 철수 리스트(UI-05)가 max(철수 다음 달, 줄 시작월)로 시작월을 바꿔 둔 가배정
+        var stored = reservations.get(0);
+        reservations.set(0, new Reservation(stored.tentativeId(), id, stored.opportunityName(), 1, "developer", "202612", "ACT"));
+        clearInvocations(mapper);
+        var edit = update(id).put("opportunityName", "고침"); ((ObjectNode)edit.path("needs").get(0)).putArray("tentativeDeveloperIds").add("developer");
+        mvc.perform(put(root + "/" + id).contentType("application/json").content(edit.toString())).andExpect(status().isOk());
+        verify(mapper, never()).tentative(any()); verify(mapper, never()).release(anyLong(), anyString());
+        assertThat(reservations).singleElement().satisfies(r -> assertThat(r.startMonth()).isEqualTo("202612"));
+        // 다른 줄로 옮기면 그 줄 시작월로 새로 쓴다.
+        var move = update(id); ((com.fasterxml.jackson.databind.node.ArrayNode)move.path("needs")).addObject().put("jobCode", "PM").put("requiredCount", 1)
+            .put("startMonth", "2027-01").put("months", 3).put("monthlyMm", 1).putArray("tentativeDeveloperIds").add("developer");
+        mvc.perform(put(root + "/" + id).contentType("application/json").content(move.toString())).andExpect(status().isOk());
+        verify(mapper).tentative(argThat(w -> w.needSn() == 2 && "2027-01".equals(w.startMonth())));
+        assertThat(reservations).singleElement().satisfies(r -> { assertThat(r.needSn()).isEqualTo(2); assertThat(r.startMonth()).isEqualTo("202701"); });
+    }
+    @Test void approvalWithoutStoredProfitRateIsValidationNotServerError() throws Exception {
+        var id = create(); var h = headers.get(id);
+        headers.put(id, header(id, input(h, h.stageCode(), h.winningProbability()), "ING", "WAIT", "N", null, null, null));
+        mvc.perform(put(root + "/" + id + "/approve").contentType("application/json").content(version(id).toString())).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("예상 이익률을 다시 계산해 저장한 뒤 승인해 주세요."));
+        mvc.perform(put(root + "/" + id + "/reject").contentType("application/json").content(version(id).toString())).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("예상 이익률을 다시 계산해 저장한 뒤 반려해 주세요."));
+        verify(mapper, never()).approval(any()); verify(mapper, times(1)).appendHistory(any());
+    }
+    @Test void needRowErrorsUseKoreanLabels() throws Exception {
+        var id = create();
+        var wrongRow = update(id); ((ObjectNode)wrongRow.path("needs").get(0)).put("needSn", 7);
+        mvc.perform(put(root + "/" + id).contentType("application/json").content(wrongRow.toString())).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("needs[0].needSn"))
+            .andExpect(jsonPath("$.message").value("1번째 줄의 필요 인력 줄 칸을 확인해 주세요."));
+        var unknown = update(id); ((ObjectNode)unknown.path("needs").get(0)).putArray("tentativeDeveloperIds").add("missing");
+        mvc.perform(put(root + "/" + id).contentType("application/json").content(unknown.toString())).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("needs[0].tentativeDeveloperIds"))
+            .andExpect(jsonPath("$.message").value("1번째 줄의 가배정 인력 칸을 확인해 주세요."));
+        var shape = valid(); ((ObjectNode)shape.path("needs").get(0)).put("tentativeDeveloperIds", "developer");
+        mvc.perform(post(root).contentType("application/json").content(shape.toString())).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("1번째 줄의 가배정 인력 칸을 확인해 주세요."));
+    }
+    @Test void detailCarriesStoredAndApprovedProfitRateAndApprovalStandard() throws Exception {
+        when(calculations.approvalRate()).thenReturn(new BigDecimal("15"));
+        var id = create();
+        mvc.perform(get(root + "/" + id)).andExpect(jsonPath("$.data.expectedProfitRate").value(14.0))
+            .andExpect(jsonPath("$.data.approvedProfitRate").value(org.hamcrest.Matchers.nullValue()))
+            .andExpect(jsonPath("$.data.approvalRate").value(15));
+        mvc.perform(put(root + "/" + id + "/approve").contentType("application/json").content(version(id).toString())).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.approvedProfitRate").value(14.0));
+    }
     @Test void equalWinDatesRejectBeforeProjectCreation() throws Exception { var id = create(); var before = headers.get(id); mvc.perform(post(root + "/" + id + "/win").contentType("application/json").content(winBody(id).put("contractEndDate", "2026-11-01").toString())).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("contractEndDate")); assertThat(headers.get(id)).isEqualTo(before); verify(projects, never()).create(any(), any()); }
 }

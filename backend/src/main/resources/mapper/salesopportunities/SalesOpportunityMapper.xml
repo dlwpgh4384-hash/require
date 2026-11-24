@@ -35,10 +35,14 @@
     LEFT JOIN TB_BS_CLNT c ON c.clnt_id=o.cust_clnt_id WHERE o.opp_id=#{id} FOR UPDATE OF o
   </select>
   <select id="lockDevelopers" resultType="string">
-    SELECT d.dev_id FROM TB_HR_DEV d ORDER BY d.dev_id FOR UPDATE
+    SELECT d.dev_id FROM TB_HR_DEV d WHERE d.dev_id IN
+      <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    ORDER BY d.dev_id FOR UPDATE
   </select>
   <select id="lockOpportunities" resultType="string">
-    SELECT o.opp_id FROM TB_SL_OPP o ORDER BY o.opp_id FOR UPDATE
+    SELECT o.opp_id FROM TB_SL_OPP o WHERE o.opp_id IN
+      <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    ORDER BY o.opp_id FOR UPDATE
   </select>
   <resultMap id="need" type="com.company.common.salesopportunities.mapper.SalesOpportunityRows$NeedRow" autoMapping="false">
     <constructor>
@@ -75,6 +79,17 @@
   <select id="developerReservations" resultMap="reservation">
     <include refid="reservations"/> WHERE t.dev_id=#{developerId} AND t.tent_stat_cd='ACT' ORDER BY t.opp_id,t.need_sn,t.tent_id
   </select>
+  <select id="developersReservations" resultMap="reservation">
+    <include refid="reservations"/> WHERE t.tent_stat_cd='ACT' AND t.dev_id IN
+      <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    ORDER BY t.opp_id,t.need_sn,t.tent_id
+  </select>
+  <select id="developerConversions" resultMap="reservation">
+    <include refid="reservations"/> WHERE t.dev_id=#{developerId} AND t.tent_stat_cd='CNVT' ORDER BY t.tent_id
+  </select>
+  <select id="manpowerPlans" resultType="java.math.BigDecimal">
+    SELECT SUM(n.need_cnt*n.mon_mm*n.prd_mcnt) FROM TB_SL_OPP_NEED n WHERE n.opp_id=#{id} GROUP BY n.job_cd ORDER BY n.job_cd
+  </select>
   <select id="customer" resultType="boolean">
     SELECT EXISTS(SELECT 1 FROM TB_BS_CLNT c WHERE c.clnt_id=#{id} AND c.use_yn='Y' AND c.clnt_type_cd IN ('CUST','BOTH'))
   </select>
@@ -93,7 +108,9 @@
       SELECT d.dev_id,d.job_cd,d.grade_cd,SUM(c.labor_alloc_amt+c.team_exps_amt+c.proj_exps_amt) AS cost
       FROM TB_HR_MON_PAY p JOIN TB_HR_DEV d ON d.dev_id=p.dev_id
       JOIN TB_CO_MON_COST c ON c.dev_id=p.dev_id AND c.cost_ym=p.pay_ym
-      WHERE p.pay_ym=(SELECT MAX(m.pay_ym) FROM TB_HR_MON_PAY m)
+      <!-- 식-83 기준 달: 급여가 올라온 달 중 월 원가도 만든 가장 최근 달(새 달 급여만 올라오고 원가가 아직 없어도 계산된다). -->
+      WHERE p.pay_ym=(SELECT MAX(m.pay_ym) FROM TB_HR_MON_PAY m
+        WHERE EXISTS(SELECT 1 FROM TB_CO_MON_COST k WHERE k.cost_ym=m.pay_ym))
         AND NOT EXISTS(SELECT 1 FROM TB_HR_DEV_STAT s WHERE s.dev_id=d.dev_id AND s.work_stat_cd='LEAVE'
           AND s.bgn_dt &lt;= (to_date(p.pay_ym,'YYYYMM')+interval '1 month - 1 day')::date
           AND (s.end_dt IS NULL OR s.end_dt &gt;= to_date(p.pay_ym,'YYYYMM')))
@@ -109,6 +126,10 @@
     SELECT COALESCE(SUM(m.mon_mm),0) FROM TB_PJ_ASGN_MON m
     JOIN TB_PJ_ASGN a ON a.asgn_id=m.asgn_id AND a.asgn_stat_cd='ACT'
     WHERE m.dev_id=#{developerId} AND m.input_ym=#{month}
+  </select>
+  <select id="nextOpportunityNumber" resultType="int">
+    SELECT COALESCE(MAX(CAST(substring(o.opp_id FROM 3) AS integer)),0)+1 FROM TB_SL_OPP o
+    WHERE o.opp_id ~ '^O-[0-9]{4}$'
   </select>
   <insert id="insert">
     INSERT INTO TB_SL_OPP(opp_id,opp_nm,cust_clnt_id,part_id,sales_step_cd,win_prbl_rt,prbl_manual_yn,

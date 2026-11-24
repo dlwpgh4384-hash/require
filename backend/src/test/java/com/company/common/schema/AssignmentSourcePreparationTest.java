@@ -55,14 +55,15 @@ class AssignmentSourcePreparationTest {
     @Test
     void originalSourcesHaveOnlyOriginalColumnsKeysAndIndexesWithoutBusinessSeeds() throws Exception {
         assertThat(text("SELECT string_agg(table_name,',' ORDER BY table_name) FROM information_schema.tables WHERE table_schema=current_schema() AND table_name LIKE 'tb_sl_%'"))
-            .isEqualTo("tb_sl_opp,tb_sl_opp_need,tb_sl_rcmd_log,tb_sl_tent_asgn");
+            // V21(영업 파이프라인 UI-29)이 견적 승인 이력 TB_SL_APRV_HIST를 더한다.
+            .isEqualTo("tb_sl_aprv_hist,tb_sl_opp,tb_sl_opp_need,tb_sl_rcmd_log,tb_sl_tent_asgn");
         assertThat(text("SELECT count(*)::text FROM tb_sl_opp")).isEqualTo("0");
         assertThat(text("SELECT count(*)::text FROM tb_sl_opp_need")).isEqualTo("0");
         assertThat(text("SELECT count(*)::text FROM tb_sl_tent_asgn")).isEqualTo("0");
         assertThat(text("SELECT string_agg(column_name,',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='tb_sl_tent_asgn'"))
             .isEqualTo("tent_id,opp_id,need_sn,dev_id,bgn_ym,tent_stat_cd,src_scrn_id,proc_dttm,reg_user_id,reg_dttm,mod_user_id,mod_dttm");
         assertThat(text("SELECT count(*)::text FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND (conrelid::regclass::text LIKE 'tb_sl_%' OR conname='fk_tb_pj_proj_02')"))
-            .isEqualTo("10");
+            .isEqualTo("11"); // V21의 FK_TB_SL_APRV_HIST_01 하나를 더함
         assertThat(text("SELECT count(*)::text FROM pg_indexes WHERE schemaname=current_schema() AND indexname LIKE 'ix_tb_sl_%'"))
             .isEqualTo("10");
     }

@@ -95,8 +95,11 @@ public class SalesPipelineCalculationRules {
         String band = rate.signum() < 0 ? "손해 예상" : rate.compareTo(approval.approvalRate()) < 0
             ? "승인 필요" : rate.compareTo(target) < 0 ? "목표 미달" : "기준 충족";
         BigDecimal minimum = cost.divide(totalMm, MathContext.DECIMAL128);
+        // 표시 값: 이익률은 저장 값(EXPCT_PRFT_RT NUMERIC(7,2), 식-84 예 13.75%)과 같게 소수 둘째 자리 반올림,
+        // 최소 단가는 원 단위 정수(식-00) 반올림. 구간 판정은 반올림 전 값으로 해서 저장 때 승인 판정과 맞춘다.
         return new Quote(revenue.setScale(0, RoundingMode.DOWN), cost.setScale(0, RoundingMode.DOWN),
-            rate, minimum, ceiling(minimum.divide(divisor, MathContext.DECIMAL128), 4),
+            rate.setScale(2, RoundingMode.HALF_UP), minimum.setScale(0, RoundingMode.HALF_UP),
+            ceiling(minimum.divide(divisor, MathContext.DECIMAL128), 4),
             cost.setScale(0, RoundingMode.DOWN), ceiling(cost.divide(divisor, MathContext.DECIMAL128), 6),
             approval.approvalRate(), approval.reapprovalGap(), band, List.copyOf(rows));
     }

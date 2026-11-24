@@ -1,5 +1,8 @@
 import type { ReactElement } from "react";
-import { SalesPipelinePage } from "../sales-pipeline/SalesPipelinePage";
+import {
+  SalesPipelineTitleActions,
+  SalesPipelineWorkspace,
+} from "../salespipeline/SalesPipelineWorkspace";
 import { MonthClosePage } from "../monthcloses/MonthClosePage";
 import {
   CandidateWorkspace,
@@ -74,7 +77,8 @@ export interface ScreenEntry {
 export const screenRegistry: readonly ScreenEntry[] = [
   {
     id: "UI-29",
-    Page: () => <SalesPipelinePage />,
+    Page: () => <SalesPipelineWorkspace />,
+    TitleActions: () => <SalesPipelineTitleActions />,
     rootTestId: "sales-pipeline-page",
     hasInputs: false,
   },

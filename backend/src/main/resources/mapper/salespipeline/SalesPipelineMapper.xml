@@ -21,6 +21,12 @@
   <resultMap id="job" type="com.company.common.salespipeline.mapper.SalesPipelineRows$Job" autoMapping="false">
     <constructor><arg column="jobCode" javaType="string"/><arg column="jobName" javaType="string"/></constructor>
   </resultMap>
+  <resultMap id="requiredJob" type="com.company.common.salespipeline.mapper.SalesPipelineRows$RequiredJob" autoMapping="false">
+    <constructor>
+      <arg column="opportunityId" javaType="string"/><arg column="jobCode" javaType="string"/>
+      <arg column="jobName" javaType="string"/><arg column="headcount" javaType="_int"/>
+    </constructor>
+  </resultMap>
   <resultMap id="closed" type="com.company.common.salespipeline.dto.SalesPipelineContracts$Closed" autoMapping="false">
     <constructor>
       <arg column="opportunityId" javaType="string"/>
@@ -33,19 +39,51 @@
       <arg column="lossReason" javaType="string"/>
     </constructor>
   </resultMap>
-  <resultMap id="revenue" type="com.company.common.salespipeline.mapper.SalesPipelineRows$Revenue" autoMapping="false">
+  <resultMap id="revenue" type="com.company.common.salespipeline.mapper.SalesPipelineRows$MonthRevenue" autoMapping="false">
     <constructor>
+      <arg column="month" javaType="string"/>
       <arg column="projectRevenue" javaType="java.math.BigDecimal"/>
       <arg column="weightedOpportunityRevenue" javaType="java.math.BigDecimal"/>
       <arg column="opportunityRevenue" javaType="java.math.BigDecimal"/>
     </constructor>
   </resultMap>
-  <resultMap id="projectDemand" type="com.company.common.withdrawals.mapper.WithdrawalRows$ProjectDemandRow" autoMapping="false">
+  <resultMap id="opportunityRevenue" type="com.company.common.salespipeline.mapper.SalesPipelineRows$OpportunityMonthRevenue" autoMapping="false">
     <constructor>
+      <arg column="opportunityId" javaType="string"/><arg column="opportunityName" javaType="string"/>
+      <arg column="winningProbability" javaType="java.math.BigDecimal"/><arg column="month" javaType="string"/>
+      <arg column="weightedRevenue" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="supply" type="com.company.common.salespipeline.mapper.SalesPipelineRows$MonthSupply" autoMapping="false">
+    <constructor>
+      <arg column="month" javaType="string"/><arg column="jobCode" javaType="string"/>
+      <arg column="developerId" javaType="string"/><arg column="confirmedMm" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="extension" type="com.company.common.salespipeline.mapper.SalesPipelineRows$MonthExtension" autoMapping="false">
+    <constructor>
+      <arg column="month" javaType="string"/><arg column="jobCode" javaType="string"/>
+      <arg column="developerId" javaType="string"/><arg column="monthlyMm" javaType="java.math.BigDecimal"/>
+      <arg column="extensionPossibilityCode" javaType="string"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="opportunityDemand" type="com.company.common.salespipeline.mapper.SalesPipelineRows$MonthOpportunityDemand" autoMapping="false">
+    <constructor>
+      <arg column="month" javaType="string"/><arg column="jobCode" javaType="string"/>
+      <arg column="requiredCount" javaType="java.math.BigDecimal"/><arg column="monthlyMm" javaType="java.math.BigDecimal"/>
+      <arg column="winningProbability" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="projectDemand" type="com.company.common.salespipeline.mapper.SalesPipelineRows$MonthProjectDemand" autoMapping="false">
+    <constructor>
+      <arg column="month" javaType="string"/><arg column="jobCode" javaType="string"/>
       <arg column="plannedMm" javaType="java.math.BigDecimal"/>
       <arg column="confirmedMm" javaType="java.math.BigDecimal"/>
       <arg column="remainingMonths" javaType="_int"/>
     </constructor>
+  </resultMap>
+  <resultMap id="candidate" type="com.company.common.salespipeline.mapper.SalesPipelineRows$CandidateCount" autoMapping="false">
+    <constructor><arg column="jobCode" javaType="string"/><arg column="candidateCount" javaType="_int"/></constructor>
   </resultMap>
   <select id="ongoing" resultMap="opportunity">
     SELECT o.OPP_ID AS "opportunityId",o.OPP_NM AS "opportunityName",
@@ -59,10 +97,14 @@
     WHERE o.OPP_STAT_CD='ING'
     ORDER BY COALESCE(o.MOD_DTTM,o.REG_DTTM) DESC,o.OPP_ID
   </select>
-  <select id="requiredJobs" resultMap="job">
-    SELECT n.JOB_CD AS "jobCode",COALESCE(c.CODE_NM,n.JOB_CD) AS "jobName"
-    FROM TB_SL_OPP_NEED n LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='JOB' AND c.CODE=n.JOB_CD
-    WHERE n.OPP_ID=#{id} ORDER BY n.NEED_SN
+  <!-- 카드의 필요 직무 칩(시안 「백엔드 개발 2」): 직무마다 한 줄, 인원 합, 첫 필요 인력 줄 순서. -->
+  <select id="requiredJobs" resultMap="requiredJob">
+    SELECT n.OPP_ID AS "opportunityId",n.JOB_CD AS "jobCode",COALESCE(MAX(c.CODE_NM),n.JOB_CD) AS "jobName",
+      SUM(n.NEED_CNT)::int AS "headcount"
+    FROM TB_SL_OPP_NEED n JOIN TB_SL_OPP o ON o.OPP_ID=n.OPP_ID AND o.OPP_STAT_CD='ING'
+    LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='JOB' AND c.CODE=n.JOB_CD
+    GROUP BY n.OPP_ID,n.JOB_CD
+    ORDER BY n.OPP_ID,MIN(n.NEED_SN)
   </select>
   <select id="jobs" resultMap="job">
     SELECT c.CODE AS "jobCode",c.CODE_NM AS "jobName"
@@ -80,42 +122,110 @@
       <if test="result != null">AND o.OPP_STAT_CD=#{result}</if>
     ORDER BY o.RSLT_DT DESC,o.OPP_ID
   </select>
-  <select id="revenue" resultMap="revenue">
-    SELECT
+  <!-- 종료 탭 건수(시안 「종료 · 수주·실주 (n)」): closed 목록(결과 전체, 사용 중지 빼고)과 같은 조건. -->
+  <select id="closedCount" resultType="int">
+    SELECT COUNT(*)::int FROM TB_SL_OPP o JOIN TB_BS_CLNT c ON c.CLNT_ID=o.CUST_CLNT_ID
+    WHERE o.OPP_STAT_CD IN ('WIN','LOSE')
+  </select>
+  <!-- 예측 달 목록(ym = YYYYMM, 첫날·말일). 아래 묶음 조회가 같이 쓴다. -->
+  <sql id="months">
+    w(ym,first_day,last_day) AS (VALUES
+      <foreach collection="months" item="m" separator=",">(CAST(#{m.month} AS varchar),CAST(#{m.firstDay} AS date),CAST(#{m.lastDay} AS date))</foreach>)
+  </sql>
+  <!-- 사람이 그 달 공급에 들어가는 조건(UI-05 supplyPeople과 같은 조건을 달마다). -->
+  <sql id="supplyPeople">
+    d.USE_YN='Y' AND d.DRCT_CLS_CD='DRCT'
+    AND (d.JNCMP_DT IS NULL OR d.JNCMP_DT &lt;= w.last_day)
+    AND (d.RETIRE_DT IS NULL OR d.RETIRE_DT &gt;= w.first_day)
+    AND NOT EXISTS(SELECT 1 FROM TB_HR_DEV_STAT s WHERE s.DEV_ID=d.DEV_ID AND s.WORK_STAT_CD='LEAVE'
+      AND s.BGN_DT &lt;= w.last_day AND (s.END_DT IS NULL OR s.END_DT &gt;= w.first_day))
+  </sql>
+  <select id="revenues" resultMap="revenue">
+    WITH <include refid="months"/>
+    SELECT w.ym AS "month",
       COALESCE((SELECT SUM(m.APLY_UPRC*m.MON_MM) FROM TB_PJ_ASGN_MON m
         JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID
         JOIN TB_PJ_PROJ p ON p.PROJ_ID=m.PROJ_ID
-        WHERE m.INPUT_YM=#{month} AND a.ASGN_STAT_CD='ACT' AND a.INPUT_TYPE_CD!='FREE'
+        WHERE m.INPUT_YM=w.ym AND a.ASGN_STAT_CD='ACT' AND a.INPUT_TYPE_CD!='FREE'
           AND p.PROJ_STAT_CD='ING' AND p.CTRT_TYPE_CD IN ('MO','DP')
-          AND a.INPUT_BGN_DT &lt;= #{lastDay} AND a.INPUT_END_DT &gt;= #{firstDay}),0)
+          AND a.INPUT_BGN_DT &lt;= w.last_day AND a.INPUT_END_DT &gt;= w.first_day),0)
       + COALESCE((SELECT SUM(GREATEST(0,p.CTRT_AMT-COALESCE((SELECT SUM(b.SPLY_AMT)
           FROM TB_BL_BILL b WHERE b.PROJ_ID=p.PROJ_ID AND b.CNCL_YN='N'),0))
           / NULLIF((extract(year FROM p.CTRT_END_DT)::int-extract(year FROM CAST(#{horizonStart} AS date))::int)*12
             +extract(month FROM p.CTRT_END_DT)::int-extract(month FROM CAST(#{horizonStart} AS date))::int+1,0))
         FROM TB_PJ_PROJ p WHERE p.PROJ_STAT_CD='ING' AND p.CTRT_TYPE_CD='TK'
-          AND p.CTRT_END_DT &gt;= #{firstDay} AND p.CTRT_BGN_DT &lt;= #{lastDay}),0) AS "projectRevenue",
+          AND p.CTRT_END_DT &gt;= w.first_day AND p.CTRT_BGN_DT &lt;= w.last_day),0) AS "projectRevenue",
       COALESCE((SELECT SUM(o.EXPCT_AMT/COALESCE(o.EXPCT_PRD_MCNT,6)*o.WIN_PRBL_RT/100)
         FROM TB_SL_OPP o WHERE o.OPP_STAT_CD='ING'
-          AND to_date(o.BGN_PLAN_YM,'YYYYMM') &lt;= #{firstDay}
-          AND to_date(o.BGN_PLAN_YM,'YYYYMM')+make_interval(months =&gt; COALESCE(o.EXPCT_PRD_MCNT,6)::int) &gt; #{firstDay}),0) AS "weightedOpportunityRevenue",
+          AND to_date(o.BGN_PLAN_YM,'YYYYMM') &lt;= w.first_day
+          AND to_date(o.BGN_PLAN_YM,'YYYYMM')+make_interval(months =&gt; COALESCE(o.EXPCT_PRD_MCNT,6)::int) &gt; w.first_day),0) AS "weightedOpportunityRevenue",
       COALESCE((SELECT SUM(o.EXPCT_AMT/COALESCE(o.EXPCT_PRD_MCNT,6)) FROM TB_SL_OPP o
-        WHERE o.OPP_STAT_CD='ING' AND to_date(o.BGN_PLAN_YM,'YYYYMM') &lt;= #{firstDay}
-          AND to_date(o.BGN_PLAN_YM,'YYYYMM')+make_interval(months =&gt; COALESCE(o.EXPCT_PRD_MCNT,6)::int) &gt; #{firstDay}),0) AS "opportunityRevenue"
+        WHERE o.OPP_STAT_CD='ING' AND to_date(o.BGN_PLAN_YM,'YYYYMM') &lt;= w.first_day
+          AND to_date(o.BGN_PLAN_YM,'YYYYMM')+make_interval(months =&gt; COALESCE(o.EXPCT_PRD_MCNT,6)::int) &gt; w.first_day),0) AS "opportunityRevenue"
+    FROM w ORDER BY w.ym
   </select>
+  <!-- 식-92 기회별 줄: revenues의 weightedOpportunityRevenue와 같은 식·조건을 기회마다 나눈 것(줄을 달마다 더하면 그 값). 진행 카드 순서. -->
+  <select id="opportunityRevenues" resultMap="opportunityRevenue">
+    WITH <include refid="months"/>
+    SELECT o.OPP_ID AS "opportunityId",o.OPP_NM AS "opportunityName",o.WIN_PRBL_RT AS "winningProbability",w.ym AS "month",
+      o.EXPCT_AMT/COALESCE(o.EXPCT_PRD_MCNT,6)*o.WIN_PRBL_RT/100 AS "weightedRevenue"
+    FROM w JOIN TB_SL_OPP o ON o.OPP_STAT_CD='ING'
+      AND to_date(o.BGN_PLAN_YM,'YYYYMM') &lt;= w.first_day
+      AND to_date(o.BGN_PLAN_YM,'YYYYMM')+make_interval(months =&gt; COALESCE(o.EXPCT_PRD_MCNT,6)::int) &gt; w.first_day
+    ORDER BY COALESCE(o.MOD_DTTM,o.REG_DTTM) DESC,o.OPP_ID,w.ym
+  </select>
+  <select id="supply" resultMap="supply">
+    WITH <include refid="months"/>,
+    confirmed AS (
+      SELECT m.DEV_ID,m.INPUT_YM,SUM(m.MON_MM) AS mm FROM TB_PJ_ASGN_MON m
+      JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID AND a.ASGN_STAT_CD='ACT'
+      WHERE m.INPUT_YM IN (SELECT ym FROM w) GROUP BY m.DEV_ID,m.INPUT_YM
+    )
+    SELECT w.ym AS "month",d.JOB_CD AS "jobCode",d.DEV_ID AS "developerId",COALESCE(c.mm,0) AS "confirmedMm"
+    FROM w JOIN TB_HR_DEV d ON <include refid="supplyPeople"/>
+    LEFT JOIN confirmed c ON c.DEV_ID=d.DEV_ID AND c.INPUT_YM=w.ym
+    ORDER BY w.ym,d.JOB_CD,d.DEV_ID
+  </select>
+  <select id="extensions" resultMap="extension">
+    WITH <include refid="months"/>
+    SELECT w.ym AS "month",d.JOB_CD AS "jobCode",d.DEV_ID AS "developerId",COALESCE((SELECT h.NEW_CTRT_MM FROM TB_PJ_ASGN_HIST h
+      WHERE h.ASGN_ID=a.ASGN_ID AND h.ASGN_CHG_TYPE_CD IN ('INPUT','RATE') AND h.NEW_CTRT_MM IS NOT NULL
+        AND to_char(h.APLY_DT,'YYYYMM') &lt;= to_char(a.INPUT_END_DT,'YYYYMM')
+      ORDER BY h.APLY_DT DESC,h.HIST_SN DESC LIMIT 1),a.CTRT_MM) AS "monthlyMm",
+      a.EXT_PSBL_CD AS "extensionPossibilityCode"
+    FROM w JOIN TB_HR_DEV d ON <include refid="supplyPeople"/>
+    JOIN TB_PJ_ASGN a ON a.DEV_ID=d.DEV_ID AND a.ASGN_STAT_CD='ACT' AND a.INPUT_END_DT &lt; w.first_day
+    ORDER BY w.ym,d.JOB_CD,d.DEV_ID,a.ASGN_ID
+  </select>
+  <select id="opportunityDemand" resultMap="opportunityDemand">
+    WITH <include refid="months"/>
+    SELECT w.ym AS "month",n.JOB_CD AS "jobCode",n.NEED_CNT AS "requiredCount",n.MON_MM AS "monthlyMm",
+      o.WIN_PRBL_RT AS "winningProbability"
+    FROM w JOIN TB_SL_OPP_NEED n ON to_date(n.BGN_YM,'YYYYMM') &lt;= w.first_day
+      AND to_date(n.BGN_YM,'YYYYMM')+make_interval(months =&gt; n.PRD_MCNT::int) &gt; w.first_day
+    JOIN TB_SL_OPP o ON o.OPP_ID=n.OPP_ID AND o.OPP_STAT_CD='ING'
+    ORDER BY w.ym,n.JOB_CD,n.OPP_ID,n.NEED_SN
+  </select>
+  <!-- 미충원(식-61): 남은 개월 = 다음 달(예측 첫 달)부터 프로젝트 종료 달까지. 그 기간 안의 진행 달에만 더한다. -->
   <select id="projectDemand" resultMap="projectDemand">
-    SELECT n.PLAN_MM AS "plannedMm",COALESCE((SELECT SUM(m.MON_MM) FROM TB_PJ_ASGN_MON m
-        JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID AND a.ASGN_STAT_CD='ACT'
-        WHERE m.PROJ_ID=n.PROJ_ID AND a.JOB_CD=n.JOB_CD),0) AS "confirmedMm",
-      ((extract(year FROM p.CTRT_END_DT)::int-extract(year FROM CAST(#{horizonStart} AS date))::int)*12
-        +extract(month FROM p.CTRT_END_DT)::int-extract(month FROM CAST(#{horizonStart} AS date))::int+1) AS "remainingMonths"
-    FROM TB_PJ_MNPW_PLAN n JOIN TB_PJ_PROJ p ON p.PROJ_ID=n.PROJ_ID
-    WHERE n.JOB_CD=#{jobCode} AND p.PROJ_STAT_CD='ING' AND p.CTRT_TYPE_CD!='IN'
-      AND p.CTRT_BGN_DT &lt;= #{lastDay} AND p.CTRT_END_DT &gt;= #{firstDay}
-    ORDER BY n.PROJ_ID,n.JOB_CD
+    WITH <include refid="months"/>,
+    plans AS (
+      SELECT n.PROJ_ID,n.JOB_CD,n.PLAN_MM,p.CTRT_BGN_DT,p.CTRT_END_DT,
+        COALESCE((SELECT SUM(m.MON_MM) FROM TB_PJ_ASGN_MON m
+          JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID AND a.ASGN_STAT_CD='ACT'
+          WHERE m.PROJ_ID=n.PROJ_ID AND a.JOB_CD=n.JOB_CD),0) AS confirmed_mm
+      FROM TB_PJ_MNPW_PLAN n JOIN TB_PJ_PROJ p ON p.PROJ_ID=n.PROJ_ID
+      WHERE p.PROJ_STAT_CD='ING' AND p.CTRT_TYPE_CD!='IN'
+    )
+    SELECT w.ym AS "month",n.JOB_CD AS "jobCode",n.PLAN_MM AS "plannedMm",n.confirmed_mm AS "confirmedMm",
+      ((extract(year FROM n.CTRT_END_DT)::int-extract(year FROM CAST(#{horizonStart} AS date))::int)*12
+        +extract(month FROM n.CTRT_END_DT)::int-extract(month FROM CAST(#{horizonStart} AS date))::int+1) AS "remainingMonths"
+    FROM w JOIN plans n ON n.CTRT_BGN_DT &lt;= w.last_day AND n.CTRT_END_DT &gt;= w.first_day
+    ORDER BY w.ym,n.JOB_CD,n.PROJ_ID
   </select>
-  <select id="candidates" resultType="_int">
-    SELECT COUNT(*)::int FROM TB_HR_CAND c
-    WHERE c.JOB_CD=#{jobCode} AND c.CNTC_STAT_CD NOT IN ('HOLD','CTRT')
+  <select id="candidates" resultMap="candidate">
+    SELECT c.JOB_CD AS "jobCode",COUNT(*)::int AS "candidateCount" FROM TB_HR_CAND c
+    WHERE c.CNTC_STAT_CD NOT IN ('HOLD','CTRT') GROUP BY c.JOB_CD ORDER BY c.JOB_CD
   </select>
   <insert id="insertAccess">
     INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)

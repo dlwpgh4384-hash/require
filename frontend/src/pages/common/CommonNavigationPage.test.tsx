@@ -572,9 +572,15 @@ const deepChecks: Record<string, (content: Content) => Promise<void>> = {
     expect(
       await content.findByText("조건에 맞는 결과가 없습니다."),
     ).toBeVisible();
-    await waitFor(() =>
-      expect(content.getByTestId("sales-pipeline-create")).toBeEnabled(),
+    // 시안 titleBar: 탭별 단추는 제목줄 오른쪽에 있고 본문에는 없다.
+    const actions = within(screen.getByTestId("screen-actions"));
+    expect(actions.getByTestId("sales-pipeline-title-actions")).toHaveClass(
+      "project-title-actions",
     );
+    await waitFor(() =>
+      expect(actions.getByTestId("sales-pipeline-create")).toBeEnabled(),
+    );
+    expect(content.queryByTestId("sales-pipeline-create")).not.toBeInTheDocument();
     expect(content.getByTestId("sales-tab-forecast")).toBeVisible();
   },
   "UI-33": async (content) => {

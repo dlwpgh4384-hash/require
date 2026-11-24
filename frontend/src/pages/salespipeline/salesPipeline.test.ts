@@ -2,6 +2,9 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
   getCommonSalesPipelineClosed,
   getCommonSalesPipelineForecastExcel,
+  putCommonSalesPipelineStage,
+  approvalBadge,
+  cardJobs,
 } from "./salesPipeline";
 let request: ReturnType<typeof vi.fn>;
 beforeEach(() => {
@@ -82,4 +85,63 @@ it("server generation failure is propagated without creating download", async ()
     "생성 실패",
   );
   expect(URL.createObjectURL).not.toHaveBeenCalled();
+});
+it("stage move sends PUT with stage code and read time to the opportunity stage endpoint", async () => {
+  request.mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      success: true,
+      data: { opportunityId: "O-1", winningProbability: 30 },
+    }),
+  });
+  const saved = await putCommonSalesPipelineStage(
+    { opportunityId: "O-1", modifiedAt: "2026-11-01T00:00:00Z" },
+    "PROP",
+  );
+  expect(saved.winningProbability).toBe(30);
+  expect(request.mock.calls[0][0]).toBe(
+    "/api/common/sales-opportunities/O-1/stage",
+  );
+  expect(request.mock.calls[0][1].method).toBe("PUT");
+  expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({
+    stageCode: "PROP",
+    modifiedAt: "2026-11-01T00:00:00Z",
+  });
+});
+it("approval badge is hidden when no approval is needed and never shows raw codes", () => {
+  expect(approvalBadge("NONE")).toBeNull();
+  expect(approvalBadge(null)).toBeNull();
+  expect(approvalBadge("WAIT")).toEqual({
+    text: "견적 승인 대기",
+    kind: "bad",
+    icon: true,
+  });
+  expect(approvalBadge("OK")?.text).toBe("견적 승인");
+  expect(approvalBadge("REJ")?.text).toBe("견적 반려");
+});
+it("card chips prefer per-job headcounts and fall back to the job code list", () => {
+  const base = {
+    opportunityId: "O",
+    opportunityName: "기회",
+    customerId: "c",
+    customerName: "고객",
+    stageCode: "FIND",
+    winningProbability: 10,
+    expectedAmount: 1,
+    startMonth: "2027-01",
+    nextAction: null,
+    nextActionDueDate: null,
+    requiredJobs: ["BE", "FE"],
+    stale: false,
+    approvalStatusCode: "NONE",
+    modifiedAt: "2026-11-01T00:00:00Z",
+  };
+  expect(cardJobs(base).map((job) => job.count)).toEqual([null, null]);
+  expect(
+    cardJobs({
+      ...base,
+      requiredJobHeadcounts: [{ jobCode: "BE", jobName: "백엔드 개발", headcount: 3 }],
+    }),
+  ).toEqual([{ jobCode: "BE", jobName: "백엔드 개발", count: 3 }]);
 });

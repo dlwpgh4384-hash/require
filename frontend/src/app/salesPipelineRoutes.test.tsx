@@ -104,7 +104,7 @@ function respond(available = true) {
       });
     if (url === "/api/common/sales-pipeline") return list();
     if (url === "/api/common/sales-pipeline/forecast")
-      return ok({ months: [], hiringReviews: [] });
+      return ok({ months: [], opportunityRevenues: [], hiringReviews: [] });
     if (url.startsWith("/api/common/sales-pipeline/closed?"))
       return ok({ items: [] });
     if (
@@ -143,8 +143,13 @@ it.each(["/screens/UI-29", "/#UI-29"])(
     expect(screen.getAllByTestId("sales-pipeline-page")).toHaveLength(1);
     expect(page).toHaveAttribute("data-screen-id", "UI-29");
     await waitFor(() =>
-      expect(within(page).getByTestId("sales-pipeline-create")).toBeEnabled(),
+      expect(
+        within(screen.getByTestId("screen-actions")).getByTestId(
+          "sales-pipeline-create",
+        ),
+      ).toBeEnabled(),
     );
+    expect(within(page).queryByTestId("sales-pipeline-create")).toBeNull();
     expect(router?.state.location.pathname).toBe("/screens/UI-29");
     expect(router?.state.matches.at(-1)?.route.path).toBe("/screens/:scrnId");
     expect(request).toHaveBeenCalledWith(
@@ -178,7 +183,7 @@ it("M011 under G004 opens UI-29 without replacing preferences and retains its se
     await router!.navigate("/screens/UI-29");
   });
   expect(screen.getByTestId("sales-tab-forecast")).toHaveAttribute(
-    "aria-pressed",
+    "aria-selected",
     "true",
   );
   expect(screen.getByTestId("sales-forecast-panel")).toBeVisible();
@@ -249,5 +254,23 @@ it("the registered forecast and closed tabs use feature-local API exports", asyn
     ),
   );
   expect(router?.state.location.pathname).toBe("/screens/UI-29");
+  expectShell();
+});
+
+it("the full-screen form takes over the shell title bar: [‹ 목록] + one form heading, no tab actions", async () => {
+  respond();
+  mount("/screens/UI-29");
+  const actions = within(await screen.findByTestId("screen-actions"));
+  const create = await actions.findByTestId("sales-pipeline-create");
+  await waitFor(() => expect(create).toBeEnabled());
+  fireEvent.click(create);
+  expect(await screen.findByTestId("sales-pipeline-form")).toBeVisible();
+  // 시안 oppFormView: tb.title = 「영업 기회 등록」, back = [‹ 목록], actions = ''.
+  expect(screen.getAllByRole("heading", { name: "영업 기회 등록" })).toHaveLength(1);
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("영업 기회 등록");
+  expect(screen.queryByTestId("screen-actions")).toBeNull();
+  fireEvent.click(screen.getByTestId("screen-title-back"));
+  expect(await screen.findByTestId("sales-ongoing-panel")).toBeVisible();
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("영업 파이프라인");
   expectShell();
 });

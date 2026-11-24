@@ -90,9 +90,10 @@ public final class SalesOpportunityRules {
             "workplace", "nextAction", "nextActionDueDate", "memo", "needs"));
         if (update) fields.add("modifiedAt");
         ClientRules.object(body, fields);
-        var probability = number(body, "winningProbability", true);
-        if (probability.signum() < 0 || probability.compareTo(new BigDecimal("100")) > 0
-            || probability.stripTrailingZeros().scale() > 2) throw invalid("winningProbability");
+        // 확률을 비우면 단계 기본값으로 저장한다(SFR-129-07, 서비스에서 정함).
+        var probability = number(body, "winningProbability", false);
+        if (probability != null && (probability.signum() < 0 || probability.compareTo(new BigDecimal("100")) > 0
+            || probability.stripTrailingZeros().scale() > 2)) throw invalid("winningProbability");
         var amount = number(body, "expectedAmount", true);
         if (amount.signum() <= 0 || amount.precision() - amount.scale() > 15
             || amount.stripTrailingZeros().scale() > 0) throw invalid("expectedAmount");
@@ -101,10 +102,7 @@ public final class SalesOpportunityRules {
         var needs = new ArrayList<Need>();
         for (int i = 0; i < array.size(); i++) {
             try { needs.add(need(array.get(i))); }
-            catch (CodeFailure failure) {
-                throw CodeFailure.invalid("needs[" + i + "]." + failure.getField(),
-                    (i + 1) + "번째 줄의 " + label(failure.getField()) + " 칸을 확인해 주세요.");
-            }
+            catch (CodeFailure failure) { throw row(i, failure.getField()); }
         }
         return new Input(text(body, "opportunityName", 100, true), text(body, "customerId", 20, true),
             text(body, "salesPartId", 20, true), text(body, "stageCode", 10, true), probability, amount,
@@ -113,18 +111,29 @@ public final class SalesOpportunityRules {
             text(body, "nextAction", 200, false), date(body, "nextActionDueDate", false),
             text(body, "memo", 500, false), List.copyOf(needs));
     }
+    /** 필요 인력 줄 칸 오류: 「n번째 줄의 ○○ 칸을 확인해 주세요.」(칸 이름은 폼 머리 글자, 영어 칸 이름은 보이지 않는다). */
+    public static CodeFailure row(int index, String field) {
+        return CodeFailure.invalid("needs[" + index + "]." + field,
+            (index + 1) + "번째 줄의 " + label(field) + " 칸을 확인해 주세요.");
+    }
     private static String label(String field) {
         return switch (field) {
             case "jobCode" -> "직무"; case "gradeCode" -> "등급";
             case "requiredCount" -> "인원"; case "startMonth" -> "시작월";
             case "months" -> "개월"; case "monthlyMm" -> "월 MM";
-            case "estimatedUnitPrice" -> "단가"; default -> field;
+            case "estimatedUnitPrice" -> "단가"; case "tentativeDeveloperIds" -> "가배정 인력";
+            case "needSn" -> "필요 인력 줄"; default -> "입력";
         };
     }
     public static Tentative tentative(JsonNode body) {
         ClientRules.object(body, Set.of("modifiedAt", "developerId", "needSn", "startMonth"));
         return new Tentative(version(body), text(body, "developerId", 20, true),
             integer(body, "needSn", null), month(body, "startMonth"));
+    }
+    public static DeveloperCheck developerCheck(JsonNode body) {
+        ClientRules.object(body, Set.of("opportunityId", "developerId", "startMonth"));
+        return new DeveloperCheck(text(body, "opportunityId", 20, false), text(body, "developerId", 20, true),
+            month(body, "startMonth"));
     }
     public static Win win(JsonNode body) {
         ClientRules.object(body, Set.of("modifiedAt", "contractAmount", "contractTypeCode", "contractStartDate",

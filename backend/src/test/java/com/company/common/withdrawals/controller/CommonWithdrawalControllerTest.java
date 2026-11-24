@@ -352,6 +352,26 @@ class CommonWithdrawalControllerTest {
     }
     @Test void sameTargetIsIdempotent() throws Exception {reservations.add(new Reservation("1","person","O-0001","기회",1,"202612","ACT"));save(1,200);noTentativeWrites();}
     @Test void handedOffCandidateCannotBeReplaced() throws Exception {reservations.add(new Reservation("1","person","old","이전",7,"202612","CNVT"));save(1,409);noTentativeWrites();}
+    @Test
+    @DisplayName("business: 수주로 넘긴(CNVT) 기회와 다른 기회(ACT)에 걸친 한 사람 때문에 목록·조회 전체가 409로 실패하지 않고, 저장만 409")
+    void oneDeveloperOnTwoOpportunitiesDoesNotFailListReadsButSaveStillConflicts() throws Exception {
+        reservations.add(new Reservation("1","person","won","수주한 기회",1,"202612","CNVT"));
+        reservations.add(new Reservation("2","person","other","다른 기회",2,"202612","ACT"));
+        mvc.perform(get("/api/common/withdrawals").param("year","2026")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].nextAssignment.opportunityName").value("다른 기회"))
+            .andExpect(jsonPath("$.data.items[0].nextAssignment.hasTentativeAssignment").value(true));
+        mvc.perform(get("/api/common/withdrawals/A-0001/tentative-assignment")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.assignment.opportunityId").value("other"));
+        mvc.perform(get("/api/common/withdrawals/tentative-assignments").param("developerId","person")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].tentativeAssignment.opportunityId").value("other"));
+        save(1,409);noTentativeWrites();
+    }
+    @Test void twoHandedOffOpportunitiesShowTheLatestWithoutFailingTheList() throws Exception {
+        reservations.add(new Reservation("3","person","first","먼저 수주",1,"202612","CNVT"));
+        reservations.add(new Reservation("10","person","later","나중 수주",4,"202612","CNVT"));
+        mvc.perform(get("/api/common/withdrawals").param("year","2026")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].nextAssignment.opportunityName").value("나중 수주"));
+    }
     @Test void currentTentativeMayBeNull() throws Exception {mvc.perform(get("/api/common/withdrawals/A-0001/tentative-assignment")).andExpect(status().isOk()).andExpect(contract("GET","/api/common/withdrawals/{assignmentId}/tentative-assignment")).andExpect(jsonPath("$.data.assignment").value(org.hamcrest.Matchers.nullValue()));}
     @Test void missingAssignmentIsValidationNotAnEmptyRecommendation() throws Exception {mvc.perform(get("/api/common/withdrawals/missing/recommendations")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("assignmentId"));}
     @Test void missingYearAndUnknownPeriodAreValidationErrors() throws Exception {

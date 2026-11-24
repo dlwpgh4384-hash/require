@@ -12704,6 +12704,9 @@ paths:
       - 기회명100자·사용중 고객·파트/단계·확률0~100·양수금액·시작월·근무지200자, 필요인력 직무/정수인원≥1/시작월/개월≥1/월MM>0≤1을 검증한다.
       - 저장 시 예상 이익률이 월 승인 기준 미만이면 승인 대기이며 정확한 기준값은 대기 아님이다.
       - 승인 후 차이≤월 재승인차이는 승인 유지, 초과하며 기준 미만이면 대기·기준 이상이면 요구 해제한다. 반려 건을 고쳐 저장하면 다시 대기다.
+      - 확률을 비우거나(등록은 0도) 단계 기본값과 같으면 단계 기본값으로 저장하고 직접 고친 확률로 보지 않는다. 계약유형은 턴키·월단위·파견만 받는다.
+      - 저장 뒤 승인 대기면 협상·계약 직전 단계로 저장할 수 없다(견적 승인 전이라 협상 단계로 옮길 수 없습니다).
+      - 투입 배정 후보로 넘긴(CNVT) 사람은 다른 기회에 가배정할 수 없다(409, 투입 배정으로 넘긴 후보입니다).
       x-side-effects:
       - TB_SL_OPP_NEED를 기회와 함께 저장하고 기회 MOD_DTTM을 갱신한다.
       x-required-tests:
@@ -12730,6 +12733,52 @@ paths:
                   - data
         '400':
           description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 가배정 인력이 투입 배정 후보로 넘긴 사람(errors[].field=needs[n].tentativeDeveloperIds); 기회·필요인력·가배정 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/sales-opportunities/tentative-assignment-check:
+    post:
+      operationId: postCommonSalesOpportunityDraftTentativeAssignmentCheck
+      summary: 저장 전 줄 가배정 충돌 경고
+      security: []
+      x-related-requirements:
+      - REQ-1405
+      description: 아직 저장하지 않은 새 기회·새 필요 인력 줄에서 고른 사람을 미리 점검한다(SFR-129-08). opportunityId는 고치는 중인 기회이고 새 기회면 넣지 않는다. needSn·modifiedAt은 받지 않는다. 경고의 needSn은 이 줄이면 null, 같은 기회의 다른 줄이면 그 줄 번호다. 점유·수정 시각은 바꾸지 않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonSalesDraftTentativeInput'
+      responses:
+        '200':
+          description: 다른 기회 가배정·같은 사람 두 줄·그 달 1.0 MM 이상 확정 투입·투입 배정 후보로 넘긴 사람 경고
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesTentativeWarnings'
+                  required:
+                  - data
+        '400':
+          description: developerId·startMonth 누락·형식 오류, 없는 인력 또는 받지 않는 칸; errors[].field, 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: opportunityId를 넣었는데 영업 기회가 없음
           content:
             application/json:
               schema:
@@ -13609,7 +13658,6 @@ components:
       - customerId
       - salesPartId
       - stageCode
-      - winningProbability
       - expectedAmount
       - startMonth
       - needs
@@ -13665,7 +13713,6 @@ components:
       - customerId
       - salesPartId
       - stageCode
-      - winningProbability
       - expectedAmount
       - startMonth
       - needs
@@ -13823,6 +13870,11 @@ components:
         modifiedAt:
           type: string
           format: date-time
+        requiredJobHeadcounts:
+          type: array
+          description: 카드 직무 칩(시안 「백엔드 개발 2」). 직무마다 한 줄, 첫 필요 인력 줄 순서, 인원은 그 직무 필요 인원 합
+          items:
+            $ref: '#/components/schemas/CommonSalesJobHeadcount'
       required:
       - opportunityId
       - opportunityName
@@ -13830,6 +13882,37 @@ components:
       - winningProbability
       - expectedAmount
       - modifiedAt
+    CommonSalesJobHeadcount:
+      type: object
+      properties:
+        jobCode:
+          type: string
+        jobName:
+          type: string
+        headcount:
+          type: integer
+          minimum: 1
+      required:
+      - jobCode
+      - jobName
+      - headcount
+    CommonSalesDraftTentativeInput:
+      type: object
+      properties:
+        opportunityId:
+          type: string
+          maxLength: 20
+          description: 고치는 중인 영업 기회 ID. 새 기회면 넣지 않는다
+        developerId:
+          type: string
+          maxLength: 20
+        startMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+      required:
+      - developerId
+      - startMonth
+      additionalProperties: false
     CommonSalesOpportunity:
       type: object
       properties:
@@ -13905,6 +13988,18 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommonSalesApprovalHistory'
+        expectedProfitRate:
+          type: number
+          nullable: true
+          description: 저장 때 계산해 둔 예상 이익률(TB_SL_OPP.EXPCT_PRFT_RT). 승인 띠는 이 값을 보인다
+        approvedProfitRate:
+          type: number
+          nullable: true
+          description: 승인한 때의 예상 이익률(TB_SL_OPP.APRV_PRFT_RT). 승인 전이면 null
+        approvalRate:
+          type: number
+          nullable: true
+          description: 이번 달 견적 승인 기준 이익률(운영 기준값 QUOTE_APRV_RT). 승인 띠 「(기준 n%)」
       required:
       - opportunityId
       - opportunityName
@@ -13926,12 +14021,16 @@ components:
           type: number
         weightedManpower:
           type: number
+        closedCount:
+          type: integer
+          description: 종료 탭 건수(수주·실주, 사용 중지 빼고). 종료 목록을 받지 않고 탭 이름에 쓴다
       required:
       - ongoingCount
       - staleCount
       - expectedAmount
       - weightedAmount
       - weightedManpower
+      - closedCount
     CommonSalesPipelineStage:
       type: object
       properties:
@@ -14007,6 +14106,8 @@ components:
             properties:
               needSn:
                 type: integer
+                nullable: true
+                description: 경고가 붙는 필요 인력 줄. 저장 전 줄 점검에서 그 줄 자신이면 null
               developerId:
                 type: string
               message:
@@ -14110,10 +14211,50 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommonSalesHiringReview'
+        opportunityRevenues:
+          type: array
+          description: 월별 예상 매출의 기회별 줄(시안 「└ 기회명 n%」). 달마다 줄 합 = months[].weightedOpportunityRevenue
+          items:
+            $ref: '#/components/schemas/CommonSalesForecastOpportunity'
       required:
       - months
       - hiringReviews
+      - opportunityRevenues
       description: 6개월·채용검토의 확정 결과. 요약4칸 정확 항목은 OQ-UI-029 확인 후 같은 schema 확장; 이 후보만으로 요약4칸 구현 완료 불가.
+    CommonSalesForecastOpportunity:
+      type: object
+      description: 월별 예상 매출의 기회 한 줄(시안 「└ 기회명 n%」, SFR-129-12 기회별 확률 반영). 진행 기회 중 예측 6개월에 예상 기간이 걸리는 것만, 진행 카드 순서
+      properties:
+        opportunityId:
+          type: string
+        opportunityName:
+          type: string
+        winningProbability:
+          type: number
+          minimum: 0
+          maximum: 100
+        months:
+          type: array
+          description: 예상 기간 안의 달만(없는 달은 화면에서 「–」). 같은 달 줄을 모두 더하면 months[].weightedOpportunityRevenue
+          items:
+            $ref: '#/components/schemas/CommonSalesForecastOpportunityMonth'
+      required:
+      - opportunityId
+      - opportunityName
+      - winningProbability
+      - months
+    CommonSalesForecastOpportunityMonth:
+      type: object
+      properties:
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+        weightedRevenue:
+          type: number
+          description: 식-92 예상 금액 ÷ 예상 기간 × 수주 확률(원 단위, 버림 뒤 남은 원은 소수 부분이 큰 줄부터 1원씩)
+      required:
+      - month
+      - weightedRevenue
     CommonCandidateInput:
       type: object
       properties:

@@ -36,7 +36,9 @@ public class SalesOpportunityCalculations {
             case "FIND" -> "1"; case "PROP" -> "2"; case "NEGO" -> "3"; case "PRE" -> "4";
             default -> throw SalesOpportunityRules.invalid("stageCode");
         };
-        return standards.effectiveStandard("STEP_PRBL_" + suffix, calendar.currentMonth()).value();
+        var value = standards.effectiveStandard("STEP_PRBL_" + suffix, calendar.currentMonth()).value();
+        if (value == null) throw CodeFailure.invalid("standardCode", "운영 기준값을 확인해 주세요.");
+        return value;
     }
     public BigDecimal price(Need need) {
         var price = need.estimatedUnitPrice() == null ? mapper.defaultPrice(need.jobCode()) : need.estimatedUnitPrice();
@@ -69,6 +71,11 @@ public class SalesOpportunityCalculations {
         }
         var rate = revenue.subtract(cost).multiply(BigDecimal.valueOf(100)).divide(revenue, MathContext.DECIMAL128);
         return new Evaluation(rate, approvals.effective(calendar.currentMonth()));
+    }
+    /** 승인 띠의 「(기준 n%)」: 이번 달 견적 승인 기준 이익률. 기준값이 없으면 상세는 그대로 보이고 null. */
+    public BigDecimal approvalRate() {
+        try { return approvals.effective(calendar.currentMonth()).approvalRate(); }
+        catch (CodeFailure failure) { return null; }
     }
     public static String approval(String oldStatus, BigDecimal baseline, Evaluation evaluation) {
         if ("REJ".equals(oldStatus)) return "WAIT";

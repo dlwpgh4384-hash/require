@@ -160,14 +160,38 @@ class CommonSalesPipelineControllerTest {
     @Test void pipelineHasFourStagesAndExactlyFourteenDaysIsNotStale() throws Exception {
         when(mapper.ongoing()).thenReturn(List.of(opportunity("exact", "FIND", now.minus(Duration.ofDays(14))),
             opportunity("old", "PROP", now.minus(Duration.ofDays(14)).minusSeconds(1))));
-        when(mapper.requiredJobs(anyString())).thenReturn(List.of(new Job("BE", "백엔드")));
+        when(mapper.requiredJobs()).thenReturn(List.of(new RequiredJob("exact", "BE", "백엔드 개발", 2),
+            new RequiredJob("exact", "PM", "PM", 1), new RequiredJob("old", "BE", "백엔드 개발", 1)));
         mvc.perform(get("/api/common/sales-pipeline"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.summary.ongoingCount").value(2))
             .andExpect(jsonPath("$.data.summary.staleCount").value(1))
             .andExpect(jsonPath("$.data.summary.weightedAmount").value(60000000))
             .andExpect(jsonPath("$.data.stages.length()").value(4))
             .andExpect(jsonPath("$.data.stages[0].items[0].stale").value(false))
-            .andExpect(jsonPath("$.data.stages[1].items[0].stale").value(true));
+            .andExpect(jsonPath("$.data.stages[1].items[0].stale").value(true))
+            .andExpect(jsonPath("$.data.stages[0].items[0].requiredJobs.length()").value(2))
+            .andExpect(jsonPath("$.data.stages[0].items[0].requiredJobs[0]").value("BE"))
+            .andExpect(jsonPath("$.data.stages[0].items[0].requiredJobHeadcounts[0].jobName").value("백엔드 개발"))
+            .andExpect(jsonPath("$.data.stages[0].items[0].requiredJobHeadcounts[0].headcount").value(2))
+            .andExpect(jsonPath("$.data.stages[0].items[0].requiredJobHeadcounts[1].jobCode").value("PM"))
+            .andExpect(jsonPath("$.data.stages[1].items[0].requiredJobHeadcounts[0].headcount").value(1));
+        // 카드마다 따로 읽지 않고 필요 직무는 한 번에 읽는다.
+        verify(mapper, times(1)).requiredJobs();
+    }
+    @Test void quoteRoundsProfitRateToTwoDecimalsAndMinimumUnitPriceToWholeWon() throws Exception {
+        when(costs.monthlyCost("BE", "MD")).thenReturn(new BigDecimal("6800000"));
+        when(costs.monthlyCost("PM", "MD")).thenReturn(new BigDecimal("4000001"));
+        var body = input(); ((ObjectNode)body.path("needs").get(0)).put("estimatedUnitPrice", 7777777);
+        ((com.fasterxml.jackson.databind.node.ArrayNode)body.path("needs")).addObject()
+            .put("jobCode", "PM").put("gradeCode", "MD").put("requiredCount", 1)
+            .put("startMonth", "2026-12").put("months", 1).put("monthlyMm", 0.33).put("estimatedUnitPrice", 6000000);
+        var response = mvc.perform(post("/api/common/sales-pipeline/quote").contentType("application/json").content(body.toString()))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        var data = json.readTree(response).path("data");
+        assertThat(data.path("profitRate").decimalValue().scale()).isLessThanOrEqualTo(2);
+        assertThat(data.path("profitRate").decimalValue()).isEqualByComparingTo("13.00");
+        assertThat(data.path("minimumUnitPrice").decimalValue().stripTrailingZeros().scale()).isLessThanOrEqualTo(0);
+        assertThat(data.path("minimumUnitPrice").decimalValue()).isEqualByComparingTo("6725061");
     }
     @Test void closedFiltersArePassedTogetherWithoutScope() throws Exception {
         when(mapper.closed(new ClosedFilter("WIN", false))).thenReturn(List.of(new Closed("won", "수주", "고객", "WIN",
@@ -187,10 +211,31 @@ class CommonSalesPipelineControllerTest {
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("result"));
         verifyNoInteractions(mapper);
     }
+    @Test void stoppedResultWithoutStoppedInclusionIs400NotSilentlyEmpty() throws Exception {
+        mvc.perform(get("/api/common/sales-pipeline/closed").param("result", "STOP"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("includeStopped"))
+            .andExpect(jsonPath("$.message").value("사용 중지한 기회는 [사용 중지 포함]을 켠 뒤 볼 수 있습니다."));
+        verifyNoInteractions(mapper);
+        when(mapper.closed(new ClosedFilter("STOP", true))).thenReturn(List.of());
+        mvc.perform(get("/api/common/sales-pipeline/closed").param("result", "STOP").param("includeStopped", "true"))
+            .andExpect(status().isOk());
+    }
+    @Test void pipelineSummaryCountsClosedTabWithoutTheClosedList() throws Exception {
+        when(mapper.ongoing()).thenReturn(List.of());
+        when(mapper.closedCount()).thenReturn(3);
+        mvc.perform(get("/api/common/sales-pipeline")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.summary.closedCount").value(3));
+        verify(mapper, never()).closed(any());
+    }
     @Test void forecastPublicHttpEnvelope() throws Exception {
-        when(forecast.getCommonSalesPipelineForecast()).thenReturn(new Forecast(List.of(), List.of()));
+        when(forecast.getCommonSalesPipelineForecast()).thenReturn(new Forecast(List.of(), List.of(), List.of(new ForecastOpportunity("O-1", "고객 포털",
+            new java.math.BigDecimal("10"), List.of(new ForecastOpportunityMonth("2026-12", new java.math.BigDecimal("1000000")))))));
         mvc.perform(get("/api/common/sales-pipeline/forecast")).andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.months").isArray()).andExpect(jsonPath("$.data.hiringReviews").isArray());
+            .andExpect(jsonPath("$.data.months").isArray()).andExpect(jsonPath("$.data.hiringReviews").isArray())
+            .andExpect(jsonPath("$.data.opportunityRevenues[0].opportunityName").value("고객 포털"))
+            .andExpect(jsonPath("$.data.opportunityRevenues[0].winningProbability").value(10))
+            .andExpect(jsonPath("$.data.opportunityRevenues[0].months[0].month").value("2026-12"))
+            .andExpect(jsonPath("$.data.opportunityRevenues[0].months[0].weightedRevenue").value(1000000));
     }
     @Test void workbookHeadersUseActualMonthRowCount() throws Exception {
         byte[] bytes = new com.company.common.support.service.ExcelExportService().write("예측", List.of("년월"),

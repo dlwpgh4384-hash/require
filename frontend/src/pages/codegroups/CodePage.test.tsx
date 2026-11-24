@@ -706,8 +706,8 @@ it("그룹·코드·수당코드 추가 창의 입력 칸 안내 글은 시안�
   expect(dialog.getByLabelText("새 코드 이름")).toHaveAttribute("placeholder", "예: 야근 수당(월)");
 });
 
-// FR-0106: 저장 409는 경고 알림 뒤 지금 값을 다시 읽는다(roles와 같은 방식).
-it("코드 저장이 409면 경고 알림을 띄우고 지금 값을 다시 읽는다", async () => {
+// FR-0106: 저장 409는 경고 알림 뒤 입력을 두고 [최신 버전 불러오기 (입력 유지)](2026-11-24 사용자 결정).
+it("코드 저장이 409면 경고 알림을 띄우고 입력은 그대로, 단추로 최신 버전만 받는다", async () => {
   await ready();
   const base = request.getMockImplementation()!;
   request.mockImplementation(async (path: string, init?: RequestInit) =>
@@ -729,9 +729,12 @@ it("코드 저장이 409면 경고 알림을 띄우고 지금 값을 다시 읽�
   const toast = await screen.findByTestId("code-toast");
   expect(toast).toHaveTextContent("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.");
   expect(toast).toHaveClass("app-toast-warn");
+  expect(screen.getByLabelText("ONE 이름")).toHaveValue("늦은 이름");
+  fireEvent.click(await screen.findByTestId("code-version-refresh"));
   await waitFor(() =>
-    expect(screen.getByLabelText("ONE 이름")).toHaveValue("첫 이름"),
+    expect(screen.queryByTestId("code-version-refresh")).not.toBeInTheDocument(),
   );
+  expect(screen.getByLabelText("ONE 이름")).toHaveValue("늦은 이름");
   expect(screen.queryByTestId("code-failure")).not.toBeInTheDocument();
 });
 it("사용을 끈 줄은 시안처럼 흐리게(muted) 보인다", async () => {

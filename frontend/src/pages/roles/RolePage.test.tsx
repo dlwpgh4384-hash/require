@@ -739,7 +739,7 @@ it("dirty cancel and role navigation use existing confirmation and notify the sh
   expect(cancelled).toHaveClass("app-toast-info");
   expect(writes()).toHaveLength(0);
 });
-it("FR-0106: 저장에 읽은 modifiedAt을 보내고, 409면 경고 알림 뒤 지금 값을 다시 읽는다", async () => {
+it("FR-0106: 저장에 읽은 modifiedAt을 보내고, 409면 입력은 두고 [최신 버전 불러오기 (입력 유지)]로 최신 시각만 받는다", async () => {
   conflict = true;
   settings.get("ADMIN")!.modifiedAt = "2026-11-13T01:00:00.123456Z";
   renderPage();
@@ -759,9 +759,12 @@ it("FR-0106: 저장에 읽은 modifiedAt을 보내고, 409면 경고 알림 뒤 
   expect(JSON.parse(writes("PUT")[0][1].body).modifiedAt).toBe(
     "2026-11-13T01:00:00.123456Z",
   );
+  const mine = (screen.getByTestId("role-sensitive") as HTMLInputElement).checked;
+  fireEvent.click(await screen.findByTestId("role-version-refresh"));
   await waitFor(() => expect(reads()).toBeGreaterThan(before));
   await waitFor(() =>
-    expect(screen.getByTestId("role-sensitive")).toBeChecked(),
+    expect(screen.queryByTestId("role-failure")).not.toBeInTheDocument(),
   );
-  expect(screen.queryByTestId("role-failure")).not.toBeInTheDocument();
+  // 내가 바꾼 칸은 그대로 남는다(2026-11-24 사용자 결정).
+  expect((screen.getByTestId("role-sensitive") as HTMLInputElement).checked).toBe(mine);
 });

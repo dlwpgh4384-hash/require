@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { mergeKeepingEdits } from "../../shared/mergeKeepingEdits";
 import { requestMenuRefresh } from "../../app/menuRefresh";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { Banner } from "../../shared/list";
@@ -67,6 +68,8 @@ export function MenuPage() {
   const [draft, setDraft] = useState<api.MenuSettingItem[]>([]);
   const [moved, setMoved] = useState<string[]>([]);
   const [failure, setFailure] = useState("");
+  /** 409 뒤 [최신 버전 불러오기 (입력 유지)] 단추를 보일지(2026-11-24 사용자 결정). */
+  const [conflict, setConflict] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   /** 저장 전 이름 검사에 걸린 줄(시안: 문구는 알림 한 줄, 칸은 빨간 테두리만). */
   const [badNames, setBadNames] = useState<string[]>([]);
@@ -131,6 +134,23 @@ export function MenuPage() {
         ?.querySelector<HTMLElement>("[aria-invalid='true']")
         ?.focus();
   }, [errors, badNames]);
+  /** 내가 고친 줄은 그대로(표 수정 시각만 최신), 안 고친 줄은 최신 값으로 합친다. */
+  const reloadKeepingInput = async () => {
+    if (!snapshot || busy) return;
+    setBusy(true);
+    try {
+      const result = await api.getCommonMenuSettings();
+      setDraft((current) => mergeKeepingEdits(current, snapshot, result.items, (row) => row.menuId));
+      version.current = result.modifiedAt ?? null;
+      setSnapshot(result.items);
+      setConflict(false);
+      setFailure("");
+    } catch (error) {
+      setFailure(message(error));
+    } finally {
+      setBusy(false);
+    }
+  };
   const refresh = async () => {
     const result = await api.getCommonMenuSettings();
     version.current = result.modifiedAt ?? null;
@@ -174,6 +194,7 @@ export function MenuPage() {
       .filter((row) => !row.menuNm.trim() || [...row.menuNm].length > 50)
       .map((row) => row.menuId);
     setErrors({});
+    setConflict(false);
     setBadNames(invalid);
     if (invalid.length) {
       setNotice("메뉴 이름은 비울 수 없고 50자 이내여야 합니다.");
@@ -213,9 +234,10 @@ export function MenuPage() {
         error instanceof MenuRegistrationRequestError &&
         error.status === 409
       ) {
-        // FR-0106: 다른 사람이 먼저 바꿨으면 안내하고 지금 값을 다시 읽는다(새 수정 시각을 받는다).
+        // FR-0106: 다른 사람이 먼저 바꿨으면 안내하고, 입력은 둔 채 [최신 버전 불러오기 (입력 유지)]를 보인다(2026-11-24 사용자 결정).
         setNotice(error.message, "warn");
-        setRevision((value) => value + 1);
+        setFailure(error.message);
+        setConflict(true);
       } else {
         setFailure(message(error));
         if (error instanceof MenuRegistrationRequestError)
@@ -513,6 +535,20 @@ export function MenuPage() {
       {failure && (
         <div role="alert" data-testid="menu-settings-failure">
           {failure}
+          {conflict && (
+            <>
+              {" "}
+              <button
+                type="button"
+                className="ls-btn ls-btn-sm"
+                data-testid="menu-settings-version-refresh"
+                disabled={busy}
+                onClick={() => void reloadKeepingInput()}
+              >
+                최신 버전 불러오기 (입력 유지)
+              </button>
+            </>
+          )}
           {(!snapshot || refreshPending) && (
             <button
               type="button"

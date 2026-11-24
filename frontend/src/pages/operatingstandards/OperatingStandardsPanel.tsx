@@ -41,6 +41,8 @@ export function OperatingStandardsPanel({
   );
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState("");
+  /** 409 뒤 [최신 버전 불러오기 (입력 유지)] 단추를 보일지(2026-11-24 사용자 결정). */
+  const [conflict, setConflict] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState("");
   const [noticeKind, setNoticeKind] = useState<ToastKind>("ok");
@@ -113,6 +115,22 @@ export function OperatingStandardsPanel({
           ? "update"
           : "add",
     }));
+  /** 고친 칸(draft)은 그대로 두고, 표의 값·수정 시각만 최신으로 바꾼다. 안 고친 칸은 최신 값이 보인다. */
+  const reloadKeepingInput = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await api.getCommonOperatingStandards();
+      setSnapshot(result.items);
+      setClosedMonth(result.closedMonth ?? null);
+      setConflict(false);
+      setFailure("");
+    } catch (error) {
+      setFailure(message(error));
+    } finally {
+      setBusy(false);
+    }
+  };
   const refresh = async () => {
     const result = await api.getCommonOperatingStandards();
     setSnapshot(result.items);
@@ -141,6 +159,7 @@ export function OperatingStandardsPanel({
     lock.current = true;
     setBusy(true);
     setFailure("");
+    setConflict(false);
     let saved = false;
     try {
       const result = await api.putCommonOperatingStandards(changes);
@@ -163,10 +182,12 @@ export function OperatingStandardsPanel({
         error instanceof api.OperatingStandardsRequestError &&
         error.status === 409
       ) {
-        // FR-0106: 다른 사람이 먼저 바꿨으면 창을 닫고 안내한 뒤 지금 값을 다시 읽는다.
+        // FR-0106: 다른 사람이 먼저 바꿨으면 창을 닫고 안내한다. 입력은 둔 채 [최신 버전 불러오기 (입력 유지)]를 보인다
+        // (2026-11-24 사용자 결정).
         setConfirmSave(false);
         notify(error.message, "warn");
-        setRevision((old) => old + 1);
+        setFailure(error.message);
+        setConflict(true);
         return;
       }
       if (saved) {
@@ -476,6 +497,20 @@ export function OperatingStandardsPanel({
       {failure && (
         <div role="alert" data-testid="operating-failure">
           {failure}
+          {conflict && (
+            <>
+              {" "}
+              <button
+                type="button"
+                className="ls-btn ls-btn-sm"
+                data-testid="operating-version-refresh"
+                disabled={busy}
+                onClick={() => void reloadKeepingInput()}
+              >
+                최신 버전 불러오기 (입력 유지)
+              </button>
+            </>
+          )}
           {(!snapshot || refreshPending) && (
             <button
               type="button"

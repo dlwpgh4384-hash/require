@@ -352,7 +352,7 @@ it("서버 거부(400)는 문구를 보이고 draft 보존", async () => {
   expect(screen.getByLabelText("M003 사용")).not.toBeChecked();
   expect(rows.find((row) => row.menuId === "M003")?.useYn).toBe("Y");
 });
-it("FR-0106: 저장에 읽은 modifiedAt을 보내고, 409면 경고 알림 뒤 지금 값을 다시 읽는다", async () => {
+it("FR-0106: 409면 입력은 두고, [최신 버전 불러오기 (입력 유지)]로 내가 안 고친 줄만 최신 값을 받는다", async () => {
   await mount();
   conflictPut = true;
   fireEvent.change(screen.getByLabelText("M003 메뉴 이름"), {
@@ -363,10 +363,14 @@ it("FR-0106: 저장에 읽은 modifiedAt을 보내고, 409면 경고 알림 뒤 
   const toast = await screen.findByTestId("menu-settings-toast");
   expect(toast).toHaveTextContent("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.");
   expect(toast).toHaveClass("app-toast-warn");
+  expect(screen.getByLabelText("M003 메뉴 이름")).toHaveValue("내 이름");
+  fireEvent.click(await screen.findByTestId("menu-settings-version-refresh"));
+  // 남이 바꾼 줄은 최신 값, 내가 고친 줄은 내 입력(2026-11-24 사용자 결정).
   await waitFor(() =>
     expect(screen.getByLabelText("M001 메뉴 이름")).toHaveValue("남이 바꾼 이름"),
   );
-  expect(screen.getByLabelText("M003 메뉴 이름")).toHaveValue("직접 메뉴");
+  expect(screen.getByLabelText("M003 메뉴 이름")).toHaveValue("내 이름");
+  expect(screen.queryByTestId("menu-settings-version-refresh")).not.toBeInTheDocument();
   expect(screen.getByTestId("menu-settings-save")).toBeEnabled();
 });
 it("시안: 같은 묶음에서 아래로 끌면 놓은 줄 뒤로 간다", async () => {

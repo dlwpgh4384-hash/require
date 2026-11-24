@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
+import { mergeKeepingEdits } from "../../shared/mergeKeepingEdits";
 import {
   ConfirmDialog,
   Toast,
@@ -30,6 +31,8 @@ export function RolePage() {
   const [draft, setDraft] = useState<api.RoleUpdate | null>(null);
   const [listFailure, setListFailure] = useState("");
   const [failure, setFailure] = useState("");
+  /** 409 뒤 [최신 버전 불러오기 (입력 유지)] 단추를 보일지(2026-11-24 사용자 결정). */
+  const [conflict, setConflict] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [revision, setRevision] = useState(0);
   const [listRevision, setListRevision] = useState(0);
@@ -144,6 +147,26 @@ export function RolePage() {
         : {},
     );
   };
+  /** 내가 바꾼 권한 칸은 그대로(변경 시각만 최신), 안 바꾼 칸은 최신 값으로 합친다. */
+  const reloadKeepingInput = async () => {
+    if (!selected || !settings || !draft) return;
+    try {
+      const latest = await api.getCommonRole(selected);
+      const original = api.roleDraft(settings);
+      const fresh = api.roleDraft(latest);
+      setDraft({
+        ...fresh,
+        dataScopeCd: draft.dataScopeCd !== original.dataScopeCd ? draft.dataScopeCd : fresh.dataScopeCd,
+        snstvViewYn: draft.snstvViewYn !== original.snstvViewYn ? draft.snstvViewYn : fresh.snstvViewYn,
+        menuAuths: mergeKeepingEdits(draft.menuAuths, original.menuAuths, fresh.menuAuths, (row) => row.menuId),
+      });
+      setSettings(latest);
+      setConflict(false);
+      setFailure("");
+    } catch (error) {
+      failed(error);
+    }
+  };
   const persist = async (confirmedAffectedUserIds: string[]) => {
     if (!draft || !settings) return;
     // 서버는 바뀐 항목마다 이력 1줄(데이터 범위·민감 항목·메뉴별 동작)을 남긴다. 시안 문구에 그 줄 수를 보여 준다.
@@ -175,6 +198,7 @@ export function RolePage() {
     lock.current = true;
     setBusy(true);
     setFailure("");
+    setConflict(false);
     setErrors({});
     try {
       if (confirmed) await persist(confirmed);
@@ -189,9 +213,10 @@ export function RolePage() {
     } catch (error) {
       setImpact(null);
       if (error instanceof api.RoleRequestError && error.status === 409) {
-        // 다른 사람이 먼저 바꿨으면 안내하고 지금 값을 다시 읽는다(새 변경 시각을 받는다).
+        // 다른 사람이 먼저 바꿨으면 안내하고, 입력은 둔 채 [최신 버전 불러오기 (입력 유지)]를 보인다(2026-11-24 사용자 결정).
         setNotice(error.message, "warn");
-        setRevision((value) => value + 1);
+        setFailure(error.message);
+        setConflict(true);
         return;
       }
       failed(error);
@@ -543,6 +568,19 @@ export function RolePage() {
       {failure && (
         <div role="alert" data-testid="role-failure" className="field-error">
           {failure}
+          {conflict && (
+            <>
+              {" "}
+              <button
+                type="button"
+                className="ls-btn ls-btn-sm"
+                data-testid="role-version-refresh"
+                onClick={() => void reloadKeepingInput()}
+              >
+                최신 버전 불러오기 (입력 유지)
+              </button>
+            </>
+          )}
           {Object.entries(errors).map(([field, text]) => (
             <p
               key={field}

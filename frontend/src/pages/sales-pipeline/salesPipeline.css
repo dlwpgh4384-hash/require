@@ -1,0 +1,115 @@
+.sales-pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  color: var(--text);
+}
+.sales-pipeline-heading,
+.sales-pipeline nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sales-pipeline-heading {
+  justify-content: space-between;
+}
+.sales-pipeline button,
+.sales-pipeline select {
+  min-height: 28px;
+}
+.sales-pipeline button[aria-pressed="true"] {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.sales-kanban {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.sales-kanban > section {
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 12px;
+}
+.sales-pipeline article {
+  padding: 12px;
+  margin: 12px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+.sales-kanban article > button {
+  text-align: left;
+  max-width: 100%;
+  white-space: normal;
+}
+.sales-kanban article.sales-card-highlight {
+  border-color: var(--primary);
+  outline: 2px solid var(--primary);
+}
+.sales-kanban article p {
+  margin: 8px 0;
+}
+.sales-overdue {
+  color: var(--ls-bad);
+}
+.sales-chart {
+  display: grid;
+  gap: 12px;
+}
+.sales-chart > div {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) 150px;
+  align-items: center;
+  gap: 12px;
+}
+.sales-bar-track {
+  display: flex;
+  height: 18px;
+  background: var(--surface);
+}
+.sales-bar-project {
+  background: var(--primary);
+}
+.sales-bar-opportunity {
+  background: var(--ls-warn);
+}
+.sales-chart meter {
+  display: block;
+  width: 100%;
+}
+.sales-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.sales-table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.sales-table-scroll td,
+.sales-table-scroll th {
+  border-bottom: 1px solid var(--border);
+  padding: 10px;
+  white-space: nowrap;
+  text-align: right;
+}
+@media (max-width: 1000px) {
+  .sales-kanban {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .sales-kanban {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sales-chart > div {
+    grid-template-columns: 65px minmax(0, 1fr);
+  }
+  .sales-chart > div > span:last-child {
+    grid-column: 2;
+  }
+}

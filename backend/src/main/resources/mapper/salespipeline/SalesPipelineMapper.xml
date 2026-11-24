@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.salespipeline.mapper.SalesPipelineMapper">
+  <resultMap id="opportunity" type="com.company.common.salespipeline.mapper.SalesPipelineRows$Opportunity" autoMapping="false">
+    <constructor>
+      <idArg column="opportunityId" javaType="string"/>
+      <arg column="opportunityName" javaType="string"/>
+      <arg column="customerId" javaType="string"/>
+      <arg column="customerName" javaType="string"/>
+      <arg column="stageCode" javaType="string"/>
+      <arg column="winningProbability" javaType="java.math.BigDecimal"/>
+      <arg column="expectedAmount" javaType="java.math.BigDecimal"/>
+      <arg column="startMonth" javaType="string"/>
+      <arg column="nextAction" javaType="string"/>
+      <arg column="nextActionDueDate" javaType="java.time.LocalDate"/>
+      <arg column="approvalStatusCode" javaType="string"/>
+      <arg column="modifiedAt" javaType="java.time.Instant"/>
+      <arg column="manpower" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="job" type="com.company.common.salespipeline.mapper.SalesPipelineRows$Job" autoMapping="false">
+    <constructor><arg column="jobCode" javaType="string"/><arg column="jobName" javaType="string"/></constructor>
+  </resultMap>
+  <resultMap id="closed" type="com.company.common.salespipeline.dto.SalesPipelineContracts$Closed" autoMapping="false">
+    <constructor>
+      <arg column="opportunityId" javaType="string"/>
+      <arg column="opportunityName" javaType="string"/>
+      <arg column="customerName" javaType="string"/>
+      <arg column="result" javaType="string"/>
+      <arg column="expectedAmount" javaType="java.math.BigDecimal"/>
+      <arg column="resultDate" javaType="java.time.LocalDate"/>
+      <arg column="projectId" javaType="string"/>
+      <arg column="lossReason" javaType="string"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="revenue" type="com.company.common.salespipeline.mapper.SalesPipelineRows$Revenue" autoMapping="false">
+    <constructor>
+      <arg column="projectRevenue" javaType="java.math.BigDecimal"/>
+      <arg column="weightedOpportunityRevenue" javaType="java.math.BigDecimal"/>
+      <arg column="opportunityRevenue" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="projectDemand" type="com.company.common.withdrawals.mapper.WithdrawalRows$ProjectDemandRow" autoMapping="false">
+    <constructor>
+      <arg column="plannedMm" javaType="java.math.BigDecimal"/>
+      <arg column="confirmedMm" javaType="java.math.BigDecimal"/>
+      <arg column="remainingMonths" javaType="_int"/>
+    </constructor>
+  </resultMap>
+  <select id="ongoing" resultMap="opportunity">
+    SELECT o.OPP_ID AS "opportunityId",o.OPP_NM AS "opportunityName",
+      o.CUST_CLNT_ID AS "customerId",c.CLNT_NM AS "customerName",o.SALES_STEP_CD AS "stageCode",
+      o.WIN_PRBL_RT AS "winningProbability",o.EXPCT_AMT AS "expectedAmount",
+      to_char(to_date(o.BGN_PLAN_YM,'YYYYMM'),'YYYY-MM') AS "startMonth",
+      o.NEXT_TODO_CN AS "nextAction",o.NEXT_TODO_DDLN_DT AS "nextActionDueDate",
+      o.APRV_STAT_CD AS "approvalStatusCode",COALESCE(o.MOD_DTTM,o.REG_DTTM) AS "modifiedAt",
+      COALESCE((SELECT SUM(n.NEED_CNT*n.MON_MM) FROM TB_SL_OPP_NEED n WHERE n.OPP_ID=o.OPP_ID),0) AS "manpower"
+    FROM TB_SL_OPP o JOIN TB_BS_CLNT c ON c.CLNT_ID=o.CUST_CLNT_ID
+    WHERE o.OPP_STAT_CD='ING'
+    ORDER BY COALESCE(o.MOD_DTTM,o.REG_DTTM) DESC,o.OPP_ID
+  </select>
+  <select id="requiredJobs" resultMap="job">
+    SELECT n.JOB_CD AS "jobCode",COALESCE(c.CODE_NM,n.JOB_CD) AS "jobName"
+    FROM TB_SL_OPP_NEED n LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='JOB' AND c.CODE=n.JOB_CD
+    WHERE n.OPP_ID=#{id} ORDER BY n.NEED_SN
+  </select>
+  <select id="jobs" resultMap="job">
+    SELECT c.CODE AS "jobCode",c.CODE_NM AS "jobName"
+    FROM TB_SY_CODE c WHERE c.CODE_GRP_ID='JOB' AND c.DEL_YN='N'
+    ORDER BY c.SORT_ORD,c.CODE
+  </select>
+  <select id="closed" resultMap="closed">
+    SELECT o.OPP_ID AS "opportunityId",o.OPP_NM AS "opportunityName",c.CLNT_NM AS "customerName",
+      o.OPP_STAT_CD AS "result",o.EXPCT_AMT AS "expectedAmount",o.RSLT_DT AS "resultDate",
+      CASE WHEN o.OPP_STAT_CD='WIN' THEN o.PROJ_ID END AS "projectId",
+      CASE WHEN o.OPP_STAT_CD='LOSE' THEN concat_ws(' · ',r.CODE_NM,o.LOSE_MEMO) END AS "lossReason"
+    FROM TB_SL_OPP o JOIN TB_BS_CLNT c ON c.CLNT_ID=o.CUST_CLNT_ID
+    LEFT JOIN TB_SY_CODE r ON r.CODE_GRP_ID='LOSE_RSN' AND r.CODE=o.LOSE_RSN_CD
+    WHERE o.OPP_STAT_CD IN ('WIN','LOSE'<if test="includeStopped">,'STOP'</if>)
+      <if test="result != null">AND o.OPP_STAT_CD=#{result}</if>
+    ORDER BY o.RSLT_DT DESC,o.OPP_ID
+  </select>
+  <select id="revenue" resultMap="revenue">
+    SELECT
+      COALESCE((SELECT SUM(m.APLY_UPRC*m.MON_MM) FROM TB_PJ_ASGN_MON m
+        JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID
+        JOIN TB_PJ_PROJ p ON p.PROJ_ID=m.PROJ_ID
+        WHERE m.INPUT_YM=#{month} AND a.ASGN_STAT_CD='ACT' AND a.INPUT_TYPE_CD!='FREE'
+          AND p.PROJ_STAT_CD='ING' AND p.CTRT_TYPE_CD IN ('MO','DP')
+          AND a.INPUT_BGN_DT &lt;= #{lastDay} AND a.INPUT_END_DT &gt;= #{firstDay}),0)
+      + COALESCE((SELECT SUM(GREATEST(0,p.CTRT_AMT-COALESCE((SELECT SUM(b.SPLY_AMT)
+          FROM TB_BL_BILL b WHERE b.PROJ_ID=p.PROJ_ID AND b.CNCL_YN='N'),0))
+          / NULLIF((extract(year FROM p.CTRT_END_DT)::int-extract(year FROM CAST(#{horizonStart} AS date))::int)*12
+            +extract(month FROM p.CTRT_END_DT)::int-extract(month FROM CAST(#{horizonStart} AS date))::int+1,0))
+        FROM TB_PJ_PROJ p WHERE p.PROJ_STAT_CD='ING' AND p.CTRT_TYPE_CD='TK'
+          AND p.CTRT_END_DT &gt;= #{firstDay} AND p.CTRT_BGN_DT &lt;= #{lastDay}),0) AS "projectRevenue",
+      COALESCE((SELECT SUM(o.EXPCT_AMT/COALESCE(o.EXPCT_PRD_MCNT,6)*o.WIN_PRBL_RT/100)
+        FROM TB_SL_OPP o WHERE o.OPP_STAT_CD='ING'
+          AND to_date(o.BGN_PLAN_YM,'YYYYMM') &lt;= #{firstDay}
+          AND to_date(o.BGN_PLAN_YM,'YYYYMM')+make_interval(months =&gt; COALESCE(o.EXPCT_PRD_MCNT,6)::int) &gt; #{firstDay}),0) AS "weightedOpportunityRevenue",
+      COALESCE((SELECT SUM(o.EXPCT_AMT/COALESCE(o.EXPCT_PRD_MCNT,6)) FROM TB_SL_OPP o
+        WHERE o.OPP_STAT_CD='ING' AND to_date(o.BGN_PLAN_YM,'YYYYMM') &lt;= #{firstDay}
+          AND to_date(o.BGN_PLAN_YM,'YYYYMM')+make_interval(months =&gt; COALESCE(o.EXPCT_PRD_MCNT,6)::int) &gt; #{firstDay}),0) AS "opportunityRevenue"
+  </select>
+  <select id="projectDemand" resultMap="projectDemand">
+    SELECT n.PLAN_MM AS "plannedMm",COALESCE((SELECT SUM(m.MON_MM) FROM TB_PJ_ASGN_MON m
+        JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID AND a.ASGN_STAT_CD='ACT'
+        WHERE m.PROJ_ID=n.PROJ_ID AND a.JOB_CD=n.JOB_CD),0) AS "confirmedMm",
+      ((extract(year FROM p.CTRT_END_DT)::int-extract(year FROM CAST(#{horizonStart} AS date))::int)*12
+        +extract(month FROM p.CTRT_END_DT)::int-extract(month FROM CAST(#{horizonStart} AS date))::int+1) AS "remainingMonths"
+    FROM TB_PJ_MNPW_PLAN n JOIN TB_PJ_PROJ p ON p.PROJ_ID=n.PROJ_ID
+    WHERE n.JOB_CD=#{jobCode} AND p.PROJ_STAT_CD='ING' AND p.CTRT_TYPE_CD!='IN'
+      AND p.CTRT_BGN_DT &lt;= #{lastDay} AND p.CTRT_END_DT &gt;= #{firstDay}
+    ORDER BY n.PROJ_ID,n.JOB_CD
+  </select>
+  <select id="candidates" resultType="_int">
+    SELECT COUNT(*)::int FROM TB_HR_CAND c
+    WHERE c.JOB_CD=#{jobCode} AND c.CNTC_STAT_CD NOT IN ('HOLD','CTRT')
+  </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES(#{userId},'DNLD','UI-29',concat('매출·인력 예측 ',#{count},'건'),clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
+</mapper>

@@ -1,0 +1,64 @@
+.sales-opportunity-form,
+.sales-opportunity-detail {
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sales-opportunity-form fieldset,
+.sales-opportunity-detail fieldset {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 12px;
+  background: var(--surface);
+}
+.sales-opportunity-form fieldset > fieldset {
+  grid-column: 1 / -1;
+}
+.sales-opportunity-form label,
+.sales-opportunity-detail label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.sales-opportunity-form input,
+.sales-opportunity-form select,
+.sales-opportunity-detail input,
+.sales-opportunity-detail select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  min-height: 32px;
+}
+.sales-opportunity-form button,
+.sales-opportunity-detail button {
+  min-height: 28px;
+}
+.sales-opportunity-detail nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sales-opportunity-form [role="alert"],
+.sales-opportunity-detail [role="alert"] {
+  color: var(--ls-warn);
+}
+.sales-opportunity-detail article {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+}
+.sales-opportunity-form output,
+.sales-opportunity-form h3 {
+  grid-column: 1 / -1;
+}

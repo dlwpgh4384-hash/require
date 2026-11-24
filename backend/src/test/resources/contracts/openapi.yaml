@@ -12523,8 +12523,1597 @@ paths:
       - 'side-effect: 추출 완료 후 창 취소 -> TB_SY_UPLD·후보 표·파일 저장소에 파일/원문/업로드 이력 없음'
       x-state-transitions:
       - 영속 상태 전이 없음; 추출 결과만 응답·등록은 별도 명령
+  /api/common/sales-pipeline:
+    get:
+      operationId: getCommonSalesPipeline
+      summary: 진행 영업 기회 현황
+      security: []
+      x-related-requirements:
+      - REQ-1389
+      - REQ-1390
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      x-pagination-contract:
+        mode: none
+        reason: 전체 집계/칸반/6개월 예측은 전체 결과를 읽으며 공통 ListView의 쪽 나눔은 로컬 표시만 바꾼다.
+      x-filtering-contract:
+        mode: none
+        reason: 현재 admin 전체 범위이며 요청에 없는 역할/파트 필터는 추가하지 않는다.
+      responses:
+        '200':
+          description: 진행 영업 기회 현황 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesPipeline'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_SL_OPP
+        result_path:
+        - data
+  /api/common/sales-opportunities/{opportunityId}:
+    get:
+      operationId: getCommonSalesOpportunity
+      summary: 영업 기회 상세
+      security: []
+      x-related-requirements:
+      - REQ-1393
+      - REQ-1401
+      - REQ-1400
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      parameters:
+      - name: opportunityId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: 영업 기회 상세 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesOpportunity'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 영업 기회가 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_SL_OPP
+        result_path:
+        - data
+    put:
+      operationId: putCommonSalesOpportunity
+      summary: 영업 기회 수정
+      security: []
+      x-related-requirements:
+      - REQ-1393
+      - REQ-1394
+      - REQ-1378
+      - REQ-1398
+      - REQ-1372
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      parameters:
+      - name: opportunityId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonSalesOpportunityUpdateInput'
+      x-business-rules:
+      - 기회 수정·단계 변경·승인·가배정 등 수정은 modifiedAt을 받아 불일치면 CodeFailure.conflict()·409와 지정 문구로 거부한다.
+      - 기회명100자·사용중 고객·파트/단계·확률0~100·양수금액·시작월·근무지200자, 필요인력 직무/정수인원≥1/시작월/개월≥1/월MM>0≤1을 검증한다.
+      - 저장 시 예상 이익률이 월 승인 기준 미만이면 승인 대기이며 정확한 기준값은 대기 아님이다.
+      - 승인 후 차이≤월 재승인차이는 승인 유지, 초과하며 기준 미만이면 대기·기준 이상이면 요구 해제한다. 반려 건을 고쳐 저장하면 다시 대기다.
+      x-side-effects:
+      - TB_SL_OPP_NEED 변경을 함께 반영하고 MOD_DTTM을 갱신한다.
+      x-required-tests:
+      - 'happy: 최신 modifiedAt으로 기회명 수정 -> 상세 GET의 TB_SL_OPP 새 이름 확인'
+      - 'auth: 개발 admin 무인증 수정 -> 전체 범위의 대상 기회만 변경; 역할 검사 추가 없음'
+      - 'validation: 필요인력 monthlyMm=0 -> 400 errors[].field=needs[0].monthlyMm·기존 필요인력 불변'
+      - 'business: 오래된 modifiedAt 수정 -> 409 지정 문구·TB_SL_OPP와 필요인력 불변; 반려 수정 저장은 승인 대기'
+      - 'side-effect: 필요인력 개월 수정 -> TB_SL_OPP_NEED 새 개월과 TB_SL_OPP.MOD_DTTM 증가 조회'
+      x-state-transitions:
+      - 진행 중 이전값 -> 진행 중 새값
+      - 반려 -> 수정 저장 후 승인 대기
+      - 승인 -> 차이≤월 적용gap이면 유지; 초과·기준미만은 대기; 기준이상은 요구해제
+      responses:
+        '200':
+          description: 영업 기회 수정 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesOpportunity'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 영업 기회가 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/sales-opportunities:
+    post:
+      operationId: postCommonSalesOpportunity
+      summary: 영업 기회 등록
+      security: []
+      x-related-requirements:
+      - REQ-1392
+      - REQ-1394
+      - REQ-1397
+      - REQ-1398
+      - REQ-1372
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonSalesOpportunityInput'
+      x-business-rules:
+      - 기회명100자·사용중 고객·파트/단계·확률0~100·양수금액·시작월·근무지200자, 필요인력 직무/정수인원≥1/시작월/개월≥1/월MM>0≤1을 검증한다.
+      - 저장 시 예상 이익률이 월 승인 기준 미만이면 승인 대기이며 정확한 기준값은 대기 아님이다.
+      - 승인 후 차이≤월 재승인차이는 승인 유지, 초과하며 기준 미만이면 대기·기준 이상이면 요구 해제한다. 반려 건을 고쳐 저장하면 다시 대기다.
+      x-side-effects:
+      - TB_SL_OPP_NEED를 기회와 함께 저장하고 기회 MOD_DTTM을 갱신한다.
+      x-required-tests:
+      - 'happy: 필수값과 필요인력 한 줄로 등록 -> 상세 GET에서 TB_SL_OPP와 TB_SL_OPP_NEED의 입력값 조회'
+      - 'auth: 개발 admin 무인증 등록 -> 로그인 오류 없이 등록; 역할 거부 시험은 UI-22 후속'
+      - 'validation: winningProbability=101 -> 400 errors[].field=winningProbability·신규 기회0건'
+      - 'business: 초기 승인 기준15%에서 이익률15.0% 등록 -> 승인 대기 아님; 미만이면 대기'
+      - 'side-effect: 기회와 필요인력 등록 -> TB_SL_OPP_NEED의 해당 기회 필요인력과 새 MOD_DTTM 조회'
+      x-state-transitions:
+      - 미등록 -> 진행 중; 이익률이 기준 미만이면 승인 대기
+      responses:
+        '200':
+          description: 영업 기회 등록 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesOpportunity'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/sales-pipeline/quote:
+    post:
+      operationId: postCommonSalesPipelineQuote
+      summary: 영업 견적 이익 점검
+      security: []
+      x-related-requirements:
+      - REQ-1395
+      - REQ-1396
+      - REQ-1372
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonSalesQuoteInput'
+      x-business-rules:
+      - 식-00·83~85와 이번달 운영 기준값을 사용하며 저장하지 않는다.
+      x-side-effects:
+      - 업무 DB 쓰기0; 견적 결과만 반환한다.
+      x-required-tests:
+      - 'happy: 필요인력 견적 요청 -> 예상매출·원가·이익률·최소/목표 단가와 금액 반환'
+      - 'auth: 개발 admin 견적 요청 -> 로그인 없이 같은 전체 기준 계산'
+      - 'validation: requiredCount=0 -> 400 errors[].field=needs[0].requiredCount'
+      - 'business: 초기15% 기준에서 정확히15% -> 승인 필요 구간 아님; 20% -> 기준 충족'
+      - 'side-effect: 견적 전후 TB_SL_OPP·NEED 비교 -> 저장 행·MOD_DTTM 불변'
+      x-state-transitions:
+      - 계산 요청 -> 계산 결과; 저장 상태 전이 없음
+      responses:
+        '200':
+          description: 영업 견적 이익 점검 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesQuote'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/sales-opportunities/{opportunityId}/stage:
+    put:
+      operationId: putCommonSalesOpportunityStage
+      summary: 영업 기회 단계 이동
+      security: []
+      x-related-requirements:
+      - REQ-1403
+      - REQ-1404
+      - REQ-1378
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      parameters:
+      - name: opportunityId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonSalesStageInput'
+      x-business-rules:
+      - 카드 끌기 또는 단계 선택으로 변경하고 직접 수정한 확률은 유지하며 나머지는 새 단계 기본 확률로 바꾼다.
+      - 명확화123행에 따라 승인 대기·반려는 협상 이상으로 앞으로 이동만 금지한다. 기존단계 유지·같은단계·뒤로 이동·수주는 허용한다.
+      - 기회 수정·단계 변경·승인·가배정 등 수정은 modifiedAt을 받아 불일치면 CodeFailure.conflict()·409와 지정 문구로 거부한다.
+      x-side-effects:
+      - 단계 저장 후 TB_SL_OPP.MOD_DTTM 갱신; 직접 수정 확률은 유지한다.
+      x-required-tests:
+      - 'happy: 기본확률 발굴을 제안으로 이동 -> 상세 GET 단계 제안·확률30%'
+      - 'auth: admin 단계 이동 -> 무인증 성공; 미래 CNFM 검사로 단계 이동을 제한하지 않음'
+      - 'validation: SALES_STEP에 없는 stageCode -> 400 errors[].field=stageCode·단계 불변'
+      - 'business: 대기/반려 제안에서 협상으로 전진 -> 400·원단계 유지·기회명 포함 지정 안내; 같은단계/후진은 성공'
+      - 'side-effect: 정상 단계 변경 -> TB_SL_OPP.MOD_DTTM 증가·미갱신 표시 해제'
+      x-state-transitions:
+      - 발굴/제안/협상/계약 직전 -> 허용된 선택 단계; 기존 단계 유지·후진 허용
+      responses:
+        '200':
+          description: 영업 기회 단계 이동 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesOpportunity'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 영업 기회가 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/sales-opportunities/{opportunityId}/approve:
+    put:
+      operationId: putCommonSalesOpportunityApprove
+      summary: 견적 승인
+      security: []
+      x-related-requirements:
+      - REQ-1399
+      - REQ-1401
+      - REQ-1378
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      parameters:
+      - name: opportunityId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonSalesVersionInput'
+      x-business-rules:
+      - 승인 대기 띠에서 견적을 승인한다. 경영진 CNFM 정책의 실제 권한 연결은 UI-22 후속이며 이번은 admin이다.
+      - 승인·반려 결과와 반려 사유를 TB_SL_APRV_HIST.ACT_RSN에 기록한다.
+      - 기회 수정·단계 변경·승인·가배정 등 수정은 modifiedAt을 받아 불일치면 CodeFailure.conflict()·409와 지정 문구로 거부한다.
+      - 동작 허용표 OQ-STATE-029는 reviewer 확인 필요; 인증/CNFM 실제 연결은 UI-22 후속.
+      x-side-effects:
+      - TB_SL_APRV_HIST에 처리 결과·시각과 ACT_RSN을 기록한다.
+      x-required-tests:
+      - 'happy: 최신 modifiedAt으로 견적 승인 -> 상세 GET의 승인상태 승인'
+      - 'auth: admin 견적 승인 -> 무인증 처리; 경영진 CNFM 접근 거부 시험은 UI-22 후속'
+      - 'validation: modifiedAt 누락 -> 400 errors[].field=modifiedAt·승인상태 불변'
+      - 'business: 오래된 modifiedAt으로 견적 승인 -> 409·승인상태와 TB_SL_APRV_HIST 불변'
+      - 'side-effect: 승인 완료 -> 상세 GET의 approvalHistory에 TB_SL_APRV_HIST 승인 동작·시각 조회'
+      x-state-transitions:
+      - 승인 대기 -> 승인; 다른 상태 허용은 OQ-STATE-029
+      responses:
+        '200':
+          description: 견적 승인 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesOpportunity'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 영업 기회가 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/sales-opportunities/{opportunityId}/reject:
+    put:
+      operationId: putCommonSalesOpportunityReject
+      summary: 견적 반려
+      security: []
+      x-related-requirements:
+      - REQ-1400
+      - REQ-1401
+      - REQ-1378
+      - REQ-1402
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      parameters:
+      - name: opportunityId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonSalesRejectInput'
+      x-business-rules:
+      - 반려 확인 창에서 선택 사유300자까지 받아 반려한다.
+      - 승인·반려 결과와 반려 사유를 TB_SL_APRV_HIST.ACT_RSN에 기록한다.
+      - 기회 수정·단계 변경·승인·가배정 등 수정은 modifiedAt을 받아 불일치면 CodeFailure.conflict()·409와 지정 문구로 거부한다.
+      - 동작 허용표 OQ-STATE-029는 reviewer 확인 필요; 인증/CNFM 실제 연결은 UI-22 후속.
+      x-side-effects:
+      - TB_SL_APRV_HIST에 처리 결과·시각과 ACT_RSN을 기록한다.
+      - TB_SY_NOTI에 담당자 시스템 알림만 기록·메일0회.
+      x-required-tests:
+      - 'happy: 최신 modifiedAt으로 견적 반려 -> 상세 GET의 승인상태 반려·선택 사유'
+      - 'auth: admin 견적 반려 -> 무인증 처리; 경영진 CNFM 접근 거부 시험은 UI-22 후속'
+      - 'validation: reason301자 -> 400 errors[].field=reason·반려 이력0행'
+      - 'business: 오래된 modifiedAt으로 견적 반려 -> 409·승인상태와 TB_SL_APRV_HIST 불변'
+      - 'side-effect: 사유 포함 반려 -> TB_SL_APRV_HIST.ACT_RSN과 TB_SY_NOTI 문구에 같은 사유·메일0회'
+      x-state-transitions:
+      - 승인 대기 -> 반려; 다른 상태 허용은 OQ-STATE-029
+      responses:
+        '200':
+          description: 견적 반려 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesOpportunity'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 영업 기회가 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/sales-opportunities/{opportunityId}/tentative-assignment-check:
+    post:
+      operationId: postCommonSalesOpportunityTentativeAssignmentCheck
+      summary: 가배정 충돌 경고
+      security: []
+      x-related-requirements:
+      - REQ-1405
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      parameters:
+      - name: opportunityId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonSalesTentativeInput'
+      x-business-rules:
+      - 같은 사람 두 줄·다른 기회 가배정·해당월1.0 이상 확정투입은 줄 아래 경고한다.
+      x-side-effects:
+      - 점유 변경 없이 줄별 경고만 반환한다.
+      x-required-tests:
+      - 'happy: 다른 기회 가배정 인력 검사 -> 해당 줄 경고와 이전 기회 표시'
+      - 'auth: admin 점유 검사 -> 로그인 없이 경고만 조회'
+      - 'validation: developerId 누락 -> 400 errors[].field=developerId'
+      - 'business: 같은사람 두줄 또는 월투입1.0 -> 줄별 경고; 신규 저장 차단 규칙으로 확대하지 않음'
+      - 'side-effect: 경고 검사 -> TB_SL_TENT_ASGN과 TB_SL_OPP.MOD_DTTM 불변'
+      x-state-transitions:
+      - 검사 요청 -> 경고 결과; 저장 상태 전이 없음
+      responses:
+        '200':
+          description: 가배정 충돌 경고 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesTentativeWarnings'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 영업 기회가 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/sales-opportunities/{opportunityId}/tentative-assignment:
+    put:
+      operationId: putCommonSalesOpportunityTentativeAssignment
+      summary: 영업 기회 가배정 저장
+      security: []
+      x-related-requirements:
+      - REQ-1406
+      - REQ-1380
+      - REQ-1378
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      parameters:
+      - name: opportunityId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonSalesTentativeInput'
+      x-business-rules:
+      - 다른 기회 가배정 경고 후 저장하면 이전 기회 점유를 해제하고 한 사람은 한 기회에만 남긴다.
+      - 어느 화면에서든 가배정·해제 시 TB_SL_OPP.MOD_DTTM을 갱신한다.
+      - 기회 수정·단계 변경·승인·가배정 등 수정은 modifiedAt을 받아 불일치면 CodeFailure.conflict()·409와 지정 문구로 거부한다.
+      x-side-effects:
+      - 기존 기회 해제와 새 기회 점유를 원자 반영하고 양쪽 MOD_DTTM을 갱신한다. 확정 투입 생성0.
+      x-required-tests:
+      - 'happy: 다른기회 점유 인력을 새기회에 저장 -> 공유 GET에서 새기회 가배정만 조회'
+      - 'auth: admin 가배정 저장 -> 로그인 없이 변경; 역할별 범위 필터 추가 없음'
+      - 'validation: needSn 누락 -> 400 errors[].field=needSn·점유 불변'
+      - 'business: stale modifiedAt -> 409·이전기회 점유 유지; 다른기회 점유 자체는 경고 후 저장 허용'
+      - 'side-effect: 점유 이전 -> TB_SL_TENT_ASGN 새기회와 두 TB_SL_OPP.MOD_DTTM 증가·TB_PJ_ASGN 확정행 불변'
+      x-state-transitions:
+      - 이전 기회 활성 가배정 -> 해제; 선택 기회 -> 활성 가배정
+      responses:
+        '200':
+          description: 영업 기회 가배정 저장 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesOpportunity'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 영업 기회가 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/sales-opportunities/{opportunityId}/win:
+    post:
+      operationId: postCommonSalesOpportunityWin
+      summary: 수주 프로젝트 인계
+      security: []
+      x-related-requirements:
+      - REQ-1407
+      - REQ-1408
+      - REQ-1409
+      - REQ-1381
+      - REQ-1378
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      parameters:
+      - name: opportunityId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonSalesWinInput'
+      x-business-rules:
+      - 계약금액·계약유형·시작/종료일·상태를 확인한다. 금액은 예상금액, 유형은 기회값 또는 턴키, 날짜는 시작월1일~기간 마지막말일, 상태는 진행 기본·수주예정도 허용한다.
+      - 수주 시 프로젝트1건 생성·기회 수주 종료·TB_SL_OPP.PROJ_ID 저장. 이름·고객·영업파트·근무지를 기회에서 복사한다.
+      - 필요인력의 직무별 인원×월MM×개월 합을 인원계획으로 만들고 가배정은 투입 후보로만 UI-12에 넘긴다.
+      - 대기·반려를 이유로 수주를 차단하지 않는다(명확화123행). 최신 modifiedAt 확인 후 한 트랜잭션으로 수행한다.
+      x-side-effects:
+      - 프로젝트1건·직무 인원계획·투입후보를 만든 후 원가배정을 정리하고 기회.PROJ_ID와 수주결과를 저장한다.
+      x-required-tests:
+      - 'happy: 최신 기회 수주 -> 상세 GET PROJ_ID와 프로젝트 GET의 기회명/고객/파트/근무지 일치'
+      - 'auth: 현재 admin 수주 -> 로그인 검사 없이 처리; 최종 권한은 UI-22 후속'
+      - 'validation: contractEndDate=contractStartDate -> 400 errors[].field=contractEndDate·프로젝트0건'
+      - 'business: 승인대기·반려의 유효 수주 -> 성공·TB_SL_OPP 수주; stale modifiedAt이면409·프로젝트0건'
+      - 'side-effect: 수주 완료 -> TB_PJ_MNPW_PLAN 직무합계와 UI-12 후보 조회·확정 TB_PJ_ASGN 생성0건'
+      x-state-transitions:
+      - 진행 중 -> 수주; PROJ_ID 연결·활성 가배정 정리
+      responses:
+        '200':
+          description: 수주 프로젝트 인계 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesOpportunity'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 영업 기회가 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/sales-opportunities/{opportunityId}/lose:
+    post:
+      operationId: postCommonSalesOpportunityLose
+      summary: 실주 처리
+      security: []
+      x-related-requirements:
+      - REQ-1410
+      - REQ-1378
+      - REQ-1381
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      parameters:
+      - name: opportunityId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonSalesLoseInput'
+      x-business-rules:
+      - 필수 실주 사유(가격·기술 평가·일정·고객 사업 취소·기타)와 메모로 종료하고 가배정을 해제한다.
+      - 기회 수정·단계 변경·승인·가배정 등 수정은 modifiedAt을 받아 불일치면 CodeFailure.conflict()·409와 지정 문구로 거부한다.
+      x-side-effects:
+      - TB_SL_OPP 결과·MOD_DTTM과 활성 가배정 정리를 같은 트랜잭션으로 처리한다.
+      x-required-tests:
+      - 'happy: 최신 modifiedAt으로 실주 처리 -> 상세 GET의 실주 사유·종료 결과'
+      - 'auth: admin 실주 처리 -> 인증 없이 해당 기회만 변경'
+      - 'validation: lossReasonCode 누락 -> 400 errors[].field=lossReasonCode·진행상태 유지'
+      - 'business: 오래된 modifiedAt으로 실주 처리 -> 409·기회와 가배정 불변'
+      - 'side-effect: 실주 처리 완료 -> 공유 GET의 해당 기회 활성가배정0·원본 기회행 보존'
+      x-state-transitions:
+      - 진행 중 -> 실주
+      responses:
+        '200':
+          description: 실주 처리 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesOpportunity'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 영업 기회가 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/sales-opportunities/{opportunityId}/stop:
+    post:
+      operationId: postCommonSalesOpportunityStop
+      summary: 진행 기회 사용 중지
+      security: []
+      x-related-requirements:
+      - REQ-1411
+      - REQ-1378
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      parameters:
+      - name: opportunityId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonSalesVersionInput'
+      x-business-rules:
+      - 진행 기회만 확인 창 후 사용 안 함으로 남기고 RSLT_DT에 처리일을 저장·가배정을 해제한다. 물리 삭제는 없다.
+      - 기회 수정·단계 변경·승인·가배정 등 수정은 modifiedAt을 받아 불일치면 CodeFailure.conflict()·409와 지정 문구로 거부한다.
+      x-side-effects:
+      - TB_SL_OPP 결과·MOD_DTTM과 활성 가배정 정리를 같은 트랜잭션으로 처리한다.
+      x-required-tests:
+      - 'happy: 최신 modifiedAt으로 진행 기회 사용 중지 -> 상세 GET의 사용안함·처리일 RSLT_DT'
+      - 'auth: admin 진행 기회 사용 중지 -> 인증 없이 해당 기회만 변경'
+      - 'validation: modifiedAt 누락 -> 400 errors[].field=modifiedAt·기회 무변경'
+      - 'business: 수주 기회 사용 중지 -> 400·수주상태와 PROJ_ID 불변'
+      - 'side-effect: 진행 기회 사용 중지 완료 -> 공유 GET의 해당 기회 활성가배정0·원본 기회행 보존'
+      x-state-transitions:
+      - 진행 중 -> 사용 안 함·RSLT_DT=처리일
+      responses:
+        '200':
+          description: 진행 기회 사용 중지 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesOpportunity'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 영업 기회가 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/sales-opportunities/{opportunityId}/resume:
+    post:
+      operationId: postCommonSalesOpportunityResume
+      summary: 다시 사용
+      security: []
+      x-related-requirements:
+      - REQ-1413
+      - REQ-1378
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      parameters:
+      - name: opportunityId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonSalesVersionInput'
+      x-business-rules:
+      - 중지 상세의 다시 사용으로 진행 중에 복원하고 결과일자를 비우되 해제한 가배정은 복구하지 않는다.
+      - 기회 수정·단계 변경·승인·가배정 등 수정은 modifiedAt을 받아 불일치면 CodeFailure.conflict()·409와 지정 문구로 거부한다.
+      x-side-effects:
+      - RSLT_DT를 비우고 가배정을 복구하지 않는다.
+      x-required-tests:
+      - 'happy: 최신 modifiedAt으로 다시 사용 -> 상세 GET의 진행 중·빈 RSLT_DT'
+      - 'auth: admin 다시 사용 -> 인증 없이 해당 기회만 변경'
+      - 'validation: modifiedAt 누락 -> 400 errors[].field=modifiedAt·기회 무변경'
+      - 'business: 오래된 modifiedAt으로 다시 사용 -> 409·기회와 가배정 불변'
+      - 'side-effect: 다시 사용 완료 -> TB_SL_TENT_ASGN 복구0·RSLT_DT 비움'
+      x-state-transitions:
+      - 사용 안 함 -> 진행 중·RSLT_DT=null
+      responses:
+        '200':
+          description: 다시 사용 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesOpportunity'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 영업 기회가 존재하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/sales-pipeline/closed:
+    get:
+      operationId: getCommonSalesPipelineClosed
+      summary: 종료 영업 기회 목록
+      security: []
+      x-related-requirements:
+      - REQ-1414
+      - REQ-1412
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      x-pagination-contract:
+        mode: none
+        reason: 전체 집계/칸반/6개월 예측은 전체 결과를 읽으며 공통 ListView의 쪽 나눔은 로컬 표시만 바꾼다.
+      x-filtering-contract:
+        fields:
+        - result
+        - includeStopped
+        source: SPEC-REQUEST.md:58-59
+      parameters:
+      - name: result
+        in: query
+        schema:
+          type: string
+          description: OPP_STAT 기존 결과 코드
+      - name: includeStopped
+        in: query
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '200':
+          description: 종료 영업 기회 목록 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesClosedList'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_SL_OPP
+        result_path:
+        - data
+        - items
+  /api/common/sales-pipeline/forecast:
+    get:
+      operationId: getCommonSalesPipelineForecast
+      summary: 매출 인력 예측
+      security: []
+      x-related-requirements:
+      - REQ-1415
+      - REQ-1416
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      x-pagination-contract:
+        mode: none
+        reason: 전체 집계/칸반/6개월 예측은 전체 결과를 읽으며 공통 ListView의 쪽 나눔은 로컬 표시만 바꾼다.
+      x-filtering-contract:
+        mode: none
+        reason: 현재 admin 전체 범위이며 요청에 없는 역할/파트 필터는 추가하지 않는다.
+      responses:
+        '200':
+          description: 매출 인력 예측 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesForecast'
+                  required:
+                  - data
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_SL_OPP
+        result_path:
+        - data
+  /api/common/sales-pipeline/forecast/excel:
+    get:
+      operationId: getCommonSalesPipelineForecastExcel
+      summary: 매출 인력 예측 엑셀
+      security: []
+      x-related-requirements:
+      - REQ-1417
+      - REQ-1373
+      - REQ-1374
+      - REQ-1375
+      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
+      responses:
+        '200':
+          description: 공통 실제 xlsx·1행 수신자와 생성시각·화면이름_기간_다운로드일시.xlsx·UI-29 DNLD
+          headers:
+            X-Total-Count:
+              description: 조회 결과 건수
+              schema:
+                type: integer
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
+    CommonSalesOpportunityNeed:
+      type: object
+      properties:
+        needSn:
+          type: integer
+        jobCode:
+          type: string
+        gradeCode:
+          type: string
+        requiredCount:
+          type: integer
+          minimum: 1
+        startMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+        months:
+          type: integer
+          minimum: 1
+        monthlyMm:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          maximum: 1
+        estimatedUnitPrice:
+          type: number
+        tentativeDeveloperIds:
+          type: array
+          items:
+            type: string
+      required:
+      - jobCode
+      - requiredCount
+      - startMonth
+      - months
+      - monthlyMm
+    CommonSalesOpportunityInput:
+      type: object
+      properties:
+        opportunityName:
+          type: string
+          maxLength: 100
+        customerId:
+          type: string
+        salesPartId:
+          type: string
+        stageCode:
+          type: string
+        winningProbability:
+          type: number
+          minimum: 0
+          maximum: 100
+        expectedAmount:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        contractTypeCode:
+          type: string
+        startMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+        expectedMonths:
+          type: integer
+          minimum: 1
+          default: 6
+        workplace:
+          type: string
+          maxLength: 200
+        nextAction:
+          type: string
+        nextActionDueDate:
+          type: string
+          format: date
+        memo:
+          type: string
+        needs:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonSalesOpportunityNeed'
+          minItems: 1
+      required:
+      - opportunityName
+      - customerId
+      - salesPartId
+      - stageCode
+      - winningProbability
+      - expectedAmount
+      - startMonth
+      - needs
+    CommonSalesOpportunityUpdateInput:
+      type: object
+      properties:
+        opportunityName:
+          type: string
+          maxLength: 100
+        customerId:
+          type: string
+        salesPartId:
+          type: string
+        stageCode:
+          type: string
+        winningProbability:
+          type: number
+          minimum: 0
+          maximum: 100
+        expectedAmount:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        contractTypeCode:
+          type: string
+        startMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+        expectedMonths:
+          type: integer
+          minimum: 1
+          default: 6
+        workplace:
+          type: string
+          maxLength: 200
+        nextAction:
+          type: string
+        nextActionDueDate:
+          type: string
+          format: date
+        memo:
+          type: string
+        needs:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonSalesOpportunityNeed'
+          minItems: 1
+        modifiedAt:
+          type: string
+          format: date-time
+      required:
+      - opportunityName
+      - customerId
+      - salesPartId
+      - stageCode
+      - winningProbability
+      - expectedAmount
+      - startMonth
+      - needs
+      - modifiedAt
+    CommonSalesVersionInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+      required:
+      - modifiedAt
+    CommonSalesStageInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+        stageCode:
+          type: string
+      required:
+      - modifiedAt
+      - stageCode
+    CommonSalesRejectInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          maxLength: 300
+      required:
+      - modifiedAt
+    CommonSalesTentativeInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+        developerId:
+          type: string
+        needSn:
+          type: integer
+        startMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+      required:
+      - modifiedAt
+      - developerId
+      - needSn
+      - startMonth
+    CommonSalesWinInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+        contractAmount:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        contractTypeCode:
+          type: string
+        contractStartDate:
+          type: string
+          format: date
+        contractEndDate:
+          type: string
+          format: date
+        projectStatusCode:
+          type: string
+      required:
+      - modifiedAt
+      - contractAmount
+      - contractTypeCode
+      - contractStartDate
+      - contractEndDate
+      - projectStatusCode
+    CommonSalesLoseInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+        lossReasonCode:
+          type: string
+        memo:
+          type: string
+      required:
+      - modifiedAt
+      - lossReasonCode
+    CommonSalesQuoteInput:
+      type: object
+      properties:
+        needs:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonSalesOpportunityNeed'
+          minItems: 1
+      required:
+      - needs
+    CommonSalesApprovalHistory:
+      type: object
+      properties:
+        actionCode:
+          type: string
+        actedAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          maxLength: 300
+      required:
+      - actionCode
+      - actedAt
+    CommonSalesOpportunityCard:
+      type: object
+      properties:
+        opportunityName:
+          type: string
+          maxLength: 100
+        customerId:
+          type: string
+        stageCode:
+          type: string
+        winningProbability:
+          type: number
+          minimum: 0
+          maximum: 100
+        expectedAmount:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        startMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+        nextAction:
+          type: string
+        nextActionDueDate:
+          type: string
+          format: date
+        opportunityId:
+          type: string
+        customerName:
+          type: string
+        requiredJobs:
+          type: array
+          items:
+            type: string
+        stale:
+          type: boolean
+        approvalStatusCode:
+          type: string
+        modifiedAt:
+          type: string
+          format: date-time
+      required:
+      - opportunityId
+      - opportunityName
+      - stageCode
+      - winningProbability
+      - expectedAmount
+      - modifiedAt
+    CommonSalesOpportunity:
+      type: object
+      properties:
+        opportunityName:
+          type: string
+          maxLength: 100
+        customerId:
+          type: string
+        salesPartId:
+          type: string
+        stageCode:
+          type: string
+        winningProbability:
+          type: number
+          minimum: 0
+          maximum: 100
+        expectedAmount:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        contractTypeCode:
+          type: string
+        startMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+        expectedMonths:
+          type: integer
+          minimum: 1
+          default: 6
+        workplace:
+          type: string
+          maxLength: 200
+        nextAction:
+          type: string
+        nextActionDueDate:
+          type: string
+          format: date
+        memo:
+          type: string
+        needs:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonSalesOpportunityNeed'
+          minItems: 1
+        opportunityId:
+          type: string
+        customerName:
+          type: string
+        requiredJobs:
+          type: array
+          items:
+            type: string
+        stale:
+          type: boolean
+        approvalStatusCode:
+          type: string
+        modifiedAt:
+          type: string
+          format: date-time
+        projectId:
+          type: string
+          nullable: true
+        resultDate:
+          type: string
+          format: date
+          nullable: true
+        opportunityStatusCode:
+          type: string
+        lossReasonCode:
+          type: string
+          nullable: true
+        approvalHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonSalesApprovalHistory'
+      required:
+      - opportunityId
+      - opportunityName
+      - needs
+      - modifiedAt
+      - approvalStatusCode
+      - opportunityStatusCode
+      - approvalHistory
+    CommonSalesPipelineSummary:
+      type: object
+      properties:
+        ongoingCount:
+          type: integer
+        staleCount:
+          type: integer
+        expectedAmount:
+          type: number
+        weightedAmount:
+          type: number
+        weightedManpower:
+          type: number
+      required:
+      - ongoingCount
+      - staleCount
+      - expectedAmount
+      - weightedAmount
+      - weightedManpower
+    CommonSalesPipelineStage:
+      type: object
+      properties:
+        stageCode:
+          type: string
+        count:
+          type: integer
+        amount:
+          type: number
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonSalesOpportunityCard'
+      required:
+      - stageCode
+      - count
+      - amount
+      - items
+    CommonSalesPipeline:
+      type: object
+      properties:
+        summary:
+          $ref: '#/components/schemas/CommonSalesPipelineSummary'
+        stages:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonSalesPipelineStage'
+      required:
+      - summary
+      - stages
+    CommonSalesQuote:
+      type: object
+      properties:
+        expectedRevenue:
+          type: number
+        expectedCost:
+          type: number
+        profitRate:
+          type: number
+        minimumUnitPrice:
+          type: number
+        targetUnitPrice:
+          type: number
+        breakEvenAmount:
+          type: number
+        targetAmount:
+          type: number
+        approvalRate:
+          type: number
+        reapprovalGap:
+          type: number
+        profitBand:
+          type: string
+          description: 요청의 네 표시구간 이름; 저장 코드 enum 아님
+      required:
+      - expectedRevenue
+      - expectedCost
+      - profitRate
+      - minimumUnitPrice
+      - targetUnitPrice
+      - breakEvenAmount
+      - targetAmount
+      - profitBand
+      - approvalRate
+      - reapprovalGap
+    CommonSalesTentativeWarnings:
+      type: object
+      properties:
+        warnings:
+          type: array
+          items:
+            type: object
+            properties:
+              needSn:
+                type: integer
+              developerId:
+                type: string
+              message:
+                type: string
+            required:
+            - needSn
+            - developerId
+            - message
+      required:
+      - warnings
+    CommonSalesClosedRow:
+      type: object
+      properties:
+        opportunityId:
+          type: string
+        opportunityName:
+          type: string
+        customerName:
+          type: string
+        result:
+          type: string
+        expectedAmount:
+          type: number
+        resultDate:
+          type: string
+          format: date
+        projectId:
+          type: string
+          nullable: true
+        lossReason:
+          type: string
+          nullable: true
+      required:
+      - opportunityId
+      - opportunityName
+      - customerName
+      - result
+      - expectedAmount
+      - resultDate
+    CommonSalesClosedList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonSalesClosedRow'
+      required:
+      - items
+    CommonSalesForecastMonth:
+      type: object
+      properties:
+        month:
+          type: string
+        projectRevenue:
+          type: number
+        weightedOpportunityRevenue:
+          type: number
+        allWonRevenue:
+          type: number
+        demand:
+          type: number
+        supply:
+          type: number
+      required:
+      - month
+      - projectRevenue
+      - weightedOpportunityRevenue
+      - allWonRevenue
+      - demand
+      - supply
+    CommonSalesHiringReview:
+      type: object
+      properties:
+        jobCode:
+          type: string
+        jobName:
+          type: string
+        shortageStartMonth:
+          type: string
+        maximumShortage:
+          type: number
+        recommendedHiringMonth:
+          type: string
+        candidateCount:
+          type: integer
+      required:
+      - jobCode
+      - jobName
+      - shortageStartMonth
+      - maximumShortage
+      - recommendedHiringMonth
+      - candidateCount
+    CommonSalesForecast:
+      type: object
+      properties:
+        months:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonSalesForecastMonth'
+        hiringReviews:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonSalesHiringReview'
+      required:
+      - months
+      - hiringReviews
+      description: 6개월·채용검토의 확정 결과. 요약4칸 정확 항목은 OQ-UI-029 확인 후 같은 schema 확장; 이 후보만으로 요약4칸 구현 완료 불가.
     CommonCandidateInput:
       type: object
       properties:
@@ -21334,6 +22923,74 @@ x-requirement-context:
 
 
 x-uncovered-requirements:
+- canonical_id: REQ-1362
+  status: data-constraint
+  evidence: 'DB 계산식 원천 — 계산 서비스 시험에서 해당 CALC_ID 조회와 누락 정의 오류를 관찰하고 임의 수식 상수 대체가 없는지 검사한다. 소유: data-model.md'
+- canonical_id: REQ-1363
+  status: data-constraint
+  evidence: '공통코드 원천 — 옵션 응답과 실제 DML의 코드·표시명을 대조하며 새 enum 값을 만들지 않는다. 소유: data-model.md'
+- canonical_id: REQ-1364
+  status: out-of-scope
+  evidence: '로그인 연기 — UI-29 개발 진입에서 로그인 화면과 인증 검사 호출이 없다. 소유: architecture.md/quickstart.md'
+- canonical_id: REQ-1365
+  status: non-functional
+  evidence: '공백 검사 — 실제 구현 저장소에서 명령 종료 0·stdout 공백을 기록한다. 소유: architecture.md/quickstart.md'
+- canonical_id: REQ-1366
+  status: non-functional
+  evidence: 'record 생성자 일관성 — 확장 record의 모든 호출 컴파일과 인자 개수 품질 검사가 통과한다. 소유: architecture.md/quickstart.md'
+- canonical_id: REQ-1367
+  status: non-functional
+  evidence: '기동 설정 보존 — 기동 설정 diff에서 세 정책값이 보존된다. 소유: architecture.md/quickstart.md'
+- canonical_id: REQ-1368
+  status: non-functional
+  evidence: 'OpenAPI 인증 정의 금지 — 유효 OpenAPI에 인증 정의가 없음을 구조 검사한다. 생성 지시의 scheme 필수와 충돌은 OQ-AUTH-029로 리뷰한다. 소유: architecture.md/quickstart.md'
+- canonical_id: REQ-1369
+  status: non-functional
+  evidence: '기존 공개 계약 보존 — 병합 전후 OpenAPI의 기존 경로와 schema 필드 포함 관계를 검사한다. 소유: architecture.md/quickstart.md'
+- canonical_id: REQ-1370
+  status: non-functional
+  evidence: '화면 등록 회귀 — MenuRegistrationControllerTest·MenuRegistrationProjectionTest·CommonNavigationPage.test.tsx와
+    미개발 예제 시험이 통과한다. 소유: architecture.md/quickstart.md'
+- canonical_id: REQ-1371
+  status: data-constraint
+  evidence: 'V21 제한 준비 — 빈 표 환경에서 신규 승인 이력과 FK가 준비되고 기존 표·값은 불변이다. V20 다음 목록과 두 파일 수 시험은 21을 확인한다. 소유: data-model.md'
+- canonical_id: REQ-1376
+  status: non-functional
+  evidence: '단일 화면 폴더 — 중복 pages 구현·미사용 사본과 사본 시험이 없다. 소유: architecture.md/quickstart.md'
+- canonical_id: REQ-1377
+  status: non-functional
+  evidence: 'DB 시험 매퍼 의존 — 실제 DB 통합 시험에서 참조 매퍼 statement 미등록 오류가 없다. 소유: architecture.md/quickstart.md'
+- canonical_id: REQ-1379
+  status: screen-only
+  evidence: '409 화면 복구 — 창 충돌은 닫힌 뒤 최신값, 긴 폼 충돌은 입력 보존·최신 token 갱신을 확인한다. 소유: ui-design.md'
+- canonical_id: REQ-1382
+  status: non-functional
+  evidence: '공통 UI 부품 — DOM에서 screen-body 중첩이 없고 공통 부품·다크모드 변수·28px 최소 높이를 확인한다. 소유: ui-design.md'
+- canonical_id: REQ-1383
+  status: screen-only
+  evidence: '입력 오류 표시 — 필수 누락 제출에서 첫 오류 칸 focus와 칸 아래 안내를 확인하고 해당 칸 수정 시 오류가 지워진다. 소유: ui-design.md'
+- canonical_id: REQ-1384
+  status: non-functional
+  evidence: '시안 문구 보존 — 시안 확보 후 각 표시 문구를 대조한다. 시안 미제공 부분은 OQ-UI-029이며 임의 확정하지 않는다. 소유: ui-design.md'
+- canonical_id: REQ-1385
+  status: non-functional
+  evidence: '비동기 화면 시험 — 새 조회 요청을 포함한 화면 시험이 기다림 없이 클릭하는 경합을 만들지 않는다. 소유: architecture.md/quickstart.md'
+- canonical_id: REQ-1386
+  status: non-functional
+  evidence: '실제 DB 시험 계약 — 비밀값 출력 없이 독립 DB fixture를 넣고 실제 매퍼 읽기·쓰기 시험을 수행한다. 소유: architecture.md/quickstart.md'
+- canonical_id: REQ-1387
+  status: non-functional
+  evidence: '지정 회귀 실행 — MenuRegistrationControllerTest·MenuPreparationBoundaryTest·SchemaPreparationTest·CashFlowStatementBoundaryTest·OpenApiControllerMappingContractTest·CommonNavigationPage.test.tsx·partSettlementRoutes.test.tsx·router.test.tsx
+    결과를 기록한다. 소유: architecture.md/quickstart.md'
+- canonical_id: REQ-1388
+  status: non-functional
+  evidence: '반응형 폭 — 두 viewport에서 document.scrollWidth가 viewport 이하이며 표·폼 조작이 가능하다. 소유: ui-design.md'
+- canonical_id: REQ-1391
+  status: screen-only
+  evidence: 'AI 추천 이동 — 카드 버튼으로 /screens/UI-30 진입 시 선택 기회·첫 필요직무·기회 시작월 문맥이 전달되고 AI 실행은 없다. 소유: ui-design.md'
+- canonical_id: REQ-1418
+  status: out-of-scope
+  evidence: '개발 전체범위·후속 역할범위 — 현재 예측 요청은 파트 필터 없이 전체 결과를 반환한다. 파트장 전용 범위 검사는 UI-22 후속 시험으로 명시한다. 소유: architecture.md/quickstart.md'
 - canonical_id: REQ-1260
   status: data-constraint
   evidence: DB 식 정의 사용 — 사용 CALC_ID 정의를 DB에서 읽으며 정의 누락을 임의 수식으로 대체하지 않는다.

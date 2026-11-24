@@ -274,14 +274,23 @@ class CommonWithdrawalControllerTest {
         String sql=new ClassPathResource("mapper/withdrawals/WithdrawalMapper.xml").getContentAsString(StandardCharsets.UTF_8);
         var writes=Pattern.compile("(?is)<(?:insert|update|delete)\\b[^>]*>(.*?)</(?:insert|update|delete)>").matcher(sql);
         int statements=0;
+        int opportunityTouches=0;
         while(writes.find()) {
             String write=writes.group(1).toUpperCase(Locale.ROOT);
             // 엑셀 다운로드 접근 기록(DNLD)은 업무 자료가 아니라서 따로 센다(2026-11-19).
             if (write.contains("TB_SY_ACCS_LOG")) { assertThat(write).contains("'DNLD'").doesNotContain("TB_PJ_ASGN","TB_SL_TENT_ASGN"); continue; }
+            // 가배정 변경은 영업 기회의 수정 시각·수정자도 갱신한다(REQ-1406).
+            if (write.contains("TB_SL_OPP")) {
+                assertThat(write.replaceAll("\\s+", " ").trim()).isEqualTo(
+                    "UPDATE TB_SL_OPP SET MOD_DTTM=CLOCK_TIMESTAMP(),MOD_USER_ID=#{ACTOR} WHERE OPP_ID=#{ID}");
+                opportunityTouches++;
+                continue;
+            }
             assertThat(write).contains("TB_SL_TENT_ASGN")
                 .doesNotContain("TB_PJ_ASGN","TB_CO_MON_COST","TB_SL_RCMD_LOG");statements++;
         }
         assertThat(statements).isEqualTo(2);
+        assertThat(opportunityTouches).isEqualTo(1);
         var order=inOrder(projects,mapper);order.verify(projects).lockSources();order.verify(mapper).lockDeveloper("person");order.verify(mapper).lockSource("A-0001");order.verify(mapper).reservations("person");order.verify(mapper).lockNeeds();
     }
     @Test void replacementReleasesOnlyOldActAndSharedReadShowsOnlyNewOpportunity() throws Exception {

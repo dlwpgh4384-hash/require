@@ -35,8 +35,9 @@ public class WithdrawalTentativeService {
     }
 
     static Reservation one(List<Reservation> current) {
-        if (current.size() > 1) throw new CodeFailure(409, "needSn", "여러 가배정이 있습니다. 기존 배정을 확인해 주세요.");
-        return current.isEmpty() ? null : current.get(0);
+        if (current.stream().map(Reservation::opportunityId).distinct().count() > 1)
+            throw new CodeFailure(409, "needSn", "여러 기회에 가배정이 있습니다. 기존 배정을 확인해 주세요.");
+        return current.stream().min(Comparator.comparingInt(Reservation::needSn)).orElse(null);
     }
 
     public TentativeAssignment view(Source source, Reservation reservation) {
@@ -70,6 +71,7 @@ public class WithdrawalTentativeService {
         Source source = mapper.lockSource(assignmentId);
         if (source == null || !Objects.equals(observed.developerId(), source.developerId())) throw CodeFailure.conflict();
         var reservations = mapper.reservations(source.developerId());
+        if (reservations.size() > 1) throw new CodeFailure(409, "needSn", "여러 가배정이 있습니다. 영업 기회에서 줄을 선택해 주세요.");
         Reservation current = one(reservations);
         mapper.lockNeeds();
         // 잠근 뒤에 필요 인력 줄을 처음 읽는다(남은 자리를 최신 값으로 센다).
@@ -90,9 +92,17 @@ public class WithdrawalTentativeService {
             throw new CodeFailure(409, "needSn", "남은 자리가 없습니다. 다시 불러와 주세요.");
         }
         var start = context.rules().tentativeStartMonth(source.endDate(), calendar.fromDatabaseMonth(target.startMonth()));
-        if (current != null && mapper.release(current.tentativeId(), actor.userId()) != 1) throw CodeFailure.conflict();
+        var affected = new TreeSet<String>();
+        if (current != null) {
+            if (mapper.release(current.tentativeId(), actor.userId()) != 1) throw CodeFailure.conflict();
+            affected.add(current.opportunityId());
+        }
         if (mapper.insertReservation(new ReservationWrite(source.developerId(), target.opportunityId(),
             target.needSn(), calendar.toDatabaseMonth(start), actor.userId())) != 1) throw CodeFailure.conflict();
-        return new TentativeResult(view(source, one(mapper.reservations(source.developerId()))));
+        affected.add(opportunityId);
+        affected.forEach(id -> mapper.touchOpportunity(id, actor.userId()));
+        var saved = mapper.reservations(source.developerId()).stream()
+            .filter(r -> opportunityId.equals(r.opportunityId()) && r.needSn() == needSn).findFirst().orElse(null);
+        return new TentativeResult(view(source, saved));
     }
 }

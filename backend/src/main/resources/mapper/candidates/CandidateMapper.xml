@@ -147,4 +147,8 @@
     SELECT c.code_val FROM TB_SY_CODE c WHERE c.code_grp_id='ALWNC' AND c.code=#{code}
       AND c.use_yn='Y' AND c.del_yn='N'
   </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES (#{userId},'DNLD','UI-33',#{target},clock_timestamp(),#{userId},clock_timestamp())
+  </insert>
 </mapper>

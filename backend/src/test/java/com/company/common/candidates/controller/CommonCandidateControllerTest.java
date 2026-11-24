@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(CommonCandidateController.class)
 @ContextConfiguration(classes = {CommonCandidateController.class, CommonCandidateService.class,
+    com.company.common.support.service.ExcelExportService.class, com.company.common.support.service.CurrentBusinessActor.class,
     CodeExceptionHandler.class, ApiExceptionHandler.class})
 class CommonCandidateControllerTest {
     @Autowired MockMvc mvc;
@@ -328,5 +329,38 @@ class CommonCandidateControllerTest {
         mvc.perform(put("/api/common/candidates/{id}", id).contentType("application/json").content(b.toString())).andExpect(status().isOk());
         mvc.perform(get("/api/common/candidates/{id}/matches", id)).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.items[0].expectedProfitRate").value(23.75));
+    }
+    @Test void excelHasAllFilteredRowsInListColumnOrderAndRecordsDownload() throws Exception {
+        when(calendar.now()).thenReturn(now);
+        create(); create();
+        var other = input(); other.put("primaryJobCode", "PM");
+        mvc.perform(post("/api/common/candidates").contentType("application/json").content(other.toString())).andExpect(status().isOk());
+        var response = mvc.perform(get("/api/common/candidates/excel").param("jobCode", "DEV"))
+            .andExpect(status().isOk()).andExpect(header().string("X-Total-Count", "2"))
+            .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            .andReturn().getResponse();
+        assertThat(response.getHeader("Content-Disposition")).contains("UTF-8''").contains(".xlsx");
+        try (var book = new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(response.getContentAsByteArray()))) {
+            var sheet = book.getSheetAt(0);
+            assertThat(sheet.getRow(0).getCell(0).toString()).startsWith("외부 인력 후보 · 다운로드: admin");
+            var head = sheet.getRow(2);
+            var labels = new ArrayList<String>();
+            for (var cell : head) labels.add(cell.toString());
+            assertThat(labels).containsExactly("이름", "구분", "직무", "등급", "기술", "거주지", "희망 단가",
+                "투입 가능일", "연락 상태", "최근 연락", "출처");
+            assertThat(sheet.getLastRowNum()).isEqualTo(4);
+            var row = sheet.getRow(3);
+            assertThat(row.getCell(0).toString()).isEqualTo("후보");
+            assertThat(row.getCell(4).toString()).isEqualTo("Java");
+            assertThat(row.getCell(5).toString()).isEqualTo("서울 강남구");
+            assertThat(row.getCell(6).getNumericCellValue()).isEqualTo(6500000d);
+            assertThat(row.getCell(7).toString()).isEqualTo("2026-12-01");
+        }
+        verify(mapper).insertAccess("admin", "외부 인력 후보 2건");
+    }
+    @Test void excelRejectsUnknownFilterWithoutRecordingDownload() throws Exception {
+        mvc.perform(get("/api/common/candidates/excel").param("availabilityWindow", "someday"))
+            .andExpect(status().isBadRequest());
+        verify(mapper, never()).insertAccess(anyString(), anyString());
     }
 }

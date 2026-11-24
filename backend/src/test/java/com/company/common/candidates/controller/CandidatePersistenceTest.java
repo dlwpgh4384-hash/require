@@ -44,7 +44,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(CommonCandidateController.class)
 @ContextConfiguration(classes = {CommonCandidateController.class, CommonCandidateService.class,
     CandidateCalculationRules.class, CandidateCodes.class, CandidateDefinitions.class, CommonCodeService.class,
-    CalculationRuleService.class, CodeExceptionHandler.class, ApiExceptionHandler.class, CandidatePersistenceTest.Persistence.class})
+    CalculationRuleService.class, com.company.common.support.service.ExcelExportService.class,
+    com.company.common.support.service.CurrentBusinessActor.class,
+    CodeExceptionHandler.class, ApiExceptionHandler.class, CandidatePersistenceTest.Persistence.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class CandidatePersistenceTest {
     @Autowired MockMvc mvc;

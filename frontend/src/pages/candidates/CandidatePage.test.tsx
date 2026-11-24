@@ -619,6 +619,68 @@ it("Enter shortcut searches with the current filters", async () => {
   );
   expect(screen.getByText("투입 가능")).toBeInTheDocument();
 });
+it("excel download asks the server with the applied filters and toasts the count", async () => {
+  render(<CandidatePage />);
+  await screen.findByTestId("list-row-candidate");
+  const original = request.getMockImplementation()!;
+  const created = vi.fn(() => "blob:candidate");
+  vi.stubGlobal(
+    "URL",
+    class extends URL {
+      static createObjectURL = created;
+      static revokeObjectURL = vi.fn();
+    },
+  );
+  const click = vi
+    .spyOn(HTMLAnchorElement.prototype, "click")
+    .mockImplementation(() => {});
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    String(url).includes("/excel?")
+      ? ({
+          ok: true,
+          headers: new Headers({
+            "Content-Type":
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "X-Total-Count": "3",
+            "Content-Disposition":
+              "attachment; filename*=UTF-8''%EC%99%B8%EB%B6%80.xlsx",
+          }),
+          blob: async () => new Blob(["PK"]),
+        } as unknown as Response)
+      : original(url, init),
+  );
+  fireEvent.click(screen.getByTestId("list-download"));
+  expect(await screen.findByTestId("candidate-toast")).toHaveTextContent(
+    "엑셀 파일을 만들었습니다 (조회 결과 3건)",
+  );
+  expect(
+    request.mock.calls.some((call) =>
+      String(call[0]).startsWith("/api/common/candidates/excel?"),
+    ),
+  ).toBe(true);
+  expect(click).toHaveBeenCalledOnce();
+  expect(created).toHaveBeenCalledOnce();
+  click.mockRestore();
+});
+it("failed excel download shows the server message and no completion toast", async () => {
+  render(<CandidatePage />);
+  await screen.findByTestId("list-row-candidate");
+  const original = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    String(url).includes("/excel?")
+      ? ({
+          ok: false,
+          headers: new Headers(),
+          json: async () => ({ message: "다운로드 실패" }),
+        } as unknown as Response)
+      : original(url, init),
+  );
+  fireEvent.click(screen.getByTestId("list-download"));
+  expect(await screen.findByTestId("candidate-toast")).toHaveTextContent(
+    "다운로드 실패",
+  );
+  expect(screen.queryByText(/엑셀 파일을 만들었습니다/)).not.toBeInTheDocument();
+});
 it("new form uses mockup title, defaults, labels, texts and focuses the name", async () => {
   renderForm(false);
   await readyForm();

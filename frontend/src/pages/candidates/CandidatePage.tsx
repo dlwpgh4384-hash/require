@@ -25,6 +25,7 @@ import {
   contactStatusKind,
   getCandidateOptions,
   getCommonCandidates,
+  getCommonCandidatesExcel,
   getCommonCandidateSummary,
   getCommonCandidateShortages,
   type Candidate,
@@ -80,6 +81,7 @@ export function CandidatePage({
     message: string;
     kind: ToastKind;
   } | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<ListSort | null>(null);
   const presentation = useListPresentation();
@@ -310,6 +312,18 @@ export function CandidatePage({
   );
   const notify = (message: string, kind: ToastKind = "ok") =>
     setNotice({ message, kind });
+  const download = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const count = await getCommonCandidatesExcel(applied);
+      notify(`엑셀 파일을 만들었습니다 (조회 결과 ${count}건)`);
+    } catch (reason) {
+      notify(developerFailure(reason), "warn");
+    } finally {
+      setDownloading(false);
+    }
+  };
   const nextMonth = nextMonthFirst();
   return (
     <div
@@ -459,6 +473,8 @@ export function CandidatePage({
         hiddenColumns={cols.hidden}
         onToggleColumn={cols.toggle}
         onResetColumns={cols.reset}
+        onDownload={() => void download()}
+        downloading={downloading}
         rows={
           sorted?.slice(
             (page - 1) * presentation.pageSize,

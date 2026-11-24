@@ -24,4 +24,5 @@ public interface CandidateMapper {
     Area selectArea(String code);
     List<Seat> selectSeats(String jobCode);
     BigDecimal allowance(String code);
+    int insertAccess(@Param("userId") String userId, @Param("target") String target);
 }

@@ -29,6 +29,10 @@ public class CommonCandidateService {
         this.calendar = calendar;
         this.calculations = calculations;
     }
+    public Instant now() { return calendar.now(); }
+    /** 후보 목록 엑셀을 받으면 접근 기록(DNLD)을 남긴다(SFR-011-03, 다른 목록 엑셀과 같음). */
+    @Transactional
+    public void recordDownload(String userId, int count) { mapper.insertAccess(userId, "외부 인력 후보 " + count + "건"); }
     private CandidateRow require(String id, boolean lock) {
         if (id == null || id.isBlank() || id.length() > 20) throw CandidateRules.invalid("candidateId");
         var row = lock ? mapper.lockCandidate(id) : mapper.selectCandidate(id);

@@ -174,7 +174,46 @@ export const getCommonCandidates = (
     signal,
   });
 };
-export const getCommonCandidate = (id: string, signal?: AbortSignal) =>
+const xlsx =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+/** 목록 엑셀(SFR-011): 지금 조건의 전체 결과를 받고 건수를 돌려준다. */
+export async function getCommonCandidatesExcel(
+  filter: CandidateFilter = {},
+): Promise<number> {
+  const query = new URLSearchParams(
+    Object.entries(filter).filter(([, value]) => !!value) as [string, string][],
+  );
+  const response = await fetch(`${root}/excel?${query}`);
+  if (!response.ok || !response.headers.get("Content-Type")?.includes(xlsx)) {
+    let message = "엑셀 파일을 받지 못했습니다. 다시 시도해 주세요.";
+    try {
+      message = (await response.json()).message || message;
+    } catch {
+      /* binary error */
+    }
+    throw new Error(message);
+  }
+  const count = response.headers.get("X-Total-Count");
+  if (count === null || !/^\d+$/.test(count))
+    throw new Error("조회 결과 건수를 확인하지 못했습니다.");
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+  const plain = /filename="?([^";]+)"?/i.exec(disposition)?.[1];
+  const blob = await response.blob();
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = encoded
+    ? decodeURIComponent(encoded)
+    : plain || "외부 인력 후보.xlsx";
+  link.dataset.testid = "candidate-download-link";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(href), 1000);
+  return Number(count);
+}
+export const getCommonCandidate =(id: string, signal?: AbortSignal) =>
   developerRequest<Candidate>(target(id), { signal });
 export const getCommonCandidateContacts = (id: string, signal?: AbortSignal) =>
   developerRequest<{ items: CandidateContact[] }>(`${target(id)}/contacts`, {

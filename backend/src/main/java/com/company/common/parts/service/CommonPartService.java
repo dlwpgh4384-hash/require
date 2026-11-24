@@ -182,12 +182,22 @@ public class CommonPartService {
                     + fromDb(confirmed).plusMonths(1) + " 이후로 고르세요.");
             }
         }
-        var next = rows.stream().filter(row -> row.month.compareTo(month) > 0)
+        // 시안 partSave: 새 기준 뒤에 예정돼 있던 기준(아직 오지 않은 달)은 지우고 새 기준이 이어진다(2026-11-24 사용자 결정).
+        // 이미 적용된 달(이번 달 이하)의 줄은 지우지 않는다.
+        String current = mapper.selectCurrentMonth();
+        var scheduled = rows.stream()
+            .filter(row -> row.month.compareTo(month) > 0 && row.month.compareTo(current) > 0).toList();
+        var next = rows.stream().filter(row -> row.month.compareTo(month) > 0 && !scheduled.contains(row))
             .min(Comparator.comparing(row -> row.month)).orElse(null);
         String end = next == null ? null : db(fromDb(next.month).minusMonths(1));
         affected(mapper.touch(id, input.modifiedAt()));
+        for (var row : scheduled) {
+            affected(mapper.deletePeriod(id, row.month));
+            history("TB_BS_PART_STD", id + ":" + row.month, "DEL", "적용 기간",
+                publicMonth(row.month) + " ~ " + Objects.toString(publicMonth(row.endMonth), "계속"), null);
+        }
         if (same != null) {
-            affected(mapper.updatePeriod(new PeriodMutation(id, month, same.endMonth, input.values())));
+            affected(mapper.updatePeriod(new PeriodMutation(id, month, scheduled.isEmpty() ? same.endMonth : end, input.values())));
         } else {
             var previous = rows.stream().filter(row -> row.month.compareTo(month) < 0)
                 .max(Comparator.comparing(row -> row.month)).orElse(null);

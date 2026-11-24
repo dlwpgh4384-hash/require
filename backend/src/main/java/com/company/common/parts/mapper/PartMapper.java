@@ -20,6 +20,7 @@ public interface PartMapper {
     int insertPeriod(PeriodMutation mutation);
     int updatePeriod(PeriodMutation mutation);
     int endPeriod(@Param("id") String id, @Param("month") String month, @Param("end") String end);
+    int deletePeriod(@Param("id") String id, @Param("month") String month);
     int touch(@Param("id") String id, @Param("token") Instant token);
     int rename(@Param("id") String id, @Param("name") String name);
     int stop(@Param("id") String id);

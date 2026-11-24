@@ -42,7 +42,7 @@
     (SELECT count(DISTINCT j.proj_id)
        FROM TB_PJ_PROJ j
        JOIN TB_PJ_PROJ_PART pp ON pp.proj_id=j.proj_id
-      WHERE pp.part_id=p.part_id AND j.proj_stat_cd='ING'
+      WHERE pp.part_id=p.part_id AND j.proj_stat_cd NOT IN ('END','LOSE')
         AND pp.aply_bgn_ym=(SELECT max(pr.aply_bgn_ym) FROM TB_PJ_PROJ_PART pr
           WHERE pr.proj_id=j.proj_id AND pr.aply_bgn_ym &lt;= #{month})) AS project_count
   </sql>
@@ -55,7 +55,7 @@
       (SELECT count(DISTINCT d.dev_id) FROM TB_HR_DEV d WHERE d.part_id=p.part_id) AS person_count,
       (SELECT count(DISTINCT j.proj_id) FROM TB_PJ_PROJ j
         JOIN TB_PJ_PROJ_PART pp ON pp.proj_id=j.proj_id
-        WHERE pp.part_id=p.part_id AND j.proj_stat_cd='ING'
+        WHERE pp.part_id=p.part_id AND j.proj_stat_cd NOT IN ('END','LOSE')
           AND pp.aply_bgn_ym=(SELECT max(pr.aply_bgn_ym) FROM TB_PJ_PROJ_PART pr
             WHERE pr.proj_id=j.proj_id AND pr.aply_bgn_ym &lt;=
               to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM'))) AS project_count
@@ -98,6 +98,9 @@
     UPDATE TB_BS_PART_STD SET aply_end_ym=#{end},mod_user_id='admin',mod_dttm=clock_timestamp()
     WHERE part_id=#{id} AND aply_bgn_ym=#{month}
   </update>
+  <delete id="deletePeriod">
+    DELETE FROM TB_BS_PART_STD WHERE part_id=#{id} AND aply_bgn_ym=#{month}
+  </delete>
   <update id="touch">
     UPDATE TB_BS_PART SET mod_user_id='admin',
       mod_dttm=GREATEST(clock_timestamp(),COALESCE(mod_dttm,reg_dttm)+INTERVAL '1 microsecond')

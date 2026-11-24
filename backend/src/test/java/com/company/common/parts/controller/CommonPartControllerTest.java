@@ -202,14 +202,18 @@ class CommonPartControllerTest {
             .andExpect(jsonPath("$.message").value("같은 이름의 파트가 이미 있습니다."));
         assertThat(data.masters.values()).extracting(row -> row.partName).containsExactly("기존 파트", "다른 파트"); noWrites();
     }
-    @Test void insertionPreservesScheduledRowAndEndsPredecessor() throws Exception {
+    @Test void insertionReplacesScheduledRowLikeMockupAndEndsPredecessor() throws Exception {
         data.rows.get("part-a:202601").endMonth = "202611";
         data.period("part-a", "202612", null, "leader-b", "50", "1700000");
         standard(values("2026-10", "45")).andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.items.length()").value(3));
-        assertThat(data.rows.get("part-a:202610").endMonth).isEqualTo("202611");
+            .andExpect(jsonPath("$.data.items.length()").value(2));
+        // 시안 partSave: 뒤에 예정돼 있던 2026-12 기준은 지우고 새 기준이 계속 이어진다.
+        assertThat(data.rows).doesNotContainKey("part-a:202612");
+        assertThat(data.rows.get("part-a:202610").endMonth).isNull();
         assertThat(data.rows.get("part-a:202601").endMonth).isEqualTo("202609");
-        assertThat(data.rows.get("part-a:202612").distributionRate).isEqualByComparingTo("50");
+        assertThat(data.histories).anySatisfy(h -> {
+            assertThat(h.item()).isEqualTo("적용 기간"); assertThat(h.before()).isEqualTo("2026-12 ~ 계속"); assertThat(h.after()).isNull();
+        });
         verify(calculations).definition("식-45"); verify(calculations).definition("식-00");
     }
     @Test

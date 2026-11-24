@@ -21,6 +21,13 @@ public final class ClientRules {
             if (!fields.contains(field)) throw invalid(field);
         });
     }
+    /** 사업자등록번호: 하이픈·빈칸을 빼고 숫자 10자리면 DDL 모양 「000-00-00000」으로 맞춘다(2026-11-24 사용자 결정). 아니면 그대로. */
+    public static String businessNumber(String raw) {
+        if (raw == null) return null;
+        String digits = raw.replaceAll("[-\\s]", "");
+        return digits.matches("[0-9]{10}")
+            ? digits.substring(0, 3) + "-" + digits.substring(3, 5) + "-" + digits.substring(5) : raw.trim();
+    }
     public static String text(JsonNode body, String field, int limit, boolean required) {
         var node = body.get(field);
         if (node == null) {
@@ -40,7 +47,7 @@ public final class ClientRules {
         if (update) { allowed.remove("businessNumber"); allowed.add("modifiedAt"); }
         object(body, allowed);
         String type = text(body, "clientTypeCode", 10, true);
-        String business = update ? null : text(body, "businessNumber", 12, true);
+        String business = update ? null : businessNumber(text(body, "businessNumber", 12, true));
         if (!update && !business.matches("[0-9]{3}-[0-9]{2}-[0-9]{5}")) throw invalid("businessNumber");
         boolean customer = customer(type);
         boolean vendor = vendor(type);

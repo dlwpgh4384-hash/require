@@ -135,10 +135,12 @@
       AND mod_dttm IS NOT DISTINCT FROM #{version.modifiedAt,jdbcType=TIMESTAMP_WITH_TIMEZONE}
   </update>
   <select id="hasOngoingProject" resultType="boolean">
-    SELECT EXISTS (SELECT 1 FROM TB_PJ_PROJ p WHERE p.cust_clnt_id=#{clientId} AND p.proj_stat_cd='ING')
+    <!-- 진행 프로젝트 = 종료·실주가 아닌 것(수주예정 포함, 시안 actProj, 2026-11-24 사용자 결정). -->
+    SELECT EXISTS (SELECT 1 FROM TB_PJ_PROJ p WHERE p.cust_clnt_id=#{clientId} AND p.proj_stat_cd NOT IN ('END','LOSE'))
   </select>
   <select id="hasAffiliatedPerson" resultType="boolean">
-    SELECT EXISTS (SELECT 1 FROM TB_HR_DEV d WHERE d.blng_clnt_id=#{clientId})
+    <!-- 지금 일하는 소속 인력만 센다(사용 중·퇴사 아님). 퇴사·중지한 사람 때문에 영영 중지하지 못하는 일을 막음(2026-11-24 사용자 결정). -->
+    SELECT EXISTS (SELECT 1 FROM TB_HR_DEV d WHERE d.blng_clnt_id=#{clientId} AND d.use_yn='Y' AND d.work_stat_cd &lt;&gt; 'RETIRE')
   </select>
   <select id="selectAssignments" resultMap="assignment">
     SELECT p.proj_id, p.proj_nm, d.dev_nm, d.mng_no, COALESCE(v.clnt_nm,'') AS company_name,

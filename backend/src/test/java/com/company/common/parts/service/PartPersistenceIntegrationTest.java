@@ -156,17 +156,19 @@ class PartPersistenceIntegrationTest {
         }
         assertThat(count("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE scrn_id='UI-15' AND act_type_cd='DNLD'")).isEqualTo(1);
     }
-    @Test void insertingBeforeScheduleKeepsNextAndSameMonthUpdatesWithMoreHistory() throws Exception {
+    @Test void insertingBeforeScheduleReplacesItAndSameMonthUpdatesWithMoreHistory() throws Exception {
         String id = create("기간 파트");
+        long first = count("SELECT count(*) FROM TB_BS_PART_STD WHERE part_id=?", id);
         standard(id, "2090-12", 50, null);
         standard(id, "2090-10", 45, version(id));
+        // 시안 partSave: 뒤에 예정된 2090-12 기준은 지우고 2090-10 기준이 계속 이어진다.
         assertThat(db.queryForObject("SELECT aply_end_ym FROM TB_BS_PART_STD WHERE part_id=? AND aply_bgn_ym='209010'",
-            String.class, id)).isEqualTo("209011");
-        assertThat(db.queryForObject("SELECT prft_dstrb_rt FROM TB_BS_PART_STD WHERE part_id=? AND aply_bgn_ym='209012'",
-            BigDecimal.class, id)).isEqualByComparingTo("50");
+            String.class, id)).isNull();
+        assertThat(count("SELECT count(*) FROM TB_BS_PART_STD WHERE part_id=? AND aply_bgn_ym='209012'", id)).isZero();
+        assertThat(count("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_key=? AND chg_type_cd='DEL'", id + ":209012")).isEqualTo(1);
         long history = count("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_key LIKE ?", id + ":%");
         standard(id, "2090-10", 46, version(id));
-        assertThat(count("SELECT count(*) FROM TB_BS_PART_STD WHERE part_id=?", id)).isEqualTo(3);
+        assertThat(count("SELECT count(*) FROM TB_BS_PART_STD WHERE part_id=?", id)).isEqualTo(first + 1);
         assertThat(count("SELECT count(*) FROM TB_SY_CHG_HIST WHERE trgt_key LIKE ?", id + ":%")).isGreaterThan(history);
     }
     @Test void historyFailureRollsBackParentAndFirstPeriod() throws Exception {

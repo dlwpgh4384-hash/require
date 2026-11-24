@@ -188,8 +188,12 @@ public class CommonClientService {
                 if (!Objects.equals(value, after.get(field))) history(id, "UPD", field, value, after.get(field));
             });
             var saved = require(id);
-            if (accountChanged) history(id, "UPD", "계좌번호", summary(old), summary(saved));
-            if (holderChanged) history(id, "UPD", "예금주", summary(old), summary(saved));
+            // 계좌는 민감 항목이라 가린 채로 적되, 무엇이 바뀌었는지는 보이게 한다(Q-24-2, 2026-11-24 사용자 결정).
+            if (accountChanged) {
+                String was = summary(old), now = summary(saved);
+                history(id, "UPD", "계좌번호", was, now.equals(was) ? now + " (번호 바뀜)" : now);
+            }
+            if (holderChanged) history(id, "UPD", "예금주", "", "예금주 바뀜");
         }
         return new Save(getCommonClient(id), warnings(input, id));
     }

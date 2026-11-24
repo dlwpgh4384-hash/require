@@ -361,7 +361,7 @@ it("[수정]은 「사용자 수정」 창에서 아이디를 잠그고 이름·
   );
 });
 
-it("리뷰: 수정 저장이 409면 입력은 남기고 창의 수정 시각을 새로 읽어 다시 저장할 수 있다", async () => {
+it("리뷰: 수정 저장이 409면 입력은 남기고 [최신 버전 불러오기 (입력 유지)] 뒤 새 수정 시각으로 다시 저장한다", async () => {
   const newer = "2026-01-03T00:00:00.000001Z";
   const base = request.getMockImplementation()!;
   let conflict = true;
@@ -394,23 +394,51 @@ it("리뷰: 수정 저장이 409면 입력은 남기고 창의 수정 시각을 
     await within(dialog).findByText("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요."),
   ).toBeInTheDocument();
   expect(within(dialog).getByTestId("user-name-input")).toHaveValue("바꾼 이름");
-  // 새 계정(새 수정 시각)을 읽을 때까지 기다린다.
+  fireEvent.click(within(dialog).getByTestId("user-version-refresh"));
   await waitFor(() =>
-    expect(
-      request.mock.calls.filter(
-        (call: unknown[]) =>
-          call[0] === "/api/common/users/test" &&
-          !(call[1] as RequestInit | undefined)?.method,
-      ).length,
-    ).toBeGreaterThan(1),
+    expect(within(dialog).queryByTestId("user-version-refresh")).not.toBeInTheDocument(),
   );
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(within(dialog).getByTestId("user-name-input")).toHaveValue("바꾼 이름");
   fireEvent.click(within(screen.getByTestId("user-dialog")).getByTestId("user-save"));
   await waitFor(() => expect(writes()).toHaveLength(2));
   expect(JSON.parse(String((writes()[1][1] as RequestInit).body))).toMatchObject({
     name: "바꾼 이름",
     modDttm: newer,
   });
+});
+
+it("리뷰: 409 뒤 [최신 버전 불러오기]를 누르지 않고 다시 저장하면 옛 수정 시각 그대로라 다른 사람 것을 덮어쓰지 않는다", async () => {
+  const older = account.modDttm;
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url === "/api/common/users/test" && init?.method === "PUT") {
+      account = { ...account, modDttm: "2026-01-03T00:00:00.000001Z" };
+      return {
+        ok: false,
+        status: 409,
+        json: async () => ({
+          success: false,
+          message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+          errors: [],
+        }),
+      };
+    }
+    return base(url, init);
+  });
+  page();
+  fireEvent.click(await screen.findByTestId("list-row-test"));
+  const panel = await screen.findByTestId("user-detail");
+  fireEvent.click(await within(panel).findByTestId("user-edit"));
+  const dialog = await screen.findByTestId("user-dialog");
+  fireEvent.change(within(dialog).getByTestId("user-name-input"), {
+    target: { value: "바꾼 이름" },
+  });
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  expect(await within(dialog).findByTestId("user-version-refresh")).toBeInTheDocument();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  await waitFor(() => expect(writes()).toHaveLength(2));
+  expect(JSON.parse(String((writes()[1][1] as RequestInit).body)).modDttm).toBe(older);
 });
 
 it("체크하면 「N건 선택」과 일괄 [사용 중지]가 나오고, 확인 창은 시안 문구를 쓴다", async () => {
@@ -660,6 +688,34 @@ it("서버가 막은 계정만 고르면 확인 창 없이 이유를 알린다",
     "영업1 파트장입니다.",
   );
   expect(screen.queryByTestId("user-stop-confirm")).not.toBeInTheDocument();
+});
+
+it("일괄 중지에서 파트장이라 못 한 건은 시안 문구(건수·영업 파트 탭 안내)로 알린다", async () => {
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    url.endsWith("/stop") && init?.method === "PUT"
+      ? response({
+          processedUserIds: [],
+          unprocessedCount: 1,
+          unprocessed: [
+            {
+              userId: "test",
+              reason:
+                "영업1 파트장입니다. 영업 파트 탭에서 먼저 파트장을 바꾸세요.",
+            },
+          ],
+        })
+      : base(url, init),
+  );
+  page();
+  await screen.findByTestId("list-row-test");
+  fireEvent.click(screen.getByTestId("list-select-test"));
+  fireEvent.click(screen.getByTestId("list-bulk-stop"));
+  const confirm = await screen.findByTestId("user-stop-confirm");
+  fireEvent.click(within(confirm).getByTestId("confirmation-proceed"));
+  expect(await screen.findByTestId("user-toast")).toHaveTextContent(
+    "0건의 사용을 중지했습니다. 1건은 파트장이라 중지하지 못했습니다. 영업 파트 탭에서 먼저 파트장을 바꾸세요.",
+  );
 });
 
 it.each(["USE", "LOCK", "STOP"] as const)(

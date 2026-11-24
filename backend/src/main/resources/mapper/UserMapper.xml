@@ -75,11 +75,13 @@
     SELECT count(*) FROM TB_SY_USER u <include refid="filters"/>
   </select>
   <select id="selectRoles" resultType="string">
-    SELECT r.role_id FROM TB_SY_USER_ROLE r WHERE r.user_id=#{id} ORDER BY r.role_id
+    SELECT ur.role_id FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.role_id=ur.role_id
+    WHERE ur.user_id=#{id} ORDER BY r.sort_ord, ur.role_id
   </select>
+  <!-- 역할 배지는 권한 화면의 역할 정렬 순서(SORT_ORD)대로(2026-11-24 사용자 결정). selectRoles와 같은 순서. -->
   <select id="selectRoleNames" resultType="string">
     SELECT r.role_nm FROM TB_SY_ROLE r JOIN TB_SY_USER_ROLE ur ON ur.role_id=r.role_id
-    WHERE ur.user_id=#{id} ORDER BY r.role_id
+    WHERE ur.user_id=#{id} ORDER BY r.sort_ord, r.role_id
   </select>
   <select id="selectParts" resultType="string">
     SELECT names.part_nm FROM (

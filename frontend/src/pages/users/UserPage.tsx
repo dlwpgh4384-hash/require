@@ -230,14 +230,23 @@ export function UserPage() {
       );
       const skipped =
         stopTarget.impact.blockedUsers.length + value.unprocessedCount;
-      const reasons = [
-        ...stopTarget.impact.blockedUsers,
-        ...value.unprocessed,
-      ].map((item) => item.reason);
+      const all = [...stopTarget.impact.blockedUsers, ...value.unprocessed];
+      // 시안 문구: 파트장이라 못 한 건은 건수와 「영업 파트 탭에서 먼저 파트장을 바꾸세요.」(2026-11-24 사용자 결정).
+      const leaders = all.filter((item) => item.reason.includes(" 파트장입니다."));
+      const others = all
+        .filter((item) => !item.reason.includes(" 파트장입니다."))
+        .map((item) => item.reason);
+      const otherCount = skipped - leaders.length;
       clearSelection();
       setStopTarget(null);
       refresh(
-        `${value.processedUserIds.length}건의 사용을 중지했습니다.${skipped ? ` ${skipped}건은 중지하지 못했습니다. ${[...new Set(reasons)].join(" ")}` : ""}`,
+        `${value.processedUserIds.length}건의 사용을 중지했습니다.` +
+          (leaders.length
+            ? ` ${leaders.length}건은 파트장이라 중지하지 못했습니다. 영업 파트 탭에서 먼저 파트장을 바꾸세요.`
+            : "") +
+          (otherCount > 0
+            ? ` ${otherCount}건은 중지하지 못했습니다.${others.length ? ` ${[...new Set(others)].join(" ")}` : ""}`
+            : ""),
       );
     } catch (error) {
       setStopTarget(null);
@@ -507,17 +516,14 @@ export function UserPage() {
               reloadOptions();
               refresh(text);
             }}
-            onConflict={() => {
-              setRevision((value) => value + 1);
-              // 409: 열린 수정 창의 버전(modDttm)을 새로 읽은 계정으로 바꾼다(입력은 그대로, 창 key 같음).
+            onConflict={() => setRevision((value) => value + 1)}
+            onReloadVersion={async () => {
+              // [최신 버전 불러오기 (입력 유지)]: 열린 수정 창의 버전(modDttm)만 새로 읽은 계정으로 바꾼다(입력은 그대로, 창 key 같음).
               const target = editing?.userId;
               if (!target) return;
-              api.getCommonUser(target).then(
-                (latest) =>
-                  setEditing((current) =>
-                    current && current.userId === latest.userId ? latest : current,
-                  ),
-                () => undefined,
+              const latest = await api.getCommonUser(target);
+              setEditing((current) =>
+                current && current.userId === latest.userId ? latest : current,
               );
             }}
           />

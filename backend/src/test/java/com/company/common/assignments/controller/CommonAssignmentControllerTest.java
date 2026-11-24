@@ -181,6 +181,8 @@ class CommonAssignmentControllerTest {
             .andExpect(jsonPath("$.data.assignmentId").value("A-0002"));
         assertThat(rows.get("A-0001").endDate()).isEqualTo(today.minusDays(1));
         assertThat(histories).extracting(HistoryRow::type).containsExactly("INPUT","EARLY");
+        // [같이 처리] 메모는 빠지는 사람의 조기 철수 줄에만(시안). 새 배정 「투입」 줄에는 없다.
+        assertThat(histories.get(0).memo()).isNull();
         verify(mapper).insertHistory(argThat(w -> "EARLY".equals(w.row().type())
             && "PERSON".equals(w.row().reasonCode()) && "대체 투입 확인".equals(w.row().memo())
             && "admin".equals(w.actor())));

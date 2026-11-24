@@ -34,4 +34,16 @@ class ExcelExportNumericCellTest {
             assertThat(sheet.getRow(5).getCell(4).getNumericCellValue()).isEqualTo(5765433d);
         }
     }
+    @Test
+    void wordsWithoutDigitsDoNotTurnAPriceColumnIntoText() throws Exception {
+        var bytes = new ExcelExportService().write("시험", List.of("이름", "월 단가"),
+            List.of(List.of("가", "5000000"), List.of("나", "배분표"), List.of("다", "무상지원")),
+            "admin", Instant.parse("2026-11-20T15:00:00Z"));
+        try (var book = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+            var sheet = book.getSheetAt(0);
+            assertThat(sheet.getRow(3).getCell(1).getNumericCellValue()).isEqualTo(5000000d);
+            assertThat(sheet.getRow(4).getCell(1).getStringCellValue()).isEqualTo("배분표");
+            assertThat(sheet.getRow(5).getCell(1).getStringCellValue()).isEqualTo("무상지원");
+        }
+    }
 }

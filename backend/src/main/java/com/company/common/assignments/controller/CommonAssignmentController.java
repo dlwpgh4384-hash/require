@@ -44,8 +44,9 @@ public class CommonAssignmentController {
     @GetMapping(value="/api/common/assignments/excel",produces={"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/json"})
     public ResponseEntity<byte[]> getCommonAssignmentsExcel(@ModelAttribute Filter filter) {
         var items=service.getCommonAssignments(filter).items();
+        var types=new java.util.HashMap<String,String>();
         var rows=items.stream().map(r -> List.of(String.join(" / ",r.warnings()),r.projectName(),r.name(),r.jobName(),r.startDate().toString(),r.endDate().toString(),
-            r.billingPrice()==null?"":r.billingPrice().toPlainString(),r.monthlyMm().toPlainString(),r.yearMm().toPlainString(),r.extensionPossibilityName(),r.inputTypeName())).toList();
+            service.excelPrice(r,types),r.monthlyMm().toPlainString(),r.yearMm().toPlainString(),r.extensionPossibilityName(),r.inputTypeName())).toList();
         var now=service.now(); int year=filter.year()==null?now.atZone(java.time.ZoneId.of("Asia/Seoul")).getYear():filter.year();
         byte[] bytes=excel.write("투입 배정",List.of("경고","프로젝트","이름","직무","투입일","철수일","월 단가","월 MM","그 해 MM","연장 가능성","투입 구분"),rows,service.userId(),now);
         service.recordDownload(items.size(),year);

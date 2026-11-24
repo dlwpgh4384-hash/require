@@ -79,8 +79,6 @@ const sparkle = (
     <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />
   </svg>
 );
-const PM_NO_RATE =
-  "월 단가가 없어 배정할 수 없습니다. 파트장·재무에게 요청해 주세요.";
 const TK_REUPLOAD =
   "턴키 배분표는 다시 옮겨 올려 주셔야 합니다. 그 전까지는 배분 불일치 경고가 뜹니다.";
 const serverField: Record<string, string> = {
@@ -448,7 +446,15 @@ export function AssignmentForm({
         // 서버 칸 오류(예: 후보의 프로젝트·개발자만 확정, 간접 인력 제외)는 그 칸 밑에 보이고 첫 오류 칸으로 간다.
         setErrors(
           Object.fromEntries(
-            e.errors.map((f) => [serverField[f.field] ?? f.field, f.message]),
+            e.errors.map((f) => [
+              // 청구 단가 칸이 안 보이는 PM은 단가 오류를 개발자(대체투입은 계약상 인력) 칸 밑에 보인다.
+              f.field === "billingPrice" && !canRate
+                ? v.kind === "SUB"
+                  ? "orig"
+                  : "developer"
+                : (serverField[f.field] ?? f.field),
+              f.message,
+            ]),
           ),
         );
         window.setTimeout(() => focusFirstError(body.current), 0);
@@ -461,19 +467,8 @@ export function AssignmentForm({
     if (busy || !loaded) return;
     const e: Record<string, string> = {};
     const mm = Number(v.mm);
-    if (
-      project &&
-      ["MO", "DP"].includes(project.contractTypeCode) &&
-      v.kind !== "FREE" &&
-      dv &&
-      !canRate &&
-      !(v.kind === "SUB" && !v.orig)
-    ) {
-      // 시안: PM은 청구 단가 칸이 없어 개발자 풀 월 단가(대체투입이면 계약상 인력 단가)로 저장한다.
-      const base = v.kind === "SUB" ? contract?.billingPrice : pool?.rate;
-      if (!((base ?? 0) > 0))
-        e[v.kind === "SUB" ? "orig" : "developer"] = PM_NO_RATE;
-    }
+    // PM은 청구 단가 칸이 없어 개발자 풀 월 단가(대체투입이면 계약상 인력 단가)로 저장한다.
+    // PM 화면에는 그 금액이 오지 않으므로 단가가 있는지는 서버가 검사하고(「월 단가가 없어 배정할 수 없습니다. 파트장·재무에게 요청해 주세요.」), 화면은 그 문구를 보인다(2026-11-24 사용자 결정).
     if (!dv) e.developer = "개발자를 골라 주세요.";
     if (!v.startDate || !v.endDate) e.dates = "투입일과 철수일을 넣어 주세요.";
     else if (v.endDate < v.startDate) e.dates = "철수일이 투입일보다 앞입니다.";
@@ -846,11 +841,18 @@ export function AssignmentForm({
                 "기본값은 개발자 월 단가입니다. 고객과 다르게 계약했으면 고쳐 넣습니다. 풀로 출근하지 않으면 단가는 그대로 두고 월 MM을 줄입니다(예: 주 3일 0.6).",
             )
           ) : (
-            <p className="project-cap" data-testid="assignment-no-price">
-              {project?.contractTypeCode === "TK"
-                ? "턴키는 배분표 금액으로 매출을 계산하므로 청구 단가 칸이 없습니다."
-                : "내부 프로젝트는 매출이 없어 청구 단가 칸이 없습니다."}
-            </p>
+            project && (
+              // 청구 단가 칸이 없는 까닭을 경우마다 맞게 알린다(2026-11-24 사용자 결정, 시안은 내부 프로젝트 문구 하나).
+              <p className="project-cap" data-testid="assignment-no-price">
+                {project.contractTypeCode === "TK"
+                  ? "턴키는 배분표 금액으로 매출을 계산하므로 청구 단가 칸이 없습니다."
+                  : !["MO", "DP"].includes(project.contractTypeCode)
+                    ? "내부 프로젝트는 매출이 없어 청구 단가 칸이 없습니다."
+                    : v.kind === "FREE"
+                      ? "무상지원은 매출이 없어 청구 단가를 0으로 저장합니다."
+                      : "청구 단가는 개발자 월 단가(대체투입은 계약상 인력 단가)로 저장됩니다. 단가는 파트장·재무가 고칩니다."}
+              </p>
+            )
           )}
           <p className="project-cap">
             연장 가능성은 처음에 「미정」이고 철수 리스트(UI-05)에서 바꿉니다.

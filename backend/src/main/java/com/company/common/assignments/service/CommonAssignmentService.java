@@ -31,6 +31,16 @@ public class CommonAssignmentService {
     private static final int CHUNK=500;
     public Instant now() { return calendar.now(); }
     public String userId() { return actor.userId(); }
+    /** 엑셀 「월 단가」: 화면 목록과 같이 턴키는 「배분표」, 무상지원은 「무상지원」, 그 밖은 금액(2026-11-24 사용자 결정). */
+    public String excelPrice(Assignment a, Map<String,String> contractTypes) {
+        String type=contractTypes.computeIfAbsent(a.projectId(), id -> {
+            var project=projects.selectProject(id,calendar.today(),db(calendar.currentMonth()));
+            return project==null?"":project.contractTypeCode;
+        });
+        if ("TK".equals(type)) return "배분표";
+        if ("FREE".equals(a.inputTypeCode())) return "무상지원";
+        return a.billingPrice()==null?"":a.billingPrice().toPlainString();
+    }
     public List<String> roles() { return new ArrayList<>(actor.roles()); }
     public static boolean blank(String s) { return s==null || s.isBlank(); }
     private static String db(YearMonth m) { return m.toString().replace("-",""); }
@@ -287,7 +297,8 @@ public class CommonAssignmentService {
         String id=allocate();
         Row row=new Row(id,projectId,developer,job,start,end,mm,price,input,contract,extension,0,"N","ACT",null,project.projectName,person.name(),null,code("JOB",job,""),project.contractTypeCode,project.statusCode);
         mapper.insert(new Write(row,userId(),null));
-        history(row,new Event("INPUT",start,"","투입",null,memo,price,mm,null));
+        // [같이 처리] 메모는 빠지는 사람의 조기 철수 이력에만 남긴다(시안, 2026-11-24 사용자 결정). 신규 투입처럼 「투입」 줄에는 넣지 않는다.
+        history(row,new Event("INPUT",start,"","투입",null,originals.isEmpty()?memo:null,price,mm,null));
         if (candidate!=null && mapper.confirmCandidate(candidate,userId())!=1) throw CodeFailure.conflict();
         for (Row source:originals) {
             Row withdrawn=replace(source,new Values(start.minusDays(1),source.monthlyMm(),source.billingPrice(),source.inputTypeCode(),source.extensionPossibilityCode(),source.extensionCount(),"Y",source.statusCode()));

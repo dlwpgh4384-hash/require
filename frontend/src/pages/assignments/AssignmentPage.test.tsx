@@ -603,14 +603,18 @@ it("assign form validates with the mockup messages before any POST", async () =>
   expect(writes()).toHaveLength(0);
 });
 
-it("PM has no price field and is blocked when the pool has no monthly rate", async () => {
+it("PM has no price field; the server checks the rate and its message shows under the developer", async () => {
   developer.monthlyRate = null;
   form({ roles: ["PM"] });
   await pick();
   expect(screen.queryByTestId("assignment-billing-price")).not.toBeInTheDocument();
+  const message = "월 단가가 없어 배정할 수 없습니다. 파트장·재무에게 요청해 주세요.";
+  writeFailure = { status: 400, message: "입력 내용을 확인해 주세요.", errors: [{ field: "billingPrice", message }] };
   fireEvent.click(screen.getByTestId("assignment-form-save"));
-  expect(await screen.findByText("월 단가가 없어 배정할 수 없습니다. 파트장·재무에게 요청해 주세요.")).toBeInTheDocument();
-  expect(writes()).toHaveLength(0);
+  // PM 화면에는 금액이 오지 않으므로 화면이 미리 막지 않고 서버가 검사한다(2026-11-24 사용자 결정).
+  expect(await within(screen.getByTestId("assignment-field-developer")).findByText(message)).toBeInTheDocument();
+  expect(writes()).toHaveLength(1);
+  expect(JSON.parse(String((writes()[0][1] as RequestInit).body))).not.toHaveProperty("billingPrice");
 });
 
 it("finance sees the no-rate hint, free support hides price and turnkey shows the notice", async () => {
@@ -775,16 +779,16 @@ it("assign form subtitle follows how it was opened", async () => {
   expect(await screen.findByRole("dialog", { name: "투입 배정" })).toHaveTextContent("AI 인력 추천에서 채움");
 });
 
-it("shows the no-price notice whenever the price field is hidden", async () => {
+it("shows the no-price notice whenever the price field is hidden, with a reason that fits", async () => {
   form({ roles: ["PM"] });
   await ready();
-  expect(screen.getByTestId("assignment-no-price")).toHaveTextContent("내부 프로젝트는 매출이 없어 청구 단가 칸이 없습니다.");
+  expect(screen.getByTestId("assignment-no-price")).toHaveTextContent("청구 단가는 개발자 월 단가(대체투입은 계약상 인력 단가)로 저장됩니다. 단가는 파트장·재무가 고칩니다.");
   cleanup();
   form();
   await ready();
   expect(screen.queryByTestId("assignment-no-price")).not.toBeInTheDocument();
   fireEvent.change(screen.getByTestId("assignment-input-type"), { target: { value: "FREE" } });
-  expect(screen.getByTestId("assignment-no-price")).toHaveTextContent("내부 프로젝트는 매출이 없어 청구 단가 칸이 없습니다.");
+  expect(screen.getByTestId("assignment-no-price")).toHaveTextContent("무상지원은 매출이 없어 청구 단가를 0으로 저장합니다.");
 });
 
 it("monthly MM drops letters at once", async () => {

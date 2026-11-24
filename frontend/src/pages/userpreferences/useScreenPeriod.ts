@@ -6,7 +6,12 @@ import {
   type PeriodOptions,
   type PeriodValue,
 } from "../../shared/period/periodRules";
-import { createPreferenceSaver, getCommonUserPreference } from "./userPreferences";
+import {
+  createPreferenceSaver,
+  getCommonUserPreference,
+  PERIOD_CHANGED_EVENT,
+  type PeriodChangedDetail,
+} from "./userPreferences";
 
 type State =
   | { status: "loading" }
@@ -83,5 +88,23 @@ export function useScreenPeriod(screenId: string, options: PeriodOptions) {
     },
     [save],
   );
+  // 다른 화면(월 마감 [확인하기])이 이 화면 기간을 바꿔 저장하면, 이미 열린 탭도 그 기간으로 바꾼다(다시 저장하지 않음).
+  useEffect(() => {
+    const current: PeriodOptions = JSON.parse(optionsKey);
+    const listener = (event: Event) => {
+      const detail = (event as CustomEvent<PeriodChangedDetail>).detail;
+      if (!detail || detail.screenId !== screenId) return;
+      const next = parseSaved(detail.prefVal);
+      if (!next) return;
+      saver.setToken(detail.modDttm);
+      setState((previous) =>
+        previous.status === "ready" && isAllowed(next, previous.basis, current)
+          ? { ...previous, value: next }
+          : previous,
+      );
+    };
+    window.addEventListener(PERIOD_CHANGED_EVENT, listener);
+    return () => window.removeEventListener(PERIOD_CHANGED_EVENT, listener);
+  }, [screenId, optionsKey, saver]);
   return { state, setValue };
 }

@@ -997,7 +997,7 @@ describe("cash flow statement route composition", () => {
         });
         expect(screen.getByTestId("cash-flow-toast")).toHaveTextContent(
           succeeds
-            ? "엑셀 파일을 내려받았습니다."
+            ? "엑셀 파일을 만들었습니다 (조회 결과"
             : "엑셀 파일을 받지 못했습니다. 다시 시도해 주세요.",
         );
         expect(request).toHaveBeenCalledWith(
@@ -1379,7 +1379,7 @@ describe("common code route composition", () => {
       expect(await screen.findByText("등록된 표기가 없습니다.")).toBeVisible();
       expect(screen.getByTestId("code-maps-panel")).toBeVisible();
       fireEvent.click(screen.getByTestId("code-tab-standards"));
-      expect(await screen.findByLabelText("기초 잔액")).toHaveValue("1000");
+      expect(await screen.findByLabelText("기초 잔액")).toHaveValue("1,000");
       fireEvent.click(screen.getByTestId("code-tab-history"));
       expect(await screen.findByTestId("code-history-empty")).toBeVisible();
       expect(
@@ -1527,12 +1527,12 @@ describe("common code route composition", () => {
     fireEvent.click(screen.getByTestId("confirmation-cancel"));
     fireEvent.click(screen.getByTestId("code-tab-history"));
     fireEvent.click(screen.getByTestId("code-discard-cancel"));
-    expect(screen.getByLabelText("기초 잔액")).toHaveValue("2999");
+    expect(screen.getByLabelText("기초 잔액")).toHaveValue("2,999");
     fireEvent.click(screen.getByTestId("code-tab-history"));
     fireEvent.click(screen.getByTestId("code-discard-proceed"));
     await screen.findByTestId("code-history-empty");
     fireEvent.click(screen.getByTestId("code-tab-standards"));
-    expect(await screen.findByLabelText("기초 잔액")).toHaveValue("1000");
+    expect(await screen.findByLabelText("기초 잔액")).toHaveValue("1,000");
     expect(
       request.mock.calls.filter(
         ([url, init]) =>

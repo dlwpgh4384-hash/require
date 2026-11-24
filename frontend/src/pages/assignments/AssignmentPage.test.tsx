@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { announcePeriodChanged } from "../userpreferences/userPreferences";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { AssignmentPage } from "./AssignmentPage";
@@ -279,6 +280,17 @@ it("reopening uses the saved year and changing the year saves it (FR-0105)", asy
       ),
     ).toBe(true),
   );
+});
+
+it("an already open tab follows a period saved by month close [확인하기]", async () => {
+  page();
+  await screen.findByTestId("list-row-A-0001");
+  expect(screen.queryByTestId("assignment-lock-banner")).not.toBeInTheDocument();
+  act(() => announcePeriodChanged({ screenId: "UI-12", prefVal: '{"year":2025}', modDttm: null }));
+  expect(await screen.findByTestId("assignment-lock-banner")).toHaveTextContent("2025년은 지난 해라 읽기만 할 수 있습니다.");
+  // 다른 화면 신호는 무시한다.
+  act(() => announcePeriodChanged({ screenId: "UI-01", prefVal: '{"year":2024}', modDttm: null }));
+  expect(screen.getByTestId("assignment-lock-banner")).toHaveTextContent("2025년");
 });
 
 it("last year shows the lock banner and hides every editing control", async () => {

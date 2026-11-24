@@ -647,6 +647,9 @@ it.each([
 ])(
   "check %s saves the target screen's period shape before navigating to %s",
   async (index, target) => {
+    const signals: string[] = [];
+    const listener = (event: Event) => signals.push((event as CustomEvent).detail.screenId);
+    window.addEventListener("period-preference-changed", listener);
     mount();
     await ready();
     fireEvent.click(screen.getByTestId(`month-close-visit-${index}`));
@@ -663,6 +666,9 @@ it.each([
     expect(JSON.parse(JSON.parse(String(preference![1].body)).prefVal)).toEqual(
       target === "UI-19" ? { year: 2026, month: 10 } : { year: 2026 },
     );
+    // 이미 열린 탭도 바뀌게 알린다(2026-11-24 사용자 결정).
+    expect(signals).toEqual([target]);
+    window.removeEventListener("period-preference-changed", listener);
   },
 );
 it("double clicking 확인하기 navigates only once", async () => {

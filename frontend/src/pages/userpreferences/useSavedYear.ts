@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPreferenceSaver, getCommonUserPreference } from "./userPreferences";
+import {
+  createPreferenceSaver,
+  getCommonUserPreference,
+  PERIOD_CHANGED_EVENT,
+  type PeriodChangedDetail,
+} from "./userPreferences";
 
 /**
  * 연도만 고르는 화면(UI-01·05·11·12)의 고른 연도를 TB_SY_USER_PREF(PERIOD)에 저장하고 다시 열면 읽는다
@@ -44,6 +49,27 @@ export function useSavedYear(
     // 화면을 처음 열 때 한 번만 읽는다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screenId, saver]);
+  // 다른 화면(월 마감 [확인하기])이 이 화면 연도를 바꿔 저장하면, 이미 열린 탭도 그 해로 바꾼다(다시 저장하지 않음).
+  useEffect(() => {
+    const listener = (event: Event) => {
+      const detail = (event as CustomEvent<PeriodChangedDetail>).detail;
+      if (!detail || detail.screenId !== screenId) return;
+      let next: number | null = null;
+      try {
+        const parsed = JSON.parse(detail.prefVal);
+        if (parsed && Number.isInteger(parsed.year)) next = parsed.year;
+      } catch {
+        next = null;
+      }
+      if (next === null || next < min || next > max) return;
+      saver.setToken(detail.modDttm);
+      touched.current = true;
+      setYearState(next);
+      loaded.current?.(next);
+    };
+    window.addEventListener(PERIOD_CHANGED_EVENT, listener);
+    return () => window.removeEventListener(PERIOD_CHANGED_EVENT, listener);
+  }, [screenId, saver, min, max]);
   const setYear = useCallback(
     (next: number) => {
       touched.current = true;

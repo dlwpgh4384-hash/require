@@ -16,6 +16,7 @@ import { formatDateTime, koreanThisMonth } from "../../shared/time";
 import { requestMenuBadgeRefresh } from "../../app/menuBadges";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
 import {
+  announcePeriodChanged,
   createPreferenceSaver,
   getCommonUserPreference,
 } from "../userpreferences/userPreferences";
@@ -295,7 +296,9 @@ export function MonthClosePage({
         screen === "UI-12" || screen === "UI-13"
           ? { year: period.value.year }
           : period.value;
-      await saver.save(JSON.stringify(targetPeriod));
+      const saved = await saver.save(JSON.stringify(targetPeriod));
+      // 이미 탭으로 열려 있는 화면도 이 기간으로 바꾸게 알린다(2026-11-24 사용자 결정).
+      announcePeriodChanged({ screenId: screen, prefVal: JSON.stringify(targetPeriod), modDttm: saved.data.modDttm });
       navigate(`/screens/${screen}`);
     } catch (failure) {
       visiting.current = false;

@@ -249,7 +249,8 @@ export function CashFlowStatementPage() {
         )}
         {fields.map((field, index) => (
           <p className="cash-flow-field-error" key={`${field.field}-${index}`}>
-            {field.field}: {field.message}
+            {/* 다른 화면처럼 문구만(영어 칸 이름 없이, 2026-11-24 사용자 결정). */}
+            {field.message}
           </p>
         ))}
       </div>
@@ -384,10 +385,10 @@ export function CashFlowStatementPage() {
                               role="tooltip"
                               id={`cash-flow-warning-detail-${warning.yearMonth}`}
                             >
-                              예상 잔액{" "}
-                              {formatKoreanMoney(warning.expectedBalance)} ·
-                              최소 운영자금{" "}
-                              {formatKoreanMoney(warning.minimumCash)}
+                              {/* 시안 문구 그대로(2026-11-24 사용자 결정). */}
+                              월말 잔액이 최소 운영자금(
+                              {formatKoreanMoney(warning.minimumCash)})보다 적을
+                              것으로 예상
                             </span>
                           </span>
                         )}

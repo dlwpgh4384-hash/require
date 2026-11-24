@@ -318,7 +318,7 @@ it("shows one warning banner listing shortage months with focusable header expla
   expect(excel).not.toHaveTextContent("⇩");
   expect(
     document.getElementById(icon.getAttribute("aria-describedby")!),
-  ).toHaveTextContent("예상 잔액 9.0억 원 · 최소 운영자금 10.0억 원");
+  ).toHaveTextContent("월말 잔액이 최소 운영자금(10.0억 원)보다 적을 것으로 예상");
   fireEvent.click(screen.getByTestId("cash-flow-receivables"));
   expect(screen.getByTestId("current-location")).toHaveTextContent(
     "/screens/UI-13",
@@ -398,7 +398,7 @@ it("renders errors and field validation then retries", async () => {
   await screen.findByTestId("cash-flow-error");
   expect(
     within(screen.getByTestId("cash-flow-period")).getByText(
-      "year: 조회 연도를 확인해 주세요.",
+      "조회 연도를 확인해 주세요.",
     ),
   ).toBeVisible();
   expect(screen.getByTestId("period-year")).toHaveFocus();
@@ -460,7 +460,7 @@ it("places fallback year validation by its selector and focuses it", async () =>
   await screen.findByTestId("cash-flow-error");
   expect(
     within(screen.getByTestId("cash-flow-period")).getByText(
-      "year: 조회 연도를 확인해 주세요.",
+      "조회 연도를 확인해 주세요.",
     ),
   ).toBeVisible();
   expect(screen.getByTestId("cash-flow-year")).toHaveFocus();

@@ -20,6 +20,13 @@ const nextMonth = (month: string) => {
   const date = new Date(Date.UTC(year, value, 1));
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 };
+/** 정수 부분에 세 자리마다 콤마(소수·음수 부호는 그대로). */
+const withCommas = (value: string) => {
+  const [whole, fraction] = value.split(".");
+  const sign = whole.startsWith("-") ? "-" : "";
+  const digits = whole.replace("-", "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return sign + digits + (fraction !== undefined ? `.${fraction}` : "");
+};
 
 /** SCR-UI-27 운영 기준값 탭. 네 탭의 CodePage 작업 공간에서 이 패널을 사용한다. */
 export function OperatingStandardsPanel({
@@ -348,7 +355,12 @@ export function OperatingStandardsPanel({
                             ? undefined
                             : "decimal"
                         }
-                        value={draft[row.standardCode] ?? row.value}
+                        value={
+                          // 기초 잔액은 금액이라 콤마를 넣어 보인다(SFR-006-02, 2026-11-24 사용자 결정). 저장 값은 콤마 없음.
+                          row.standardCode === "CASH_BASE_AMT"
+                            ? withCommas(draft[row.standardCode] ?? row.value)
+                            : (draft[row.standardCode] ?? row.value)
+                        }
                         disabled={blocked || (row.immediate && row.closed)}
                         aria-invalid={!!error}
                         onChange={(event) => {

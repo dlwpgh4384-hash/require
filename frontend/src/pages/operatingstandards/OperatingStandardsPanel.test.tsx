@@ -436,6 +436,20 @@ it("closed application month rejection keeps draft and shows field error in M4",
   expect(screen.getByLabelText("부가세율")).toHaveValue("11");
   expect(rows.find((item) => item.standardCode === "VAT_RT")!.value).toBe("10");
 });
+it("opening balance shows commas but saves the plain number", async () => {
+  await mount();
+  expect(screen.getByLabelText("자금수지 기초 잔액")).toHaveValue("1,150,000,000");
+  fireEvent.change(screen.getByLabelText("자금수지 기초 잔액"), {
+    target: { value: "2,000,000" },
+  });
+  expect(screen.getByLabelText("자금수지 기초 잔액")).toHaveValue("2,000,000");
+  openSave();
+  fireEvent.click(screen.getByTestId("operating-save-confirm"));
+  await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
+  expect(
+    JSON.parse(String((writes()[0][1] as RequestInit).body)).items[0],
+  ).toMatchObject({ standardCode: "CASH_BASE_AMT", value: "2000000" });
+});
 it("cash-only save has no effective month and sends null while unlocked", async () => {
   await mount();
   change("cash-base-amt", "123.1250");

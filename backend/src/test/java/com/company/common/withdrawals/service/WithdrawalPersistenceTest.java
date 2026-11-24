@@ -198,6 +198,18 @@ class WithdrawalPersistenceTest {
         assertThat(count("SELECT count(*) FROM TB_SL_TENT_ASGN WHERE TENT_STAT_CD='REL'")).isEqualTo(1);
     }
 
+    /** 시안 forecast·unfilled: 오래전에 끝난 투입은 연장으로 빼지 않고, 미충원은 다음 달(또는 늦은 시작 달)부터 나눈다. */
+    @Test void longEndedAssignmentIsNotAnExtensionAndUnfilledDividesFromNextMonth(@Autowired WithdrawalMapper mapper){
+        db.update("UPDATE TB_PJ_ASGN SET INPUT_END_DT='2026-06-30' WHERE ASGN_ID='A-WITHDRAWAL-B'");
+        db.update("INSERT INTO TB_PJ_MNPW_PLAN(PROJ_ID,JOB_CD,PLAN_MM,SRC_CD,REG_USER_ID) VALUES('P-WITHDRAWAL',?,30,'MANUAL','admin')",job);
+        var base=LocalDate.of(2026,11,1);
+        var december=new com.company.common.withdrawals.mapper.WithdrawalRows.MonthFilter(job,"202612",LocalDate.of(2026,12,1),LocalDate.of(2026,12,31),base);
+        assertThat(mapper.extensions(december)).extracting(r -> r.developerId()).containsExactly("withdrawal-person-a");
+        assertThat(mapper.projectDemand(december)).singleElement().satisfies(r -> assertThat(r.remainingMonths()).isEqualTo(13));
+        var november=new com.company.common.withdrawals.mapper.WithdrawalRows.MonthFilter(job,"202611",LocalDate.of(2026,11,1),LocalDate.of(2026,11,30),base);
+        assertThat(mapper.projectDemand(november)).isEmpty();
+    }
+
     /** 엑셀을 받으면 실제 DB에 DNLD 기록이 한 줄 남는다(읽기 전용 트랜잭션 안에서 쓰기가 막히던 결함, 2026-11-20). */
     @Test void excelDownloadWritesExactlyOneDownloadAccessRow()throws Exception {
         String dnld="SELECT count(*) FROM TB_SY_ACCS_LOG WHERE SCRN_ID='UI-05' AND ACT_TYPE_CD='DNLD'";

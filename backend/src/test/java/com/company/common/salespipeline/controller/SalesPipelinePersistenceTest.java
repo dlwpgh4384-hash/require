@@ -155,4 +155,42 @@ class SalesPipelinePersistenceTest {
         }
         assertThat(db.queryForObject("SELECT COUNT(*) FROM TB_SY_ACCS_LOG WHERE scrn_id='UI-29' AND act_type_cd='DNLD'", Integer.class)).isEqualTo(1);
     }
+    @Test void forecastStartMonthIsThisOrNextMonthOnly() throws Exception {
+        var response = mvc.perform(get("/api/common/sales-pipeline/forecast").param("startMonth", "2026-11"))
+            .andExpect(status().isOk()).andReturn().getResponse();
+        var months = json.readTree(response.getContentAsString()).path("data").path("months");
+        assertThat(months).hasSize(6); assertThat(months.get(0).path("month").asText()).isEqualTo("2026-11");
+        mvc.perform(get("/api/common/sales-pipeline/forecast").param("startMonth", "2026-13")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("시작 달은 yyyy-MM 모양으로 넣어 주세요."));
+        mvc.perform(get("/api/common/sales-pipeline/forecast").param("startMonth", "2027-01")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("시작 달은 이번 달 또는 다음 달만 고를 수 있습니다."));
+    }
+    void project(String id, String start, String end) {
+        db.update("INSERT INTO TB_PJ_PROJ(proj_id,proj_nm,ctrt_type_cd,proj_stat_cd,ctrt_bgn_dt,ctrt_end_dt,ctrt_amt,team_exps_amt,proj_exps_amt,reg_user_id) VALUES(?,?,'MO','ING',CAST(? AS date),CAST(? AS date),0,0,0,'admin')", id, id, start, end);
+        db.update("INSERT INTO TB_PJ_MNPW_PLAN(proj_id,job_cd,plan_mm,src_cd,reg_user_id) VALUES(?,'BE',8,'MANUAL','admin')", id);
+    }
+    @Test void unfilledDivisorStartsAtTheLaterOfNextMonthAndProjectStart(@Autowired SalesPipelineMapper pipeline) {
+        project("pipeline-late", "2027-02-10", "2027-05-31");
+        project("pipeline-early", "2026-01-01", "2027-01-31");
+        var windows = new ArrayList<com.company.common.salespipeline.mapper.SalesPipelineRows.MonthWindow>();
+        for (int i = 0; i < 6; i++) {
+            var month = YearMonth.of(2026, 11).plusMonths(i);
+            windows.add(new com.company.common.salespipeline.mapper.SalesPipelineRows.MonthWindow(
+                month.format(java.time.format.DateTimeFormatter.ofPattern("uuuuMM")), month.atDay(1), month.atEndOfMonth()));
+        }
+        var rows = pipeline.projectDemand(windows, LocalDate.of(2026, 12, 1));
+        // 늦게 시작: 2027-02~05 = 4개월로 나누고 2~4월(예측 안)에만. 일찍 시작: 다음 달 12월~1월 = 2개월, 이번 달(11월)은 더하지 않는다.
+        assertThat(rows).extracting(r -> r.month() + ":" + r.remainingMonths()).containsExactly(
+            "202612:2", "202701:2", "202702:4", "202703:4", "202704:4");
+    }
+    @Test void onlyAssignmentsEndingThisMonthOrLaterCountAsExtensions(@Autowired SalesPipelineMapper pipeline) {
+        project("pipeline-proj", "2026-01-01", "2027-05-31");
+        db.update("INSERT INTO TB_HR_DEV(dev_id,mng_no,dev_nm,emp_type_cd,grade_cd,job_cd,drct_cls_cd,part_id,work_stat_cd,reg_user_id) VALUES('pipeline-ext','K-9001','연장 시험','EMP','MD','BE','DRCT','pipeline-part','WORK','admin')");
+        for (String[] a : new String[][]{{"pipeline-old", "2026-06-30"}, {"pipeline-now", "2026-11-10"}}) {
+            db.update("INSERT INTO TB_PJ_ASGN(asgn_id,proj_id,dev_id,job_cd,input_bgn_dt,input_end_dt,ctrt_mm,input_type_cd,ext_psbl_cd,ext_cnt,asgn_stat_cd,reg_user_id) VALUES(?,'pipeline-proj','pipeline-ext','BE',DATE '2026-01-01',CAST(? AS date),0.5,'NEW','H',0,'ACT','admin')", a[0], a[1]);
+        }
+        var december = List.of(new com.company.common.salespipeline.mapper.SalesPipelineRows.MonthWindow("202612", LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 31)));
+        assertThat(pipeline.extensions(december, LocalDate.of(2026, 11, 1))).hasSize(1);
+        assertThat(pipeline.extensions(december, LocalDate.of(2026, 6, 1))).hasSize(2);
+    }
 }

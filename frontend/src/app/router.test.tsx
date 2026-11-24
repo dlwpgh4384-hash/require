@@ -12,6 +12,7 @@ import "@testing-library/jest-dom/vitest";
 import { RouterProvider } from "react-router-dom";
 import type { ShellMenuResponse } from "./NavigationRoot";
 import { createAppRouter } from "./router";
+import { koreanToday } from "../shared/time";
 import type { RoleSettings } from "../pages/roles/roles";
 import type {
   MenuSettingItem,
@@ -25,6 +26,7 @@ import type { RateRenegotiationResult } from "../pages/raterenegotiations/rateRe
 import type { BusinessPlanComparisonResult } from "../pages/commonops/businessPlanComparisons";
 import type { CashFlowStatementResult } from "../pages/cashflowstatements/cashFlowStatements";
 import type { MonthClose } from "../pages/monthcloses/monthCloses";
+import type { ManpowerBoardResult } from "../pages/manpowerboard/manpowerBoard";
 
 let router: ReturnType<typeof createAppRouter> | undefined;
 
@@ -623,6 +625,318 @@ function respondWithCashFlowStatements(available = true) {
   return { request, list, download };
 }
 
+function respondWithManpowerBoard(available = true) {
+  const menus = response();
+  menus.data.push(
+    {
+      ...menus.data[0],
+      menuId: "G004",
+      menuNm: "인력 계획",
+      scrnId: null,
+      sortOrd: 2,
+    },
+    {
+      ...menus.data[0],
+      menuId: "M009",
+      upperMenuId: "G004",
+      menuNm: "인력 운영 보드",
+      scrnId: "UI-28",
+      menuLvl: 2,
+    },
+  );
+  menus.meta.screenAccess.push({ scrnId: "UI-28", available, pcOnlyYn: "N" });
+  const result: ManpowerBoardResult = {
+    year: 2026,
+    summary: {
+      idleCount: 0,
+      availableMm: 0,
+      withdrawalCount: 0,
+      highExtensionCount: 0,
+      concurrentCount: 0,
+      overAllocatedCount: 0,
+      futureAvailableMm: 0,
+    },
+    items: [],
+    totalCount: 0,
+    monthTotals: Array.from({ length: 12 }, (_, index) => ({
+      month: `2026-${String(index + 1).padStart(2, "0")}`,
+      idleCount: null,
+      availableMm: null,
+    })),
+  };
+  const success = (data: unknown) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ success: true, meta: {}, data }),
+  });
+  const list = vi.fn(async () => success(result));
+  const forecast = vi.fn(async () =>
+    success({
+      months: [
+        "2026-12",
+        "2027-01",
+        "2027-02",
+        "2027-03",
+        "2027-04",
+        "2027-05",
+      ].map((month, index) => ({
+        month,
+        demand: index + 0.25,
+        supply: index + 0.75,
+        projectRevenue: 0,
+        weightedOpportunityRevenue: 0,
+        allWonRevenue: 0,
+      })),
+      opportunityRevenues: [],
+      hiringReviews: [],
+    }),
+  );
+  const download = vi.fn(async () => ({
+    ok: true,
+    status: 200,
+    headers: new Headers({
+      "Content-Type":
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": "attachment; filename=board.xlsx",
+      "X-Total-Count": "0",
+    }),
+    blob: async () => new Blob(["workbook"]),
+    json: async () => ({
+      success: false,
+      message: "파일 생성 실패",
+      errors: [],
+    }),
+  }));
+  const request = vi.fn(async (url: string, _init?: RequestInit) => {
+    if (url === "/api/common/menus")
+      return { ok: true, status: 200, json: async () => menus };
+    if (url.startsWith("/api/common/user-preferences/")) {
+      const preference = preferenceResponse(url);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ...preference,
+          meta: {
+            periodBasis: {
+              latestYm: "202611",
+              cashBaseYm: "202601",
+              closedMonths: [],
+            },
+          },
+        }),
+      };
+    }
+    if (url.startsWith("/api/common/manpower-board/excel?")) return download();
+    if (url.startsWith("/api/common/manpower-board?")) return list();
+    if (url === `/api/common/sales-pipeline/forecast?startMonth=${koreanToday().slice(0, 7)}`)
+      return forecast();
+    if (/^\/api\/common\/code-groups\/(JOB|GRADE|EMP_TYPE)\/codes$/.test(url))
+      return success({
+        items: [{ code: "BE", codeName: "백엔드", useYn: "Y" }],
+      });
+    if (url === "/api/common/bills/unpaid-count") return success({ count: 0 });
+    throw new Error(`예상하지 않은 요청: ${url}`);
+  });
+  vi.stubGlobal("fetch", request);
+  return { request, list, forecast, download, result };
+}
+
+describe("manpower board route composition", () => {
+  it.each(["/screens/UI-28", "/#UI-28"])(
+    "%s resolves the public board and title actions in one shell",
+    async (path) => {
+      const { request, forecast } = respondWithManpowerBoard();
+      mount(path);
+      await screen.findByTestId("manpower-board-empty");
+      await screen.findByTestId("manpower-board-year");
+      const actions = within(screen.getByTestId("screen-actions"));
+      await waitFor(() =>
+        expect(actions.getByTestId("manpower-board-excel")).toBeEnabled(),
+      );
+      expect(screen.getAllByTestId("manpower-board-page")).toHaveLength(1);
+      expect(
+        screen.getByTestId("manpower-board-page").querySelector(".screen-body"),
+      ).toBeNull();
+      expect(
+        within(screen.getByTestId("manpower-board-page")).queryByTestId(
+          "manpower-board-excel",
+        ),
+      ).not.toBeInTheDocument();
+      expect(request).toHaveBeenCalledWith(
+        "/api/common/manpower-board?year=2026",
+        { signal: expect.any(AbortSignal) },
+      );
+      expect(
+        request.mock.calls.some(([url]) => url.startsWith("/api/auth/")),
+      ).toBe(false);
+      expect(
+        request.mock.calls.some(([url]) =>
+          url.startsWith("/api/common/developers"),
+        ),
+      ).toBe(false);
+      expect(forecast).not.toHaveBeenCalled();
+      await waitFor(() =>
+        expect(router?.state.location.pathname).toBe("/screens/UI-28"),
+      );
+      expectSingleShell();
+    },
+  );
+
+  it("M009 under G004 opens the board without replacing preferences", async () => {
+    respondWithManpowerBoard();
+    mount("/screens/ADDED");
+    await screen.findByRole("region", { name: "ADDED 본문" });
+    const preferences = screen.getByTestId("user-preferences");
+    fireEvent.click(screen.getByTestId("menu-toggle-g004"));
+    fireEvent.click(screen.getByRole("link", { name: "인력 운영 보드" }));
+    await screen.findByTestId("manpower-board-empty");
+    expect(router?.state.location.pathname).toBe("/screens/UI-28");
+    expect(screen.getByTestId("user-preferences")).toBe(preferences);
+    expectSingleShell();
+  });
+
+  it("unavailable UI-28 never starts board or forecast reads", async () => {
+    const { list, forecast, download } = respondWithManpowerBoard(false);
+    mount("/screens/UI-28");
+    expect(await screen.findByText("사용할 수 없는 화면입니다")).toBeVisible();
+    expect(screen.queryByTestId("manpower-board-page")).not.toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
+    expect(forecast).not.toHaveBeenCalled();
+    expect(download).not.toHaveBeenCalled();
+    expectSingleShell();
+  });
+
+  it("a failed board read disables title export and retries through the same client", async () => {
+    const { list, result } = respondWithManpowerBoard();
+    list.mockRejectedValue(new Error("보드 조회 실패"));
+    mount("/screens/UI-28");
+    await screen.findByTestId("manpower-board-error");
+    await screen.findByTestId("manpower-board-year");
+    const button = within(screen.getByTestId("screen-actions")).getByTestId(
+      "manpower-board-excel",
+    );
+    expect(button).toBeDisabled();
+    expect(
+      screen.queryByTestId("manpower-board-empty"),
+    ).not.toBeInTheDocument();
+    list.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, meta: {}, data: result }),
+    });
+    fireEvent.click(screen.getByTestId("manpower-board-retry"));
+    await screen.findByTestId("manpower-board-empty");
+    await waitFor(() => expect(button).toBeEnabled());
+    expectSingleShell();
+  });
+
+  it("forecast tab sends only this month to the existing client despite calendar filters", async () => {
+    const { request, forecast } = respondWithManpowerBoard();
+    mount("/screens/UI-28");
+    await screen.findByTestId("manpower-board-empty");
+    await screen.findByTestId("manpower-board-year");
+    await screen.findAllByRole("option", { name: "백엔드" });
+    fireEvent.change(screen.getByTestId("manpower-board-jobcode"), {
+      target: { value: "BE" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "조회" }));
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        "/api/common/manpower-board?year=2026&jobCode=BE",
+        { signal: expect.any(AbortSignal) },
+      ),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "수요·공급" }));
+    const panel = screen.getByTestId("manpower-board-forecast");
+    await within(panel).findByText("2026-12");
+    expect(forecast).toHaveBeenCalledTimes(1);
+    expect(
+      request.mock.calls
+        .filter(([url]) => url.includes("/sales-pipeline/forecast"))
+        .map(([url]) => url),
+    ).toEqual([
+      `/api/common/sales-pipeline/forecast?startMonth=${koreanToday().slice(0, 7)}`,
+    ]);
+    expect(within(panel).getAllByRole("row")).toHaveLength(4);
+    expect(
+      within(panel)
+        .getAllByRole("columnheader")
+        .slice(1)
+        .map((header) => header.textContent),
+    ).toEqual([
+      "2026-12",
+      "2027-01",
+      "2027-02",
+      "2027-03",
+      "2027-04",
+      "2027-05",
+    ]);
+    fireEvent.click(screen.getByRole("tab", { name: "달력" }));
+    expect(screen.getByTestId("manpower-board-jobcode")).toHaveValue("BE");
+    expectSingleShell();
+  });
+
+  it.each([true, false])(
+    "title export uses the feature client and reports success=%s",
+    async (succeeds) => {
+      const { request, download } = respondWithManpowerBoard();
+      const created = vi.fn(() => "blob:board");
+      vi.stubGlobal(
+        "URL",
+        class extends URL {
+          static createObjectURL = created;
+          static revokeObjectURL = vi.fn();
+        },
+      );
+      const click = vi
+        .spyOn(HTMLAnchorElement.prototype, "click")
+        .mockImplementation(() => undefined);
+      if (!succeeds)
+        download.mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          headers: new Headers(),
+          blob: async () => new Blob(),
+          json: async () => ({
+            success: false,
+            message: "파일 생성 실패",
+            errors: [],
+          }),
+        });
+      mount("/screens/UI-28");
+      await screen.findByTestId("manpower-board-year");
+      const button = within(screen.getByTestId("screen-actions")).getByTestId(
+        "manpower-board-excel",
+      );
+      await waitFor(() => expect(button).toBeEnabled());
+      vi.useFakeTimers();
+      try {
+        await act(async () => {
+          fireEvent.click(button);
+        });
+        expect(screen.getByTestId("manpower-board-toast")).toHaveTextContent(
+          succeeds
+            ? "엑셀 파일을 만들었습니다 (조회 결과 0건)"
+            : "엑셀 파일을 받지 못했습니다. 다시 시도해 주세요.",
+        );
+        expect(request).toHaveBeenCalledWith(
+          "/api/common/manpower-board/excel?year=2026",
+        );
+        expect(download).toHaveBeenCalledTimes(1);
+        expect(click).toHaveBeenCalledTimes(succeeds ? 1 : 0);
+        expect(created).toHaveBeenCalledTimes(succeeds ? 1 : 0);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1000);
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+      expectSingleShell();
+    },
+  );
+});
+
 function respondWithMonthCloses(available = true) {
   const menus = response();
   menus.data.push(
@@ -681,8 +995,7 @@ function respondWithMonthCloses(available = true) {
     if (url === "/api/common/menus")
       return { ok: true, status: 200, json: async () => menus };
     if (url === "/api/common/month-closes/2026-10") return list();
-    if (url === "/api/common/month-close-history")
-      return history();
+    if (url === "/api/common/month-close-history") return history();
     if (url === "/api/common/month-close-badge")
       return success({ needsAttention: true });
     if (url.startsWith("/api/common/user-preferences/")) {
@@ -735,13 +1048,10 @@ describe("month close route composition", () => {
         credentials: "same-origin",
         signal: expect.any(AbortSignal),
       });
-      expect(request).toHaveBeenCalledWith(
-        "/api/common/month-close-history",
-        {
-          credentials: "same-origin",
-          signal: expect.any(AbortSignal),
-        },
-      );
+      expect(request).toHaveBeenCalledWith("/api/common/month-close-history", {
+        credentials: "same-origin",
+        signal: expect.any(AbortSignal),
+      });
       expect(await screen.findByTestId("menu-badge-UI-14")).toHaveTextContent(
         "!",
       );

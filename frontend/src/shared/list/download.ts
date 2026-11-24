@@ -11,6 +11,8 @@ export async function downloadFile(
     message: string,
     errors: { field: string; message: string }[],
   ) => Error,
+  /** 받기 전에 응답 머리(예: X-Total-Count)를 읽거나 확인한다. 던지면 저장하지 않는다. */
+  onResponse?: (response: Response) => void,
 ) {
   const response = await fetch(url);
   if (!response.ok) {
@@ -30,6 +32,7 @@ export async function downloadFile(
     }
     throw createError ? createError(message, errors) : new Error(message);
   }
+  onResponse?.(response);
   const header = response.headers.get("Content-Disposition") ?? "";
   const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)?.[1];
   // filename*=UTF-8''… 가 없으면 filename="…"(서버 양식 이름)을 쓴다

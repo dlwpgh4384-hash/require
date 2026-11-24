@@ -139,8 +139,13 @@ export const putCommonSalesPipelineStage = (
       body: JSON.stringify({ stageCode, modifiedAt: card.modifiedAt }),
     },
   );
-export const getCommonSalesPipelineForecast = () =>
-  developerRequest<SalesForecast>(`${root}/forecast`);
+/** startMonth(yyyy-MM)를 주면 그 달부터 예측한다(인력 운영 보드는 이번 달). */
+export const getCommonSalesPipelineForecast = (startMonth?: string) =>
+  developerRequest<SalesForecast>(
+    startMonth
+      ? `${root}/forecast?${new URLSearchParams({ startMonth })}`
+      : `${root}/forecast`,
+  );
 export async function getCommonSalesPipelineForecastExcel(): Promise<number> {
   const response = await fetch(`${root}/forecast/excel`);
   if (!response.ok) {

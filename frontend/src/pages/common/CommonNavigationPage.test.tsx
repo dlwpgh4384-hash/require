@@ -138,6 +138,30 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (url.startsWith("/api/common/manpower-board?"))
+      return {
+        success: true,
+        meta: {},
+        data: {
+          year: Number(new URLSearchParams(url.split("?")[1]).get("year")),
+          summary: {
+            idleCount: 0,
+            availableMm: 0,
+            withdrawalCount: 0,
+            highExtensionCount: 0,
+            concurrentCount: 0,
+            overAllocatedCount: 0,
+            futureAvailableMm: 0,
+          },
+          items: [],
+          totalCount: 0,
+          monthTotals: Array.from({ length: 12 }, (_, index) => ({
+            month: `2026-${String(index + 1).padStart(2, "0")}`,
+            idleCount: null,
+            availableMm: null,
+          })),
+        },
+      };
     if (url === "/api/common/sales-pipeline")
       return {
         success: true,
@@ -507,7 +531,8 @@ function respond(body: ShellMenuResponse) {
               url.endsWith("/UI-09") ||
               url.endsWith("/UI-18") ||
               url.endsWith("/UI-21") ||
-              url.endsWith("/UI-14")
+              url.endsWith("/UI-14") ||
+              url.endsWith("/UI-28")
                 ? {
                     periodBasis: {
                       latestYm: "202602",
@@ -568,6 +593,24 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-28": async (content) => {
+    expect(await content.findByTestId("manpower-board-empty")).toBeVisible();
+    expect(content.getByRole("tab", { name: "달력" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(content.getByRole("tab", { name: "수요·공급" })).toBeVisible();
+    const actions = within(screen.getByTestId("screen-actions"));
+    await waitFor(() =>
+      expect(actions.getByTestId("manpower-board-excel")).toBeEnabled(),
+    );
+    expect(
+      content.queryByTestId("manpower-board-excel"),
+    ).not.toBeInTheDocument();
+    expect(content.getByTestId("manpower-board-year")).toHaveTextContent(
+      "그 해 1~12월 달력",
+    );
+  },
   "UI-29": async (content) => {
     expect(
       await content.findByText("조건에 맞는 결과가 없습니다."),
@@ -580,7 +623,9 @@ const deepChecks: Record<string, (content: Content) => Promise<void>> = {
     await waitFor(() =>
       expect(actions.getByTestId("sales-pipeline-create")).toBeEnabled(),
     );
-    expect(content.queryByTestId("sales-pipeline-create")).not.toBeInTheDocument();
+    expect(
+      content.queryByTestId("sales-pipeline-create"),
+    ).not.toBeInTheDocument();
     expect(content.getByTestId("sales-tab-forecast")).toBeVisible();
   },
   "UI-33": async (content) => {
@@ -1110,6 +1155,7 @@ describe("common placeholder screen contract", () => {
           // 철수 리스트·인원 계획 대비 투입·프로젝트 현황판: 글 칸은 없지만 시안 조건 줄의 [조회]가 있다.
           else if (
             (id === "UI-05" ||
+              id === "UI-28" ||
               id === "UI-11" ||
               id === "UI-31" ||
               id === "UI-32" ||

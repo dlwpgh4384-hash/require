@@ -61,7 +61,7 @@ class SalesPipelineMappingTest {
             }).when(mappedRows).getObject(anyString(), eq(java.time.LocalDate.class));
             Statement jdbc = mock(Statement.class); when(jdbc.getResultSet()).thenReturn(mappedRows); when(jdbc.getUpdateCount()).thenReturn(-1);
             Object parameter = operation.equals("closed") ? new ClosedFilter("WIN", false)
-                : java.util.Set.of("revenues", "opportunityRevenues", "supply", "extensions", "opportunityDemand", "projectDemand").contains(operation) ? java.util.Map.of("months", List.of(new MonthWindow("202612", java.time.LocalDate.of(2026, 12, 1), java.time.LocalDate.of(2026, 12, 31))), "horizonStart", java.time.LocalDate.of(2026, 12, 1))
+                : java.util.Set.of("revenues", "opportunityRevenues", "supply", "extensions", "opportunityDemand", "projectDemand").contains(operation) ? java.util.Map.of("months", List.of(new MonthWindow("202612", java.time.LocalDate.of(2026, 12, 1), java.time.LocalDate.of(2026, 12, 31))), "horizonStart", java.time.LocalDate.of(2026, 12, 1), "baseMonth", java.time.LocalDate.of(2026, 11, 1))
                 : java.util.Map.of("id", "opportunity");
             var handler = new DefaultResultSetHandler(null, statement, null, null, statement.getBoundSql(parameter), RowBounds.DEFAULT);
             List<Object> actual = handler.handleResultSets(jdbc);

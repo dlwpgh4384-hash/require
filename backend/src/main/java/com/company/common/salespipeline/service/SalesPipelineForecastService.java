@@ -4,11 +4,13 @@ import com.company.common.salespipeline.dto.SalesPipelineContracts.*;
 import com.company.common.salespipeline.mapper.SalesPipelineMapper;
 import com.company.common.salespipeline.mapper.SalesPipelineRows.*;
 import com.company.common.support.service.BusinessCalendar;
+import com.company.common.support.service.CodeFailure;
 import com.company.common.withdrawals.service.WithdrawalCalculationRules;
 import com.company.common.withdrawals.service.WithdrawalCalculationRules.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -33,14 +35,30 @@ public class SalesPipelineForecastService {
 
     private static String key(String month, String job) { return month + "|" + job; }
 
-    public Forecast getCommonSalesPipelineForecast() {
+    public Forecast getCommonSalesPipelineForecast() { return getCommonSalesPipelineForecast(null); }
+
+    /** 시작 달(yyyy-MM)은 이번 달 또는 다음 달만 받는다. 없으면 다음 달(영업 파이프라인 UI-29), 인력 운영 보드(UI-28)는 이번 달. */
+    public Forecast getCommonSalesPipelineForecast(String startMonth) {
+        var base = calendar.currentMonth();
+        var next = base.plusMonths(1);
+        YearMonth first = next;
+        if (startMonth != null) {
+            if (!startMonth.matches("\\d{4}-\\d{2}"))
+                throw CodeFailure.invalid("startMonth", "시작 달은 yyyy-MM 모양으로 넣어 주세요.");
+            try {
+                first = YearMonth.parse(startMonth);
+            } catch (DateTimeParseException e) {
+                throw CodeFailure.invalid("startMonth", "시작 달은 yyyy-MM 모양으로 넣어 주세요.");
+            }
+            if (!first.equals(base) && !first.equals(next))
+                throw CodeFailure.invalid("startMonth", "시작 달은 이번 달 또는 다음 달만 고를 수 있습니다.");
+        }
         var loaded = calculations.definitions();
         SalesPipelineCalculationRules.require(loaded, "식-60", "max(0, 1", "소수 첫째 자리");
         SalesPipelineCalculationRules.require(loaded, "식-61", "필요 인원 × 월 MM × 수주 확률", "미충원");
         SalesPipelineCalculationRules.require(loaded, "식-92", "다음 달부터", "예상 금액 ÷ 예상 기간");
         SalesPipelineCalculationRules.require(loaded, "식-93", "첫 부족 월", "권장 시작 월");
         var settings = workforceRules.settings();
-        var first = calendar.currentMonth().plusMonths(1);
         var jobs = mapper.jobs();
         BigDecimal threshold = calculations.standard("SHORT_PERSON");
         int lead = calculations.standard("HIRE_LEAD_MON").intValueExact();
@@ -50,16 +68,18 @@ public class SalesPipelineForecastService {
             windows.add(new MonthWindow(calendar.toDatabaseMonth(month), month.atDay(1), month.atEndOfMonth()));
         }
         // 6개월 × 직무를 묶음 조회 몇 번으로 읽고(달·직무마다 따로 읽지 않음) 아래에서 달·직무로 나눈다.
-        var revenues = mapper.revenues(windows, first.atDay(1)).stream()
+        // 식-92 턴키 나눗수와 식-61 미충원 나눗수는 시작 달과 상관없이 다음 달부터 센다(시안 unfilled f1).
+        var revenues = mapper.revenues(windows, next.atDay(1)).stream()
             .collect(Collectors.toMap(MonthRevenue::month, r -> r, (a, b) -> a));
         var supply = mapper.supply(windows).stream()
             .collect(Collectors.groupingBy(r -> key(r.month(), r.jobCode()), LinkedHashMap::new, Collectors.toList()));
-        var extensions = mapper.extensions(windows).stream()
+        // 식-60: 끝난 투입은 종료 달이 이번 달 이상일 때만 연장 가능성만큼 뺀다(시안 forecast e >= BASE).
+        var extensions = mapper.extensions(windows, base.atDay(1)).stream()
             .collect(Collectors.groupingBy(r -> key(r.month(), r.jobCode()) + "|" + r.developerId(),
                 LinkedHashMap::new, Collectors.toList()));
         var opportunities = mapper.opportunityDemand(windows).stream()
             .collect(Collectors.groupingBy(r -> key(r.month(), r.jobCode()), LinkedHashMap::new, Collectors.toList()));
-        var projects = mapper.projectDemand(windows, first.atDay(1)).stream()
+        var projects = mapper.projectDemand(windows, next.atDay(1)).stream()
             .collect(Collectors.groupingBy(r -> key(r.month(), r.jobCode()), LinkedHashMap::new, Collectors.toList()));
         var opportunityRows = mapper.opportunityRevenues(windows);
         var months = new ArrayList<ForecastMonth>();

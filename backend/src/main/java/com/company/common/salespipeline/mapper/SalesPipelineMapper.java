@@ -22,7 +22,8 @@ public interface SalesPipelineMapper {
     /** 월별 예상 매출의 기회별 줄(시안 「└ 기회명 n%」). revenues의 weightedOpportunityRevenue와 같은 식·조건. */
     List<OpportunityMonthRevenue> opportunityRevenues(@Param("months") List<MonthWindow> months);
     List<MonthSupply> supply(@Param("months") List<MonthWindow> months);
-    List<MonthExtension> extensions(@Param("months") List<MonthWindow> months);
+    /** 예측 달보다 먼저 끝난 투입 중 종료 달이 이번 달(baseMonth = 이번 달 1일) 이상인 것만(식-60, 시안 forecast). */
+    List<MonthExtension> extensions(@Param("months") List<MonthWindow> months, @Param("baseMonth") LocalDate baseMonth);
     List<MonthOpportunityDemand> opportunityDemand(@Param("months") List<MonthWindow> months);
     List<MonthProjectDemand> projectDemand(@Param("months") List<MonthWindow> months, @Param("horizonStart") LocalDate horizonStart);
     List<CandidateCount> candidates();

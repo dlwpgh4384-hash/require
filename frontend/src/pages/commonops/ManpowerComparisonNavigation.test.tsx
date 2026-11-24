@@ -110,7 +110,7 @@ it("registers only the comparison body without borrowed title actions and isolat
   await screen.findByTestId("list-empty");
   expect(findScreen("UI-11")?.TitleActions).toBeUndefined();
   expect(findScreen("UI-17")).toBeUndefined();
-  expect(findScreen("UI-28")).toBeUndefined();
+  expect(findScreen("UI-28")?.rootTestId).toBe("manpower-board-page");
   expect(findScreen("UI-30")).toBeUndefined();
   await act(async () => {
     await router!.navigate("/screens/OTHER");

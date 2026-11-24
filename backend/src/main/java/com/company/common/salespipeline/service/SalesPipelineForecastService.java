@@ -106,6 +106,10 @@ public class SalesPipelineForecastService {
     }
 
     public List<WorkforceMonth> getWorkforceForecast(List<MonthWindow> months) {
+        // 영업 파이프라인 예측(UI-29)과 같이 식-60·식-61 정의를 먼저 확인한다(인력 수요 예측 UI-17 입구).
+        var loaded = calculations.definitions();
+        SalesPipelineCalculationRules.require(loaded, "식-60", "max(0, 1", "소수 첫째 자리");
+        SalesPipelineCalculationRules.require(loaded, "식-61", "필요 인원 × 월 MM × 수주 확률", "미충원");
         return workforceForecast(List.copyOf(months), mapper.jobs());
     }
 

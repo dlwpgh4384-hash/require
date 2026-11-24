@@ -64,7 +64,8 @@ class SalesPipelineForecastTest {
         assertThat(hiring.maximumShortage()).isEqualByComparingTo("1.7");
         assertThat(hiring.recommendedHiringMonth()).isEqualTo("지금");
         assertThat(hiring.candidateCount()).isEqualTo(4);
-        verify(metadata, times(6)).effectiveStandard("EXT_PRBL_H", YearMonth.of(2026, 11));
+        // 6개월 철수 줄이 있어도 연장 확률 기준값은 한 요청에서 코드마다 한 번만 읽는다(값은 같음).
+        verify(metadata, times(1)).effectiveStandard("EXT_PRBL_H", YearMonth.of(2026, 11));
     }
     @Test void sixMonthsAndEveryJobAreReadWithOneGroupedQueryEach() {
         when(mapper.jobs()).thenReturn(List.of(new Job("BE", "백엔드"), new Job("FE", "프론트엔드"), new Job("PM", "PM")));

@@ -4,7 +4,6 @@ import com.company.common.calculation.service.CalculationRuleService;
 import com.company.common.manpowerforecasts.controller.CommonManpowerForecastController;
 import com.company.common.manpowerforecasts.mapper.ManpowerForecastMapper;
 import com.company.common.manpowerforecasts.service.*;
-import com.company.common.preferences.service.UserPreferencePeriodBasis;
 import com.company.common.salespipeline.mapper.SalesPipelineMapper;
 import com.company.common.salespipeline.mapper.SalesPipelineRows.*;
 import com.company.common.salespipeline.service.*;
@@ -46,7 +45,6 @@ class CommonManpowerForecastControllerTest {
     @MockBean ManpowerForecastMapper audit;
     @MockBean CalculationRuleService metadata;
     @MockBean SalesPipelineCalculationRules calculations;
-    @MockBean UserPreferencePeriodBasis periods;
     @MockBean BusinessCalendar calendar;
     @MockBean PlatformTransactionManager transactions;
     @SpyBean ExcelExportService excel;
@@ -57,7 +55,6 @@ class CommonManpowerForecastControllerTest {
         when(calendar.now()).thenReturn(Instant.parse("2026-11-15T00:00:00Z"));
         when(calendar.currentMonth()).thenReturn(YearMonth.of(2026, 11));
         when(calendar.toDatabaseMonth(any())).thenAnswer(call -> ((YearMonth) call.getArgument(0)).format(java.time.format.DateTimeFormatter.ofPattern("uuuuMM")));
-        when(periods.metadata()).thenReturn(Map.of("periodBasis", new UserPreferencePeriodBasis.Basis("202411", "202401", List.of())));
         when(workforce.jobs()).thenReturn(List.of(new Job("BE", "백엔드")));
         when(workforce.opportunityDemand(anyList())).thenReturn(List.of(new MonthOpportunityDemand("202611", "BE", BigDecimal.ONE, new BigDecimal("1.25"), new BigDecimal("100"))));
     }
@@ -66,8 +63,11 @@ class CommonManpowerForecastControllerTest {
             .andExpect(status().isOk()).andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.months.length()").value(2))
             .andExpect(jsonPath("$.data.months[0].demand").value(1.25))
+            // 차이 = 한 자리 가용(0.0) − 한 자리 필요(1.25 → 1.3), 긴 소수(DECIMAL128)가 아니다.
+            .andExpect(jsonPath("$.data.months[0].difference").value(-1.3))
             .andExpect(jsonPath("$.data.summary.lastMonthDemand").value(0))
             .andExpect(jsonPath("$.data.summary.mostShortage.jobName").value("백엔드"))
+            .andExpect(jsonPath("$.data.summary.mostShortage.maximumShortage").value(1.3))
             .andExpect(jsonPath("$.data.thresholds.shortageThreshold").value(0.4));
         verifyNoInteractions(audit);
     }
@@ -78,7 +78,7 @@ class CommonManpowerForecastControllerTest {
             .andExpect(status().isOk()).andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .andExpect(header().string("X-Total-Count", "3")).andReturn().getResponse();
         var disposition = org.springframework.http.ContentDisposition.parse(response.getHeader("Content-Disposition"));
-        assertThat(disposition.getFilename()).isEqualTo("인력 수요 예측_2026-11~2026-12_20261115_0900.xlsx");
+        assertThat(disposition.getFilename()).isEqualTo("인력 수요 예측_2026년_20261115_0900.xlsx");
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(response.getContentAsByteArray()))) {
             assertThat(book.getNumberOfSheets()).isEqualTo(1);
             var sheet = book.getSheetAt(0);
@@ -111,14 +111,21 @@ class CommonManpowerForecastControllerTest {
     }
     @ParameterizedTest @ValueSource(strings = {"/api/common/manpower-forecasts", "/api/common/manpower-forecasts/excel"})
     void outOfRangeYearIsFieldError(String path) throws Exception {
-        mvc.perform(get(path).param("year", "2028")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("year"));
+        // 올해(2026)·내년(2027)만 고를 수 있다. 지난해·내후년은 400.
+        for (String year : List.of("2025", "2024", "2028")) {
+            var response = mvc.perform(get(path).param("year", year)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("year")).andReturn().getResponse();
+            assertThat(response.getContentAsString(StandardCharsets.UTF_8)).contains("선택할 수 있는 조회 연도를 확인해 주세요.");
+        }
         verifyNoInteractions(workforce, audit);
     }
-    @Test void emptyHistoricalProjectionStillExportsThreeLabelledRows() throws Exception {
-        var file = mvc.perform(get("/api/common/manpower-forecasts/excel").param("year", "2024"))
+    @Test void nextYearExportsTwelveMonthsWithYearFileName() throws Exception {
+        var file = mvc.perform(get("/api/common/manpower-forecasts/excel").param("year", "2027"))
             .andExpect(status().isOk()).andExpect(header().string("X-Total-Count", "3")).andReturn().getResponse();
+        var disposition = org.springframework.http.ContentDisposition.parse(file.getHeader("Content-Disposition"));
+        assertThat(disposition.getFilename()).isEqualTo("인력 수요 예측_2027년_20261115_0900.xlsx");
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(file.getContentAsByteArray()))) {
-            assertThat(book.getSheetAt(0).getRow(3).getLastCellNum()).isEqualTo((short) 1);
+            assertThat(book.getSheetAt(0).getRow(3).getLastCellNum()).isEqualTo((short) 13);
             assertThat(book.getSheetAt(0).getRow(5).getCell(0).getStringCellValue()).isEqualTo("차이");
         }
         verify(audit).insertAccess("admin", 3);

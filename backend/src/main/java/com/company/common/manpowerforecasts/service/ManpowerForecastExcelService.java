@@ -46,9 +46,8 @@ public class ManpowerForecastExcelService {
             row("가용 인력", result, Month::supply), row("차이", result, Month::difference));
         var now = calendar.now();
         var bytes = oneDecimal(excel.write("인력 수요 예측", headers, rows, actor.userId(), now));
-        String period = result.months().isEmpty() ? year.toString()
-            : result.months().get(0).month() + "~" + result.months().get(result.months().size() - 1).month();
-        String name = excel.fileName("인력 수요 예측", period, now);
+        // 다른 연도 화면(인력 운영 보드·철수 리스트)처럼 파일 이름 기간은 「2026년」.
+        String name = excel.fileName("인력 수요 예측", year + "년", now);
         mapper.insertAccess(actor.userId(), rows.size());
         return new Workbook(bytes, name, rows.size());
     }
@@ -56,6 +55,7 @@ public class ManpowerForecastExcelService {
     private static List<String> row(String label, Result result, Function<Month, BigDecimal> value) {
         var cells = new ArrayList<String>();
         cells.add(label);
+        // 가용·필요는 두 자리 값을 한 자리로, 차이는 이미 한 자리 값끼리 뺀 값이라 그대로(화면과 같은 숫자).
         result.months().forEach(m -> cells.add(value.apply(m).setScale(1, RoundingMode.HALF_UP).toPlainString()));
         return cells;
     }

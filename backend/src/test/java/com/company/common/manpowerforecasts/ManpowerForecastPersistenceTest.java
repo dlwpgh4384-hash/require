@@ -5,7 +5,6 @@ import com.company.common.calculation.service.CalculationRuleService;
 import com.company.common.manpowerforecasts.controller.CommonManpowerForecastController;
 import com.company.common.manpowerforecasts.mapper.ManpowerForecastMapper;
 import com.company.common.manpowerforecasts.service.*;
-import com.company.common.preferences.service.UserPreferencePeriodBasis;
 import com.company.common.salespipeline.mapper.SalesPipelineMapper;
 import com.company.common.salespipeline.service.*;
 import com.company.common.schema.SchemaPreparation;
@@ -59,7 +58,6 @@ class ManpowerForecastPersistenceTest {
     @Autowired SalesPipelineForecastService shared;
     @MockBean CalculationRuleService metadata;
     @MockBean SalesPipelineCalculationRules calculations;
-    @MockBean UserPreferencePeriodBasis periods;
     JdbcTemplate db;
     record ForecastDatabase(String name) {}
     @TestConfiguration(proxyBeanMethods = false)
@@ -95,7 +93,6 @@ class ManpowerForecastPersistenceTest {
     @BeforeEach void setup() throws Exception {
         db = new JdbcTemplate(source);
         ManpowerForecastTestData.definitions(metadata, calculations);
-        when(periods.metadata()).thenReturn(Map.of("periodBasis", new UserPreferencePeriodBasis.Basis("202401", "202401", List.of())));
         doAnswer(call -> new Standard(call.getArgument(0), YearMonth.of(2026, 1),
             db.queryForObject("SELECT std_val FROM TB_SY_OPER_STD WHERE std_cd=? AND aply_bgn_ym<=? ORDER BY aply_bgn_ym DESC LIMIT 1", BigDecimal.class,
                 call.getArgument(0), ((YearMonth) call.getArgument(1)).format(java.time.format.DateTimeFormatter.ofPattern("uuuuMM")))))
@@ -153,12 +150,46 @@ class ManpowerForecastPersistenceTest {
         var legacy = shared.getCommonSalesPipelineForecast("2026-11").months();
         var response = mvc.perform(get("/api/common/manpower-forecasts").param("year", "2026")).andExpect(status().isOk()).andReturn().getResponse();
         var months = json.readTree(response.getContentAsString(StandardCharsets.UTF_8)).path("data").path("months");
+        // 올해 조회(11·12월)는 인력 운영 보드가 쓰는 이번 달 시작 6개월 예측의 앞 두 달과 겹친다.
+        assertThat(months.size()).isEqualTo(2);
         for (int i = 0; i < months.size(); i++) {
+            assertThat(months.get(i).path("month").asText()).isEqualTo(legacy.get(i).month());
             assertThat(months.get(i).path("supply").decimalValue()).isEqualByComparingTo(legacy.get(i).supply());
             assertThat(months.get(i).path("demand").decimalValue()).isEqualByComparingTo(legacy.get(i).demand());
         }
         mvc.perform(get("/api/common/manpower-forecasts/excel").param("year", "2026")).andExpect(status().isOk());
         assertThat(standards()).isEqualTo(before);
+    }
+    @Test void realDatabaseMonthValuesMatchHandCalculatedExpectations() throws Exception {
+        // 연장 확인용 사람의 11월 확정 투입 0.5(11-30 철수, 연장 가능성 미정 → 12월에 50% 반영).
+        db.update("INSERT INTO TB_PJ_ASGN_MON(asgn_id,input_ym,dev_id,proj_id,input_day_cnt,mon_mm,aply_uprc,sales_amt,reg_user_id) VALUES('forecast-extension','202611','forecast-extension','forecast-project',21,0.5,0,0,'admin')");
+        var response = mvc.perform(get("/api/common/manpower-forecasts").param("year", "2026")).andExpect(status().isOk()).andReturn().getResponse();
+        var data = json.readTree(response.getContentAsString(StandardCharsets.UTF_8)).path("data");
+        var months = data.path("months");
+        assertThat(months.size()).isEqualTo(2);
+        // 11월 가용: 휴직자 제외, 연장 확인 1 − 0.5 = 0.5, 향후 투입(12월부터) 사람은 11월 투입 없음 1 → 1.5.
+        // 11월 필요: 미충원은 다음 달(12월)부터 → 0.
+        assertMonth(months.get(0), "2026-11", "1.50", "0.00", "0.00", "1.5");
+        // 12월 가용: 연장 확인 1 − 0.5×50% = 0.75, 향후 확정 1 − 0.5 = 0.5 → 1.25 → 식-60 한 자리 1.3.
+        // 12월 필요(미충원): (계획 8 − 배정 1.0) ÷ 12월~2027-05 6개월 = 1.1667 → 1.17. 차이 1.3 − 1.2 = 0.1.
+        assertMonth(months.get(1), "2026-12", "1.30", "1.17", "1.17", "0.1");
+        assertThat(data.path("summary").path("lastMonthSupply").decimalValue()).isEqualByComparingTo("1.30");
+        assertThat(data.path("summary").path("lastMonthDemand").decimalValue()).isEqualByComparingTo("1.17");
+        assertThat(data.path("summary").path("mostShortage").isNull()).isTrue();
+        var legacy = shared.getCommonSalesPipelineForecast("2026-11").months();
+        for (int i = 0; i < months.size(); i++) {
+            assertThat(months.get(i).path("supply").decimalValue()).isEqualByComparingTo(legacy.get(i).supply());
+            assertThat(months.get(i).path("demand").decimalValue()).isEqualByComparingTo(legacy.get(i).demand());
+        }
+    }
+    static void assertMonth(com.fasterxml.jackson.databind.JsonNode month, String name, String supply, String demand,
+        String unfilled, String difference) {
+        assertThat(month.path("month").asText()).isEqualTo(name);
+        assertThat(month.path("supply").decimalValue()).isEqualByComparingTo(supply);
+        assertThat(month.path("demand").decimalValue()).isEqualByComparingTo(demand);
+        assertThat(month.path("unfilledDemand").decimalValue()).isEqualByComparingTo(unfilled);
+        assertThat(month.path("difference").decimalValue()).isEqualByComparingTo(difference);
+        assertThat(month.path("difference").decimalValue().scale()).isLessThanOrEqualTo(1);
     }
     @Test void successfulDownloadPersistsUi17DnldWithThreeRowsAndNoUi29Audit() throws Exception {
         mvc.perform(get("/api/common/manpower-forecasts/excel").param("year", "2026")).andExpect(status().isOk());

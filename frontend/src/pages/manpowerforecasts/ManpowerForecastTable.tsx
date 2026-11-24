@@ -1,70 +1,72 @@
 import { formatDecimal } from "../../shared/list";
-import type {
-  ManpowerForecastMonth,
-  ManpowerForecastResult,
+import {
+  forecastDifference,
+  forecastDifferenceText,
+  type ManpowerForecastResult,
 } from "./manpowerForecasts";
 
+/** 시안 sdTotTable 색: 기준(운영 기준값)보다 더 부족하면 bad(빨강), 더 남으면 warn(주황). */
 export function manpowerForecastDifference(
   value: number,
   thresholds: ManpowerForecastResult["thresholds"],
 ) {
   return value < -thresholds.shortageThreshold
-    ? "shortage"
+    ? "bad"
     : value > thresholds.surplusThreshold
-      ? "surplus"
-      : "balanced";
+      ? "warn"
+      : undefined;
 }
 export function ManpowerForecastTable({
   months,
   thresholds,
 }: Pick<ManpowerForecastResult, "months" | "thresholds">) {
-  const rows: { field: "demand" | "supply" | "difference"; label: string }[] = [
-    { field: "demand", label: "필요 인력" },
-    { field: "supply", label: "가용 인력" },
-    { field: "difference", label: "차이" },
-  ];
-  const difference = (m: ManpowerForecastMonth) => {
-    const magnitude = formatDecimal(Math.abs(m.difference));
-    return magnitude === "0.0"
-      ? "맞음"
-      : `${magnitude}명 ${m.difference < 0 ? "부족" : "남음"}`;
-  };
   return (
-    <div className="manpower-forecast-table-scroll">
-      <table className="manpower-forecast-table" aria-label="월별 전체 인력">
+    <div className="ls-twrap manpower-forecast-free">
+      <table className="ls-t" aria-label="월별 전체 인력">
         <thead>
           <tr>
-            <th scope="col">구분</th>
+            <th scope="col" className="ls-sc">
+              구분
+            </th>
             {months.map((m) => (
-              <th key={m.month} scope="col">
+              <th key={m.month} scope="col" className="ls-right">
                 {m.month}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.field}
-              data-testid={`manpower-forecast-row-${row.field}`}
-            >
-              <th scope="row">{row.label}</th>
-              {months.map((m) => (
-                <td
-                  key={m.month}
-                  className={
-                    row.field === "difference"
-                      ? manpowerForecastDifference(m.difference, thresholds)
-                      : undefined
-                  }
-                >
-                  {row.field === "difference"
-                    ? difference(m)
-                    : `${formatDecimal(m[row.field])}명`}
+          <tr data-testid="manpower-forecast-row-demand">
+            <td className="ls-sc">필요 인력</td>
+            {months.map((m) => (
+              <td key={m.month} className="ls-right">
+                {formatDecimal(m.demand)}명
+              </td>
+            ))}
+          </tr>
+          <tr data-testid="manpower-forecast-row-supply">
+            <td className="ls-sc">가용 인력</td>
+            {months.map((m) => (
+              <td key={m.month} className="ls-right">
+                {formatDecimal(m.supply)}명
+              </td>
+            ))}
+          </tr>
+          <tr data-testid="manpower-forecast-row-difference">
+            <td className="ls-sc">
+              <strong>차이</strong>
+            </td>
+            {months.map((m) => {
+              const d = forecastDifference(m);
+              return (
+                <td key={m.month} className="ls-right">
+                  <span className={manpowerForecastDifference(d, thresholds)}>
+                    {forecastDifferenceText(d)}
+                  </span>
                 </td>
-              ))}
-            </tr>
-          ))}
+              );
+            })}
+          </tr>
         </tbody>
       </table>
     </div>

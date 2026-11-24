@@ -22,11 +22,18 @@ import {
 import "../profitstructures/profitStructures.css";
 import "./manpowerForecast.css";
 
-const options = {
-  kind: "year",
-  allowNextYear: true,
-  allowBeforeStart: false,
-} as const;
+// 시안 ic('info'): 안내 띠 아이콘
+const infoIcon = (
+  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" />
+  </svg>
+);
+/** 시안 note: 「달별 미충원: 11월 0.0 · 12월 2.1명.」 */
+export function unfilledNote(months: ManpowerForecastResult["months"]) {
+  return months
+    .map((m) => `${Number(m.month.slice(5))}월 ${formatDecimal(m.unfilledDemand)}`)
+    .join(" · ");
+}
 // SCR-UI-17: 연도별 조회 전용 예측. 업무 입력·결과 저장 동작은 없다.
 export function UI17Page({
   renderActions,
@@ -34,6 +41,13 @@ export function UI17Page({
   const today = koreanToday();
   const currentYear = Number(today.slice(0, 4));
   const currentYm = today.slice(0, 7).replace("-", "");
+  // 시안 YR['UI-17']: 올해와 내년만 고른다.
+  const options = {
+    kind: "year",
+    allowNextYear: true,
+    allowBeforeStart: false,
+    firstDataYear: currentYear,
+  } as const;
   const period = useScreenPeriod("UI-17", options, currentYm);
   const year = period.state.status === "ready" ? period.state.value.year : null;
   const [response, setResponse] = useState<{
@@ -102,6 +116,9 @@ export function UI17Page({
       disabled={!data || downloading}
       onClick={() => void download()}
     >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+      </svg>{" "}
       {downloading ? "만드는 중…" : "엑셀 다운로드"}
     </button>
   );
@@ -112,6 +129,8 @@ export function UI17Page({
     )
       period.setValue({ year: next });
   };
+  const last = data?.months.length ? data.months[data.months.length - 1] : null;
+  const lastLabel = last ? `${Number(last.month.slice(5))}월` : "마지막 달";
   return (
     <div
       className="screen-body profit-structures-page manpower-forecast-page"
@@ -124,23 +143,13 @@ export function UI17Page({
         <div className="project-title-actions">{actions}</div>
       )}
       {period.state.status === "ready" && (
-        <div className="manpower-forecast-year">
-          <YearBar
-            year={period.state.value.year}
-            currentYear={currentYear}
-            {...yearRange(period.state.basis, options)}
-            caption=""
-            onChange={choose}
-          />
-          <button
-            type="button"
-            className="ls-btn"
-            data-testid="manpower-forecast-current-year"
-            onClick={() => choose(currentYear)}
-          >
-            올해
-          </button>
-        </div>
+        <YearBar
+          year={period.state.value.year}
+          currentYear={currentYear}
+          {...yearRange(period.state.basis, options)}
+          caption="그 해 남은 달의 가용·필요 예측"
+          onChange={choose}
+        />
       )}
       {fields.map((field, i) => (
         <p className="profit-field-error" key={`${field.field}-${i}`}>
@@ -149,8 +158,9 @@ export function UI17Page({
             : `${field.field}: ${field.message}`}
         </p>
       ))}
-      <Banner kind="info">
-        <Badge kind="info">예측</Badge> UI-28과 같은 계산
+      <Banner kind="info" icon={infoIcon}>
+        이 화면의 숫자는 <Badge kind="info">예측</Badge>입니다. 인력 운영
+        보드의 &apos;수요·공급&apos;과 같은 계산입니다.
       </Banner>
       {period.state.status === "error" && (
         <p role="alert">{period.state.message}</p>
@@ -178,14 +188,23 @@ export function UI17Page({
             className="manpower-forecast-kpis"
           >
             <KpiCard
-              label="마지막 달 가용 인력"
+              testId="manpower-forecast-kpi-supply"
+              label={`${lastLabel} 가용 인력`}
               value={`${formatDecimal(data.summary.lastMonthSupply)}명`}
+              description={last ? `${last.month} · 대기 + 연장 안 될 몫` : undefined}
             />
             <KpiCard
-              label="마지막 달 필요 인력"
+              testId="manpower-forecast-kpi-demand"
+              label={`${lastLabel} 필요 인력`}
               value={`${formatDecimal(data.summary.lastMonthDemand)}명`}
+              description={
+                last
+                  ? `영업 기회 확률 반영 · 그중 미충원 ${formatDecimal(last.unfilledDemand)}명`
+                  : undefined
+              }
             />
             <KpiCard
+              testId="manpower-forecast-kpi-job"
               label="가장 부족한 직무"
               value={
                 data.summary.mostShortage?.jobName ??
@@ -205,17 +224,19 @@ export function UI17Page({
           ) : (
             <p data-testid="manpower-forecast-empty">예측 자료가 없습니다.</p>
           )}
+          <ManpowerForecastTable
+            months={data.months}
+            thresholds={data.thresholds}
+          />
+          <p className="ls-note" data-testid="manpower-forecast-note">
+            표는 직무를 나누지 않은 전체 사람 수입니다(MM 합). 차이 = 가용 −
+            필요, 빨간색은 부족(사람을 구해야 함), 주황색은 남음(잉여
+            인력)입니다. 필요 인력 = 진행 중 영업 기회(수주 확률 반영) + 진행
+            프로젝트 미충원(인원 계획의 계획 MM − 배정 MM을 다음 달부터 종료
+            달까지 나눈 값). 달별 미충원: {unfilledNote(data.months)}명.
+          </p>
         </>
       )}
-      <ManpowerForecastTable
-        months={data?.months ?? []}
-        thresholds={
-          data?.thresholds ?? {
-            shortageThreshold: Infinity,
-            surplusThreshold: Infinity,
-          }
-        }
-      />
       {notice && (
         <Toast
           kind={notice.kind}

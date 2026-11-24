@@ -164,6 +164,23 @@ class CommonPersonalCostProfitControllerTest {
             .andExpect(jsonPath("$.data.totals.totalCost").value(2475))
             .andExpect(jsonPath("$.data.summary.averageCost").value(2175));
     }
+    @Test void headcountAndRatesStayCompanyWideWhenAFilterNarrowsTheTable() throws Exception {
+        // 총 인원·가동률·가득률은 조건과 상관없이 회사 전체(식-37·38, 시안, 2026-11-24 사용자 결정). 평균은 표 인원.
+        when(mapper.selectPeople(argThat(f -> f != null && "BE".equals(f.jobCode())))).thenReturn(List.of(person("A")));
+        when(mapper.selectPeople(argThat(f -> f != null && f.jobCode() == null))).thenReturn(List.of(person("A"), person("B")));
+        when(mapper.selectPayroll(any())).thenReturn(List.of(pay("A", "202601", "1000"), pay("A", "202602", "1000"),
+            pay("B", "202601", "1000"), pay("B", "202602", "1000")));
+        mvc.perform(request("").param("jobCode", "BE")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items.length()").value(1))
+            .andExpect(jsonPath("$.data.summary.totalPeople").value(2));
+    }
+    @Test void lossOnlyUsesThePersonsOwnProfitNotTheLeaveCost() throws Exception {
+        // 「적자만」은 표에 보이는 그 사람 영업이익(휴직 비용은 대기 원가로 따로), 요약 적자 인원과 같은 기준.
+        var body = mvc.perform(request("").param("view", "적자만")).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        int listed = com.jayway.jsonpath.JsonPath.read(body, "$.data.items.length()");
+        int counted = com.jayway.jsonpath.JsonPath.read(body, "$.data.summary.lossPeople");
+        org.assertj.core.api.Assertions.assertThat(listed).isEqualTo(counted);
+    }
     @Test void unpaidLeaveDoesNotCreateMoney() throws Exception {
         when(mapper.selectPeople(any())).thenReturn(List.of(person("UNPAID")));
         when(mapper.selectPayroll(any())).thenReturn(List.of());

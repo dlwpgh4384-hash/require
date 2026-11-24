@@ -27,12 +27,13 @@ class RateRenegotiationServiceTest {
         when(source.read()).thenReturn(new RateRenegotiationSource.Context("202602", false, n("20"), costs, List.of(), help(), java.util.Set.of()));
         when(mapper.selectAssignmentInfo("202602", false)).thenReturn(assignments);
     }
-    @Test void keepsAssignmentsDistinctCountsPeopleOnceAndSortsExactRatiosStably() {
+    @Test void keepsAssignmentsDistinctCountsRowsAndSortsExactRatiosStably() {
         sources(List.of(cost("A", "450000"), cost("B", "450001"), cost("C", "450001")),
             List.of(info("A", 1), info("B", 2), info("C", 3)));
         var result = service.getCommonRateRenegotiations(filter());
         assertThat(result.items()).extracting(Row::assignmentId).containsExactly("B", "C", "A");
-        assertThat(result.summary().targetCount()).isEqualTo(1);
+        // 「재협상 대상 n명」은 표의 줄 수(투입 단위, 시안, 2026-11-24 사용자 결정).
+        assertThat(result.summary().targetCount()).isEqualTo(3);
         assertThat(result.summary().averageProfitRate()).isEqualByComparingTo("10.0");
         assertThat(result.summary().assumedAnnualProfitIncrease()).isEqualByComparingTo("1800000");
         assertThat(result.totalAnnualProfitIncrease()).isEqualByComparingTo(result.summary().assumedAnnualProfitIncrease());
@@ -64,7 +65,7 @@ class RateRenegotiationServiceTest {
         var actor = new CurrentBusinessActor();
         var export = new RateRenegotiationExcelService(calculation, mapper, writer, actor, calendar);
         when(calculation.getCommonRateRenegotiations(any())).thenReturn(new Result("2026-02", n("5"), List.of(),
-            new Summary(0, null, n("20"), n("0"), n("0")), n("0"), help(), List.of()));
+            new Summary(0, null, n("20"), n("0"), n("0")), n("0"), help(), List.of(), List.of()));
         when(calendar.now()).thenReturn(java.time.Instant.parse("2026-02-01T00:00:00Z"));
         when(writer.write(anyString(), anyList(), anyList(), anyString(), any())).thenThrow(new IllegalStateException("generation"));
         assertThatThrownBy(() -> export.getCommonRateRenegotiationsExcel(filter(), List.of("developerName")))

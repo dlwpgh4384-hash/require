@@ -1,6 +1,5 @@
 import { projectRequest, ProjectRequestError } from "../projects/projects";
 import { getCommonCodes } from "../codegroups/codeGroups";
-import { getCommonProjects } from "../projects/projects";
 import { downloadFile } from "../../shared/list/download";
 
 export interface RateRenegotiationFilter {
@@ -44,6 +43,8 @@ export interface RateRenegotiationResult {
   totalAnnualProfitIncrease: number;
   /** 이 달 급여 업로드 전이라 개발자 풀 월 급여로 계산한 대상자 */
   salaryEstimatedDeveloperIds?: string[];
+  /** 조건 「프로젝트」 목록: 재협상 대상이 될 수 있는 프로젝트만(시안·SFR-132-02, 2026-11-24 사용자 결정). */
+  projectOptions?: { projectId: string; projectName: string }[];
   formulaHelp: Record<
     | "renewalDate"
     | "monthlyCost"
@@ -122,17 +123,11 @@ export function getCommonRateRenegotiationsExcel(
   );
 }
 export async function getRateRenegotiationOptions(signal?: AbortSignal) {
-  const [employees, projects] = await Promise.all([
-    getCommonCodes("EMP_TYPE", signal),
-    getCommonProjects(signal),
-  ]);
+  // 프로젝트 목록은 조회 결과(projectOptions)에서 받는다(대상이 될 수 있는 프로젝트만).
+  const employees = await getCommonCodes("EMP_TYPE", signal);
   return {
     employees: (employees?.items ?? [])
       .filter((c) => c.useYn === "Y")
       .map((c) => ({ value: c.code, label: c.codeName })),
-    projects: (projects?.items ?? []).map((p) => ({
-      value: p.projectId,
-      label: p.projectName,
-    })),
   };
 }

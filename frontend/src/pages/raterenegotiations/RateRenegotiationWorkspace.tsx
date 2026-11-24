@@ -428,9 +428,9 @@ export function RateRenegotiationWorkspace() {
             onChange={(e) => change("projectId", e.target.value)}
           >
             <option value="">전체</option>
-            {(options?.projects ?? []).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
+            {(data?.projectOptions ?? []).map((o) => (
+              <option key={o.projectId} value={o.projectId}>
+                {o.projectName}
               </option>
             ))}
           </select>

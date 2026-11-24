@@ -120,8 +120,6 @@ it("normalizes null option payloads safely", async () => {
       json: async () => ({ success: true, data: { items: null } }),
     }),
   );
-  expect(await getRateRenegotiationOptions()).toEqual({
-    employees: [],
-    projects: [],
-  });
+  // 프로젝트 목록은 조회 결과 projectOptions에서 받는다(대상이 될 수 있는 프로젝트만).
+  expect(await getRateRenegotiationOptions()).toEqual({ employees: [] });
 });

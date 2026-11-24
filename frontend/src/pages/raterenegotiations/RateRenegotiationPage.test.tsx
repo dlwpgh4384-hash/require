@@ -380,6 +380,15 @@ it("shows how many people were calculated from the developer pool salary before 
     "2월 급여 업로드 전: 1명은 개발자 풀 월 급여로 계산한 값입니다.",
   );
 });
+it("project filter lists only projects that can be renegotiation targets (from the result)", async () => {
+  result = { ...result, projectOptions: [{ projectId: "project-ok", projectName: "파견 운영" }] };
+  mount();
+  await ready();
+  const select = screen.getByTestId("rate-project-id");
+  expect(within(select).getByRole("option", { name: "파견 운영" })).toBeInTheDocument();
+  // 프로젝트 화면의 전체 목록(턴키·종료 포함)은 쓰지 않는다(시안·SFR-132-02).
+  expect(within(select).queryByRole("option", { name: "업무 시스템" })).not.toBeInTheDocument();
+});
 it("keeps an emptied assumption box empty without querying 0 and restores it on blur", async () => {
   mount();
   await ready();

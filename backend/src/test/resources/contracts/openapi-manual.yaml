@@ -2027,6 +2027,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/sales-opportunities/tentative-assignment-check:
+    post:
+      operationId: postCommonSalesOpportunityDraftTentativeAssignmentCheck
+      summary: 저장 전 줄 가배정 충돌 경고
+      security: []
+      x-related-requirements:
+      - REQ-1405
+      description: 아직 저장하지 않은 새 기회·새 필요 인력 줄에서 고른 사람을 미리 점검한다(SFR-129-08). opportunityId는 고치는 중인 기회이고 새 기회면 넣지 않는다. needSn·modifiedAt은 받지 않는다. 경고의 needSn은 이 줄이면 null, 같은 기회의 다른 줄이면 그 줄 번호다. 점유·수정 시각은 바꾸지 않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonSalesDraftTentativeInput'
+      responses:
+        '200':
+          description: 다른 기회 가배정·같은 사람 두 줄·그 달 1.0 MM 이상 확정 투입·투입 배정 후보로 넘긴 사람 경고
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSalesTentativeWarnings'
+                  required:
+                  - data
+        '400':
+          description: developerId·startMonth 누락·형식 오류, 없는 인력 또는 받지 않는 칸; errors[].field, 데이터 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: opportunityId를 넣었는데 영업 기회가 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
     ApiError:
@@ -3479,3 +3519,282 @@ components:
       - opportunityId
       - needSn
       additionalProperties: false
+    CommonSalesOpportunityCard:
+      type: object
+      properties:
+        opportunityName:
+          type: string
+          maxLength: 100
+        customerId:
+          type: string
+        stageCode:
+          type: string
+        winningProbability:
+          type: number
+          minimum: 0
+          maximum: 100
+        expectedAmount:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        startMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+        nextAction:
+          type: string
+        nextActionDueDate:
+          type: string
+          format: date
+        opportunityId:
+          type: string
+        customerName:
+          type: string
+        requiredJobs:
+          type: array
+          items:
+            type: string
+        stale:
+          type: boolean
+        approvalStatusCode:
+          type: string
+        modifiedAt:
+          type: string
+          format: date-time
+        requiredJobHeadcounts:
+          type: array
+          description: 카드 직무 칩(시안 「백엔드 개발 2」). 직무마다 한 줄, 첫 필요 인력 줄 순서, 인원은 그 직무 필요 인원 합
+          items:
+            $ref: '#/components/schemas/CommonSalesJobHeadcount'
+      required:
+      - opportunityId
+      - opportunityName
+      - stageCode
+      - winningProbability
+      - expectedAmount
+      - modifiedAt
+    CommonSalesJobHeadcount:
+      type: object
+      properties:
+        jobCode:
+          type: string
+        jobName:
+          type: string
+        headcount:
+          type: integer
+          minimum: 1
+      required:
+      - jobCode
+      - jobName
+      - headcount
+    CommonSalesDraftTentativeInput:
+      type: object
+      properties:
+        opportunityId:
+          type: string
+          maxLength: 20
+          description: 고치는 중인 영업 기회 ID. 새 기회면 넣지 않는다
+        developerId:
+          type: string
+          maxLength: 20
+        startMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+      required:
+      - developerId
+      - startMonth
+      additionalProperties: false
+    CommonSalesTentativeWarnings:
+      type: object
+      properties:
+        warnings:
+          type: array
+          items:
+            type: object
+            properties:
+              needSn:
+                type: integer
+                nullable: true
+                description: 경고가 붙는 필요 인력 줄. 저장 전 줄 점검에서 그 줄 자신이면 null
+              developerId:
+                type: string
+              message:
+                type: string
+            required:
+            - needSn
+            - developerId
+            - message
+      required:
+      - warnings
+    CommonSalesForecast:
+      type: object
+      properties:
+        months:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonSalesForecastMonth'
+        hiringReviews:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonSalesHiringReview'
+        opportunityRevenues:
+          type: array
+          description: 월별 예상 매출의 기회별 줄(시안 「└ 기회명 n%」). 달마다 줄 합 = months[].weightedOpportunityRevenue
+          items:
+            $ref: '#/components/schemas/CommonSalesForecastOpportunity'
+      required:
+      - months
+      - hiringReviews
+      - opportunityRevenues
+      description: 6개월·채용검토의 확정 결과. 요약4칸 정확 항목은 OQ-UI-029 확인 후 같은 schema 확장; 이 후보만으로 요약4칸 구현 완료 불가.
+    CommonSalesForecastOpportunity:
+      type: object
+      description: 월별 예상 매출의 기회 한 줄(시안 「└ 기회명 n%」, SFR-129-12 기회별 확률 반영). 진행 기회 중 예측 6개월에 예상 기간이 걸리는 것만, 진행 카드 순서
+      properties:
+        opportunityId:
+          type: string
+        opportunityName:
+          type: string
+        winningProbability:
+          type: number
+          minimum: 0
+          maximum: 100
+        months:
+          type: array
+          description: 예상 기간 안의 달만(없는 달은 화면에서 「–」). 같은 달 줄을 모두 더하면 months[].weightedOpportunityRevenue
+          items:
+            $ref: '#/components/schemas/CommonSalesForecastOpportunityMonth'
+      required:
+      - opportunityId
+      - opportunityName
+      - winningProbability
+      - months
+    CommonSalesForecastOpportunityMonth:
+      type: object
+      properties:
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+        weightedRevenue:
+          type: number
+          description: 식-92 예상 금액 ÷ 예상 기간 × 수주 확률(원 단위, 버림 뒤 남은 원은 소수 부분이 큰 줄부터 1원씩)
+      required:
+      - month
+      - weightedRevenue
+    CommonSalesOpportunity:
+      type: object
+      properties:
+        opportunityName:
+          type: string
+          maxLength: 100
+        customerId:
+          type: string
+        salesPartId:
+          type: string
+        stageCode:
+          type: string
+        winningProbability:
+          type: number
+          minimum: 0
+          maximum: 100
+        expectedAmount:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        contractTypeCode:
+          type: string
+        startMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+        expectedMonths:
+          type: integer
+          minimum: 1
+          default: 6
+        workplace:
+          type: string
+          maxLength: 200
+        nextAction:
+          type: string
+        nextActionDueDate:
+          type: string
+          format: date
+        memo:
+          type: string
+        needs:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonSalesOpportunityNeed'
+          minItems: 1
+        opportunityId:
+          type: string
+        customerName:
+          type: string
+        requiredJobs:
+          type: array
+          items:
+            type: string
+        stale:
+          type: boolean
+        approvalStatusCode:
+          type: string
+        modifiedAt:
+          type: string
+          format: date-time
+        projectId:
+          type: string
+          nullable: true
+        resultDate:
+          type: string
+          format: date
+          nullable: true
+        opportunityStatusCode:
+          type: string
+        lossReasonCode:
+          type: string
+          nullable: true
+        approvalHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonSalesApprovalHistory'
+        expectedProfitRate:
+          type: number
+          nullable: true
+          description: 저장 때 계산해 둔 예상 이익률(TB_SL_OPP.EXPCT_PRFT_RT). 승인 띠는 이 값을 보인다
+        approvedProfitRate:
+          type: number
+          nullable: true
+          description: 승인한 때의 예상 이익률(TB_SL_OPP.APRV_PRFT_RT). 승인 전이면 null
+        approvalRate:
+          type: number
+          nullable: true
+          description: 이번 달 견적 승인 기준 이익률(운영 기준값 QUOTE_APRV_RT). 승인 띠 「(기준 n%)」
+      required:
+      - opportunityId
+      - opportunityName
+      - needs
+      - modifiedAt
+      - approvalStatusCode
+      - opportunityStatusCode
+      - approvalHistory
+    CommonSalesPipelineSummary:
+      type: object
+      properties:
+        ongoingCount:
+          type: integer
+        staleCount:
+          type: integer
+        expectedAmount:
+          type: number
+        weightedAmount:
+          type: number
+        weightedManpower:
+          type: number
+        closedCount:
+          type: integer
+          description: 종료 탭 건수(수주·실주, 사용 중지 빼고). 종료 목록을 받지 않고 탭 이름에 쓴다
+      required:
+      - ongoingCount
+      - staleCount
+      - expectedAmount
+      - weightedAmount
+      - weightedManpower
+      - closedCount

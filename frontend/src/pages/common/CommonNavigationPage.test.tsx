@@ -138,6 +138,21 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (url === "/api/common/sales-pipeline")
+      return {
+        success: true,
+        meta: {},
+        data: {
+          summary: {
+            ongoingCount: 0,
+            staleCount: 0,
+            expectedAmount: 0,
+            weightedAmount: 0,
+            weightedManpower: 0,
+          },
+          stages: [],
+        },
+      };
     if (url.startsWith("/api/common/cash-flow-statements?")) {
       return {
         success: true,
@@ -538,7 +553,7 @@ function respond(body: ShellMenuResponse) {
                 url.startsWith("/api/common/developers?") ||
                 url.startsWith("/api/common/assignments?") ||
                 url.startsWith("/api/common/candidates?") ||
-                /^\/api\/common\/code-groups\/(CLNT_TYPE|INDUTY|BANK|EMP_TYPE|JOB|GRADE|JBPS|DRCT_CLS|SKILL|WORK_STAT|EXT_PSBL|CNTC_STAT|CAND_SRC)\/codes$/.test(
+                /^\/api\/common\/code-groups\/(CLNT_TYPE|INDUTY|BANK|EMP_TYPE|JOB|GRADE|JBPS|DRCT_CLS|SKILL|WORK_STAT|EXT_PSBL|CNTC_STAT|CAND_SRC|SALES_STEP|CTRT_TYPE|APRV_STAT|OPP_STAT|LOSE_RSN|PROJ_STAT|APRV_ACT)\/codes$/.test(
                   url,
                 )
               ? { success: true, meta: {}, data: { items: [] } }
@@ -553,6 +568,21 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-29": async (content) => {
+    expect(
+      await content.findByText("조건에 맞는 결과가 없습니다."),
+    ).toBeVisible();
+    // 시안 titleBar: 탭별 단추는 제목줄 오른쪽에 있고 본문에는 없다.
+    const actions = within(screen.getByTestId("screen-actions"));
+    expect(actions.getByTestId("sales-pipeline-title-actions")).toHaveClass(
+      "project-title-actions",
+    );
+    await waitFor(() =>
+      expect(actions.getByTestId("sales-pipeline-create")).toBeEnabled(),
+    );
+    expect(content.queryByTestId("sales-pipeline-create")).not.toBeInTheDocument();
+    expect(content.getByTestId("sales-tab-forecast")).toBeVisible();
+  },
   "UI-33": async (content) => {
     // 시안 빈 문구: 부족 직무 카드와 공통 목록.
     expect(
@@ -566,7 +596,9 @@ const deepChecks: Record<string, (content: Content) => Promise<void>> = {
     expect(root).toHaveClass("screen-body");
     expect(root.querySelectorAll(".screen-body")).toHaveLength(0);
     expect(root.querySelectorAll("[data-screen-id='UI-33']")).toHaveLength(0);
-    expect(content.queryByRole("heading", { name: "외부 인력 후보" })).toBeNull();
+    expect(
+      content.queryByRole("heading", { name: "외부 인력 후보" }),
+    ).toBeNull();
     const actions = within(screen.getByTestId("screen-actions"));
     await waitFor(() =>
       expect(actions.getByTestId("candidate-register")).toBeEnabled(),

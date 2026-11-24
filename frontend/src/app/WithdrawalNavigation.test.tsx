@@ -26,7 +26,6 @@ const screens = [
 const pending = [
   { id: "UI-28", menuId: "M009", parent: "G004", title: "인력 운영 보드" },
   { id: "UI-17", menuId: "M010", parent: "G004", title: "인력 수요 예측" },
-  { id: "UI-29", menuId: "M011", parent: "G004", title: "영업 파이프라인" },
 ];
 const menuScreens = [...screens, ...pending];
 
@@ -133,9 +132,13 @@ describe.each(["파트장", "관리자", "PM"])("UI-05 handover for %s", () => {
     );
     // 엑셀 다운로드는 목록 도구줄에만 있고 제목줄에는 없다(같은 기능 두 개를 하나로, 사용자 결정 2026-11-18).
     expect(
-      screen.getByTestId("list-download").closest("[data-testid=withdrawal-list]"),
+      screen
+        .getByTestId("list-download")
+        .closest("[data-testid=withdrawal-list]"),
     ).not.toBeNull();
-    expect(document.querySelector(".screen-actions [data-testid=list-download]")).toBeNull();
+    expect(
+      document.querySelector(".screen-actions [data-testid=list-download]"),
+    ).toBeNull();
     expect(request).toHaveBeenCalledWith(
       expect.stringMatching(/^\/api\/common\/withdrawals\?year=\d{4}$/),
       { signal: expect.any(AbortSignal) },
@@ -185,7 +188,7 @@ describe("withdrawal route composition", () => {
     },
   );
 
-  // 인력 운영 보드·인력 수요 예측·영업 파이프라인은 아직 만들지 않았다: 메뉴를 누르면 공통 「준비 중」이 보이고 가배정 자료를 읽지 않는다.
+  // 인력 운영 보드·인력 수요 예측은 아직 만들지 않았다: 메뉴를 누르면 공통 「준비 중」이 보이고 가배정 자료를 읽지 않는다.
   it.each(pending)(
     "$id is not registered yet and shows the common placeholder",
     async (entry) => {
@@ -227,7 +230,9 @@ describe("withdrawal route composition", () => {
     );
     expect(screen.getByTestId("user-preferences")).toBe(preferences);
     expect(
-      screen.getByTestId("list-download").closest("[data-testid=withdrawal-list]"),
+      screen
+        .getByTestId("list-download")
+        .closest("[data-testid=withdrawal-list]"),
     ).not.toBeNull();
     expectShell();
   });

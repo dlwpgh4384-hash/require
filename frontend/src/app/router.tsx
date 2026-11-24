@@ -15,6 +15,7 @@ export function createAppRouter() {
         // UI-07 (M019/G007), UI-08 (M020/G007), UI-09 (M021/G007) resolve through screenRegistry.
         // UI-18 (M022/G007) resolves through screenRegistry.
         // UI-33 (M012/G004) resolves through screenRegistry at /screens/UI-33.
+        // UI-29 (M011/G004) resolves through screenRegistry at /screens/UI-29.
         // Keep the shared screen route; feature pages own their API clients.
         { path: "/screens/:scrnId", element: <CommonNavigationPage /> },
         { path: "*", element: <CommonNavigationPage /> },

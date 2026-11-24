@@ -77,6 +77,9 @@
     LEFT JOIN TB_SY_CODE g ON g.CODE_GRP_ID='GRADE' AND g.CODE=COALESCE(n.GRADE_CD,'MD')
     ORDER BY n.OPP_ID,n.NEED_SN
   </select>
+  <update id="touchOpportunity">
+    UPDATE TB_SL_OPP SET MOD_DTTM=clock_timestamp(),MOD_USER_ID=#{actor} WHERE OPP_ID=#{id}
+  </update>
   <select id="lockNeeds" resultType="string">
     SELECT n.OPP_ID FROM TB_SL_OPP_NEED n JOIN TB_SL_OPP o ON o.OPP_ID=n.OPP_ID
     ORDER BY n.OPP_ID,n.NEED_SN FOR UPDATE OF n,o

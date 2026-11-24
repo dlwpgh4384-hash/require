@@ -32,6 +32,7 @@ import { RoleWorkspaceProvider } from "../roles/RoleWorkspace";
 import { UserWorkspaceProvider } from "../users/UserWorkspace";
 import { MonthCloseWorkspaceProvider } from "../monthcloses/MonthCloseWorkspace";
 import { CandidateWorkspaceProvider } from "../candidates/CandidateWorkspace";
+import { SalesPipelineWorkspaceProvider } from "../salespipeline/SalesPipelineWorkspace";
 
 // 만든 화면은 화면 목록(screenRegistry) 한 곳에서 고른다. 없으면 「준비 중」.
 const renderScreen = (scrnId: string) => {
@@ -133,19 +134,21 @@ export function CommonNavigationPage() {
                                       <NetProfitStatementWorkspaceProvider>
                                         <MonthCloseWorkspaceProvider>
                                           <CandidateWorkspaceProvider>
-                                            {preferences ? (
-                                              <PreferenceNavigation />
-                                            ) : (
-                                              <NavigationRoot
-                                                tabs
-                                                renderScreen={renderScreen}
-                                                extensions={(context) => ({
-                                                  screenActions: screenActions(
-                                                    context.screenId,
-                                                  ),
-                                                })}
-                                              />
-                                            )}
+                                            <SalesPipelineWorkspaceProvider>
+                                              {preferences ? (
+                                                <PreferenceNavigation />
+                                              ) : (
+                                                <NavigationRoot
+                                                  tabs
+                                                  renderScreen={renderScreen}
+                                                  extensions={(context) => ({
+                                                    screenActions: screenActions(
+                                                      context.screenId,
+                                                    ),
+                                                  })}
+                                                />
+                                              )}
+                                            </SalesPipelineWorkspaceProvider>
                                           </CandidateWorkspaceProvider>
                                         </MonthCloseWorkspaceProvider>
                                       </NetProfitStatementWorkspaceProvider>

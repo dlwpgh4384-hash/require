@@ -25,7 +25,13 @@ class ManualContractPreservationTest {
             // 2026-11-18 인원 계획 대비 투입 엑셀(GET /api/common/manpower-comparisons/excel) 경로를 더해 다시 맞춤(LF 기준).
             // 2026-11-19 프로젝트 현황판 이슈 모아 보기 엑셀(GET /api/common/project-issues/excel) 경로와 프로젝트 상세 신호등 이유 칸(CommonProject)을 더해 다시 맞춤(LF 기준).
             // 2026-11-19 청구 목록 엑셀(GET /api/common/bills/excel) 경로를 더해 다시 맞춤(LF 기준).
-            assertThat(digest).isEqualTo("9205b09316cbd4dd4c799531469d1434621fbc2f600ed70fbb697ef1252dd38d");
+            // 2026-11-24 영업 파이프라인(UI-29) 저장 전 줄 가배정 점검(POST /api/common/sales-opportunities/tentative-assignment-check) 경로와
+            //   카드 직무 인원(CommonSalesOpportunityCard.requiredJobHeadcounts)·경고 needSn null 칸을 더해 다시 맞춤(LF 기준).
+            // 2026-11-24 영업 파이프라인(UI-29) 매출 예측의 기회별 줄(CommonSalesForecast.opportunityRevenues·CommonSalesForecastOpportunity·
+            //   CommonSalesForecastOpportunityMonth)을 더해 다시 맞춤(LF 기준).
+            // 2026-11-24 영업 파이프라인(UI-29) 상세의 저장된 이익률·승인 이익률·승인 기준(CommonSalesOpportunity.expectedProfitRate·
+            //   approvedProfitRate·approvalRate)과 종료 탭 건수(CommonSalesPipelineSummary.closedCount)를 더하며 두 스키마 전체를 manual에 옮겨 다시 맞춤(LF 기준).
+            assertThat(digest).isEqualTo("3c78991c503a9ae05c0adafde68e7b0368644be86b3ad1cb0c2b86dc20eb642c");
         }
     }
 

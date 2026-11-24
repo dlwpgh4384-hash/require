@@ -116,10 +116,11 @@ class BusinessPlanComparisonControllerTest {
             .andExpect(jsonPath("$.data.summary.cumulativeRevenueAchievementRate").isEmpty())
             .andExpect(jsonPath("$.data.summary.cumulativeOperatingProfitAchievementRate").isEmpty());
     }
-    @Test void zeroProfitTargetWithPositiveRevenueKeepsMarginDifferenceAndDownPrecision() throws Exception {
+    // 식-36: 비율은 소수 첫째 자리 반올림(2026-11-24 사용자 결정, 예전 버림 −16.6 → −16.7).
+    @Test void zeroProfitTargetWithPositiveRevenueKeepsMarginDifferenceRoundedHalfUp() throws Exception {
         when(targets.targets(2026)).thenReturn(List.of(new Target("202601", n(200), n(0))));
         mvc.perform(get(PATH).param("year", "2026").param("baseMonth", "202601"))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.data.months[0].profitRateDifference").value(-16.6));
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.months[0].profitRateDifference").value(-16.7));
     }
     @Test void absentAnnualTargetsKeepsActualAmountsButNoSummaryRatios() throws Exception {
         when(targets.targets(2026)).thenReturn(List.of());

@@ -62,6 +62,19 @@ class BusinessPlanUploadFormTest {
         assertThat(form.templateRows(null)).isEmpty();
         assertThatThrownBy(() -> form.templateRows(2025)).isInstanceOf(CodeFailure.class);
     }
+    @Test void monthsMissingFromTheFileAreZeroWithAnEmptyMonthWarning() {
+        // 줄 자체가 없는 달도 빈칸처럼 0으로 올리고 「목표가 빈 달」(SFR-118-04, 예전 목표가 남지 않게, 2026-11-24).
+        var rows = year(2026).subList(0, 10);
+        var result = inspect(new java.util.ArrayList<>(rows));
+        assertThat(result.errorCount()).isZero();
+        assertThat(result.warningCount()).isEqualTo(2);
+        assertThat(result.issues()).extracting(i -> i.inputValue() + " " + i.reason())
+            .containsExactly("2026-11 " + BusinessPlanUploadForm.EMPTY_TARGET, "2026-12 " + BusinessPlanUploadForm.EMPTY_TARGET);
+        form.apply(result, null, 8L);
+        var written = written();
+        assertThat(written).hasSize(12);
+        assertThat(written.get(11).revenueTarget()).isZero();
+    }
     @Test void blankTargetsAreZeroWithAnEmptyMonthWarningNotAnError() {
         var rows = year(2026);
         rows.get(2).set(1, "");

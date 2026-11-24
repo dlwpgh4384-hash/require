@@ -31,8 +31,11 @@ public final class BusinessPlanComparisonProjection {
             BigDecimal achievement = target == null ? null : ratio(revenue, rt);
             BigDecimal actualMargin = ratio(profit, revenue);
             BigDecimal targetMargin = target == null ? null : ratio(pt, rt);
-            BigDecimal difference = actualMargin == null || targetMargin == null
-                ? null : actualMargin.subtract(targetMargin);
+            // 이익률 차이는 반올림 전 값끼리 빼고 마지막에 소수 첫째 자리 반올림(식-36, 반올림한 두 값을 빼면 0.1 어긋날 수 있음).
+            BigDecimal difference = actualMargin == null || targetMargin == null ? null
+                : profit.multiply(BigDecimal.valueOf(100)).divide(revenue, 10, java.math.RoundingMode.HALF_UP)
+                    .subtract(pt.multiply(BigDecimal.valueOf(100)).divide(rt, 10, java.math.RoundingMode.HALF_UP))
+                    .setScale(1, java.math.RoundingMode.HALF_UP);
             months.add(new Month(ym, rt, revenue, pt, profit, achievement, difference));
             if (m <= end) {
                 revenueTarget = revenueTarget.add(rt);

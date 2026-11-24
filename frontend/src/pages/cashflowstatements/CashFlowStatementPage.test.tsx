@@ -287,8 +287,7 @@ it("shows year-only selector and readonly fifteen-by-fifteen table", async () =>
 it("uses common year bounds and loads changed year without a month argument", async () => {
   open();
   await screen.findByTestId("cash-flow-table");
-  const year = screen.getByTestId("period-year");
-  fireEvent.change(year, { target: { value: "2025" } });
+  fireEvent.click(screen.getByTestId("period-year-prev"));
   await screen.findByText("2025년 자금수지 (부가세 포함)");
   const paths = request.mock.calls
     .map(([path]) => String(path))
@@ -401,7 +400,7 @@ it("renders errors and field validation then retries", async () => {
       "조회 연도를 확인해 주세요.",
     ),
   ).toBeVisible();
-  expect(screen.getByTestId("period-year")).toHaveFocus();
+  expect(screen.getByTestId("period-year-prev")).toHaveFocus();
   expect(screen.getByTestId("cash-flow-table-pending")).toBeVisible();
   expect(screen.getByTestId("cash-flow-balance-chart")).toBeInTheDocument();
   expect(screen.getByTestId("cash-flow-excel")).toBeDisabled();
@@ -481,9 +480,7 @@ it("keeps the chosen money unit when loading a different year", async () => {
   fireEvent.change(screen.getByTestId("money-unit"), {
     target: { value: "원" },
   });
-  fireEvent.change(screen.getByTestId("period-year"), {
-    target: { value: "2025" },
-  });
+  fireEvent.click(screen.getByTestId("period-year-prev"));
   await waitFor(() =>
     expect(request).toHaveBeenCalledWith(
       "/api/common/cash-flow-statements?year=2025",
@@ -528,9 +525,7 @@ it("ignores a slow old year response after the year changes", async () => {
   expect(screen.getByTestId("cash-flow-balance-chart")).toBeInTheDocument();
   expect(screen.getByTestId("cash-flow-excel")).toBeDisabled();
   expect(screen.queryByTestId("banner-bad")).not.toBeInTheDocument();
-  fireEvent.change(screen.getByTestId("period-year"), {
-    target: { value: "2025" },
-  });
+  fireEvent.click(screen.getByTestId("period-year-prev"));
   await screen.findByText("2025년 자금수지 (부가세 포함)");
   await act(async () => resolveOld(ok(report(2026))));
   expect(

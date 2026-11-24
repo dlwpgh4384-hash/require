@@ -384,9 +384,9 @@ it("one confirmation dialog permits remaining warnings and sends only the nullab
   expect(await screen.findByTestId("month-close-history-0")).toHaveTextContent(
     "영업 파트 정산",
   );
-  // 저장 결과를 그대로 쓴다: 점검·기간 기준을 다시 읽지 않고 이력만 다시 읽는다.
+  // 저장 결과를 그대로 쓴다: 점검은 다시 읽지 않고 이력만 다시 읽는다. 기간 기준은 열린 탭들이 새로 읽도록 한 번 다시 읽는다(2026-11-24).
   expect(detailReads()).toHaveLength(detailCount);
-  expect(preferenceReads()).toHaveLength(preferenceCount);
+  await waitFor(() => expect(preferenceReads()).toHaveLength(preferenceCount + 1));
   expect(historyReads()).toHaveLength(2);
   expect(screen.getByRole("combobox", { name: "조회 월" })).toHaveValue(
     "2026-10",

@@ -39,6 +39,13 @@ import {
 } from "./rateRenegotiationFormulas";
 import "./rateRenegotiations.css";
 
+/** 시안 ic('warn',18): 다른 화면 경고 띠와 같은 아이콘 */
+const warnIcon = (
+  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01" />
+  </svg>
+);
+
 const moneyKeys = new Set<string>([
   "currentUnitPrice",
   "monthlyCost",
@@ -302,7 +309,7 @@ export function RateRenegotiationWorkspace() {
     <div className="rate-workspace" data-testid="rate-workspace" ref={root}>
       {data && (data.salaryEstimatedDeveloperIds ?? []).length > 0 && (
         <div data-testid="rate-salary-estimated">
-          <Banner kind="warn">
+          <Banner kind="warn" icon={warnIcon}>
             {`${Number(data.baseYearMonth.slice(-2))}월 급여 업로드 전: ${(data.salaryEstimatedDeveloperIds ?? []).length}명은 개발자 풀 월 급여로 계산한 값입니다.`}
           </Banner>
         </div>

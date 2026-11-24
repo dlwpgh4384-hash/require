@@ -120,6 +120,14 @@ export interface PeriodChangedDetail {
 export function announcePeriodChanged(detail: PeriodChangedDetail) {
   window.dispatchEvent(new CustomEvent<PeriodChangedDetail>(PERIOD_CHANGED_EVENT, { detail }));
 }
+/**
+ * 월을 마감하거나 마감을 해제했음을 알린다. 이미 탭으로 열린 화면이 기간 기준(마감한 달·가장 최근 달)을
+ * 다시 읽어, 처음 열 때 받은 옛 기준으로 고를 수 있는 달이 멈춰 있지 않게 한다(2026-11-24 사용자 지적).
+ */
+export const PERIOD_BASIS_CHANGED_EVENT = "period-basis-changed";
+export function announcePeriodBasisChanged() {
+  window.dispatchEvent(new Event(PERIOD_BASIS_CHANGED_EVENT));
+}
 export function createPreferenceSaver(type: PreferenceType, key: string) {
   let token: string | null = null;
   let chain: Promise<unknown> = Promise.resolve();

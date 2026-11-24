@@ -9,6 +9,7 @@ import {
 import {
   createPreferenceSaver,
   getCommonUserPreference,
+  PERIOD_BASIS_CHANGED_EVENT,
   PERIOD_CHANGED_EVENT,
   type PeriodChangedDetail,
 } from "./userPreferences";
@@ -106,5 +107,33 @@ export function useScreenPeriod(screenId: string, options: PeriodOptions) {
     window.addEventListener(PERIOD_CHANGED_EVENT, listener);
     return () => window.removeEventListener(PERIOD_CHANGED_EVENT, listener);
   }, [screenId, optionsKey, saver]);
+  // 월 마감·해제 뒤에는 기간 기준을 다시 읽는다. 고른 기간은 그대로 두고, 새 기준에서 고를 수 없게 되면 가장 최근 달로 바꾼다.
+  useEffect(() => {
+    const current: PeriodOptions = JSON.parse(optionsKey);
+    let controller: AbortController | null = null;
+    const listener = () => {
+      controller?.abort();
+      const active = new AbortController();
+      controller = active;
+      getCommonUserPreference("PERIOD", screenId, active.signal)
+        .then((response) => {
+          const basis = response.meta.periodBasis;
+          if (active.signal.aborted || !basis) return;
+          setState((previous) => {
+            if (previous.status !== "ready") return previous;
+            const value = isAllowed(previous.value, basis, current)
+              ? previous.value
+              : latestPeriod(basis, current.kind);
+            return { status: "ready", basis, value };
+          });
+        })
+        .catch(() => undefined);
+    };
+    window.addEventListener(PERIOD_BASIS_CHANGED_EVENT, listener);
+    return () => {
+      controller?.abort();
+      window.removeEventListener(PERIOD_BASIS_CHANGED_EVENT, listener);
+    };
+  }, [screenId, optionsKey]);
   return { state, setValue };
 }

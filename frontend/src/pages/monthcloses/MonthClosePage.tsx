@@ -16,6 +16,7 @@ import { formatDateTime, koreanThisMonth } from "../../shared/time";
 import { requestMenuBadgeRefresh } from "../../app/menuBadges";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
 import {
+  announcePeriodBasisChanged,
   announcePeriodChanged,
   createPreferenceSaver,
   getCommonUserPreference,
@@ -250,6 +251,7 @@ export function MonthClosePage({
       });
       refreshHistory((value) => value + 1);
       requestMenuBadgeRefresh();
+      announcePeriodBasisChanged();
     } catch (failure) {
       if (isConflict(failure)) {
         // 다른 사람이 먼저 바꿨다: 창을 닫고 지금 상태를 다시 읽는다.

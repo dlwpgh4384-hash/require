@@ -287,6 +287,13 @@ main {
   border: 0;
   border-radius: 0;
 }
+/* 화면 제목 줄 오른쪽 단추 자리(시안 .tb-r): 단추 사이 8px. 월 마감 [다시 점검][마감하기] 등이 붙어 보였다. */
+.project-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .shell-icon {
   display: block;
   flex-shrink: 0;

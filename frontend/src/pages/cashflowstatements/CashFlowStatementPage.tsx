@@ -136,8 +136,9 @@ export function CashFlowStatementPage() {
           failure.errors.some((f) => f.field === "year")
         )
           root.current
-            ?.querySelector<HTMLSelectElement>(
-              '[data-testid="period-year"], [data-testid="cash-flow-year"]',
+            // 시안 연도 줄(‹ 2026년 ›)은 연도 글자가 칸이 아니므로 누를 수 있는 화살표로 커서를 옮긴다.
+            ?.querySelector<HTMLElement>(
+              '[data-testid="period-year-prev"]:not(:disabled), [data-testid="period-year-next"]:not(:disabled), [data-testid="cash-flow-year"]',
             )
             ?.focus();
       })
@@ -177,7 +178,7 @@ export function CashFlowStatementPage() {
   const actions = (
     <button
       type="button"
-      className="ls-btn ls-btn-sm"
+      className="ls-btn"
       data-testid="cash-flow-excel"
       disabled={downloading || loading || !data || !!error}
       onClick={() => void download()}
@@ -213,6 +214,7 @@ export function CashFlowStatementPage() {
         {state.status === "ready" ? (
           <PeriodSelector
             {...cashFlowPeriodOptions}
+            variant="yearBar"
             basis={state.basis}
             value={state.value}
             onChange={period.setValue}
@@ -333,9 +335,10 @@ export function CashFlowStatementPage() {
             testId="cash-flow-balance-chart"
           />
         </article>
-        <article className="profit-card" data-testid="cash-flow-table-card">
-          <div className="profit-card-h">
-            <h2>
+        {/* 시안: 표 제목·단위는 카드 밖 한 줄(.tbar), 표만 테두리 상자 */}
+        <div className="cash-flow-table-section" data-testid="cash-flow-table-card">
+          <div className="ls-tbar cash-flow-table-bar">
+            <h2 className="cash-flow-table-title">
               {year === undefined
                 ? "자금수지 (부가세 포함)"
                 : `${year}년 자금수지 (부가세 포함)`}
@@ -368,9 +371,10 @@ export function CashFlowStatementPage() {
                         }
                       >
                         {column.label}
-                        {column.actual !== null && (
-                          <small>{column.actual ? "실적" : "예정"}</small>
-                        )}
+                        {/* 둘째 줄: 「예정」 옆에 부족 경고 아이콘(머리가 3줄로 커지지 않게) */}
+                        {(column.actual !== null || (column.warning && warning)) && (
+                        <small>
+                        {column.actual !== null && (column.actual ? "실적" : "예정")}
                         {column.warning && warning && (
                           <span
                             className="cash-flow-warning-icon"
@@ -391,6 +395,8 @@ export function CashFlowStatementPage() {
                               것으로 예상
                             </span>
                           </span>
+                        )}
+                        </small>
                         )}
                       </th>
                     );
@@ -435,7 +441,7 @@ export function CashFlowStatementPage() {
           <p className="ls-note" data-testid="cash-flow-note">
             마감한 달은 실적, 마감 전 달은 예정(보조 글자색)입니다. 수입은 청구·입금과 재무 항목에서, 지출은 급여 업로드(정규직·계약직·프리랜서, 4대보험·원천세는 다음 달), 외주 원가 + 부가세, 재무 항목(판관비·영업외비용, 법인카드 대금, 계좌이체 지출)에서 바로 계산합니다. 법인카드 대금과 계좌이체 지출(구분 「계좌이체」)은 제경비에, 계좌이체 지출 구분 「특별비」는 미지급 인건비에 들어가고 손익에는 들어가지 않습니다. 지급은 모두 냈다고 보고, 안 맞는 금액은 재무 항목에 행을 추가해 맞춥니다.
           </p>
-        </article>
+        </div>
       </>
       {notice && (
         <Toast

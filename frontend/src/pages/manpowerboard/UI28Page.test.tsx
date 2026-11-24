@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -9,7 +10,11 @@ import {
 } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
-import { UI28Page } from "./UI28Page";
+import {
+  manpowerBoardCellText,
+  manpowerBoardTooltip,
+  UI28Page,
+} from "./UI28Page";
 import * as board from "./manpowerBoard";
 import * as pipeline from "../salespipeline/salesPipeline";
 import { DeveloperDetail } from "../developers/DeveloperDetail";
@@ -45,24 +50,48 @@ vi.mock("../../shared/time", async () => ({
   )),
   koreanToday: () => "2026-11-15",
 }));
+const periodControl: {
+  ready: boolean;
+  makeReady?: () => void;
+} = { ready: true };
 vi.mock("../userpreferences/useScreenPeriod", async () => {
   const { useState } = await import("react");
   return {
     useScreenPeriod: () => {
       const [value, setValue] = useState({ year: 2026 });
+      const [ready, setReady] = useState(periodControl.ready);
+      periodControl.makeReady = () => setReady(true);
       return {
-        state: {
-          status: "ready",
-          basis: { latestYm: "202611", cashBaseYm: "202601", closedMonths: [] },
-          value,
-        },
+        state: ready
+          ? {
+              status: "ready",
+              basis: {
+                latestYm: "202611",
+                cashBaseYm: "202601",
+                closedMonths: [],
+              },
+              value,
+            }
+          : { status: "loading" },
         setValue,
       };
     },
   };
 });
-const result = (count = 1): board.ManpowerBoardResult => ({
-  year: 2026,
+type Cell = board.ManpowerBoardCell;
+const cell = (month: string, patch: Partial<Cell> = {}): Cell => ({
+  month,
+  statusCode: "none",
+  statusName: "–",
+  totalMm: 0,
+  projects: [],
+  extensionPossibilityName: null,
+  winningProbability: null,
+  tentative: false,
+  ...patch,
+});
+const result = (count = 1, year = 2026): board.ManpowerBoardResult => ({
+  year,
   summary: {
     idleCount: 3,
     availableMm: 3.6,
@@ -70,26 +99,28 @@ const result = (count = 1): board.ManpowerBoardResult => ({
     highExtensionCount: 2,
     concurrentCount: 2,
     overAllocatedCount: 1,
-    futureAvailableMm: 5.2,
+    futureAvailableMm: 5.24,
   },
   totalCount: count,
   items: Array.from({ length: count }, (_, i) => ({
     developerId: `person-${i}`,
-    name: `인력 ${i}`,
+    name: `인력 ${year}-${i}`,
     jobName: "백엔드",
-    cells: Array.from({ length: 12 }, (_, month) => ({
-      month: `2026-${String(month + 1).padStart(2, "0")}`,
-      statusName: month < 10 ? "–" : "일부 투입",
-      totalMm: month < 10 ? 0 : 0.4,
-      projects: month < 10 ? [] : [{ projectName: "프로젝트", monthlyMm: 0.4 }],
-      extensionPossibilityName: null,
-      winningProbability: null,
-      tentative: false,
-    })),
+    cells: Array.from({ length: 12 }, (_, month) => {
+      const ym = `${year}-${String(month + 1).padStart(2, "0")}`;
+      return month < 10
+        ? cell(ym)
+        : cell(ym, {
+            statusCode: "on",
+            statusName: "투입 중",
+            totalMm: 0.4,
+            projects: [{ projectName: "프로젝트", monthlyMm: 0.4 }],
+          });
+    }),
   })),
   monthTotals: Array.from({ length: 12 }, (_, i) => ({
-    month: `2026-${String(i + 1).padStart(2, "0")}`,
-    idleCount: i < 10 ? null : 3,
+    month: `${year}-${String(i + 1).padStart(2, "0")}`,
+    idleCount: i < 10 ? null : i === 10 ? 3 : 0,
     availableMm: i < 10 ? null : 3.6,
   })),
 });
@@ -110,8 +141,11 @@ function mount() {
     </MemoryRouter>,
   );
 }
+const cellsOf = (row: HTMLElement) =>
+  Array.from(row.querySelectorAll<HTMLElement>("td.mc .cell"));
 beforeEach(() => {
   vi.clearAllMocks();
+  periodControl.ready = true;
   vi.mocked(board.getCommonManpowerBoard).mockResolvedValue(result());
   vi.mocked(board.getCommonManpowerBoardExcel).mockResolvedValue(37);
   vi.mocked(getCommonCodes).mockResolvedValue({
@@ -119,55 +153,20 @@ beforeEach(() => {
   } as Awaited<ReturnType<typeof getCommonCodes>>);
   vi.mocked(pipeline.getCommonSalesPipelineForecast).mockResolvedValue({
     months: [
-      {
-        month: "2026-12",
-        demand: 4.123,
-        supply: 1.023,
-        projectRevenue: 7,
-        weightedOpportunityRevenue: 3,
-        allWonRevenue: 10,
-      },
-      {
-        month: "2027-01",
-        demand: 1.222,
-        supply: 2.322,
-        projectRevenue: 8,
-        weightedOpportunityRevenue: 4,
-        allWonRevenue: 12,
-      },
-      {
-        month: "2027-02",
-        demand: 2,
-        supply: 2,
-        projectRevenue: 9,
-        weightedOpportunityRevenue: 4,
-        allWonRevenue: 13,
-      },
-      {
-        month: "2027-03",
-        demand: 3,
-        supply: 3,
-        projectRevenue: 9,
-        weightedOpportunityRevenue: 5,
-        allWonRevenue: 14,
-      },
-      {
-        month: "2027-04",
-        demand: 4,
-        supply: 4,
-        projectRevenue: 9,
-        weightedOpportunityRevenue: 6,
-        allWonRevenue: 15,
-      },
-      {
-        month: "2027-05",
-        demand: 5,
-        supply: 5,
-        projectRevenue: 9,
-        weightedOpportunityRevenue: 7,
-        allWonRevenue: 16,
-      },
-    ],
+      ["2026-11", 4.123, 1.023],
+      ["2026-12", 1.222, 2.322],
+      ["2027-01", 2, 2.02],
+      ["2027-02", 3, 2.7],
+      ["2027-03", 4, 4],
+      ["2027-04", 5, 5],
+    ].map(([month, demand, supply]) => ({
+      month: month as string,
+      demand: demand as number,
+      supply: supply as number,
+      projectRevenue: 7,
+      weightedOpportunityRevenue: 3,
+      allWonRevenue: 10,
+    })),
     hiringReviews: [],
     opportunityRevenues: [],
   });
@@ -177,12 +176,21 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it("renders four API-backed cards and navigates only to existing destinations without query filters", async () => {
+it("renders the four mockup cards with 명 units and one-decimal MM and navigates to existing screens", async () => {
   mount();
   await screen.findByTestId("manpower-board-person-person-0");
   const summary = screen.getByTestId("manpower-board-summary");
   expect(summary.children).toHaveLength(4);
-  expect(summary).toHaveTextContent("남는 MM 3.60");
+  const [idle, withdrawal, concurrent, future] = Array.from(summary.children);
+  expect(idle).toHaveTextContent("3명");
+  expect(idle).toHaveTextContent("남는 MM 3.6 (일부 투입 포함)");
+  expect(withdrawal).toHaveTextContent("4명");
+  expect(withdrawal).toHaveTextContent("연장 가능성 높음 2명");
+  expect(concurrent).toHaveTextContent("2명");
+  expect(concurrent).toHaveTextContent("이번 달 2건 이상 · 1.0 초과 1명");
+  expect(future).toHaveTextContent("3개월 뒤 남는 MM");
+  expect(future).toHaveTextContent("5.2");
+  expect(within(future as HTMLElement).getByText("예측")).toBeInTheDocument();
   fireEvent.click(screen.getByTestId("manpower-board-withdrawal"));
   expect(screen.getByTestId("location")).toHaveTextContent(
     /^\/screens\/UI-05$/,
@@ -193,10 +201,27 @@ it("renders four API-backed cards and navigates only to existing destinations wi
   );
 });
 
-it("keeps condition drafts until search, changes year immediately, and resets conditions without resetting year", async () => {
+it("waits for the period and sends exactly one first board request", async () => {
+  periodControl.ready = false;
+  mount();
+  expect(board.getCommonManpowerBoard).not.toHaveBeenCalled();
+  act(() => periodControl.makeReady!());
+  await screen.findByTestId("manpower-board-person-person-0");
+  expect(board.getCommonManpowerBoard).toHaveBeenCalledTimes(1);
+  expect(board.getCommonManpowerBoard).toHaveBeenCalledWith(
+    { year: 2026 },
+    expect.any(AbortSignal),
+  );
+});
+
+it("keeps condition drafts until search, changes year with the year bar, and resets conditions without resetting year", async () => {
   mount();
   await screen.findByTestId("manpower-board-person-person-0");
   await screen.findAllByRole("option", { name: "백엔드" });
+  expect(screen.getByTestId("manpower-board-year")).toHaveTextContent(
+    "그 해 1~12월 달력",
+  );
+  expect(screen.getByTestId("manpower-board-year-prev")).toBeDisabled();
   const before = vi.mocked(board.getCommonManpowerBoard).mock.calls.length;
   fireEvent.change(screen.getByTestId("manpower-board-jobcode"), {
     target: { value: "BE" },
@@ -209,14 +234,14 @@ it("keeps condition drafts until search, changes year immediately, and resets co
       expect.any(AbortSignal),
     ),
   );
-  const year = screen.getByTestId("period-year");
-  fireEvent.change(year, { target: { value: "2027" } });
+  fireEvent.click(screen.getByTestId("manpower-board-year-next"));
   await waitFor(() =>
     expect(board.getCommonManpowerBoard).toHaveBeenLastCalledWith(
-      expect.objectContaining({ year: 2027 }),
+      expect.objectContaining({ year: 2027, jobCode: "BE" }),
       expect.any(AbortSignal),
     ),
   );
+  expect(screen.getByTestId("manpower-board-year-next")).toBeDisabled();
   fireEvent.click(screen.getByRole("button", { name: "초기화" }));
   await waitFor(() =>
     expect(board.getCommonManpowerBoard).toHaveBeenLastCalledWith(
@@ -225,6 +250,34 @@ it("keeps condition drafts until search, changes year immediately, and resets co
     ),
   );
   expect(screen.getByTestId("manpower-board-jobcode")).toHaveValue("");
+});
+
+it("ignores a late response from the previous year after a fast year change", async () => {
+  let late!: (value: board.ManpowerBoardResult) => void;
+  vi.mocked(board.getCommonManpowerBoard)
+    .mockReturnValueOnce(
+      new Promise((resolve) => {
+        late = resolve;
+      }),
+    )
+    .mockResolvedValueOnce(result(1, 2027));
+  mount();
+  await waitFor(() =>
+    expect(board.getCommonManpowerBoard).toHaveBeenCalledTimes(1),
+  );
+  fireEvent.click(screen.getByTestId("manpower-board-year-next"));
+  await screen.findByText("인력 2027-0");
+  await act(async () => {
+    late(result(1, 2026));
+  });
+  expect(screen.getByText("인력 2027-0")).toBeInTheDocument();
+  expect(screen.queryByText("인력 2026-0")).not.toBeInTheDocument();
+  expect(
+    within(screen.getByTestId("manpower-board-scroll"))
+      .getAllByRole("columnheader")
+      .slice(2, 3)
+      .map((h) => h.textContent),
+  ).toEqual(["27-01"]);
 });
 
 it("uses local paging with full totals and no extra board fetch", async () => {
@@ -239,17 +292,40 @@ it("uses local paging with full totals and no extra board fetch", async () => {
     ).not.toBeInTheDocument(),
   );
   expect(board.getCommonManpowerBoard).toHaveBeenCalledTimes(calls);
-  expect(screen.getByText("총 51명")).toBeInTheDocument();
-  expect(
-    screen.getByText("남는 MM (일부 투입 포함)").closest("tr"),
-  ).toHaveTextContent("3.60");
+  expect(screen.getByTestId("manpower-board-total")).toHaveTextContent(
+    "총 51명",
+  );
 });
 
-it("opens only the selected existing readonly detail and preserves calendar filters on close", async () => {
+it("renders mockup footer rows: idle n명 in red, free MM with one decimal, past months as –", async () => {
   mount();
-  await screen.findByTestId("manpower-board-detail-person-0");
+  await screen.findByTestId("manpower-board-person-person-0");
+  const idle = screen.getByTestId("manpower-board-idle-row");
+  const idleCells = Array.from(idle.querySelectorAll("td.mc"));
+  expect(idle.querySelector("td")).toHaveTextContent("비는 인원");
+  expect(idleCells.map((td) => td.textContent)).toEqual([
+    ...Array(10).fill("–"),
+    "3명",
+    "0명",
+  ]);
+  expect(idleCells[10].querySelector("span")).toHaveClass("board-bad");
+  expect(idleCells[11].querySelector("span")).not.toHaveClass("board-bad");
+  const free = screen.getByTestId("manpower-board-free-row");
+  const [first, second] = Array.from(free.querySelectorAll("td"));
+  expect(first).toHaveTextContent(/^남는 MM$/);
+  expect(second).toHaveTextContent("일부 투입 포함");
+  expect(second).toHaveClass("ls-cap");
+  expect(
+    Array.from(free.querySelectorAll("td.mc")).map((td) => td.textContent),
+  ).toEqual([...Array(10).fill("–"), "3.6", "3.6"]);
+});
+
+it("opens the existing readonly detail from the row click only and preserves calendar filters on close", async () => {
+  mount();
+  const row = await screen.findByTestId("manpower-board-person-person-0");
   expect(DeveloperDetail).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByTestId("manpower-board-detail-person-0"));
+  expect(within(row).queryByRole("button")).not.toBeInTheDocument();
+  fireEvent.click(within(row).getByText("인력 2026-0"));
   await screen.findByTestId("existing-developer-detail");
   const props = vi.mocked(DeveloperDetail).mock.calls.at(-1)?.[0];
   expect(props).toEqual({
@@ -263,43 +339,100 @@ it("opens only the selected existing readonly detail and preserves calendar filt
     screen.queryByTestId("existing-developer-detail"),
   ).not.toBeInTheDocument();
   expect(board.getCommonManpowerBoard).toHaveBeenCalledTimes(calls);
+  fireEvent.keyDown(row, { key: "Enter" });
+  expect(
+    await screen.findByTestId("existing-developer-detail"),
+  ).toBeInTheDocument();
 });
 
-it("isolates forecast conditions and displays exact returned month order and supply-demand difference", async () => {
+it("shows the person number under the name, falling back to the developer id", async () => {
+  const data = result(2);
+  data.items[0].managementNumber = "E-1001";
+  vi.mocked(board.getCommonManpowerBoard).mockResolvedValue(data);
   mount();
-  await screen.findByTestId("manpower-board-detail-person-0");
+  const first = await screen.findByTestId("manpower-board-person-person-0");
+  expect(first.querySelector(".board-pname small")).toHaveTextContent(
+    "E-1001",
+  );
+  expect(
+    screen
+      .getByTestId("manpower-board-person-person-1")
+      .querySelector(".board-pname small"),
+  ).toHaveTextContent("person-1");
+});
+
+it("loads the demand/supply table from this month in 명 and keeps it when switching tabs", async () => {
+  mount();
+  await screen.findByTestId("manpower-board-person-person-0");
   fireEvent.click(screen.getByRole("tab", { name: "수요·공급" }));
   const panel = await screen.findByTestId("manpower-board-forecast");
-  await within(panel).findByText("2026-12");
-  expect(pipeline.getCommonSalesPipelineForecast).toHaveBeenCalledWith();
+  await within(panel).findByText("2026-11");
+  expect(pipeline.getCommonSalesPipelineForecast).toHaveBeenCalledWith(
+    "2026-11",
+  );
+  expect(within(panel).getByTestId("banner-info")).toHaveTextContent(
+    "가용 = 사람마다 (1 − 그 달 투입 MM)의 합. 철수한 투입은 연장 가능성(높음 80%·보통 50%·낮음 0%)만큼 남는다고 봅니다. 필요 = 영업 기회의 필요 인력 × 단계 확률 + 진행 프로젝트 미충원.",
+  );
+  const rows = within(panel).getAllByRole("row");
   expect(
-    within(within(panel).getAllByRole("row")[0])
+    within(rows[0])
       .getAllByRole("columnheader")
-      .slice(1)
-      .map((cell) => cell.textContent),
-  ).toEqual(["2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05"]);
+      .map((c) => c.textContent),
+  ).toEqual([
+    "구분",
+    "2026-11",
+    "2026-12",
+    "2027-01",
+    "2027-02",
+    "2027-03",
+    "2027-04",
+  ]);
+  expect(rows[1]).toHaveTextContent("필요 인력4.1명1.2명2.0명3.0명4.0명5.0명");
+  expect(rows[2]).toHaveTextContent("가용 인력1.0명2.3명2.0명2.7명4.0명5.0명");
+  expect(within(panel).getByText("3.1명 부족")).toHaveClass("board-bad");
+  expect(within(panel).getByText("1.1명 남음")).toHaveClass("board-warn");
+  expect(within(panel).getByText("0.3명 부족")).not.toHaveClass("board-bad");
+  expect(within(panel).getAllByText("맞음")).toHaveLength(3);
   expect(
     screen.queryByTestId("manpower-board-gradecode"),
   ).not.toBeInTheDocument();
-  expect(within(panel).getByText("3.10 MM 부족")).toHaveClass("board-shortage");
-  expect(within(panel).getByText("1.10 MM 남음")).toHaveClass("board-surplus");
-  expect(within(panel).getByText("4.12")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("tab", { name: "달력" }));
   expect(screen.getByTestId("manpower-board-gradecode")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("tab", { name: "수요·공급" }));
+  expect(within(screen.getByTestId("manpower-board-forecast")).getByText("2026-11")).toBeInTheDocument();
+  expect(pipeline.getCommonSalesPipelineForecast).toHaveBeenCalledTimes(1);
 });
 
-it("shows forecast failures in its own panel without replacing calendar data", async () => {
-  vi.mocked(pipeline.getCommonSalesPipelineForecast).mockRejectedValue(
+it("uses the common tab look with aria-controls only on the shown panel", async () => {
+  mount();
+  await screen.findByTestId("manpower-board-person-person-0");
+  const calendar = screen.getByRole("tab", { name: "달력" });
+  const forecast = screen.getByRole("tab", { name: "수요·공급" });
+  expect(calendar.parentElement).toHaveClass("ls-tabs");
+  expect(calendar).toHaveClass("ls-tb", "ls-on");
+  expect(calendar).toHaveAttribute("aria-selected", "true");
+  expect(calendar).toHaveAttribute("aria-controls", "manpower-board-calendar");
+  expect(forecast).not.toHaveAttribute("aria-controls");
+  expect(forecast).toHaveAttribute("aria-selected", "false");
+});
+
+it("shows forecast failures in its own panel and refetches only on retry", async () => {
+  vi.mocked(pipeline.getCommonSalesPipelineForecast).mockRejectedValueOnce(
     new Error("예측 조회 오류"),
   );
   mount();
-  await screen.findByTestId("manpower-board-detail-person-0");
+  await screen.findByTestId("manpower-board-person-person-0");
   fireEvent.click(screen.getByRole("tab", { name: "수요·공급" }));
   await screen.findByText("예측 조회 오류");
   fireEvent.click(screen.getByRole("tab", { name: "달력" }));
   expect(
     screen.getByTestId("manpower-board-person-person-0"),
   ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("tab", { name: "수요·공급" }));
+  expect(pipeline.getCommonSalesPipelineForecast).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByTestId("manpower-board-forecast-retry"));
+  await screen.findByText("2026-11");
+  expect(pipeline.getCommonSalesPipelineForecast).toHaveBeenCalledTimes(2);
 });
 
 it("keeps loading separate from empty and disables download until a result exists", async () => {
@@ -312,15 +445,48 @@ it("keeps loading separate from empty and disables download until a result exist
   expect(screen.getByTestId("manpower-board-excel")).toBeDisabled();
 });
 
-it("keeps headers, summary, footer and filters when the API returns an empty roster", async () => {
+it("keeps short month headers, the current month mark, legend, note and footer for an empty roster", async () => {
   vi.mocked(board.getCommonManpowerBoard).mockResolvedValue(result(0));
   mount();
   await screen.findByTestId("manpower-board-empty");
-  expect(
-    screen.getByRole("columnheader", { name: "12월" }),
-  ).toBeInTheDocument();
+  const headers = within(screen.getByTestId("manpower-board-scroll"))
+    .getAllByRole("columnheader")
+    .map((h) => h.textContent);
+  expect(headers).toEqual([
+    "이름",
+    "직무",
+    ...Array.from({ length: 12 }, (_, i) => `26-${String(i + 1).padStart(2, "0")}`),
+  ]);
+  expect(screen.getByRole("columnheader", { name: "26-11" })).toHaveClass(
+    "mc",
+    "cur",
+  );
+  expect(screen.getByRole("columnheader", { name: "26-10" })).not.toHaveClass(
+    "cur",
+  );
   expect(screen.getByTestId("manpower-board-filters")).toBeInTheDocument();
-  expect(screen.getByText("남는 MM (일부 투입 포함)")).toBeInTheDocument();
+  expect(screen.getByTestId("manpower-board-free-row")).toBeInTheDocument();
+  const legend = screen.getByTestId("manpower-board-legend");
+  expect(legend.closest(".ls-tr")).not.toBeNull();
+  expect(
+    Array.from(legend.children).map((item) => item.textContent),
+  ).toEqual([
+    "투입 중",
+    "일부 투입(1.0 미만)",
+    "2건동시 투입",
+    "철수 예정",
+    "비어 있음",
+    "가배정",
+    "휴직",
+    "퇴사",
+    "⚠미계약 선투입",
+  ]);
+  expect(legend.querySelectorAll(".cell")).toHaveLength(9);
+  expect(
+    screen.getByText(
+      "칸에 마우스를 올리면 그 달의 프로젝트별 MM이 보입니다. 1.0 미만으로 투입된 달은 투입된 만큼만 칠합니다.",
+    ),
+  ).toBeInTheDocument();
 });
 
 it("shows shared errors[].field errors rather than an empty successful calendar", async () => {
@@ -346,8 +512,11 @@ it("shows success Toast only after the blob download resolves and uses X-Total-C
     }),
   );
   mount();
-  await screen.findByTestId("manpower-board-detail-person-0");
+  await screen.findByTestId("manpower-board-person-person-0");
   fireEvent.click(screen.getByTestId("manpower-board-excel"));
+  expect(board.getCommonManpowerBoardExcel).toHaveBeenCalledWith({
+    year: 2026,
+  });
   expect(screen.queryByTestId("manpower-board-toast")).not.toBeInTheDocument();
   expect(screen.getByTestId("manpower-board-excel")).toBeDisabled();
   complete(37);
@@ -363,7 +532,7 @@ it("shows warn and never success on download failure", async () => {
     new Error("파일 생성 실패"),
   );
   mount();
-  await screen.findByTestId("manpower-board-detail-person-0");
+  await screen.findByTestId("manpower-board-person-person-0");
   fireEvent.click(screen.getByTestId("manpower-board-excel"));
   await waitFor(() =>
     expect(screen.getByTestId("manpower-board-toast")).toHaveTextContent(
@@ -375,75 +544,122 @@ it("shows warn and never success on download failure", async () => {
   );
 });
 
-it("preserves tentative, retirement and excess classes and builds tooltips from the selected month only", async () => {
+it("draws each calendar cell like the mockup: status class, partial fill, over outline, short text and a one-line tooltip", async () => {
   const data = result();
-  data.items[0].cells[10] = {
-    month: "2026-11",
-    statusName: "동시 투입",
+  const cells = data.items[0].cells;
+  cells[0] = cell("2026-01", {
+    statusCode: "on",
+    statusName: "투입 중",
+    totalMm: 1,
+    projects: [{ projectName: "가 프로젝트", monthlyMm: 1 }],
+  });
+  cells[1] = cell("2026-02", { statusCode: "leave", statusName: "휴직" });
+  cells[2] = cell("2026-03", { statusCode: "ret", statusName: "퇴사" });
+  cells[3] = cell("2026-04", { statusCode: "pre", statusName: "미계약 선투입", totalMm: 1, projects: [{ projectName: "수주 예정", monthlyMm: 1 }] });
+  cells[9] = cell("2026-10", {
+    statusCode: "idle",
+    statusName: "비어 있음",
+  });
+  cells[10] = cell("2026-11", {
+    statusCode: "on",
+    statusName: "투입 중",
     totalMm: 1.3,
     projects: [
       { projectName: "첫 프로젝트", monthlyMm: 0.7 },
       { projectName: "둘째 프로젝트", monthlyMm: 0.6 },
     ],
-    extensionPossibilityName: "높음 / 낮음",
-    winningProbability: null,
-    tentative: false,
-  };
-  data.items[0].cells[11] = {
-    month: "2026-12",
+  });
+  cells[11] = cell("2026-12", {
+    statusCode: "tent",
     statusName: "가배정",
-    totalMm: 0,
-    projects: [{ projectName: "영업 기회", monthlyMm: 0 }],
-    extensionPossibilityName: null,
     winningProbability: 30,
     tentative: true,
-  };
+  });
+  data.items.push({
+    ...data.items[0],
+    developerId: "person-1",
+    name: "인력 끝",
+    cells: data.items[0].cells.map((c, i) =>
+      i === 11
+        ? cell("2026-12", {
+            statusCode: "end",
+            statusName: "철수 예정",
+            totalMm: 1,
+            projects: [{ projectName: "끝 프로젝트", monthlyMm: 1 }],
+            extensionPossibilityName: "높음",
+          })
+        : i === 10
+          ? cell("2026-11", {
+              statusCode: "end",
+              statusName: "철수 예정",
+              totalMm: 0.5,
+              projects: [{ projectName: "끝 프로젝트", monthlyMm: 0.5 }],
+              extensionPossibilityName: "보통",
+            })
+          : c,
+    ),
+  });
   vi.mocked(board.getCommonManpowerBoard).mockResolvedValue(data);
   mount();
   const row = await screen.findByTestId("manpower-board-person-person-0");
-  const excess = within(row).getByText("동시 투입").closest("td")!;
-  expect(excess).toHaveClass("board-excess");
-  expect(excess.title).toContain("첫 프로젝트 · 0.70 MM");
-  expect(excess.title).toContain("합계 1.30 MM");
-  expect(excess.title).not.toContain("영업 기회");
-  expect(within(row).getByText("가배정").closest("td")).toHaveClass(
-    "board-tentative",
+  const spans = cellsOf(row);
+  expect(spans).toHaveLength(12);
+  expect(row.querySelectorAll("td.mc .cell")[0].parentElement).toHaveClass(
+    "mc",
   );
+  expect(spans[0]).toHaveAttribute("class", "cell c-on");
+  expect(spans[0]).toHaveTextContent(/^$/);
+  expect(spans[0].title).toBe("2026-01 · 투입 중 · 가 프로젝트 1.00MM");
+  expect(spans[1]).toHaveAttribute("class", "cell c-leave");
+  expect(spans[1].title).toBe("2026-02 · 휴직");
+  expect(spans[2]).toHaveAttribute("class", "cell c-ret");
+  expect(spans[3]).toHaveAttribute("class", "cell c-pre");
+  expect(spans[3]).toHaveTextContent("⚠");
+  expect(spans[4]).toHaveAttribute("class", "cell c-none");
+  expect(spans[4].title).toBe("2026-05 · –");
+  expect(spans[9]).toHaveAttribute("class", "cell c-idle");
+  expect(spans[10]).toHaveAttribute("class", "cell c-on c-over");
+  expect(spans[10]).toHaveTextContent("2건");
+  expect(spans[10].title).toBe(
+    "2026-11 · 투입 중 · 첫 프로젝트 0.70MM, 둘째 프로젝트 0.60MM (합계 1.30, 1.0 초과)",
+  );
+  expect(spans[11]).toHaveAttribute("class", "cell c-tent");
+  expect(spans[11]).toHaveTextContent("30%");
+  expect(row.querySelector("td.mc .ls-b, td.mc small")).toBeNull();
+
+  const end = cellsOf(screen.getByTestId("manpower-board-person-person-1"));
+  expect(end[11]).toHaveAttribute("class", "cell c-end");
+  expect(end[11]).toHaveTextContent("높음");
+  expect(end[10]).toHaveAttribute("class", "cell c-end c-part");
+  expect(end[10]).toHaveTextContent("0.5");
+  expect(end[10].style.getPropertyValue("--p")).toBe("50%");
 });
 
-it.each(["퇴사", "휴직"])(
-  "gives %s precedence over excess color without hiding raw project totals",
-  async (statusName) => {
-    const data = result();
-    data.items[0].cells[11] = {
-      month: "2026-12",
-      statusName,
-      totalMm: 1.3,
-      projects: [{ projectName: "계약 프로젝트", monthlyMm: 1.3 }],
-      extensionPossibilityName: null,
-      winningProbability: null,
-      tentative: false,
-    };
-    vi.mocked(board.getCommonManpowerBoard).mockResolvedValue(data);
-    mount();
-    const row = await screen.findByTestId("manpower-board-person-person-0");
-    const cell = within(row).getByText(statusName).closest("td")!;
-    expect(cell).toHaveClass("board-ineligible");
-    expect(cell).not.toHaveClass("board-excess");
-    expect(cell).toHaveTextContent("합계 1.30 MM");
-    expect(
-      screen.queryByRole("button", { name: "저장" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "삭제" }),
-    ).not.toBeInTheDocument();
-  },
-);
-
-it("does not color historical empty cells as idle capacity", async () => {
+it("fills partial months by MM and keeps the text rules as pure helpers", async () => {
   mount();
   const row = await screen.findByTestId("manpower-board-person-person-0");
-  for (const empty of within(row).getAllByText("–")) {
-    expect(empty.closest("td")).not.toHaveClass("board-idle");
-  }
+  const partial = cellsOf(row)[10];
+  expect(partial).toHaveAttribute("class", "cell c-on c-part");
+  expect(partial).toHaveTextContent("0.4");
+  expect(partial.style.getPropertyValue("--p")).toBe("40%");
+  expect(partial.title).toBe("2026-11 · 투입 중 · 프로젝트 0.40MM");
+  const base = cell("2026-11");
+  expect(manpowerBoardCellText({ ...base, statusCode: "tent" })).toBe("");
+  expect(
+    manpowerBoardCellText({
+      ...base,
+      statusCode: "end",
+      totalMm: 1,
+      extensionPossibilityName: null,
+    }),
+  ).toBe("");
+  expect(
+    manpowerBoardTooltip({
+      ...base,
+      statusCode: "on",
+      statusName: "투입 중",
+      totalMm: 1,
+      projects: [{ projectName: "A", monthlyMm: 1 }],
+    }),
+  ).toBe("2026-11 · 투입 중 · A 1.00MM");
 });

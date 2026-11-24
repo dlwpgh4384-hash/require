@@ -39,8 +39,8 @@ public class CommonSalesPipelineController {
         return Response.of(service.getCommonSalesPipelineClosed(result, includeStopped));
     }
     @GetMapping("/forecast")
-    public Response<Forecast> getCommonSalesPipelineForecast() {
-        return Response.of(forecast.getCommonSalesPipelineForecast());
+    public Response<Forecast> getCommonSalesPipelineForecast(@RequestParam(required = false) String startMonth) {
+        return Response.of(forecast.getCommonSalesPipelineForecast(startMonth));
     }
     @GetMapping(value = "/forecast/excel", produces = {XLSX, "application/json"})
     public ResponseEntity<byte[]> getCommonSalesPipelineForecastExcel() {

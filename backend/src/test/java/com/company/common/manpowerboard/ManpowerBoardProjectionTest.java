@@ -1,7 +1,7 @@
 package com.company.common.manpowerboard;
 
-import com.company.common.manpowerboard.dto.ManpowerBoardContracts.Filter;
 import com.company.common.manpowerboard.mapper.ManpowerBoardMapper;
+import com.company.common.manpowerboard.mapper.ManpowerBoardRows.Period;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
@@ -35,7 +35,7 @@ class ManpowerBoardProjectionTest {
             assertThat(mappings).hasSize(components.length);
             var aliases = new HashSet<String>();
             var matcher = Pattern.compile("(?i)\\bAS\\s+\"([a-zA-Z][a-zA-Z0-9]*)\"")
-                .matcher(statement.getBoundSql(new Filter(2026, null, null, null, false)).getSql());
+                .matcher(statement.getBoundSql(PERIOD).getSql());
             while (matcher.find()) aliases.add(matcher.group(1));
             var values = new Object[components.length];
             for (int i = 0; i < components.length; i++) {
@@ -55,20 +55,22 @@ class ManpowerBoardProjectionTest {
         }
     }
 
-    @Test void filtersAreDynamicAndBusinessSqlIsReadOnly() throws Exception {
+    static final Period PERIOD = new Period(LocalDate.of(2026, 1, 1), LocalDate.of(2027, 2, 28));
+
+    @Test void onlyDirectStaffAreReadForTheBoundedPeriodAndBusinessSqlIsReadOnly() throws Exception {
         var configuration = configuration();
         for (String method : List.of("developers", "assignments", "monthly", "history", "statuses", "tentative")) {
             var statement = configuration.getMappedStatement(ManpowerBoardMapper.class.getName() + "." + method);
-            var absent = statement.getBoundSql(new Filter(2026, null, null, null, false));
-            assertThat(absent.getParameterMappings()).isEmpty();
-            var present = statement.getBoundSql(new Filter(2027, "BE", "MD", "FT", true));
-            assertThat(present.getParameterMappings()).extracting(p -> p.getProperty())
-                .containsExactly("jobCode", "gradeCode", "employeeTypeCode");
-            assertThat(absent.getSql()).doesNotContain("? IS NULL", "UPDATE", "DELETE", "INSERT");
+            var bound = statement.getBoundSql(PERIOD);
+            assertThat(bound.getSql()).contains("d.DRCT_CLS_CD='DRCT'")
+                .doesNotContain("? IS NULL", "UPDATE", "DELETE", "INSERT", "JOB_CD=?", "GRADE_CD=?", "EMP_TYPE_CD=?");
+            var properties = bound.getParameterMappings().stream().map(p -> p.getProperty()).toList();
+            if (method.equals("developers")) assertThat(properties).isEmpty();
+            else assertThat(properties).isNotEmpty().allMatch(p -> p.equals("from") || p.equals("to")).contains("to");
         }
         var developers = configuration.getMappedStatement(ManpowerBoardMapper.class.getName() + ".developers")
-            .getBoundSql(new Filter(2026, null, null, null, false)).getSql();
-        assertThat(developers).doesNotContain("USE_YN='Y'");
+            .getBoundSql(null).getSql();
+        assertThat(developers).doesNotContain("USE_YN='Y'").contains("MNG_NO", "WORK_STAT_CD");
         var access = configuration.getMappedStatement(ManpowerBoardMapper.class.getName() + ".insertAccess")
             .getBoundSql(Map.of("userId", "admin", "target", "board")).getSql();
         assertThat(access).contains("TB_SY_ACCS_LOG", "'UI-28'", "'DNLD'");

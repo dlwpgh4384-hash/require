@@ -52,7 +52,8 @@ public class CandidateOverviewService {
             BigDecimal maximum = BigDecimal.ZERO;
             for (int i = 0; i < 6; i++) {
                 YearMonth month = first.plusMonths(i);
-                var filter = new MonthFilter(job.code(), calendar.toDatabaseMonth(month), month.atDay(1), month.atEndOfMonth());
+                var filter = new MonthFilter(job.code(), calendar.toDatabaseMonth(month), month.atDay(1), month.atEndOfMonth(),
+                    first.minusMonths(1).atDay(1));
                 var extensions = forecast.extensions(filter);
                 var people = forecast.supply(filter).stream().map(person -> new SupplyPerson(person.confirmedMm(),
                     extensions.stream().filter(row -> row.developerId().equals(person.developerId()))

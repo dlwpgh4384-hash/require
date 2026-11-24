@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 
 public final class ManpowerBoardRules {
     private static final DateTimeFormatter DB_MONTH = DateTimeFormatter.ofPattern("uuuuMM");
+    private static final Map<String, Integer> EXTENSION_RANK = Map.of("H", 3, "M", 2, "L", 1);
     private final LocalDate today;
     private final Map<String, List<Assignment>> assignments;
     private final Map<String, BigDecimal> monthly;
@@ -36,21 +37,22 @@ public final class ManpowerBoardRules {
         return rows.stream().collect(Collectors.groupingBy(key));
     }
 
-    public boolean eligible(Developer developer, YearMonth month) {
-        return (developer.hireDate() == null || !month.isBefore(YearMonth.from(developer.hireDate())))
-            && (developer.retirementDate() == null || !month.isAfter(YearMonth.from(developer.retirementDate())))
-            && statuses.getOrDefault(developer.developerId(), List.of()).stream().noneMatch(s ->
-                "LEAVE".equals(s.statusCode()) && overlaps(s.startDate(), s.endDate(), month));
+    /** 퇴사한 다음 달부터 퇴사(시안 retOut). */
+    public boolean retired(Developer developer, YearMonth month) {
+        return developer.retirementDate() != null && month.isAfter(YearMonth.from(developer.retirementDate()));
     }
 
-    public boolean withdrawal(Assignment assignment) {
-        return !assignment.endDate().isBefore(today)
-            && !assignment.endDate().isAfter(YearMonth.from(today).plusMonths(2).atEndOfMonth());
-    }
-
-    public LocalDate withdrawalDate(Developer developer) {
-        return personAssignments(developer).stream().filter(this::withdrawal)
-            .map(Assignment::endDate).min(LocalDate::compareTo).orElse(null);
+    /**
+     * 휴직: LEAVE 기간이 그 달 1일을 덮으면 휴직. LEAVE 이력이 없으면 지금 근무 상태(WORK_STAT_CD=LEAVE)를 보고
+     * 이번 달부터 휴직으로 본다(시안 p.status==='휴직').
+     */
+    public boolean onLeave(Developer developer, YearMonth month) {
+        var leaves = statuses.getOrDefault(developer.developerId(), List.of()).stream()
+            .filter(s -> "LEAVE".equals(s.statusCode())).toList();
+        if (leaves.isEmpty()) return "LEAVE".equals(developer.workStatusCode()) && !month.isBefore(YearMonth.from(today));
+        LocalDate first = month.atDay(1);
+        return leaves.stream().anyMatch(s -> !s.startDate().isAfter(first)
+            && (s.endDate() == null || !s.endDate().isBefore(first)));
     }
 
     public List<Assignment> personAssignments(Developer developer) {
@@ -62,47 +64,83 @@ public final class ManpowerBoardRules {
             .filter(a -> overlaps(a.startDate(), a.endDate(), month)).toList();
     }
 
+    /** 칸 판정(시안 cellInfo, SFR-128-03). 휴직·퇴사·입사 전 칸은 투입을 세지 않는다. */
     public Cell cell(Developer developer, YearMonth month) {
+        var base = YearMonth.from(today);
+        String key = month.toString();
+        if (retired(developer, month)) return empty(key, "ret");
+        if (developer.hireDate() != null && month.isBefore(YearMonth.from(developer.hireDate()))) return empty(key, "none");
+        if (onLeave(developer, month)) return empty(key, "leave");
         var active = active(developer, month);
-        var projects = active.stream().map(a -> new Project(a.projectName(), mm(a, month))).toList();
-        var total = projects.stream().map(Project::monthlyMm).reduce(BigDecimal.ZERO, BigDecimal::add);
-        boolean past = month.isBefore(YearMonth.from(today));
-        String status;
-        String extension = active.stream().filter(a -> a.extensionName() != null)
-            .map(a -> a.projectName() + ": " + a.extensionName()).distinct()
-            .collect(Collectors.joining(" / "));
-        if (extension.isEmpty()) extension = null;
-        BigDecimal probability = null;
-        boolean overlay = false;
-        if (developer.hireDate() != null && month.isBefore(YearMonth.from(developer.hireDate()))) {
-            status = "–";
-        } else if (developer.retirementDate() != null && month.isAfter(YearMonth.from(developer.retirementDate()))) {
-            status = "퇴사";
-        } else if (!eligible(developer, month)) {
-            status = "휴직";
-        } else if (active.stream().anyMatch(a -> "PRE".equals(a.projectStatus()))) {
-            status = "미계약 선투입";
-        } else if (!past && !active.isEmpty() && active.stream().allMatch(this::withdrawal)) {
-            status = "철수 예정";
-        } else if (!active.isEmpty()) {
-            status = active.size() >= 2 ? "동시 투입" : total.compareTo(BigDecimal.ONE) < 0
-                && total.signum() > 0 ? "일부 투입" : "투입 중";
-        } else {
-            var candidates = tentative.getOrDefault(developer.developerId(), List.of()).stream()
-                .filter(t -> overlaps(t.startDate(), t.endDate(), month)).toList();
-            if (!past && !candidates.isEmpty()) {
-                status = "가배정";
-                overlay = true;
-                probability = candidates.get(0).winningProbability();
-                projects = candidates.stream().map(t -> new Project(t.projectName(), BigDecimal.ZERO)).toList();
-            } else status = past ? "–" : "비어 있음";
+        if (!active.isEmpty()) {
+            var projects = active.stream().map(a -> new Project(a.projectName(), mm(a, month))).toList();
+            var total = projects.stream().map(Project::monthlyMm).reduce(BigDecimal.ZERO, BigDecimal::add);
+            // 철수 예정: 이번 달 이후, 그 달에 걸친 투입이 모두 이번 달 ~ 이번 달 + 2 안에 끝난다(달로 비교).
+            String code = active.stream().anyMatch(a -> "PRE".equals(a.projectStatus())) ? "pre"
+                : !month.isBefore(base) && active.stream()
+                    .allMatch(a -> !YearMonth.from(a.endDate()).isAfter(base.plusMonths(2))) ? "end" : "on";
+            String name = switch (code) {
+                case "pre" -> "미계약 선투입";
+                case "end" -> "철수 예정";
+                default -> active.size() >= 2 ? "동시 투입"
+                    : total.compareTo(BigDecimal.ONE) < 0 && total.signum() > 0 ? "일부 투입" : "투입 중";
+            };
+            return new Cell(key, code, name, total, projects, "end".equals(code) ? extensionName(active) : null, null, false);
         }
-        return new Cell(month.toString(), status, total, projects, extension, probability, overlay);
+        // 가배정 판정이 대기보다 먼저(시안 SFR-128-03): 진행 중 기회의 ACT 가배정이 그 달 이전부터.
+        // 가배정 칸의 projects는 비운다(화면 툴팁·「N건」에 기회가 0MM 투입으로 보이지 않게). 기회명은 tentatives로 읽는다.
+        var candidates = tentatives(developer, month);
+        if (!candidates.isEmpty()) {
+            return new Cell(key, "tent", "가배정", BigDecimal.ZERO, List.of(),
+                null, candidates.get(0).winningProbability(), true);
+        }
+        // 지난 달은 비어 있음으로 칠하지 않는다(Q-28-4).
+        if (!month.isBefore(base) && ("IDLE".equals(developer.workStatusCode())
+            || developer.firstAssignmentEndDate() != null && YearMonth.from(developer.firstAssignmentEndDate()).isBefore(month)))
+            return empty(key, "idle");
+        return empty(key, "none");
     }
 
+    /** 그 달 이전부터 시작한 진행 중 기회의 ACT 가배정(시작 달 순). */
+    public List<Tentative> tentatives(Developer developer, YearMonth month) {
+        return tentative.getOrDefault(developer.developerId(), List.of()).stream()
+            .filter(t -> !YearMonth.from(t.startDate()).isAfter(month)).toList();
+    }
+
+    private static Cell empty(String month, String code) {
+        String name = switch (code) {
+            case "ret" -> "퇴사";
+            case "leave" -> "휴직";
+            case "idle" -> "비어 있음";
+            default -> "–";
+        };
+        return new Cell(month, code, name, BigDecimal.ZERO, List.of(), null, null, false);
+    }
+
+    /** 끝나는 투입의 연장 가능성 표시명(여럿이면 가장 높은 것). 코드 이름의 「(80%)」 꼬리는 뺀다(시안 「높음」). */
+    private static String extensionName(List<Assignment> active) {
+        return active.stream().filter(a -> a.extensionCode() != null && a.extensionName() != null)
+            .max(Comparator.comparingInt(a -> EXTENSION_RANK.getOrDefault(a.extensionCode(), 0)))
+            .map(a -> a.extensionName().replaceFirst("\\s*\\(.*\\)$", "")).orElse(null);
+    }
+
+    /** 끝나는 투입 중 연장 가능성이 높음(H)인 것이 있는지. */
+    public boolean highExtension(Developer developer, YearMonth month) {
+        return active(developer, month).stream()
+            .anyMatch(a -> !a.endDate().isBefore(today) && "H".equals(a.extensionCode()));
+    }
+
+    /** 요약 「3개월 안 철수 예정」(식-77 D-n ≥ 0, 철수 리스트와 같은 사람): 오늘 이후 끝나는 투입이 있는지. */
+    public boolean assignedFromToday(Developer developer, YearMonth month) {
+        return active(developer, month).stream().anyMatch(a -> !a.endDate().isBefore(today));
+    }
+
+    /** 남는 MM(식-63, 시안 freeMM): 휴직·–·퇴사는 0, 그 밖은 max(0, 1 − 그 달 MM). 지난 달은 0. */
     public BigDecimal available(Developer developer, YearMonth month) {
-        if (!eligible(developer, month) || month.isBefore(YearMonth.from(today))) return BigDecimal.ZERO;
-        return BigDecimal.ONE.subtract(cell(developer, month).totalMm()).max(BigDecimal.ZERO);
+        if (month.isBefore(YearMonth.from(today))) return BigDecimal.ZERO;
+        var cell = cell(developer, month);
+        if (Set.of("leave", "none", "ret").contains(cell.statusCode())) return BigDecimal.ZERO;
+        return BigDecimal.ONE.subtract(cell.totalMm()).max(BigDecimal.ZERO);
     }
 
     public BigDecimal mm(Assignment assignment, YearMonth month) {

@@ -195,6 +195,7 @@
       a.EXT_PSBL_CD AS "extensionPossibilityCode"
     FROM w JOIN TB_HR_DEV d ON <include refid="supplyPeople"/>
     JOIN TB_PJ_ASGN a ON a.DEV_ID=d.DEV_ID AND a.ASGN_STAT_CD='ACT' AND a.INPUT_END_DT &lt; w.first_day
+      AND a.INPUT_END_DT &gt;= CAST(#{baseMonth} AS date)
     ORDER BY w.ym,d.JOB_CD,d.DEV_ID,a.ASGN_ID
   </select>
   <select id="opportunityDemand" resultMap="opportunityDemand">
@@ -206,11 +207,12 @@
     JOIN TB_SL_OPP o ON o.OPP_ID=n.OPP_ID AND o.OPP_STAT_CD='ING'
     ORDER BY w.ym,n.JOB_CD,n.OPP_ID,n.NEED_SN
   </select>
-  <!-- 미충원(식-61): 남은 개월 = 다음 달(예측 첫 달)부터 프로젝트 종료 달까지. 그 기간 안의 진행 달에만 더한다. -->
+  <!-- 미충원(식-61, 시안 unfilled): f0 = 다음 달과 프로젝트 시작 달 중 늦은 달. 남은 개월 = f0부터 종료 달까지, 그 기간 안의 진행 달에만 더한다. -->
   <select id="projectDemand" resultMap="projectDemand">
     WITH <include refid="months"/>,
     plans AS (
       SELECT n.PROJ_ID,n.JOB_CD,n.PLAN_MM,p.CTRT_BGN_DT,p.CTRT_END_DT,
+        GREATEST(CAST(#{horizonStart} AS date),date_trunc('month',p.CTRT_BGN_DT)::date) AS f0,
         COALESCE((SELECT SUM(m.MON_MM) FROM TB_PJ_ASGN_MON m
           JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID AND a.ASGN_STAT_CD='ACT'
           WHERE m.PROJ_ID=n.PROJ_ID AND a.JOB_CD=n.JOB_CD),0) AS confirmed_mm
@@ -218,9 +220,10 @@
       WHERE p.PROJ_STAT_CD='ING' AND p.CTRT_TYPE_CD!='IN'
     )
     SELECT w.ym AS "month",n.JOB_CD AS "jobCode",n.PLAN_MM AS "plannedMm",n.confirmed_mm AS "confirmedMm",
-      ((extract(year FROM n.CTRT_END_DT)::int-extract(year FROM CAST(#{horizonStart} AS date))::int)*12
-        +extract(month FROM n.CTRT_END_DT)::int-extract(month FROM CAST(#{horizonStart} AS date))::int+1) AS "remainingMonths"
+      ((extract(year FROM n.CTRT_END_DT)::int-extract(year FROM n.f0)::int)*12
+        +extract(month FROM n.CTRT_END_DT)::int-extract(month FROM n.f0)::int+1) AS "remainingMonths"
     FROM w JOIN plans n ON n.CTRT_BGN_DT &lt;= w.last_day AND n.CTRT_END_DT &gt;= w.first_day
+      AND w.first_day &gt;= n.f0
     ORDER BY w.ym,n.JOB_CD,n.PROJ_ID
   </select>
   <select id="candidates" resultMap="candidate">

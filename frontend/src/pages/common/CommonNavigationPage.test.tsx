@@ -607,9 +607,8 @@ const deepChecks: Record<string, (content: Content) => Promise<void>> = {
     expect(
       content.queryByTestId("manpower-board-excel"),
     ).not.toBeInTheDocument();
-    expect(content.getByTestId("period-selector")).toHaveAttribute(
-      "data-kind",
-      "year",
+    expect(content.getByTestId("manpower-board-year")).toHaveTextContent(
+      "그 해 1~12월 달력",
     );
   },
   "UI-29": async (content) => {

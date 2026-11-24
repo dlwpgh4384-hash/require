@@ -3,9 +3,13 @@
 <mapper namespace="com.company.common.manpowerboard.mapper.ManpowerBoardMapper">
   <resultMap id="developer" type="com.company.common.manpowerboard.mapper.ManpowerBoardRows$Developer" autoMapping="false">
     <constructor>
-      <arg column="developerId" javaType="string"/><arg column="name" javaType="string"/>
-      <arg column="jobName" javaType="string"/><arg column="hireDate" javaType="java.time.LocalDate"/>
-      <arg column="retirementDate" javaType="java.time.LocalDate"/>
+      <arg column="developerId" javaType="string"/><arg column="managementNumber" javaType="string"/>
+      <arg column="name" javaType="string"/><arg column="jobCode" javaType="string"/>
+      <arg column="jobName" javaType="string"/><arg column="gradeCode" javaType="string"/>
+      <arg column="employeeTypeCode" javaType="string"/><arg column="workStatusCode" javaType="string"/>
+      <arg column="hireDate" javaType="java.time.LocalDate"/><arg column="retirementDate" javaType="java.time.LocalDate"/>
+      <arg column="firstAssignmentEndDate" javaType="java.time.LocalDate"/>
+      <arg column="lastAssignmentEndDate" javaType="java.time.LocalDate"/>
     </constructor>
   </resultMap>
   <resultMap id="assignment" type="com.company.common.manpowerboard.mapper.ManpowerBoardRows$Assignment" autoMapping="false">
@@ -38,16 +42,19 @@
     <constructor><arg column="groupCode" javaType="string"/><arg column="code" javaType="string"/>
       <arg column="name" javaType="string"/></constructor>
   </resultMap>
-  <sql id="conditions">
-    <if test="jobCode != null">AND d.JOB_CD=#{jobCode}</if>
-    <if test="gradeCode != null">AND d.GRADE_CD=#{gradeCode}</if>
-    <if test="employeeTypeCode != null">AND d.EMP_TYPE_CD=#{employeeTypeCode}</if>
-  </sql>
+  <!-- 직접 인력만(WithdrawalMapper·SalesPipelineMapper supplyPeople과 같은 구분). 직무·등급·직원구분은 서버에서 나눈다. -->
+  <sql id="direct">d.DRCT_CLS_CD='DRCT'</sql>
+  <!-- 읽는 기간과 겹치는 ACT 투입만(min(연초, 이번 달) ~ max(연말, 이번 달 + 3)) -->
+  <sql id="overlap">a.ASGN_STAT_CD='ACT' AND a.INPUT_BGN_DT &lt;= CAST(#{to} AS date) AND a.INPUT_END_DT &gt;= CAST(#{from} AS date)</sql>
   <select id="developers" resultMap="developer">
-    SELECT d.DEV_ID AS "developerId",d.DEV_NM AS "name",COALESCE(j.CODE_NM,'–') AS "jobName",
-      d.JNCMP_DT AS "hireDate",d.RETIRE_DT AS "retirementDate"
+    SELECT d.DEV_ID AS "developerId",d.MNG_NO AS "managementNumber",d.DEV_NM AS "name",d.JOB_CD AS "jobCode",
+      COALESCE(j.CODE_NM,'–') AS "jobName",d.GRADE_CD AS "gradeCode",d.EMP_TYPE_CD AS "employeeTypeCode",
+      d.WORK_STAT_CD AS "workStatusCode",d.JNCMP_DT AS "hireDate",d.RETIRE_DT AS "retirementDate",
+      e.first_end AS "firstAssignmentEndDate",e.last_end AS "lastAssignmentEndDate"
     FROM TB_HR_DEV d LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=d.JOB_CD
-    WHERE 1=1 <include refid="conditions"/>
+    LEFT JOIN (SELECT a.DEV_ID,MIN(a.INPUT_END_DT) AS first_end,MAX(a.INPUT_END_DT) AS last_end
+      FROM TB_PJ_ASGN a WHERE a.ASGN_STAT_CD='ACT' GROUP BY a.DEV_ID) e ON e.DEV_ID=d.DEV_ID
+    WHERE <include refid="direct"/>
     ORDER BY d.DEV_NM,d.DEV_ID
   </select>
   <select id="assignments" resultMap="assignment">
@@ -57,30 +64,34 @@
     FROM TB_PJ_ASGN a JOIN TB_HR_DEV d ON d.DEV_ID=a.DEV_ID
     JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID
     LEFT JOIN TB_SY_CODE e ON e.CODE_GRP_ID='EXT_PSBL' AND e.CODE=a.EXT_PSBL_CD
-    WHERE a.ASGN_STAT_CD='ACT' <include refid="conditions"/>
+    WHERE <include refid="overlap"/> AND <include refid="direct"/>
     ORDER BY a.INPUT_END_DT,a.ASGN_ID
   </select>
   <select id="monthly" resultMap="monthly">
     SELECT m.ASGN_ID AS "assignmentId",m.INPUT_YM AS "month",m.MON_MM AS "monthlyMm"
     FROM TB_PJ_ASGN_MON m JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID
     JOIN TB_HR_DEV d ON d.DEV_ID=a.DEV_ID
-    WHERE a.ASGN_STAT_CD='ACT' <include refid="conditions"/>
+    WHERE <include refid="overlap"/> AND <include refid="direct"/>
+      AND m.INPUT_YM BETWEEN to_char(CAST(#{from} AS date),'YYYYMM') AND to_char(CAST(#{to} AS date),'YYYYMM')
     ORDER BY m.ASGN_ID,m.INPUT_YM
   </select>
+  <!-- 기간 앞에 적용된 단가·MM 변경도 그 기간의 유효값이라 적용일 아래 한도는 두지 않는다(겹치는 투입의 것만). -->
   <select id="history" resultMap="history">
     SELECT h.ASGN_ID AS "assignmentId",h.APLY_DT AS "appliedDate",h.HIST_SN::int AS "sequence",
       h.NEW_CTRT_MM AS "contractMm"
     FROM TB_PJ_ASGN_HIST h JOIN TB_PJ_ASGN a ON a.ASGN_ID=h.ASGN_ID
     JOIN TB_HR_DEV d ON d.DEV_ID=a.DEV_ID
-    WHERE a.ASGN_STAT_CD='ACT' AND h.ASGN_CHG_TYPE_CD IN ('INPUT','RATE')
-      AND h.NEW_CTRT_MM IS NOT NULL <include refid="conditions"/>
+    WHERE <include refid="overlap"/> AND <include refid="direct"/>
+      AND h.ASGN_CHG_TYPE_CD IN ('INPUT','RATE') AND h.NEW_CTRT_MM IS NOT NULL
+      AND h.APLY_DT &lt;= CAST(#{to} AS date)
     ORDER BY h.ASGN_ID,h.APLY_DT,h.HIST_SN
   </select>
   <select id="statuses" resultMap="status">
     SELECT s.DEV_ID AS "developerId",s.WORK_STAT_CD AS "statusCode",
       s.BGN_DT AS "startDate",s.END_DT AS "endDate"
     FROM TB_HR_DEV_STAT s JOIN TB_HR_DEV d ON d.DEV_ID=s.DEV_ID
-    WHERE 1=1 <include refid="conditions"/>
+    WHERE <include refid="direct"/> AND s.BGN_DT &lt;= CAST(#{to} AS date)
+      AND (s.END_DT IS NULL OR s.END_DT &gt;= CAST(#{from} AS date))
     ORDER BY s.DEV_ID,s.STAT_SN
   </select>
   <select id="tentative" resultMap="tentative">
@@ -91,7 +102,8 @@
     FROM TB_SL_TENT_ASGN t JOIN TB_HR_DEV d ON d.DEV_ID=t.DEV_ID
     JOIN TB_SL_OPP o ON o.OPP_ID=t.OPP_ID AND o.OPP_STAT_CD='ING'
     JOIN TB_SL_OPP_NEED n ON n.OPP_ID=t.OPP_ID AND n.NEED_SN=t.NEED_SN
-    WHERE t.TENT_STAT_CD='ACT' <include refid="conditions"/>
+    WHERE t.TENT_STAT_CD='ACT' AND <include refid="direct"/>
+      AND to_date(t.BGN_YM,'YYYYMM') &lt;= CAST(#{to} AS date)
     ORDER BY t.BGN_YM,t.TENT_ID
   </select>
   <select id="codes" resultMap="code">

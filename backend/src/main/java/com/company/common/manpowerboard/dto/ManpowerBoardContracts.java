@@ -13,8 +13,9 @@ public final class ManpowerBoardContracts {
     public record Summary(int idleCount, BigDecimal availableMm, int withdrawalCount,
         int highExtensionCount, int concurrentCount, int overAllocatedCount,
         BigDecimal futureAvailableMm) {}
-    public record Person(String developerId, String name, String jobName, List<Cell> cells) {}
-    public record Cell(String month, String statusName, BigDecimal totalMm, List<Project> projects,
+    public record Person(String developerId, String managementNumber, String name, String jobName, List<Cell> cells) {}
+    /** statusCode: on·end·idle·tent·leave·ret·pre·none(시안 cellInfo). statusName은 화면 표시명. */
+    public record Cell(String month, String statusCode, String statusName, BigDecimal totalMm, List<Project> projects,
         String extensionPossibilityName, BigDecimal winningProbability, boolean tentative) {}
     public record Project(String projectName, BigDecimal monthlyMm) {}
     public record MonthTotal(String month, Integer idleCount, BigDecimal availableMm) {}

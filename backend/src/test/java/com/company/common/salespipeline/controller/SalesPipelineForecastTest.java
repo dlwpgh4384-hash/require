@@ -41,7 +41,7 @@ class SalesPipelineForecastTest {
             new BigDecimal("15000000"), new BigDecimal("50000000"))));
         when(mapper.supply(anyList())).thenReturn(everyMonthAll(m -> List.of(new MonthSupply(m, "BE", "part", new BigDecimal("0.5")),
             new MonthSupply(m, "BE", "idle", BigDecimal.ZERO), new MonthSupply(m, "BE", "extend", BigDecimal.ZERO))));
-        when(mapper.extensions(anyList())).thenReturn(everyMonth(m -> new MonthExtension(m, "BE", "extend", BigDecimal.ONE, "H")));
+        when(mapper.extensions(anyList(), any())).thenReturn(everyMonth(m -> new MonthExtension(m, "BE", "extend", BigDecimal.ONE, "H")));
         when(mapper.opportunityDemand(anyList())).thenReturn(everyMonthAll(m -> List.of(
             new MonthOpportunityDemand(m, "BE", new BigDecimal("3"), BigDecimal.ONE, new BigDecimal("60")),
             new MonthOpportunityDemand(m, "BE", new BigDecimal("2"), BigDecimal.ONE, new BigDecimal("30")))));
@@ -70,7 +70,7 @@ class SalesPipelineForecastTest {
         when(mapper.jobs()).thenReturn(List.of(new Job("BE", "백엔드"), new Job("FE", "프론트엔드"), new Job("PM", "PM")));
         service.getCommonSalesPipelineForecast();
         verify(mapper, times(1)).revenues(anyList(), any()); verify(mapper, times(1)).supply(anyList());
-        verify(mapper, times(1)).extensions(anyList()); verify(mapper, times(1)).opportunityDemand(anyList());
+        verify(mapper, times(1)).extensions(anyList(), any()); verify(mapper, times(1)).opportunityDemand(anyList());
         verify(mapper, times(1)).projectDemand(anyList(), any()); verify(mapper, times(1)).candidates();
         verify(mapper).revenues(argThat(months -> months.size() == 6 && months.get(0).month().equals("202612")
             && months.get(0).firstDay().equals(LocalDate.of(2026, 12, 1)) && months.get(5).lastDay().equals(LocalDate.of(2027, 5, 31))),
@@ -121,13 +121,13 @@ class SalesPipelineForecastTest {
     }
     @Test void exactlyShortageThresholdDoesNotRecommendHiring() {
         when(mapper.supply(anyList())).thenReturn(everyMonth(m -> new MonthSupply(m, "BE", "idle", BigDecimal.ZERO)));
-        when(mapper.extensions(anyList())).thenReturn(List.of());
+        when(mapper.extensions(anyList(), any())).thenReturn(List.of());
         when(mapper.opportunityDemand(anyList())).thenReturn(everyMonth(m -> new MonthOpportunityDemand(m, "BE", new BigDecimal("2"), BigDecimal.ONE, new BigDecimal("70"))));
         when(mapper.projectDemand(anyList(), any())).thenReturn(List.of());
         assertThat(service.getCommonSalesPipelineForecast().hiringReviews()).isEmpty();
     }
     @Test void noWorkforceOrOpportunitiesStillReturnsSixMonths() {
-        when(mapper.supply(anyList())).thenReturn(List.of()); when(mapper.extensions(anyList())).thenReturn(List.of());
+        when(mapper.supply(anyList())).thenReturn(List.of()); when(mapper.extensions(anyList(), any())).thenReturn(List.of());
         when(mapper.opportunityDemand(anyList())).thenReturn(List.of()); when(mapper.projectDemand(anyList(), any())).thenReturn(List.of());
         when(mapper.revenues(anyList(), any())).thenReturn(everyMonth(m -> new MonthRevenue(m, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO)));
         var result = service.getCommonSalesPipelineForecast();
@@ -135,5 +135,28 @@ class SalesPipelineForecastTest {
             assertThat(m.demand()).isZero(); assertThat(m.supply()).isZero(); assertThat(m.allWonRevenue()).isZero();
         });
         assertThat(result.hiringReviews()).isEmpty();
+    }
+    @Test void startMonthDefaultsToNextMonthAndKeepsDivisorsFromNextMonth() {
+        service.getCommonSalesPipelineForecast(null);
+        verify(mapper).supply(argThat(months -> months.get(0).month().equals("202612")));
+        verify(mapper).extensions(anyList(), eq(LocalDate.of(2026, 11, 1)));
+        verify(mapper).projectDemand(anyList(), eq(LocalDate.of(2026, 12, 1)));
+    }
+    @Test void currentStartMonthReadsSixMonthsFromThisMonthButDivisorsStillStartNextMonth() {
+        var result = service.getCommonSalesPipelineForecast("2026-11");
+        assertThat(result.months()).extracting(m -> m.month()).containsExactly("2026-11", "2026-12", "2027-01", "2027-02", "2027-03", "2027-04");
+        verify(mapper).revenues(argThat(months -> months.size() == 6 && months.get(0).month().equals("202611")
+            && months.get(0).firstDay().equals(LocalDate.of(2026, 11, 1))), eq(LocalDate.of(2026, 12, 1)));
+        verify(mapper).extensions(anyList(), eq(LocalDate.of(2026, 11, 1)));
+        verify(mapper).projectDemand(anyList(), eq(LocalDate.of(2026, 12, 1)));
+        assertThat(service.getCommonSalesPipelineForecast("2026-12").months().get(0).month()).isEqualTo("2026-12");
+    }
+    @Test void invalidOrOutOfRangeStartMonthIsRejected() {
+        for (String bad : List.of("2026-1", "202611", "2026-13", "abc", "2026-10", "2027-01")) {
+            assertThatThrownBy(() -> service.getCommonSalesPipelineForecast(bad))
+                .isInstanceOf(com.company.common.support.service.CodeFailure.class)
+                .hasMessageContaining("시작 달");
+        }
+        verifyNoInteractions(mapper);
     }
 }

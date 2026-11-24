@@ -236,7 +236,7 @@ class CommonCandidateOverviewControllerTest {
             .andExpect(jsonPath("$.data.items[0].totalCandidateCount").value(2));
         verify(forecast, times(6)).opportunityDemand(any());
         verify(forecast).opportunityDemand(new com.company.common.withdrawals.mapper.WithdrawalRows.MonthFilter(
-            "DEV", "202706", LocalDate.of(2027,6,1), LocalDate.of(2027,6,30)));
+            "DEV", "202706", LocalDate.of(2027,6,1), LocalDate.of(2027,6,30), LocalDate.of(2026,12,1)));
         verify(forecast, never()).projectDemand(any());
     }
 

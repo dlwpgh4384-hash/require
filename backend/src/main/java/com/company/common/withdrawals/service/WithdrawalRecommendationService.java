@@ -147,9 +147,10 @@ public class WithdrawalRecommendationService {
         int window = settings.candidateWindowMonths();
         String job = source.primaryJobCode();
         String jobName = context.codes().jobName(job, source.jobName());
+        var base = calendar.currentMonth().atDay(1);
         for (int i = 0; i <= window; i++) {
             YearMonth month = from.plusMonths(i);
-            var filter = new MonthFilter(job, calendar.toDatabaseMonth(month), month.atDay(1), month.atEndOfMonth());
+            var filter = new MonthFilter(job, calendar.toDatabaseMonth(month), month.atDay(1), month.atEndOfMonth(), base);
             var extensions = new HashMap<String, List<WithdrawalCalculationRules.Extension>>();
             for (var row : mapper.extensions(filter)) {
                 extensions.computeIfAbsent(row.developerId(), key -> new ArrayList<>())

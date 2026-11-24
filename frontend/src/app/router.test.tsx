@@ -12,6 +12,7 @@ import "@testing-library/jest-dom/vitest";
 import { RouterProvider } from "react-router-dom";
 import type { ShellMenuResponse } from "./NavigationRoot";
 import { createAppRouter } from "./router";
+import { koreanToday } from "../shared/time";
 import type { RoleSettings } from "../pages/roles/roles";
 import type {
   MenuSettingItem,
@@ -728,7 +729,8 @@ function respondWithManpowerBoard(available = true) {
     }
     if (url.startsWith("/api/common/manpower-board/excel?")) return download();
     if (url.startsWith("/api/common/manpower-board?")) return list();
-    if (url === "/api/common/sales-pipeline/forecast") return forecast();
+    if (url === `/api/common/sales-pipeline/forecast?startMonth=${koreanToday().slice(0, 7)}`)
+      return forecast();
     if (/^\/api\/common\/code-groups\/(JOB|GRADE|EMP_TYPE)\/codes$/.test(url))
       return success({
         items: [{ code: "BE", codeName: "백엔드", useYn: "Y" }],
@@ -747,7 +749,7 @@ describe("manpower board route composition", () => {
       const { request, forecast } = respondWithManpowerBoard();
       mount(path);
       await screen.findByTestId("manpower-board-empty");
-      await screen.findByTestId("period-selector");
+      await screen.findByTestId("manpower-board-year");
       const actions = within(screen.getByTestId("screen-actions"));
       await waitFor(() =>
         expect(actions.getByTestId("manpower-board-excel")).toBeEnabled(),
@@ -810,7 +812,7 @@ describe("manpower board route composition", () => {
     list.mockRejectedValue(new Error("보드 조회 실패"));
     mount("/screens/UI-28");
     await screen.findByTestId("manpower-board-error");
-    await screen.findByTestId("period-selector");
+    await screen.findByTestId("manpower-board-year");
     const button = within(screen.getByTestId("screen-actions")).getByTestId(
       "manpower-board-excel",
     );
@@ -829,11 +831,11 @@ describe("manpower board route composition", () => {
     expectSingleShell();
   });
 
-  it("forecast tab calls the existing parameterless client despite calendar filters", async () => {
+  it("forecast tab sends only this month to the existing client despite calendar filters", async () => {
     const { request, forecast } = respondWithManpowerBoard();
     mount("/screens/UI-28");
     await screen.findByTestId("manpower-board-empty");
-    await screen.findByTestId("period-selector");
+    await screen.findByTestId("manpower-board-year");
     await screen.findAllByRole("option", { name: "백엔드" });
     fireEvent.change(screen.getByTestId("manpower-board-jobcode"), {
       target: { value: "BE" },
@@ -853,7 +855,9 @@ describe("manpower board route composition", () => {
       request.mock.calls
         .filter(([url]) => url.includes("/sales-pipeline/forecast"))
         .map(([url]) => url),
-    ).toEqual(["/api/common/sales-pipeline/forecast"]);
+    ).toEqual([
+      `/api/common/sales-pipeline/forecast?startMonth=${koreanToday().slice(0, 7)}`,
+    ]);
     expect(within(panel).getAllByRole("row")).toHaveLength(4);
     expect(
       within(panel)
@@ -901,7 +905,7 @@ describe("manpower board route composition", () => {
           }),
         });
       mount("/screens/UI-28");
-      await screen.findByTestId("period-selector");
+      await screen.findByTestId("manpower-board-year");
       const button = within(screen.getByTestId("screen-actions")).getByTestId(
         "manpower-board-excel",
       );
@@ -914,7 +918,7 @@ describe("manpower board route composition", () => {
         expect(screen.getByTestId("manpower-board-toast")).toHaveTextContent(
           succeeds
             ? "엑셀 파일을 만들었습니다 (조회 결과 0건)"
-            : "파일 생성 실패",
+            : "엑셀 파일을 받지 못했습니다. 다시 시도해 주세요.",
         );
         expect(request).toHaveBeenCalledWith(
           "/api/common/manpower-board/excel?year=2026",

@@ -155,6 +155,7 @@
       a.EXT_PSBL_CD AS "extensionPossibilityCode"
     FROM TB_HR_DEV d JOIN TB_PJ_ASGN a ON a.DEV_ID=d.DEV_ID
     WHERE <include refid="supplyPeople"/> AND a.ASGN_STAT_CD='ACT' AND a.INPUT_END_DT &lt; #{firstDay}
+      AND a.INPUT_END_DT &gt;= CAST(#{baseMonth} AS date)
     ORDER BY d.DEV_ID,a.ASGN_ID
   </select>
   <resultMap id="opportunityDemand" type="com.company.common.withdrawals.mapper.WithdrawalRows$OpportunityDemandRow"><constructor>
@@ -173,15 +174,18 @@
     <arg column="plannedMm" javaType="java.math.BigDecimal"/><arg column="confirmedMm" javaType="java.math.BigDecimal"/>
     <arg column="remainingMonths" javaType="_int"/>
   </constructor></resultMap>
+  <!-- 미충원(식-61, 시안 unfilled): f0 = 다음 달(이번 달 + 1)과 프로젝트 시작 달 중 늦은 달. 남은 개월 = f0~종료 달, f0 이후 달에만 더한다. -->
   <select id="projectDemand" resultMap="projectDemand">
     SELECT p.PLAN_MM AS "plannedMm",COALESCE((SELECT SUM(m.MON_MM) FROM TB_PJ_ASGN_MON m
       JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID AND a.ASGN_STAT_CD='ACT'
       WHERE m.PROJ_ID=p.PROJ_ID AND a.JOB_CD=p.JOB_CD),0) AS "confirmedMm",
-      ((extract(year FROM j.CTRT_END_DT)::int-extract(year FROM CAST(#{firstDay} AS date))::int)*12
-        +extract(month FROM j.CTRT_END_DT)::int-extract(month FROM CAST(#{firstDay} AS date))::int+1) AS "remainingMonths"
+      ((extract(year FROM j.CTRT_END_DT)::int-extract(year FROM f.f0)::int)*12
+        +extract(month FROM j.CTRT_END_DT)::int-extract(month FROM f.f0)::int+1) AS "remainingMonths"
     FROM TB_PJ_MNPW_PLAN p JOIN TB_PJ_PROJ j ON j.PROJ_ID=p.PROJ_ID
-    WHERE p.JOB_CD=#{jobCode} AND j.PROJ_STAT_CD='ING' AND j.CTRT_BGN_DT &lt;= #{lastDay}
-      AND j.CTRT_END_DT &gt;= #{firstDay} ORDER BY p.PROJ_ID,p.JOB_CD
+    CROSS JOIN LATERAL (SELECT GREATEST((CAST(#{baseMonth} AS date)+interval '1 month')::date,
+      date_trunc('month',j.CTRT_BGN_DT)::date) AS f0) f
+    WHERE p.JOB_CD=#{jobCode} AND j.PROJ_STAT_CD='ING' AND j.CTRT_TYPE_CD!='IN' AND j.CTRT_BGN_DT &lt;= #{lastDay}
+      AND j.CTRT_END_DT &gt;= #{firstDay} AND CAST(#{firstDay} AS date) &gt;= f.f0 ORDER BY p.PROJ_ID,p.JOB_CD
   </select>
   <insert id="insertAccess">
     INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)

@@ -228,7 +228,7 @@ class CommonSalesPipelineControllerTest {
         verify(mapper, never()).closed(any());
     }
     @Test void forecastPublicHttpEnvelope() throws Exception {
-        when(forecast.getCommonSalesPipelineForecast()).thenReturn(new Forecast(List.of(), List.of(), List.of(new ForecastOpportunity("O-1", "고객 포털",
+        when(forecast.getCommonSalesPipelineForecast(null)).thenReturn(new Forecast(List.of(), List.of(), List.of(new ForecastOpportunity("O-1", "고객 포털",
             new java.math.BigDecimal("10"), List.of(new ForecastOpportunityMonth("2026-12", new java.math.BigDecimal("1000000")))))));
         mvc.perform(get("/api/common/sales-pipeline/forecast")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.months").isArray()).andExpect(jsonPath("$.data.hiringReviews").isArray())
@@ -236,6 +236,14 @@ class CommonSalesPipelineControllerTest {
             .andExpect(jsonPath("$.data.opportunityRevenues[0].winningProbability").value(10))
             .andExpect(jsonPath("$.data.opportunityRevenues[0].months[0].month").value("2026-12"))
             .andExpect(jsonPath("$.data.opportunityRevenues[0].months[0].weightedRevenue").value(1000000));
+    }
+    @Test void forecastPassesStartMonthAndInvalidStartMonthIs400() throws Exception {
+        when(forecast.getCommonSalesPipelineForecast("2026-11")).thenReturn(new Forecast(List.of(), List.of(), List.of()));
+        mvc.perform(get("/api/common/sales-pipeline/forecast").param("startMonth", "2026-11")).andExpect(status().isOk());
+        verify(forecast).getCommonSalesPipelineForecast("2026-11");
+        when(forecast.getCommonSalesPipelineForecast("2026-1")).thenThrow(
+            com.company.common.support.service.CodeFailure.invalid("startMonth", "시작 달은 yyyy-MM 모양으로 넣어 주세요."));
+        mvc.perform(get("/api/common/sales-pipeline/forecast").param("startMonth", "2026-1")).andExpect(status().isBadRequest());
     }
     @Test void workbookHeadersUseActualMonthRowCount() throws Exception {
         byte[] bytes = new com.company.common.support.service.ExcelExportService().write("예측", List.of("년월"),

@@ -98,7 +98,10 @@ class ManpowerBoardPersistenceTest {
             .andReturn().getResponse();
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(response.getContentAsByteArray()))) {
             var sheet = book.getSheetAt(0);
-            assertThat(sheet.getLastRowNum() - 2).isEqualTo(board.path("totalCount").asInt());
+            // 머리 3줄 + 사람 줄 + 합계 줄 2줄(비는 인원·남는 MM)
+            assertThat(sheet.getLastRowNum() - 4).isEqualTo(board.path("totalCount").asInt());
+            assertThat(sheet.getRow(sheet.getLastRowNum() - 1).getCell(0).getStringCellValue()).isEqualTo("비는 인원");
+            assertThat(sheet.getRow(sheet.getLastRowNum()).getCell(0).getStringCellValue()).isEqualTo("남는 MM");
             assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).contains("admin", "2026-11-15 09:00");
             for (int i = 0; i < board.path("items").size(); i++) {
                 assertThat(sheet.getRow(i + 3).getCell(0).getStringCellValue())
@@ -197,8 +200,30 @@ class ManpowerBoardPersistenceTest {
             .param("gradeCode", "MD").param("employeeTypeCode", "FT"))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).path("data");
         var expected = fixture.db().queryForObject(
-            "SELECT COUNT(*) FROM TB_HR_DEV WHERE JOB_CD='BE' AND GRADE_CD='MD' AND EMP_TYPE_CD='FT'", Integer.class);
+            "SELECT COUNT(*) FROM TB_HR_DEV WHERE JOB_CD='BE' AND GRADE_CD='MD' AND EMP_TYPE_CD='FT' AND DRCT_CLS_CD='DRCT'", Integer.class);
         assertThat(data.path("totalCount").asInt()).isEqualTo(expected);
         assertThat(data.path("items").size()).isEqualTo(expected);
+    }
+
+    @Test void indirectStaffAreLeftOutAndNeverAssignedWorkingPersonShowsDashWithNoFreeMm() throws Exception {
+        String indirect = fixture.person("간접 인력");
+        fixture.db().update("UPDATE TB_HR_DEV SET DRCT_CLS_CD='INDRCT' WHERE DEV_ID=?", indirect);
+        String working = fixture.person("투입 이력 없음");
+        fixture.db().update("UPDATE TB_HR_DEV SET WORK_STAT_CD='WORK',MNG_NO='K-9901' WHERE DEV_ID=?", working);
+        var data = json.readTree(mvc.perform(get(ROOT).param("year", "2026")).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).path("data");
+        var rows = java.util.stream.StreamSupport.stream(data.path("items").spliterator(), false)
+            .collect(java.util.stream.Collectors.toMap(row -> row.path("developerId").asText(), row -> row));
+        assertThat(rows).doesNotContainKey(indirect);
+        var none = rows.get(working);
+        assertThat(none.path("managementNumber").asText()).isEqualTo("K-9901");
+        assertThat(none.path("cells").get(10).path("statusCode").asText()).isEqualTo("none");
+        assertThat(none.path("cells").get(10).path("statusName").asText()).isEqualTo("–");
+        assertThat(data.path("totalCount").asInt()).isEqualTo(fixture.db().queryForObject(
+            "SELECT COUNT(*) FROM TB_HR_DEV WHERE DRCT_CLS_CD='DRCT'", Integer.class));
+        // 휴직 칸은 투입을 세지 않는다(시안 cellInfo).
+        var leave = rows.get(people.get("leave")).path("cells").get(10);
+        assertThat(leave.path("statusCode").asText()).isEqualTo("leave");
+        assertThat(leave.path("projects").size()).isZero();
     }
 }

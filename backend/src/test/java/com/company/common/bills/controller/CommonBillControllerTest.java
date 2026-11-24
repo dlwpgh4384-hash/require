@@ -106,6 +106,20 @@ class CommonBillControllerTest {
         var original=rows.get("B-202611-001");mvc.perform(post(target()+"/next-month")).andExpect(status().isOk()).andExpect(jsonPath("$.data.bill.billMonth").value("202612")).andExpect(jsonPath("$.data.bill.billDate").value("2026-11-15")).andExpect(jsonPath("$.data.bill.payDueDate").value("2027-01-25")).andExpect(jsonPath("$.data.bill.taxInvoiceNo").isEmpty()).andExpect(jsonPath("$.data.bill.vatRate").value(10));
         assertThat(rows.get(original.billId())).isEqualTo(original);verify(mapper).insert(argThat(w -> w.actor().equals("admin") && w.billOrder()==2));
     }
+    @Test void decemberNextMonthMakesNextYearJanuaryBill() throws Exception {
+        // 12월 청구의 [다음 달 청구]는 다음 해 1월 청구를 만든다(2026-11-24 사용자 결정).
+        when(calendar.today()).thenReturn(LocalDate.of(2026,12,15)); when(calendar.currentMonth()).thenReturn(YearMonth.of(2026,12));
+        rows.clear(); rows.put("B-202611-001",invoice(false,false,0,"MO",true,"202612"));
+        mvc.perform(post(target()+"/next-month")).andExpect(status().isOk()).andExpect(jsonPath("$.data.bill.billMonth").value("202701"));
+        verify(mapper).insert(any());
+    }
+    @Test void billTwoMonthsAheadInNextYearIsStillRefused() throws Exception {
+        when(calendar.today()).thenReturn(LocalDate.of(2026,11,15));
+        rows.clear(); rows.put("B-202611-001",invoice(false,false,0,"MO",true,"202612"));
+        mvc.perform(post(target()+"/next-month")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("올해 청구만 등록·수정·취소할 수 있습니다."));
+        verify(mapper,never()).insert(any());
+    }
     @Test void nextMonthMissingIs404() throws Exception {mvc.perform(post("/api/common/bills/missing/next-month")).andExpect(status().isNotFound());verify(mapper,never()).insert(any());}
     @Test void nextMonthDuplicateDoesNotInsert() throws Exception {when(mapper.exists("P-0001","202612")).thenReturn(true);mvc.perform(post(target()+"/next-month")).andExpect(status().isBadRequest());verify(mapper,never()).insert(any());}
     @Test void nextMonthClosedDoesNotInsert() throws Exception {when(mapper.closed("202612")).thenReturn(true);mvc.perform(post(target()+"/next-month")).andExpect(status().isBadRequest());verify(mapper,never()).insert(any());}

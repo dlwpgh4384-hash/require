@@ -33,6 +33,7 @@ class BillingLookupControllerTest {
     @MockBean BillingLookupMapper mapper;
     @MockBean CalculationRuleService definitions;
     @MockBean BusinessCalendar calendar;
+    @MockBean com.company.common.bills.service.BillDunningService dunning;
     final BusinessCalendar real=new BusinessCalendar(Clock.fixed(Instant.parse("2026-11-14T16:00:00Z"),ZoneOffset.UTC));
     List<UnpaidBill> bills;
     List<HistoryRow> histories;
@@ -116,6 +117,13 @@ class BillingLookupControllerTest {
             .andExpect(jsonPath("$.data.cards[0].recipients[0]").value("DB PM"))
             .andExpect(jsonPath("$.data.cards[2].recipients.length()").value(4));
     }
+    @Test void nextNotificationNamesTheRecipientsLikeTheMockup()throws Exception {
+        // 시안 「날짜 n단계 → 받는 사람」(2026-11-24 사용자 결정).
+        bills.add(bill("named",10));
+        when(dunning.recipientNames("selected",1)).thenReturn(List.of("김PM","이PM"));
+        mvc.perform(get("/api/common/bill-dunning")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].nextNotification").value(org.hamcrest.Matchers.endsWith("1단계 자동 알림 예정 → 김PM, 이PM")));
+    }
     @Test void priorYearOutstandingBillIsIncludedAndStageThreeHasNoLaterStage()throws Exception {
         bills.add(bill("prior-year",500));
         histories.add(new HistoryRow("prior-year",1,3,real.today(),"받는 사람","BOTH",false));
@@ -123,7 +131,8 @@ class BillingLookupControllerTest {
             .andExpect(jsonPath("$.data.items[0].billId").value("prior-year"))
             .andExpect(jsonPath("$.data.items[0].currentStep").value(3))
             .andExpect(jsonPath("$.data.items[0].canResend").value(true))
-            .andExpect(jsonPath("$.data.items[0].nextNotification").value(org.hamcrest.Matchers.nullValue()));
+            // 시안: 3단계를 보낸 뒤 「다음 알림」은 「마지막 단계」.
+            .andExpect(jsonPath("$.data.items[0].nextNotification").value("마지막 단계"));
     }
     @Test void firstOverdueDayIsVisibleBeforeNotificationThreshold()throws Exception {
         bills.add(bill("old",1));

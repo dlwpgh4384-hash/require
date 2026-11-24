@@ -77,11 +77,6 @@ export function getCommonBillOptions(
 }
 export const getCommonBillDunning = (signal?: AbortSignal) =>
   projectRequest<BillingDunningResult>("/api/common/bill-dunning", { signal });
-export const getBillingReceivable = (billId: string, signal?: AbortSignal) =>
-  projectRequest<{ bill: BillingReceivable }>(
-    `/api/common/bills/${encodeURIComponent(billId)}`,
-    { signal },
-  );
 export const postBillingDunningResend = (billId: string) =>
   projectRequest<{ billId: string; history: BillingDunningHistory }>(
     `/api/common/bills/${encodeURIComponent(billId)}/dunning-resend`,

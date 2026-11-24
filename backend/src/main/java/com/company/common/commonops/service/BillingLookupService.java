@@ -23,10 +23,21 @@ public class BillingLookupService {
     private final BillingCalculationRules rules;
     private final CalculationRuleService metadata;
     private final BusinessCalendar calendar;
+    /** 「다음 알림」 받는 사람(미수 알림 보내기와 같은 규칙). 없으면(시험 등) 이름 없이 보인다. */
+    private final org.springframework.beans.factory.ObjectProvider<com.company.common.bills.service.BillDunningService> dunning;
 
     public BillingLookupService(BillingLookupMapper mapper, BillingCalculationRules rules,
-        CalculationRuleService metadata, BusinessCalendar calendar) {
-        this.mapper=mapper; this.rules=rules; this.metadata=metadata; this.calendar=calendar;
+        CalculationRuleService metadata, BusinessCalendar calendar,
+        org.springframework.beans.factory.ObjectProvider<com.company.common.bills.service.BillDunningService> dunning) {
+        this.mapper=mapper; this.rules=rules; this.metadata=metadata; this.calendar=calendar; this.dunning=dunning;
+    }
+
+    /** 시안 「다음 알림」: 「날짜 n단계 → 받는 사람」. 받는 사람을 모르면 이름 없이. */
+    private String who(String projectId, int step) {
+        var service=dunning.getIfAvailable();
+        if (service==null) return "";
+        var names=service.recipientNames(projectId,step);
+        return names.isEmpty()?"":" → "+String.join(", ",names);
     }
 
     public Options getCommonBillOptions(String projectId, String billMonth) {
@@ -79,11 +90,11 @@ public class BillingLookupService {
             boolean resent=step!=null && sent.stream().anyMatch(h -> h.step()==step && h.resend());
             String next=null;
             if (step!=null && sent.stream().noneMatch(h -> h.step()==step && !h.resend()))
-                next=today+" "+step+"단계 자동 알림 예정";
+                next=today+" "+step+"단계 자동 알림 예정"+who(bill.projectId(),step);
             else if (step==null || step<3) {
                 int index=step==null?0:step;
-                next=bill.payDueDate().plusDays(thresholds[index])+" "+(index+1)+"단계 예정";
-            }
+                next=bill.payDueDate().plusDays(thresholds[index])+" "+(index+1)+"단계 예정"+who(bill.projectId(),index+1);
+            } else next="마지막 단계";
             items.add(new DunningRow(bill.billId(),bill.projectId(),bill.projectName(),bill.unpaidAmount(),
                 bill.payDueDate(),Math.toIntExact(ChronoUnit.DAYS.between(bill.payDueDate(),today)),step,
                 sent.stream().map(HistoryRow::value).toList(),next,step!=null && !resent,

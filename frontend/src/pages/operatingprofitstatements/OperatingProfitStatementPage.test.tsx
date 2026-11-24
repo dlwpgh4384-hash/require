@@ -250,6 +250,18 @@ it("renders exact provisional copy and server headers, row style, cost direction
   );
   expect(screen.queryByTestId("operating-formulas")).not.toBeInTheDocument();
 });
+it("a query error with the same text as its field shows only once", async () => {
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    String(url).startsWith("/api/common/operating-profit-statements?")
+      ? { ok: false, status: 400, json: async () => ({ message: "조회 연도를 확인해 주세요.", errors: [{ field: "year", message: "조회 연도를 확인해 주세요." }] }) }
+      : base(url, init),
+  );
+  mount();
+  expect(await screen.findByTestId("operating-error-year")).toHaveTextContent("조회 연도를 확인해 주세요.");
+  // 띠와 칸 밑에 같은 문구가 두 번 나오지 않는다(2026-11-24 사용자 결정).
+  expect(screen.getAllByText("조회 연도를 확인해 주세요.")).toHaveLength(1);
+});
 it("closed base removes provisional banner and markers", async () => {
   mount();
   await ready();

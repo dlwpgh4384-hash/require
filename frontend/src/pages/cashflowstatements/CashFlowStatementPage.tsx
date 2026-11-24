@@ -156,7 +156,11 @@ export function CashFlowStatementPage() {
     try {
       await getCommonCashFlowStatementsExcel({ year }, unit);
       if (current === generation.current)
-        setNotice({ message: "엑셀 파일을 내려받았습니다.", kind: "ok" });
+        // 시안 xls 알림: 「엑셀 파일을 만들었습니다 (조회 결과 n건).」 n은 표 줄 수(2026-11-24 사용자 결정).
+        setNotice({
+          message: `엑셀 파일을 만들었습니다 (조회 결과 ${data?.numericTable.rows.length ?? 0}건).`,
+          kind: "ok",
+        });
     } catch (failure) {
       if (current === generation.current)
         setNotice({

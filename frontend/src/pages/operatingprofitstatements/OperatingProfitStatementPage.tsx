@@ -161,7 +161,11 @@ export function OperatingProfitStatementPage() {
     try {
       await getCommonOperatingProfitStatementsExcel(filter, unit);
       if (current === generation.current)
-        setNotice({ message: "엑셀 파일을 내려받았습니다.", kind: "ok" });
+        // 시안 xls 알림: 「엑셀 파일을 만들었습니다 (조회 결과 n건).」 n은 표 줄 수(2026-11-24 사용자 결정).
+        setNotice({
+          message: `엑셀 파일을 만들었습니다 (조회 결과 ${data?.numericTable.rows.length ?? 0}건).`,
+          kind: "ok",
+        });
     } catch (failure) {
       if (current === generation.current)
         setNotice({
@@ -262,7 +266,8 @@ export function OperatingProfitStatementPage() {
           {f.message}
         </p>
       ))}
-      {error && (
+      {/* 칸 오류와 같은 문구면 띠는 다시 보이지 않는다(한 번만 보이게, 2026-11-24 사용자 결정). */}
+      {error && !fields.some((f) => f.message === error) && (
         <Banner
           kind="warn"
           icon={infoIcon}

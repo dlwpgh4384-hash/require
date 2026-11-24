@@ -236,7 +236,8 @@ export function ProfitStructurePage() {
     setDownloading(true);
     try {
       await getCommonProfitStructuresExcel(filter);
-      if (current === generation.current) notify("엑셀 파일을 내려받았습니다.");
+      // 시안 UI-07 알림은 건수 없이 「엑셀 파일을 만들었습니다.」(2026-11-24 사용자 결정).
+      if (current === generation.current) notify("엑셀 파일을 만들었습니다.");
     } catch (failure) {
       if (current !== generation.current) return;
       notify(
@@ -310,7 +311,8 @@ export function ProfitStructurePage() {
           </button>
         ))}
       </div>
-      {error && (
+      {/* 칸 오류와 같은 문구면 띠는 다시 보이지 않는다(한 번만 보이게, 2026-11-24 사용자 결정). */}
+      {error && !fields.some((f) => f.message === error) && (
         <Banner
           kind="warn"
           icon={infoIcon}

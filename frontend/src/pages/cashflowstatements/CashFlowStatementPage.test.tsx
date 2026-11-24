@@ -427,7 +427,7 @@ it("downloads the selected year and displayed unit from the title portal", async
     expect(download).toHaveBeenCalledWith({ year: 2026 }, "원"),
   );
   expect(await screen.findByTestId("cash-flow-toast")).toHaveTextContent(
-    "내려받았습니다",
+    "엑셀 파일을 만들었습니다 (조회 결과",
   );
 });
 it("reports failed export without a false success toast", async () => {

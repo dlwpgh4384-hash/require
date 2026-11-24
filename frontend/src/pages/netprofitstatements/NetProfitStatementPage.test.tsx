@@ -418,7 +418,7 @@ it("successful download shows completion only after the download helper resolves
   expect(screen.queryByTestId("net-profit-toast")).not.toBeInTheDocument();
   await act(async () => complete("순이익표.xlsx"));
   expect(await screen.findByTestId("net-profit-toast")).toHaveTextContent(
-    "엑셀 파일을 내려받았습니다.",
+    "엑셀 파일을 만들었습니다 (조회 결과",
   );
   expect(exportFile).toHaveBeenCalledWith(
     { year: 2026, baseMonth: "202602" },

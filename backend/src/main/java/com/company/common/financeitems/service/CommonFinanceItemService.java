@@ -264,8 +264,16 @@ public class CommonFinanceItemService {
         return !Objects.equals(before.scheduledDate(),after.scheduledDate()) || !same(before.paymentAmount(),after.paymentAmount());
     }
     public void reallocate(int year) {
-        var annual=mapper.estimate(String.format("%04d",year));
-        if (annual==null) return;
+        String key=String.format("%04d",year);
+        var annual=mapper.estimate(key);
+        if (annual==null) {
+            // 그해를 화면에서 열기 전에 엑셀부터 올려도 판관비·영업외가 손익에 바로 들어가게, 화면을 열 때와 같이
+            // 연간 예상 줄·납부 일정을 먼저 만든다(2026-10-28 「재무 항목 → 손익 연결」, 2026-11-24 사용자 결정).
+            mapper.prepareYear(key,actor.userId());
+            mapper.preparePayments(key,actor.userId());
+            annual=mapper.estimate(key);
+            if (annual==null) return;
+        }
         var closed=new HashSet<>(mapper.closedMonths());
         var allocated=allocation(year,annual.estimatedTaxAmount(),closed,mapper::fixedTax);
         for (var entry:allocated.entrySet()) if (!closed.contains(entry.getKey())) {

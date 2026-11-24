@@ -87,6 +87,14 @@ class FinanceItemPersistenceTest {
         assertThat(jdbc.queryForList("SELECT PAY_YN FROM TB_FI_TAX_PAY",String.class)).containsOnly("N"); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_TAX_PAY WHERE PAY_AMT IS NULL",Integer.class)).isEqualTo(2);
         assertThat(payment().path("scheduledDate").asText()).isEqualTo("2027-03-31");
     }
+    @Test void savingBeforeTheYearIsOpenedStillPreparesTheYearSoProfitIsReallocated() throws Exception {
+        // 그해를 열기 전에 저장·업로드해도 연간 예상 줄·납부 일정을 먼저 만들어 손익에 바로 반영(2026-11-24 사용자 결정).
+        item("202601",1,"원본","N",null);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_CORP_TAX",Integer.class)).isZero();
+        save("202601",input(getMonth("202601")));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_CORP_TAX WHERE TAX_YR='2026'",Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_TAX_PAY",Integer.class)).isPositive();
+    }
     @Test void getDoesNotInitializeYearOrPersistRepeatedDrafts() throws Exception {
         item("202601",1,"반복","Y",null); var data=getMonth("202602"); assertThat(data.path("autoFillCount").asInt()).isEqualTo(1); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_ITEM WHERE FIN_YM='202602'",Integer.class)).isZero(); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TB_FI_CORP_TAX",Integer.class)).isZero();
     }

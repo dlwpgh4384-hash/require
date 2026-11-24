@@ -18,7 +18,7 @@ public class DevelopedScreenRegistry {
             new Screen("UI-32", "단가 재협상 대상"), new Screen("UI-10", "재무 항목"),
             new Screen("UI-07", "전체 수익 구조"), new Screen("UI-08", "영업이익표"),
             new Screen("UI-09", "순이익표"), new Screen("UI-14", "월 마감"), new Screen("UI-18", "사업계획 대비 실적"),
-            new Screen("UI-21", "자금수지표"));
+            new Screen("UI-21", "자금수지표"), new Screen("UI-33", "외부 인력 후보"));
     }
 
     public boolean contains(String scrnId) {

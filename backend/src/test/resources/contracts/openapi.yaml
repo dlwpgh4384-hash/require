@@ -11904,8 +11904,1068 @@ paths:
                   - data
       x-open-question: 'OQ-API-014: 호출자 입력 없는 이번달 배지 읽기의 정정 가능한 4xx 근거 미제공. 인프라 예외로 위장하지 않는다.'
 
+  /api/common/candidate-summary:
+    get:
+      operationId: getCommonCandidateSummary
+      summary: 외부 후보 요약
+      security: []
+      x-related-requirements:
+      - REQ-1328
+      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
+      responses:
+        '200':
+          description: 정상 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCandidateSummary'
+                  required:
+                  - data
+        '400':
+          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-aiops-query-role:
+        entity: TB_HR_CAND
+        result_path:
+        - data
+  /api/common/candidate-shortages:
+    get:
+      operationId: getCommonCandidateShortages
+      summary: 부족 직무별 후보
+      security: []
+      x-related-requirements:
+      - REQ-1329
+      - REQ-1330
+      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
+      responses:
+        '200':
+          description: 정상 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCandidateShortageList'
+                  required:
+                  - data
+        '400':
+          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      x-pagination-filtering:
+        pagination: 조건 전체 조회 후 기존 공통 목록 표시 설정 적용; 미요청 서버 page를 신설하지 않음
+        filtering: 다음 달부터6개월·영업 기회 수요만
+        ordering: DB식 부족 직무 결과 순서; 동률 세부순서 OQ-QUERY-033
+      x-aiops-query-role:
+        entity: TB_HR_CAND
+        result_path:
+        - data
+        - items
+  /api/common/candidates:
+    get:
+      operationId: getCommonCandidates
+      summary: 외부 후보 목록
+      security: []
+      x-related-requirements:
+      - REQ-1331
+      - REQ-1332
+      - REQ-1333
+      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
+      responses:
+        '200':
+          description: 정상 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCandidateList'
+                  required:
+                  - data
+        '400':
+          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: jobCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: gradeCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: employeeTypeCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: contactStatusCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: availabilityWindow
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - next-month
+          - within-three-months
+          description: 다음 달까지·3개월 안의 설계 wire 값; 저장 enum 아님
+      x-pagination-filtering:
+        pagination: 조건 전체 조회 후 기존 공통 목록 표시 설정 적용; 미요청 서버 page를 신설하지 않음
+        filtering: jobCode·gradeCode·employeeTypeCode·contactStatusCode·availabilityWindow
+        ordering: 보류·계약 완료 뒤·투입 가능일 오름차순
+      x-aiops-query-role:
+        entity: TB_HR_CAND
+        result_path:
+        - data
+        - items
+    post:
+      operationId: postCommonCandidate
+      summary: 외부 후보 등록
+      security: []
+      x-related-requirements:
+      - REQ-1334
+      - REQ-1335
+      - REQ-1336
+      - REQ-1337
+      - REQ-1338
+      - REQ-1339
+      - REQ-1340
+      - REQ-1341
+      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
+      responses:
+        '200':
+          description: 정상 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCandidate'
+                  required:
+                  - data
+        '400':
+          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonCandidateInput'
+      x-business-rules:
+      - 새 등록창의 입력을 TB_HR_CAND와 TB_HR_CAND_SKILL에 저장하고 연락 전·최근 연락일=등록일로 시작한다. 등록 성공 직후 목록 맨 위에 보여 준다.
+      - 이름50·전화20(숫자와 -)·이메일100/형식·메모500을 검사하고 필수 이름/단가/구분/주직무/기술1개 이상/등급/가능일/출처를 검사한다. 외주일 때만 업체 필수다. 기술
+        중복은 제거하고 보조직무가 주직무와 같으면 비운다.
+      - 외주를 고르면 사용 중 협력사·고객·협력 거래처 선택칸을 보이고 없으면 거래처에서 먼저 등록하도록 한다.
+      - 전화번호 또는 이메일을 입력하면 개인정보 수집·이용 동의가 필수이고 이력서 처리로 자동 체크하지 않는다.
+      - TB_SY_ADM_AREA의 시·도→시·군·구로 선택하고 HOME_AREA_CD+HOME_ADDR를 저장하며 수정은 코드로 복원한다. 거주지는 AI 추천 점수에 쓰지 않는다.
+      x-side-effects:
+      - getCommonCandidateContacts 맨 위 TB_HR_CAND_CNTC 시스템 등록1줄
+      x-required-tests:
+      - 'happy: 유효 후보 등록 -> getCommonCandidate에서 TB_HR_CAND 입력값·연락 전·등록일 최근연락과 스킬 재조회'
+      - 'auth: 인증 없는 개발 admin 등록 -> 로그인 거부 없이 저장되고 PRVC_AGRE_USER_ID가 admin; 역할 거부는 UI-22 후속'
+      - 'validation: 이름51자 또는 기술0개 -> 400 errors의 name 또는 skills와 후보 신규0행'
+      - 'business: 외주인데 companyId 없음 또는 연락처 있으나 동의 false -> 400 해당 칸 오류·TB_HR_CAND 불변'
+      - 'side-effect: 정상 등록 -> getCommonCandidateContacts 맨 위 TB_HR_CAND_CNTC 시스템 등록1줄'
+      x-state-transitions:
+      - 미등록 -> 연락 전·최근 연락일=등록일
+  /api/common/candidates/excel:
+    get:
+      operationId: getCommonCandidatesExcel
+      summary: 외부 후보 목록 엑셀
+      security: []
+      x-related-requirements:
+      - REQ-1332
+      description: SFR-011 목록 엑셀(사람이 더함, 2026-11-24). 현재 조건의 후보 전체·화면 목록 열 순서(이름·구분·직무·등급·기술·거주지·희망 단가·투입 가능일·연락 상태·최근 연락·출처). 받으면 접근 기록(DNLD, UI-33)을 남긴다. 인증·메뉴 검사는 UI-22 후속.
+      responses:
+        '200':
+          description: 현재 조건의 후보 전체 xlsx. 완료 문구 엑셀 파일을 만들었습니다 (조회 결과 n건).
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: 기존 ExcelExportService 파일명/인코딩 관례(외부 인력 후보_다운로드일시.xlsx)
+            X-Total-Count:
+              schema:
+                type: integer
+              description: 파일에 담긴 후보 수
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 조건 코드 오류; errors의 field·message로 정정하며 접근 기록을 남기지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: jobCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: gradeCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: employeeTypeCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: contactStatusCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: availabilityWindow
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - next-month
+          - within-three-months
+  /api/common/candidates/{candidateId}:
+    get:
+      operationId: getCommonCandidate
+      summary: 외부 후보 기본 정보
+      security: []
+      x-related-requirements:
+      - REQ-1334
+      - REQ-1338
+      - REQ-1339
+      - REQ-1340
+      - REQ-1354
+      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
+      responses:
+        '200':
+          description: 정상 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCandidate'
+                  required:
+                  - data
+        '400':
+          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 후보가 존재하지 않음; 기존 공통 오류 경계
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: candidateId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-aiops-query-role:
+        entity: TB_HR_CAND
+        result_path:
+        - data
+    put:
+      operationId: putCommonCandidate
+      summary: 외부 후보 정보 수정
+      security: []
+      x-related-requirements:
+      - REQ-1354
+      - REQ-1335
+      - REQ-1336
+      - REQ-1337
+      - REQ-1338
+      - REQ-1339
+      - REQ-1355
+      - REQ-1320
+      - REQ-1321
+      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
+      responses:
+        '200':
+          description: 정상 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCandidate'
+                  required:
+                  - data
+        '400':
+          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 후보가 존재하지 않음; 기존 공통 오류 경계
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 후보·스킬·연락 기록 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: candidateId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonCandidateUpdateInput'
+      x-business-rules:
+      - 상세 수정은 등록과 같은 칸을 다시 쓰되 이력서 등록은 제공하지 않는다. 후보·스킬 변경 후 희망 단가의 새 값으로 맞는 자리 이익률을 다시 계산한다.
+      - 이름50·전화20(숫자와 -)·이메일100/형식·메모500을 검사하고 필수 이름/단가/구분/주직무/기술1개 이상/등급/가능일/출처를 검사한다. 외주일 때만 업체 필수다. 기술
+        중복은 제거하고 보조직무가 주직무와 같으면 비운다.
+      - 외주를 고르면 사용 중 협력사·고객·협력 거래처 선택칸을 보이고 없으면 거래처에서 먼저 등록하도록 한다.
+      - 전화번호 또는 이메일을 입력하면 개인정보 수집·이용 동의가 필수이고 이력서 처리로 자동 체크하지 않는다.
+      - TB_SY_ADM_AREA의 시·도→시·군·구로 선택하고 HOME_AREA_CD+HOME_ADDR를 저장하며 수정은 코드로 복원한다. 거주지는 AI 추천 점수에 쓰지 않는다.
+      - 후보 수정과 연락 기록은 읽은 modifiedAt이 DB와 다르면 CodeFailure.conflict()의 409와 지정 문구로 거부한다.
+      - 후보 수정·연락 저장의 409를 받으면 화면은 창을 닫고 최신 후보를 다시 불러온다.
+      x-side-effects:
+      - getCommonCandidateContacts의 정보 수정 시스템1줄·최근 연락일 불변
+      x-required-tests:
+      - 'happy: 최신 modifiedAt으로 희망 단가 수정 -> getCommonCandidate의 새 단가·기존 최근 연락일과 matches 재계산'
+      - 'auth: 무인증 개발 admin 수정 -> 인증 오류 없이 대상 후보만 변경; 실제 PM 접근 거부를 앞당기지 않음'
+      - 'validation: 메모501자로 수정 -> 400 errors.memo·기존 후보 메모 보존'
+      - 'business: 오래된 modifiedAt으로 수정 -> 409 지정 문구·TB_HR_CAND와 스킬 및 연락 기록 불변'
+      - 'side-effect: 정상 정보 수정 -> getCommonCandidateContacts의 정보 수정 시스템1줄·최근 연락일 불변'
+      x-state-transitions:
+      - 후보 정보 이전값 -> 새값·최근 연락일 유지
+  /api/common/candidates/{candidateId}/contacts:
+    get:
+      operationId: getCommonCandidateContacts
+      summary: 후보 연락 기록
+      security: []
+      x-related-requirements:
+      - REQ-1351
+      - REQ-1341
+      - REQ-1355
+      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
+      responses:
+        '200':
+          description: 정상 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCandidateContactList'
+                  required:
+                  - data
+        '400':
+          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 후보가 존재하지 않음; 기존 공통 오류 경계
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: candidateId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-pagination-filtering:
+        pagination: 조건 전체 조회 후 기존 공통 목록 표시 설정 적용; 미요청 서버 page를 신설하지 않음
+        filtering: candidateId
+        ordering: 최신 기록 먼저
+      x-aiops-query-role:
+        entity: TB_HR_CAND_CNTC
+        result_path:
+        - data
+        - items
+    post:
+      operationId: postCommonCandidateContact
+      summary: 후보 연락 기록 저장
+      security: []
+      x-related-requirements:
+      - REQ-1349
+      - REQ-1360
+      - REQ-1350
+      - REQ-1320
+      - REQ-1321
+      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
+      responses:
+        '200':
+          description: 정상 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCandidate'
+                  required:
+                  - data
+        '400':
+          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 후보가 존재하지 않음; 기존 공통 오류 경계
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 후보·스킬·연락 기록 무변경
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: candidateId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonCandidateContactInput'
+      x-business-rules:
+      - 상세 연락 기록에서 연락 상태와200자 메모를 받아 기록을 맨 위에 추가하고 상태·최근 연락일=오늘을 함께 바꾼다. 상태가 같아도 메모 저장은 오늘로 갱신한다.
+      - 연락 전·연락함·면접 예정·보류·계약 완료 중 상태와 메모를 필수로 받고 메모는200자까지다.
+      - 후보 수정과 연락 기록은 읽은 modifiedAt이 DB와 다르면 CodeFailure.conflict()의 409와 지정 문구로 거부한다.
+      - 후보 수정·연락 저장의 409를 받으면 화면은 창을 닫고 최신 후보를 다시 불러온다.
+      x-side-effects:
+      - getCommonCandidateContacts 맨 위 새 기록·summary overdueContactCount에서 대상 제외
+      x-required-tests:
+      - 'happy: 같은 상태와 유효 메모 저장 -> getCommonCandidate.lastContactDate가 오늘·상태는 입력값'
+      - 'auth: 인증 없는 개발 admin 연락 저장 -> 로그인 오류 없이 그 후보 연락 기록에 admin 처리자가 남음'
+      - 'validation: 메모201자 또는 공백 -> 400 errors.memo·TB_HR_CAND_CNTC 신규0행'
+      - 'business: 오래된 modifiedAt 연락 저장 -> 409·후보 상태와 최근 연락일 및 연락 기록 수 불변'
+      - 'side-effect: 보류 또는 계약 완료 연락 저장 -> getCommonCandidateContacts 맨 위 새 기록·summary overdueContactCount에서
+        대상 제외'
+      x-state-transitions:
+      - 현재 연락 상태 -> 선택 CNTC_STAT·동일 상태도 최근 연락일=오늘
+  /api/common/candidates/{candidateId}/matches:
+    get:
+      operationId: getCommonCandidateMatches
+      summary: 후보의 맞는 자리
+      security: []
+      x-related-requirements:
+      - REQ-1352
+      - REQ-1353
+      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
+      responses:
+        '200':
+          description: 정상 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCandidateMatchList'
+                  required:
+                  - data
+        '400':
+          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 지정 후보가 존재하지 않음; 기존 공통 오류 경계
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: candidateId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      x-pagination-filtering:
+        pagination: 조건 전체 조회 후 기존 공통 목록 표시 설정 적용; 미요청 서버 page를 신설하지 않음
+        filtering: candidateId
+        ordering: 등급 유사도·이익률 내림차순·최대4곳
+      x-aiops-query-role:
+        entity: TB_SL_OPP_NEED
+        result_path:
+        - data
+        - items
+  /api/common/candidate-resume-extractions:
+    post:
+      operationId: postCommonCandidateResumeExtraction
+      summary: 이력서 후보 정보 추출
+      security: []
+      x-related-requirements:
+      - REQ-1342
+      - REQ-1343
+      - REQ-1344
+      - REQ-1345
+      - REQ-1346
+      - REQ-1347
+      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
+      responses:
+        '200':
+          description: 정상 업무 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonCandidateResumeExtraction'
+                  required:
+                  - data
+        '400':
+          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Word·PDF·PPT·HWP·TXT·기존 한도10MB 이하; jpg 불가
+              required:
+              - file
+      x-business-rules:
+      - 10MB 초과와 jpg 등 스캔 그림을 받지 않고 기존 칸 검증을 그대로 적용한다.
+      - 전화 숫자를 010-0000-0000 형식으로·이메일 소문자로 정리하고 풀주소 앞부분을 TB_SY_ADM_AREA 시도/시군구에 맞추며 650만원은6,500,000으로 변환한다.
+      - 빈칸만 클라이언트에서 병합·기입값 보존·동의 자동체크 금지·등급 불변·추정값 사용자 미확인
+      x-side-effects:
+      - TB_SY_UPLD·후보 표·파일 저장소에 파일/원문/업로드 이력 없음
+      x-required-tests:
+      - 'happy: 허용 텍스트 이력서에서 희망금액650만원 -> fields의 desiredMonthlyRate 값6500000이며 후보 신규0행'
+      - 'auth: 무인증 개발 admin 파일 추출 -> 인증 오류 없이 임시 결과 반환·PRVC_AGRE_USER_ID 자동저장0'
+      - 'validation: jpg 또는10MB 초과 전송 -> 400 file 오류·후보와 업로드 기록 신규0행'
+      - 'business: 사전에 없는 소속 업체·추정 직무 -> 업체 빈값·직무 estimated=true와 원문·중급 등급 불변'
+      - 'side-effect: 추출 완료 후 창 취소 -> TB_SY_UPLD·후보 표·파일 저장소에 파일/원문/업로드 이력 없음'
+      x-state-transitions:
+      - 영속 상태 전이 없음; 추출 결과만 응답·등록은 별도 명령
 components:
   schemas:
+    CommonCandidateInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        desiredMonthlyRate:
+          type: number
+          description: 원/월. 필수이며 음수/0 정책은 OQ-VALID-033으로 확인한다.
+        employeeTypeCode:
+          type: string
+          description: EMP_TYPE의 프리랜서·외주 실제 코드
+        companyId:
+          type: string
+          nullable: true
+          description: 외주일 때만 필수; 사용 중 협력사 또는 고객·협력 거래처
+        phone:
+          type: string
+          maxLength: 20
+          pattern: ^[0-9-]*$
+          nullable: true
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          nullable: true
+        privacyAgreement:
+          type: boolean
+          description: 연락처가 있으면 true 필수. 파일 추출로 자동 true 금지
+        primaryJobCode:
+          type: string
+          minLength: 1
+          description: JOB 원천·매칭 기준
+        secondaryJobCode:
+          type: string
+          nullable: true
+          description: 주직무와 같으면 null; 표시만
+        skills:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          minItems: 1
+          description: 쉼표 입력 분리 후 중복 제거
+        gradeCode:
+          type: string
+          minLength: 1
+          description: GRADE 원천·기본 중급
+        availableDate:
+          type: string
+          format: date
+          description: 기본 한국 오늘+30일
+        homeAreaCode:
+          type: string
+          nullable: true
+        homeAddress:
+          type: string
+          nullable: true
+        sourceCode:
+          type: string
+          minLength: 1
+          description: CAND_SRC 원천·기본 구인 사이트
+        memo:
+          type: string
+          maxLength: 500
+          nullable: true
+      required:
+      - name
+      - desiredMonthlyRate
+      - employeeTypeCode
+      - primaryJobCode
+      - skills
+      - gradeCode
+      - availableDate
+      - sourceCode
+    CommonCandidateUpdateInput:
+      allOf:
+      - $ref: '#/components/schemas/CommonCandidateInput'
+      - type: object
+        properties:
+          modifiedAt:
+            type: string
+            format: date-time
+            nullable: true
+            description: GET에서 읽은 시각 그대로
+        required:
+        - modifiedAt
+    CommonCandidate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        desiredMonthlyRate:
+          type: number
+          description: PM 정책에서는 값 비노출·표 머리도 숨김; 현재 개발 admin은 공개
+          nullable: true
+        employeeTypeCode:
+          type: string
+          description: EMP_TYPE의 프리랜서·외주 실제 코드
+        companyId:
+          type: string
+          nullable: true
+          description: 외주일 때만 필수; 사용 중 협력사 또는 고객·협력 거래처
+        phone:
+          type: string
+          maxLength: 20
+          pattern: ^[0-9-]*$
+          nullable: true
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          nullable: true
+        privacyAgreement:
+          type: boolean
+          description: 연락처가 있으면 true 필수. 파일 추출로 자동 true 금지
+        primaryJobCode:
+          type: string
+          minLength: 1
+          description: JOB 원천·매칭 기준
+        secondaryJobCode:
+          type: string
+          nullable: true
+          description: 주직무와 같으면 null; 표시만
+        skills:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          minItems: 1
+          description: 쉼표 입력 분리 후 중복 제거
+        gradeCode:
+          type: string
+          minLength: 1
+          description: GRADE 원천·기본 중급
+        availableDate:
+          type: string
+          format: date
+          description: 기본 한국 오늘+30일
+        homeAreaCode:
+          type: string
+          nullable: true
+        homeAddress:
+          type: string
+          nullable: true
+        sourceCode:
+          type: string
+          minLength: 1
+          description: CAND_SRC 원천·기본 구인 사이트
+        memo:
+          type: string
+          maxLength: 500
+          nullable: true
+        candidateId:
+          type: string
+        employeeTypeName:
+          type: string
+        companyName:
+          type: string
+          nullable: true
+        primaryJobName:
+          type: string
+        secondaryJobName:
+          type: string
+          nullable: true
+        gradeName:
+          type: string
+        sourceName:
+          type: string
+        contactStatusCode:
+          type: string
+        contactStatusName:
+          type: string
+          description: CNTC_STAT 원천
+        lastContactDate:
+          type: string
+          format: date
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        privacyAgreementDate:
+          type: string
+          format: date
+          nullable: true
+          description: PRVC_AGRE_DT·최초 Y 날짜
+        privacyAgreementUserId:
+          type: string
+          nullable: true
+          description: PRVC_AGRE_USER_ID·현재 admin
+        privacyAgreementUserName:
+          type: string
+          nullable: true
+        daysSinceLastContact:
+          type: integer
+          minimum: 0
+        overdueContact:
+          type: boolean
+          description: 오늘-최근연락일>30이고 보류/계약 완료가 아닐 때만 true
+      required:
+      - candidateId
+      - name
+      - contactStatusCode
+      - contactStatusName
+      - lastContactDate
+      - modifiedAt
+    CommonCandidateList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCandidate'
+      required:
+      - items
+    CommonCandidateSummary:
+      type: object
+      properties:
+        totalCount:
+          type: integer
+          minimum: 0
+          description: 보류·계약 완료까지 모든 후보 수(나머지 값은 진행 중 후보만)
+        activeCount:
+          type: integer
+          minimum: 0
+        interviewScheduledCount:
+          type: integer
+          minimum: 0
+        availableByNextMonthCount:
+          type: integer
+          minimum: 0
+        overdueContactCount:
+          type: integer
+          minimum: 0
+      required:
+      - totalCount
+      - activeCount
+      - interviewScheduledCount
+      - availableByNextMonthCount
+      - overdueContactCount
+    CommonCandidateShortage:
+      type: object
+      properties:
+        jobCode:
+          type: string
+        jobName:
+          type: string
+        shortageStartMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+        maxShortage:
+          type: number
+        availableCandidateCount:
+          type: integer
+          minimum: 0
+        totalCandidateCount:
+          type: integer
+          minimum: 0
+      required:
+      - jobCode
+      - jobName
+      - shortageStartMonth
+      - maxShortage
+      - availableCandidateCount
+      - totalCandidateCount
+    CommonCandidateShortageList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCandidateShortage'
+      required:
+      - items
+    CommonCandidateContactInput:
+      type: object
+      properties:
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        contactStatusCode:
+          type: string
+          description: CNTC_STAT 중 연락 전·연락함·면접 예정·보류·계약 완료
+        memo:
+          type: string
+          minLength: 1
+          maxLength: 200
+      required:
+      - modifiedAt
+      - contactStatusCode
+      - memo
+    CommonCandidateContact:
+      type: object
+      properties:
+        contactStatusCode:
+          type: string
+          nullable: true
+        contactStatusName:
+          type: string
+          nullable: true
+        memo:
+          type: string
+        recordedAt:
+          type: string
+          format: date-time
+        recordedBy:
+          type: string
+        systemRecord:
+          type: boolean
+      required:
+      - memo
+      - recordedAt
+      - recordedBy
+      - systemRecord
+    CommonCandidateContactList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCandidateContact'
+      required:
+      - items
+    CommonCandidateMatch:
+      type: object
+      properties:
+        opportunityId:
+          type: string
+        opportunityName:
+          type: string
+        winningProbability:
+          type: number
+        jobName:
+          type: string
+        gradeName:
+          type: string
+        startMonth:
+          type: string
+        slotMonthlyRate:
+          type: number
+        expectedProfitRate:
+          type: number
+        lowMargin:
+          type: boolean
+          description: 예상 이익률이 lowMarginRate 미만(같으면 아님)
+        lowMarginRate:
+          type: number
+          description: 빨강 기준 이익률(%). 이번 달 적용 운영 기준값 QUOTE_APRV_RT(처음 15)
+      required:
+      - opportunityId
+      - opportunityName
+      - winningProbability
+      - jobName
+      - gradeName
+      - startMonth
+      - slotMonthlyRate
+      - expectedProfitRate
+      - lowMargin
+      - lowMarginRate
+    CommonCandidateMatchList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCandidateMatch'
+          maxItems: 4
+      required:
+      - items
+    CommonCandidateResumeField:
+      type: object
+      properties:
+        field:
+          type: string
+          enum:
+          - name
+          - desiredMonthlyRate
+          - employeeTypeCode
+          - companyId
+          - phone
+          - email
+          - primaryJobCode
+          - secondaryJobCode
+          - skills
+          - availableDate
+          - homeAreaCode
+          - homeAddress
+        value:
+          type: string
+          description: 대상 폼 칸에 맞게 변환할 값; 숫자 단가는 정규 십진 문자열·기술은 쉼표 분리 문자열
+        estimated:
+          type: boolean
+        originalText:
+          type: string
+          nullable: true
+          description: estimated=true이면 원문의 해당 부분 필수·전체 이력서 아님·영속저장 금지
+      required:
+      - field
+      - value
+      - estimated
+      oneOf:
+      - type: object
+        properties:
+          estimated:
+            type: boolean
+            enum:
+            - true
+          originalText:
+            type: string
+            minLength: 1
+        required:
+        - estimated
+        - originalText
+      - type: object
+        properties:
+          estimated:
+            type: boolean
+            enum:
+            - false
+        required:
+        - estimated
+    CommonCandidateResumeExtraction:
+      type: object
+      properties:
+        fileName:
+          type: string
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCandidateResumeField'
+        careerYears:
+          type: number
+          nullable: true
+          description: 표시 전용·등급 자동변경 금지
+      required:
+      - fileName
+      - fields
     CommonFinanceItem:
       type: object
       properties:
@@ -22022,6 +23082,86 @@ x-uncovered-requirements:
 - canonical_id: REQ-1125
   status: out-of-scope
   evidence: 보고서 업무 입력 제외 — 영업이익표에는 직접 금액 입력/수정 폼을 만들지 않고 조회와 전년 손익 업로드만 제공한다.
+- canonical_id: REQ-1307
+  status: non-functional
+  evidence: DB 계산식 원천는 DB 식 정의를 바꾼 독립 시험에서 그 정의를 읽으며 기존 식 행은 변경되지 않는다.
+- canonical_id: REQ-1308
+  status: data-constraint
+  evidence: 공통코드 원천는 UI-33 선택지가 해당 DB 그룹과 같으며 시안 표시값을 별도 제품 코드로 생성하지 않는다.
+- canonical_id: REQ-1309
+  status: out-of-scope
+  evidence: 로그인·메뉴 검사 후속는 무인증 개발 호출이 로그인 화면으로 전환되지 않으며 실제 메뉴 권한 검사를 새로 구현하지 않는다.
+- canonical_id: REQ-1310
+  status: non-functional
+  evidence: 마지막 공백 검사는 구현 저장소에서 지정 명령 종료0·출력0을 확인한다. 현재 명세 작업 트리는 Git 저장소가 아니므로 실행 완료를 주장하지 않는다.
+- canonical_id: REQ-1311
+  status: non-functional
+  evidence: record 생성자 일치는 새 record 필드 수와 전체 생성 호출의 인자 수가 같고 우회 오버로드가 없다.
+- canonical_id: REQ-1312
+  status: non-functional
+  evidence: 개발 기동 설정 보존는 일반 기동이 V20을 자동 실행하지 않고 개발 HTTP에 인증을 요구하지 않는다.
+- canonical_id: REQ-1313
+  status: out-of-scope
+  evidence: 인증 정의 금지는 유효 OpenAPI의 components.securitySchemes·bearerAuth·최상위 security가 추가되지 않는다. 생성 지시의
+    scheme 요구와 충돌은 OQ-AUTH-033이다.
+- canonical_id: REQ-1314
+  status: non-functional
+  evidence: 수동 API 보정 보존는 정본 병합 전후 기존 API 구조를 비교해 지정 수동 필드·응답·경로가 모두 남는다.
+- canonical_id: REQ-1315
+  status: non-functional
+  evidence: UI-33 개발 화면 등록과 회귀는 두 등록 목록에 UI-33이 있고 MenuRegistrationControllerTest·MenuRegistrationProjectionTest·CommonNavigationPage.test.tsx가
+    일치하며 partSettlementRoutes.test.tsx의 미개발 예시는 실제 미개발 화면이다.
+- canonical_id: REQ-1316
+  status: data-constraint
+  evidence: V20 후보 표 준비는 빈 후보 구조에서 세 표만 생성되고 기존 TB_SL_OPP_NEED V13·TB_PJ_MNPW_PLAN V12·TB_SY_ADM_AREA
+    V10과 모든 기존 값은 불변이다.
+- canonical_id: REQ-1317
+  status: data-constraint
+  evidence: 후보 FK·구조 비교는 원문 DDL 대조 시험에서 신규 FK 네 개가 있고 기존 표에는 FK/ALTER를 추가하지 않으며 p·c·u 비교만 수행한다.
+- canonical_id: REQ-1318
+  status: non-functional
+  evidence: 준비 파일 시험 목록 확장는 준비 목록 순서에서 V20이 V19 바로 뒤이고 파일 수 기대값20으로 세 시험이 통과한다.
+- canonical_id: REQ-1319
+  status: non-functional
+  evidence: 실DB 매퍼 의존 포함는 후보 통합 호출에서 누락 statement/resultMap 500이 없고 의존 XML 목록이 호출 그래프를 포함한다.
+- canonical_id: REQ-1322
+  status: screen-only
+  evidence: UI-33 컴포넌트·CSS와 입력 편집 핸들러에서 screen-body·Banner.icon·scope root·오류 제거를 검증한다; 서버 업무 연산 없음.
+- canonical_id: REQ-1323
+  status: screen-only
+  evidence: UI-33의 띠·Dialog·Toast·빈표 문자열을 v1.8 스크립트와 대조한다; API가 문구를 저장/선택하지 않는다.
+- canonical_id: REQ-1324
+  status: non-functional
+  evidence: 화면 비동기 시험 규칙는 지연 응답 시험에서도 준비 전 클릭이 없고 새 후보 읽기 요청이 요청 목록 규칙에 포함된다.
+- canonical_id: REQ-1325
+  status: non-functional
+  evidence: 실DB 자료·환경 규약는 시험 설정이 지정 환경 변수와 원문 표·칸을 사용하며 비밀값은 명세·로그에 출력하지 않는다.
+- canonical_id: REQ-1326
+  status: non-functional
+  evidence: 지정 회귀 시험 실행는 구현 manifest의 실제 명령으로 각 지정 시험 결과를 남긴다. 현재 구현 부재로 제품시험 not_run이다.
+- canonical_id: REQ-1327
+  status: screen-only
+  evidence: UI-33 및 등록/수정 Dialog를375/1440px에서 렌더링해 scrollWidth를 측정한다; 서버 API가 viewport를 처리하지 않는다.
+- canonical_id: REQ-1348
+  status: out-of-scope
+  evidence: 이력서 비보관는 추출·창 닫기·후보 등록 후 후보 표와 TB_SY_UPLD에 파일/원문/업로드 기록이 추가되지 않고 저장소에 원본 파일이 남지 않는다.
+- canonical_id: REQ-1356
+  status: out-of-scope
+  evidence: 후보 삭제 제외는 UI-33에 삭제 단추가 없고 신규 후보 DELETE 또는 삭제 명령 API를 만들지 않는다.
+- canonical_id: REQ-1357
+  status: out-of-scope
+  evidence: 개발자 풀 자동 연계 제외는 계약 완료 연락 저장 후 TB_HR_DEV 신규행0·개발자 풀 넘기기 단추/연계 API0이며105행 명확화가58행 설명보다 우선한다.
+- canonical_id: REQ-1358
+  status: screen-only
+  evidence: UI-33 사용자 안내와 현재 admin 처리자 문맥을 사용한다; 실제 역할 인가는 제외되어 새 역할/로그인 연산이 없다.
+- canonical_id: REQ-1359
+  status: data-constraint
+  evidence: 저장·조회 표 경계는 후보 업무 호출 전후 TB_PJ_MNPW_PLAN·TB_SL_OPP_NEED·TB_SY_ADM_AREA가 불변이며 새 후보 세 표 이외의 업무
+    저장이 없다.
+- canonical_id: REQ-1361
+  status: screen-only
+  evidence: UI-27의 기존 postCommonCodeGroup·postCommonCode로 RESUME_LABEL/RESUME_JOB 단어와 추가값을 저장하고 getCommonCodes로
+    재조회한다; 기존 임의 그룹 기능을 재사용하므로 후보 전용 사전 쓰기 API를 추가하지 않는다.
 x-change-supersession:
   description: 기존 operation과 기준선 시험은 원형 보존한다. 이번 공통 기능 인수에는 다음 예외가 우선하며 기존 메뉴 조회 자체를 상태 저장 API로 바꾸지 않는다.
   ui-header: 'REQ-071·REQ-086: 제목줄 정보와 시스템 관리자 이름은 이번 원문으로 허용한다.'

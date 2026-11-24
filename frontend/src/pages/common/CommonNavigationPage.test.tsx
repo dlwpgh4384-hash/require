@@ -396,6 +396,17 @@ function respond(body: ShellMenuResponse) {
           },
         },
       };
+    if (url === "/api/common/candidate-summary")
+      return {
+        success: true,
+        meta: {},
+        data: {
+          activeCount: 0,
+          interviewScheduledCount: 0,
+          availableByNextMonthCount: 0,
+          overdueContactCount: 0,
+        },
+      };
     if (url.startsWith("/api/common/bills?"))
       return {
         success: true,
@@ -521,11 +532,13 @@ function respond(body: ShellMenuResponse) {
                   "/api/common/developers/areas",
                   "/api/common/projects",
                   "/api/common/assignments/candidates",
+                  "/api/common/candidate-shortages",
                 ].includes(url) ||
                 url.startsWith("/api/common/clients?") ||
                 url.startsWith("/api/common/developers?") ||
                 url.startsWith("/api/common/assignments?") ||
-                /^\/api\/common\/code-groups\/(CLNT_TYPE|INDUTY|BANK|EMP_TYPE|JOB|GRADE|JBPS|DRCT_CLS|SKILL|WORK_STAT|EXT_PSBL)\/codes$/.test(
+                url.startsWith("/api/common/candidates?") ||
+                /^\/api\/common\/code-groups\/(CLNT_TYPE|INDUTY|BANK|EMP_TYPE|JOB|GRADE|JBPS|DRCT_CLS|SKILL|WORK_STAT|EXT_PSBL|CNTC_STAT|CAND_SRC)\/codes$/.test(
                   url,
                 )
               ? { success: true, meta: {}, data: { items: [] } }
@@ -540,6 +553,26 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-33": async (content) => {
+    // 시안 빈 문구: 부족 직무 카드와 공통 목록.
+    expect(
+      await content.findByText("부족이 예상되는 직무가 없습니다."),
+    ).toBeVisible();
+    expect(
+      await content.findByText("조건에 맞는 결과가 없습니다."),
+    ).toBeVisible();
+    // 화면 뿌리(screen-body)는 하나만 둔다.
+    const root = content.getByTestId("candidate-workspace");
+    expect(root).toHaveClass("screen-body");
+    expect(root.querySelectorAll(".screen-body")).toHaveLength(0);
+    expect(root.querySelectorAll("[data-screen-id='UI-33']")).toHaveLength(0);
+    expect(content.queryByRole("heading", { name: "외부 인력 후보" })).toBeNull();
+    const actions = within(screen.getByTestId("screen-actions"));
+    await waitFor(() =>
+      expect(actions.getByTestId("candidate-register")).toBeEnabled(),
+    );
+    expect(content.queryByTestId("candidate-register")).not.toBeInTheDocument();
+  },
   "UI-14": async (content) => {
     expect(await content.findByTestId("month-close-check-5")).toBeVisible();
     // 시안: 확인할 항목이 없으면 info 띠, [마감하기]는 제목줄 오른쪽에 있다.
@@ -1049,6 +1082,7 @@ describe("common placeholder screen contract", () => {
               id === "UI-31" ||
               id === "UI-32" ||
               id === "UI-04" ||
+              id === "UI-33" ||
               id === "UI-13") &&
             name === "조회"
           )

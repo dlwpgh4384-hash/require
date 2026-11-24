@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.commonops.mapper.CandidateOverviewMapper">
+  <resultMap id="summary" type="com.company.common.commonops.dto.CandidateOverviewContracts$Summary"><constructor>
+    <arg column="totalCount" javaType="_int"/>
+    <arg column="activeCount" javaType="_int"/><arg column="interviewScheduledCount" javaType="_int"/>
+    <arg column="availableByNextMonthCount" javaType="_int"/><arg column="overdueContactCount" javaType="_int"/>
+  </constructor></resultMap>
+  <select id="summary" resultMap="summary">
+    SELECT COUNT(*)::int AS "totalCount",
+      COUNT(*) FILTER (WHERE CNTC_STAT_CD NOT IN ('HOLD','CTRT'))::int AS "activeCount",
+      COUNT(*) FILTER (WHERE CNTC_STAT_CD='ITVW')::int AS "interviewScheduledCount",
+      COUNT(*) FILTER (WHERE CNTC_STAT_CD NOT IN ('HOLD','CTRT') AND INPUT_PSBL_DT &lt;= #{nextMonth})::int AS "availableByNextMonthCount",
+      COUNT(*) FILTER (WHERE CNTC_STAT_CD NOT IN ('HOLD','CTRT') AND LAST_CNTC_DT &lt; #{overdueBefore})::int AS "overdueContactCount"
+    FROM TB_HR_CAND
+  </select>
+  <resultMap id="candidateCount" type="com.company.common.commonops.mapper.CandidateOverviewMapper$CandidateCount"><constructor>
+    <arg column="jobCode" javaType="string"/><arg column="availableDate" javaType="java.time.LocalDate"/>
+  </constructor></resultMap>
+  <select id="activeCandidates" resultMap="candidateCount">
+    SELECT JOB_CD AS "jobCode", INPUT_PSBL_DT AS "availableDate" FROM TB_HR_CAND
+    WHERE CNTC_STAT_CD NOT IN ('HOLD','CTRT') ORDER BY CAND_ID
+  </select>
+  <resultMap id="dictionary" type="com.company.common.commonops.mapper.CandidateOverviewMapper$Dictionary"><constructor>
+    <arg column="groupId" javaType="string"/><arg column="code" javaType="string"/>
+    <arg column="name" javaType="string"/><arg column="target" javaType="string"/>
+  </constructor></resultMap>
+  <select id="dictionary" resultMap="dictionary">
+    SELECT c.CODE_GRP_ID AS "groupId", c.CODE AS "code", c.CODE_NM AS "name", c.ADD_VAL1 AS "target"
+    FROM TB_SY_CODE c JOIN TB_SY_CODE_GRP g ON g.CODE_GRP_ID=c.CODE_GRP_ID
+    WHERE c.CODE_GRP_ID=#{groupId} AND c.USE_YN='Y' AND c.DEL_YN='N' AND g.USE_YN='Y'
+    ORDER BY c.SORT_ORD,c.CODE
+  </select>
+  <resultMap id="company" type="com.company.common.commonops.mapper.CandidateOverviewMapper$Company"><constructor>
+    <arg column="id" javaType="string"/><arg column="name" javaType="string"/>
+  </constructor></resultMap>
+  <select id="companies" resultMap="company">
+    SELECT CLNT_ID AS "id",CLNT_NM AS "name" FROM TB_BS_CLNT
+    WHERE USE_YN='Y' AND CLNT_TYPE_CD IN ('VNDR','BOTH') ORDER BY CLNT_ID
+  </select>
+  <resultMap id="area" type="com.company.common.commonops.mapper.CandidateOverviewMapper$Area"><constructor>
+    <arg column="code" javaType="string"/><arg column="sido" javaType="string"/>
+    <arg column="sidoFull" javaType="string"/><arg column="district" javaType="string"/>
+  </constructor></resultMap>
+  <select id="areas" resultMap="area">
+    SELECT AREA_CD AS "code",SIDO_NM AS "sido",SIDO_FULL_NM AS "sidoFull",SGG_NM AS "district"
+    FROM TB_SY_ADM_AREA WHERE USE_YN='Y' AND SGG_NM IS NOT NULL AND EMD_NM IS NULL ORDER BY AREA_CD
+  </select>
+</mapper>

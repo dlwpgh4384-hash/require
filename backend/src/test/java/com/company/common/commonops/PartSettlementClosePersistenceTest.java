@@ -184,10 +184,10 @@ class PartSettlementClosePersistenceTest {
         part("check-expired", "N", "Y"); criteria("check-expired", "202601", "202609");
         assertThat(ids(check())).doesNotContain("check-expired");
     }
-    @Test void stoppedDuringMonthIsExcludedEvenThoughItWasPreviouslyActive() throws Exception {
+    @Test void stoppedDuringMonthIsIncludedBecauseItWasUsedThatMonth() throws Exception {
         part("check-stop", "N", "N"); criteria("check-stop", "202601", null);
         history("check-stop", "Y", "N", "2026-10-15T00:00:00Z");
-        assertThat(ids(check())).doesNotContain("check-stop");
+        assertThat(ids(check())).contains("check-stop");
     }
     @Test void stoppedBeforeMonthIsExcludedWithoutSubsequentHistory() throws Exception {
         part("check-old-stop", "N", "N"); criteria("check-old-stop", "202601", null);
@@ -199,11 +199,12 @@ class PartSettlementClosePersistenceTest {
         history("check-later-stop", "Y", "N", "2026-10-31T15:00:00Z");
         assertThat(ids(check())).contains("check-later-stop");
     }
-    @Test void laterResumeDoesNotRewriteStoppedMonthAsActive() throws Exception {
+    @Test void stoppedMidMonthThenResumedLaterStillCountsTheMonthItWasUsed() throws Exception {
+        // 그 달에 하루라도 사용 중이면 정산 대상(2026-11-24 사용자 결정, 2026-11-01 「그 달 뒤에 중지」 기준을 바꿈).
         target("check-resume");
         history("check-resume", "Y", "N", "2026-10-15T00:00:00Z");
         history("check-resume", "N", "Y", "2026-11-05T00:00:00Z");
-        assertThat(ids(check())).doesNotContain("check-resume");
+        assertThat(ids(check())).contains("check-resume");
     }
     @Test void earliestSubsequentHistoryWinsWithHistoryIdResolvingTimestampTies() throws Exception {
         part("check-tie", "N", "N"); criteria("check-tie", "202601", null);

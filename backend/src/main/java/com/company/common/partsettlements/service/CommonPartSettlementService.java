@@ -33,7 +33,9 @@ public class CommonPartSettlementService {
         var rules=new PartSettlementRules(loaded);
         var parts=mapper.selectParts(db(month));
         var tabs=new ArrayList<Tab>();
-        for (Part p:parts) if (!"Y".equals(p.hqYn) && p.distributionRate!=null) {
+        // 탭은 월 마감 정산 대상과 같은 파트(그 달에 하루라도 사용 중, 2026-11-24 사용자 결정).
+        var history=mapper.selectHistory();
+        for (Part p:parts) if (PartSettlementRules.closeTarget(p,month,history)) {
             var detail=read(p,month,false,rules,parts);
             tabs.add(new Tab(p.partId,p.partName,detail.summary()));
         }

@@ -62,7 +62,11 @@ public class PartSettlementExcelService {
             var trendHeaders=new ArrayList<>(List.of("이름","구분"));
             data.monthlyTotals().forEach(t->trendHeaders.add(Integer.parseInt(t.yearMonth().substring(5))+"월"));
             trendHeaders.add("합계");
+            // 화면·시안처럼 맨 끝 「비고」(기준월 표의 사람별 비고, 사람의 첫 줄에만, 2026-11-24 사용자 결정).
+            trendHeaders.add("비고");
             headers=trendHeaders;
+            var notes=new HashMap<String,String>();
+            for (var r:service.getCommonPartSettlement(partId,yearMonth).items()) notes.put(r.developerId(),String.join(" · ",r.notes()));
             for (var person:data.items()) for (String metric:List.of("M/M","단가","비용","이익","이익금")) {
                 var row=new ArrayList<>(List.of(person.developerName(),metric));
                 java.math.BigDecimal sum=java.math.BigDecimal.ZERO;
@@ -75,11 +79,13 @@ public class PartSettlementExcelService {
                     if (m.monthlyMm().signum()>0) { row.add(value.toPlainString()); sum=sum.add(value); } else row.add("–");
                 }
                 row.add(sum.toPlainString());
+                row.add("M/M".equals(metric)?notes.getOrDefault(person.developerId(),""):"");
                 rows.add(row);
             }
             var total=new ArrayList<>(List.of("파트 이익금",""));
             data.monthlyTotals().forEach(t->total.add(t.partProfitAmount().toPlainString()));
             total.add(data.monthlyTotals().stream().map(TrendTotal::partProfitAmount).reduce(java.math.BigDecimal.ZERO,java.math.BigDecimal::add).toPlainString());
+            total.add("");
             rows.add(total);
         } else throw CodeFailure.invalid("view","이번 달 또는 기간 추이를 골라 주세요.");
         var now=calendar.now();

@@ -35,7 +35,7 @@ class WithdrawalProjectionTest {
     @Test void everyProjectionHasExplicitOrderedTypesLabelsAndNonDefaultValues() throws Exception {
         var config = config();
         var aliases = Pattern.compile("(?i)\\bAS\\s+\"([a-zA-Z][a-zA-Z0-9]*)\"");
-        var filter = new WithdrawalRows.MonthFilter("BE", "202612", LocalDate.of(2026,12,1), LocalDate.of(2026,12,31));
+        var filter = new WithdrawalRows.MonthFilter("BE", "202612", LocalDate.of(2026,12,1), LocalDate.of(2026,12,31), LocalDate.of(2026,11,1));
         for (String statement : List.of("source", "needs", "reservations", "supply", "extensions", "opportunityDemand", "projectDemand")) {
             var mapped = config.getMappedStatement(WithdrawalMapper.class.getName() + "." + statement);
             var mapping = mapped.getResultMaps().get(0);

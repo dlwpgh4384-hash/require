@@ -1,0 +1,310 @@
+/* UI-29 영업 기회 상세·등록(시안 v1.8 .card/.fgrid/.fld/.kv/.banner/.fbar 값 그대로). 색은 공통 변수만. */
+.sales-opportunity-form,
+.sales-opportunity-detail {
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sales-opportunity-form {
+  gap: 24px;
+}
+.sales-opportunity-form button,
+.sales-opportunity-detail button,
+.so-mb button {
+  min-height: 28px;
+}
+.so-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+/* 시안 .card · .card-h */
+.so-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px 24px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.so-card h3,
+.so-h {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.so-card-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.so-card-h .ls-btn,
+.so-banner-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.so-banner-actions {
+  gap: 8px;
+  margin-left: auto;
+}
+/* 시안 .fgrid · .fld · .fl · .fc */
+.so-fgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+}
+.so-fld {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: start;
+}
+.so-fld.so-full {
+  grid-column: 1 / -1;
+}
+.so-fl {
+  padding-top: 8px;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+}
+.so-fl.so-req::after {
+  content: " *";
+  color: var(--ls-bad);
+}
+.so-fc,
+.so-mfc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.so-mfl {
+  padding: 0;
+  text-align: left;
+}
+.so-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.so-dates > .so-mfc {
+  flex: 1 1 0;
+}
+.so-help {
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 16px;
+}
+.so-errmsg {
+  display: block;
+  color: var(--ls-bad);
+  font-size: 12px;
+  line-height: 16px;
+}
+/* 시안 .in · .in-sm · .money · .err */
+.so-in {
+  box-sizing: border-box;
+  height: 36px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+.so-in:focus {
+  outline: none;
+  border-color: var(--primary-text);
+  box-shadow: 0 0 0 1px var(--primary-text);
+}
+.so-in:disabled {
+  background: var(--hover);
+  color: var(--text-sub);
+}
+.so-in.so-err {
+  border-color: var(--ls-bad);
+}
+.so-in-sm {
+  height: 28px;
+  padding: 0 6px;
+  font-size: 13px;
+}
+.so-wide {
+  width: 100%;
+}
+.so-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.so-textarea {
+  width: 100%;
+  height: auto;
+  min-height: 76px;
+  padding: 8px 10px;
+  line-height: 20px;
+  resize: vertical;
+}
+.so-sub {
+  color: var(--text-sub);
+  margin: 0;
+}
+.so-cap {
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 16px;
+}
+.so-bad {
+  color: var(--ls-bad);
+}
+.so-warn {
+  color: var(--ls-warn);
+}
+.so-tnum {
+  font-variant-numeric: tabular-nums;
+}
+.so-ic {
+  flex: none;
+}
+.so-twrap {
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  max-height: none;
+}
+.so-needs td {
+  vertical-align: top;
+}
+.so-tent-warn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 12px;
+}
+.so-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+/* 시안 .fbar: 아래에 붙는 [삭제] … [취소][저장] */
+.so-fbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--divider);
+  background: var(--surface);
+}
+.so-fbar-r {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+/* 서랍 머리(바깥 서랍 없이 그릴 때): 시안 .dh */
+.so-dh {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.so-tabs {
+  padding: 0;
+}
+.so-db {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+/* 시안 drMenu(.pop.small) */
+.so-more {
+  position: relative;
+}
+.so-more-menu {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  box-shadow: var(--ls-shadow-sm);
+}
+.so-more-menu button {
+  width: 100%;
+  min-height: 0;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--divider);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+}
+.so-more-menu button:last-child {
+  border-bottom: 0;
+}
+.so-more-menu button:hover {
+  background: var(--hover);
+}
+/* 작은 창 본문(시안 .mb) */
+.so-mb {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.so-mb p {
+  margin: 0;
+}
+@media (max-width: 767px) {
+  .so-fgrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .so-fld {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .so-fl {
+    padding-top: 0;
+    text-align: left;
+  }
+  .so-card {
+    padding: 16px;
+  }
+  .so-dates {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

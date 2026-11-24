@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.salesopportunities.mapper.SalesOpportunityMapper">
+  <resultMap id="header" type="com.company.common.salesopportunities.mapper.SalesOpportunityRows$Header" autoMapping="false">
+    <constructor>
+      <idArg column="opp_id" javaType="string"/>
+      <arg column="opp_nm" javaType="string"/><arg column="cust_clnt_id" javaType="string"/>
+      <arg column="customer_name" javaType="string"/><arg column="part_id" javaType="string"/>
+      <arg column="sales_step_cd" javaType="string"/><arg column="win_prbl_rt" javaType="java.math.BigDecimal"/>
+      <arg column="prbl_manual_yn" javaType="string"/><arg column="expct_amt" javaType="java.math.BigDecimal"/>
+      <arg column="ctrt_type_cd" javaType="string"/><arg column="bgn_plan_ym" javaType="string"/>
+      <arg column="expct_prd_mcnt" javaType="java.lang.Integer"/><arg column="work_plc_addr" javaType="string"/>
+      <arg column="next_todo_cn" javaType="string"/><arg column="next_todo_ddln_dt" javaType="java.time.LocalDate"/>
+      <arg column="rmrk" javaType="string"/><arg column="opp_stat_cd" javaType="string"/>
+      <arg column="expct_prft_rt" javaType="java.math.BigDecimal"/><arg column="aprv_stat_cd" javaType="string"/>
+      <arg column="aprv_prft_rt" javaType="java.math.BigDecimal"/><arg column="rslt_dt" javaType="java.time.LocalDate"/>
+      <arg column="lose_rsn_cd" javaType="string"/><arg column="lose_memo" javaType="string"/>
+      <arg column="proj_id" javaType="string"/><arg column="reg_user_id" javaType="string"/>
+      <arg column="modified_at" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+  <sql id="columns">
+    o.opp_id,o.opp_nm,o.cust_clnt_id,c.clnt_nm AS customer_name,o.part_id,o.sales_step_cd,
+    o.win_prbl_rt,o.prbl_manual_yn,o.expct_amt,o.ctrt_type_cd,o.bgn_plan_ym,o.expct_prd_mcnt::int,
+    o.work_plc_addr,o.next_todo_cn,o.next_todo_ddln_dt,o.rmrk,o.opp_stat_cd,o.expct_prft_rt,
+    o.aprv_stat_cd,o.aprv_prft_rt,o.rslt_dt,o.lose_rsn_cd,o.lose_memo,o.proj_id,o.reg_user_id,
+    COALESCE(o.mod_dttm,o.reg_dttm) AS modified_at
+  </sql>
+  <select id="select" resultMap="header">
+    SELECT <include refid="columns"/> FROM TB_SL_OPP o
+    LEFT JOIN TB_BS_CLNT c ON c.clnt_id=o.cust_clnt_id WHERE o.opp_id=#{id}
+  </select>
+  <select id="lock" resultMap="header">
+    SELECT <include refid="columns"/> FROM TB_SL_OPP o
+    LEFT JOIN TB_BS_CLNT c ON c.clnt_id=o.cust_clnt_id WHERE o.opp_id=#{id} FOR UPDATE OF o
+  </select>
+  <select id="lockDevelopers" resultType="string">
+    SELECT d.dev_id FROM TB_HR_DEV d WHERE d.dev_id IN
+      <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    ORDER BY d.dev_id FOR UPDATE
+  </select>
+  <select id="lockOpportunities" resultType="string">
+    SELECT o.opp_id FROM TB_SL_OPP o WHERE o.opp_id IN
+      <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    ORDER BY o.opp_id FOR UPDATE
+  </select>
+  <resultMap id="need" type="com.company.common.salesopportunities.mapper.SalesOpportunityRows$NeedRow" autoMapping="false">
+    <constructor>
+      <arg column="need_sn" javaType="java.lang.Integer"/><arg column="job_cd" javaType="string"/>
+      <arg column="grade_cd" javaType="string"/><arg column="need_cnt" javaType="_int"/>
+      <arg column="bgn_ym" javaType="string"/><arg column="prd_mcnt" javaType="_int"/>
+      <arg column="mon_mm" javaType="java.math.BigDecimal"/><arg column="expct_uprc" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <select id="needs" resultMap="need">
+    SELECT n.need_sn::int,n.job_cd,n.grade_cd,n.need_cnt::int,n.bgn_ym,n.prd_mcnt::int,n.mon_mm,n.expct_uprc
+    FROM TB_SL_OPP_NEED n WHERE n.opp_id=#{id} ORDER BY n.need_sn
+  </select>
+  <resultMap id="history" type="com.company.common.salesopportunities.dto.SalesOpportunityContracts$ApprovalHistory" autoMapping="false">
+    <constructor><arg column="aprv_act_cd" javaType="string"/>
+      <arg column="reg_dttm" javaType="java.time.Instant"/><arg column="act_rsn" javaType="string"/></constructor>
+  </resultMap>
+  <select id="history" resultMap="history">
+    SELECT h.aprv_act_cd,h.reg_dttm,h.act_rsn FROM TB_SL_APRV_HIST h WHERE h.opp_id=#{id} ORDER BY h.hist_sn DESC
+  </select>
+  <resultMap id="reservation" type="com.company.common.salesopportunities.mapper.SalesOpportunityRows$Reservation" autoMapping="false">
+    <constructor><idArg column="tent_id" javaType="_long"/>
+      <arg column="opp_id" javaType="string"/><arg column="opp_nm" javaType="string"/>
+      <arg column="need_sn" javaType="_int"/><arg column="dev_id" javaType="string"/>
+      <arg column="bgn_ym" javaType="string"/><arg column="tent_stat_cd" javaType="string"/></constructor>
+  </resultMap>
+  <sql id="reservations">
+    SELECT t.tent_id::bigint,t.opp_id,o.opp_nm,t.need_sn::int,t.dev_id,t.bgn_ym,t.tent_stat_cd
+    FROM TB_SL_TENT_ASGN t JOIN TB_SL_OPP o ON o.opp_id=t.opp_id
+  </sql>
+  <select id="reservations" resultMap="reservation">
+    <include refid="reservations"/> WHERE t.opp_id=#{id} AND t.tent_stat_cd IN ('ACT','CNVT') ORDER BY t.tent_id
+  </select>
+  <select id="developerReservations" resultMap="reservation">
+    <include refid="reservations"/> WHERE t.dev_id=#{developerId} AND t.tent_stat_cd='ACT' ORDER BY t.opp_id,t.need_sn,t.tent_id
+  </select>
+  <select id="developersReservations" resultMap="reservation">
+    <include refid="reservations"/> WHERE t.tent_stat_cd='ACT' AND t.dev_id IN
+      <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    ORDER BY t.opp_id,t.need_sn,t.tent_id
+  </select>
+  <select id="developerConversions" resultMap="reservation">
+    <include refid="reservations"/> WHERE t.dev_id=#{developerId} AND t.tent_stat_cd='CNVT' ORDER BY t.tent_id
+  </select>
+  <select id="manpowerPlans" resultType="java.math.BigDecimal">
+    SELECT SUM(n.need_cnt*n.mon_mm*n.prd_mcnt) FROM TB_SL_OPP_NEED n WHERE n.opp_id=#{id} GROUP BY n.job_cd ORDER BY n.job_cd
+  </select>
+  <select id="customer" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_BS_CLNT c WHERE c.clnt_id=#{id} AND c.use_yn='Y' AND c.clnt_type_cd IN ('CUST','BOTH'))
+  </select>
+  <select id="part" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_BS_PART p WHERE p.part_id=#{id} AND p.use_yn='Y')
+  </select>
+  <select id="developer" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_HR_DEV d WHERE d.dev_id=#{id} AND d.use_yn='Y')
+  </select>
+  <select id="defaultPrice" resultType="java.math.BigDecimal">
+    SELECT CASE WHEN j.add_val2 ~ '^[0-9]+$' THEN CAST(j.add_val2 AS numeric) END
+    FROM TB_SY_CODE j WHERE j.code_grp_id='JOB' AND j.code=#{jobCode} AND j.use_yn='Y' AND j.del_yn='N'
+  </select>
+  <select id="monthlyCost" resultType="java.math.BigDecimal">
+    WITH people AS (
+      SELECT d.dev_id,d.job_cd,d.grade_cd,SUM(c.labor_alloc_amt+c.team_exps_amt+c.proj_exps_amt) AS cost
+      FROM TB_HR_MON_PAY p JOIN TB_HR_DEV d ON d.dev_id=p.dev_id
+      JOIN TB_CO_MON_COST c ON c.dev_id=p.dev_id AND c.cost_ym=p.pay_ym
+      <!-- 식-83 기준 달: 급여가 올라온 달 중 월 원가도 만든 가장 최근 달(새 달 급여만 올라오고 원가가 아직 없어도 계산된다). -->
+      WHERE p.pay_ym=(SELECT MAX(m.pay_ym) FROM TB_HR_MON_PAY m
+        WHERE EXISTS(SELECT 1 FROM TB_CO_MON_COST k WHERE k.cost_ym=m.pay_ym))
+        AND NOT EXISTS(SELECT 1 FROM TB_HR_DEV_STAT s WHERE s.dev_id=d.dev_id AND s.work_stat_cd='LEAVE'
+          AND s.bgn_dt &lt;= (to_date(p.pay_ym,'YYYYMM')+interval '1 month - 1 day')::date
+          AND (s.end_dt IS NULL OR s.end_dt &gt;= to_date(p.pay_ym,'YYYYMM')))
+      GROUP BY d.dev_id,d.job_cd,d.grade_cd
+    )
+    SELECT round((CASE WHEN COUNT(*) FILTER(WHERE p.job_cd=#{jobCode}) &gt;= 2
+      <if test="gradeCode == null">OR true</if>
+      THEN AVG(p.cost) FILTER(WHERE p.job_cd=#{jobCode}) ELSE AVG(p.cost) END)/10000)*10000
+    FROM people p
+    <where><if test="gradeCode != null">p.grade_cd=#{gradeCode}</if></where>
+  </select>
+  <select id="confirmedMm" resultType="java.math.BigDecimal">
+    SELECT COALESCE(SUM(m.mon_mm),0) FROM TB_PJ_ASGN_MON m
+    JOIN TB_PJ_ASGN a ON a.asgn_id=m.asgn_id AND a.asgn_stat_cd='ACT'
+    WHERE m.dev_id=#{developerId} AND m.input_ym=#{month}
+  </select>
+  <select id="nextOpportunityNumber" resultType="int">
+    SELECT COALESCE(MAX(CAST(substring(o.opp_id FROM 3) AS integer)),0)+1 FROM TB_SL_OPP o
+    WHERE o.opp_id ~ '^O-[0-9]{4}$'
+  </select>
+  <insert id="insert">
+    INSERT INTO TB_SL_OPP(opp_id,opp_nm,cust_clnt_id,part_id,sales_step_cd,win_prbl_rt,prbl_manual_yn,
+      expct_amt,ctrt_type_cd,bgn_plan_ym,expct_prd_mcnt,work_plc_addr,next_todo_cn,next_todo_ddln_dt,rmrk,
+      opp_stat_cd,expct_prft_rt,aprv_stat_cd,reg_user_id,reg_dttm,mod_user_id,mod_dttm)
+    VALUES(#{id},#{input.opportunityName},#{input.customerId},#{input.salesPartId},#{input.stageCode},
+      #{input.winningProbability},#{manualYn},#{input.expectedAmount},#{input.contractTypeCode,jdbcType=VARCHAR},
+      replace(#{input.startMonth},'-',''),#{input.expectedMonths},#{input.workplace,jdbcType=VARCHAR},
+      #{input.nextAction,jdbcType=VARCHAR},#{input.nextActionDueDate,jdbcType=DATE},#{input.memo,jdbcType=VARCHAR},
+      'ING',#{profit},#{approval},#{actor},clock_timestamp(),#{actor},clock_timestamp())
+    ON CONFLICT ON CONSTRAINT PK_TB_SL_OPP DO NOTHING
+  </insert>
+  <update id="update">
+    UPDATE TB_SL_OPP SET opp_nm=#{input.opportunityName},cust_clnt_id=#{input.customerId},part_id=#{input.salesPartId},
+      sales_step_cd=#{input.stageCode},win_prbl_rt=#{input.winningProbability},prbl_manual_yn=#{manualYn},
+      expct_amt=#{input.expectedAmount},ctrt_type_cd=#{input.contractTypeCode,jdbcType=VARCHAR},
+      bgn_plan_ym=replace(#{input.startMonth},'-',''),expct_prd_mcnt=#{input.expectedMonths},
+      work_plc_addr=#{input.workplace,jdbcType=VARCHAR},next_todo_cn=#{input.nextAction,jdbcType=VARCHAR},
+      next_todo_ddln_dt=#{input.nextActionDueDate,jdbcType=DATE},rmrk=#{input.memo,jdbcType=VARCHAR},
+      expct_prft_rt=#{profit},aprv_stat_cd=#{approval},mod_user_id=#{actor},mod_dttm=clock_timestamp()
+    WHERE opp_id=#{id}
+  </update>
+  <insert id="insertNeed">
+    INSERT INTO TB_SL_OPP_NEED(opp_id,need_sn,job_cd,grade_cd,need_cnt,bgn_ym,prd_mcnt,mon_mm,expct_uprc,reg_user_id,reg_dttm)
+    VALUES(#{id},#{need.needSn},#{need.jobCode},#{need.gradeCode,jdbcType=VARCHAR},#{need.requiredCount},
+      replace(#{need.startMonth},'-',''),#{need.months},#{need.monthlyMm},#{need.estimatedUnitPrice},#{actor},clock_timestamp())
+  </insert>
+  <update id="updateNeed">
+    UPDATE TB_SL_OPP_NEED SET job_cd=#{need.jobCode},grade_cd=#{need.gradeCode,jdbcType=VARCHAR},need_cnt=#{need.requiredCount},
+      bgn_ym=replace(#{need.startMonth},'-',''),prd_mcnt=#{need.months},mon_mm=#{need.monthlyMm},expct_uprc=#{need.estimatedUnitPrice},
+      mod_user_id=#{actor},mod_dttm=clock_timestamp() WHERE opp_id=#{id} AND need_sn=#{need.needSn}
+  </update>
+  <select id="historicalNeed" resultType="int">
+    SELECT COUNT(*)::int FROM TB_SL_TENT_ASGN t WHERE t.opp_id=#{id} AND t.need_sn=#{needSn} AND t.tent_stat_cd NOT IN ('ACT','REL')
+  </select>
+  <delete id="deleteReleasedNeedReservations">
+    DELETE FROM TB_SL_TENT_ASGN WHERE opp_id=#{id} AND need_sn=#{needSn} AND tent_stat_cd='REL'
+  </delete>
+  <delete id="removeNeed">DELETE FROM TB_SL_OPP_NEED WHERE opp_id=#{id} AND need_sn=#{needSn}</delete>
+  <update id="releaseNeed">
+    UPDATE TB_SL_TENT_ASGN SET tent_stat_cd='REL',proc_dttm=clock_timestamp(),mod_dttm=clock_timestamp(),mod_user_id=#{actor}
+    WHERE opp_id=#{id} AND need_sn=#{needSn} AND tent_stat_cd='ACT'
+  </update>
+  <update id="release">
+    UPDATE TB_SL_TENT_ASGN SET tent_stat_cd='REL',proc_dttm=clock_timestamp(),mod_dttm=clock_timestamp(),mod_user_id=#{actor}
+    WHERE tent_id=#{tentativeId} AND tent_stat_cd='ACT'
+  </update>
+  <update id="releaseAll">
+    UPDATE TB_SL_TENT_ASGN SET tent_stat_cd='REL',proc_dttm=clock_timestamp(),mod_dttm=clock_timestamp(),mod_user_id=#{actor}
+    WHERE opp_id=#{id} AND tent_stat_cd='ACT'
+  </update>
+  <update id="touch">UPDATE TB_SL_OPP SET mod_user_id=#{actor},mod_dttm=clock_timestamp() WHERE opp_id=#{id}</update>
+  <insert id="tentative">
+    WITH changed AS (
+      UPDATE TB_SL_TENT_ASGN SET bgn_ym=replace(#{startMonth},'-',''),mod_user_id=#{actor},mod_dttm=clock_timestamp()
+      WHERE opp_id=#{id} AND need_sn=#{needSn} AND dev_id=#{developerId} AND tent_stat_cd='ACT' RETURNING tent_id
+    )
+    INSERT INTO TB_SL_TENT_ASGN(opp_id,need_sn,dev_id,bgn_ym,tent_stat_cd,src_scrn_id,reg_user_id,reg_dttm)
+    SELECT #{id},#{needSn},#{developerId},replace(#{startMonth},'-',''),'ACT','UI-29',#{actor},clock_timestamp()
+    WHERE NOT EXISTS(SELECT 1 FROM changed)
+  </insert>
+  <update id="stage">
+    UPDATE TB_SL_OPP SET sales_step_cd=#{stage},win_prbl_rt=#{probability},mod_user_id=#{actor},mod_dttm=clock_timestamp() WHERE opp_id=#{id}
+  </update>
+  <update id="approval">
+    UPDATE TB_SL_OPP SET aprv_stat_cd=#{status},aprv_prft_rt=CASE WHEN #{status}='OK' THEN #{profit} ELSE aprv_prft_rt END,
+      mod_user_id=#{actor},mod_dttm=clock_timestamp() WHERE opp_id=#{id}
+  </update>
+  <insert id="appendHistory">
+    INSERT INTO TB_SL_APRV_HIST(opp_id,hist_sn,aprv_act_cd,prft_rt,act_rsn,reg_user_id,reg_dttm)
+    SELECT #{id},COALESCE(MAX(h.hist_sn),0)+1,#{status},#{profit},#{reason,jdbcType=VARCHAR},#{actor},clock_timestamp()
+    FROM TB_SL_APRV_HIST h WHERE h.opp_id=#{id}
+  </insert>
+  <insert id="notifyOwner">
+    INSERT INTO TB_SY_NOTI(rcvr_user_id,noti_type_cd,noti_cn,link_scrn_id,link_key,send_mthd_cd,noti_dttm,reg_user_id,reg_dttm)
+    VALUES(#{recipient},'QUOTE_REJ',#{text},'UI-29',#{id},'SYS',clock_timestamp(),#{actor},clock_timestamp())
+  </insert>
+  <update id="result">
+    UPDATE TB_SL_OPP SET opp_stat_cd=#{status},rslt_dt=#{date,jdbcType=DATE},lose_rsn_cd=#{reason,jdbcType=VARCHAR},
+      lose_memo=#{memo,jdbcType=VARCHAR},mod_user_id=#{actor},mod_dttm=clock_timestamp() WHERE opp_id=#{id}
+  </update>
+  <update id="linkProject">
+    WITH linked AS (UPDATE TB_PJ_PROJ SET opp_id=#{id},mod_user_id=#{actor},mod_dttm=clock_timestamp() WHERE proj_id=#{projectId})
+    UPDATE TB_SL_OPP SET opp_stat_cd='WIN',proj_id=#{projectId},rslt_dt=#{date},mod_user_id=#{actor},mod_dttm=clock_timestamp() WHERE opp_id=#{id}
+  </update>
+  <insert id="manpower">
+    INSERT INTO TB_PJ_MNPW_PLAN(proj_id,job_cd,plan_mm,src_cd,reg_user_id,reg_dttm)
+    SELECT #{projectId},n.job_cd,SUM(n.need_cnt*n.mon_mm*n.prd_mcnt),'OPP',#{actor},clock_timestamp()
+    FROM TB_SL_OPP_NEED n WHERE n.opp_id=#{id} GROUP BY n.job_cd
+  </insert>
+  <update id="convert">
+    UPDATE TB_SL_TENT_ASGN SET tent_stat_cd='CNVT',proc_dttm=clock_timestamp(),mod_user_id=#{actor},mod_dttm=clock_timestamp()
+    WHERE opp_id=#{id} AND tent_stat_cd='ACT'
+  </update>
+</mapper>

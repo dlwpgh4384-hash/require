@@ -1,0 +1,155 @@
+/*
+ * 시안 SCR['UI-28'] 인력 운영 보드. 칸 색은 공통 색 이름으로만 만든다(시안 --on-cell·--end-cell·--leave-cell에 맞는 공통 이름이 없어 가까운 색으로 섞음).
+ */
+.manpower-board-page {
+  --board-on: color-mix(in srgb, var(--primary) 18%, var(--surface));
+  --board-end: color-mix(in srgb, var(--ls-warn) 16%, var(--ls-warn-bg));
+  --board-leave: var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text);
+}
+.manpower-board-page [role="tabpanel"] {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+.manpower-board-page .ls-tabs {
+  margin-bottom: -8px;
+}
+.manpower-board-page .field-error {
+  display: block;
+  color: var(--ls-bad);
+}
+.manpower-board-page .board-bad {
+  color: var(--ls-bad);
+}
+.manpower-board-page .board-warn {
+  color: var(--ls-warn);
+}
+/* 시안 .pname: 이름 아래 작은 사번 */
+.board-pname {
+  display: flex;
+  flex-direction: column;
+  line-height: 18px;
+}
+.board-pname small {
+  font-size: 12px;
+  color: var(--text-sub);
+}
+/* 시안 .board td.mc: 달 칸 58px */
+.board-table td.mc {
+  width: 58px;
+  min-width: 58px;
+  padding: 0;
+  text-align: center;
+  font-size: 12px;
+  border-left: 1px solid var(--divider);
+}
+.board-table th.mc {
+  text-align: center;
+  padding: 0 4px;
+  border-left: 1px solid var(--divider);
+}
+.board-table th.cur {
+  background: var(--primary-bg);
+}
+/* 시안 .cell · .c-* */
+.manpower-board-page .cell {
+  display: grid;
+  place-items: center;
+  height: 30px;
+  margin: 3px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text);
+}
+.manpower-board-page .c-on {
+  --fill: var(--board-on);
+  background: var(--board-on);
+}
+.manpower-board-page .c-end {
+  --fill: var(--board-end);
+  background: var(--board-end);
+}
+.manpower-board-page .c-idle {
+  border: 1px dashed var(--ls-bad);
+  color: var(--ls-bad);
+}
+.manpower-board-page .c-tent {
+  border: 1px dashed var(--primary-text);
+  color: var(--primary-text);
+}
+.manpower-board-page .c-leave {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--board-leave) 0 3px,
+    transparent 3px 7px
+  );
+}
+.manpower-board-page .c-ret {
+  background: var(--board-leave);
+  opacity: 0.55;
+}
+.manpower-board-page .c-pre {
+  --fill: var(--board-on);
+  background: var(--board-on);
+  color: var(--ls-warn);
+}
+/* 1.0 미만 투입: 투입한 만큼(--p)만 칠한다 */
+.manpower-board-page .c-part {
+  background: linear-gradient(
+    90deg,
+    var(--fill) var(--p),
+    transparent var(--p)
+  );
+  outline: 1px dashed var(--ls-bad);
+  outline-offset: -1px;
+}
+.manpower-board-page .c-over {
+  box-shadow: inset 0 0 0 2px var(--ls-warn);
+}
+/* 시안 .legend */
+.board-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 12px;
+  color: var(--text-sub);
+  align-items: center;
+}
+.board-legend .cell {
+  display: inline-grid;
+  width: 22px;
+  height: 14px;
+  margin: 0 6px 0 0;
+  vertical-align: -3px;
+}
+.manpower-board-page .board-free {
+  max-height: none;
+  min-height: 0;
+}
+.manpower-board-page .ls-note {
+  margin-top: -12px;
+}
+@media (max-width: 767px) {
+  .manpower-board-page,
+  .manpower-board-page [role="tabpanel"] {
+    gap: 16px;
+  }
+  .manpower-board-page .ls-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .manpower-board-page .ls-note {
+    margin-top: -4px;
+  }
+  /* 시안 모바일: 도구 줄 오른쪽(범례)은 숨긴다 */
+  .manpower-board-page .ls-tbar .ls-tr {
+    display: none;
+  }
+}

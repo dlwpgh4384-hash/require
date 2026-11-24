@@ -15,6 +15,7 @@ public interface WithdrawalMapper {
     String lockDeveloper(@Param("id") String id);
     List<Need> needs();
     List<String> lockNeeds();
+    int touchOpportunity(@Param("id") String id, @Param("actor") String actor);
     List<Reservation> reservations(@Param("developerId") String developerId);
     /** 여러 사람의 현재 가배정(ACT·CNVT)을 한 번에 읽는다. 빈 목록으로는 부르지 않는다. */
     List<Reservation> reservationsFor(@Param("developerIds") Collection<String> developerIds);
@@ -23,7 +24,6 @@ public interface WithdrawalMapper {
     List<String> skills(@Param("developerId") String developerId);
     int release(@Param("id") String id, @Param("actor") String actor);
     int insertReservation(ReservationWrite write);
-    int touchOpportunity(@Param("id") String id, @Param("actor") String actor);
     List<SupplyRow> supply(MonthFilter filter);
     List<ExtensionRow> extensions(MonthFilter filter);
     List<OpportunityDemandRow> opportunityDemand(MonthFilter filter);

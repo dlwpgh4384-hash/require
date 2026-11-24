@@ -25,7 +25,8 @@ public final class WithdrawalRows {
         String startMonth, String actor) {}
     /** 조기 철수 이력 한 줄(목록 전체를 한 번에 읽는다). */
     public record EarlyRow(String assignmentId, LocalDate effectiveDate, String afterValue) {}
-    public record MonthFilter(String jobCode, String month, LocalDate firstDay, LocalDate lastDay) {}
+    /** baseMonth = 이번 달 1일(한국): 끝난 투입의 연장(식-60)과 미충원 나눗수 시작(식-61, 다음 달)을 정한다. */
+    public record MonthFilter(String jobCode, String month, LocalDate firstDay, LocalDate lastDay, LocalDate baseMonth) {}
     public record SupplyRow(String developerId, BigDecimal confirmedMm) {}
     public record ExtensionRow(String developerId, BigDecimal monthlyMm, String extensionPossibilityCode) {}
     public record OpportunityDemandRow(BigDecimal requiredCount, BigDecimal monthlyMm, BigDecimal winningProbability) {}

@@ -117,8 +117,12 @@ public class CommonDeveloperService {
             LocalDate start=a.startDate.isAfter(first)?a.startDate:first, end=a.endDate.isBefore(last)?a.endDate:last;
             if (end.isBefore(start)) continue;
             BigDecimal weighted=BigDecimal.ZERO;
-            for (LocalDate day=start; !day.isAfter(end); day=day.plusDays(1))
-                weighted=weighted.add(history?Objects.requireNonNull(mapper.selectAssignmentMm(a.assignmentId,day)):a.mm);
+            if (history) {
+                // 날마다 따로 읽지 않고 그 기간의 날별 MM을 한 번에 읽는다(같은 규칙, 결과 같음).
+                for (BigDecimal mm : mapper.selectAssignmentDailyMms(a.assignmentId,start,end)) weighted=weighted.add(Objects.requireNonNull(mm));
+            } else {
+                for (LocalDate day=start; !day.isAfter(end); day=day.plusDays(1)) weighted=weighted.add(a.mm);
+            }
             total=total.add(calculations.prorate(weighted,first.lengthOfMonth()));
         }
         return total;

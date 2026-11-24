@@ -14,6 +14,7 @@ import {
   type ClientChange,
   type ClientCode,
 } from "./clients";
+import { historyValue } from "../../shared/historyValue";
 
 const dash = (value: string | null | undefined) => (value ? value : "–");
 
@@ -323,8 +324,8 @@ export function ClientDetail({
             <tr key={index} data-testid={`client-history-${index}`}>
               <td>{formatDateTime(line.changedAt)}</td>
               <td>{line.fieldName}</td>
-              <td>{dash(line.beforeValue)}</td>
-              <td>{dash(line.afterValue)}</td>
+              <td>{dash(historyValue(line.fieldName, line.beforeValue))}</td>
+              <td>{dash(historyValue(line.fieldName, line.afterValue))}</td>
               <td>{line.changedBy}</td>
             </tr>
           ))}

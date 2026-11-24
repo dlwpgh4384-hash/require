@@ -39,11 +39,12 @@ const ok = (data: unknown) => ({
   status: 200,
   json: async () => ({ success: true, meta: {}, data: structuredClone(data) }),
 });
+// 고른 연도 저장(사용자 설정 PERIOD)은 업무 쓰기가 아니라서 뺀다.
 const writes = () =>
-  request.mock.calls.filter((c) =>
-    ["POST", "PUT"].includes(
-      (c[1] as RequestInit | undefined)?.method ?? "GET",
-    ),
+  request.mock.calls.filter(
+    (c) =>
+      ["POST", "PUT"].includes((c[1] as RequestInit | undefined)?.method ?? "GET") &&
+      !String(c[0]).startsWith("/api/common/user-preferences/"),
   );
 const body = (call: unknown[]) =>
   JSON.parse(((call[1] as RequestInit).body as string) ?? "{}");

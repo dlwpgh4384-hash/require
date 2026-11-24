@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useSavedYear } from "../userpreferences/useSavedYear";
 import { createPortal } from "react-dom";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
@@ -126,7 +127,11 @@ export function ProjectPage() {
   const host = useProjectTitleHost();
   const presentation = useListPresentation();
   const currentYear = Number(projectToday().slice(0, 4));
-  const [year, setYear] = useState(currentYear);
+  // 고른 연도를 기억한다(FR-0105, 2026-11-24 사용자 결정).
+  const [year, setYear] = useSavedYear("UI-01", currentYear, 1, currentYear + 1, () => {
+    setPage(1);
+    setDetail(null);
+  });
   const [rows, setRows] = useState<Project[] | null>(null);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);

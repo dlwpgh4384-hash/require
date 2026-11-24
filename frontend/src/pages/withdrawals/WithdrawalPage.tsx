@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSavedYear } from "../userpreferences/useSavedYear";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
@@ -67,7 +68,8 @@ const sortValue = (row: WithdrawalRow, key: string): string | number => {
 /** 시안 철수 리스트(UI-05): 연도 줄, 안내 띠 2개, 조건, 공통 목록, 다음 자리 추천 창. */
 export function WithdrawalPage({ roles = [] }: { roles?: readonly string[] }) {
   const currentYear = Number(koreanToday().slice(0, 4));
-  const [year, setYear] = useState(currentYear);
+  // 고른 연도를 기억한다(FR-0105, 2026-11-24 사용자 결정).
+  const [year, setYear] = useSavedYear("UI-05", currentYear, 1, currentYear + 1, () => setPage(1));
   // 조건은 고른 값(draft)과 [조회]로 적용한 값(applied)을 나눈다(투입 배정과 같게).
   const [draft, setDraft] = useState<Filter>({});
   const [applied, setApplied] = useState<Filter>({});

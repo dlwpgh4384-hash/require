@@ -192,7 +192,8 @@ const form = (props: Partial<Parameters<typeof AssignmentForm>[0]> = {}) =>
   inRouter(<AssignmentForm projects={[project]} roles={["FIN"]} onClose={vi.fn()} onSaved={vi.fn()} {...props} />);
 const detail = (readOnly = false, roles = ["FIN"]) =>
   inRouter(<AssignmentDetail id={row.assignmentId} roles={roles} readOnly={readOnly} onClose={vi.fn()} onChanged={vi.fn()} />);
-const writes = () => request.mock.calls.filter((c) => ["POST", "PUT"].includes((c[1] as RequestInit | undefined)?.method ?? "GET"));
+// 고른 연도 저장(사용자 설정 PERIOD)은 업무 쓰기가 아니라서 뺀다.
+const writes = () => request.mock.calls.filter((c) => ["POST", "PUT"].includes((c[1] as RequestInit | undefined)?.method ?? "GET") && !String(c[0]).startsWith("/api/common/user-preferences/"));
 const body = (n = 0) => JSON.parse(String((writes()[n][1] as RequestInit).body));
 const ready = () => waitFor(() => expect(screen.getByTestId("assignment-form-save")).not.toBeDisabled());
 const pick = async () => {
@@ -253,6 +254,31 @@ it("places template, upload and primary create in the title host and excel downl
   expect(list.getByTestId("list-download")).toHaveTextContent("엑셀 다운로드");
   expect(list.getByTestId("list-columns")).toHaveTextContent("열 설정");
   expect(list.getByTestId("list-density")).toHaveTextContent("좁게 보기");
+});
+
+it("reopening uses the saved year and changing the year saves it (FR-0105)", async () => {
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    String(url) === "/api/common/user-preferences/PERIOD/UI-12"
+      ? init?.method === "PUT"
+        ? ok({ prefTypeCd: "PERIOD", prefKey: "UI-12", found: true, prefVal: String(JSON.parse(String(init.body)).prefVal ?? ""), modDttm: "2026-11-24T00:00:00Z" })
+        : ok({ prefTypeCd: "PERIOD", prefKey: "UI-12", found: true, prefVal: '{"year":2025}', modDttm: "2026-11-23T00:00:00Z" })
+      : base(url, init),
+  );
+  page();
+  expect(await screen.findByTestId("assignment-lock-banner")).toHaveTextContent("2025년은 지난 해라 읽기만 할 수 있습니다.");
+  await waitFor(() =>
+    expect(request.mock.calls.some(([u]) => String(u).startsWith("/api/common/assignments?") && String(u).includes("year=2025"))).toBe(true),
+  );
+  fireEvent.click(screen.getByTestId("assignment-year-next"));
+  await waitFor(() =>
+    expect(
+      request.mock.calls.some(
+        ([u, i]) => String(u) === "/api/common/user-preferences/PERIOD/UI-12" && (i as RequestInit | undefined)?.method === "PUT"
+          && String((i as RequestInit).body).includes('\\"year\\":2026'),
+      ),
+    ).toBe(true),
+  );
 });
 
 it("last year shows the lock banner and hides every editing control", async () => {

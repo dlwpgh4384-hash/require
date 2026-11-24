@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useSavedYear } from "../userpreferences/useSavedYear";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
@@ -78,6 +79,11 @@ export function ManpowerComparisonPage() {
     year: Math.min(2027, Math.max(2025, currentYear)),
   }));
   const [applied, setApplied] = useState<ManpowerComparisonFilter>(draft);
+  // 고른 연도를 기억한다(FR-0105, 2026-11-24 사용자 결정). 다시 열면 저장된 해로 바로 조회한다.
+  const [, saveYear] = useSavedYear("UI-11", draft.year, 2025, 2027, (year) => {
+    setDraft((previous) => ({ ...previous, year }));
+    setApplied((previous) => ({ ...previous, year }));
+  });
   const [revision, setRevision] = useState(0);
   const openEdit = useOpenProjectEdit();
   const [data, setData] = useState<ManpowerComparisonResult | null>(null);
@@ -154,6 +160,7 @@ export function ManpowerComparisonPage() {
       ? projectId
       : undefined;
   const changeYear = (year: number) => {
+    saveYear(year);
     setDraft((previous) => ({
       ...previous,
       year,

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useSavedYear } from "../userpreferences/useSavedYear";
 import { createPortal } from "react-dom";
 import {
   ConfirmDialog,
@@ -117,7 +118,11 @@ export function AssignmentPage({
   const host = useAssignmentTitleHost();
   const presentation = useListPresentation();
   const currentYear = Number(koreanToday().slice(0, 4));
-  const [year, setYear] = useState(currentYear);
+  // 고른 연도를 기억한다(FR-0105, 2026-11-24 사용자 결정).
+  const [year, setYear] = useSavedYear("UI-12", currentYear, 1, currentYear + 1, () => {
+    setPage(1);
+    setDetail(null);
+  });
   const [filter, setFilter] = useState(emptyFilter);
   const [applied, setApplied] = useState(emptyFilter);
   const [rows, setRows] = useState<Assignment[] | null>(null);

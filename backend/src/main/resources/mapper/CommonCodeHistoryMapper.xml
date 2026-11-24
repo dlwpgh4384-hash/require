@@ -17,11 +17,40 @@
         WHEN 'TB_SY_OPER_STD' THEN '운영 기준값'
         WHEN 'TB_SY_CODE_MAP' THEN '표기 대응'
       END AS kind,
-      COALESCE(h.chg_item_nm, h.trgt_key) AS item,
-      COALESCE(h.bfr_val, '') AS before_value,
-      COALESCE(h.aft_val, '') AS after_value,
-      h.reg_user_id
+      <!-- 시안 log27Body 모양(2026-11-24 사용자 결정): 항목은 「그룹 이름 · 코드」(이름 말고 다른 칸이면 칸 이름을 붙임),
+           운영 기준값은 기준값 이름, 값은 사용/사용 안 함·단위·적용 시작월, 처리자는 사용자 이름. -->
+      CASE h.trgt_tbl_nm
+        WHEN 'TB_SY_CODE' THEN COALESCE(g.code_grp_nm, split_part(h.trgt_key, ':', 1)) || ' · ' || split_part(h.trgt_key, ':', 2)
+          || CASE h.chg_item_nm WHEN 'CODE_NM' THEN '' WHEN 'SORT_ORD' THEN ' · 순서' WHEN 'USE_YN' THEN ' · 사용'
+               WHEN 'CODE_VAL' THEN ' · 값' WHEN 'UNIT_NM' THEN ' · 단위' WHEN 'ADD_VAL1' THEN ' · 추가값 1'
+               WHEN 'ADD_VAL2' THEN ' · 추가값 2' WHEN 'ADD_VAL3' THEN ' · 추가값 3' WHEN 'DEL_YN' THEN '' ELSE '' END
+        WHEN 'TB_SY_CODE_GRP' THEN COALESCE(g.code_grp_nm, h.aft_val, h.trgt_key)
+        WHEN 'TB_SY_OPER_STD' THEN COALESCE(s.std_nm, split_part(h.trgt_key, ':', 1))
+        ELSE COALESCE(h.chg_item_nm, h.trgt_key)
+      END AS item,
+      CASE
+        WHEN h.bfr_val IS NULL OR h.bfr_val = '' THEN '–'
+        WHEN h.chg_item_nm IN ('USE_YN', 'DEL_YN') THEN CASE h.bfr_val WHEN 'Y' THEN '사용' WHEN 'N' THEN '사용 안 함' ELSE h.bfr_val END
+        WHEN h.trgt_tbl_nm = 'TB_SY_OPER_STD' THEN h.bfr_val || COALESCE(s.unit_nm, '')
+        ELSE h.bfr_val
+      END AS before_value,
+      CASE
+        WHEN h.chg_item_nm = 'DEL_YN' AND h.aft_val = 'Y' THEN '삭제'
+        WHEN h.chg_item_nm = 'USE_YN' THEN CASE h.aft_val WHEN 'Y' THEN '사용' WHEN 'N' THEN '사용 안 함' ELSE COALESCE(h.aft_val, '–') END
+        WHEN h.aft_val IS NULL OR h.aft_val = '' THEN '–'
+        WHEN h.trgt_tbl_nm = 'TB_SY_OPER_STD' THEN h.aft_val || COALESCE(s.unit_nm, '')
+          || CASE WHEN split_part(h.trgt_key, ':', 2) ~ '^[0-9]{6}$'
+               THEN ' (' || substr(split_part(h.trgt_key, ':', 2), 1, 4) || '-' || substr(split_part(h.trgt_key, ':', 2), 5, 2) || '부터)'
+               ELSE '' END
+        ELSE h.aft_val
+      END AS after_value,
+      COALESCE(u.user_nm, h.reg_user_id) AS reg_user_id
     FROM TB_SY_CHG_HIST h
+    LEFT JOIN TB_SY_CODE_GRP g ON g.code_grp_id = CASE h.trgt_tbl_nm WHEN 'TB_SY_CODE' THEN split_part(h.trgt_key, ':', 1)
+      WHEN 'TB_SY_CODE_GRP' THEN h.trgt_key END
+    LEFT JOIN TB_SY_OPER_STD s ON h.trgt_tbl_nm = 'TB_SY_OPER_STD' AND s.std_cd = split_part(h.trgt_key, ':', 1)
+      AND s.aply_bgn_ym = (SELECT min(x.aply_bgn_ym) FROM TB_SY_OPER_STD x WHERE x.std_cd = s.std_cd)
+    LEFT JOIN TB_SY_USER u ON u.user_id = h.reg_user_id
     WHERE h.trgt_tbl_nm IN ('TB_SY_CODE_GRP', 'TB_SY_CODE', 'TB_SY_OPER_STD', 'TB_SY_CODE_MAP')
     ORDER BY h.reg_dttm DESC, h.hist_id DESC
   </select>

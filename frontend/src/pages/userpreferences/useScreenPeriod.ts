@@ -6,7 +6,10 @@ import {
   type PeriodOptions,
   type PeriodValue,
 } from "../../shared/period/periodRules";
-import { createPreferenceSaver, getCommonUserPreference } from "./userPreferences";
+import {
+  createPreferenceSaver,
+  getCommonUserPreference,
+} from "./userPreferences";
 
 type State =
   | { status: "loading" }
@@ -32,10 +35,17 @@ function parseSaved(value: string | null): PeriodValue | null {
  * 저장된 기간을 먼저 쓰고, 없으면 가장 최근 달. 저장된 기간이 지금 허용 범위 밖이면
  * 가장 최근 달로 바꿔 보여 주고 다시 저장한다(안내 창 없음).
  */
-export function useScreenPeriod(screenId: string, options: PeriodOptions) {
+export function useScreenPeriod(
+  screenId: string,
+  options: PeriodOptions,
+  latestYm?: string,
+) {
   const [state, setState] = useState<State>({ status: "loading" });
   // 화면마다 따로 차례로 저장한다(빨리 두 번 바꿔도 두 번째가 남고, 다른 화면의 수정 시각과 섞이지 않는다).
-  const saver = useMemo(() => createPreferenceSaver("PERIOD", screenId), [screenId]);
+  const saver = useMemo(
+    () => createPreferenceSaver("PERIOD", screenId),
+    [screenId],
+  );
   const optionsKey = JSON.stringify(options);
   const save = useCallback(
     async (value: PeriodValue) => {
@@ -50,7 +60,9 @@ export function useScreenPeriod(screenId: string, options: PeriodOptions) {
     getCommonUserPreference("PERIOD", screenId, controller.signal)
       .then((response) => {
         if (controller.signal.aborted) return;
-        const basis = response.meta.periodBasis;
+        const sourceBasis = response.meta.periodBasis;
+        const basis =
+          sourceBasis && latestYm ? { ...sourceBasis, latestYm } : sourceBasis;
         if (!basis) {
           setState({
             status: "error",
@@ -63,17 +75,22 @@ export function useScreenPeriod(screenId: string, options: PeriodOptions) {
         saver.setToken(response.data.modDttm);
         const saved = parseSaved(response.data.prefVal);
         const value =
-          saved && isAllowed(saved, basis, current) ? saved : latestPeriod(basis, current.kind);
+          saved && isAllowed(saved, basis, current)
+            ? saved
+            : latestPeriod(basis, current.kind);
         setState({ status: "ready", basis, value });
         if (saved && !isAllowed(saved, basis, current))
           void save(value).catch(() => undefined);
       })
       .catch(() => {
         if (!controller.signal.aborted)
-          setState({ status: "error", message: "기간을 불러오지 못했습니다. 다시 시도해 주세요." });
+          setState({
+            status: "error",
+            message: "기간을 불러오지 못했습니다. 다시 시도해 주세요.",
+          });
       });
     return () => controller.abort();
-  }, [screenId, optionsKey, save]);
+  }, [screenId, optionsKey, save, latestYm]);
   const setValue = useCallback(
     (value: PeriodValue) => {
       setState((previous) =>

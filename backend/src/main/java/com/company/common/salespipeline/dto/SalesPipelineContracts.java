@@ -41,4 +41,8 @@ public final class SalesPipelineContracts {
     public record Forecast(List<ForecastMonth> months, List<HiringReview> hiringReviews,
         List<ForecastOpportunity> opportunityRevenues) {}
     public record Workbook(byte[] bytes, String fileName, int count) {}
+    public record WorkforceJob(String jobCode, String jobName, BigDecimal supply,
+        BigDecimal demand, BigDecimal unfilledDemand) {}
+    public record WorkforceMonth(String month, BigDecimal supply, BigDecimal demand,
+        BigDecimal unfilledDemand, List<WorkforceJob> jobs) {}
 }

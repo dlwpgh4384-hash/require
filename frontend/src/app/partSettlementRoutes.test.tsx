@@ -80,8 +80,8 @@ function respond(developerId = "DEV-selected", available = true) {
       {
         menuId: "M024",
         upperMenuId: "G008",
-        menuNm: "인력 수요 예측",
-        scrnId: "UI-17",
+        menuNm: "미구현 화면",
+        scrnId: "UI-30",
         menuLvl: 2,
         sortOrd: 1,
         pcOnlyYn: "N",
@@ -91,7 +91,7 @@ function respond(developerId = "DEV-selected", available = true) {
     meta: {
       screenAccess: [
         { scrnId: "UI-19", available, pcOnlyYn: "N" },
-        { scrnId: "UI-17", available: true, pcOnlyYn: "N" },
+        { scrnId: "UI-30", available: true, pcOnlyYn: "N" },
       ],
     },
   };
@@ -276,11 +276,11 @@ it.each(["/screens/UI-19", "/#UI-19"])(
   },
 );
 
-it("M016 opens UI-19 in the existing preference provider while UI-17 stays a placeholder", async () => {
+it("M016 opens UI-19 in the existing preference provider while UI-30 stays a placeholder", async () => {
   const { request, developer } = respond();
-  mount("/screens/UI-17");
+  mount("/screens/UI-30");
   expect(
-    await screen.findByRole("region", { name: "UI-17 본문" }),
+    await screen.findByRole("region", { name: "UI-30 본문" }),
   ).toHaveTextContent("준비 중");
   const preferences = screen.getByTestId("user-preferences");
   expect(
@@ -292,9 +292,9 @@ it("M016 opens UI-19 in the existing preference provider while UI-17 stays a pla
   expect(router?.state.location.pathname).toBe("/screens/UI-19");
   expect(screen.getByTestId("user-preferences")).toBe(preferences);
   await act(async () => {
-    await router!.navigate("/screens/UI-17");
+    await router!.navigate("/screens/UI-30");
   });
-  expect(screen.getByRole("region", { name: "UI-17 본문" })).toHaveTextContent(
+  expect(screen.getByRole("region", { name: "UI-30 본문" })).toHaveTextContent(
     "준비 중",
   );
   expect(
@@ -442,7 +442,9 @@ it("in the real shell the title bar holds [정산 확정]; confirming asks first
       screen.getByTestId(`list-row-${developer.developerId}`),
     ).findByText("정규직"),
   ).toBeVisible();
-  expect(screen.queryByTestId("part-settlement-banner")).not.toBeInTheDocument();
+  expect(
+    screen.queryByTestId("part-settlement-banner"),
+  ).not.toBeInTheDocument();
   const bar = within(screen.getByTestId("part-settlement-title-actions"));
   fireEvent.click(bar.getByRole("button", { name: "정산 확정" }));
   const dialog = screen.getByRole("alertdialog", {

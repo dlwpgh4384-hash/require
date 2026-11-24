@@ -24,7 +24,7 @@ const screens = [
 ];
 /** 아직 만들지 않은 화면(화면 목록에 없음): 메뉴에는 있고 본문은 공통 「준비 중」. */
 const pending = [
-  { id: "UI-17", menuId: "M010", parent: "G004", title: "인력 수요 예측" },
+  { id: "UI-30", menuId: "M030", parent: "G004", title: "미구현 화면" },
 ];
 const menuScreens = [...screens, ...pending];
 
@@ -214,10 +214,10 @@ describe("withdrawal route composition", () => {
     });
     const preferences = screen.getByTestId("user-preferences");
     await act(async () => {
-      await router!.navigate("/screens/UI-17");
+      await router!.navigate("/screens/UI-30");
     });
     const placeholder = await screen.findByRole("region", {
-      name: "UI-17 본문",
+      name: "UI-30 본문",
     });
     expect(placeholder).toHaveTextContent("준비 중");
     expect(screen.getByTestId("list-download")).not.toBeVisible();

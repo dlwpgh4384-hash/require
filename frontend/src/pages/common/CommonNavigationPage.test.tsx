@@ -138,6 +138,20 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (url.startsWith("/api/common/manpower-forecasts?"))
+      return {
+        success: true,
+        meta: {},
+        data: {
+          months: [],
+          summary: {
+            lastMonthSupply: 0,
+            lastMonthDemand: 0,
+            mostShortage: null,
+          },
+          thresholds: { shortageThreshold: 0.4, surplusThreshold: 1 },
+        },
+      };
     if (url.startsWith("/api/common/manpower-board?"))
       return {
         success: true,
@@ -532,7 +546,8 @@ function respond(body: ShellMenuResponse) {
               url.endsWith("/UI-18") ||
               url.endsWith("/UI-21") ||
               url.endsWith("/UI-14") ||
-              url.endsWith("/UI-28")
+              url.endsWith("/UI-28") ||
+              url.endsWith("/UI-17")
                 ? {
                     periodBasis: {
                       latestYm: "202602",
@@ -593,6 +608,15 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-17": async (content) => {
+    expect(await content.findByTestId("manpower-forecast-empty")).toBeVisible();
+    expect(
+      content.getByRole("table", { name: "월별 전체 인력" }),
+    ).toHaveTextContent("필요 인력");
+    expect(
+      content.queryByRole("button", { name: /저장|등록|삭제/ }),
+    ).not.toBeInTheDocument();
+  },
   "UI-28": async (content) => {
     expect(await content.findByTestId("manpower-board-empty")).toBeVisible();
     expect(content.getByRole("tab", { name: "달력" })).toHaveAttribute(

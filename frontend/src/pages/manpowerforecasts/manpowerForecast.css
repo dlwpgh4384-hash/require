@@ -1,0 +1,56 @@
+.manpower-forecast-page {
+  min-width: 0;
+  max-width: 100%;
+}
+.manpower-forecast-year {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.manpower-forecast-kpis {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.manpower-forecast-table-scroll {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.manpower-forecast-table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+}
+.manpower-forecast-table th,
+.manpower-forecast-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+.manpower-forecast-table th:first-child {
+  text-align: left;
+}
+.manpower-forecast-table .shortage {
+  color: var(--ls-bad);
+}
+.manpower-forecast-table .surplus {
+  color: var(--ls-warn);
+}
+.manpower-forecast-table .balanced {
+  color: var(--text-sub);
+}
+.manpower-forecast-unfilled {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: var(--text-sub);
+  font-size: 12px;
+}
+@media (max-width: 767px) {
+  .manpower-forecast-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .manpower-forecast-page .profit-card {
+    padding: 16px;
+  }
+}

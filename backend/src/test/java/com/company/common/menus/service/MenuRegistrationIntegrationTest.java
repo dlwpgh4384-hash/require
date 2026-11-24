@@ -179,6 +179,17 @@ class MenuRegistrationIntegrationTest {
         assertThat(count("SELECT count(*) FROM TB_SY_ROLE_MENU_AUTH WHERE menu_id=?", id))
             .isEqualTo(count("SELECT count(*) FROM TB_SY_ROLE"));
     }
+    @Test void sameGroupNameIsRefusedWithMockupMessageAndNoRow() throws Exception {
+        mvc.perform(post("/api/common/menus").contentType("application/json")
+            .content(json.writeValueAsString(Map.of("menuLvl", 1, "menuNm", "합성 묶음")))).andExpect(status().isOk());
+        long menus = count("SELECT count(*) FROM TB_SY_MENU");
+        mvc.perform(post("/api/common/menus").contentType("application/json")
+            .content(json.writeValueAsString(Map.of("menuLvl", 1, "menuNm", " 합성 묶음 "))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("menuNm"))
+            .andExpect(jsonPath("$.errors[0].message").value("같은 이름의 대메뉴가 있습니다."));
+        assertThat(count("SELECT count(*) FROM TB_SY_MENU")).isEqualTo(menus);
+    }
     @Test void stoppedAndActiveRolesReceiveSevenNAndOnlyOneRegistrationHistory() throws Exception {
         freeDevelopedScreen();
         db.update("INSERT INTO TB_SY_ROLE(role_id,role_nm,data_scope_cd,sort_ord,use_yn,reg_user_id) "

@@ -11,6 +11,7 @@ public interface MenuRegistrationMapper {
     List<MenuRegistrationRow> selectParents();
     MenuRegistrationRow selectMenu(@Param("id") String id);
     boolean screenExists(@Param("scrnId") String scrnId);
+    boolean groupNameExists(@Param("name") String name);
     BigInteger selectIssuedNumber(@Param("prefix") String prefix);
     int selectNextSortOrder(@Param("parentId") String parentId);
     void insertMenu(Item item);

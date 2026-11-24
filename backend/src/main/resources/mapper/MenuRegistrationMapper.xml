@@ -27,6 +27,10 @@
   <select id="screenExists" resultType="boolean">
     SELECT EXISTS (SELECT 1 FROM TB_SY_MENU WHERE scrn_id=#{scrnId})
   </select>
+  <!-- 시안 menuAdd: 같은 이름의 대메뉴(사용 안 함 포함)가 있으면 막는다(2026-11-24 사용자 결정). -->
+  <select id="groupNameExists" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_SY_MENU WHERE menu_lvl=1 AND BTRIM(menu_nm)=BTRIM(#{name}))
+  </select>
   <select id="selectIssuedNumber" resultType="java.math.BigInteger">
     SELECT COALESCE(MAX(substring(issued.id FROM 2)::numeric),0)
     FROM (

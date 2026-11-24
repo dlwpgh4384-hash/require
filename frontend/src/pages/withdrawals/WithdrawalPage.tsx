@@ -506,9 +506,14 @@ export function WithdrawalPage({ roles = [] }: { roles?: readonly string[] }) {
                 {row.name}
                 <small>{row.jobName}</small>
               </span>
-              <Badge kind={row.remainingDays <= 30 ? "bad" : "warn"}>
-                D-{row.remainingDays}
-              </Badge>
+              {/* 철수가 끝난 사람은 PC 목록처럼 「철수 완료」(「D--5」가 나오던 것, 2026-11-24 사용자 결정). */}
+              {row.withdrawalCompleted ? (
+                days(row)
+              ) : (
+                <Badge kind={row.remainingDays <= 30 ? "bad" : "warn"}>
+                  D-{row.remainingDays}
+                </Badge>
+              )}
             </div>
             <div className="ls-r2">
               <span>{row.projectName}</span>

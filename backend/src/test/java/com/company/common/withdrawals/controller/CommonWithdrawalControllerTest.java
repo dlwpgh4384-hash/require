@@ -268,6 +268,7 @@ class CommonWithdrawalControllerTest {
         verify(assignments,never()).update(any());verify(assignments,never()).saveMonth(any());
         verify(assignments,never()).insert(any());verify(assignments,never()).insertHistory(any());
         verify(mapper).insertReservation(argThat(w -> "person".equals(w.developerId()) && "admin".equals(w.actor()) && w.needSn()==1));
+        verify(mapper).touchOpportunity("O-0001","admin");
         mvc.perform(get("/api/common/withdrawals/tentative-assignments").param("developerId","person"))
             .andExpect(status().isOk()).andExpect(contract("GET","/api/common/withdrawals/tentative-assignments"))
             .andExpect(jsonPath("$.data.items[0].tentativeAssignment.opportunityId").value("O-0001"));
@@ -278,6 +279,8 @@ class CommonWithdrawalControllerTest {
             String write=writes.group(1).toUpperCase(Locale.ROOT);
             // 엑셀 다운로드 접근 기록(DNLD)은 업무 자료가 아니라서 따로 센다(2026-11-19).
             if (write.contains("TB_SY_ACCS_LOG")) { assertThat(write).contains("'DNLD'").doesNotContain("TB_PJ_ASGN","TB_SL_TENT_ASGN"); continue; }
+            // 가배정·해제 때 영업 기회 수정 시각만 바꾼다(결정 C8, 2026-11-24). 다른 칸은 쓰지 않는다.
+            if (write.contains("UPDATE TB_SL_OPP ")) { assertThat(write).contains("MOD_DTTM","MOD_USER_ID").doesNotContain("OPP_STAT_CD","SALES_STEP_CD","EXPCT_AMT","WIN_PRBL_RT"); continue; }
             assertThat(write).contains("TB_SL_TENT_ASGN")
                 .doesNotContain("TB_PJ_ASGN","TB_CO_MON_COST","TB_SL_RCMD_LOG");statements++;
         }

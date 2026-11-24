@@ -23,6 +23,7 @@ public interface WithdrawalMapper {
     List<String> skills(@Param("developerId") String developerId);
     int release(@Param("id") String id, @Param("actor") String actor);
     int insertReservation(ReservationWrite write);
+    int touchOpportunity(@Param("id") String id, @Param("actor") String actor);
     List<SupplyRow> supply(MonthFilter filter);
     List<ExtensionRow> extensions(MonthFilter filter);
     List<OpportunityDemandRow> opportunityDemand(MonthFilter filter);

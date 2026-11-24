@@ -91,8 +91,10 @@ public class WithdrawalTentativeService {
         }
         var start = context.rules().tentativeStartMonth(source.endDate(), calendar.fromDatabaseMonth(target.startMonth()));
         if (current != null && mapper.release(current.tentativeId(), actor.userId()) != 1) throw CodeFailure.conflict();
+        if (current != null) mapper.touchOpportunity(current.opportunityId(), actor.userId());
         if (mapper.insertReservation(new ReservationWrite(source.developerId(), target.opportunityId(),
             target.needSn(), calendar.toDatabaseMonth(start), actor.userId())) != 1) throw CodeFailure.conflict();
+        mapper.touchOpportunity(target.opportunityId(), actor.userId());
         return new TentativeResult(view(source, one(mapper.reservations(source.developerId()))));
     }
 }

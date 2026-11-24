@@ -692,3 +692,12 @@ it("mobile cards follow the mockup and hold no controls", async () => {
   fireEvent.click(first);
   expect(await screen.findByTestId("withdrawal-assignment-detail")).toHaveTextContent("a");
 });
+it("mobile card shows 철수 완료 like the PC list for someone already withdrawn (no D--1)", async () => {
+  viewport.mobile = true;
+  viewport.width = 375;
+  page();
+  const done = await screen.findByTestId("list-card-d");
+  expect(done).toHaveTextContent("철수 완료");
+  expect(done).not.toHaveTextContent("D--1");
+  expect(within(screen.getByTestId("list-card-a")).getByText("D-30")).toBeInTheDocument();
+});

@@ -131,8 +131,10 @@ export function useScreenPeriod(
       controller = active;
       getCommonUserPreference("PERIOD", screenId, active.signal)
         .then((response) => {
-          const basis = response.meta.periodBasis;
-          if (active.signal.aborted || !basis) return;
+          const sourceBasis = response.meta.periodBasis;
+          if (active.signal.aborted || !sourceBasis) return;
+          // 처음 읽을 때와 같이, 화면이 넘긴 기준 달(latestYm)이 있으면 그것으로 덮는다(인력 수요 예측 등).
+          const basis = latestYm ? { ...sourceBasis, latestYm } : sourceBasis;
           setState((previous) => {
             if (previous.status !== "ready") return previous;
             const value = isAllowed(previous.value, basis, current)
@@ -148,6 +150,6 @@ export function useScreenPeriod(
       controller?.abort();
       window.removeEventListener(PERIOD_BASIS_CHANGED_EVENT, listener);
     };
-  }, [screenId, optionsKey]);
+  }, [screenId, optionsKey, latestYm]);
   return { state, setValue };
 }

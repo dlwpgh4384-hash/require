@@ -45,3 +45,18 @@ it("rereads the period basis of an open screen after a month close and keeps the
   // 기간 기준만 다시 읽고 고른 기간을 새로 저장하지 않는다.
   expect(fetchMock.mock.calls.every((call) => (call as unknown[])[1] === undefined || ((call as unknown[])[1] as RequestInit).method === undefined)).toBe(true);
 });
+
+it("keeps the screen's own latest month after the basis is reread", async () => {
+  // 인력 수요 예측처럼 화면이 기준 달(latestYm)을 넘기면, 월 마감 뒤 다시 읽어도 그 달을 쓴다.
+  const options = { kind: "year", allowNextYear: true, allowBeforeStart: false, firstDataYear: 2026 } as const;
+  const { result } = renderHook(() => useScreenPeriod("UI-31", options, "202612"));
+  await waitFor(() => expect(result.current.state.status).toBe("ready"));
+  closedTo = 10;
+  act(() => announcePeriodBasisChanged());
+  await waitFor(() => {
+    const state = result.current.state;
+    expect(state.status === "ready" && state.basis.closedMonths).toHaveLength(10);
+  });
+  const after = result.current.state;
+  expect(after.status === "ready" && after.basis.latestYm).toBe("202612");
+});

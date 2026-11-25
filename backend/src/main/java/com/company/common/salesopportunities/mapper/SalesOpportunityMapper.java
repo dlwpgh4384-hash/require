@@ -19,6 +19,8 @@ public interface SalesOpportunityMapper {
     List<NeedRow> needs(@Param("id") String id);
     List<ApprovalHistory> history(@Param("id") String id);
     List<Reservation> reservations(@Param("id") String id);
+    /** 상세 가배정 인력 줄(reservations와 같은 ACT·CNVT, 사람 이름 포함). */
+    List<TentativeLineRow> tentativeLines(@Param("id") String id);
     List<Reservation> developerReservations(@Param("developerId") String developerId);
     /** 여러 사람의 ACT 가배정을 한 번에 읽는다(잠글 기회를 정할 때). 빈 목록으로는 부르지 않는다. */
     List<Reservation> developersReservations(@Param("ids") Collection<String> ids);
@@ -42,6 +44,7 @@ public interface SalesOpportunityMapper {
     int updateNeed(NeedWrite write);
     int removeNeed(@Param("id") String id, @Param("needSn") int needSn);
     int historicalNeed(@Param("id") String id, @Param("needSn") int needSn);
+    int maxNeedSn(@Param("id") String id);
     int deleteReleasedNeedReservations(@Param("id") String id, @Param("needSn") int needSn);
     int releaseNeed(@Param("id") String id, @Param("needSn") int needSn, @Param("actor") String actor);
     int release(@Param("tentativeId") long tentativeId, @Param("actor") String actor);

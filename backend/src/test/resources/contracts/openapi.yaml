@@ -12526,7 +12526,7 @@ paths:
         - data
     put:
       operationId: putCommonSalesOpportunity
-      summary: 영업 기회 필요 인력 수정
+      summary: 영업 기회 수정
       security: []
       x-related-requirements:
       - REQ-1393
@@ -24767,18 +24767,6 @@ components:
           nullable: true
         assignmentCandidate:
           type: boolean
-        costBasis:
-          type: object
-          properties:
-            cost:
-              type: number
-              nullable: true
-            price:
-              type: number
-              nullable: true
-          required:
-          - cost
-          - price
       required:
       - developerId
       - developerName

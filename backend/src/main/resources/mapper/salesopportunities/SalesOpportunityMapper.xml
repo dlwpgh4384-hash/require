@@ -79,6 +79,17 @@
   <select id="reservations" resultMap="reservation">
     <include refid="reservations"/> WHERE t.opp_id=#{id} AND t.tent_stat_cd IN ('ACT','CNVT') ORDER BY t.tent_id
   </select>
+  <resultMap id="tentativeLine" type="com.company.common.salesopportunities.mapper.SalesOpportunityRows$TentativeLineRow" autoMapping="false">
+    <constructor><arg column="need_sn" javaType="_int"/><arg column="dev_id" javaType="string"/>
+      <arg column="dev_nm" javaType="string"/><arg column="bgn_ym" javaType="string"/>
+      <arg column="tent_stat_cd" javaType="string"/></constructor>
+  </resultMap>
+  <!-- 상세 가배정 인력 줄: reservations와 같은 줄(ACT·CNVT)에 이름을 붙인다. 「투입 가능」은 각자의 BGN_YM. -->
+  <select id="tentativeLines" resultMap="tentativeLine">
+    SELECT t.need_sn::int,t.dev_id,d.dev_nm,t.bgn_ym,t.tent_stat_cd
+    FROM TB_SL_TENT_ASGN t JOIN TB_HR_DEV d ON d.dev_id=t.dev_id
+    WHERE t.opp_id=#{id} AND t.tent_stat_cd IN ('ACT','CNVT') ORDER BY t.tent_id
+  </select>
   <select id="developerReservations" resultMap="reservation">
     <include refid="reservations"/> WHERE t.dev_id=#{developerId} AND t.tent_stat_cd='ACT' ORDER BY t.opp_id,t.need_sn,t.tent_id
   </select>
@@ -170,6 +181,13 @@
   </update>
   <select id="historicalNeed" resultType="int">
     SELECT COUNT(*)::int FROM TB_SL_TENT_ASGN t WHERE t.opp_id=#{id} AND t.need_sn=#{needSn} AND t.tent_stat_cd NOT IN ('ACT','REL')
+  </select>
+  <!-- 지금 줄과 AI 추천 기록에 남은 가장 큰 필요 인력 줄 번호(없으면 0). 새 줄은 이 값 + 1.
+       가배정(TB_SL_TENT_ASGN)은 외래키로 지금 줄에만 붙으므로 따로 보지 않는다. -->
+  <select id="maxNeedSn" resultType="int">
+    SELECT GREATEST(
+      COALESCE((SELECT MAX(n.need_sn) FROM TB_SL_OPP_NEED n WHERE n.opp_id=#{id}),0),
+      COALESCE((SELECT MAX(l.need_sn) FROM TB_SL_RCMD_LOG l WHERE l.opp_id=#{id}),0))::int
   </select>
   <delete id="deleteReleasedNeedReservations">
     DELETE FROM TB_SL_TENT_ASGN WHERE opp_id=#{id} AND need_sn=#{needSn} AND tent_stat_cd='REL'

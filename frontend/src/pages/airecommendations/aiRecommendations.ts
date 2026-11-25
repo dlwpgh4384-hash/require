@@ -50,7 +50,6 @@ export interface AiCard {
   reason: string;
   otherTentativeOpportunityName: string | null;
   assignmentCandidate: boolean;
-  costBasis?: { cost: number | null; price: number | null } | null;
 }
 export interface AiResult {
   recommendationId: string;
@@ -70,6 +69,40 @@ export interface AiTentativeResult {
   overCapacityCount: number;
   message: string;
 }
+
+/** 시안 카드 점수 줄 이름(순서도 시안 그대로). 서버가 다른 이름을 보내도 화면은 이 이름을 쓴다. */
+export const AI_SCORE_LABELS: readonly [string, string][] = [
+  ["job", "직무"],
+  ["skill", "스킬"],
+  ["customerIndustry", "고객·업종"],
+  ["grade", "등급"],
+  ["performance", "성과"],
+  ["cost", "비용"],
+  ["availability", "가용일"],
+  ["workplace", "근무지"],
+];
+
+/** 시안 대상 목록: 영업 기회 먼저, 그다음 프로젝트(각각 받은 순서). */
+export const orderedTargets = (targets: readonly AiTarget[]) => [
+  ...targets.filter((t) => t.targetType === "opportunity"),
+  ...targets.filter((t) => t.targetType !== "opportunity"),
+];
+export const targetLabel = (t: AiTarget) =>
+  `${t.targetType === "opportunity" ? "[기회]" : "[프로젝트]"} ${t.targetName}`;
+/** 가배정 자리(필요 인력 줄)는 NEED_SN 순서로 1번부터 센다. */
+export const orderedNeeds = (needs: readonly AiNeed[]) =>
+  [...needs].sort((a, b) => a.needSn - b.needSn);
+
+/**
+ * 시안 .why 문장. 서버가 늘 시안 문장(주 직무 → 같은 고객사 → 투입 가능 → 보유 스킬)을 보내므로
+ * 화면은 그 글을 그대로 쓰고, 끝에 마침표만 맞춘다(화면에서 문장을 따로 만들지 않음).
+ */
+export function aiReasonText(card: AiCard) {
+  const own = card.reason?.trim() ?? "";
+  return !own || /[.!?]$/.test(own) ? own : `${own}.`;
+}
+
+const FAILURE = "요청을 처리하지 못했습니다. 잠시 뒤 다시 시도해 주세요.";
 async function request<T>(
   path: string,
   method = "GET",
@@ -84,11 +117,12 @@ async function request<T>(
           body: JSON.stringify(body),
         }),
   });
-  const payload = await response.json();
-  if (!response.ok || !payload.success)
+  // 서버가 JSON이 아닌 응답(예: 프록시 오류 화면)을 주면 영어·HTML 대신 우리말로 알린다.
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload?.success)
     throw new AssignmentRequestError(
-      payload.message ?? "요청을 처리하지 못했습니다.",
-      payload.errors ?? [],
+      payload?.message || FAILURE,
+      payload?.errors ?? [],
       response.status,
     );
   return payload.data as T;

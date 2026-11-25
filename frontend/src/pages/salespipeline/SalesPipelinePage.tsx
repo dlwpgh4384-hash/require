@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { requestAiRecommendation } from "../airecommendations/aiRecommendationRequest";
+import { withdrawalRefreshEvent } from "../withdrawals/withdrawals";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
@@ -213,6 +214,12 @@ export function SalesPipelinePage({
   const notify = (message: string, kind: ToastKind = "ok") =>
     show([{ message, kind }]);
 
+  // AI 인력 추천 [가배정]·[배정], 철수 리스트 가배정이 바뀌면 열린 탭의 카드·필요 인력도 다시 읽는다.
+  useEffect(() => {
+    const reload = () => setRevision((v) => v + 1);
+    window.addEventListener(withdrawalRefreshEvent, reload);
+    return () => window.removeEventListener(withdrawalRefreshEvent, reload);
+  }, []);
   useEffect(() => {
     if (!highlight) return;
     const timer = window.setTimeout(

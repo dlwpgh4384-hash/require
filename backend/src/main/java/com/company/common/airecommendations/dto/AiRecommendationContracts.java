@@ -13,12 +13,11 @@ public final class AiRecommendationContracts {
     public record Condition(String targetType, String targetId, String jobCode,
         String startMonth, String gradeCode, Integer needSn) {}
     public record ScoreItem(String name, BigDecimal score, BigDecimal maximumScore) {}
-    public record CostBasis(BigDecimal cost, BigDecimal price) {}
+    /** 원가·단가 숫자는 응답에 넣지 않는다(비용 점수만 서버에서 계산). */
     public record Card(String developerId, String developerName, String managementNumber,
         String jobName, String gradeName, String employeeTypeName, BigDecimal totalScore,
         Map<String, ScoreItem> scores, String reason, String otherTentativeOpportunityName,
-        boolean assignmentCandidate,
-        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) CostBasis costBasis) {}
+        boolean assignmentCandidate) {}
     public record Result(String recommendationId, Condition condition, List<Card> items) {}
     public record AssignmentInput(String developerId, String assignmentId) {}
     public record AssignmentResult(String recommendationId, String developerId,

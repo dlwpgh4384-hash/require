@@ -1,8 +1,9 @@
-package com.company.common.common;
+package com.company.common.airecommendations.service;
 
-import com.company.common.common.AiRecommendationLogCodec.Metadata;
-import com.company.common.common.AiRecommendationLogCodec.Score;
-import com.company.common.common.AiRecommendationLogCodec.Snapshot;
+import com.company.common.airecommendations.service.AiRecommendationLogCodec.Metadata;
+import com.company.common.airecommendations.service.AiRecommendationLogCodec.Score;
+import com.company.common.airecommendations.service.AiRecommendationLogCodec.Snapshot;
+import com.company.common.common.ManpowerBoardFixture;
 import com.company.common.schema.SchemaPreparation;
 import com.company.common.support.service.BusinessCalendar;
 import com.fasterxml.jackson.databind.ObjectMapper;

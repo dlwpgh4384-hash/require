@@ -1,7 +1,7 @@
-package com.company.common.commonops.controller;
+package com.company.common.airecommendations.controller;
 
-import com.company.common.commonops.dto.AiRecommendationOptionsContracts.*;
-import com.company.common.commonops.service.AiRecommendationOptionsService;
+import com.company.common.airecommendations.dto.AiRecommendationOptionsContracts.*;
+import com.company.common.airecommendations.service.AiRecommendationOptionsService;
 import com.company.common.users.dto.UserContracts.Response;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;

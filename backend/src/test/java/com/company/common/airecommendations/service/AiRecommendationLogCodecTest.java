@@ -1,8 +1,8 @@
-package com.company.common.common;
+package com.company.common.airecommendations.service;
 
-import com.company.common.common.AiRecommendationLogCodec.Metadata;
-import com.company.common.common.AiRecommendationLogCodec.Score;
-import com.company.common.common.AiRecommendationLogCodec.Snapshot;
+import com.company.common.airecommendations.service.AiRecommendationLogCodec.Metadata;
+import com.company.common.airecommendations.service.AiRecommendationLogCodec.Score;
+import com.company.common.airecommendations.service.AiRecommendationLogCodec.Snapshot;
 import com.company.common.support.service.CodeFailure;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -15,6 +15,15 @@ import static org.assertj.core.api.Assertions.*;
 class AiRecommendationLogCodecTest {
     private final ObjectMapper json = new ObjectMapper();
     private final AiRecommendationLogCodec codec = new AiRecommendationLogCodec(json);
+
+    @Test
+    void requestFingerprintIsStableHexAndRejectsBlank() {
+        String first = AiRecommendationLogCodec.fingerprint("../request/한글");
+        assertThat(first).matches("[a-f0-9]{64}");
+        assertThat(first).isEqualTo(AiRecommendationLogCodec.fingerprint("../request/한글"));
+        assertThat(first).isNotEqualTo(AiRecommendationLogCodec.fingerprint(" ../request/한글"));
+        assertThatThrownBy(() -> AiRecommendationLogCodec.fingerprint(" ")).isInstanceOf(CodeFailure.class);
+    }
     private final Metadata metadata = new Metadata("a".repeat(64), 7, null);
 
     private Snapshot snapshot() {

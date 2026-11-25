@@ -3,7 +3,6 @@ package com.company.common.airecommendations.controller;
 import com.company.common.airecommendations.mapper.*;
 import com.company.common.airecommendations.mapper.AiRecommendationRows.*;
 import com.company.common.airecommendations.service.*;
-import com.company.common.common.*;
 import com.company.common.codegroups.dto.CodeContracts.Item;
 import com.company.common.projects.mapper.ProjectMapper;
 import com.company.common.salesopportunities.mapper.SalesOpportunityMapper;
@@ -33,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(CommonAiRecommendationController.class)
 @ContextConfiguration(classes={CommonAiRecommendationController.class, CommonAiRecommendationService.class,
     AiRecommendationActionService.class, AiRecommendationResources.class, AiRecommendationLogCodec.class,
-    AiRecommendationExecutionJournal.class, CurrentBusinessActor.class, CodeExceptionHandler.class, ApiExceptionHandler.class})
+    CurrentBusinessActor.class, CodeExceptionHandler.class, ApiExceptionHandler.class})
 class CommonAiRecommendationControllerTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
@@ -54,9 +53,10 @@ class CommonAiRecommendationControllerTest {
         logs.clear();
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         when(calendar.today()).thenReturn(LocalDate.of(2026,11,25));
+        when(calendar.currentMonth()).thenReturn(YearMonth.of(2026,11));
         when(calendar.fromDatabaseMonth(anyString())).thenAnswer(c->YearMonth.parse(((String)c.getArgument(0)).substring(0,4)+"-"+((String)c.getArgument(0)).substring(4)));
         when(calendar.toDatabaseMonth(any())).thenAnswer(c->c.getArgument(0).toString().replace("-",""));
-        when(mapper.target(anyString(),anyString())).thenAnswer(c->new Target(c.getArgument(0),c.getArgument(1),"대상","202612","202712","ING","MO","customer","IT",null,"Java","project"));
+        when(mapper.target(anyString(),anyString())).thenAnswer(c->new Target(c.getArgument(0),c.getArgument(1),"대상","202612","202712","ING","MO","customer","IT",null,"Java","project","고객사"));
         when(codes.selectable("JOB")).thenReturn(List.of(code("BE"),code("FE")));
         when(codes.selectable("GRADE")).thenReturn(List.of(code("MD"),code("SR")));
         when(codes.selectable("SKILL")).thenReturn(List.of());
@@ -68,10 +68,12 @@ class CommonAiRecommendationControllerTest {
         when(mapper.nextId()).thenAnswer(c->Long.toString(++sequence));
         var person=new Person("developer","인력","M001","BE",null,"백엔드","SR","고급","FT","정규",null);
         when(mapper.person("developer")).thenReturn(person);
+        when(mapper.people(any())).thenReturn(List.of(person));
         when(mapper.candidates(any())).thenReturn(List.of(person));
         when(mapper.evidence(any())).thenReturn(new Evidence(0,0,0,false,false,null,false));
         when(mapper.insert(any())).thenAnswer(c->{ LogWrite w=c.getArgument(0); logs.add(w.log()); return 1; });
-        when(mapper.replay(anyString())).thenAnswer(c->logs.stream().filter(l->codec.decode(l.scoreDetail()).metadata().fingerprint().equals(c.getArgument(0))).toList());
+        when(mapper.replay(anyString(),anyString(),anyString())).thenAnswer(c->logs.stream().filter(l->codec.decode(l.scoreDetail()).metadata().fingerprint().equals(c.getArgument(0))
+            && l.targetType().equals(c.getArgument(1)) && l.targetId().equals(c.getArgument(2))).toList());
         when(mapper.candidate(anyString(),anyString())).thenAnswer(c->logs.stream().filter(l->l.recommendationId().equals(c.getArgument(0)) && l.developerId().equals(c.getArgument(1))).findFirst().orElse(null));
         when(mapper.lockCandidate(anyString(),anyString())).thenAnswer(c->mapper.candidate(c.getArgument(0),c.getArgument(1)));
         when(mapper.action(any())).thenAnswer(c->{ Action a=c.getArgument(0); Log old=mapper.candidate(a.recommendationId(),a.developerId());
@@ -100,7 +102,7 @@ class CommonAiRecommendationControllerTest {
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings={"FL","OS"})
     void dispatchedOpportunityRejectsEachExternalEmploymentType(String employment) throws Exception {
-        when(mapper.target("opportunity","target")).thenReturn(new Target("opportunity","target","파견","202612",null,"ING","DP",null,null,null,null,null));
+        when(mapper.target("opportunity","target")).thenReturn(new Target("opportunity","target","파견","202612",null,"ING","DP",null,null,null,null,null,null));
         when(mapper.candidates(any())).thenReturn(List.of(new Person("external","외부","M002","BE",null,"백엔드","SR","고급",employment,"외부",null)));
         mvc.perform(post("/api/common/ai-recommendations").contentType("application/json").content(json.writeValueAsBytes(input("opportunity"))))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.items.length()").value(0));
@@ -121,6 +123,20 @@ class CommonAiRecommendationControllerTest {
         var in=input("project");in.put("startMonth","2026-13");
         mvc.perform(post("/api/common/ai-recommendations").contentType("application/json").content(json.writeValueAsBytes(in)))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("startMonth")); assertThat(logs).isEmpty();
+    }
+    /** L-13: 프로젝트 시작월 = max(요청 월, 이번 달, 프로젝트 시작월). 지난(마감) 달로는 추천하지 않는다. 기회는 그대로. */
+    @Test void projectStartMonthIsRaisedToThisMonthButOpportunityKeepsAskedMonth() throws Exception {
+        when(mapper.target(anyString(),anyString())).thenAnswer(c->new Target(c.getArgument(0),c.getArgument(1),"대상","202603","202712","ING","MO","customer","IT",null,"Java","project","고객사"));
+        var project=input("project");project.put("startMonth","2026-03");
+        mvc.perform(post("/api/common/ai-recommendations").contentType("application/json").content(json.writeValueAsBytes(project)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.condition.startMonth").value("2026-11"));
+        assertThat(logs).extracting(Log::startMonth).containsOnly("202611");
+        var captor=org.mockito.ArgumentCaptor.forClass(AiRecommendationRows.Filter.class);
+        verify(mapper,atLeastOnce()).candidates(captor.capture());
+        assertThat(captor.getValue().firstDay()).isEqualTo(LocalDate.of(2026,11,1));
+        var opportunity=input("opportunity");opportunity.put("startMonth","2026-03");
+        mvc.perform(post("/api/common/ai-recommendations").contentType("application/json").content(json.writeValueAsBytes(opportunity)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.condition.startMonth").value("2026-03"));
     }
     @Test void afterProjectEndIsRejectedBeforeAnyWrite() throws Exception {
         var in=input("project");in.put("startMonth","2028-01");
@@ -164,11 +180,28 @@ class CommonAiRecommendationControllerTest {
         verify(mapper,times(1)).candidates(any());
         verify(definitions,times(1)).currentMaxima();
     }
-    @Test void zeroResultsHaveSequenceIdentityWithoutSentinelAndReplayExactly() throws Exception {
+    @Test void zeroResultsHaveSequenceIdentityWithoutSentinelOrLogRows() throws Exception {
+        // 0명이면 남길 기록 줄이 없으므로 같은 요청을 다시 보내도 쓰기 없이 다시 계산한다(결과는 계속 0명).
         when(mapper.candidates(any())).thenReturn(List.of()); var in=input("project");byte[] body=json.writeValueAsBytes(in);
-        String first=mvc.perform(post("/api/common/ai-recommendations").contentType("application/json").content(body)).andExpect(status().isOk()).andExpect(jsonPath("$.data.items").isEmpty()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
-        mvc.perform(post("/api/common/ai-recommendations").contentType("application/json").content(body)).andExpect(status().isOk()).andExpect(content().json(first));
-        assertThat(logs).isEmpty();verify(mapper,times(1)).nextId();
+        mvc.perform(post("/api/common/ai-recommendations").contentType("application/json").content(body)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items").isEmpty()).andExpect(jsonPath("$.data.recommendationId").value("101"));
+        mvc.perform(post("/api/common/ai-recommendations").contentType("application/json").content(body)).andExpect(status().isOk()).andExpect(jsonPath("$.data.items").isEmpty());
+        assertThat(logs).isEmpty();verify(mapper,never()).insert(any());verify(mapper,never()).evidences(any());
+    }
+    @Test void responseHasNoCostOrPriceNumbers() throws Exception {
+        String body=mvc.perform(post("/api/common/ai-recommendations").contentType("application/json").content(json.writeValueAsBytes(input("project"))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].scores.cost.score").exists())
+            .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertThat(body).doesNotContain("costBasis").doesNotContain("\"price\"");
+    }
+    @Test void candidateEvidenceIsReadOnceForAllCandidates() throws Exception {
+        var people=new ArrayList<Person>();
+        for(int i=0;i<4;i++)people.add(new Person("p"+i,"P"+i,"M00"+i,"BE",null,"백엔드","SR","고급","FT","정규",null));
+        when(mapper.candidates(any())).thenReturn(people);
+        mvc.perform(post("/api/common/ai-recommendations").contentType("application/json").content(json.writeValueAsBytes(input("project")))).andExpect(status().isOk());
+        verify(mapper,times(1)).evidences(any());verify(mapper,times(1)).payrolls(any(),anyString());verify(mapper,times(1)).prices(any(),anyString());
+        verify(mapper,times(1)).skills(any());verify(mapper,times(1)).conversions(any());verify(opportunities,times(1)).developersReservations(any());
+        verify(mapper,never()).evidence(any());verify(opportunities,never()).developerReservations(anyString());
     }
     @Test void noNeedOpportunityCanRecommendAndExcludeWithFixedActorAudit() throws Exception {
         String id=recommend("opportunity");
@@ -176,6 +209,27 @@ class CommonAiRecommendationControllerTest {
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.excluded").value(true)).andExpect(jsonPath("$.data.actedBy").value("admin"));
         assertThat(logs.get(0).reasonCode()).isEqualTo("OTHER");assertThat(logs.get(0).actedAt()).isEqualTo(now);
         assertThat(codec.decode(logs.get(0).scoreDetail()).metadata().exclusionActive()).isTrue();
+        // 같은 후보를 다시 제외하면 처음 기록 그대로 성공(쓰기 없음).
+        mvc.perform(post("/api/common/ai-recommendations/{id}/exclusions",id).contentType("application/json").content("{\"developerId\":\"developer\",\"reasonCode\":\"OTHER\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.excluded").value(true)).andExpect(jsonPath("$.data.reasonCode").value("OTHER"));
+        verify(mapper,times(1)).exclude(any());
+    }
+    @Test void exclusionDoesNotOverwriteTentativeCandidate() throws Exception {
+        String id=recommend("opportunity");Log old=logs.get(0);
+        logs.set(0,new Log(old.recommendationId(),old.rankOrder(),old.targetType(),old.targetId(),old.jobCode(),old.startMonth(),old.gradeCode(),1,old.developerId(),old.totalScore(),old.scoreDetail(),old.reason(),"TENT",null,"admin",now));
+        Log before=logs.get(0);
+        mvc.perform(post("/api/common/ai-recommendations/{id}/exclusions",id).contentType("application/json").content("{\"developerId\":\"developer\",\"reasonCode\":\"OTHER\"}"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("이미 처리한 추천 후보입니다."));
+        assertThat(logs.get(0)).isEqualTo(before);verify(mapper,never()).exclude(any());
+    }
+    @Test void cancelledAssignmentCannotBeLinked() throws Exception { invalidAssignment("assignment",new Assignment("assignment","developer","target","CNCL")); }
+    @Test void missingDeveloperForTentativeIsFieldErrorNotServerError() throws Exception {
+        String id=recommend("opportunity");when(withdrawals.lockDeveloper("developer")).thenReturn("developer");
+        when(mapper.person("developer")).thenReturn(null);
+        mvc.perform(put("/api/common/ai-recommendations/{id}/tentative-assignment",id).contentType("application/json").content("{\"developerId\":\"developer\",\"needSn\":1}"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("developerId"))
+            .andExpect(jsonPath("$.message").value("추천 후보를 확인해 주세요."));
+        verify(withdrawals,never()).insertReservation(any());
     }
     @Test void missingExclusionReasonDoesNotChangeAudit() throws Exception { invalidReason("{}"); }
     @Test void codeFromAnotherGroupDoesNotChangeAudit() throws Exception { invalidReason("{\"developerId\":\"developer\",\"reasonCode\":\"BE\"}"); }
@@ -185,15 +239,15 @@ class CommonAiRecommendationControllerTest {
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("reasonCode"));assertThat(logs.get(0)).isEqualTo(before);
     }
     @Test void assignmentSelectionLinksOnlyMatchingSavedAssignmentAndDoesNotTouchTentative() throws Exception {
-        String id=recommend("project");when(mapper.assignment("assignment")).thenReturn(new Assignment("assignment","developer","target"));
+        String id=recommend("project");when(mapper.assignment("assignment")).thenReturn(new Assignment("assignment","developer","target","ACT"));
         mvc.perform(post("/api/common/ai-recommendations/{id}/assignment",id).contentType("application/json").content("{\"developerId\":\"developer\",\"assignmentId\":\"assignment\"}"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.userActCode").value("ASGN"));
         assertThat(logs.get(0).actedBy()).isEqualTo("admin");assertThat(logs.get(0).userActCode()).isEqualTo("ASGN");verifyNoInteractions(withdrawals);
     }
     @Test void missingAssignmentIdIsFieldErrorAndUnchanged() throws Exception { invalidAssignment(null,null); }
     @Test void nonexistentAssignmentIsFieldErrorAndUnchanged() throws Exception { invalidAssignment("missing",null); }
-    @Test void otherDeveloperAssignmentCannotBeLinked() throws Exception { invalidAssignment("assignment",new Assignment("assignment","other","target")); }
-    @Test void otherProjectAssignmentCannotBeLinked() throws Exception { invalidAssignment("assignment",new Assignment("assignment","developer","other")); }
+    @Test void otherDeveloperAssignmentCannotBeLinked() throws Exception { invalidAssignment("assignment",new Assignment("assignment","other","target","ACT")); }
+    @Test void otherProjectAssignmentCannotBeLinked() throws Exception { invalidAssignment("assignment",new Assignment("assignment","developer","other","ACT")); }
     void invalidAssignment(String assignment,Assignment row) throws Exception {
         String id=recommend("project");Log before=logs.get(0);if(assignment!=null)when(mapper.assignment(assignment)).thenReturn(row);
         var body=new HashMap<String,String>();body.put("developerId","developer");if(assignment!=null)body.put("assignmentId",assignment);
@@ -223,7 +277,7 @@ class CommonAiRecommendationControllerTest {
         people.add(new Person("c","C","M000","BE",null,"백엔드","MD","중급","FT","정규",null));
         for(int i=0;i<4;i++)people.add(new Person("extra"+i,"기타","Z00"+i,"BE",null,"백엔드","MD","중급","FT","정규",null));
         when(mapper.candidates(any())).thenReturn(people);
-        when(mapper.evidence(any())).thenAnswer(call->{ EvidenceFilter f=call.getArgument(0);return f.developerId().equals("b")?new Evidence(5,2,0,false,false,LocalDate.of(2027,1,31),true):new Evidence(0,0,0,false,false,null,false); });
+        when(mapper.evidences(any())).thenReturn(List.of(new EvidenceRow("b",5,2,0,false,false,LocalDate.of(2027,1,31),true)));
         var result=json.readTree(mvc.perform(post("/api/common/ai-recommendations").contentType("application/json").content(json.writeValueAsBytes(input("project"))))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8)).path("data").path("items");
         assertThat(result.size()).isEqualTo(5);assertThat(logs).hasSize(5);
@@ -235,20 +289,25 @@ class CommonAiRecommendationControllerTest {
         String id=recommend("opportunity");
         when(withdrawals.lockDeveloper("developer")).thenReturn("developer");
         when(withdrawals.reservations("developer")).thenReturn(List.of(new Reservation("9","developer","previous","이전 기회",1,"202612","ACT")));
-        when(opportunities.needs("target")).thenReturn(List.of(new NeedRow(2,"BE","SR",1,"202701",6,BigDecimal.ONE,null)));
+        // 2명 자리에 3번째 사람: 넘은 수(overCapacityCount)는 1, 알림의 n은 자리 인원 2.
+        when(opportunities.needs("target")).thenReturn(List.of(new NeedRow(2,"BE","SR",2,"202701",6,BigDecimal.ONE,null)));
         when(mapper.evidence(any())).thenReturn(new Evidence(0,0,0,false,false,LocalDate.of(2026,12,31),false));
         when(withdrawals.release("9","admin")).thenReturn(1);
         when(withdrawals.insertReservation(any())).thenReturn(1);
         var header=mock(com.company.common.salesopportunities.mapper.SalesOpportunityRows.Header.class);
         when(header.opportunityName()).thenReturn("새 기회");when(opportunities.select("target")).thenReturn(header);
         when(opportunities.reservations("target")).thenReturn(List.of(
+            new com.company.common.salesopportunities.mapper.SalesOpportunityRows.Reservation(9,"target","새 기회",2,"another","202701","ACT"),
             new com.company.common.salesopportunities.mapper.SalesOpportunityRows.Reservation(10,"target","새 기회",2,"other","202701","ACT"),
             new com.company.common.salesopportunities.mapper.SalesOpportunityRows.Reservation(11,"target","새 기회",2,"developer","202701","ACT")));
         mvc.perform(put("/api/common/ai-recommendations/{id}/tentative-assignment",id).contentType("application/json").content("{\"developerId\":\"developer\",\"needSn\":2}"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.assignment.needSn").value(2))
             .andExpect(jsonPath("$.data.assignment.startMonth").value("2027-01"))
             .andExpect(jsonPath("$.data.overCapacityCount").value(1))
-            .andExpect(jsonPath("$.data.message").value(org.hamcrest.Matchers.containsString("이 자리는 1명을 넘었습니다.")));
+            .andExpect(jsonPath("$.data.assignment.assignmentId").value("11"))
+            // 시안 문구 그대로, 「1번 자리」는 NEED_SN(2)이 아니라 지금 줄 가운데 순서.
+            .andExpect(jsonPath("$.data.message").value("인력님을 「새 기회」 1번 자리(백엔드)에 가배정했습니다. (이전 가배정 「이전 기회」은 풀렸습니다)"
+                + " 영업 파이프라인 필요 인력과 인력 운영 보드에서 볼 수 있습니다. 이 자리는 2명을 넘었습니다."));
         var write=org.mockito.ArgumentCaptor.forClass(com.company.common.withdrawals.mapper.WithdrawalRows.ReservationWrite.class);
         verify(withdrawals).insertReservation(write.capture());
         assertThat(write.getValue().sourceScreenId()).isEqualTo("UI-30");

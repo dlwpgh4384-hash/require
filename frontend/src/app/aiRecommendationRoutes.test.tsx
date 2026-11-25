@@ -205,7 +205,7 @@ it("tab activation retains the recommendation draft without another execution", 
     await router!.navigate("/screens/UI-30");
   });
   expect(screen.getByTestId("ai-grade")).toHaveValue("MD");
-  expect(screen.getByTestId("ai-applied")).toHaveTextContent("SR");
+  expect(screen.getByTestId("ai-applied")).toHaveTextContent("고급");
   expect(runs).toHaveBeenCalledTimes(1);
   expectShell();
 });

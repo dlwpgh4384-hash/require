@@ -1,11 +1,9 @@
-package com.company.common.commonops;
+package com.company.common.airecommendations.service;
 
 import com.company.common.codegroups.mapper.CodeGroupMapper;
 import com.company.common.codegroups.service.CommonCodeService;
-import com.company.common.common.AiRecommendationCodes;
-import com.company.common.commonops.controller.AiRecommendationOptionsController;
-import com.company.common.commonops.mapper.AiRecommendationOptionsMapper;
-import com.company.common.commonops.service.AiRecommendationOptionsService;
+import com.company.common.airecommendations.controller.AiRecommendationOptionsController;
+import com.company.common.airecommendations.mapper.AiRecommendationOptionsMapper;
 import com.company.common.schema.SchemaPreparation;
 import com.company.common.support.controller.ApiExceptionHandler;
 import com.company.common.support.controller.CodeExceptionHandler;
@@ -80,7 +78,7 @@ class AiRecommendationOptionsPersistenceTest {
         @Bean SqlSessionFactory sqlSessionFactory(DataSource source) throws Exception {
             var factory = new SqlSessionFactoryBean();
             factory.setDataSource(source);
-            factory.setMapperLocations(new ClassPathResource("mapper/commonops/AiRecommendationOptionsMapper.xml"),
+            factory.setMapperLocations(new ClassPathResource("mapper/airecommendations/AiRecommendationOptionsMapper.xml"),
                 new ClassPathResource("mapper/CodeGroupMapper.xml"));
             var configuration = new org.apache.ibatis.session.Configuration();
             configuration.setMapUnderscoreToCamelCase(false);

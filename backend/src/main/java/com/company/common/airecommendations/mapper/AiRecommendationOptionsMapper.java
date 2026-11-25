@@ -1,6 +1,6 @@
-package com.company.common.commonops.mapper;
+package com.company.common.airecommendations.mapper;
 
-import com.company.common.commonops.dto.AiRecommendationOptionsContracts.Filter;
+import com.company.common.airecommendations.dto.AiRecommendationOptionsContracts.Filter;
 import java.util.Collection;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;

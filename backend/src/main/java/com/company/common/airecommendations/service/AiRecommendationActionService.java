@@ -48,7 +48,8 @@ public class AiRecommendationActionService {
         Log log = candidate(id, input.developerId());
         var assignment = mapper.assignment(input.assignmentId());
         if ("EXCL".equals(log.userActCode())) throw CodeFailure.invalid("developerId", "이미 제외한 추천 후보입니다.");
-        if (assignment == null) throw CodeFailure.invalid("assignmentId", "저장한 투입을 확인해 주세요.");
+        if (assignment == null || "CNCL".equals(assignment.statusCode()))
+            throw CodeFailure.invalid("assignmentId", "저장한 투입을 확인해 주세요.");
         if (!"project".equals(log.targetType()) || !log.targetId().equals(assignment.projectId())
             || !log.developerId().equals(assignment.developerId()))
             throw CodeFailure.invalid("assignmentId", "추천 후보와 투입의 개발자·프로젝트가 일치하지 않습니다.");
@@ -64,6 +65,10 @@ public class AiRecommendationActionService {
         if ("opportunity".equals(observed.targetType())) opportunities.lock(observed.targetId());
         else projects.lockProject(observed.targetId());
         Log log = candidate(id, input.developerId());
+        // 같은 후보를 두 번 제외하면 처음 기록을 그대로 돌려준다(사유·작업자·시각은 처음 것).
+        if ("EXCL".equals(log.userActCode()))
+            return new ExclusionResult(id, input.developerId(), true, log.reasonCode(), log.actedBy(), log.actedAt());
+        if (log.userActCode() != null) throw CodeFailure.invalid("developerId", "이미 처리한 추천 후보입니다.");
         active(log);
         String detail = resources.codec().exclusionActive(log.scoreDetail(), true);
         if (mapper.exclude(new ExclusionWrite(new Action(id, input.developerId(), "EXCL", log.needSn(), input.reasonCode(), actor.userId()), detail)) != 1)
@@ -91,21 +96,28 @@ public class AiRecommendationActionService {
         withdrawals.lockNeeds();
         Log log = candidate(id, input.developerId());
         active(log);
+        var person = mapper.person(log.developerId());
+        if (person == null) throw CodeFailure.invalid("developerId", "추천 후보를 확인해 주세요.");
         if (current.stream().anyMatch(r -> "CNVT".equals(r.statusCode()))
             || !opportunities.developerConversions(input.developerId()).isEmpty())
             throw new CodeFailure(409, "needSn", "투입 배정으로 넘긴 후보입니다. 투입 상세에서 확인해 주세요.");
-        var need = opportunities.needs(log.targetId()).stream().filter(n -> Objects.equals(n.needSn(), input.needSn()))
-            .findFirst().orElseThrow(() -> CodeFailure.invalid("needSn", "이 기회의 필요 인력 줄을 골라 주세요."));
+        var needs = opportunities.needs(log.targetId());
+        int seat = 0;
+        while (seat < needs.size() && !Objects.equals(needs.get(seat).needSn(), input.needSn())) seat++;
+        if (seat == needs.size()) throw CodeFailure.invalid("needSn", "이 기회의 필요 인력 줄을 골라 주세요.");
+        var need = needs.get(seat);
+        // 알림의 「n번 자리」는 지금 줄 가운데 몇 번째인지(NEED_SN 순, 1부터)이고 NEED_SN 자체가 아니다.
+        int seatNumber = seat + 1;
         var same = current.stream().filter(r -> r.opportunityId().equals(log.targetId()) && r.needSn() == input.needSn()).findFirst();
         String startMonth;
-        String released = current.stream().filter(r -> !r.opportunityId().equals(log.targetId()))
+        String released = same.isPresent() ? null : current.stream()
+            .filter(r -> "ACT".equals(r.statusCode()) && !r.opportunityId().equals(log.targetId()))
             .map(r -> r.opportunityName()).findFirst().orElse(null);
         if (same.isPresent()) startMonth = same.get().startMonth();
         else {
             YearMonth month = resources.calendar().fromDatabaseMonth(log.startMonth());
             var condition = new Condition(log.targetType(), log.targetId(), log.jobCode(), month.toString(), log.gradeCode(), log.needSn());
             var target = mapper.target(log.targetType(), log.targetId());
-            var person = mapper.person(log.developerId());
             boolean eligible = mapper.candidates(new Filter(condition, month.atDay(1), month.atEndOfMonth(), resources.calendar().today(), true))
                 .stream().anyMatch(p -> p.developerId().equals(log.developerId()));
             if (!eligible || "DP".equals(target.contractTypeCode()) && Set.of("FL", "OS").contains(person.employeeTypeCode()))
@@ -126,15 +138,18 @@ public class AiRecommendationActionService {
         }
         if (mapper.action(new Action(id, input.developerId(), "TENT", input.needSn(), null, actor.userId())) != 1) throw CodeFailure.conflict();
         var header = opportunities.select(log.targetId());
-        int occupied = (int) opportunities.reservations(log.targetId()).stream().filter(r -> r.needSn() == input.needSn()).count();
-        int excess = Math.max(0, occupied - need.requiredCount());
+        var seats = opportunities.reservations(log.targetId()).stream().filter(r -> r.needSn() == input.needSn()).toList();
+        int excess = Math.max(0, seats.size() - need.requiredCount());
+        String tentativeId = seats.stream().filter(r -> "ACT".equals(r.status()) && log.developerId().equals(r.developerId()))
+            .map(r -> Long.toString(r.tentativeId())).findFirst().orElseThrow(CodeFailure::conflict);
         String jobName = resources.codes().name("JOB", need.jobCode());
-        String name = mapper.person(log.developerId()).developerName();
-        String message = name + "님을 「" + header.opportunityName() + "」 " + input.needSn() + "번 " + jobName + " 자리에 가배정했습니다."
-            + (released == null ? "" : " 이전 「" + released + "」 가배정을 해제했습니다.")
-            + (excess == 0 ? "" : " 이 자리는 " + excess + "명을 넘었습니다.")
-            + " 영업 기회 상세에서 가배정 인력을 볼 수 있습니다.";
-        return new TentativeResult(new TentativeAssignment("", log.developerId(), log.targetId(), header.opportunityName(),
+        // 문구는 화면 시안(UI-30 가배정 알림) 그대로, 자리가 넘치면 끝에 한 문장.
+        String message = person.developerName() + "님을 「" + header.opportunityName() + "」 " + seatNumber + "번 자리(" + jobName + ")에 가배정했습니다."
+            + (released == null ? "" : " (이전 가배정 「" + released + "」은 풀렸습니다)")
+            + " 영업 파이프라인 필요 인력과 인력 운영 보드에서 볼 수 있습니다."
+            // n = 이 자리의 필요 인원(넘은 사람 수가 아님): 4명 자리에 5번째면 「4명을 넘었습니다」.
+            + (excess == 0 ? "" : " 이 자리는 " + need.requiredCount() + "명을 넘었습니다.");
+        return new TentativeResult(new TentativeAssignment(tentativeId, log.developerId(), log.targetId(), header.opportunityName(),
             input.needSn(), resources.calendar().fromDatabaseMonth(startMonth).toString()), released, excess, message);
     }
 }

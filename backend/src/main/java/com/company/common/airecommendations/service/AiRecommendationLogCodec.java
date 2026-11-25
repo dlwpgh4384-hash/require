@@ -1,4 +1,4 @@
-package com.company.common.common;
+package com.company.common.airecommendations.service;
 
 import com.company.common.support.service.CodeFailure;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -33,6 +33,19 @@ public class AiRecommendationLogCodec {
     public record Snapshot(Map<String, Score> scores, Metadata metadata) {
         public Snapshot {
             scores = Map.copyOf(scores);
+        }
+    }
+
+    /** 같은 요청(requestId)을 다시 보낼 때 기록을 찾는 지문: SHA-256 16진수 64자(f). */
+    public static String fingerprint(String requestId) {
+        if (requestId == null || requestId.isBlank()) {
+            throw CodeFailure.invalid("requestId", "추천 요청 식별자를 확인해 주세요.");
+        }
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                .digest(requestId.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
         }
     }
 

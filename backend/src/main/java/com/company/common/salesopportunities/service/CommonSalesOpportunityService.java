@@ -90,9 +90,13 @@ public class CommonSalesOpportunityService {
     public Opportunity getCommonSalesOpportunity(String id) { return detail(required(id, false)); }
     private Opportunity detail(Header row) {
         var reserved = mapper.reservations(row.opportunityId());
+        var lines = mapper.tentativeLines(row.opportunityId());
         var needs = mapper.needs(row.opportunityId()).stream().map(n -> new Need(n.needSn(), n.jobCode(), n.gradeCode(),
             n.requiredCount(), month(n.startMonth()), n.months(), n.monthlyMm(), n.estimatedUnitPrice(),
-            reserved.stream().filter(t -> t.needSn() == n.needSn()).map(Reservation::developerId).distinct().toList())).toList();
+            reserved.stream().filter(t -> t.needSn() == n.needSn()).map(Reservation::developerId).distinct().toList(),
+            // 상세 「투입 가능」 = 각자의 가배정 시작월(TB_SL_TENT_ASGN.BGN_YM), 줄 시작월이 아님.
+            lines.stream().filter(t -> t.needSn() == n.needSn()).map(t -> new TentativeLine(t.developerId(),
+                t.developerName(), month(t.startMonth()), t.status())).toList())).toList();
         var jobs = needs.stream().map(n -> codes.name("JOB", n.jobCode())).distinct().toList();
         boolean stale = "ING".equals(row.status()) && Duration.between(row.modifiedAt(), calendar.now())
             .compareTo(Duration.ofDays(14)) > 0;
@@ -136,8 +140,9 @@ public class CommonSalesOpportunityService {
             throw com.company.common.projects.service.ProjectRules.invalidWorkArea();
         String opportunityId = old == null ? null : old.opportunityId();
         var existing = old == null ? List.<NeedRow>of() : mapper.needs(old.opportunityId());
-        var used = new HashSet<Integer>();
-        existing.forEach(n -> used.add(n.needSn()));
+        // 새 줄 번호(2026-11-25 결정): 지운 줄 번호는 다시 쓰지 않는다 — 지금 줄·AI 추천 기록에 남은 가장 큰 번호 + 1.
+        int last = old == null ? 0 : mapper.maxNeedSn(old.opportunityId());
+        for (var n : existing) last = Math.max(last, n.needSn());
         var retained = new HashSet<Integer>();
         var prepared = new ArrayList<Need>();
         for (int index = 0; index < in.needs().size(); index++) {
@@ -149,11 +154,8 @@ public class CommonSalesOpportunityService {
             if (sn != null && (old == null || existing.stream().noneMatch(n -> n.needSn().equals(need.needSn()))
                 || !retained.add(sn))) throw SalesOpportunityRules.row(index, "needSn");
             if (sn == null) {
-                int next = 1;
-                while (used.contains(next)) next++;
-                if (next > 999) throw SalesOpportunityRules.row(index, "needSn");
-                sn = next;
-                used.add(sn);
+                if (last >= 999) throw SalesOpportunityRules.row(index, "needSn");
+                sn = ++last;
                 retained.add(sn);
             }
             // SFR-129-03·식-84: 비운 예상 단가는 계산에서만 직무 기준 단가로 바꾼다(저장은 비운 그대로).

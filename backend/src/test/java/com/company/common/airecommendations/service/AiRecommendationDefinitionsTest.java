@@ -1,4 +1,4 @@
-package com.company.common.common;
+package com.company.common.airecommendations.service;
 
 import com.company.common.calculation.dto.CalculationRuleContracts.Definition;
 import com.company.common.calculation.mapper.CalculationRuleMapper;

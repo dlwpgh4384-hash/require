@@ -1,9 +1,8 @@
-package com.company.common.commonops;
+package com.company.common.airecommendations.mapper;
 
-import com.company.common.commonops.dto.AiRecommendationOptionsContracts.Filter;
-import com.company.common.commonops.mapper.AiRecommendationOptionsMapper;
-import com.company.common.commonops.mapper.AiRecommendationOptionsMapper.*;
-import com.company.common.config.MyBatisConfig;
+import com.company.common.airecommendations.AiRecommendationConfiguration;
+import com.company.common.airecommendations.dto.AiRecommendationOptionsContracts.Filter;
+import com.company.common.airecommendations.mapper.AiRecommendationOptionsMapper.*;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.Types;
@@ -30,7 +29,7 @@ class AiRecommendationOptionsMappingTest {
         var config = new Configuration();
         config.setMapUnderscoreToCamelCase(false);
         config.setAutoMappingUnknownColumnBehavior(AutoMappingUnknownColumnBehavior.FAILING);
-        String resource = "mapper/commonops/AiRecommendationOptionsMapper.xml";
+        String resource = "mapper/airecommendations/AiRecommendationOptionsMapper.xml";
         try (var input = new ClassPathResource(resource).getInputStream()) {
             new XMLMapperBuilder(input, config, resource, config.getSqlFragments()).parse();
         }
@@ -97,7 +96,7 @@ class AiRecommendationOptionsMappingTest {
             .extracting(mapping -> mapping.getProperty()).containsExactly("targetId");
         assertThat(targets.getBoundSql(new Filter("opportunity", "chosen")).getParameterMappings())
             .extracting(mapping -> mapping.getProperty()).containsExactly("targetType", "targetId");
-        assertThat(MyBatisConfig.class.getAnnotation(MapperScan.class).basePackages())
+        assertThat(AiRecommendationConfiguration.class.getAnnotation(MapperScan.class).basePackages())
             .contains(AiRecommendationOptionsMapper.class.getPackageName());
         for (var method : AiRecommendationOptionsMapper.class.getDeclaredMethods()) {
             assertThat(config.getMappedStatement(NS + method.getName()).getSqlCommandType())

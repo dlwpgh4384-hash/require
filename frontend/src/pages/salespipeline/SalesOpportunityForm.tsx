@@ -732,6 +732,24 @@ export function SalesOpportunityForm({
         ?.message || ""
     );
   };
+  // 저장된 줄을 고칠 때 가배정자는 그대로 둔다(저장은 됨): 직무를 바꾸면, 인원을 가배정 수보다 줄이면 줄 아래 경고.
+  const savedNeed = (need: SalesNeed) =>
+    need.needSn == null
+      ? undefined
+      : initial.needs.find((n) => n.needSn === need.needSn);
+  const jobChangeWarning = (need: SalesNeed) => {
+    const saved = savedNeed(need);
+    return saved &&
+      need.tentativeDeveloperIds.length > 0 &&
+      saved.jobCode !== need.jobCode
+      ? "다른 직무 사람이 가배정되어 있습니다"
+      : "";
+  };
+  const countWarning = (need: SalesNeed) =>
+    Number.isFinite(need.requiredCount) &&
+    need.tentativeDeveloperIds.length > need.requiredCount
+      ? `가배정한 ${need.tentativeDeveloperIds.length}명보다 인원이 적습니다. 저장은 됩니다.`
+      : "";
   const candidates = (need: SalesNeed) =>
     options.developers
       .filter(
@@ -1205,6 +1223,24 @@ export function SalesOpportunityForm({
                             data-testid={`sales-need-${index}-warning`}
                           >
                             {salesIcon("warn", 12)} {warning}
+                          </div>
+                        )}
+                        {jobChangeWarning(need) && (
+                          <div
+                            className="so-warn so-tent-warn"
+                            role="status"
+                            data-testid={`sales-need-${index}-job-warning`}
+                          >
+                            {salesIcon("warn", 12)} {jobChangeWarning(need)}
+                          </div>
+                        )}
+                        {countWarning(need) && (
+                          <div
+                            className="so-warn so-tent-warn"
+                            role="status"
+                            data-testid={`sales-need-${index}-count-warning`}
+                          >
+                            {salesIcon("warn", 12)} {countWarning(need)}
                           </div>
                         )}
                       </td>

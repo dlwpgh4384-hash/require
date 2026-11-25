@@ -111,6 +111,9 @@ export function AssignmentForm({
   onConflict,
   recommendedMonth,
   initialValues,
+  subtitle,
+  screenId = "UI-12",
+  extraWarning,
 }: {
   projects: Project[];
   candidate?: AssignmentCandidate;
@@ -127,6 +130,12 @@ export function AssignmentForm({
     startDate: string;
     endDate: string;
   };
+  /** 창 머리 작은 글(예: AI 인력 추천에서 열면 「AI 인력 추천에서 채움」). */
+  subtitle?: string;
+  /** 이 창을 띄운 화면(저장 안 한 내용 표시용). 투입 배정은 UI-12, AI 인력 추천은 UI-30. */
+  screenId?: string;
+  /** 경고 띠 맨 위에 더할 한 줄(예: 다른 기회 가배정은 유지됩니다). */
+  extraWarning?: string;
 }) {
   const openAiRecommendation = useOpenAiRecommendation();
   const canRate = assignmentPriceEditable(roles);
@@ -161,6 +170,8 @@ export function AssignmentForm({
   const [pool, setPool] = useState<{
     rate?: number | null;
     retirementDate?: string | null;
+    /** 개발자 목록 API에는 파트 이름이 없어 상세(getCommonDeveloper)의 이름을 쓴다. */
+    salesPartName?: string | null;
   } | null>(null);
   const [statuses, setStatuses] = useState<DeveloperStatus[]>([]);
   const [booked, setBooked] = useState<DeveloperAssignment[]>([]);
@@ -188,9 +199,9 @@ export function AssignmentForm({
     canRate;
   const setDirty = useScreenDirty();
   useEffect(() => {
-    setDirty("UI-12", touched);
-    return () => setDirty("UI-12", false);
-  }, [touched, setDirty]);
+    setDirty(screenId, touched);
+    return () => setDirty(screenId, false);
+  }, [touched, setDirty, screenId]);
   const edit = (patch: Partial<typeof v>) => {
     setTouched(true);
     setV((d) => ({ ...d, ...patch }));
@@ -225,7 +236,11 @@ export function AssignmentForm({
     getCommonDeveloper(v.developerId)
       .then((d) => {
         if (!active) return;
-        setPool({ rate: d.monthlyRate, retirementDate: d.retirementDate });
+        setPool({
+          rate: d.monthlyRate,
+          retirementDate: d.retirementDate,
+          salesPartName: d.salesPartName,
+        });
         if (!priceTouched)
           setV((x) => (x.orig ? x : { ...x, price: money(d.monthlyRate) }));
       })
@@ -342,7 +357,7 @@ export function AssignmentForm({
     edit({ orig: id, price: c ? money(c.billingPrice) : money(pool?.rate) });
   };
   // 시안 경고 띠(저장은 됨)
-  const warnings: string[] = [];
+  const warnings: string[] = extraWarning ? [extraWarning] : [];
   if (dv) {
     // 시안: 기간이 [투입일, 철수일]과 겹치는 이 사람 배정의 지금 월 MM 합(프로젝트·연도·달 구분 없음) + 입력 MM
     const cur =
@@ -379,7 +394,7 @@ export function AssignmentForm({
     ) {
       const label = (id: string, name?: string | null) =>
         id === HQ_PART ? "본사" : (name ?? id);
-      const mine = label(dv.salesPartId, dv.salesPartName);
+      const mine = label(dv.salesPartId, dv.salesPartName ?? pool?.salesPartName);
       const theirs = label(project.salesPartId, project.salesPartName);
       warnings.push(
         `영업 파트가 다릅니다: ${dv.name}님은 ${mine} 소속, 프로젝트는 ${theirs}입니다. 매출은 ${theirs}로, 이 사람 이익금은 ${dv.salesPartId === HQ_PART ? "본사(파트 정산 제외)" : mine}로 잡힙니다. 파트를 잘못 골랐다면 개발자 풀에서 고쳐 주세요. 저장은 됩니다.`,
@@ -601,11 +616,12 @@ export function AssignmentForm({
       <DetailPanel
         title="투입 배정"
         sub={
-          candidate
+          subtitle ??
+          (candidate
             ? "배정 후보 확정"
             : recommendedMonth
               ? "AI 인력 추천에서 채움"
-              : "오른쪽 창 입력(유형 B)"
+              : "오른쪽 창 입력(유형 B)")
         }
         testId="assignment-form"
         onClose={leave}

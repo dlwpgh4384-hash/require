@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.company.common.commonops.mapper.AiRecommendationOptionsMapper">
+<mapper namespace="com.company.common.airecommendations.mapper.AiRecommendationOptionsMapper">
   <resultMap id="target"
-             type="com.company.common.commonops.mapper.AiRecommendationOptionsMapper$TargetRow"
+             type="com.company.common.airecommendations.mapper.AiRecommendationOptionsMapper$TargetRow"
              autoMapping="false">
     <constructor>
       <arg column="targetType" javaType="string"/>
@@ -33,7 +33,7 @@
     ORDER BY t.target_name,t.target_id,t.target_type
   </select>
   <resultMap id="need"
-             type="com.company.common.commonops.mapper.AiRecommendationOptionsMapper$NeedRow"
+             type="com.company.common.airecommendations.mapper.AiRecommendationOptionsMapper$NeedRow"
              autoMapping="false">
     <constructor>
       <arg column="opportunityId" javaType="string"/>

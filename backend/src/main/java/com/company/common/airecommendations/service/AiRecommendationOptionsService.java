@@ -1,8 +1,7 @@
-package com.company.common.commonops.service;
+package com.company.common.airecommendations.service;
 
-import com.company.common.common.AiRecommendationCodes;
-import com.company.common.commonops.dto.AiRecommendationOptionsContracts.*;
-import com.company.common.commonops.mapper.AiRecommendationOptionsMapper;
+import com.company.common.airecommendations.dto.AiRecommendationOptionsContracts.*;
+import com.company.common.airecommendations.mapper.AiRecommendationOptionsMapper;
 import com.company.common.support.service.BusinessCalendar;
 import com.company.common.support.service.CodeFailure;
 import java.util.ArrayList;

@@ -1,4 +1,4 @@
-package com.company.common.commonops.dto;
+package com.company.common.airecommendations.dto;
 
 import java.util.List;
 

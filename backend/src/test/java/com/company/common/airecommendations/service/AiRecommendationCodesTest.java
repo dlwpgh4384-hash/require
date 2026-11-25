@@ -1,4 +1,4 @@
-package com.company.common.common;
+package com.company.common.airecommendations.service;
 
 import com.company.common.codegroups.mapper.CodeGroupMapper;
 import com.company.common.codegroups.mapper.CodeRows;

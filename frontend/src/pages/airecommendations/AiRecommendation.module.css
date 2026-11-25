@@ -1,107 +1,275 @@
+/* 시안 UI-30: .content(간격 24, 휴대폰 16) · .card · .fgrid.rcf · .recs/.rec · .sbar · .why · .note */
 .page {
+  /* 시안 차트 색 --c1(파랑). 앱 공통 변수에는 없어 다른 화면(영업 파이프라인 등)처럼 화면 안에 --pf-c1로 둔다. */
+  --pf-c1: #1d4ed8;
   display: flex;
   flex-direction: column;
   gap: 24px;
   color: var(--text);
   min-width: 0;
 }
-.page h1 {
-  margin: 0;
-  font-size: 22px;
+@media (prefers-color-scheme: dark) {
+  .page {
+    --pf-c1: #60a5fa;
+  }
 }
 .page h2 {
+  margin: 0;
   font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
 }
-.page p {
-  overflow-wrap: anywhere;
-}
-.conditions {
-  padding: 20px;
+.card {
   border: 1px solid var(--divider);
   border-radius: 8px;
   background: var(--surface);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+/* 시안 .fgrid.rcf: 두 칸(4:6), 칸 사이 16px 24px */
+.form {
   display: grid;
-  gap: 16px;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
+  gap: 16px 24px;
+}
+.fld {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: start;
+}
+.full {
+  grid-column: 1 / -1;
+}
+.fl {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-sub);
+  text-align: right;
+  padding-top: 8px;
+}
+.req::after {
+  content: " *";
+  color: var(--ls-bad);
+}
+.fc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 .row {
   display: flex;
-  align-items: end;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
-  gap: 20px;
 }
-.row label {
+/* 시안 .row.rc-jn: 직무(140) + 가배정 자리(최대 236)를 한 줄에 */
+.jobRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+.job {
+  width: 140px;
+  flex: none;
+}
+.slotLabel {
+  padding-top: 0;
+  white-space: nowrap;
+  margin-left: 16px;
+}
+.slot {
+  width: auto;
+  flex: 0 1 236px;
+  min-width: 0;
+}
+.month,
+.grade {
+  width: 160px;
+}
+.sub {
+  color: var(--text-sub);
+  cursor: help;
+}
+.help {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.bad {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ls-bad);
+}
+/* 시안 .card-h: 결과 제목과 「추천 n명」 띠 */
+.cardH {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.cardH h2 {
+  overflow-wrap: anywhere;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.results {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-width: 140px;
+  gap: 16px;
+  min-width: 0;
 }
-.row:first-child label {
-  width: 80%;
-  max-width: 520px;
-}
-.row label span {
-  color: var(--text-sub);
-  font-size: 12px;
-}
-.cards {
+.recs {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: 16px;
 }
-.card {
-  padding: 16px;
+.rec {
   border: 1px solid var(--divider);
   border-radius: 8px;
   background: var(--surface);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   min-width: 0;
 }
-.card header,
-.card footer {
+.recH {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
+  align-items: flex-start;
 }
-.card header b {
-  color: var(--primary);
-  white-space: nowrap;
+.pname {
+  display: flex;
+  flex-direction: column;
+  line-height: 18px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
-.card p {
+.pname small {
+  font-size: 12px;
   color: var(--text-sub);
-  font-size: 13px;
 }
 .score {
-  display: flex;
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.score small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-sub);
+}
+.sbar {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) 44px;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   font-size: 12px;
-  margin: 8px 0;
+  color: var(--text-sub);
 }
-.score dt {
-  flex: 0 0 84px;
+.track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--divider);
+  overflow: hidden;
 }
-.score dd {
+.fill {
+  height: 100%;
+  background: var(--pf-c1);
+  border-radius: 3px;
+}
+.sbar span:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.why {
   margin: 0;
-  display: flex;
-  gap: 6px;
-  align-items: center;
+  font-size: 13px;
+  color: var(--text-sub);
+  line-height: 20px;
+  overflow-wrap: anywhere;
 }
-.score meter {
-  width: 80px;
-  accent-color: var(--primary);
+.recF {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.empty {
+  margin: 0;
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-sub);
+}
+/* 불러오는 동안 카드 자리에 회색 틀(시안 색 변수만) */
+.skel {
+  height: 12px;
+  border-radius: 3px;
+  background: var(--divider);
+  animation: ai-pulse 1.2s ease-in-out infinite;
+}
+.skelShort {
+  width: 40%;
+}
+@keyframes ai-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel {
+    animation: none;
+  }
+}
+.dfc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dfc label {
+  margin-top: 0;
 }
 @media (max-width: 767px) {
   .page {
     gap: 16px;
   }
-  .conditions {
-    padding: 12px;
+  .card {
+    padding: 16px;
   }
-  .row {
-    gap: 12px;
+  .form,
+  .fld {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .row:first-child label {
-    width: 100%;
+  .fl {
+    text-align: left;
+    padding-top: 0;
+  }
+  .jobRow {
+    flex-wrap: wrap;
+  }
+  .slotLabel {
+    margin-left: 0;
+  }
+  .full > span:first-child {
+    display: none;
   }
 }

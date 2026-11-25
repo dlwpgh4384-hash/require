@@ -1,12 +1,11 @@
-package com.company.common.commonops;
+package com.company.common.airecommendations.controller;
 
 import com.company.common.codegroups.dto.CodeContracts.Item;
-import com.company.common.common.AiRecommendationCodes;
-import com.company.common.commonops.controller.AiRecommendationOptionsController;
-import com.company.common.commonops.dto.AiRecommendationOptionsContracts.Filter;
-import com.company.common.commonops.mapper.AiRecommendationOptionsMapper;
-import com.company.common.commonops.mapper.AiRecommendationOptionsMapper.*;
-import com.company.common.commonops.service.AiRecommendationOptionsService;
+import com.company.common.airecommendations.service.AiRecommendationCodes;
+import com.company.common.airecommendations.dto.AiRecommendationOptionsContracts.Filter;
+import com.company.common.airecommendations.mapper.AiRecommendationOptionsMapper;
+import com.company.common.airecommendations.mapper.AiRecommendationOptionsMapper.*;
+import com.company.common.airecommendations.service.AiRecommendationOptionsService;
 import com.company.common.support.controller.ApiExceptionHandler;
 import com.company.common.support.controller.CodeExceptionHandler;
 import com.company.common.support.service.BusinessCalendar;

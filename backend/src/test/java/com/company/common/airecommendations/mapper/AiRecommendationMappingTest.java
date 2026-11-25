@@ -27,7 +27,7 @@ class AiRecommendationMappingTest {
         var config=configuration();
         for(var method:AiRecommendationMapper.class.getDeclaredMethods()) assertThat(config.hasStatement(AiRecommendationMapper.class.getName()+"."+method.getName())).isTrue();
     }
-    @ParameterizedTest @ValueSource(strings={"target","person","evidence","payroll","price","areas","candidate"})
+    @ParameterizedTest @ValueSource(strings={"target","person","people","evidence","evidences","payrolls","prices","skills","areas","candidate","assignment"})
     void everyRecordMaterializesThroughRealMyBatisWithoutDatabase(String name) throws Exception {
         var config=configuration();var statement=config.getMappedStatement(AiRecommendationMapper.class.getName()+"."+name);
         var mapping=statement.getResultMaps().get(0);var args=mapping.getConstructorResultMappings();
@@ -46,7 +46,7 @@ class AiRecommendationMappingTest {
             ResultSet results=mock(ResultSet.class,org.mockito.AdditionalAnswers.delegatesTo(rows));doReturn(false).when(results).isClosed();
             doAnswer(c->rows.getDate((String)c.getArgument(0)).toLocalDate()).when(results).getObject(anyString(),eq(LocalDate.class));
             Statement jdbc=mock(Statement.class);when(jdbc.getResultSet()).thenReturn(results);when(jdbc.getUpdateCount()).thenReturn(-1);
-            Map<String,Object> parameters=new HashMap<>();parameters.put("type","project");parameters.put("id","p");parameters.put("developerId","d");parameters.put("customerId","c");parameters.put("industryCode","IT");parameters.put("today",LocalDate.of(2026,11,25));parameters.put("firstDay",LocalDate.of(2026,12,1));parameters.put("month","202612");
+            Map<String,Object> parameters=new HashMap<>();parameters.put("type","project");parameters.put("id","p");parameters.put("developerId","d");parameters.put("customerId","c");parameters.put("industryCode","IT");parameters.put("today",LocalDate.of(2026,11,25));parameters.put("firstDay",LocalDate.of(2026,12,1));parameters.put("month","202612");parameters.put("ids",List.of("d"));
             var actual=new DefaultResultSetHandler(null,statement,null,null,statement.getBoundSql(parameters),RowBounds.DEFAULT).handleResultSets(jdbc);
             assertThat(actual).containsExactly(mapping.getType().getDeclaredConstructors()[0].newInstance(values.toArray()));
         }

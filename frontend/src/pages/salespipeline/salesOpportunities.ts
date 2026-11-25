@@ -14,6 +14,13 @@ export interface SalesNeed {
   monthlyMm: number;
   estimatedUnitPrice: number | null;
   tentativeDeveloperIds: string[];
+  /** 상세 응답만(읽기 전용): 가배정 인력과 각자의 가배정 시작월(TB_SL_TENT_ASGN.BGN_YM). 저장 때는 보내지 않는다. */
+  tentativeAssignments?: {
+    developerId: string;
+    developerName: string;
+    startMonth: string;
+    tentativeStatusCode: string;
+  }[];
 }
 export interface SalesOpportunityInput {
   opportunityName: string;
@@ -142,7 +149,8 @@ export function salesOpportunityPayload(
     nextAction: input.nextAction || null,
     nextActionDueDate: input.nextActionDueDate || null,
     memo: input.memo || null,
-    needs: input.needs.map((n) => ({
+    // 읽기 전용 줄(tentativeAssignments)은 빼고 보낸다(서버는 모르는 칸을 받지 않음).
+    needs: input.needs.map(({ tentativeAssignments: _lines, ...n }) => ({
       ...n,
       gradeCode: n.gradeCode || null,
       estimatedUnitPrice: n.estimatedUnitPrice || null,

@@ -27,6 +27,10 @@ import {
   getCommonSalesPipelineForecast,
   type SalesForecast,
 } from "../salespipeline/salesPipeline";
+import {
+  forecastDifference,
+  forecastDifferenceText,
+} from "../manpowerforecasts/manpowerForecasts";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
 import {
   getCommonManpowerBoard,
@@ -633,7 +637,7 @@ export function UI28Page({
                     <td className="ls-sc">필요 인력</td>
                     {forecast.months.map((month) => (
                       <td key={month.month} className="ls-right">
-                        {month.demand.toFixed(1)}명
+                        {one(month.demand)}명
                       </td>
                     ))}
                   </tr>
@@ -641,7 +645,7 @@ export function UI28Page({
                     <td className="ls-sc">가용 인력</td>
                     {forecast.months.map((month) => (
                       <td key={month.month} className="ls-right">
-                        {month.supply.toFixed(1)}명
+                        {one(month.supply)}명
                       </td>
                     ))}
                   </tr>
@@ -650,7 +654,8 @@ export function UI28Page({
                       <strong>차이</strong>
                     </td>
                     {forecast.months.map((month) => {
-                      const d = month.supply - month.demand;
+                      // 인력 수요 예측(UI-17) 표와 같은 글: 화면에 보이는 두 값(소수 첫째 자리)의 차
+                      const d = forecastDifference(month);
                       return (
                         <td key={month.month} className="ls-right">
                           <span
@@ -662,9 +667,7 @@ export function UI28Page({
                                   : undefined
                             }
                           >
-                            {Math.abs(d) < 0.05
-                              ? "맞음"
-                              : `${Math.abs(d).toFixed(1)}명 ${d < 0 ? "부족" : "남음"}`}
+                            {forecastDifferenceText(d)}
                           </span>
                         </td>
                       );

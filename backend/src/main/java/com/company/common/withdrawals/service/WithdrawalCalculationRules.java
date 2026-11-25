@@ -59,6 +59,7 @@ public class WithdrawalCalculationRules {
         private Integer minimumSeats;
         private Weights weights;
         private SupplyTerms supplyTerms;
+        private final Map<String, BigDecimal> probabilities = new HashMap<>();
         private boolean demandRead;
 
         private Settings() {}
@@ -197,7 +198,9 @@ public class WithdrawalCalculationRules {
                         case "L" -> "EXT_PRBL_L";
                         default -> throw CodeFailure.invalid("extensionPossibilityCode", "등록된 값을 골라 주세요.");
                     };
-                    BigDecimal probability = definitions.effectiveStandard(standard, month).value();
+                    // 같은 묶음(Settings) 안에서는 기준값을 코드·달마다 한 번만 읽는다(철수 줄마다 다시 읽지 않음).
+                    BigDecimal probability = probabilities.computeIfAbsent(standard + "|" + month,
+                        key -> definitions.effectiveStandard(standard, month).value());
                     if (probability.signum() < 0 || probability.compareTo(BigDecimal.valueOf(100)) > 0)
                         throw CodeFailure.invalid("calculation", "운영 기준값 " + standard + "을(를) 확인해 주세요.");
                     extended = extended.add(extension.monthlyMm().multiply(probability).movePointLeft(2));

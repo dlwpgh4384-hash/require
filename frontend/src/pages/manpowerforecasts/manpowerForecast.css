@@ -1,0 +1,32 @@
+.manpower-forecast-page {
+  min-width: 0;
+  max-width: 100%;
+}
+.manpower-forecast-kpis {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+/* 시안 .twrap.free: 표 높이를 자르지 않고, 넓으면 표 상자 안에서만 가로로 넘긴다. */
+.manpower-forecast-page .manpower-forecast-free {
+  max-height: none;
+  min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+.manpower-forecast-page .ls-t {
+  white-space: nowrap;
+}
+/* 시안 sdTotTable span.bad·span.warn */
+.manpower-forecast-page .ls-t .bad {
+  color: var(--ls-bad);
+}
+.manpower-forecast-page .ls-t .warn {
+  color: var(--ls-warn);
+}
+@media (max-width: 767px) {
+  .manpower-forecast-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .manpower-forecast-page .profit-card {
+    padding: 16px;
+  }
+}

@@ -58,10 +58,10 @@ function respond(available = true) {
         iconNm: null,
       },
       {
-        menuId: "M030",
+        menuId: "M025",
         upperMenuId: "G004",
-        menuNm: "인력 추천",
-        scrnId: "UI-30",
+        menuNm: "준비 화면",
+        scrnId: "UI-26",
         menuLvl: 2,
         sortOrd: 2,
         pcOnlyYn: "N",
@@ -71,7 +71,7 @@ function respond(available = true) {
     meta: {
       screenAccess: [
         { scrnId: "UI-29", available, pcOnlyYn: "N" },
-        { scrnId: "UI-30", available: true, pcOnlyYn: "N" },
+        { scrnId: "UI-26", available: true, pcOnlyYn: "N" },
       ],
     },
   };
@@ -165,9 +165,9 @@ it.each(["/screens/UI-29", "/#UI-29"])(
 
 it("M011 under G004 opens UI-29 without replacing preferences and retains its selected tab", async () => {
   respond();
-  mount("/screens/UI-30");
+  mount("/screens/UI-26");
   expect(
-    await screen.findByRole("region", { name: "UI-30 본문" }),
+    await screen.findByRole("region", { name: "UI-26 본문" }),
   ).toHaveTextContent("준비 중");
   const preferences = screen.getByTestId("user-preferences");
   const group = screen.getByTestId("menu-toggle-g004");
@@ -177,7 +177,7 @@ it("M011 under G004 opens UI-29 without replacing preferences and retains its se
   fireEvent.click(screen.getByTestId("sales-tab-forecast"));
   await screen.findByTestId("sales-forecast-panel");
   await act(async () => {
-    await router!.navigate("/screens/UI-30");
+    await router!.navigate("/screens/UI-26");
   });
   await act(async () => {
     await router!.navigate("/screens/UI-29");
@@ -266,11 +266,17 @@ it("the full-screen form takes over the shell title bar: [‹ 목록] + one form
   fireEvent.click(create);
   expect(await screen.findByTestId("sales-pipeline-form")).toBeVisible();
   // 시안 oppFormView: tb.title = 「영업 기회 등록」, back = [‹ 목록], actions = ''.
-  expect(screen.getAllByRole("heading", { name: "영업 기회 등록" })).toHaveLength(1);
-  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("영업 기회 등록");
+  expect(
+    screen.getAllByRole("heading", { name: "영업 기회 등록" }),
+  ).toHaveLength(1);
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+    "영업 기회 등록",
+  );
   expect(screen.queryByTestId("screen-actions")).toBeNull();
   fireEvent.click(screen.getByTestId("screen-title-back"));
   expect(await screen.findByTestId("sales-ongoing-panel")).toBeVisible();
-  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("영업 파이프라인");
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+    "영업 파이프라인",
+  );
   expectShell();
 });

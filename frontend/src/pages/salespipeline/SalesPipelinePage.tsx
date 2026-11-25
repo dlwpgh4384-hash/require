@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router-dom";
+import { requestAiRecommendation } from "../airecommendations/aiRecommendationRequest";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
@@ -200,9 +201,7 @@ export function SalesPipelinePage({
     milliseconds: number;
   } | null>(null);
   // 시안 toast()는 알림을 쌓는다(저장 알림 아래에 승인 대기 안내 한 장 더).
-  const [notices, setNotices] = useState<
-    (SalesNotice & { id: number })[]
-  >([]);
+  const [notices, setNotices] = useState<(SalesNotice & { id: number })[]>([]);
   const [downloading, setDownloading] = useState(false);
   const [moving, setMoving] = useState<string | null>(null);
   const [dropStage, setDropStage] = useState<string | null>(null);
@@ -330,7 +329,11 @@ export function SalesPipelinePage({
       : undefined;
   }, [pipeline]);
   const resultName = (code: string) =>
-    code === "WIN" ? "수주" : code === "LOSE" ? "실주" : codeName("OPP_STAT", code) || "–";
+    code === "WIN"
+      ? "수주"
+      : code === "LOSE"
+        ? "실주"
+        : codeName("OPP_STAT", code) || "–";
 
   async function move(card: PipelineCard, stageCode: string) {
     if (!stageCode || card.stageCode === stageCode || moving) return;
@@ -365,7 +368,6 @@ export function SalesPipelinePage({
       .find((item) => item.opportunityId === id);
     if (card) void move(card, stageCode);
   };
-
 
   async function download() {
     if (downloading) return;
@@ -552,7 +554,11 @@ export function SalesPipelinePage({
       ) : (
         <p role="status">{listMessages.loading}</p>
       )}
-      <div className="ls-tabs sales-tabs" role="tablist" aria-label="영업 파이프라인 탭">
+      <div
+        className="ls-tabs sales-tabs"
+        role="tablist"
+        aria-label="영업 파이프라인 탭"
+      >
         {tabs.map(([key, text]) => (
           <button
             key={key}
@@ -693,20 +699,13 @@ export function SalesPipelinePage({
                               onClick={(event) => {
                                 event.stopPropagation();
                                 // 대상 = 이 기회, 직무 = 첫 필요 인력 줄, 시작월 = 기회 시작월(SFR-129-02).
-                                const target = {
-                                  opportunityId: card.opportunityId,
-                                  jobCode: jobs[0]?.jobCode || "",
+                                requestAiRecommendation({
+                                  targetType: "opportunity",
+                                  targetId: card.opportunityId,
+                                  jobCode: jobs[0]?.jobCode || "BE",
                                   startMonth: card.startMonth,
-                                };
-                                navigate(
-                                  {
-                                    pathname: "/screens/UI-30",
-                                    search: new URLSearchParams(
-                                      target,
-                                    ).toString(),
-                                  },
-                                  { state: target },
-                                );
+                                });
+                                navigate("/screens/UI-30");
                               }}
                             >
                               {icon(paths.sparkle, 14)} 인력 추천
@@ -825,7 +824,11 @@ export function SalesPipelinePage({
                   labels={labels}
                   height={220}
                   series={[
-                    { name: "진행 중 프로젝트", color: chart.c1, values: projectRevenue },
+                    {
+                      name: "진행 중 프로젝트",
+                      color: chart.c1,
+                      values: projectRevenue,
+                    },
                     {
                       name: "영업 기회(확률 반영)",
                       color: chart.c3,
@@ -842,8 +845,16 @@ export function SalesPipelinePage({
                 <PeopleChart
                   labels={labels}
                   series={[
-                    { name: "공급(투입 가능)", color: chart.c1, values: supply },
-                    { name: "수요(확률 반영)", color: chart.c3, values: demand },
+                    {
+                      name: "공급(투입 가능)",
+                      color: chart.c1,
+                      values: supply,
+                    },
+                    {
+                      name: "수요(확률 반영)",
+                      color: chart.c3,
+                      values: demand,
+                    },
                   ]}
                 />
               </section>
@@ -928,7 +939,9 @@ export function SalesPipelinePage({
                       </td>
                       {projectRevenue.map((v, i) => (
                         <td key={months[i].month} className="ls-right">
-                          <strong>{formatMoney(v + weightedRevenue[i], unit)}</strong>
+                          <strong>
+                            {formatMoney(v + weightedRevenue[i], unit)}
+                          </strong>
                         </td>
                       ))}
                       <td className="ls-right">
@@ -1018,8 +1031,8 @@ export function SalesPipelinePage({
                     </table>
                   </div>
                   <p className="ls-note">
-                    채용 시작 권장 = 부족 시작월 − 2개월(채용·계약에 걸리는 기간).
-                    이미 지났으면 &apos;지금&apos;입니다.
+                    채용 시작 권장 = 부족 시작월 − 2개월(채용·계약에 걸리는
+                    기간). 이미 지났으면 &apos;지금&apos;입니다.
                   </p>
                 </>
               ) : (

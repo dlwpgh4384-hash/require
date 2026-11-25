@@ -335,16 +335,13 @@ public class CommonSalesOpportunityService {
         return new Warnings(List.copyOf(warnings));
     }
     private void transfer(String id, Tentative input) {
-        var affected = new TreeSet<String>();
-        for (var old : mapper.developerReservations(input.developerId())) {
-            if (!id.equals(old.opportunityId())) {
-                mapper.release(old.tentativeId(), actor.userId());
-                affected.add(old.opportunityId());
-            }
-        }
-        mapper.tentative(new TentativeWrite(id, input.needSn(), input.developerId(), input.startMonth(), actor.userId()));
-        affected.add(id);
-        affected.forEach(opp -> mapper.touch(opp, actor.userId()));
+        var previous = mapper.developerReservations(input.developerId()).stream()
+            .filter(old -> !id.equals(old.opportunityId()))
+            .map(old -> new com.company.common.common.TentativeTransfers.Previous(Long.toString(old.tentativeId()), old.opportunityId())).toList();
+        com.company.common.common.TentativeTransfers.apply(
+            new com.company.common.common.TentativeTransfers.Mutation(previous, id, () ->
+                mapper.tentative(new TentativeWrite(id, input.needSn(), input.developerId(), input.startMonth(), actor.userId()))),
+            previousId -> mapper.release(Long.parseLong(previousId), actor.userId()), opp -> mapper.touch(opp, actor.userId()));
     }
     @Transactional
     public Opportunity tentative(String id, Tentative input) {

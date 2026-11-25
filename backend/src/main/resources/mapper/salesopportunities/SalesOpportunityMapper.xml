@@ -214,11 +214,17 @@
     VALUES(#{recipient},'QUOTE_REJ',#{text},'UI-29',#{id},'SYS',clock_timestamp(),#{actor},clock_timestamp())
   </insert>
   <update id="result">
+    <if test="status != 'ING'">
+    WITH expired AS (UPDATE TB_SL_RCMD_LOG SET SCORE_DTL=replace(SCORE_DTL,'&quot;e&quot;:true','&quot;e&quot;:false')
+      WHERE OPP_ID=#{id} AND USER_ACT_CD='EXCL' AND SCORE_DTL LIKE '%&quot;e&quot;:true%')
+    </if>
     UPDATE TB_SL_OPP SET opp_stat_cd=#{status},rslt_dt=#{date,jdbcType=DATE},lose_rsn_cd=#{reason,jdbcType=VARCHAR},
       lose_memo=#{memo,jdbcType=VARCHAR},mod_user_id=#{actor},mod_dttm=clock_timestamp() WHERE opp_id=#{id}
   </update>
   <update id="linkProject">
-    WITH linked AS (UPDATE TB_PJ_PROJ SET opp_id=#{id},mod_user_id=#{actor},mod_dttm=clock_timestamp() WHERE proj_id=#{projectId})
+    WITH linked AS (UPDATE TB_PJ_PROJ SET opp_id=#{id},mod_user_id=#{actor},mod_dttm=clock_timestamp() WHERE proj_id=#{projectId}),
+    expired AS (UPDATE TB_SL_RCMD_LOG SET SCORE_DTL=replace(SCORE_DTL,'&quot;e&quot;:true','&quot;e&quot;:false')
+      WHERE OPP_ID=#{id} AND USER_ACT_CD='EXCL' AND SCORE_DTL LIKE '%&quot;e&quot;:true%')
     UPDATE TB_SL_OPP SET opp_stat_cd='WIN',proj_id=#{projectId},rslt_dt=#{date},mod_user_id=#{actor},mod_dttm=clock_timestamp() WHERE opp_id=#{id}
   </update>
   <insert id="manpower">

@@ -729,7 +729,10 @@ function respondWithManpowerBoard(available = true) {
     }
     if (url.startsWith("/api/common/manpower-board/excel?")) return download();
     if (url.startsWith("/api/common/manpower-board?")) return list();
-    if (url === `/api/common/sales-pipeline/forecast?startMonth=${koreanToday().slice(0, 7)}`)
+    if (
+      url ===
+      `/api/common/sales-pipeline/forecast?startMonth=${koreanToday().slice(0, 7)}`
+    )
       return forecast();
     if (/^\/api\/common\/code-groups\/(JOB|GRADE|EMP_TYPE)\/codes$/.test(url))
       return success({
@@ -2633,15 +2636,15 @@ function respondWithAssignments() {
     },
     {
       ...menus.data[0],
-      menuId: "recommendations-menu",
-      menuNm: "AI 추천",
-      scrnId: "UI-30",
+      menuId: "assistant-menu",
+      menuNm: "준비 화면",
+      scrnId: "UI-26",
       sortOrd: 3,
     },
   );
   menus.meta.screenAccess.push(
     { scrnId: "UI-12", available: true, pcOnlyYn: "N" },
-    { scrnId: "UI-30", available: true, pcOnlyYn: "N" },
+    { scrnId: "UI-26", available: true, pcOnlyYn: "N" },
   );
   const success = (data: unknown) => ({
     ok: true,
@@ -2923,16 +2926,16 @@ describe("assignment route composition", () => {
     expectSingleShell();
   });
 
-  it("UI-30 remains navigation-only and preserves the preferences scope on return", async () => {
+  it("UI-26 remains navigation-only and preserves the preferences scope on return", async () => {
     respondWithAssignments();
     mount("/screens/UI-12");
     await screen.findByTestId("assignment-empty");
     const preferences = screen.getByTestId("user-preferences");
     await act(async () => {
-      await router!.navigate("/screens/UI-30");
+      await router!.navigate("/screens/UI-26");
     });
     expect(
-      await screen.findByRole("region", { name: "UI-30 본문" }),
+      await screen.findByRole("region", { name: "UI-26 본문" }),
     ).toHaveTextContent("준비 중");
     expect(screen.queryByTestId("assignment-create")).not.toBeInTheDocument();
     expect(screen.getByTestId("user-preferences")).toBe(preferences);

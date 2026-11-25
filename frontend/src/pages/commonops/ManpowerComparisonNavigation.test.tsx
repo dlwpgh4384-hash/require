@@ -111,7 +111,7 @@ it("registers only the comparison body without borrowed title actions and isolat
   expect(findScreen("UI-11")?.TitleActions).toBeUndefined();
   expect(findScreen("UI-17")?.rootTestId).toBe("manpower-forecast-page");
   expect(findScreen("UI-28")?.rootTestId).toBe("manpower-board-page");
-  expect(findScreen("UI-30")).toBeUndefined();
+  expect(findScreen("UI-30")?.rootTestId).toBe("ai-recommendation-page");
   await act(async () => {
     await router!.navigate("/screens/OTHER");
   });

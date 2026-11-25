@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useOpenAiRecommendation } from "../airecommendations/aiRecommendationRequest";
 import { Banner, DetailPanel } from "../../shared/list/DetailPanel";
 import { Dialog } from "../../shared/feedback/Dialog";
 import { focusFirstError } from "../../shared/feedback/messages";
@@ -110,6 +110,7 @@ export function AssignmentForm({
   onSaved,
   onConflict,
   recommendedMonth,
+  initialValues,
 }: {
   projects: Project[];
   candidate?: AssignmentCandidate;
@@ -119,21 +120,32 @@ export function AssignmentForm({
   /** 저장이 409(다른 사람이 먼저 바꿈, 예: 후보를 이미 확정·뺌)면 부른다. 없으면 창 안에 안내만 띄운다. */
   onConflict?: (reason: unknown) => void;
   recommendedMonth?: string;
+  initialValues?: {
+    projectId: string;
+    developerId: string;
+    jobCode: string;
+    startDate: string;
+    endDate: string;
+  };
 }) {
-  const navigate = useNavigate();
+  const openAiRecommendation = useOpenAiRecommendation();
   const canRate = assignmentPriceEditable(roles);
   const initial =
-    projects.find((p) => p.projectId === candidate?.projectId) ?? projects[0];
+    projects.find(
+      (p) => p.projectId === (candidate?.projectId ?? initialValues?.projectId),
+    ) ?? projects[0];
   const [v, setV] = useState(() => ({
     projectId: initial?.projectId ?? "",
-    developerId: candidate?.developerId ?? "",
-    jobCode: candidate?.jobCode ?? "BE",
+    developerId: candidate?.developerId ?? initialValues?.developerId ?? "",
+    jobCode: candidate?.jobCode ?? initialValues?.jobCode ?? "BE",
     ...(initial
       ? assignmentInitialDates(koreanToday(), initial, false, recommendedMonth)
       : { startDate: koreanToday(), endDate: "" }),
     ...(candidate
       ? { startDate: candidate.startDate, endDate: candidate.endDate }
-      : {}),
+      : initialValues
+        ? { startDate: initialValues.startDate, endDate: initialValues.endDate }
+        : {}),
     mm: "1.00",
     kind: "NEW",
     orig: "",
@@ -569,7 +581,16 @@ export function AssignmentForm({
     }
     setTouched(false);
     onClose();
-    navigate("/screens/UI-30", state ? { state } : undefined);
+    openAiRecommendation(
+      state
+        ? {
+            targetType: "project",
+            targetId: state.projectId,
+            jobCode: state.jobCode,
+            startMonth: state.startMonth,
+          }
+        : {},
+    );
   };
   const noRateHelp =
     dv && !((pool?.rate ?? 0) > 0) && v.kind !== "SUB"
@@ -814,46 +835,44 @@ export function AssignmentForm({
                   : "") +
                 "저장할 때 이 사람 배정을 투입일 전날로 조기 철수할지 묻습니다.",
             )}
-          {showRate ? (
-            field(
-              "assignment-billing-price",
-              "price",
-              "청구 단가(월)",
-              true,
-              <span className="project-row assignment-row">
-                <input
-                  id="assignment-billing-price"
-                  data-testid="assignment-billing-price"
-                  className="project-money"
-                  style={{ width: 160 }}
-                  inputMode="numeric"
-                  value={v.price}
-                  onChange={(e) => {
-                    setPriceTouched(true);
-                    const n = digits(e.target.value);
-                    edit({ price: n ? won(Number(n)) : "" });
-                  }}
-                  {...invalid("price")}
-                />
-                <span className="project-unit">원</span>
-              </span>,
-              noRateHelp +
-                "기본값은 개발자 월 단가입니다. 고객과 다르게 계약했으면 고쳐 넣습니다. 풀로 출근하지 않으면 단가는 그대로 두고 월 MM을 줄입니다(예: 주 3일 0.6).",
-            )
-          ) : (
-            project && (
-              // 청구 단가 칸이 없는 까닭을 경우마다 맞게 알린다(2026-11-24 사용자 결정, 시안은 내부 프로젝트 문구 하나).
-              <p className="project-cap" data-testid="assignment-no-price">
-                {project.contractTypeCode === "TK"
-                  ? "턴키는 배분표 금액으로 매출을 계산하므로 청구 단가 칸이 없습니다."
-                  : !["MO", "DP"].includes(project.contractTypeCode)
-                    ? "내부 프로젝트는 매출이 없어 청구 단가 칸이 없습니다."
-                    : v.kind === "FREE"
-                      ? "무상지원은 매출이 없어 청구 단가를 0으로 저장합니다."
-                      : "청구 단가는 개발자 월 단가(대체투입은 계약상 인력 단가)로 저장됩니다. 단가는 파트장·재무가 고칩니다."}
-              </p>
-            )
-          )}
+          {showRate
+            ? field(
+                "assignment-billing-price",
+                "price",
+                "청구 단가(월)",
+                true,
+                <span className="project-row assignment-row">
+                  <input
+                    id="assignment-billing-price"
+                    data-testid="assignment-billing-price"
+                    className="project-money"
+                    style={{ width: 160 }}
+                    inputMode="numeric"
+                    value={v.price}
+                    onChange={(e) => {
+                      setPriceTouched(true);
+                      const n = digits(e.target.value);
+                      edit({ price: n ? won(Number(n)) : "" });
+                    }}
+                    {...invalid("price")}
+                  />
+                  <span className="project-unit">원</span>
+                </span>,
+                noRateHelp +
+                  "기본값은 개발자 월 단가입니다. 고객과 다르게 계약했으면 고쳐 넣습니다. 풀로 출근하지 않으면 단가는 그대로 두고 월 MM을 줄입니다(예: 주 3일 0.6).",
+              )
+            : project && (
+                // 청구 단가 칸이 없는 까닭을 경우마다 맞게 알린다(2026-11-24 사용자 결정, 시안은 내부 프로젝트 문구 하나).
+                <p className="project-cap" data-testid="assignment-no-price">
+                  {project.contractTypeCode === "TK"
+                    ? "턴키는 배분표 금액으로 매출을 계산하므로 청구 단가 칸이 없습니다."
+                    : !["MO", "DP"].includes(project.contractTypeCode)
+                      ? "내부 프로젝트는 매출이 없어 청구 단가 칸이 없습니다."
+                      : v.kind === "FREE"
+                        ? "무상지원은 매출이 없어 청구 단가를 0으로 저장합니다."
+                        : "청구 단가는 개발자 월 단가(대체투입은 계약상 인력 단가)로 저장됩니다. 단가는 파트장·재무가 고칩니다."}
+                </p>
+              )}
           <p className="project-cap">
             연장 가능성은 처음에 「미정」이고 철수 리스트(UI-05)에서 바꿉니다.
           </p>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.commonops.mapper.AiRecommendationOptionsMapper">
+  <resultMap id="target"
+             type="com.company.common.commonops.mapper.AiRecommendationOptionsMapper$TargetRow"
+             autoMapping="false">
+    <constructor>
+      <arg column="targetType" javaType="string"/>
+      <arg column="targetId" javaType="string"/>
+      <arg column="targetName" javaType="string"/>
+      <arg column="startMonth" javaType="string"/>
+      <arg column="endMonth" javaType="string"/>
+    </constructor>
+  </resultMap>
+  <select id="targets" resultMap="target">
+    SELECT t.target_type AS "targetType",t.target_id AS "targetId",t.target_name AS "targetName",
+      t.start_month AS "startMonth",t.end_month AS "endMonth"
+    FROM (
+      SELECT 'project' AS target_type,p.PROJ_ID AS target_id,p.PROJ_NM AS target_name,
+        to_char(p.CTRT_BGN_DT,'YYYYMM') AS start_month,to_char(p.CTRT_END_DT,'YYYYMM') AS end_month
+      FROM TB_PJ_PROJ p
+      WHERE p.PROJ_STAT_CD='ING' AND p.CTRT_TYPE_CD!='IN'
+      UNION ALL
+      SELECT 'opportunity' AS target_type,o.OPP_ID AS target_id,o.OPP_NM AS target_name,
+        o.BGN_PLAN_YM AS start_month,NULL::text AS end_month
+      FROM TB_SL_OPP o
+      WHERE o.OPP_STAT_CD='ING' AND (o.CTRT_TYPE_CD IS NULL OR o.CTRT_TYPE_CD!='IN')
+    ) t
+    <where>
+      <if test="targetType != null">AND t.target_type=#{targetType}</if>
+      <if test="targetId != null">AND t.target_id=#{targetId}</if>
+    </where>
+    ORDER BY t.target_name,t.target_id,t.target_type
+  </select>
+  <resultMap id="need"
+             type="com.company.common.commonops.mapper.AiRecommendationOptionsMapper$NeedRow"
+             autoMapping="false">
+    <constructor>
+      <arg column="opportunityId" javaType="string"/>
+      <arg column="needSn" javaType="_int"/>
+      <arg column="jobCode" javaType="string"/>
+      <arg column="jobName" javaType="string"/>
+      <arg column="requiredCount" javaType="_int"/>
+      <arg column="startMonth" javaType="string"/>
+    </constructor>
+  </resultMap>
+  <select id="needs" resultMap="need">
+    SELECT n.OPP_ID AS "opportunityId",n.NEED_SN::int AS "needSn",n.JOB_CD AS "jobCode",
+      COALESCE(j.CODE_NM,n.JOB_CD) AS "jobName",n.NEED_CNT::int AS "requiredCount",n.BGN_YM AS "startMonth"
+    FROM TB_SL_OPP_NEED n
+    LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=n.JOB_CD
+    WHERE n.OPP_ID IN
+      <foreach collection="opportunityIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    ORDER BY n.OPP_ID,n.NEED_SN
+  </select>
+</mapper>

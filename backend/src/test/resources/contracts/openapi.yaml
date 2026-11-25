@@ -11,22 +11,6 @@ info:
     원장 REQ-044의 출처 불일치 UP-001도 보존한다. 완성된 실행 계약이나 구현 성공을 주장하지 않는다.
 x-design-status: clarification_required
 x-test-status: not_run
-x-open-questions:
-  - 'OQ-AUTH-017: 원문25행 인증정의 금지와 재사용 scheme 필수 표준 충돌; 무인증 후보를 보존하며 reviewer가 문서 표준 예외를 결정한다.'
-  - 'OQ-PERIOD-017: 기존 periodRules.ts UI-17의 과거연도 허용범위 실물 대조; 올해/내년 범위는 확정.'
-  - 'OQ-XLS-017: 엑셀 세 행 외 추가영역과 X-Total-Count 집계단위는 기존 시안/다운로드 계약 대조 후 결정.'
-  - 'OQ-AUTH-018: 원문25행의 securitySchemes 금지와 생성 지시의 재사용 scheme 요구 충돌; 기준선 무인증을 유지한 후보이며 reviewer가 적용 표준을 결정한다.'
-  - 'OQ-UPLOAD-018: B10 중복연월/누락월/음수목표/파일용량과 마감경합 정책은 미제공; 임의값으로 확정하지 않는다.'
-  - 'OQ-001: Java21/Boot3.5.x와 고정 Java17/Boot3.3.x 충돌 해소 승인 없음.'
-  - 'OQ-002: 원문 최상위 메뉴 배열·[]와 ApiResponse 봉투의 충돌 보존. data 배열로 변경하는 원문 계약 승인은 별도 확인 필요.'
-  - 'OQ-003: 휴대폰 폭 수치는 원문 미제공. cost의767px 이하는 설계 제안이며 사용자 승인 수치가 아님.'
-  - 'OQ-004: /screens/{scrnId}·getCommonMenus는 구현 명칭 제안이며 원문 확정 이름으로 가장하지 않음.'
-  - 'OQ-005: 필터된 메뉴 목록만으로 미등록과 숨김 화면을 구분할 수 없음. 판별 정보 전달 방식과 혼합 메뉴 SCRN_ID 직접 진입 취급 확인 필요.'
-  - 'OQ-006: /api/health 성공 값·본문·DB 포함 여부·실패 조건·호출자 오류 및 4xx 부재 근거 확인 필요. 빈 결과 객체나 면제 근거를 발명하지 않음.'
-  - 'OQ-007: 전체 계층 GET의 검색·페이지 입력·호출자 입력 검증·4xx가 원문에 없음. pagination/filtering 및 오류 계약을 임의 확정하지 않음.'
-  - 'OQ-008: schema/migration 도구·실행 명령 확인 필요.'
-  - 'OQ-009: 기존 SQ_TB_SY_NOTI 값 변경·초기화 정책 확인 필요.'
-  - 'OQ-010: 기존 구조 차이 보고 방식·확인 절차 형식 확인 필요.'
 paths:
   /api/common/menus:
     get:
@@ -155,7 +139,7 @@ paths:
         - 'integration: 실제 backend PostgreSQL 메뉴 GET과 같은 DB의 frontend를 함께 검수 -> API 공개 필드·정렬·숨김과 Sidebar·경로 표시가 대응하며 frontend 단독 모의 메뉴로 대체되지 않는다(REQ-046, REQ-048).'
       responses:
         '200':
-          description: 사용 메뉴 목록 또는 빈 목록. data 봉투는 OQ-002 충돌을 보존한 설계다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -169,7 +153,7 @@ paths:
                         items:
                           $ref: '#/components/schemas/MenuItem'
         '500':
-          description: 메뉴 DB 읽기 실패. 상세 오류 필드는 원문 미제공이며 공통 실패 봉투만 제안한다.
+          description: 서버 오류
           content:
             application/json:
               schema:
@@ -232,7 +216,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonMenuSettingItem'
         '400':
-          description: 레벨별 필수·이름 길이·미개발 화면·잘못된 상위 대메뉴 또는 중복 화면. 중복 문구는 이미 다른 메뉴에 등록된 화면입니다.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -272,20 +256,19 @@ paths:
           minLength: 1
           maxLength: 30
         description: PERIOD는 대상 SCRN_ID, 나머지는 GLOBAL. 기존 DML 충돌 여부는 확인한다.
-      description: 로그인 없이 서버 고정 admin의 설정 하나를 읽는다. 행 부재는 found=false이며 임의 기본값을 생성하지 않는다.
       x-aiops-query-role:
         entity: TB_SY_USER_PREF
         result_path:
         - data
       responses:
         '200':
-          description: 저장 설정 또는 found=false
+          description: 성공
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserPreferenceResponse'
         '400':
-          description: 지원하지 않는 설정 종류·키 규약 오류
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -305,7 +288,6 @@ paths:
       - REQ-097
       - REQ-109
       parameters: *id001
-      description: 서버 고정 admin의 설정 단건을 저장한다. 사용자 ID·역할을 받거나 로그인 검사를 추가하지 않는다.
       requestBody:
         required: true
         content:
@@ -342,19 +324,19 @@ paths:
         다음 GET.modDttm과 같다.'
       responses:
         '200':
-          description: 저장한 설정과 수정 시각
+          description: 성공
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserPreferenceResponse'
         '400':
-          description: 종류·키·직렬화·허용값·길이·목록 한도 오류
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 읽은 시각과 다른 기존 행. 기존 값은 보존한다.
+          description: 충돌
           content:
             application/json:
               schema:
@@ -421,7 +403,7 @@ paths:
         description: 이름 또는 아이디 검색
       responses:
         '200':
-          description: 조회 또는 저장한 사용자 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -434,7 +416,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonUserListResult'
         '400':
-          description: 요청 필수값·형식·필드 오류
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -486,7 +468,7 @@ paths:
         condition: 유효한 신규 사용자 저장
       responses:
         '200':
-          description: 조회 또는 저장한 사용자 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -499,7 +481,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonUserSaveResult'
         '400':
-          description: 요청 필수값·형식·필드 오류 또는 원문 업무 보호 위반
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -526,10 +508,9 @@ paths:
           pattern: ^[a-z0-9]{4,20}$
           minLength: 4
           maxLength: 20
-        description: 대상 계정 ID. 실행자는 서버 고정 admin이다.
       responses:
         '200':
-          description: 조회 또는 저장한 사용자 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -542,7 +523,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonUserAccount'
         '400':
-          description: 요청 필수값·형식·필드 오류
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -578,7 +559,6 @@ paths:
           pattern: ^[a-z0-9]{4,20}$
           minLength: 4
           maxLength: 20
-        description: 대상 계정 ID. 실행자는 서버 고정 admin이다.
       requestBody:
         required: true
         content:
@@ -613,7 +593,7 @@ paths:
         condition: MOD_DTTM 일치·보호 통과·필요한 영향 확인
       responses:
         '200':
-          description: 조회 또는 저장한 사용자 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -626,13 +606,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonUserSaveResult'
         '400':
-          description: 요청 필수값·형식·필드 오류 또는 원문 업무 보호 위반
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: MOD_DTTM 동시 수정 충돌; 최신 사용자·역할·담당범위 보존
+          description: 충돌
           content:
             application/json:
               schema:
@@ -664,7 +644,6 @@ paths:
           pattern: ^[a-z0-9]{4,20}$
           minLength: 4
           maxLength: 20
-        description: 대상 계정 ID. 실행자는 서버 고정 admin이다.
       - name: page
         in: query
         required: false
@@ -685,7 +664,7 @@ paths:
         description: 화면은 공통 목록 설정을 전달한다. default는 HTTP 요청 생략 시 설계값이며 제품 seed가 아니다.
       responses:
         '200':
-          description: 조회 또는 저장한 사용자 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -698,7 +677,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonUserAccessLogResult'
         '400':
-          description: 요청 필수값·형식·필드 오류
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -724,7 +703,6 @@ paths:
           pattern: ^[a-z0-9]{4,20}$
           minLength: 4
           maxLength: 20
-        description: 대상 계정 ID. 실행자는 서버 고정 admin이다.
       requestBody:
         required: true
         content:
@@ -751,7 +729,7 @@ paths:
         condition: MOD_DTTM 일치; 상태별 허용 범위는 OQ-STATE-023
       responses:
         '200':
-          description: 조회 또는 저장한 사용자 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -764,13 +742,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonUserPasswordResult'
         '400':
-          description: 요청 필수값·형식·필드 오류 또는 원문 업무 보호 위반
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: MOD_DTTM 동시 수정 충돌; 최신 사용자·역할·담당범위 보존
+          description: 충돌
           content:
             application/json:
               schema:
@@ -795,7 +773,6 @@ paths:
           pattern: ^[a-z0-9]{4,20}$
           minLength: 4
           maxLength: 20
-        description: 대상 계정 ID. 실행자는 서버 고정 admin이다.
       requestBody:
         required: true
         content:
@@ -820,7 +797,7 @@ paths:
         condition: MOD_DTTM 일치
       responses:
         '200':
-          description: 조회 또는 저장한 사용자 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -833,13 +810,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonUserUnlockResult'
         '400':
-          description: 요청 필수값·형식·필드 오류 또는 원문 업무 보호 위반
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: MOD_DTTM 동시 수정 충돌; 최신 사용자·역할·담당범위 보존
+          description: 충돌
           content:
             application/json:
               schema:
@@ -891,7 +868,7 @@ paths:
         condition: 보호 통과·버전 일치·PM 영향 확인; 보호 계정은 불변
       responses:
         '200':
-          description: 조회 또는 저장한 사용자 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -904,13 +881,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonUserStopResult'
         '400':
-          description: 요청 필수값·형식·필드 오류 또는 원문 업무 보호 위반
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: MOD_DTTM 동시 수정 충돌; 최신 사용자·역할·담당범위 보존
+          description: 충돌
           content:
             application/json:
               schema:
@@ -936,7 +913,6 @@ paths:
           pattern: ^[a-z0-9]{4,20}$
           minLength: 4
           maxLength: 20
-        description: 대상 계정 ID. 실행자는 서버 고정 admin이다.
       requestBody:
         required: true
         content:
@@ -961,7 +937,7 @@ paths:
         condition: MOD_DTTM 일치; 담당 프로젝트 복원 없음
       responses:
         '200':
-          description: 조회 또는 저장한 사용자 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -974,13 +950,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonUserAccount'
         '400':
-          description: 요청 필수값·형식·필드 오류 또는 원문 업무 보호 위반
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: MOD_DTTM 동시 수정 충돌; 최신 사용자·역할·담당범위 보존
+          description: 충돌
           content:
             application/json:
               schema:
@@ -1003,7 +979,7 @@ paths:
         filtering: 역할과 상태는 원문 DB 목록, 프로젝트는 지정 가능한 원천 목록; 타 업무 접근 권한 필터는 추가하지 않음; 역할은 TB_SY_ROLE.USE_YN=Y만 반환한다.
       responses:
         '200':
-          description: 조회 또는 저장한 사용자 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1016,7 +992,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonUserOptionsResult'
         '400':
-          description: 요청 필수값·형식·필드 오류
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -1067,7 +1043,7 @@ paths:
         description: ROLE_CHANGE 대상 역할 집합; 담당 프로젝트 적격성 소멸 판정용
       responses:
         '200':
-          description: 조회 또는 저장한 사용자 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1080,7 +1056,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonUserImpactResult'
         '400':
-          description: 요청 필수값·형식·필드 오류
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -1104,7 +1080,7 @@ paths:
         - 'route: 로컬 backend 기동 뒤 GET /api/health 호출 -> 필수 경로를 처리하며 미등록 경로404로 반환하지 않는다. 성공 본문 기대값은 OQ-006 확인 필요다(REQ-043).'
       responses:
         '200':
-          description: 'OQ-006: 성공 응답 의미·본문 스키마 확인 필요. JSON 결과 완성을 주장하지 않음.'
+          description: 성공
           content:
             application/json:
               schema:
@@ -1119,7 +1095,7 @@ paths:
       - REQ-184
       responses:
         '200':
-          description: 역할 업무 처리 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1132,13 +1108,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonRoleList'
         '400':
-          description: '필수·코드·업무 보호 오류: errors에 대상 필드와 안내를 반환한다.'
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 대상 또는 원본 역할이 존재하지 않는다.
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -1161,7 +1137,7 @@ paths:
       - REQ-201
       responses:
         '200':
-          description: 역할 업무 처리 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1174,13 +1150,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonRoleSettings'
         '400':
-          description: '필수·코드·업무 보호 오류: errors에 대상 필드와 안내를 반환한다.'
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 대상 또는 원본 역할이 존재하지 않는다.
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -1227,7 +1203,7 @@ paths:
           description: 기존 기본 역할 식별자 또는 서버 자동 R-nnn. 실제 물리 PK/코드 매핑은 SQL 원문 대조.
       responses:
         '200':
-          description: 역할 업무 처리 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1240,13 +1216,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonRoleSettings'
         '400':
-          description: '필수·코드·업무 보호 오류: errors에 대상 필드와 안내를 반환한다.'
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 대상 또는 원본 역할이 존재하지 않는다.
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -1286,7 +1262,7 @@ paths:
           description: 기존 기본 역할 식별자 또는 서버 자동 R-nnn. 실제 물리 PK/코드 매핑은 SQL 원문 대조.
       responses:
         '200':
-          description: 역할 업무 처리 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1299,19 +1275,19 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonRoleSettings'
         '400':
-          description: '필수·코드·업무 보호 오류: errors에 대상 필드와 안내를 반환한다.'
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 대상 또는 원본 역할이 존재하지 않는다.
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 읽은 뒤 다른 사람이 이 역할을 먼저 저장했다(modifiedAt 다름). 기존 값은 보존한다.
+          description: 충돌
           content:
             application/json:
               schema:
@@ -1377,7 +1353,7 @@ paths:
           minLength: 1
       responses:
         '200':
-          description: 역할 업무 처리 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1390,13 +1366,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonRoleImpact'
         '400':
-          description: '필수·코드·업무 보호 오류: errors에 대상 필드와 안내를 반환한다.'
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 대상 또는 원본 역할이 존재하지 않는다.
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -1424,7 +1400,7 @@ paths:
           description: 기존 기본 역할 식별자 또는 서버 자동 R-nnn. 실제 물리 PK/코드 매핑은 SQL 원문 대조.
       responses:
         '200':
-          description: 역할 업무 처리 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1437,13 +1413,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonRoleStopResult'
         '400':
-          description: '필수·코드·업무 보호 오류: errors에 대상 필드와 안내를 반환한다.'
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 대상 또는 원본 역할이 존재하지 않는다.
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -1507,7 +1483,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonMenuSettingsResult'
         '400':
-          description: menuLvl이 1·2 외의 값이거나 정수 형식이 아니다. errors의 field=menuLvl.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -1583,13 +1559,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonMenuSettingsResult'
         '400':
-          description: 이름 필수·50자 초과·유효하지 않은 소속 또는 시스템 메뉴 끄기/타 묶음 이동. errors는 해당 입력 필드를 가리킨다.
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 조회한 뒤 다른 사람이 메뉴를 바꿈(modifiedAt 불일치). 아무것도 바꾸지 않는다.
+          description: 충돌
           content:
             application/json:
               schema:
@@ -1629,7 +1605,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonMenuOptionResult'
         '400':
-          description: menuLvl 누락·정수 형식 오류·1 또는 2가 아닌 레벨; errors.field=menuLvl.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -1656,7 +1632,7 @@ paths:
         - items
       responses:
         '200':
-          description: 공통코드 그룹 목록 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1669,7 +1645,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonCodeGroupList'
         '400':
-          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -1704,7 +1680,7 @@ paths:
               $ref: '#/components/schemas/CommonCodeGroupInput'
       responses:
         '200':
-          description: 업무 코드 그룹 등록 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1717,7 +1693,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonCodeGroup'
         '400':
-          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -1751,7 +1727,7 @@ paths:
         - items
       responses:
         '200':
-          description: 그룹별 공통코드 조회 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1764,7 +1740,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonCodeList'
         '400':
-          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -1809,7 +1785,7 @@ paths:
               $ref: '#/components/schemas/CommonCodeInput'
       responses:
         '200':
-          description: 업무·수당 코드 등록 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1822,7 +1798,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonCode'
         '400':
-          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -1875,7 +1851,7 @@ paths:
               $ref: '#/components/schemas/CommonCodesInput'
       responses:
         '200':
-          description: 공통코드 변경 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1888,13 +1864,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonCodeList'
         '400':
-          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: '동시 수정: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.'
+          description: 충돌
           content:
             application/json:
               schema:
@@ -1940,7 +1916,7 @@ paths:
       x-no-request-body-reason: 그룹과 코드 식별자는 path로 전달하고 삭제 실행은 사용 참조를 서버에서 재검증한다. 추가 업무 입력이 없는 명시적 논리 삭제다.
       responses:
         '200':
-          description: 미사용 업무 코드 삭제 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1953,7 +1929,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonCodeDeleteResult'
         '400':
-          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -1980,7 +1956,7 @@ paths:
         - items
       responses:
         '200':
-          description: 운영 기준값과 이력 조회 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -1993,7 +1969,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonOperatingStandardList'
         '400':
-          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -2040,7 +2016,7 @@ paths:
               $ref: '#/components/schemas/CommonOperatingStandardsInput'
       responses:
         '200':
-          description: 운영 기준값 월 이력 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2053,13 +2029,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonOperatingStandardList'
         '400':
-          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: '동시 수정: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.'
+          description: 충돌
           content:
             application/json:
               schema:
@@ -2084,7 +2060,7 @@ paths:
         - items
       responses:
         '200':
-          description: 엑셀 표기 대응 조회 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2097,7 +2073,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonCodeMapList'
         '400':
-          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -2132,7 +2108,7 @@ paths:
               $ref: '#/components/schemas/CommonCodeMapInput'
       responses:
         '200':
-          description: 엑셀 표기 대응 추가 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2145,7 +2121,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonCodeMap'
         '400':
-          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -2181,7 +2157,7 @@ paths:
               $ref: '#/components/schemas/CommonCodeMapDeleteInput'
       responses:
         '200':
-          description: 엑셀 표기 대응 삭제 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2194,7 +2170,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonCodeMapDeleteResult'
         '400':
-          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -2219,7 +2195,7 @@ paths:
         - items
       responses:
         '200':
-          description: 공통코드 변경 이력 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2232,7 +2208,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonCodeChangeHistoryList'
         '400':
-          description: 요청 필드 형식 또는 원문 업무 보호 조건 위반; ApiError.errors에 대상 입력 필드와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -2248,7 +2224,6 @@ paths:
       - REQ-287
       - REQ-305
       - REQ-325
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       parameters:
       - name: clientTypeCode
         in: query
@@ -2280,7 +2255,7 @@ paths:
         - items
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2293,7 +2268,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonClientList'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -2310,7 +2285,6 @@ paths:
       - REQ-316
       - REQ-317
       - REQ-319
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       x-business-rules:
       - 고객사는 이메일 필수; 협력사는 은행·계좌번호·예금주 필수; 고객·협력은 모두 필수
       - 숨긴 구분 비해당 필드는 저장하지 않음; 사업자번호 형식·유일성만 검사
@@ -2333,7 +2307,7 @@ paths:
               $ref: '#/components/schemas/CommonClientInput'
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2346,7 +2320,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonClientSaveResult'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -2359,7 +2333,6 @@ paths:
       x-related-requirements:
       - REQ-330
       - REQ-318
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       parameters:
       - name: clientId
         in: path
@@ -2377,7 +2350,7 @@ paths:
         - data
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2390,7 +2363,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonClient'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -2405,7 +2378,6 @@ paths:
       - REQ-318
       - REQ-306
       - REQ-304
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       parameters:
       - name: clientId
         in: path
@@ -2438,7 +2410,7 @@ paths:
               $ref: '#/components/schemas/CommonClientUpdate'
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2451,13 +2423,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonClientSaveResult'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 데이터·성공 이력 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -2517,7 +2489,6 @@ paths:
       - REQ-330
       - REQ-316
       - REQ-321
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       parameters:
       - name: clientId
         in: path
@@ -2536,7 +2507,7 @@ paths:
         - items
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2549,7 +2520,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonClientChangeList'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -2561,7 +2532,6 @@ paths:
       security: []
       x-related-requirements:
       - REQ-322
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       parameters:
       - name: clientId
         in: path
@@ -2579,7 +2549,7 @@ paths:
         - data
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2592,7 +2562,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonClientAccount'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -2607,7 +2577,6 @@ paths:
       - REQ-324
       - REQ-325
       - REQ-306
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       x-business-rules:
       - 진행 프로젝트 또는 협력사 소속 인력이 있으면 중지 거부
       - 일괄은 가능한 건만 처리·실패 건수/이유; 중지 거래처는 신규 프로젝트 선택 제외
@@ -2630,7 +2599,7 @@ paths:
               $ref: '#/components/schemas/CommonClientStateInput'
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2643,13 +2612,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonClientStateResult'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 데이터·성공 이력 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -2664,7 +2633,6 @@ paths:
       - REQ-287
       - REQ-305
       - REQ-336
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       x-pagination-filtering:
         pagination: 전체 조회 후 useListPresentation으로 화면 건수/밀도 적용
         filtering: 명시 query와 path 식별자만 적용; 추가 필터 추정 금지
@@ -2676,7 +2644,7 @@ paths:
         - items
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2689,7 +2657,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPartList'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -2705,7 +2673,6 @@ paths:
       - REQ-336
       - REQ-337
       - REQ-344
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       x-business-rules:
       - 활성 영업 파트장 사용자만·겸임 허용; 관리자·재무만 추가 정책
       - 파트명30자·중복 불가; 배분율0~100
@@ -2730,7 +2697,7 @@ paths:
               $ref: '#/components/schemas/CommonPartInput'
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2743,13 +2710,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPart'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 데이터·성공 이력 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -2763,14 +2730,13 @@ paths:
       - REQ-292
       - REQ-334
       - REQ-344
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       x-pagination-filtering:
         pagination: 전체 조회 후 useListPresentation으로 화면 건수/밀도 적용
         filtering: 명시 query와 path 식별자만 적용; 추가 필터 추정 금지
         ordering: 시안 기준. 거래처 신규 등록 직후 맨 위 강조, 동순위는 기존 mapper 대조
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2783,7 +2749,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPartOptions'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -2798,7 +2764,6 @@ paths:
       - REQ-331
       - REQ-338
       - REQ-337
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       parameters:
       - name: partId
         in: path
@@ -2817,7 +2782,7 @@ paths:
         - items
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2830,7 +2795,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPartStandardList'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -2846,7 +2811,6 @@ paths:
       - REQ-344
       - REQ-347
       - REQ-306
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       parameters:
       - name: partId
         in: path
@@ -2877,7 +2841,7 @@ paths:
               $ref: '#/components/schemas/CommonPartStandardInput'
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2890,13 +2854,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPartStandardList'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 데이터·성공 이력 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -2911,7 +2875,6 @@ paths:
       - REQ-334
       - REQ-306
       - REQ-304
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       parameters:
       - name: partId
         in: path
@@ -2939,7 +2902,7 @@ paths:
               $ref: '#/components/schemas/CommonPartRenameInput'
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -2952,13 +2915,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPart'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 데이터·성공 이력 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -2971,7 +2934,6 @@ paths:
       x-related-requirements:
       - REQ-342
       - REQ-306
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       parameters:
       - name: partId
         in: path
@@ -3000,7 +2962,7 @@ paths:
               $ref: '#/components/schemas/CommonPartStopInput'
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -3013,13 +2975,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPart'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 데이터·성공 이력 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -3080,7 +3042,7 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -3221,7 +3183,7 @@ paths:
         months: 선택연도 1~12월 12줄; 금액 빈칸0
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -3234,7 +3196,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonUploadResult'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -3343,7 +3305,7 @@ paths:
         - data
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -3356,7 +3318,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonUploadResult'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -3410,7 +3372,7 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -3549,7 +3511,7 @@ paths:
               $ref: '#/components/schemas/CommonUploadApplyInput'
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -3562,13 +3524,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonUploadResult'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 데이터·성공 이력 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -3580,7 +3542,6 @@ paths:
       security: []
       x-related-requirements:
       - REQ-347
-      description: UI-22 전 무인증·admin 고정. auth.required=false이며 인증 scheme은 추가하지 않는다. 역할 조건은 서버 정책 단위시험으로 검수한다.
       parameters:
       - name: partId
         in: path
@@ -3599,7 +3560,7 @@ paths:
         - items
       responses:
         '200':
-          description: 조회 또는 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -3612,7 +3573,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonClientChangeList'
         '400':
-          description: 필드 형식·필수값 또는 해당 원문 업무 보호 위반; errors에 해당 입력 항목과 한국어 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -4023,7 +3984,6 @@ paths:
       operationId: getCommonDeveloperChangeHistory
       summary: 개발자 변경 이력
       security: []
-      description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
       x-related-requirements:
       - REQ-377
       - REQ-391
@@ -4045,7 +4005,7 @@ paths:
         ordering: 개발자 목록 이름순; 상태 이력의 입사일 재직 줄은 맨 아래. 나머지는 원천 순서 보존.
       responses:
         '200':
-          description: 개발자 변경 이력 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -4058,7 +4018,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonDeveloperChangeList'
         '400':
-          description: 필수/형식/기간 또는 해당 업무 규칙 위반. ApiError.errors에 입력 필드와 한국어 사유. 기존 업무행 불변.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -4068,7 +4028,6 @@ paths:
       operationId: getCommonDeveloperAreas
       summary: 거주지 행정구역
       security: []
-      description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
       x-related-requirements:
       - REQ-373
       parameters:
@@ -4090,7 +4049,7 @@ paths:
         ordering: 개발자 목록 이름순; 상태 이력의 입사일 재직 줄은 맨 아래. 나머지는 원천 순서 보존.
       responses:
         '200':
-          description: 거주지 행정구역 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -4103,7 +4062,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonDeveloperAreaList'
         '400':
-          description: 필수/형식/기간 또는 해당 업무 규칙 위반. ApiError.errors에 입력 필드와 한국어 사유. 기존 업무행 불변.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -4113,7 +4072,6 @@ paths:
       operationId: getCommonDevelopersExcel
       summary: 개발자 목록 엑셀
       security: []
-      description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
       x-related-requirements:
       - REQ-356
       - REQ-357
@@ -4158,14 +4116,14 @@ paths:
           default: false
       responses:
         '200':
-          description: 개발자 목록 엑셀 결과
+          description: 성공
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
                 type: string
                 format: binary
         '400':
-          description: 필수/형식/기간 또는 해당 업무 규칙 위반. ApiError.errors에 입력 필드와 한국어 사유. 기존 업무행 불변.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -4353,7 +4311,6 @@ paths:
       operationId: putCommonDeveloperUseStatus
       summary: 개발자 사용 중지·재개
       security: []
-      description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
       x-related-requirements:
       - REQ-404
       - REQ-405
@@ -4379,7 +4336,7 @@ paths:
       - 'side-effect: 가능/불가 혼합 중지 -> 처리가능 ID만 TB_HR_DEV 중지·rejected 이름/이유와 DB의 미처리 행 일치'
       responses:
         '200':
-          description: 개발자 사용 중지·재개 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -4392,7 +4349,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonDeveloperUseResult'
         '400':
-          description: 필수/형식/기간 또는 해당 업무 규칙 위반. ApiError.errors에 입력 필드와 한국어 사유. 기존 업무행 불변.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -4666,13 +4623,12 @@ paths:
       operationId: getCommonProjectChangeHistory
       summary: 계약 변경 이력 조회
       security: []
-      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-422
       - REQ-444
       responses:
         '200':
-          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -4685,7 +4641,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -4711,12 +4667,11 @@ paths:
       operationId: getCommonProjectSalesParts
       summary: 영업 파트 이력 조회
       security: []
-      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-448
       responses:
         '200':
-          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -4729,7 +4684,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -4755,14 +4710,13 @@ paths:
       operationId: putCommonProjectSalesPart
       summary: 프로젝트 영업 파트 변경
       security: []
-      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-445
       - REQ-446
       - REQ-447
       responses:
         '200':
-          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -4775,7 +4729,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -4906,19 +4860,18 @@ paths:
       operationId: getCommonProjectDistributionTemplate
       summary: 턴키 배분표 양식
       security: []
-      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-458
       responses:
         '200':
-          description: 선택 프로젝트 계약월별 B.6 xlsx
+          description: 성공
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
                 type: string
                 format: binary
         '400':
-          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -4939,12 +4892,11 @@ paths:
       operationId: getCommonProjectManpowerPlan
       summary: 프로젝트 인원 계획 조회
       security: []
-      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-464
       responses:
         '200':
-          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -4957,7 +4909,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -4982,13 +4934,12 @@ paths:
       operationId: putCommonProjectManpowerPlan
       summary: 프로젝트 인원 계획 저장
       security: []
-      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-465
       - REQ-466
       responses:
         '200':
-          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -5001,7 +4952,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -5037,12 +4988,11 @@ paths:
       operationId: getCommonProjectDirectExpenses
       summary: 프로젝트 추가 경비 조회
       security: []
-      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-467
       responses:
         '200':
-          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -5055,7 +5005,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -5080,13 +5030,12 @@ paths:
       operationId: postCommonProjectDirectExpense
       summary: 프로젝트 추가 경비 등록
       security: []
-      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-468
       - REQ-469
       responses:
         '200':
-          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -5099,7 +5048,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -5135,12 +5084,11 @@ paths:
       operationId: postCommonProjectDirectExpenseDelete
       summary: 프로젝트 추가 경비 삭제
       security: []
-      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-470
       responses:
         '200':
-          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -5153,7 +5101,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -5252,12 +5200,11 @@ paths:
       operationId: getCommonProjectLoseImpact
       summary: 프로젝트 실주 영향 조회
       security: []
-      description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-474
       responses:
         '200':
-          description: 조회 또는 처리 후 재조회 가능한 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -5270,7 +5217,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·기간·업무상태·마감 검증 실패; errors에 해당 필드와 한국어 사유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -5728,7 +5675,6 @@ paths:
       - REQ-536
       - REQ-493
       - REQ-489
-      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
       parameters:
       - name: assignmentId
         in: path
@@ -5738,7 +5684,7 @@ paths:
           minLength: 1
       responses:
         '200':
-          description: 투입 배정 변경 기록 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -5751,13 +5697,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonAssignment'
         '400':
-          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: '상세 modifiedAt 불일치: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 배정·이력은 불변이다.'
+          description: 충돌
           content:
             application/json:
               schema:
@@ -5808,7 +5754,6 @@ paths:
       - REQ-537
       - REQ-538
       - REQ-489
-      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
       parameters:
       - name: assignmentId
         in: path
@@ -5824,7 +5769,7 @@ paths:
           minLength: 1
       responses:
         '200':
-          description: 투입 이력 정정 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -5837,13 +5782,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonAssignmentHistory'
         '400':
-          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: '상세 modifiedAt 불일치: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. 기존 배정·이력은 불변이다.'
+          description: 충돌
           content:
             application/json:
               schema:
@@ -5988,7 +5933,6 @@ paths:
       x-related-requirements:
       - REQ-491
       - REQ-492
-      description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
       parameters:
       - name: year
         in: query
@@ -6022,14 +5966,14 @@ paths:
           type: string
       responses:
         '200':
-          description: 현재 조건의 실제 xlsx 파일
+          description: 성공
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
                 type: string
                 format: binary
         '400':
-          description: 필수 누락·기간/월 MM/단가·정정 대상 등 해당 연산의 업무 규칙 위반. errors에 field·한국어 message를 반환한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -6198,7 +6142,7 @@ paths:
         대조한다.
       responses:
         '200':
-          description: 요청한 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -6211,13 +6155,13 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수 식별자/연도·기간·공통코드 오류; errors의 field·message로 정정하며 업무 행은 변경하지 않는다.
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 배정 modifiedAt 불일치; 기존 연장 가능성과 변경 이력은 불변이며 다시 조회한다.
+          description: 충돌
           content:
             application/json:
               schema:
@@ -6433,7 +6377,7 @@ paths:
         대조한다.
       responses:
         '200':
-          description: 현재 조건의 철수 인력 전체·화면 목록 열 그대로인 xlsx. 추천/부족전망 제외. 완료 문구 엑셀 파일을 만들었습니다 (조회 결과 n건).
+          description: 성공
           headers:
             Content-Disposition:
               schema:
@@ -6445,7 +6389,7 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: 필수 식별자/연도·기간·공통코드 오류; errors의 field·message로 정정하며 업무 행은 변경하지 않는다.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -7124,7 +7068,7 @@ paths:
         - items
       responses:
         '200':
-          description: 프로젝트 현황판 조회 결과; 재조회 가능한 공개 데이터
+          description: 성공
           content:
             application/json:
               schema:
@@ -7137,7 +7081,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectBoardResult'
         '400':
-          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -7182,14 +7126,14 @@ paths:
         ordering: 정렬 세부는 OQ-UI-031; 기존 목록 관례 대조
       responses:
         '200':
-          description: 현황판 조건에 맞는 프로젝트 엑셀; 원가 금액 제외
+          description: 성공
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
                 type: string
                 format: binary
         '400':
-          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -7221,7 +7165,7 @@ paths:
         - items
       responses:
         '200':
-          description: 프로젝트 주간 메모 조회 결과; 재조회 가능한 공개 데이터
+          description: 성공
           content:
             application/json:
               schema:
@@ -7234,13 +7178,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectBoardMemoList'
         '400':
-          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -7283,7 +7227,7 @@ paths:
               $ref: '#/components/schemas/CommonProjectBoardMemoInput'
       responses:
         '200':
-          description: 주간 메모 등록 결과; 재조회 가능한 공개 데이터
+          description: 성공
           content:
             application/json:
               schema:
@@ -7296,13 +7240,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectBoardMemo'
         '400':
-          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -7352,7 +7296,7 @@ paths:
               $ref: '#/components/schemas/CommonProjectBoardMemoUpdateInput'
       responses:
         '200':
-          description: 주간 메모 수정 결과; 재조회 가능한 공개 데이터
+          description: 성공
           content:
             application/json:
               schema:
@@ -7365,19 +7309,19 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectBoardMemo'
         '400':
-          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 그 사이 다른 사람이 먼저 바꿈(보낸 modifiedAt이 지금 값과 다름). errors.field=modifiedAt, 공통 문구 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」; 업무행 무변경
+          description: 충돌
           content:
             application/json:
               schema:
@@ -7408,7 +7352,7 @@ paths:
         - items
       responses:
         '200':
-          description: 프로젝트 단계 계획 조회 결과; 재조회 가능한 공개 데이터
+          description: 성공
           content:
             application/json:
               schema:
@@ -7421,13 +7365,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectBoardStepList'
         '400':
-          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -7469,7 +7413,7 @@ paths:
               $ref: '#/components/schemas/CommonProjectBoardStepDatesInput'
       responses:
         '200':
-          description: 단계 계획 날짜 저장 결과; 재조회 가능한 공개 데이터
+          description: 성공
           content:
             application/json:
               schema:
@@ -7482,19 +7426,19 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectBoardStepList'
         '400':
-          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 그 사이 다른 사람이 먼저 바꿈(보낸 modifiedAt이 지금 값과 다름). errors.field=modifiedAt, 공통 문구 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」; 업무행 무변경
+          description: 충돌
           content:
             application/json:
               schema:
@@ -7531,7 +7475,7 @@ paths:
       x-no-request-body-reason: 경로가 지정한 누락 단계 보완 동작이며 날짜·단계명·비중은 서버 계약/DB 원천에서 정한다.
       responses:
         '200':
-          description: 누락 단계 기본값 보완 결과; 재조회 가능한 공개 데이터
+          description: 성공
           content:
             application/json:
               schema:
@@ -7544,13 +7488,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectBoardStepList'
         '400':
-          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -7592,7 +7536,7 @@ paths:
       x-no-request-body-reason: 경로가 지정한 단계 완료 동작이며 날짜·단계명·비중은 서버 계약/DB 원천에서 정한다.
       responses:
         '200':
-          description: 프로젝트 단계 완료 결과; 재조회 가능한 공개 데이터
+          description: 성공
           content:
             application/json:
               schema:
@@ -7605,13 +7549,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectBoardStep'
         '400':
-          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -7671,7 +7615,7 @@ paths:
         - items
       responses:
         '200':
-          description: 프로젝트 이슈 모아 보기 결과; 재조회 가능한 공개 데이터
+          description: 성공
           content:
             application/json:
               schema:
@@ -7684,7 +7628,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectBoardIssueList'
         '400':
-          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -7721,7 +7665,7 @@ paths:
               $ref: '#/components/schemas/CommonProjectBoardIssueInput'
       responses:
         '200':
-          description: 프로젝트 이슈 등록 결과; 재조회 가능한 공개 데이터
+          description: 성공
           content:
             application/json:
               schema:
@@ -7734,13 +7678,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectBoardIssue'
         '400':
-          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -7848,7 +7792,7 @@ paths:
               $ref: '#/components/schemas/CommonProjectBoardIssueUpdateInput'
       responses:
         '200':
-          description: 프로젝트 이슈 수정·종료 결과; 재조회 가능한 공개 데이터
+          description: 성공
           content:
             application/json:
               schema:
@@ -7861,19 +7805,19 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectBoardIssue'
         '400':
-          description: 입력 필수/길이/코드/기간/프로젝트 상태 위반; errors에 해당 필드·한국어 이유, 업무행 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 프로젝트·메모·단계·이슈가 없거나 대상 프로젝트에 속하지 않음; 업무행 무변경
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 그 사이 다른 사람이 먼저 바꿈(보낸 modifiedAt이 지금 값과 다름). errors.field=modifiedAt, 공통 문구 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」; 업무행 무변경
+          description: 충돌
           content:
             application/json:
               schema:
@@ -7891,7 +7835,6 @@ paths:
       - REQ-678
       - REQ-683
       - REQ-652
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       parameters:
       - name: year
         in: query
@@ -7915,7 +7858,7 @@ paths:
           type: string
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -7928,7 +7871,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBillingList'
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -7960,7 +7903,6 @@ paths:
       - REQ-688
       - REQ-689
       - REQ-720
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       requestBody:
         required: true
         content:
@@ -7969,7 +7911,7 @@ paths:
               $ref: '#/components/schemas/CommonBillingInput'
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -7987,7 +7929,7 @@ paths:
                       type: string
                       nullable: true
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -8075,7 +8017,6 @@ paths:
       - REQ-684
       - REQ-685
       - REQ-686
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       parameters:
       - name: projectId
         in: query
@@ -8089,7 +8030,7 @@ paths:
           type: string
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -8102,7 +8043,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBillingOptions'
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -8126,10 +8067,9 @@ paths:
       security: []
       x-related-requirements:
       - SFR-001-04
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 취소 안 된 청구 중 미수 잔액이 남은 건수(연도 구분 없음). 0이면 화면이 배지를 숨긴다. 데이터 범위는 UI-22 후속이다.
       responses:
         '200':
-          description: 미수 청구 건수
+          description: 성공
           content:
             application/json:
               schema:
@@ -8150,7 +8090,6 @@ paths:
       - REQ-679
       - REQ-715
       - REQ-717
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       parameters:
       - name: billId
         in: path
@@ -8160,7 +8099,7 @@ paths:
           minLength: 1
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -8173,13 +8112,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBillingDetail'
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 청구 또는 입금이 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -8198,7 +8137,6 @@ paths:
       - REQ-685
       - REQ-686
       - REQ-720
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       parameters:
       - name: billId
         in: path
@@ -8214,7 +8152,7 @@ paths:
               $ref: '#/components/schemas/CommonBillingEditInput'
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -8227,19 +8165,19 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBillingDetail'
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 청구 또는 입금이 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿈(modifiedAt 불일치). 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」 업무행은 그대로다.
+          description: 충돌
           content:
             application/json:
               schema:
@@ -8268,7 +8206,6 @@ paths:
       - REQ-715
       - REQ-683
       - REQ-720
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       parameters:
       - name: billId
         in: path
@@ -8284,7 +8221,7 @@ paths:
               $ref: '#/components/schemas/CommonBillingCancelInput'
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -8297,19 +8234,19 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBillingDetail'
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 청구 또는 입금이 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿈(modifiedAt 불일치). 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」 업무행은 그대로다.
+          description: 충돌
           content:
             application/json:
               schema:
@@ -8338,7 +8275,6 @@ paths:
       - REQ-691
       - REQ-692
       - REQ-716
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       requestBody:
         required: true
         content:
@@ -8347,7 +8283,7 @@ paths:
               $ref: '#/components/schemas/CommonBillingReceiptInput'
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -8360,7 +8296,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBillingReceiptResult'
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -8391,7 +8327,6 @@ paths:
       - REQ-708
       - REQ-717
       - REQ-718
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       parameters:
       - name: receiptId
         in: path
@@ -8407,7 +8342,7 @@ paths:
               $ref: '#/components/schemas/CommonBillingReceiptCancelInput'
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -8420,19 +8355,19 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBillingReceiptResult'
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 청구 또는 입금이 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿈(modifiedAt 불일치). 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」 업무행은 그대로다.
+          description: 충돌
           content:
             application/json:
               schema:
@@ -8460,7 +8395,6 @@ paths:
       - REQ-693
       - REQ-694
       - REQ-698
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       parameters:
       - name: checkMonth
         in: query
@@ -8471,7 +8405,7 @@ paths:
         description: 미지정은 기존 마감 서비스가 반환한 마지막 마감월. 마감없음 초기선택은 OQ-UI-013.
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -8484,7 +8418,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBillingCheckResult'
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -8510,7 +8444,6 @@ paths:
       - REQ-720
       - REQ-688
       - REQ-689
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       requestBody:
         required: true
         content:
@@ -8519,7 +8452,7 @@ paths:
               $ref: '#/components/schemas/CommonBillingCheckInput'
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -8532,7 +8465,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBillingDetail'
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -8562,7 +8495,6 @@ paths:
       - REQ-720
       - REQ-688
       - REQ-689
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       requestBody:
         required: true
         content:
@@ -8571,7 +8503,7 @@ paths:
               $ref: '#/components/schemas/CommonBillingCheckInput'
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -8584,7 +8516,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBillingDetail'
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -8613,7 +8545,6 @@ paths:
       - REQ-696
       - REQ-720
       - REQ-681
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       requestBody:
         required: true
         content:
@@ -8622,7 +8553,7 @@ paths:
               $ref: '#/components/schemas/CommonBillingCheckInput'
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -8635,13 +8566,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBillingDetail'
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿈(고칠 청구의 modifiedAt 불일치). 「다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.」 업무행은 그대로다.
+          description: 충돌
           content:
             application/json:
               schema:
@@ -8672,10 +8603,9 @@ paths:
       - REQ-700
       - REQ-701
       - REQ-704
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -8688,7 +8618,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBillingDunningResult'
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -8713,7 +8643,6 @@ paths:
       - REQ-703
       - REQ-700
       - REQ-704
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       parameters:
       - name: billId
         in: path
@@ -8724,7 +8653,7 @@ paths:
       x-no-request-body-reason: billId와 현재일·DB 잔액/이력에서 현재단계와 수신자를 서버가 읽는다. 사용자에게 단계/수신자/토큰 입력을 요구하지 않는다.
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -8737,13 +8666,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBillingDunningSendResult'
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 청구 또는 입금이 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -8774,7 +8703,6 @@ paths:
       - REQ-688
       - REQ-689
       - REQ-720
-      description: 개발 단계 CurrentBusinessActor=admin·무인증. 로그인과 메뉴 권한 연결은 UI-22 후속이다. 업무 마감/잔액 보호는 서버에서 최종 재검증한다.
       parameters:
       - name: billId
         in: path
@@ -8785,7 +8713,7 @@ paths:
       x-no-request-body-reason: 원 billId에서 프로젝트·세율을 읽고 다음달 월투입·DB식을 사용한다. 창없이 즉시 생성하므로 임의 공급가/날짜를 body로 받지 않는다.
       responses:
         '200':
-          description: 요청한 업무 결과. 저장은 연결된 GET으로 다시 검증한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -8798,13 +8726,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBillingDetail'
         '400':
-          description: 필수·형식·금액·마감·현재 업무상태 오류. errors에 해당 입력 필드를 표시하며 업무행은 보존한다.
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 청구 또는 입금이 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -8991,7 +8919,7 @@ paths:
             - netPay
       responses:
         '200':
-          description: 개인별 행·요약·합계·직무등급 공헌이익. 민감필드는 기존정책으로 투영한다.
+          description: 성공
           content:
             application/json:
               schema:
@@ -9145,7 +9073,7 @@ paths:
       - 'side-effect: 파일 성공 후 검수 DB TB_SY_ACCS_LOG 재조회 -> 해당 다운로드 DNLD와 저장 시각 존재·TB_CO_MON_COST 행/값 불변.'
       responses:
         '200':
-          description: 현재 보이는 열의 개인 원가·수익 xlsx
+          description: 성공
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
@@ -9247,7 +9175,7 @@ paths:
         ordering: alertCount 내림차순·동순위는 프로젝트 이름 가나다순
       responses:
         '200':
-          description: 프로젝트 원가 분석 조회 공개 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -9260,7 +9188,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectCostAnalysisResult'
         '400':
-          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -9350,14 +9278,14 @@ paths:
         ordering: 목록 경보순·파일 세부열 OQ-EXPORT-004
       responses:
         '200':
-          description: 프로젝트 원가 분석 목록 xlsx·성공 다운로드 DNLD
+          description: 성공
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
                 type: string
                 format: binary
         '400':
-          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -9414,7 +9342,7 @@ paths:
         ordering: 기존 원천 순서·세부 정렬 OQ-UI-004
       responses:
         '200':
-          description: 프로젝트 월별 원가 조회 공개 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -9427,13 +9355,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectCostAnalysisMonthlyCosts'
         '400':
-          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 선택 projectId가 존재하지 않음·다른 프로젝트 결과를 반환하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -9497,7 +9425,7 @@ paths:
         ordering: 기존 원천 순서·세부 정렬 OQ-UI-004
       responses:
         '200':
-          description: 프로젝트 투입 인력 조회 공개 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -9510,13 +9438,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectCostAnalysisWorkforce'
         '400':
-          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 선택 projectId가 존재하지 않음·다른 프로젝트 결과를 반환하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -9601,7 +9529,7 @@ paths:
       - 업무 원자료·마감·계약·투입·분석 결과 쓰기0.
       responses:
         '200':
-          description: 프로젝트 가상 마진 계산 공개 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -9621,7 +9549,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 선택 projectId가 존재하지 않음·다른 프로젝트 결과를 반환하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -9685,7 +9613,7 @@ paths:
         ordering: 원인 amount 내림차순
       responses:
         '200':
-          description: 프로젝트 원가 초과 원인 공개 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -9698,13 +9626,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonProjectCostAnalysisCauses'
         '400':
-          description: year/baseMonth 누락·월1~12 밖·가장 최근 달 뒤/CASH_BASE_YM 앞·조건 형식/코드 오류·그 달 대상이 아닌 projectId; ApiError.errors[].field는 해당 입력명. 미정 업무 상한을 발명하지 않는다.
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 선택 projectId가 존재하지 않음·다른 프로젝트 결과를 반환하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -9760,7 +9688,7 @@ paths:
       - 'auth: 현재 admin이 인증헤더 없이 getCommonPartSettlements 호출 -> 200·원문133행의 전체정보/대상조회 유지'
       responses:
         '200':
-          description: 영업 파트 탭·요약 조회 공개 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -9773,7 +9701,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPartSettlementTabs'
         '400':
-          description: 필수년월/파트 오류·형식오류; errors[].field=yearMonth/partId/view 해당입력명
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -9828,7 +9756,7 @@ paths:
       - 'auth: 현재 admin이 인증헤더 없이 getCommonPartSettlement 호출 -> 200·원문133행의 전체정보/대상조회 유지'
       responses:
         '200':
-          description: 이번 달 인력별 이익금 조회 공개 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -9841,13 +9769,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPartSettlement'
         '400':
-          description: 필수년월/파트 오류·형식오류; errors[].field=yearMonth/partId/view 해당입력명
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 해당 partId가 존재하지 않음·다른파트값반환금지
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -9894,7 +9822,7 @@ paths:
       - 'auth: 현재 admin이 인증헤더 없이 getCommonPartSettlementTrends 호출 -> 200·원문133행의 전체정보/대상조회 유지'
       responses:
         '200':
-          description: 기간 추이 조회 공개 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -9907,13 +9835,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPartSettlementTrends'
         '400':
-          description: 필수년월/파트 오류·형식오류; errors[].field=yearMonth/partId/view 해당입력명
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 해당 partId가 존재하지 않음·다른파트값반환금지
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -9972,7 +9900,7 @@ paths:
       - 확정 -> 카드변경 거부400·상태불변
       responses:
         '200':
-          description: 법인카드 저장 공개 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -9985,19 +9913,19 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPartSettlement'
         '400':
-          description: 필수년월/파트 오류·형식오류; 필수 금액/modifiedAt/취소사유 오류·확정카드수정/마감취소 거부; errors[].field=해당입력명
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: modifiedAt 불일치·공통 충돌문구·header/detail/이력 부분변경0
+          description: 충돌
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 해당 partId가 존재하지 않음·다른파트값반환금지
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -10054,7 +9982,7 @@ paths:
       - 이미확정 재요청 -> OQ-STATE-019·멱등응답추정금지
       responses:
         '200':
-          description: 정산 직접 확정 공개 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -10067,19 +9995,19 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPartSettlement'
         '400':
-          description: 필수년월/파트 오류·형식오류; 필수 금액/modifiedAt/취소사유 오류·확정카드수정/마감취소 거부; errors[].field=해당입력명
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: modifiedAt 불일치·공통 충돌문구·header/detail/이력 부분변경0
+          description: 충돌
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 해당 partId가 존재하지 않음·다른파트값반환금지
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -10139,7 +10067,7 @@ paths:
       - 이미미확정 재요청 -> OQ-STATE-019
       responses:
         '200':
-          description: 정산 확정 취소 공개 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -10152,19 +10080,19 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPartSettlement'
         '400':
-          description: 필수년월/파트 오류·형식오류; 필수 금액/modifiedAt/취소사유 오류·확정카드수정/마감취소 거부; errors[].field=해당입력명
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: modifiedAt 불일치·공통 충돌문구·header/detail/이력 부분변경0
+          description: 충돌
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 해당 partId가 존재하지 않음·다른파트값반환금지
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -10224,14 +10152,14 @@ paths:
       - 'auth: 현재 admin이 인증헤더 없이 getCommonPartSettlementsExcel 호출 -> 200·원문133행의 전체정보/대상조회 유지'
       responses:
         '200':
-          description: 선택파트·기간/표의 xlsx·현재admin 모든민감칸·다운로드DNLD
+          description: 성공
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
                 type: string
                 format: binary
         '400':
-          description: 필수년월/파트 오류·형식오류; errors[].field=yearMonth/partId/view 해당입력명
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -10269,7 +10197,7 @@ paths:
       - 'auth: 현재 admin이 인증헤더 없이 getCommonPartSettlementCloseCheck 호출 -> 200·원문133행의 전체정보/대상조회 유지'
       responses:
         '200':
-          description: 영업 파트 정산 마감 점검 공개 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -10282,7 +10210,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPartSettlementCloseCheck'
         '400':
-          description: 필수년월/파트 오류·형식오류; errors[].field=yearMonth/partId/view 해당입력명
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -10332,7 +10260,7 @@ paths:
       - HQ/그달기준없음 -> 대상제외
       responses:
         '200':
-          description: 월 마감 영업 파트 자동 확정 공개 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -10345,13 +10273,13 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonPartSettlementCloseResult'
         '400':
-          description: 필수년월/파트 오류·형식오류; 필수 금액/modifiedAt/취소사유 오류·확정카드수정/마감취소 거부; errors[].field=해당입력명
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: modifiedAt 불일치·공통 충돌문구·header/detail/이력 부분변경0
+          description: 충돌
           content:
             application/json:
               schema:
@@ -10442,7 +10370,7 @@ paths:
         불변이다.'
       responses:
         '200':
-          description: 대상 목록·요약4칸·적용 인상률·계산 도움말
+          description: 성공
           content:
             application/json:
               schema:
@@ -10556,14 +10484,14 @@ paths:
         불변이다.'
       responses:
         '200':
-          description: 현재 조회 대상의 실제 엑셀
+          description: 성공
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
                 type: string
                 format: binary
         '400':
-          description: 대상 조회조건 오류 또는 허용하지 않은 columns key. field별 한국어 오류이며 성공 파일/접근기록 생성 없음.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -10603,7 +10531,7 @@ paths:
         시안 문구는 OQ-DATA/CALC/UI-010 대조.
       responses:
         '200':
-          description: 요구별 공개 결과와 저장 후 새 modifiedAt
+          description: 성공
           content:
             application/json:
               schema:
@@ -10616,7 +10544,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 잘못된 선택월·필수 칸·코드/열 또는 마감/확인된 줄 보호 위반; errors[].field와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -10679,7 +10607,7 @@ paths:
         시안 문구는 OQ-DATA/CALC/UI-010 대조.
       responses:
         '200':
-          description: 요구별 공개 결과와 저장 후 새 modifiedAt
+          description: 성공
           content:
             application/json:
               schema:
@@ -10692,13 +10620,13 @@ paths:
                   required:
                   - data
         '400':
-          description: 잘못된 선택월·필수 칸·코드/열 또는 마감/확인된 줄 보호 위반; errors[].field와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 기존 행 modifiedAt 불일치; 공통 문구·필드/성공 부수효과 무변경
+          description: 충돌
           content:
             application/json:
               schema:
@@ -10745,7 +10673,7 @@ paths:
         시안 문구는 OQ-DATA/CALC/UI-010 대조.
       responses:
         '200':
-          description: 요구별 공개 결과와 저장 후 새 modifiedAt
+          description: 성공
           content:
             application/json:
               schema:
@@ -10758,13 +10686,13 @@ paths:
                   required:
                   - data
         '400':
-          description: 잘못된 선택월·필수 칸·코드/열 또는 마감/확인된 줄 보호 위반; errors[].field와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 기존 행 modifiedAt 불일치; 공통 문구·필드/성공 부수효과 무변경
+          description: 충돌
           content:
             application/json:
               schema:
@@ -10805,7 +10733,7 @@ paths:
         시안 문구는 OQ-DATA/CALC/UI-010 대조.
       responses:
         '200':
-          description: 요구별 공개 결과와 저장 후 새 modifiedAt
+          description: 성공
           content:
             application/json:
               schema:
@@ -10818,13 +10746,13 @@ paths:
                   required:
                   - data
         '400':
-          description: 잘못된 선택월·필수 칸·코드/열 또는 마감/확인된 줄 보호 위반; errors[].field와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 기존 행 modifiedAt 불일치; 공통 문구·필드/성공 부수효과 무변경
+          description: 충돌
           content:
             application/json:
               schema:
@@ -10881,7 +10809,7 @@ paths:
         시안 문구는 OQ-DATA/CALC/UI-010 대조.
       responses:
         '200':
-          description: 요구별 공개 결과와 저장 후 새 modifiedAt
+          description: 성공
           content:
             application/json:
               schema:
@@ -10894,7 +10822,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 잘못된 선택월·필수 칸·코드/열 또는 마감/확인된 줄 보호 위반; errors[].field와 한국어 문구
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -10907,7 +10835,6 @@ paths:
       operationId: getCommonProfitStructures
       summary: 전체 수익 구조 조회
       security: []
-      description: 마감 고정값과 미마감 실시간 손익을 공통 계산경계에서 읽는다. 현재 인증/메뉴 검사는 UI-22 후속; OQ-AUTH-007 보존. 조회로 업무 손익을 저장하지 않는다.
       parameters:
       - name: year
         in: query
@@ -10980,7 +10907,7 @@ paths:
       - 'comparison: 2026년조회에2025년B11자료전체월항목과1월공백항목을혼합 -> 완전항목비교제공·불완전항목전년값null/파일「–」, 다른항목비교유지이다.'
       responses:
         '200':
-          description: 동일기간 요약·차트·숫자표와 표시제어
+          description: 성공
           content:
             application/json:
               schema:
@@ -11054,7 +10981,7 @@ paths:
       - 'comparison: 2026년조회에2025년B11자료전체월항목과1월공백항목을혼합 -> 완전항목비교제공·불완전항목전년값null/파일「–」, 다른항목비교유지이다.'
       responses:
         '200':
-          description: 화면 숫자로 보기와 동일한 xlsx
+          description: 성공
           headers:
             Content-Disposition:
               schema:
@@ -11066,7 +10993,7 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: 기간 입력 필드별 오류, 파일 미생성
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -11080,7 +11007,6 @@ paths:
       operationId: getCommonOperatingProfitStatements
       summary: 영업이익표 조회
       security: []
-      description: UI-08 조회. 기존 year(…) 직접 재사용·FIX_YN=Y 고정값·미마감 실시간. 항목별 전년 완전성 및 첫 운영연도 이관 비교. UI-22 전 인증/메뉴 검사 없음(OQ-AUTH-008).
       parameters:
       - name: year
         in: query
@@ -11140,7 +11066,7 @@ paths:
       - 'provisional: 미마감/마감/시작전이관기준월 각각GET -> provisional=true/false/false·누계잠정/미표시/미표시다.'
       responses:
         '200':
-          description: 동일기간 요약·서버 보고서 표·잠정 안내
+          description: 성공
           content:
             application/json:
               schema:
@@ -11153,7 +11079,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonOperatingProfitStatementResult'
         '400':
-          description: year/baseMonth 필수·형식·연도정합 또는 기존 허용기간 위반; 필드별 오류
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -11163,7 +11089,6 @@ paths:
       operationId: getCommonOperatingProfitStatementsExcel
       summary: 영업이익표 엑셀
       security: []
-      description: 조회와 같은numericTable/잠정/작업중/전년누락을 공유. columns 매개변수 없음; 선택 금액단위 숫자셀. 현재 무인증 정책 유지.
       parameters:
       - name: year
         in: query
@@ -11214,7 +11139,7 @@ paths:
         condition: 다운로드는업무상태변경없이DNLD기록만추가
       responses:
         '200':
-          description: 화면과동일한B.4 xlsx
+          description: 성공
           headers:
             Content-Disposition:
               schema:
@@ -11226,7 +11151,7 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: 기간 또는 amountUnit 오류; 파일미생성
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -11301,7 +11226,7 @@ paths:
       - 'visibility: 2025 시작전 GET 후 운영기간 GET -> contributionVisible=false/true와 안내/카드 표시가 일치한다.'
       responses:
         '200':
-          description: 동일기간 순이익 요약·서버 표·기여도·잠정 안내
+          description: 성공
           content:
             application/json:
               schema:
@@ -11314,7 +11239,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonNetProfitStatementResult'
         '400':
-          description: year/baseMonth 누락·형식·연도 불일치 또는 공통 허용기간 오류; 필드별 오류·원천 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -11381,7 +11306,7 @@ paths:
         condition: 정상 다운로드는 손익 전이 없이 TB_SY_ACCS_LOG의 UI-09 DNLD 기록만 추가
       responses:
         '200':
-          description: 화면 표와 동일한 B.4 xlsx
+          description: 성공
           headers:
             Content-Disposition:
               schema:
@@ -11393,7 +11318,7 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: 기간 또는 amountUnit 필드 오류; 파일 미생성·접근기록 미추가
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -11456,7 +11381,7 @@ paths:
       - 'side-effect: 마감고정·미마감fixture GET 전후 -> TB_FI_BIZ_PLAN/TB_CO_MON_PL/TB_CL_CLOSE 값과행수가동일하다.'
       responses:
         '200':
-          description: 선택연도 요약·12개월 목표와 동일원천 실적
+          description: 성공
           content:
             application/json:
               schema:
@@ -11469,7 +11394,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonBusinessPlanComparisonResult'
         '400':
-          description: year/baseMonth 필수·형식·연도 정합·2026년 이전 오류; 해당 필드 사유
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -11537,7 +11462,7 @@ paths:
       - 'receipt: 일부수납과 남은 미수잔액을 다른 입금/예정월로 GET -> 받은액은 입금월·잔액만 예정월, 청구총액 중복0.'
       responses:
         '200':
-          description: 조회 연도 월별 입출금·잔액·부족 예정·동일 표; 계산 근거 없는 잔액은 null
+          description: 성공
           content:
             application/json:
               schema:
@@ -11550,7 +11475,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonCashFlowStatementResult'
         '400':
-          description: year 누락/형식/공통 허용기간 오류; ApiError.errors[].field=year
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -11596,14 +11521,14 @@ paths:
       - 'side-effect: 파일을 받은 뒤 원천 TB_FI_ITEM·TB_FI_XFER·TB_FI_LOAN 읽기 -> 값/행수 불변; 별도 자금수지 저장행 없음.'
       responses:
         '200':
-          description: 자금수지표 XLSX; 화면과 동일 줄·열·단위
+          description: 성공
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
                 type: string
                 format: binary
         '400':
-          description: year 누락/형식/기존 기간 오류 또는 amountUnit 누락/허용값 오류; 해당 field 오류
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -11626,10 +11551,9 @@ paths:
         schema:
           type: string
           pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
-      description: 현재 고정 개발 admin·로그인/메뉴권한 검사는 UI-22 후속. 원문25행에 따라 scheme은 추가하지 않으며 표준 충돌 OQ-AUTH-014를 보존한다.
       responses:
         '200':
-          description: 공개 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -11642,7 +11566,7 @@ paths:
                   required:
                   - data
         '400':
-          description: yearMonth 형식/필수·대상월/업무 조건 오류; errors[].field에 해당 입력명
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -11676,10 +11600,9 @@ paths:
         schema:
           type: string
           pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
-      description: 현재 고정 개발 admin·로그인/메뉴권한 검사는 UI-22 후속. 원문25행에 따라 scheme은 추가하지 않으며 표준 충돌 OQ-AUTH-014를 보존한다.
       responses:
         '200':
-          description: 공개 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -11692,13 +11615,13 @@ paths:
                   required:
                   - data
         '400':
-          description: yearMonth 형식/필수·대상월/업무 조건 오류; errors[].field에 해당 입력명
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: modifiedAt 불일치; 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict()·전체 변경0
+          description: 충돌
           content:
             application/json:
               schema:
@@ -11746,10 +11669,9 @@ paths:
         schema:
           type: string
           pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
-      description: 현재 고정 개발 admin·로그인/메뉴권한 검사는 UI-22 후속. 원문25행에 따라 scheme은 추가하지 않으며 표준 충돌 OQ-AUTH-014를 보존한다.
       responses:
         '200':
-          description: 공개 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -11762,7 +11684,7 @@ paths:
                   required:
                   - data
         '400':
-          description: yearMonth 형식/필수·대상월/업무 조건 오류; errors[].field에 해당 입력명
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -11791,10 +11713,9 @@ paths:
         schema:
           type: string
           pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
-      description: 현재 고정 개발 admin·로그인/메뉴권한 검사는 UI-22 후속. 원문25행에 따라 scheme은 추가하지 않으며 표준 충돌 OQ-AUTH-014를 보존한다.
       responses:
         '200':
-          description: 공개 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -11807,13 +11728,13 @@ paths:
                   required:
                   - data
         '400':
-          description: yearMonth 형식/필수·대상월/업무 조건 오류; errors[].field에 해당 입력명
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: modifiedAt 불일치; 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict()·전체 변경0
+          description: 충돌
           content:
             application/json:
               schema:
@@ -11852,10 +11773,9 @@ paths:
       security: []
       x-related-requirements:
       - REQ-1297
-      description: 현재 고정 개발 admin·로그인/메뉴권한 검사는 UI-22 후속. 원문25행에 따라 scheme은 추가하지 않으며 표준 충돌 OQ-AUTH-014를 보존한다.
       responses:
         '200':
-          description: 공개 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -11868,7 +11788,7 @@ paths:
                   required:
                   - data
         '400':
-          description: yearMonth 형식/필수·대상월/업무 조건 오류; errors[].field에 해당 입력명
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -11896,10 +11816,9 @@ paths:
       security: []
       x-related-requirements:
       - REQ-1273
-      description: 현재 고정 개발 admin·로그인/메뉴권한 검사는 UI-22 후속. 원문25행에 따라 scheme은 추가하지 않으며 표준 충돌 OQ-AUTH-014를 보존한다.
       responses:
         '200':
-          description: 공개 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -11920,10 +11839,9 @@ paths:
       security: []
       x-related-requirements:
       - REQ-1328
-      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
       responses:
         '200':
-          description: 정상 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -11936,7 +11854,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -11953,10 +11871,9 @@ paths:
       x-related-requirements:
       - REQ-1329
       - REQ-1330
-      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
       responses:
         '200':
-          description: 정상 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -11969,7 +11886,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -11992,10 +11909,9 @@ paths:
       - REQ-1331
       - REQ-1332
       - REQ-1333
-      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
       responses:
         '200':
-          description: 정상 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12008,7 +11924,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -12065,10 +11981,9 @@ paths:
       - REQ-1339
       - REQ-1340
       - REQ-1341
-      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
       responses:
         '200':
-          description: 정상 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12081,7 +11996,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -12116,10 +12031,9 @@ paths:
       security: []
       x-related-requirements:
       - REQ-1332
-      description: SFR-011 목록 엑셀(사람이 더함, 2026-11-24). 현재 조건의 후보 전체·화면 목록 열 순서(이름·구분·직무·등급·기술·거주지·희망 단가·투입 가능일·연락 상태·최근 연락·출처). 받으면 접근 기록(DNLD, UI-33)을 남긴다. 인증·메뉴 검사는 UI-22 후속.
       responses:
         '200':
-          description: 현재 조건의 후보 전체 xlsx. 완료 문구 엑셀 파일을 만들었습니다 (조회 결과 n건).
+          description: 성공
           headers:
             Content-Disposition:
               schema:
@@ -12135,7 +12049,7 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: 조건 코드 오류; errors의 field·message로 정정하며 접근 기록을 남기지 않는다.
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -12180,10 +12094,9 @@ paths:
       - REQ-1339
       - REQ-1340
       - REQ-1354
-      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
       responses:
         '200':
-          description: 정상 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12196,13 +12109,13 @@ paths:
                   required:
                   - data
         '400':
-          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 후보가 존재하지 않음; 기존 공통 오류 경계
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -12232,10 +12145,9 @@ paths:
       - REQ-1355
       - REQ-1320
       - REQ-1321
-      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
       responses:
         '200':
-          description: 정상 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12248,19 +12160,19 @@ paths:
                   required:
                   - data
         '400':
-          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 후보가 존재하지 않음; 기존 공통 오류 경계
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 후보·스킬·연락 기록 무변경
+          description: 충돌
           content:
             application/json:
               schema:
@@ -12306,10 +12218,9 @@ paths:
       - REQ-1351
       - REQ-1341
       - REQ-1355
-      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
       responses:
         '200':
-          description: 정상 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12322,13 +12233,13 @@ paths:
                   required:
                   - data
         '400':
-          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 후보가 존재하지 않음; 기존 공통 오류 경계
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -12359,10 +12270,9 @@ paths:
       - REQ-1350
       - REQ-1320
       - REQ-1321
-      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
       responses:
         '200':
-          description: 정상 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12375,19 +12285,19 @@ paths:
                   required:
                   - data
         '400':
-          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 후보가 존재하지 않음; 기존 공통 오류 경계
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 후보·스킬·연락 기록 무변경
+          description: 충돌
           content:
             application/json:
               schema:
@@ -12429,10 +12339,9 @@ paths:
       x-related-requirements:
       - REQ-1352
       - REQ-1353
-      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
       responses:
         '200':
-          description: 정상 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12445,13 +12354,13 @@ paths:
                   required:
                   - data
         '400':
-          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 후보가 존재하지 않음; 기존 공통 오류 경계
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -12484,10 +12393,9 @@ paths:
       - REQ-1345
       - REQ-1346
       - REQ-1347
-      description: 현재 개발 사용자 admin·인증/메뉴 검사는 UI-22 후속. 원문 개인정보·상태·동시 수정 규칙을 보존한다.
       responses:
         '200':
-          description: 정상 업무 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12500,7 +12408,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 해당 입력 형식·공통코드·필수값 또는 명시된 업무 규칙 위반; errors[].field에 칸 오류·업무행 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -12540,7 +12448,6 @@ paths:
       x-related-requirements:
       - REQ-1389
       - REQ-1390
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       x-pagination-contract:
         mode: none
         reason: 전체 집계/칸반/6개월 예측은 전체 결과를 읽으며 공통 ListView의 쪽 나눔은 로컬 표시만 바꾼다.
@@ -12549,7 +12456,7 @@ paths:
         reason: 현재 admin 전체 범위이며 요청에 없는 역할/파트 필터는 추가하지 않는다.
       responses:
         '200':
-          description: 진행 영업 기회 현황 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12562,7 +12469,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -12580,7 +12487,6 @@ paths:
       - REQ-1393
       - REQ-1401
       - REQ-1400
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       parameters:
       - name: opportunityId
         in: path
@@ -12590,7 +12496,7 @@ paths:
           minLength: 1
       responses:
         '200':
-          description: 영업 기회 상세 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12603,13 +12509,13 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 영업 기회가 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
@@ -12628,7 +12534,6 @@ paths:
       - REQ-1378
       - REQ-1398
       - REQ-1372
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       parameters:
       - name: opportunityId
         in: path
@@ -12661,7 +12566,7 @@ paths:
       - 승인 -> 차이≤월 적용gap이면 유지; 초과·기준미만은 대기; 기준이상은 요구해제
       responses:
         '200':
-          description: 영업 기회 수정 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12674,19 +12579,19 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 영업 기회가 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -12702,7 +12607,6 @@ paths:
       - REQ-1397
       - REQ-1398
       - REQ-1372
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       requestBody:
         required: true
         content:
@@ -12728,7 +12632,7 @@ paths:
       - 미등록 -> 진행 중; 이익률이 기준 미만이면 승인 대기
       responses:
         '200':
-          description: 영업 기회 등록 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12741,13 +12645,13 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 가배정 인력이 투입 배정 후보로 넘긴 사람(errors[].field=needs[n].tentativeDeveloperIds); 기회·필요인력·가배정 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -12801,7 +12705,6 @@ paths:
       - REQ-1395
       - REQ-1396
       - REQ-1372
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       requestBody:
         required: true
         content:
@@ -12822,7 +12725,7 @@ paths:
       - 계산 요청 -> 계산 결과; 저장 상태 전이 없음
       responses:
         '200':
-          description: 영업 견적 이익 점검 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12835,7 +12738,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -12849,7 +12752,6 @@ paths:
       - REQ-1403
       - REQ-1404
       - REQ-1378
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       parameters:
       - name: opportunityId
         in: path
@@ -12879,7 +12781,7 @@ paths:
       - 발굴/제안/협상/계약 직전 -> 허용된 선택 단계; 기존 단계 유지·후진 허용
       responses:
         '200':
-          description: 영업 기회 단계 이동 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12892,19 +12794,19 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 영업 기회가 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -12918,7 +12820,6 @@ paths:
       - REQ-1399
       - REQ-1401
       - REQ-1378
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       parameters:
       - name: opportunityId
         in: path
@@ -12949,7 +12850,7 @@ paths:
       - 승인 대기 -> 승인; 다른 상태 허용은 OQ-STATE-029
       responses:
         '200':
-          description: 견적 승인 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -12962,19 +12863,19 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 영업 기회가 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -12989,7 +12890,6 @@ paths:
       - REQ-1401
       - REQ-1378
       - REQ-1402
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       parameters:
       - name: opportunityId
         in: path
@@ -13021,7 +12921,7 @@ paths:
       - 승인 대기 -> 반려; 다른 상태 허용은 OQ-STATE-029
       responses:
         '200':
-          description: 견적 반려 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -13034,19 +12934,19 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 영업 기회가 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -13058,7 +12958,6 @@ paths:
       security: []
       x-related-requirements:
       - REQ-1405
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       parameters:
       - name: opportunityId
         in: path
@@ -13086,7 +12985,7 @@ paths:
       - 검사 요청 -> 경고 결과; 저장 상태 전이 없음
       responses:
         '200':
-          description: 가배정 충돌 경고 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -13099,19 +12998,19 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 영업 기회가 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -13125,7 +13024,6 @@ paths:
       - REQ-1406
       - REQ-1380
       - REQ-1378
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       parameters:
       - name: opportunityId
         in: path
@@ -13155,7 +13053,7 @@ paths:
       - 이전 기회 활성 가배정 -> 해제; 선택 기회 -> 활성 가배정
       responses:
         '200':
-          description: 영업 기회 가배정 저장 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -13168,19 +13066,19 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 영업 기회가 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -13196,7 +13094,6 @@ paths:
       - REQ-1409
       - REQ-1381
       - REQ-1378
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       parameters:
       - name: opportunityId
         in: path
@@ -13227,7 +13124,7 @@ paths:
       - 진행 중 -> 수주; PROJ_ID 연결·활성 가배정 정리
       responses:
         '200':
-          description: 수주 프로젝트 인계 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -13240,19 +13137,19 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 영업 기회가 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -13266,7 +13163,6 @@ paths:
       - REQ-1410
       - REQ-1378
       - REQ-1381
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       parameters:
       - name: opportunityId
         in: path
@@ -13295,7 +13191,7 @@ paths:
       - 진행 중 -> 실주
       responses:
         '200':
-          description: 실주 처리 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -13308,19 +13204,19 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 영업 기회가 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -13333,7 +13229,6 @@ paths:
       x-related-requirements:
       - REQ-1411
       - REQ-1378
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       parameters:
       - name: opportunityId
         in: path
@@ -13362,7 +13257,7 @@ paths:
       - 진행 중 -> 사용 안 함·RSLT_DT=처리일
       responses:
         '200':
-          description: 진행 기회 사용 중지 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -13375,19 +13270,19 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 영업 기회가 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -13400,7 +13295,6 @@ paths:
       x-related-requirements:
       - REQ-1413
       - REQ-1378
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       parameters:
       - name: opportunityId
         in: path
@@ -13429,7 +13323,7 @@ paths:
       - 사용 안 함 -> 진행 중·RSLT_DT=null
       responses:
         '200':
-          description: 다시 사용 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -13442,19 +13336,19 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '404':
-          description: 지정 영업 기회가 존재하지 않음
+          description: 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '409':
-          description: 다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요. CodeFailure.conflict(); 기회·필요인력·이력·알림 불변
+          description: 충돌
           content:
             application/json:
               schema:
@@ -13467,7 +13361,6 @@ paths:
       x-related-requirements:
       - REQ-1414
       - REQ-1412
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       x-pagination-contract:
         mode: none
         reason: 전체 집계/칸반/6개월 예측은 전체 결과를 읽으며 공통 ListView의 쪽 나눔은 로컬 표시만 바꾼다.
@@ -13489,7 +13382,7 @@ paths:
           default: false
       responses:
         '200':
-          description: 종료 영업 기회 목록 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -13502,7 +13395,7 @@ paths:
                   required:
                   - data
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -13569,10 +13462,9 @@ paths:
       - REQ-1373
       - REQ-1374
       - REQ-1375
-      description: 현재 개발 admin 전체 기준. 인증·역할별 필터는 UI-22 후속이며 기존 명칭과 무인증 경계를 유지한다.
       responses:
         '200':
-          description: 공통 실제 xlsx·1행 수신자와 생성시각·화면이름_기간_다운로드일시.xlsx·UI-29 DNLD
+          description: 성공
           headers:
             X-Total-Count:
               description: 조회 결과 건수
@@ -13584,7 +13476,7 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: 필수·형식·공통코드 또는 명시된 업무 조건 위반; errors[].field와 지정 안내, 업무 데이터 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -13608,7 +13500,7 @@ paths:
         reason: 선택연도·직무·등급·직원구분·보기만 허용한다.
       responses:
         '200':
-          description: 인력 운영 달력과 요약 결과
+          description: 성공
           content:
             application/json:
               schema:
@@ -13621,7 +13513,7 @@ paths:
                   required:
                   - data
         '400':
-          description: year 범위/형식 또는 DB 공통코드 조건 오류; errors[].field에 해당 입력·업무 원천 무변경
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -13736,7 +13628,7 @@ paths:
       - 'side-effect: 정상 UI-28 파일 다운로드 -> 기존 TB_SY_ACCS_LOG에서 화면 UI-28·작업 DNLD를 조회할 수 있다.'
       responses:
         '200':
-          description: 실제 xlsx·공통1행/파일명·UI-28 DNLD
+          description: 성공
           headers:
             X-Total-Count:
               description: 조회 결과 인력 건수
@@ -13749,7 +13641,7 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: 연도 누락/범위 또는 코드 조건 오류; 해당 필드 오류와 업무자료 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -13794,7 +13686,7 @@ paths:
         - months
       responses:
         '200':
-          description: 월별 전체 MM·미충원과 마지막달/기간전체최대부족 요약
+          description: 성공
           content:
             application/json:
               schema:
@@ -13807,7 +13699,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonManpowerForecastResult'
         '400':
-          description: year 누락/정수형식 오류 또는 올해·내년(한국 시간) 밖의 연도 「선택할 수 있는 조회 연도를 확인해 주세요.」; errors[].field=year·업무자료 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -13857,7 +13749,7 @@ paths:
       - 'side-effect: 정상 UI-17 엑셀 제공 뒤 기존 접근기록 조회 -> TB_SY_ACCS_LOG에서 UI-17·DNLD 발생 기록을 읽는다.'
       responses:
         '200':
-          description: 실제 xlsx·첫행 수신자/시각·지정파일명·UI-17 DNLD
+          description: 성공
           headers:
             X-Total-Count:
               description: 공통 다운로드 조회 결과 건수; 집계파일 건수단위는 OQ-XLS-017 대조 후 확정
@@ -13870,7 +13762,7 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: year 누락/정수형식 오류 또는 올해·내년(한국 시간) 밖의 연도 「선택할 수 있는 조회 연도를 확인해 주세요.」; errors[].field=year·업무자료 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -13941,7 +13833,7 @@ paths:
       - 입금 예정일 다음 날부터 연체 미수를 급함(빨강)으로 표시하고 식-89 알림 단계와 분리한다.
       responses:
         '200':
-          description: 선택월·오늘 기준이 구분된 요약/할일/마감/경보/추이/6개월수급/하단3칸
+          description: 성공
           content:
             application/json:
               schema:
@@ -13954,7 +13846,7 @@ paths:
                     data:
                       $ref: '#/components/schemas/CommonDashboardResult'
         '400':
-          description: yearMonth 누락 또는 yyyy-MM 형식/유효 월 오류; errors[].field=yearMonth, 업무행 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -14008,7 +13900,7 @@ paths:
       - 'side-effect: 정상 대시보드 파일 제공 후 기존 접근기록 조회 -> TB_SY_ACCS_LOG에 UI-16·DNLD가 있으며 다른 화면 DNLD로 기록되지 않는다.'
       responses:
         '200':
-          description: 실제 xlsx·첫행 수신자/시각·공통 파일명·UI-16 DNLD
+          description: 성공
           headers:
             X-Total-Count:
               description: 공통 내려받기의 조회 결과 건수; 대시보드 복합영역의 집계단위는 OQ-XLS-016 reviewer 결정 전 임의 고정 금지
@@ -14025,7 +13917,7 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: yearMonth 누락 또는 yyyy-MM 형식/유효 월 오류; errors[].field=yearMonth, 업무행 불변
+          description: 입력 오류
           content:
             application/json:
               schema:
@@ -15590,7 +15482,6 @@ components:
           maxLength: 50
         desiredMonthlyRate:
           type: number
-          description: PM 정책에서는 값 비노출·표 머리도 숨김; 현재 개발 admin은 공개
           nullable: true
         employeeTypeCode:
           type: string
@@ -15685,7 +15576,6 @@ components:
         privacyAgreementUserId:
           type: string
           nullable: true
-          description: PRVC_AGRE_USER_ID·현재 admin
         privacyAgreementUserName:
           type: string
           nullable: true
@@ -16519,7 +16409,6 @@ components:
           description: 현재 단가·원
         monthlyCost:
           type: number
-          description: 기준월 한 달 월 원가·현재 admin 공개
         profitRate:
           type: number
           description: 이익률 %·임계값과 같으면 미만 아님
@@ -19730,7 +19619,6 @@ components:
           items:
             $ref: '#/components/schemas/CommonPartSettlementCloseItem'
       additionalProperties: false
-      description: 기존 마감 서비스가 점검 결과의 대상/버전을 전달한다. 서버가 대상집합과 버전을 재조회한다. 실행자는 요청 사용자전환 필드 없이 admin 고정.
     CommonPartSettlementCloseResult:
       type: object
       required:
@@ -24289,77 +24177,3 @@ components:
             $ref: '#/components/schemas/CommonNetProfitStatementContribution'
           description: 기준월 계약유형별 금액/비율. contributionVisible=false이면 빈 배열; 정확 안내문구는 화면 시안 OQ-UI-009
       description: UI-09 읽기 전용 결과. 운영시작 이후 자료없는 달은0, 미이관/빈칸은null; 비교기간 공백은 항목 비교null. 결과 저장 없음.
-
-x-requirement-context:
-  description: >-
-    아래 항목은 관련 요구별 역할·관찰 증거다. 면제 목록이 아니다.
-    서버 조회, 응답 소비 UI, 실행 전 준비, 실행 제약과 범위 경계를 구분한다.
-    요구 의미는 requirement-registry.json의 title·statement·acceptance_hint·source_locator가 기준이며
-    연결 자체를 구현 완성 증거로 취급하지 않는다.
-  getCommonMenus:
-    REQ-001: '응답 소비 UI — 단일 AppLayout 안 Sidebar·Header·본문 각 하나. 이동 전후 단일 구조 검수.'
-    REQ-002: '응답 소비 UI — 선택 SCRN_ID를 공통 본문에 배치, 초기30개 미구현 본문 준비 중. 업무 결과 반환 없음.'
-    REQ-003: '응답 소비 UI — Header는 후속 제목·버튼 자리만 제공. 가짜 사용자 이름·알림 건수 미표시 검수.'
-    REQ-004: '응답 소비 UI — PC 기본 펼침·휴대폰 폭 접기/펼치기 검수. 폭 수치는 OQ-003이며 서버 입력 아님.'
-    REQ-005: '서버 조회 — 실제 TB_SY_MENU의 이름·순서 반영 검수. 고정 메뉴 배열 대체 금지.'
-    REQ-006: '서버 조회 — USE_YN=Y·UPPER_MENU_ID 계층·SORT_ORD/MENU_ID 정렬 및 중지 후손 제외. 검색·페이지는 OQ-007.'
-    REQ-007: '서버 응답 — HTTP200·공개8필드 목록·0건 배열[]. ApiResponse data 배열은 현재 봉투 지시를 따르되 원문 최상위 배열 충돌 OQ-002 보존.'
-    REQ-008: '서버 오류 — DB 읽기 실패 HTTP500. 정상200 빈 배열 대체 금지.'
-    REQ-009: '응답 소비 UI — iconNm·scrnId 연결, 휴대폰 폭 pcOnlyYn=Y 숨김. LOCK_YN 필터·권한 사용 금지.'
-    REQ-010: '응답 소비 UI — upperMenuId로 구성한 상위 그룹 두 번 클릭 시 자식 열림·닫힘. 서버 변경 없음.'
-    REQ-011: '응답 소비 UI — 선택·새로고침·직접 주소에서 같은 본문·단일 틀 유지. /screens/{scrnId}는 설계 제안.'
-    REQ-012: '응답 소비 UI — 실패 양쪽 오류·다시 시도·본문 숨김. 성공 재조회 뒤 원주소 재평가, 무주소 첫 화면. OQ-005 보존.'
-    REQ-013: '응답 소비 UI — 정상200·data=[]이면 등록된 메뉴 없음. 실패 안내와 구분.'
-    REQ-014: '접근 계약 — 인증 없이 localhost 조회 성공. 역할 검사·로그인401 추가 금지.'
-    REQ-015: '응답 소비 UI — 숨김 후 SORT_ORD/MENU_ID 순 첫 가시 화면. 초기 UI-16, 가시 화면0개 빈 안내.'
-    REQ-016: '응답 소비 UI — 미등록/중지·조상·계층 숨김/휴대폰 PC전용/미구현 순 첫 본문 안내만, Sidebar 유지. 판별 전달은 OQ-005이며 HTTP 보안 통제 아님.'
-    REQ-017: '응답 소비 UI — UI-10 PC→휴대폰→PC에서 같은 주소의 준비 중→PC 전용 화면입니다→준비 중 복구 검수.'
-    REQ-018: '응답 소비 UI — 없는 화면입니다·복귀 버튼 뒤 첫 가시 화면 이동 순차 검수. 가시 화면0개 빈 안내. 판별 전달 OQ-005.'
-    REQ-019: '서버 무결성 — 빈 부모 정상 root 유지, 누락 부모·자기 참조·순환과 후손 제외 검수.'
-    REQ-020: '서버 부수 효과 — 계층 오류별 경고 관찰. DB 보정·업무 감사 저장 금지, 로그 형식·보존 기간 미정.'
-    REQ-021: '응답 소비 UI — 최종 가시 하위 화면 없는 그룹 제외. 휴대폰 G008 숨김·PC 복구 검수.'
-    REQ-022: '응답 소비 UI — SCRN_ID·자식 혼합 행 클릭은 자기 화면 이동 없이 자식 토글. 직접 주소 취급 OQ-005.'
-    REQ-023: '서버 부수 효과 — 혼합 메뉴 조회 뒤 경고 관찰. 추가 감사 저장 금지.'
-    REQ-024: '서버 대표 결정 — 전체 후보 SORT_ORD/MENU_ID 순 첫 중복 행 조건 적용. 중지 첫 행 대신 뒤 행 승격 금지, 원본 보존. 직접 주소 전달 OQ-005.'
-    REQ-025: '서버 부수 효과 — 중복 SCRN_ID 조회 뒤 경고 관찰. UNIQUE 추가·중복 삭제 대체 금지.'
-    REQ-026: '응답 소비 UI — 즐겨찾기·최근 본 화면·화면 탭·상단 도구줄·단축키·알림 여섯 자리 준비 중·비활성 검수. 임시 데이터·작동 연출 금지.'
-    REQ-027: '실행 제약 — Java21 LTS/Boot3.5.x/Gradle와 고정 Java17/Boot 및 BOM3.3.x 보존. React+TypeScript+Vite·PostgreSQL·Docker Compose 유지. OQ-001 해소 승인 없음.'
-    REQ-028: '실행 경계 — localhost UI·API 성공과 내부망 타 기기 연결 불가 각각 검수. 휴대폰 검수는 개발 PC 개발자 도구.'
-    REQ-029: '비영속 제약 — 조회·토글·이동 시 DB·브라우저 영속 저장소 상태 쓰기 금지. 메뉴 초기값만 별도 준비 예외.'
-    REQ-030: '응답 소비 UI — cost 메뉴navi·화면틀 sidebar·header·spacing·color token·responsive behavior 적용 검수. 업무 카드 생성 금지, 세부 색·크기 원문 미제공.'
-    REQ-031: '실행 전 준비 — TB_SY_USER_SCOPE·TB_SY_MENU·TB_SY_USER_PREF·TB_SY_NOTI·TB_BS_PART_STD·TB_PJ_PROJ·TB_BL_BILL·TB_BL_DUN_HIST·TB_CL_CLOSE 중 없는 표만 원문 DDL로 생성. GET에서 DDL 실행 금지.'
-    REQ-032: '실행 전 준비 — SQ_TB_SY_NOTI START WITH 1 INCREMENT BY 1을 TB_SY_NOTI보다 먼저 준비하여 nextval 기본값 정의 검수. 기존 시퀀스 재설정 OQ-009.'
-    REQ-033: '실행 전 준비 — -- FK: 주석은 관계 설명으로 보존하고 신규 물리 FK 비생성 검수. 기존 FK 제거 요구 아님.'
-    REQ-034: '실행 전 준비 — 기존 구조 차이의 표·컬럼·형식 보고 후 확인 대기. 구조·행 보존, 삭제·재생성·자동 보정 금지. 보고 방식 OQ-010.'
-    REQ-035: '실행 전 초기값 — 빈 TB_SY_MENU만 원문270-310행40개 단회 삽입 후 조회 검수. 기존 메뉴 무추가·무덮어쓰기. GET에서 seed 실행 금지.'
-    REQ-036: '데이터 경계 — 다른8개 표 신규0행·기존 데이터 불변 검수. 구조 준비 외 업무 기능 없음.'
-    REQ-037: '범위 경계 — 로그인·권한·역할 필터 없이 조회. UI-22·서버 접근 통제는 마지막 로그인 작업 범위. 신규 인증 API 금지.'
-    REQ-038: '범위 경계 — 업무 화면·계산·업무 조회/저장/다운로드/업로드/편집0건. 메뉴 읽기·누락 구조·빈 메뉴 초기값은 제외의 예외.'
-    REQ-039: '범위 경계 — 후속 도구 실제 동작 없음 검수. REQ-026 비활성 자리와 구분, 관련 저장·알림 API 추가 금지.'
-    REQ-040: '범위 경계 — 메일·AI·외부 API·로그인 연동 및 준비 생성 금지. AI 메뉴는 준비 중 경로만 제공.'
-    REQ-041: '실행 제약 — spring_boot3.3.x·node20.x·vite5.x·react18.x·postgres16.x 고정 BOM 보존. Boot3.5.x 충돌 OQ-001 미해결.'
-    REQ-042: '산출물 제약 — backend·frontend·infra/docker-compose.yml 위치 검수. 이 명세로 구현 파일 생성·실행 완료를 주장하지 않음.'
-    REQ-044: '실행 제약 — resolved·imperative·mybatis·blocking 유지, JPA/Spring JDBC/R2DBC 교체 금지. 정본은 plan.md exact marker JSON. spec.md의 selection_source=explicit과 원장 인용 policy-default 불일치 UP-001 보존. blocking_priority=[mybatis,jpa,spring-jdbc]·conflicts=[]는 버전 충돌 해소 아님.'
-    REQ-045: '준비 기준 — 후속 schema/migration 기준으로 누락 생성·시퀀스 선행·기존 보존·차이 확인 검수. 도구·명령 OQ-008. HTTP 준비 endpoint 추가 금지.'
-    REQ-046: '통합 검수 — 실제 backend 결과와 frontend Sidebar·경로를 같은 DB 조건으로 함께 확인. 제품 시험 not_run.'
-    REQ-047: '실행 제약 — Compose 각 build context .dockerignore에서 node_modules·.git·dist·build·.next·coverage 제외 검수.'
-    REQ-048: '구현 인수 — backend/ 실제 PostgreSQL 메뉴 조회 변경 필수. frontend 단독 mock으로 완료 금지.'
-    REQ-049: '문서 책임 — spec.md 기술·범위, plan.md 구조·순서·실행 정본, tasks.md backend/frontend/infra 작업, ui-design.md 시각 계약 유지. 원장 이전 단계 설명은 현재 호출의 다른 파일 수정 허가가 아님.'
-    REQ-050: '정책 유보 — 추가 성능·운영 보안·감사·백업·모니터링은 운영 배포 단계 결정. 미정을 없음·비활성으로 확정 금지. localhost 제한·메뉴 경고 유지.'
-    REQ-051: '명명 제약 — AppLayout·Sidebar·Header·TB_SY_MENU·SCRN_ID·UI-16·/api/common/menus 보존. getCommonMenus·화면 route는 설계 제안이며 원문 확정 이름으로 가장하지 않음.'
-  getHealth:
-    REQ-043: '필수 경로 — /api/health 유지. GET·getHealth는 기존 설계 제안. 성공 값·DB 포함·오류·4xx 부재 근거 OQ-006. 제품 검증 화면 추가 금지.'
-
-
-x-change-supersession:
-  description: 기존 operation과 기준선 시험은 원형 보존한다. 이번 공통 기능 인수에는 다음 예외가 우선하며 기존 메뉴 조회 자체를 상태 저장 API로 바꾸지 않는다.
-  ui-header: 'REQ-071·REQ-086: 제목줄 정보와 시스템 관리자 이름은 이번 원문으로 허용한다.'
-  ui-tools: 공통 도구만 실제 연결하고 AI·알림·로그인 관련은 여전히 비활성이다. 실제 요구 연결은 새 연산과 x-uncovered-requirements의 단건 항목을 따른다.
-  read-only: 'REQ-054·REQ-055: 메뉴 GET은 계속 읽기 전용이다. 여섯 설정 쓰기는 신규 putCommonUserPreference만 수행하므로 과거 UI 전체 상태 무저장 시험은
-    이 변경 범위에서 대체한다.'
-  user-screen: UI-23의 사용자 업무만 신규 사용자 연산으로 허용한다. 기존 메뉴 GET과 공통 설정 연산은 무변경이다.
-
-x-change-open-questions:
-- 'OQ-API-027: REQ-239·REQ-240·REQ-241의 기존 수동 API 3개 실제 구현 부재; 해당 기존 응답/필터/헤더를 임의 생성하지 않음. 리뷰어는 구현을 제공하고 계약만 보충한다.'
-- 'OQ-DATA-027: SQL 원문·전체 참조 칸·마감 코드 확보 후 DTO 물리 매핑 검증.'
-- UI-22 전 securitySchemes/bearerAuth 미정의가 원문 확정이며 인증 거부 시험은 추가하지 않음.

@@ -123,7 +123,7 @@ class ManpowerForecastPersistenceTest {
         var response = mvc.perform(get("/api/common/manpower-forecasts").param("year", "2026")).andExpect(status().isOk()).andReturn().getResponse();
         var months = json.readTree(response.getContentAsString(StandardCharsets.UTF_8)).path("data").path("months");
         var file = mvc.perform(get("/api/common/manpower-forecasts/excel").param("year", "2026"))
-            .andExpect(status().isOk()).andExpect(header().string("X-Total-Count", "3")).andReturn().getResponse();
+            .andExpect(status().isOk()).andExpect(header().string("X-Total-Count", "2")).andReturn().getResponse();
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(file.getContentAsByteArray()))) {
             assertThat(book.getNumberOfSheets()).isEqualTo(1);
             for (int row = 0; row < 3; row++) for (int col = 0; col < months.size(); col++) {
@@ -195,7 +195,7 @@ class ManpowerForecastPersistenceTest {
         mvc.perform(get("/api/common/manpower-forecasts/excel").param("year", "2026")).andExpect(status().isOk());
         var logs = db.queryForList("SELECT user_id,scrn_id,act_type_cd,trgt_desc,act_dttm,reg_dttm FROM TB_SY_ACCS_LOG WHERE scrn_id='UI-17'");
         assertThat(logs).hasSize(1);
-        assertThat(logs.get(0)).containsEntry("user_id", "admin").containsEntry("act_type_cd", "DNLD").containsEntry("trgt_desc", "인력 수요 예측 3건");
+        assertThat(logs.get(0)).containsEntry("user_id", "admin").containsEntry("act_type_cd", "DNLD").containsEntry("trgt_desc", "인력 수요 예측 2건");
         assertThat(logs.get(0).get("act_dttm")).isNotNull(); assertThat(logs.get(0).get("reg_dttm")).isNotNull();
         assertThat(db.queryForObject("SELECT COUNT(*) FROM TB_SY_ACCS_LOG WHERE scrn_id='UI-29'", Integer.class)).isZero();
     }

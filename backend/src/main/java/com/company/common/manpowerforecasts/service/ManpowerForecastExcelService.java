@@ -48,8 +48,10 @@ public class ManpowerForecastExcelService {
         var bytes = oneDecimal(excel.write("인력 수요 예측", headers, rows, actor.userId(), now));
         // 다른 연도 화면(인력 운영 보드·철수 리스트)처럼 파일 이름 기간은 「2026년」.
         String name = excel.fileName("인력 수요 예측", year + "년", now);
-        mapper.insertAccess(actor.userId(), rows.size());
-        return new Workbook(bytes, name, rows.size());
+        // 「조회 결과 n건」의 n은 엑셀에 담긴 달 수(올해 남은 달·내년 12달, 2026-11-25 사용자 결정).
+        int count = result.months().size();
+        mapper.insertAccess(actor.userId(), count);
+        return new Workbook(bytes, name, count);
     }
 
     private static List<String> row(String label, Result result, Function<Month, BigDecimal> value) {

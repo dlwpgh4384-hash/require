@@ -76,7 +76,7 @@ class CommonManpowerForecastControllerTest {
         var months = json.readTree(query.getContentAsString(StandardCharsets.UTF_8)).path("data").path("months");
         var response = mvc.perform(get("/api/common/manpower-forecasts/excel").param("year", "2026"))
             .andExpect(status().isOk()).andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-            .andExpect(header().string("X-Total-Count", "3")).andReturn().getResponse();
+            .andExpect(header().string("X-Total-Count", "2")).andReturn().getResponse();
         var disposition = org.springframework.http.ContentDisposition.parse(response.getHeader("Content-Disposition"));
         assertThat(disposition.getFilename()).isEqualTo("인력 수요 예측_2026년_20261115_0900.xlsx");
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(response.getContentAsByteArray()))) {
@@ -96,7 +96,7 @@ class CommonManpowerForecastControllerTest {
         }
         var order = inOrder(excel, audit);
         order.verify(excel).write(eq("인력 수요 예측"), anyList(), anyList(), eq("admin"), any());
-        order.verify(audit).insertAccess("admin", 3);
+        order.verify(audit).insertAccess("admin", 2);
         verify(workforce, never()).insertAccess(anyString(), anyInt());
     }
     @ParameterizedTest @ValueSource(strings = {"/api/common/manpower-forecasts", "/api/common/manpower-forecasts/excel"})
@@ -121,14 +121,14 @@ class CommonManpowerForecastControllerTest {
     }
     @Test void nextYearExportsTwelveMonthsWithYearFileName() throws Exception {
         var file = mvc.perform(get("/api/common/manpower-forecasts/excel").param("year", "2027"))
-            .andExpect(status().isOk()).andExpect(header().string("X-Total-Count", "3")).andReturn().getResponse();
+            .andExpect(status().isOk()).andExpect(header().string("X-Total-Count", "12")).andReturn().getResponse();
         var disposition = org.springframework.http.ContentDisposition.parse(file.getHeader("Content-Disposition"));
         assertThat(disposition.getFilename()).isEqualTo("인력 수요 예측_2027년_20261115_0900.xlsx");
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(file.getContentAsByteArray()))) {
             assertThat(book.getSheetAt(0).getRow(3).getLastCellNum()).isEqualTo((short) 13);
             assertThat(book.getSheetAt(0).getRow(5).getCell(0).getStringCellValue()).isEqualTo("차이");
         }
-        verify(audit).insertAccess("admin", 3);
+        verify(audit).insertAccess("admin", 12);
     }
     @Test void serializationFailureNeverRecordsSuccessfulDownload() throws Exception {
         doThrow(new IllegalStateException("serialization failed")).when(excel).write(anyString(), anyList(), anyList(), anyString(), any());

@@ -138,6 +138,12 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (url === "/api/common/ai-recommendation-options")
+      return {
+        success: true,
+        meta: {},
+        data: { targets: [], jobs: [], grades: [], exclusionReasons: [] },
+      };
     if (url.startsWith("/api/common/manpower-forecasts?"))
       return {
         success: true,
@@ -608,6 +614,12 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-30": async (content) => {
+    expect(
+      await content.findByText("진행 중인 대상이 없습니다."),
+    ).toBeVisible();
+    expect(content.queryByText("준비 중")).not.toBeInTheDocument();
+  },
   "UI-17": async (content) => {
     expect(await content.findByTestId("manpower-forecast-empty")).toBeVisible();
     expect(

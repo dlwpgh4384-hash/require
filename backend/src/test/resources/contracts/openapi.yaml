@@ -12534,6 +12534,9 @@ paths:
       - REQ-1378
       - REQ-1398
       - REQ-1372
+      - REQ-1588
+      - REQ-1589
+      - REQ-1590
       parameters:
       - name: opportunityId
         in: path
@@ -12552,14 +12555,21 @@ paths:
       - 기회명100자·사용중 고객·파트/단계·확률0~100·양수금액·시작월·근무지200자, 필요인력 직무/정수인원≥1/시작월/개월≥1/월MM>0≤1을 검증한다.
       - 저장 시 예상 이익률이 월 승인 기준 미만이면 승인 대기이며 정확한 기준값은 대기 아님이다.
       - 승인 후 차이≤월 재승인차이는 승인 유지, 초과하며 기준 미만이면 대기·기준 이상이면 요구 해제한다. 반려 건을 고쳐 저장하면 다시 대기다.
+      - 필요 인력 직무 변경은 가배정자를 유지하고 줄 아래 다른 직무 사람이 가배정되어 있습니다를 표시한다. 가배정수 미만 인원도 저장·경고한다.
+      - 지운 NEED_SN은 재사용하지 않고 과거 최대+1이다. 줄 시작월 변경은 가배정 startMonth를 바꾸지 않는다.
+      - 수정창 개방 후 가배정으로 증가한 MOD_DTTM보다 옛 modifiedAt이면409이며 새 가배정을 해제하지 않는다.
       x-side-effects:
       - TB_SL_OPP_NEED 변경을 함께 반영하고 MOD_DTTM을 갱신한다.
+      - 가배정 유지와 NEED_SN 비재사용 보장; 새 가배정을 미등록으로 덮어 해제하지 않는다.
       x-required-tests:
       - 'happy: 최신 modifiedAt으로 기회명 수정 -> 상세 GET의 TB_SL_OPP 새 이름 확인'
       - 'auth: 개발 admin 무인증 수정 -> 전체 범위의 대상 기회만 변경; 역할 검사 추가 없음'
       - 'validation: 필요인력 monthlyMm=0 -> 400 errors[].field=needs[0].monthlyMm·기존 필요인력 불변'
       - 'business: 오래된 modifiedAt 수정 -> 409 지정 문구·TB_SL_OPP와 필요인력 불변; 반려 수정 저장은 승인 대기'
       - 'side-effect: 필요인력 개월 수정 -> TB_SL_OPP_NEED 새 개월과 TB_SL_OPP.MOD_DTTM 증가 조회'
+      - 'happy: 가배정 있는 줄 직무/인원 수정 ->200·TB_SL_OPP_NEED 새 직무/인원과 원 가배정 인력 유지·jobMismatchWarning/overCapacityWarning 조회'
+      - 'business: 편집창 개방 후 다른 요청 가배정·옛 modifiedAt 저장 ->409·새 TB_SL_TENT_ASGN과 필요인력 불변'
+      - 'side-effect: 필요인력 삭제 후 추가·줄시작월 변경 -> 새 NEED_SN은 과거최대+1·가배정 startMonth 불변·상세 투입가능은 가배정 시작월'
       x-state-transitions:
       - 진행 중 이전값 -> 진행 중 새값
       - 반려 -> 수정 저장 후 승인 대기
@@ -13922,6 +13932,329 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/ai-recommendation-options:
+    get:
+      operationId: getCommonAiRecommendationOptions
+      summary: AI 인력 추천 조건
+      security: []
+      x-related-requirements:
+      - REQ-1556
+      - REQ-1558
+      - REQ-1609
+      - REQ-1614
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAiRecommendationOptions'
+                  required:
+                  - data
+        '400':
+          description: 입력 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+      - name: targetType
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - project
+          - opportunity
+        description: 선택 대상 종류
+      - name: targetId
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+        description: 선택 대상의 자리 옵션; 틀린 ID는400. 브라우저 주소 query 인계와는 별개다.
+      x-pagination-filtering:
+        pagination: 전체 진행 대상/필요 인력 옵션; 서버 페이지 없음
+        filtering: 진행 기회와 진행 프로젝트; 수주예정·종료·실주·내부 제외
+        ordering: 기존 진행 대상 정렬과 NEED_SN 순서 유지
+      x-aiops-query-role:
+        entity: TB_SL_OPP_NEED
+        result_path:
+        - data
+        - targets
+  /api/common/ai-recommendations:
+    post:
+      operationId: postCommonAiRecommendation
+      summary: AI 인력 추천 실행
+      security: []
+      x-related-requirements:
+      - REQ-1557
+      - REQ-1559
+      - REQ-1560
+      - REQ-1561
+      - REQ-1562
+      - REQ-1571
+      - REQ-1573
+      - REQ-1574
+      - REQ-1575
+      - REQ-1576
+      - REQ-1578
+      - REQ-1579
+      - REQ-1581
+      - REQ-1582
+      - REQ-1591
+      - REQ-1592
+      - REQ-1609
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonAiRecommendationInput'
+      x-business-rules:
+      - 입력 조건에서 진행 대상/실제 JOB·GRADE를 검증하고 나이·성별·학력은 사용하지 않는다.
+      - 식-00·68·69·70 및 당월 AI_SCORE 8개를 읽어 배제/항목 비례 반올림/동점 순서를 적용한다.
+      - 대상 변경과 개별 새 요청만 자동 실행한다. 직무/시작월/등급/자리 초안 변경만으로 이 API를 부르지 않는다.
+      - 추천1회=requestId1개; 재전송 중복은 같은 결과/기록이고 새로운 요청의 같은 대상은 별도 실행이다.
+      - 필요인력 없는 기회도 추천/제외 허용. CNVT는 추천 표시를 남긴다. 이유300자·점수JSON500자 저장 제한과 복원 정합성은 OQ-DATA-030 확인.
+      - 고객/업종은 지난 시작한 투입 포함·CNCL/미시작 제외. WORK_AREA_CD/HOME_AREA_CD 코드로 시도 비교·주소 문자열 미사용.
+      x-side-effects:
+      - TB_SL_RCMD_LOG에 대상·직무·시작월·REQ_GRADE_CD·결과·선택과 점수 snapshot을 실행당1번 저장한다.
+      - 후보만 계산하며 TB_PJ_ASGN·TB_SL_TENT_ASGN·DB 식 정의는 변경하지 않는다.
+      x-required-tests:
+      - 'happy: 진행 프로젝트와 유효 직무/시작월/등급으로 실행 -> 200 condition의 보정 시작월·선택 등급과 최대5명 items가 나오며 TB_SL_RCMD_LOG에 같은 조건/점수
+        조회'
+      - 'auth: 고정 관리자 개발환경에서 인증 헤더 없이 추천 -> 200 결과와 해당 실행 기록; 역할 이름 분기·401/403 추가0'
+      - 'validation: 틀린 targetId 또는 실제 달이 아닌 startMonth로 추천 -> 400 해당 필드 errors·TB_SL_RCMD_LOG 증가0'
+      - 'business: 프로젝트 종료월 뒤 startMonth 요청 -> 400 시작월이 프로젝트 종료월 뒤입니다.·기록 불변; 시작월 전이면 프로젝트 시작월로 보정'
+      - 'side-effect: 같은 requestId로 개발 이중 실행 후 새 requestId로 같은 대상 실행 -> 첫 실행 로그1번·새 실행 로그1번이며 REQ_GRADE_CD에 각 선택 등급
+        저장'
+      - 'eligibility: 휴직 하루겹침/무기한·해당월퇴사·사용중지·간접·확정MM1.0·같은기회 가배정 fixture를 각 추천 -> 각 후보 제외; 확정0.5와 다른기회 가배정은 유지'
+      - 'score: 근무지 없음/같은시도/다른시도/거주지없음 및 비용 결측 -> 근무지5/10/6/6·비용3; 동점은 가용일 점수 다음 관리번호'
+      - 'empty-needs: 필요인력0줄 기회로 추천 -> 200 items와 조건을 저장하며 needSn 필수 오류로 막지 않음'
+      x-state-transitions:
+      - 새 추천 실행 -> 조건/결과 기록
+      - 같은 requestId 재전송 -> 기존 결과 재사용·추가기록0
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAiRecommendationResult'
+                  required:
+                  - data
+        '400':
+          description: 입력 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/ai-recommendations/{recommendationId}/assignment:
+    post:
+      operationId: postCommonAiRecommendationAssignment
+      summary: 추천 인력 배정 선택 기록
+      security: []
+      x-related-requirements:
+      - REQ-1564
+      - REQ-1565
+      - REQ-1583
+      - REQ-1584
+      parameters:
+      - name: recommendationId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonAiRecommendationAssignmentInput'
+      x-business-rules:
+      - 원 추천의 프로젝트와 후보 developerId를 기존 TB_PJ_ASGN.assignmentId의 개발자·프로젝트와 서버에서 비교한다.
+      - 기존 postCommonAssignment 성공 후 같은 개발자일 때만 호출한다. 이 API는 투입을 생성하지 않는다.
+      - 창 취소·개발자 변경 저장은 추천 배정기록 없음. 후속 기록 실패를 투입 재저장으로 복구하지 않는다.
+      x-side-effects:
+      - TB_SL_RCMD_LOG.USER_ACT_CD=ASGN만 기록; 다른 기회 가배정은 유지한다.
+      x-required-tests:
+      - 'happy: 기존 AssignmentForm에서 같은 개발자/프로젝트로 투입 저장 후 assignmentId 연결 -> 200 userActCode=ASGN·TB_SL_RCMD_LOG 선택결과
+        ASGN 조회'
+      - 'auth: 개발 고정 관리자에서 배정 선택기록 호출 -> 인증 연결 없이200·로그 작업자는 현재 고정 사용자'
+      - 'validation: assignmentId 누락 또는 존재하지 않는 투입 연결 -> 400 assignmentId 필드오류·추천 ASGN 증가0'
+      - 'business: 다른 개발자 또는 다른 프로젝트의 투입을 연결 -> 400 불일치 오류·추천 선택결과 불변'
+      - 'side-effect: 다른 기회 가배정이 있는 개발자의 유효 투입 연결 -> TB_SL_RCMD_LOG만 ASGN·기존 TB_SL_TENT_ASGN 행/상태 불변'
+      - 'cancel: 배정창 닫기·취소 또는 다른 개발자로 저장 -> 이 API 호출0·추천 ASGN 증가0'
+      x-state-transitions:
+      - 추천 결과 -> 실제 같은 개발자 투입 연결 후 ASGN
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAiRecommendationAssignmentResult'
+                  required:
+                  - data
+        '400':
+          description: 입력 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/ai-recommendations/{recommendationId}/tentative-assignment:
+    put:
+      operationId: putCommonAiRecommendationTentativeAssignment
+      summary: 추천 인력 가배정
+      security: []
+      x-related-requirements:
+      - REQ-1566
+      - REQ-1567
+      - REQ-1568
+      - REQ-1577
+      - REQ-1585
+      - REQ-1586
+      - REQ-1587
+      - REQ-1610
+      parameters:
+      - name: recommendationId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonAiRecommendationTentativeInput'
+      x-business-rules:
+      - 세 화면은 같은 가배정 서비스를 쓰고 신규 SQL은 만들지 않는다. UI-30 sourceScreenId를 기존 매퍼 인자로 전달한다.
+      - 기회와 현재 선택 NEED_SN 소유 관계·CNVT·개발자 후보를 재검증한다. 추천 snapshot의 시작월을 사용하고 줄 변경만으로 점수는 다시 계산하지 않는다.
+      - 다른 기회 가배정은 이전 REL/새 저장/양쪽 수정시각/추천 NEED_SN을 한 트랜잭션으로 처리한다.
+      - UI-30 가배정은 인원 초과를 허용하고 경고만 반환한다. 기존 UI-05 보존 API의 별도 후보/잔여 검증은 바꾸지 않는다.
+      - 알림은 기회/자리번호/직무·이전해제·초과문구와 시안의 …볼 수 있습니다. 후반을 포함한다. 정확 전문은 OQ-UI-030 대조.
+      x-side-effects:
+      - TB_SL_TENT_ASGN 이전 REL/새 가배정, 양쪽 TB_SL_OPP.MOD_DTTM, TB_SL_RCMD_LOG.NEED_SN·선택결과를 원자 저장한다.
+      - UI-29 자리열·UI-28 점선·UI-05 다음배정은 같은 DB 커밋 후 재조회한다.
+      x-required-tests:
+      - 'happy: 진행 기회의 현재 선택 needSn으로 저장 -> 200 assignment의 NEED_SN과 max(철수다음달,추천시작월) 저장값을 공유 GET에서 조회'
+      - 'auth: 무인증 고정 관리자에서 추천 가배정 -> 200·화면 기록 UI-30이며 UI-29 고정 기록0'
+      - 'validation: needSn 누락 또는 해당 기회에 없는 줄 -> 400 needSn 필드오류·TB_SL_TENT_ASGN 원행과 로그 NEED_SN 불변'
+      - 'business: CNVT 개발자 가배정 -> 409 투입 배정으로 넘긴 후보입니다. 투입 상세에서 확인해 주세요.·상태/자리 불변; 만석 자체는 차단하지 않음'
+      - 'side-effect: 다른 기회 인력을 교체 -> 이전 행 REL·새행 가배정·양쪽 TB_SL_OPP.MOD_DTTM 증가·TB_SL_RCMD_LOG.NEED_SN 갱신·TB_PJ_ASGN
+        신규0'
+      - 'capacity: 만석 자리 추가 저장 -> 200·overCapacityCount와 알림의 초과 n명 일치·기존 가배정 보존'
+      - 'candidate-flow: 저장한 가배정의 기회 수주 후 UI-12 후보조회 -> CNVT만 표시; 확정과 투입저장 후 DONE·빼기 후 DROP은 조회 제외'
+      - 'atomicity: 이전REL 후 새 저장 실패 주입 -> 이전 가배정·양쪽 수정시각·추천 NEED_SN 모두 이전값'
+      x-state-transitions:
+      - 다른 기회 활성 가배정 -> REL·선택 기회 활성 가배정
+      - CNVT -> 변경 거부409; 수주/확정/빼기의 기존 전이는 CNVT/DONE/DROP 유지
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAiRecommendationTentativeResult'
+                  required:
+                  - data
+        '400':
+          description: 입력 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 충돌
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/ai-recommendations/{recommendationId}/exclusions:
+    post:
+      operationId: postCommonAiRecommendationExclusion
+      summary: 추천 후보 제외
+      security: []
+      x-related-requirements:
+      - REQ-1569
+      - REQ-1570
+      - REQ-1611
+      - REQ-1612
+      parameters:
+      - name: recommendationId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonAiRecommendationExclusionInput'
+      x-business-rules:
+      - 사유는 RCMD_EXCL 유효 코드 필수. 사용자에게 작업자/작업시각 입력란을 만들지 않는다.
+      - 원 추천 대상+직무 범위에만 적용하고 대상이 닫히기 전 제외는 다음 개방 주기에 적용하지 않는다.
+      - 필요 인력 등록 유무와 무관하게 추천/제외 허용; 되돌리기 CTA/API는 만들지 않는다.
+      x-side-effects:
+      - TB_SL_RCMD_LOG에 제외표시·RCMD_EXCL_CD·ACT_USER_ID·ACT_DTTM을 함께 저장한다.
+      x-required-tests:
+      - 'happy: 현재 후보와 유효 RCMD_EXCL 사유 제출 -> 200 excluded=true·TB_SL_RCMD_LOG 제외표시/사유 저장·같은 대상+직무 재추천에 후보 없음'
+      - 'auth: 현재 고정 관리자 무인증 제외 -> 200 actedBy가 고정 사용자·ACT_USER_ID와 일치하며 역할분기0'
+      - 'validation: reasonCode 누락 또는 다른 코드그룹 -> 400 reasonCode 오류·제외표시/ACT_DTTM 불변'
+      - 'business: 제외 후보를 같은 대상 다른 직무로 재추천하거나 대상 종료 후 재개방 -> 과거 제외가 새 조건을 막지 않고 해당 후보 재등장'
+      - 'side-effect: 제외 확정 -> TB_SL_RCMD_LOG.RCMD_EXCL_CD·ACT_USER_ID·ACT_DTTM과 제외표시 함께 조회·TIMESTAMPTZ/Instant 저장·취소
+        호출0'
+      - 'empty-needs: 필요인력0줄 기회 후보에 유효 사유 제외 -> 200·같은 조건 재추천에서 제외'
+      x-state-transitions:
+      - 유효 추천 후보 -> 대상+직무 제외
+      - 대상 종료 -> 기존 제외 효력 만료; 새 개방 주기는 과거 제외 미적용
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAiRecommendationExclusionResult'
+                  required:
+                  - data
+        '400':
+          description: 입력 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
     CommonDashboardSummary:
@@ -14713,6 +15046,36 @@ components:
           type: array
           items:
             type: string
+        jobMismatchWarning:
+          type: string
+          nullable: true
+          readOnly: true
+          description: 다른 직무 사람이 가배정되어 있습니다
+        overCapacityWarning:
+          type: string
+          nullable: true
+          readOnly: true
+          description: 가배정 인원 초과 경고; 저장 차단 아님
+        tentativeAssignments:
+          type: array
+          items:
+            type: object
+            properties:
+              developerId:
+                type: string
+              developerName:
+                type: string
+              startMonth:
+                type: string
+                description: 가배정 시작월=상세 투입 가능
+              tentativeStatusCode:
+                type: string
+            required:
+            - developerId
+            - developerName
+            - startMonth
+            - tentativeStatusCode
+          readOnly: true
       required:
       - jobCode
       - requiredCount
@@ -24177,3 +24540,355 @@ components:
             $ref: '#/components/schemas/CommonNetProfitStatementContribution'
           description: 기준월 계약유형별 금액/비율. contributionVisible=false이면 빈 배열; 정확 안내문구는 화면 시안 OQ-UI-009
       description: UI-09 읽기 전용 결과. 운영시작 이후 자료없는 달은0, 미이관/빈칸은null; 비교기간 공백은 항목 비교null. 결과 저장 없음.
+    CommonAiNeed:
+      type: object
+      properties:
+        needSn:
+          type: integer
+        jobCode:
+          type: string
+        jobName:
+          type: string
+        requiredCount:
+          type: integer
+        startMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+      required:
+      - needSn
+      - jobCode
+      - jobName
+      - requiredCount
+      - startMonth
+    CommonAiTarget:
+      type: object
+      properties:
+        targetType:
+          type: string
+          enum:
+          - project
+          - opportunity
+        targetId:
+          type: string
+        targetName:
+          type: string
+        startMonth:
+          type: string
+        endMonth:
+          type: string
+          nullable: true
+        needs:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAiNeed'
+      required:
+      - targetType
+      - targetId
+      - targetName
+      - startMonth
+      - endMonth
+      - needs
+    CommonAiRecommendationOptions:
+      type: object
+      properties:
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAiTarget'
+        jobs:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              name:
+                type: string
+            required:
+            - code
+            - name
+        grades:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              name:
+                type: string
+            required:
+            - code
+            - name
+        exclusionReasons:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              name:
+                type: string
+            required:
+            - code
+            - name
+      required:
+      - targets
+      - jobs
+      - grades
+      - exclusionReasons
+    CommonAiRecommendationInput:
+      type: object
+      properties:
+        requestId:
+          type: string
+          minLength: 1
+          description: 개별 추천 실행 식별자; 재전송은 동일값, 새로운 화면요청은 새값
+        targetType:
+          type: string
+          enum:
+          - project
+          - opportunity
+        targetId:
+          type: string
+          minLength: 1
+        jobCode:
+          type: string
+          minLength: 1
+        startMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+        gradeCode:
+          type: string
+          minLength: 1
+        needSn:
+          type: integer
+          description: 기회 선택 자리; 필요 인력0줄이면 생략·추천 허용
+      required:
+      - requestId
+      - targetType
+      - targetId
+      - jobCode
+      - startMonth
+      - gradeCode
+    CommonAiRecommendationCondition:
+      type: object
+      properties:
+        targetType:
+          type: string
+          enum:
+          - project
+          - opportunity
+        targetId:
+          type: string
+          minLength: 1
+        jobCode:
+          type: string
+          minLength: 1
+        startMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+        gradeCode:
+          type: string
+          minLength: 1
+        needSn:
+          type: integer
+          description: 기회 선택 자리; 필요 인력0줄이면 생략·추천 허용
+      required:
+      - targetType
+      - targetId
+      - jobCode
+      - startMonth
+      - gradeCode
+    CommonAiScoreItem:
+      type: object
+      properties:
+        name:
+          type: string
+        score:
+          type: number
+        maximumScore:
+          type: number
+      required:
+      - name
+      - score
+      - maximumScore
+    CommonAiRecommendationScores:
+      type: object
+      properties:
+        job:
+          $ref: '#/components/schemas/CommonAiScoreItem'
+        skill:
+          $ref: '#/components/schemas/CommonAiScoreItem'
+        customerIndustry:
+          $ref: '#/components/schemas/CommonAiScoreItem'
+        grade:
+          $ref: '#/components/schemas/CommonAiScoreItem'
+        performance:
+          $ref: '#/components/schemas/CommonAiScoreItem'
+        cost:
+          $ref: '#/components/schemas/CommonAiScoreItem'
+        availability:
+          $ref: '#/components/schemas/CommonAiScoreItem'
+        workplace:
+          $ref: '#/components/schemas/CommonAiScoreItem'
+      required:
+      - job
+      - skill
+      - customerIndustry
+      - grade
+      - performance
+      - cost
+      - availability
+      - workplace
+    CommonAiRecommendationCard:
+      type: object
+      properties:
+        developerId:
+          type: string
+        developerName:
+          type: string
+        managementNumber:
+          type: string
+        jobName:
+          type: string
+        gradeName:
+          type: string
+        employeeTypeName:
+          type: string
+        totalScore:
+          type: number
+        scores:
+          $ref: '#/components/schemas/CommonAiRecommendationScores'
+        reason:
+          type: string
+          maxLength: 300
+        otherTentativeOpportunityName:
+          type: string
+          nullable: true
+        assignmentCandidate:
+          type: boolean
+      required:
+      - developerId
+      - developerName
+      - managementNumber
+      - jobName
+      - gradeName
+      - employeeTypeName
+      - totalScore
+      - scores
+      - reason
+      - otherTentativeOpportunityName
+      - assignmentCandidate
+    CommonAiRecommendationResult:
+      type: object
+      properties:
+        recommendationId:
+          type: string
+        condition:
+          $ref: '#/components/schemas/CommonAiRecommendationCondition'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAiRecommendationCard'
+      required:
+      - recommendationId
+      - condition
+      - items
+    CommonAiRecommendationAssignmentInput:
+      type: object
+      properties:
+        developerId:
+          type: string
+          minLength: 1
+        assignmentId:
+          type: string
+          minLength: 1
+      required:
+      - developerId
+      - assignmentId
+    CommonAiRecommendationAssignmentResult:
+      type: object
+      properties:
+        recommendationId:
+          type: string
+        developerId:
+          type: string
+        assignmentId:
+          type: string
+        userActCode:
+          type: string
+          enum:
+          - ASGN
+      required:
+      - recommendationId
+      - developerId
+      - assignmentId
+      - userActCode
+    CommonAiRecommendationTentativeInput:
+      type: object
+      properties:
+        developerId:
+          type: string
+          minLength: 1
+        needSn:
+          type: integer
+          description: 현재 가배정 자리 선택; 추천 당시 줄과 다를 수 있음
+      required:
+      - developerId
+      - needSn
+    CommonAiRecommendationTentativeResult:
+      type: object
+      properties:
+        assignment:
+          $ref: '#/components/schemas/CommonWithdrawalTentativeAssignment'
+        releasedOpportunityName:
+          type: string
+          nullable: true
+        overCapacityCount:
+          type: integer
+          minimum: 0
+        message:
+          type: string
+      required:
+      - assignment
+      - releasedOpportunityName
+      - overCapacityCount
+      - message
+    CommonAiRecommendationExclusionInput:
+      type: object
+      properties:
+        developerId:
+          type: string
+          minLength: 1
+        reasonCode:
+          type: string
+          minLength: 1
+          description: RCMD_EXCL 유효 코드
+      required:
+      - developerId
+      - reasonCode
+    CommonAiRecommendationExclusionResult:
+      type: object
+      properties:
+        recommendationId:
+          type: string
+        developerId:
+          type: string
+        excluded:
+          type: boolean
+          enum:
+          - true
+        reasonCode:
+          type: string
+        actedBy:
+          type: string
+        actedAt:
+          type: string
+          format: date-time
+      required:
+      - recommendationId
+      - developerId
+      - excluded
+      - reasonCode
+      - actedBy
+      - actedAt

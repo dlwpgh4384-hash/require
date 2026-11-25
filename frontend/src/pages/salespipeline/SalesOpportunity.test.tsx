@@ -710,6 +710,29 @@ it("a failed warning check never blocks saving", async () => {
   fireEvent.click(screen.getByTestId("sales-opportunity-save"));
   await waitFor(() => expect(saved).toHaveBeenCalled());
 });
+it("changing a saved line's job or cutting its headcount below the tentatives only warns", async () => {
+  const jobs = options.codes.JOB;
+  options.codes.JOB = [...jobs, { code: "FE", codeName: "프론트엔드" }];
+  try {
+    row.needs[0].tentativeDeveloperIds = ["dev", "dev2"];
+    row.needs[0].requiredCount = 2;
+    const saved = form(true);
+    expect(screen.queryByTestId("sales-need-0-job-warning")).toBeNull();
+    expect(screen.queryByTestId("sales-need-0-count-warning")).toBeNull();
+    fireEvent.change(screen.getByTestId("sales-need-0-jobcode"), { target: { value: "FE" } });
+    expect(screen.getByTestId("sales-need-0-job-warning")).toHaveTextContent(
+      "다른 직무 사람이 가배정되어 있습니다",
+    );
+    fireEvent.change(screen.getByTestId("sales-need-0-requiredcount"), { target: { value: "1" } });
+    expect(screen.getByTestId("sales-need-0-count-warning")).toHaveTextContent(
+      "가배정한 2명보다 인원이 적습니다. 저장은 됩니다.",
+    );
+    fireEvent.click(screen.getByTestId("sales-opportunity-save"));
+    await waitFor(() => expect(saved).toHaveBeenCalled());
+  } finally {
+    options.codes.JOB = jobs;
+  }
+});
 it("a handed-off person (409 on the line) shows under that line, not the version-conflict banner", async () => {
   row.needs[0].tentativeDeveloperIds = ["dev2"];
   form(true);
@@ -961,6 +984,31 @@ it("needs tab lists lines and tentative people", async () => {
   );
   expect(name).toHaveClass("so-pname");
   expect(within(name).getByText("E-0001").tagName).toBe("SMALL");
+});
+it("needs tab 「투입 가능」 shows the tentative's own start month, not the need start month", async () => {
+  row.needs[0].tentativeDeveloperIds = ["dev"];
+  row.needs[0].tentativeAssignments = [
+    { developerId: "dev", developerName: "개발자", startMonth: "2027-02", tentativeStatusCode: "ACT" },
+  ];
+  detail();
+  fireEvent.click(await screen.findByTestId("sales-opportunity-detail-tab-needs"));
+  const line = screen.getByTestId("sales-detail-tentative-dev");
+  expect(line).toHaveTextContent("2027-02부터");
+  expect(line).not.toHaveTextContent("2026-11부터");
+});
+it("save payload leaves out the read-only tentativeAssignments lines", () => {
+  const payload = salesOpportunityPayload({
+    ...row,
+    needs: [
+      {
+        ...row.needs[0],
+        tentativeAssignments: [
+          { developerId: "dev", developerName: "개발자", startMonth: "2027-02", tentativeStatusCode: "ACT" },
+        ],
+      },
+    ],
+  });
+  expect(payload.needs[0]).not.toHaveProperty("tentativeAssignments");
 });
 it("needs table number boxes are text boxes with a decimal keypad and keep 「0.」 while typing", async () => {
   form();

@@ -126,7 +126,7 @@
   </update>
   <insert id="insertReservation">
     INSERT INTO TB_SL_TENT_ASGN(OPP_ID,NEED_SN,DEV_ID,BGN_YM,TENT_STAT_CD,SRC_SCRN_ID,REG_USER_ID,REG_DTTM)
-    VALUES(#{opportunityId},#{needSn},#{developerId},#{startMonth},'ACT','UI-05',#{actor},clock_timestamp())
+    VALUES(#{opportunityId},#{needSn},#{developerId},#{startMonth},'ACT',#{sourceScreenId},#{actor},clock_timestamp())
   </insert>
   <resultMap id="supply" type="com.company.common.withdrawals.mapper.WithdrawalRows$SupplyRow"><constructor>
     <arg column="developerId" javaType="string"/><arg column="confirmedMm" javaType="java.math.BigDecimal"/>

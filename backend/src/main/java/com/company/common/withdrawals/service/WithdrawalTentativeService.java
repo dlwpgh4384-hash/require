@@ -92,11 +92,11 @@ public class WithdrawalTentativeService {
         Need target = context.needs().stream()
             .filter(n -> n.needSn() == needSn && opportunityId.equals(n.opportunityId())).findFirst().orElse(null);
         if (target == null) throw CodeFailure.invalid("needSn", "현재 인력에게 맞는 추천 자리를 골라 주세요.");
-        if (current != null && WithdrawalRecommendationService.sameNeed(current, target)) {
-            return new TentativeResult(view(source, current));
-        }
         if (current != null && "CNVT".equals(current.statusCode())) {
             throw new CodeFailure(409, "needSn", "투입 배정으로 넘긴 후보입니다. 투입 상세에서 확인해 주세요.");
+        }
+        if (current != null && WithdrawalRecommendationService.sameNeed(current, target)) {
+            return new TentativeResult(view(source, current));
         }
         if (!recommendations.eligible(source, context) || !recommendations.matches(source, target, context)) {
             throw CodeFailure.invalid("needSn", "현재 인력은 신규 추천 대상이 아닙니다.");
@@ -105,15 +105,13 @@ public class WithdrawalTentativeService {
             throw new CodeFailure(409, "needSn", "남은 자리가 없습니다. 다시 불러와 주세요.");
         }
         var start = context.rules().tentativeStartMonth(source.endDate(), calendar.fromDatabaseMonth(target.startMonth()));
-        var affected = new TreeSet<String>();
-        if (current != null) {
-            if (mapper.release(current.tentativeId(), actor.userId()) != 1) throw CodeFailure.conflict();
-            affected.add(current.opportunityId());
-        }
-        if (mapper.insertReservation(new ReservationWrite(source.developerId(), target.opportunityId(),
-            target.needSn(), calendar.toDatabaseMonth(start), actor.userId())) != 1) throw CodeFailure.conflict();
-        affected.add(opportunityId);
-        affected.forEach(id -> mapper.touchOpportunity(id, actor.userId()));
+        var previous = current == null ? List.<com.company.common.common.TentativeTransfers.Previous>of()
+            : List.of(new com.company.common.common.TentativeTransfers.Previous(current.tentativeId(), current.opportunityId()));
+        com.company.common.common.TentativeTransfers.apply(
+            new com.company.common.common.TentativeTransfers.Mutation(previous, opportunityId, () -> {
+                if (mapper.insertReservation(new ReservationWrite(source.developerId(), target.opportunityId(),
+                    target.needSn(), calendar.toDatabaseMonth(start), actor.userId(), "UI-05")) != 1) throw CodeFailure.conflict();
+            }), id -> mapper.release(id, actor.userId()), id -> mapper.touchOpportunity(id, actor.userId()));
         var saved = mapper.reservations(source.developerId()).stream()
             .filter(r -> opportunityId.equals(r.opportunityId()) && r.needSn() == needSn).findFirst().orElse(null);
         return new TentativeResult(view(source, saved));

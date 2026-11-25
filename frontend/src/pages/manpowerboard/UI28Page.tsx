@@ -40,6 +40,7 @@ import {
   type ManpowerBoardFilter,
   type ManpowerBoardResult,
 } from "./manpowerBoard";
+import { withdrawalRefreshEvent } from "../withdrawals/withdrawals";
 import "./manpowerBoard.css";
 
 const periodOptions = {
@@ -157,8 +158,12 @@ export function UI28Page({
 
   useEffect(() => {
     alive.current = true;
+    // AI 인력 추천 [배정]·[가배정], 철수 리스트 가배정이 바뀌면 열린 탭의 달력(점선 포함)도 다시 읽는다.
+    const reload = () => setRevision((n) => n + 1);
+    window.addEventListener(withdrawalRefreshEvent, reload);
     return () => {
       alive.current = false;
+      window.removeEventListener(withdrawalRefreshEvent, reload);
     };
   }, []);
   useEffect(() => {

@@ -69,6 +69,10 @@
       #{project.budgetManualYn}, #{project.teamExpenseAmount}, #{project.projectExpenseAmount}, #{project.feature}, #{actor}, clock_timestamp())
   </insert>
   <update id="updateProject">
+    <if test="project.statusCode == 'END' or project.statusCode == 'LOSE'">
+    WITH expired AS (UPDATE TB_SL_RCMD_LOG SET SCORE_DTL=replace(SCORE_DTL,'&quot;e&quot;:true','&quot;e&quot;:false')
+      WHERE PROJ_ID=#{project.projectId} AND USER_ACT_CD='EXCL' AND SCORE_DTL LIKE '%&quot;e&quot;:true%')
+    </if>
     UPDATE TB_PJ_PROJ SET PROJ_NM=#{project.projectName}, CUST_CLNT_ID=#{project.customerId},
       CTRT_BGN_DT=#{project.startDate}, CTRT_END_DT=#{project.endDate}, WORK_PLC_ADDR=#{project.workplace},
       WORK_AREA_CD=#{project.workAreaCode,jdbcType=VARCHAR},
@@ -173,6 +177,8 @@
     MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp() WHERE ASGN_ID=#{assignmentId}
   </update>
   <update id="lose">
+    WITH expired AS (UPDATE TB_SL_RCMD_LOG SET SCORE_DTL=replace(SCORE_DTL,'&quot;e&quot;:true','&quot;e&quot;:false')
+      WHERE PROJ_ID=#{projectId} AND USER_ACT_CD='EXCL' AND SCORE_DTL LIKE '%&quot;e&quot;:true%')
     UPDATE TB_PJ_PROJ SET PROJ_STAT_CD='LOSE',LOSE_DT=#{today},LOSE_RSN_CD=#{input.reasonCode},
       LOSE_MEMO=#{input.memo},MOD_USER_ID=#{actor},MOD_DTTM=clock_timestamp() WHERE PROJ_ID=#{projectId}
   </update>

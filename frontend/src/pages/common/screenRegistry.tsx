@@ -27,6 +27,7 @@ import { BillingPage } from "../bills/BillingPage";
 import { BillingTitleActions } from "../bills/BillingWorkspace";
 import { ProjectPage } from "../projects/ProjectPage";
 import { AssignmentPage } from "../assignments/AssignmentPage";
+import { AiRecommendationPage } from "../airecommendations/AiRecommendationPage";
 import { WithdrawalPage } from "../withdrawals/WithdrawalPage";
 import { ProjectTitleActions } from "../projects/ProjectWorkspace";
 import { AssignmentTitleActions } from "../assignments/AssignmentWorkspace";
@@ -87,6 +88,12 @@ export interface ScreenEntry {
  * 공통 화면 틀 시험도 여기서 만든 화면과 「준비 중」 화면을 나눈다. 새 화면은 여기에 한 줄만 더한다.
  */
 export const screenRegistry: readonly ScreenEntry[] = [
+  {
+    id: "UI-30",
+    Page: AiRecommendationPage,
+    rootTestId: "ai-recommendation-page",
+    hasInputs: true,
+  },
   {
     id: "UI-16",
     Page: DashboardWorkspace,

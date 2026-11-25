@@ -653,7 +653,13 @@ export function SalesOpportunityDetail({
                             <td>
                               {index + 1}. {name("JOB", need.jobCode)}
                             </td>
-                            <td>{need.startMonth}부터</td>
+                            <td>
+                              {/* 투입 가능 = 그 사람 가배정 시작월(BGN_YM). 줄 시작월이 아님. */}
+                              {need.tentativeAssignments?.find(
+                                (t) => t.developerId === id,
+                              )?.startMonth ?? need.startMonth}
+                              부터
+                            </td>
                           </tr>
                         );
                       })}

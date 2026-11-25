@@ -19,6 +19,8 @@ public final class SalesOpportunityRows {
         String startMonth, int months, BigDecimal monthlyMm, BigDecimal estimatedUnitPrice) {}
     public record Reservation(long tentativeId, String opportunityId, String opportunityName,
         int needSn, String developerId, String startMonth, String status) {}
+    /** 상세 가배정 인력 줄(이름·가배정 시작월 TB_SL_TENT_ASGN.BGN_YM). */
+    public record TentativeLineRow(int needSn, String developerId, String developerName, String startMonth, String status) {}
     public record Write(String id, Input input, BigDecimal profit, String approval, String manualYn, String actor) {}
     public record NeedWrite(String id, Need need, String actor) {}
     public record ApprovalWrite(String id, String status, BigDecimal profit, String reason, String actor) {}

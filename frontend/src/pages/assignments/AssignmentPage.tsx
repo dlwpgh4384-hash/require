@@ -36,6 +36,7 @@ import { AssignmentForm } from "./AssignmentForm";
 import {
   EXT_KIND,
   EXT_LABEL,
+  assignmentDevelopmentRoles,
   assignmentPriceEditable,
   getCommonAssignmentCandidates,
   getCommonAssignments,
@@ -48,6 +49,7 @@ import {
   type Assignment,
   type AssignmentCandidate,
 } from "./assignments";
+import { withdrawalRefreshEvent } from "../withdrawals/withdrawals";
 import "../projects/projects.css";
 import "./assignments.css";
 
@@ -63,7 +65,6 @@ const emptyFilter: Filter = {
   warning: "",
   keyword: "",
 };
-const developmentRoles = ["FIN", "SALES_LDR"];
 const svg = (d: string, size = 16, className?: string) => (
   <svg
     className={className}
@@ -111,7 +112,7 @@ const sortValue = (a: Assignment, key: string): string | number => {
 
 /** 시안 투입 배정(UI-12): 연도 줄, 조건, 배정 후보 카드, 공통 목록, 상세·배정 창. */
 export function AssignmentPage({
-  roles = developmentRoles,
+  roles = assignmentDevelopmentRoles,
 }: {
   roles?: readonly string[];
 }) {
@@ -156,6 +157,12 @@ export function AssignmentPage({
   const readOnly = year < currentYear;
   const canRate = assignmentPriceEditable(roles);
   const refresh = () => setRevision((n) => n + 1);
+  // 다른 화면(AI 인력 추천 [배정]·[가배정], 철수 리스트)이 배정·가배정을 바꾸면 열린 탭도 다시 읽는다.
+  useEffect(() => {
+    const reload = () => setRevision((n) => n + 1);
+    window.addEventListener(withdrawalRefreshEvent, reload);
+    return () => window.removeEventListener(withdrawalRefreshEvent, reload);
+  }, []);
   const toast = (message: string, kind: ToastKind = "ok") => {
     setNoticeKind(kind);
     setNotice(message);

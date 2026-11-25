@@ -223,7 +223,7 @@ it.each(["/screens/UI-21", "/"])(
                 menuId: "M024",
                 upperMenuId: "G007",
                 menuNm: "준비 화면",
-                scrnId: "UI-30",
+                scrnId: "UI-26",
                 menuLvl: 2,
                 sortOrd: 2,
                 pcOnlyYn: "N",
@@ -233,7 +233,7 @@ it.each(["/screens/UI-21", "/"])(
             {
               screenAccess: [
                 { scrnId: "UI-21", available: true, pcOnlyYn: "N" },
-                { scrnId: "UI-30", available: true, pcOnlyYn: "N" },
+                { scrnId: "UI-26", available: true, pcOnlyYn: "N" },
               ],
             },
           )
@@ -253,7 +253,7 @@ it.each(["/screens/UI-21", "/"])(
     ).toHaveLength(1);
     fireEvent.click(screen.getByRole("link", { name: "준비 화면" }));
     expect(
-      await screen.findByRole("region", { name: "UI-30 본문" }),
+      await screen.findByRole("region", { name: "UI-26 본문" }),
     ).toHaveTextContent("준비 중");
   },
 );
@@ -525,7 +525,7 @@ it("ignores a slow old year response after the year changes", async () => {
       expect.anything(),
     ),
   );
-  expect(screen.getByTestId("cash-flow-loading")).toBeVisible();
+  expect(await screen.findByTestId("cash-flow-loading")).toBeVisible();
   const pending = screen.getByTestId("cash-flow-table-pending");
   expect(pending).toHaveAttribute("aria-busy", "true");
   expect(within(pending).getAllByRole("columnheader")).toHaveLength(16);

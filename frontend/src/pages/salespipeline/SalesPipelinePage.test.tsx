@@ -14,6 +14,11 @@ import * as api from "./salesPipeline";
 import { SalesOpportunityForm } from "./SalesOpportunityForm";
 import { quoteCommonSalesOpportunity } from "./salesOpportunities";
 import type { SalesOpportunityOptions } from "./salesOpportunities";
+import {
+  subscribeAiRecommendation,
+  type AiRecommendationEvent,
+} from "../airecommendations/aiRecommendationRequest";
+import { withdrawalRefreshEvent } from "../withdrawals/withdrawals";
 
 vi.mock("./salesPipeline", async () => {
   const actual =
@@ -339,13 +344,34 @@ it("approved and rejected quotes show the mockup badges", async () => {
     within(screen.getByTestId("sales-card-plain")).getByText("견적 반려"),
   ).toHaveClass("ls-b-lock");
 });
+it("an AI recommendation tentative signal reloads the open pipeline", async () => {
+  page();
+  await screen.findByTestId("sales-card-opp");
+  const before = vi.mocked(api.getCommonSalesPipeline).mock.calls.length;
+  window.dispatchEvent(new Event(withdrawalRefreshEvent));
+  await waitFor(() =>
+    expect(vi.mocked(api.getCommonSalesPipeline).mock.calls.length).toBe(
+      before + 1,
+    ),
+  );
+});
 it("recommendation opens UI-30 with opportunity, first job and start month", async () => {
   page();
   fireEvent.click(await screen.findByTestId("sales-recommend-opp"));
+  // 주소 query·state 없이 UI-30 요청 통로(createScreenRequest)로 넘긴다.
   expect(screen.getByTestId("location")).toHaveTextContent(
-    "/screens/UI-30?opportunityId=opp&jobCode=BE&startMonth=2026-12",
+    /^\/screens\/UI-30\|null$/,
   );
-  expect(screen.getByTestId("location")).toHaveTextContent('"jobCode":"BE"');
+  const received: AiRecommendationEvent[] = [];
+  subscribeAiRecommendation((event) => received.push(event))();
+  expect(received).toEqual([
+    expect.objectContaining({
+      targetType: "opportunity",
+      targetId: "opp",
+      jobCode: "BE",
+      startMonth: "2026-12",
+    }),
+  ]);
   expect(screen.queryByTestId("sales-pipeline-detail")).toBeNull();
 });
 it("the card stage select moves the card with its read time and shows the mockup toast", async () => {

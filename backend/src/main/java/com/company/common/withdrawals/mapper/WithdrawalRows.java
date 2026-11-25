@@ -22,7 +22,7 @@ public final class WithdrawalRows {
     public record Reservation(String tentativeId, String developerId, String opportunityId,
         String opportunityName, int needSn, String startMonth, String statusCode) {}
     public record ReservationWrite(String developerId, String opportunityId, int needSn,
-        String startMonth, String actor) {}
+        String startMonth, String actor, String sourceScreenId) {}
     /** 조기 철수 이력 한 줄(목록 전체를 한 번에 읽는다). */
     public record EarlyRow(String assignmentId, LocalDate effectiveDate, String afterValue) {}
     /** baseMonth = 이번 달 1일(한국): 끝난 투입의 연장(식-60)과 미충원 나눗수 시작(식-61, 다음 달)을 정한다. */

@@ -16,6 +16,10 @@ import {
 } from "./assignments";
 import { AssignmentWorkspaceProvider, AssignmentTitleActions } from "./AssignmentWorkspace";
 import type { Project } from "../projects/projects";
+import {
+  subscribeAiRecommendation,
+  type AiRecommendationEvent,
+} from "../airecommendations/aiRecommendationRequest";
 
 const viewport = vi.hoisted(() => ({ mobile: false, width: 1280 }));
 vi.mock("../../shared/layout/useViewport", () => ({
@@ -153,7 +157,9 @@ beforeEach(() => {
       if (["/direct-expenses", "/sales-parts", "/change-history"].some((s) => path.endsWith(s))) return ok({ items: [] });
       return ok(project);
     }
-    if (path === "/api/common/developers") return ok({ items: [developer, ...extraDevelopers] });
+    // 실제 개발자 목록 API처럼 파트 이름(salesPartName)은 빼고 준다: 경고 글의 파트 이름은 상세에서 읽는다.
+    if (path === "/api/common/developers")
+      return ok({ items: [developer, ...extraDevelopers].map(({ salesPartName: _name, ...row }) => row) });
     if (path.endsWith("/statuses")) return ok({ items: statuses, canManageStatuses: false, canCancelPastRetirement: false });
     if (path.startsWith("/api/common/developers/") && path.endsWith("/assignments")) return ok({ items: booked });
     if (path.endsWith("/change-history")) return ok({ items: [] });
@@ -856,13 +862,21 @@ it("AI recommend passes the target only for a running non-internal project and c
   fireEvent.click(screen.getByTestId("assignment-ai-recommend"));
   expect(screen.queryByRole("dialog", { name: "저장하지 않은 내용이 있습니다" })).not.toBeInTheDocument();
   expect(onClose).toHaveBeenCalled();
-  expect(screen.getByTestId("where")).toHaveTextContent('/screens/UI-30 {"projectId":"P-0001","jobCode":"BE","startMonth":"2026-12"}');
+  // 주소 state 없이 UI-30 요청 통로(createScreenRequest)로 넘긴다.
+  const sent = () => {
+    const received: AiRecommendationEvent[] = [];
+    subscribeAiRecommendation((event) => received.push(event))();
+    return received.map(({ requestId: _id, ...rest }) => rest);
+  };
+  expect(screen.getByTestId("where")).toHaveTextContent("/screens/UI-30 null");
+  expect(sent()).toEqual([{ targetType: "project", targetId: "P-0001", jobCode: "BE", startMonth: "2026-12" }]);
   cleanup();
   project.statusCode = "PRE";
   formWithWhere();
   await ready();
   fireEvent.click(screen.getByTestId("assignment-ai-recommend"));
   expect(screen.getByTestId("where")).toHaveTextContent("/screens/UI-30 null");
+  expect(sent()).toEqual([{}]);
   cleanup();
   project.statusCode = "ING";
   project.contractTypeCode = "IN";
@@ -870,6 +884,26 @@ it("AI recommend passes the target only for a running non-internal project and c
   await ready();
   fireEvent.click(screen.getByTestId("assignment-ai-recommend"));
   expect(screen.getByTestId("where")).toHaveTextContent("/screens/UI-30 null");
+  expect(sent()).toEqual([{}]);
+});
+it("the form shows the given subtitle and extra warning, and marks the hosting screen dirty", async () => {
+  render(
+    <MemoryRouter>
+      <AssignmentForm
+        projects={[project]}
+        roles={["FIN"]}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        subtitle="AI 인력 추천에서 채움"
+        screenId="UI-30"
+        extraWarning="다른 기회 가배정은 그대로 둡니다."
+      />
+    </MemoryRouter>,
+  );
+  await ready();
+  expect(screen.getByTestId("assignment-form")).toHaveTextContent("AI 인력 추천에서 채움");
+  expect(screen.getByTestId("assignment-form-warning-0")).toHaveTextContent("다른 기회 가배정은 그대로 둡니다.");
+  expect(screen.getByTestId("assignment-billing-price")).toBeInTheDocument();
 });
 
 it("change modal resets every value on type change, uses next month for MM, commas the price and focuses the first error", async () => {

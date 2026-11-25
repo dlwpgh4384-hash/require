@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useOpenAiRecommendation } from "../airecommendations/aiRecommendationRequest";
 import { Banner, DetailPanel } from "../../shared/list/DetailPanel";
 import { Dialog } from "../../shared/feedback/Dialog";
 import { focusFirstError } from "../../shared/feedback/messages";
@@ -110,6 +110,10 @@ export function AssignmentForm({
   onSaved,
   onConflict,
   recommendedMonth,
+  initialValues,
+  subtitle,
+  screenId = "UI-12",
+  extraWarning,
 }: {
   projects: Project[];
   candidate?: AssignmentCandidate;
@@ -119,21 +123,38 @@ export function AssignmentForm({
   /** 저장이 409(다른 사람이 먼저 바꿈, 예: 후보를 이미 확정·뺌)면 부른다. 없으면 창 안에 안내만 띄운다. */
   onConflict?: (reason: unknown) => void;
   recommendedMonth?: string;
+  initialValues?: {
+    projectId: string;
+    developerId: string;
+    jobCode: string;
+    startDate: string;
+    endDate: string;
+  };
+  /** 창 머리 작은 글(예: AI 인력 추천에서 열면 「AI 인력 추천에서 채움」). */
+  subtitle?: string;
+  /** 이 창을 띄운 화면(저장 안 한 내용 표시용). 투입 배정은 UI-12, AI 인력 추천은 UI-30. */
+  screenId?: string;
+  /** 경고 띠 맨 위에 더할 한 줄(예: 다른 기회 가배정은 유지됩니다). */
+  extraWarning?: string;
 }) {
-  const navigate = useNavigate();
+  const openAiRecommendation = useOpenAiRecommendation();
   const canRate = assignmentPriceEditable(roles);
   const initial =
-    projects.find((p) => p.projectId === candidate?.projectId) ?? projects[0];
+    projects.find(
+      (p) => p.projectId === (candidate?.projectId ?? initialValues?.projectId),
+    ) ?? projects[0];
   const [v, setV] = useState(() => ({
     projectId: initial?.projectId ?? "",
-    developerId: candidate?.developerId ?? "",
-    jobCode: candidate?.jobCode ?? "BE",
+    developerId: candidate?.developerId ?? initialValues?.developerId ?? "",
+    jobCode: candidate?.jobCode ?? initialValues?.jobCode ?? "BE",
     ...(initial
       ? assignmentInitialDates(koreanToday(), initial, false, recommendedMonth)
       : { startDate: koreanToday(), endDate: "" }),
     ...(candidate
       ? { startDate: candidate.startDate, endDate: candidate.endDate }
-      : {}),
+      : initialValues
+        ? { startDate: initialValues.startDate, endDate: initialValues.endDate }
+        : {}),
     mm: "1.00",
     kind: "NEW",
     orig: "",
@@ -149,6 +170,8 @@ export function AssignmentForm({
   const [pool, setPool] = useState<{
     rate?: number | null;
     retirementDate?: string | null;
+    /** 개발자 목록 API에는 파트 이름이 없어 상세(getCommonDeveloper)의 이름을 쓴다. */
+    salesPartName?: string | null;
   } | null>(null);
   const [statuses, setStatuses] = useState<DeveloperStatus[]>([]);
   const [booked, setBooked] = useState<DeveloperAssignment[]>([]);
@@ -176,9 +199,9 @@ export function AssignmentForm({
     canRate;
   const setDirty = useScreenDirty();
   useEffect(() => {
-    setDirty("UI-12", touched);
-    return () => setDirty("UI-12", false);
-  }, [touched, setDirty]);
+    setDirty(screenId, touched);
+    return () => setDirty(screenId, false);
+  }, [touched, setDirty, screenId]);
   const edit = (patch: Partial<typeof v>) => {
     setTouched(true);
     setV((d) => ({ ...d, ...patch }));
@@ -213,7 +236,11 @@ export function AssignmentForm({
     getCommonDeveloper(v.developerId)
       .then((d) => {
         if (!active) return;
-        setPool({ rate: d.monthlyRate, retirementDate: d.retirementDate });
+        setPool({
+          rate: d.monthlyRate,
+          retirementDate: d.retirementDate,
+          salesPartName: d.salesPartName,
+        });
         if (!priceTouched)
           setV((x) => (x.orig ? x : { ...x, price: money(d.monthlyRate) }));
       })
@@ -330,7 +357,7 @@ export function AssignmentForm({
     edit({ orig: id, price: c ? money(c.billingPrice) : money(pool?.rate) });
   };
   // 시안 경고 띠(저장은 됨)
-  const warnings: string[] = [];
+  const warnings: string[] = extraWarning ? [extraWarning] : [];
   if (dv) {
     // 시안: 기간이 [투입일, 철수일]과 겹치는 이 사람 배정의 지금 월 MM 합(프로젝트·연도·달 구분 없음) + 입력 MM
     const cur =
@@ -367,7 +394,7 @@ export function AssignmentForm({
     ) {
       const label = (id: string, name?: string | null) =>
         id === HQ_PART ? "본사" : (name ?? id);
-      const mine = label(dv.salesPartId, dv.salesPartName);
+      const mine = label(dv.salesPartId, dv.salesPartName ?? pool?.salesPartName);
       const theirs = label(project.salesPartId, project.salesPartName);
       warnings.push(
         `영업 파트가 다릅니다: ${dv.name}님은 ${mine} 소속, 프로젝트는 ${theirs}입니다. 매출은 ${theirs}로, 이 사람 이익금은 ${dv.salesPartId === HQ_PART ? "본사(파트 정산 제외)" : mine}로 잡힙니다. 파트를 잘못 골랐다면 개발자 풀에서 고쳐 주세요. 저장은 됩니다.`,
@@ -569,7 +596,16 @@ export function AssignmentForm({
     }
     setTouched(false);
     onClose();
-    navigate("/screens/UI-30", state ? { state } : undefined);
+    openAiRecommendation(
+      state
+        ? {
+            targetType: "project",
+            targetId: state.projectId,
+            jobCode: state.jobCode,
+            startMonth: state.startMonth,
+          }
+        : {},
+    );
   };
   const noRateHelp =
     dv && !((pool?.rate ?? 0) > 0) && v.kind !== "SUB"
@@ -580,11 +616,12 @@ export function AssignmentForm({
       <DetailPanel
         title="투입 배정"
         sub={
-          candidate
+          subtitle ??
+          (candidate
             ? "배정 후보 확정"
             : recommendedMonth
               ? "AI 인력 추천에서 채움"
-              : "오른쪽 창 입력(유형 B)"
+              : "오른쪽 창 입력(유형 B)")
         }
         testId="assignment-form"
         onClose={leave}
@@ -814,46 +851,44 @@ export function AssignmentForm({
                   : "") +
                 "저장할 때 이 사람 배정을 투입일 전날로 조기 철수할지 묻습니다.",
             )}
-          {showRate ? (
-            field(
-              "assignment-billing-price",
-              "price",
-              "청구 단가(월)",
-              true,
-              <span className="project-row assignment-row">
-                <input
-                  id="assignment-billing-price"
-                  data-testid="assignment-billing-price"
-                  className="project-money"
-                  style={{ width: 160 }}
-                  inputMode="numeric"
-                  value={v.price}
-                  onChange={(e) => {
-                    setPriceTouched(true);
-                    const n = digits(e.target.value);
-                    edit({ price: n ? won(Number(n)) : "" });
-                  }}
-                  {...invalid("price")}
-                />
-                <span className="project-unit">원</span>
-              </span>,
-              noRateHelp +
-                "기본값은 개발자 월 단가입니다. 고객과 다르게 계약했으면 고쳐 넣습니다. 풀로 출근하지 않으면 단가는 그대로 두고 월 MM을 줄입니다(예: 주 3일 0.6).",
-            )
-          ) : (
-            project && (
-              // 청구 단가 칸이 없는 까닭을 경우마다 맞게 알린다(2026-11-24 사용자 결정, 시안은 내부 프로젝트 문구 하나).
-              <p className="project-cap" data-testid="assignment-no-price">
-                {project.contractTypeCode === "TK"
-                  ? "턴키는 배분표 금액으로 매출을 계산하므로 청구 단가 칸이 없습니다."
-                  : !["MO", "DP"].includes(project.contractTypeCode)
-                    ? "내부 프로젝트는 매출이 없어 청구 단가 칸이 없습니다."
-                    : v.kind === "FREE"
-                      ? "무상지원은 매출이 없어 청구 단가를 0으로 저장합니다."
-                      : "청구 단가는 개발자 월 단가(대체투입은 계약상 인력 단가)로 저장됩니다. 단가는 파트장·재무가 고칩니다."}
-              </p>
-            )
-          )}
+          {showRate
+            ? field(
+                "assignment-billing-price",
+                "price",
+                "청구 단가(월)",
+                true,
+                <span className="project-row assignment-row">
+                  <input
+                    id="assignment-billing-price"
+                    data-testid="assignment-billing-price"
+                    className="project-money"
+                    style={{ width: 160 }}
+                    inputMode="numeric"
+                    value={v.price}
+                    onChange={(e) => {
+                      setPriceTouched(true);
+                      const n = digits(e.target.value);
+                      edit({ price: n ? won(Number(n)) : "" });
+                    }}
+                    {...invalid("price")}
+                  />
+                  <span className="project-unit">원</span>
+                </span>,
+                noRateHelp +
+                  "기본값은 개발자 월 단가입니다. 고객과 다르게 계약했으면 고쳐 넣습니다. 풀로 출근하지 않으면 단가는 그대로 두고 월 MM을 줄입니다(예: 주 3일 0.6).",
+              )
+            : project && (
+                // 청구 단가 칸이 없는 까닭을 경우마다 맞게 알린다(2026-11-24 사용자 결정, 시안은 내부 프로젝트 문구 하나).
+                <p className="project-cap" data-testid="assignment-no-price">
+                  {project.contractTypeCode === "TK"
+                    ? "턴키는 배분표 금액으로 매출을 계산하므로 청구 단가 칸이 없습니다."
+                    : !["MO", "DP"].includes(project.contractTypeCode)
+                      ? "내부 프로젝트는 매출이 없어 청구 단가 칸이 없습니다."
+                      : v.kind === "FREE"
+                        ? "무상지원은 매출이 없어 청구 단가를 0으로 저장합니다."
+                        : "청구 단가는 개발자 월 단가(대체투입은 계약상 인력 단가)로 저장됩니다. 단가는 파트장·재무가 고칩니다."}
+                </p>
+              )}
           <p className="project-cap">
             연장 가능성은 처음에 「미정」이고 철수 리스트(UI-05)에서 바꿉니다.
           </p>

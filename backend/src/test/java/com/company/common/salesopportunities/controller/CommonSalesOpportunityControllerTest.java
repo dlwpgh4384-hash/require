@@ -125,6 +125,17 @@ class CommonSalesOpportunityControllerTest {
         assertThat(needs.get(id)).hasSize(1);
         var order = inOrder(mapper); order.verify(mapper).insert(any()); order.verify(mapper).insertNeed(any());
     }
+    @Test void detailTentativeLinesCarryEachOwnStartMonthNotTheNeedStartMonth() throws Exception {
+        var id = create();
+        // 줄 시작월은 2026-11, 가배정 시작월(BGN_YM)은 철수 다음 달 2027-02 → 상세 「투입 가능」은 2027-02.
+        when(mapper.tentativeLines(id)).thenReturn(List.of(new TentativeLineRow(1, "developer", "김개발", "202702", "ACT")));
+        mvc.perform(get(root + "/" + id)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.needs[0].startMonth").value("2026-11"))
+            .andExpect(jsonPath("$.data.needs[0].tentativeAssignments[0].developerId").value("developer"))
+            .andExpect(jsonPath("$.data.needs[0].tentativeAssignments[0].developerName").value("김개발"))
+            .andExpect(jsonPath("$.data.needs[0].tentativeAssignments[0].startMonth").value("2027-02"))
+            .andExpect(jsonPath("$.data.needs[0].tentativeAssignments[0].tentativeStatusCode").value("ACT"));
+    }
     @Test void unknownDetailIs404() throws Exception { mvc.perform(get(root + "/missing")).andExpect(status().isNotFound()); }
     @Test void detailUsesTheSameFourteenDayBoundaryAsThePipeline() throws Exception {
         var id = create();
@@ -375,6 +386,17 @@ class CommonSalesOpportunityControllerTest {
         mvc.perform(put(root + "/" + id + "/reject").contentType("application/json").content(version(id).toString())).andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value("예상 이익률을 다시 계산해 저장한 뒤 반려해 주세요."));
         verify(mapper, never()).approval(any()); verify(mapper, times(1)).appendHistory(any());
+    }
+    @Test void newNeedRowUsesLargestUsedNumberPlusOneAndNeverReusesDeletedNumbers() throws Exception {
+        var id = create();
+        // 지운 줄 2~4번이 가배정·추천 기록에 남아 있다: 빈 번호(2)를 다시 쓰지 않고 4 + 1 = 5.
+        when(mapper.maxNeedSn(id)).thenReturn(4);
+        var body = update(id);
+        ((com.fasterxml.jackson.databind.node.ArrayNode) body.path("needs")).add(json.readTree(
+            "{\"jobCode\":\"BE\",\"requiredCount\":1,\"startMonth\":\"2026-11\",\"months\":6,\"monthlyMm\":1.0}"));
+        mvc.perform(put(root + "/" + id).contentType("application/json").content(body.toString())).andExpect(status().isOk());
+        verify(mapper).insertNeed(argThat(w -> w.id().equals(id) && w.need().needSn() == 5));
+        verify(mapper, never()).insertNeed(argThat(w -> w.id().equals(id) && w.need().needSn() == 2));
     }
     @Test void needRowErrorsUseKoreanLabels() throws Exception {
         var id = create();

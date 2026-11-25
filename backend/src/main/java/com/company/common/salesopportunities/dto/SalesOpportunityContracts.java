@@ -1,5 +1,6 @@
 package com.company.common.salesopportunities.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -10,7 +11,16 @@ public final class SalesOpportunityContracts {
 
     public record Need(Integer needSn, String jobCode, String gradeCode, int requiredCount,
         String startMonth, int months, BigDecimal monthlyMm, BigDecimal estimatedUnitPrice,
-        List<String> tentativeDeveloperIds) {}
+        List<String> tentativeDeveloperIds,
+        /** 상세 응답만(읽기 전용): 가배정 인력 줄과 각자의 가배정 시작월(=상세 「투입 가능」). 입력에서는 null이라 내보내지 않는다. */
+        @JsonInclude(JsonInclude.Include.NON_NULL) List<TentativeLine> tentativeAssignments) {
+        public Need(Integer needSn, String jobCode, String gradeCode, int requiredCount, String startMonth, int months,
+            BigDecimal monthlyMm, BigDecimal estimatedUnitPrice, List<String> tentativeDeveloperIds) {
+            this(needSn, jobCode, gradeCode, requiredCount, startMonth, months, monthlyMm, estimatedUnitPrice,
+                tentativeDeveloperIds, null);
+        }
+    }
+    public record TentativeLine(String developerId, String developerName, String startMonth, String tentativeStatusCode) {}
     public record Input(String opportunityName, String customerId, String salesPartId,
         String stageCode, BigDecimal winningProbability, BigDecimal expectedAmount,
         String contractTypeCode, String startMonth, int expectedMonths, String workplace,

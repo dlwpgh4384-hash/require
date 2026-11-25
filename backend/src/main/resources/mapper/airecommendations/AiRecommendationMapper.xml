@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.airecommendations.mapper.AiRecommendationMapper">
+  <resultMap id="target" type="com.company.common.airecommendations.mapper.AiRecommendationRows$Target" autoMapping="false"><constructor>
+    <arg column="targetType" javaType="string"/><arg column="targetId" javaType="string"/>
+    <arg column="targetName" javaType="string"/><arg column="startMonth" javaType="string"/>
+    <arg column="endMonth" javaType="string"/><arg column="status" javaType="string"/>
+    <arg column="contractTypeCode" javaType="string"/><arg column="customerId" javaType="string"/>
+    <arg column="industryCode" javaType="string"/><arg column="workAreaCode" javaType="string"/>
+    <arg column="feature" javaType="string"/><arg column="projectId" javaType="string"/>
+    <arg column="customerName" javaType="string"/>
+  </constructor></resultMap>
+  <select id="target" resultMap="target">
+    <choose><when test="type == 'project'">
+      SELECT 'project' AS "targetType",p.PROJ_ID AS "targetId",p.PROJ_NM AS "targetName",
+        to_char(p.CTRT_BGN_DT,'YYYYMM') AS "startMonth",to_char(p.CTRT_END_DT,'YYYYMM') AS "endMonth",
+        p.PROJ_STAT_CD AS "status",p.CTRT_TYPE_CD AS "contractTypeCode",p.CUST_CLNT_ID AS "customerId",
+        c.INDUTY_CD AS "industryCode",p.WORK_AREA_CD AS "workAreaCode",p.FEATURE_CN AS "feature",
+        p.PROJ_ID AS "projectId",c.CLNT_NM AS "customerName"
+      FROM TB_PJ_PROJ p LEFT JOIN TB_BS_CLNT c ON c.CLNT_ID=p.CUST_CLNT_ID WHERE p.PROJ_ID=#{id}
+    </when><otherwise>
+      SELECT 'opportunity' AS "targetType",o.OPP_ID AS "targetId",o.OPP_NM AS "targetName",
+        o.BGN_PLAN_YM AS "startMonth",NULL::text AS "endMonth",o.OPP_STAT_CD AS "status",
+        o.CTRT_TYPE_CD AS "contractTypeCode",o.CUST_CLNT_ID AS "customerId",c.INDUTY_CD AS "industryCode",
+        o.WORK_AREA_CD AS "workAreaCode",o.RMRK AS "feature",o.PROJ_ID AS "projectId",
+        c.CLNT_NM AS "customerName"
+      FROM TB_SL_OPP o LEFT JOIN TB_BS_CLNT c ON c.CLNT_ID=o.CUST_CLNT_ID WHERE o.OPP_ID=#{id}
+    </otherwise></choose>
+  </select>
+  <resultMap id="person" type="com.company.common.airecommendations.mapper.AiRecommendationRows$Person" autoMapping="false"><constructor>
+    <arg column="developerId" javaType="string"/><arg column="developerName" javaType="string"/>
+    <arg column="managementNumber" javaType="string"/><arg column="jobCode" javaType="string"/>
+    <arg column="subJobCode" javaType="string"/><arg column="jobName" javaType="string"/>
+    <arg column="gradeCode" javaType="string"/><arg column="gradeName" javaType="string"/>
+    <arg column="employeeTypeCode" javaType="string"/><arg column="employeeTypeName" javaType="string"/>
+    <arg column="homeAreaCode" javaType="string"/>
+  </constructor></resultMap>
+  <sql id="people">
+    SELECT d.DEV_ID AS "developerId",d.DEV_NM AS "developerName",d.MNG_NO AS "managementNumber",
+      d.JOB_CD AS "jobCode",d.SUB_JOB_CD AS "subJobCode",COALESCE(j.CODE_NM,d.JOB_CD) AS "jobName",
+      d.GRADE_CD AS "gradeCode",COALESCE(g.CODE_NM,'–') AS "gradeName",d.EMP_TYPE_CD AS "employeeTypeCode",
+      COALESCE(e.CODE_NM,d.EMP_TYPE_CD) AS "employeeTypeName",d.HOME_AREA_CD AS "homeAreaCode"
+    FROM TB_HR_DEV d
+    LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=d.JOB_CD
+    LEFT JOIN TB_SY_CODE g ON g.CODE_GRP_ID='GRADE' AND g.CODE=d.GRADE_CD
+    LEFT JOIN TB_SY_CODE e ON e.CODE_GRP_ID='EMP_TYPE' AND e.CODE=d.EMP_TYPE_CD
+  </sql>
+  <select id="person" resultMap="person"><include refid="people"/> WHERE d.DEV_ID=#{id}</select>
+  <select id="people" resultMap="person"><include refid="people"/> WHERE d.DEV_ID IN
+    <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+  </select>
+  <select id="candidates" resultMap="person">
+    <include refid="people"/>
+    WHERE d.USE_YN='Y' AND d.DRCT_CLS_CD='DRCT'
+      AND (d.JNCMP_DT IS NULL OR d.JNCMP_DT &lt;= #{lastDay})
+      AND (d.RETIRE_DT IS NULL OR d.RETIRE_DT &gt; #{lastDay})
+      AND NOT EXISTS(SELECT 1 FROM TB_HR_DEV_STAT s WHERE s.DEV_ID=d.DEV_ID
+        AND s.WORK_STAT_CD='LEAVE' AND s.BGN_DT &lt;= #{lastDay}
+        AND (s.END_DT IS NULL OR s.END_DT &gt;= #{firstDay}))
+      <!-- 퇴사(RETIRE) 상태는 퇴사일이 비어 있어도 뺀다. 휴직 상태는 휴직 이력이 없을 때만 여기서(이력이 있으면 위 기간 규칙). -->
+      AND d.WORK_STAT_CD!='RETIRE'
+      AND NOT (d.WORK_STAT_CD='LEAVE' AND NOT EXISTS(
+        SELECT 1 FROM TB_HR_DEV_STAT s WHERE s.DEV_ID=d.DEV_ID AND s.WORK_STAT_CD='LEAVE'))
+      AND (SELECT COALESCE(SUM(m.MON_MM),0) FROM TB_PJ_ASGN_MON m
+        JOIN TB_PJ_ASGN a ON a.ASGN_ID=m.ASGN_ID AND a.ASGN_STAT_CD='ACT'
+        WHERE m.DEV_ID=d.DEV_ID AND m.INPUT_YM=replace(#{condition.startMonth},'-','')) &lt; 1
+      AND NOT (d.EMP_TYPE_CD IN ('FL','OS') AND EXISTS(
+        <choose><when test="condition.targetType == 'project'">SELECT 1 FROM TB_PJ_PROJ x WHERE x.PROJ_ID=#{condition.targetId} AND x.CTRT_TYPE_CD='DP'</when>
+          <otherwise>SELECT 1 FROM TB_SL_OPP x WHERE x.OPP_ID=#{condition.targetId} AND x.CTRT_TYPE_CD='DP'</otherwise></choose>))
+      <if test="condition.targetType == 'opportunity' and !includeSameOpportunity">
+        AND NOT EXISTS(SELECT 1 FROM TB_SL_TENT_ASGN t WHERE t.DEV_ID=d.DEV_ID
+          AND t.OPP_ID=#{condition.targetId} AND t.TENT_STAT_CD='ACT')
+      </if>
+      AND NOT EXISTS(SELECT 1 FROM TB_SL_RCMD_LOG l WHERE l.DEV_ID=d.DEV_ID
+        AND l.JOB_CD=#{condition.jobCode} AND l.USER_ACT_CD='EXCL'
+        AND CASE WHEN left(l.SCORE_DTL,6)='{&quot;v&quot;:1' THEN (l.SCORE_DTL::jsonb-&gt;&gt;'e')='true' ELSE false END
+        <choose><when test="condition.targetType == 'project'">AND l.PROJ_ID=#{condition.targetId}</when>
+          <otherwise>AND l.OPP_ID=#{condition.targetId}</otherwise></choose>)
+    ORDER BY d.MNG_NO,d.DEV_ID
+  </select>
+  <resultMap id="evidence" type="com.company.common.airecommendations.mapper.AiRecommendationRows$Evidence" autoMapping="false"><constructor>
+    <arg column="endedCount" javaType="_int"/><arg column="extendedCount" javaType="_int"/>
+    <arg column="hrWithdrawalCount" javaType="_int"/><arg column="sameCustomer" javaType="_boolean"/>
+    <arg column="sameIndustry" javaType="_boolean"/><arg column="withdrawalDate" javaType="java.time.LocalDate"/>
+    <arg column="lowExtension" javaType="_boolean"/>
+  </constructor></resultMap>
+  <select id="evidence" resultMap="evidence">
+    SELECT COUNT(*) FILTER(WHERE a.INPUT_END_DT &lt; #{today})::int AS "endedCount",
+      COUNT(*) FILTER(WHERE a.INPUT_END_DT &lt; #{today} AND a.EXT_CNT &gt; 0)::int AS "extendedCount",
+      COALESCE(SUM((SELECT COUNT(*) FROM TB_PJ_ASGN_HIST h WHERE h.ASGN_ID=a.ASGN_ID
+        AND h.ASGN_CHG_TYPE_CD='EARLY' AND h.ASGN_CHG_RSN_CD='HR' AND h.CRCT_YN='N'
+        AND h.APLY_DT &lt;= #{today})) FILTER(WHERE a.INPUT_END_DT &lt; #{today}),0)::int AS "hrWithdrawalCount",
+      COALESCE(bool_or(p.CUST_CLNT_ID=#{customerId,jdbcType=VARCHAR}),false) AS "sameCustomer",
+      COALESCE(bool_or(c.INDUTY_CD=#{industryCode,jdbcType=VARCHAR}),false) AS "sameIndustry",
+      MAX(a.INPUT_END_DT) FILTER(WHERE a.ASGN_STAT_CD='ACT' AND a.INPUT_END_DT &gt;= #{today}) AS "withdrawalDate",
+      COALESCE(bool_and(a.EXT_PSBL_CD='L') FILTER(WHERE a.ASGN_STAT_CD='ACT'
+        AND a.INPUT_END_DT &gt;= #{firstDay}),false) AS "lowExtension"
+    FROM TB_PJ_ASGN a JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID
+    LEFT JOIN TB_BS_CLNT c ON c.CLNT_ID=p.CUST_CLNT_ID
+    WHERE a.DEV_ID=#{developerId} AND a.ASGN_STAT_CD!='CNCL' AND a.INPUT_BGN_DT &lt;= #{today}
+  </select>
+  <resultMap id="evidenceRow" type="com.company.common.airecommendations.mapper.AiRecommendationRows$EvidenceRow" autoMapping="false"><constructor>
+    <arg column="developerId" javaType="string"/>
+    <arg column="endedCount" javaType="_int"/><arg column="extendedCount" javaType="_int"/>
+    <arg column="hrWithdrawalCount" javaType="_int"/><arg column="sameCustomer" javaType="_boolean"/>
+    <arg column="sameIndustry" javaType="_boolean"/><arg column="withdrawalDate" javaType="java.time.LocalDate"/>
+    <arg column="lowExtension" javaType="_boolean"/>
+  </constructor></resultMap>
+  <!-- 후보 여러 명을 한 번에(사람마다 따로 부르지 않음). 투입이 없는 사람은 줄이 없고 서비스가 0·false로 채운다.
+       withdrawalDate = 오늘 진행 중인 투입(ACT, 시작 ≤ 오늘 ≤ 철수)의 철수일. 진행 중 투입이 없으면 NULL(「지금 대기 중입니다」). -->
+  <select id="evidences" resultMap="evidenceRow">
+    SELECT a.DEV_ID AS "developerId",COUNT(*) FILTER(WHERE a.INPUT_END_DT &lt; #{today})::int AS "endedCount",
+      COUNT(*) FILTER(WHERE a.INPUT_END_DT &lt; #{today} AND a.EXT_CNT &gt; 0)::int AS "extendedCount",
+      COALESCE(SUM((SELECT COUNT(*) FROM TB_PJ_ASGN_HIST h WHERE h.ASGN_ID=a.ASGN_ID
+        AND h.ASGN_CHG_TYPE_CD='EARLY' AND h.ASGN_CHG_RSN_CD='HR' AND h.CRCT_YN='N'
+        AND h.APLY_DT &lt;= #{today})) FILTER(WHERE a.INPUT_END_DT &lt; #{today}),0)::int AS "hrWithdrawalCount",
+      COALESCE(bool_or(p.CUST_CLNT_ID=#{customerId,jdbcType=VARCHAR}),false) AS "sameCustomer",
+      COALESCE(bool_or(c.INDUTY_CD=#{industryCode,jdbcType=VARCHAR}),false) AS "sameIndustry",
+      MAX(a.INPUT_END_DT) FILTER(WHERE a.ASGN_STAT_CD='ACT' AND a.INPUT_END_DT &gt;= #{today}) AS "withdrawalDate",
+      COALESCE(bool_and(a.EXT_PSBL_CD='L') FILTER(WHERE a.ASGN_STAT_CD='ACT'
+        AND a.INPUT_END_DT &gt;= #{firstDay}),false) AS "lowExtension"
+    FROM TB_PJ_ASGN a JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID
+    LEFT JOIN TB_BS_CLNT c ON c.CLNT_ID=p.CUST_CLNT_ID
+    WHERE a.DEV_ID IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+      AND a.ASGN_STAT_CD!='CNCL' AND a.INPUT_BGN_DT &lt;= #{today}
+    GROUP BY a.DEV_ID
+  </select>
+  <resultMap id="pay" type="com.company.common.personalcostprofits.mapper.PersonalCostProfitRows$Pay" autoMapping="false"><constructor>
+    <arg column="yearMonth" javaType="string"/><arg column="developerId" javaType="string"/>
+    <arg column="employeeTypeCode" javaType="string"/><arg column="salary" javaType="java.math.BigDecimal"/>
+    <arg column="allowance" javaType="java.math.BigDecimal"/><arg column="companyInsurance" javaType="java.math.BigDecimal"/>
+    <arg column="retirementReserve" javaType="java.math.BigDecimal"/><arg column="personalInsurance" javaType="java.math.BigDecimal"/>
+    <arg column="withholdingTax" javaType="java.math.BigDecimal"/><arg column="incomeTax" javaType="java.math.BigDecimal"/>
+    <arg column="netPay" javaType="java.math.BigDecimal"/><arg column="vendorSupply" javaType="java.math.BigDecimal"/>
+  </constructor></resultMap>
+  <select id="payrolls" resultMap="pay">
+    SELECT DISTINCT ON (p.DEV_ID) p.PAY_YM AS "yearMonth",p.DEV_ID AS "developerId",p.EMP_TYPE_CD AS "employeeTypeCode",
+      p.PAY_AMT AS "salary",p.ALWNC_AMT AS "allowance",p.INSR_CMPNY_AMT AS "companyInsurance",
+      p.RETIRE_RSV_AMT AS "retirementReserve",p.INSR_SELF_AMT AS "personalInsurance",
+      p.WTHLD_TAX_AMT AS "withholdingTax",p.INCM_TAX_AMT AS "incomeTax",p.REAL_PAY_AMT AS "netPay",
+      p.VNDR_SPLY_AMT AS "vendorSupply"
+    FROM TB_HR_MON_PAY p WHERE p.DEV_ID IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+      AND p.PAY_YM &lt;= #{month} ORDER BY p.DEV_ID,p.PAY_YM DESC
+  </select>
+  <resultMap id="price" type="com.company.common.airecommendations.mapper.AiRecommendationRows$Price" autoMapping="false"><constructor>
+    <arg column="developerId" javaType="string"/><arg column="monthlyPrice" javaType="java.math.BigDecimal"/>
+  </constructor></resultMap>
+  <select id="prices" resultMap="price">
+    SELECT DISTINCT ON (p.DEV_ID) p.DEV_ID AS "developerId",p.MON_UPRC AS "monthlyPrice" FROM TB_HR_DEV_PRC p
+    WHERE p.DEV_ID IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+      AND p.APLY_BGN_YM &lt;= #{month} AND (p.APLY_END_YM IS NULL OR p.APLY_END_YM &gt;= #{month})
+    ORDER BY p.DEV_ID,p.APLY_BGN_YM DESC
+  </select>
+  <resultMap id="skill" type="com.company.common.airecommendations.mapper.AiRecommendationRows$Skill" autoMapping="false"><constructor>
+    <arg column="developerId" javaType="string"/><arg column="skillName" javaType="string"/>
+  </constructor></resultMap>
+  <select id="skills" resultMap="skill">
+    SELECT s.DEV_ID AS "developerId",s.SKILL_NM AS "skillName" FROM TB_HR_DEV_SKILL s
+    WHERE s.DEV_ID IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    ORDER BY s.DEV_ID,s.SORT_ORD,s.SKILL_NM
+  </select>
+  <select id="conversions" resultType="string">
+    SELECT DISTINCT t.DEV_ID FROM TB_SL_TENT_ASGN t JOIN TB_SL_OPP o ON o.OPP_ID=t.OPP_ID
+    WHERE t.TENT_STAT_CD='CNVT' AND t.DEV_ID IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+  </select>
+  <resultMap id="area" type="com.company.common.airecommendations.mapper.AiRecommendationRows$Area" autoMapping="false"><constructor>
+    <arg column="code" javaType="string"/><arg column="parentCode" javaType="string"/>
+  </constructor></resultMap>
+  <select id="areas" resultMap="area">SELECT a.AREA_CD AS "code",a.UPPER_AREA_CD AS "parentCode" FROM TB_SY_ADM_AREA a</select>
+  <select id="nextId" resultType="string">SELECT nextval('SQ_TB_SL_RCMD_LOG')::text</select>
+  <select id="lockRequest" resultType="string">
+    SELECT pg_advisory_xact_lock(hashtextextended(#{fingerprint},734903))::text
+  </select>
+  <resultMap id="log" type="com.company.common.airecommendations.mapper.AiRecommendationRows$Log" autoMapping="false"><constructor>
+    <arg column="recommendationId" javaType="string"/><arg column="rankOrder" javaType="_int"/>
+    <arg column="targetType" javaType="string"/><arg column="targetId" javaType="string"/>
+    <arg column="jobCode" javaType="string"/><arg column="startMonth" javaType="string"/>
+    <arg column="gradeCode" javaType="string"/><arg column="needSn" javaType="java.lang.Integer"/>
+    <arg column="developerId" javaType="string"/><arg column="totalScore" javaType="java.math.BigDecimal"/>
+    <arg column="scoreDetail" javaType="string"/><arg column="reason" javaType="string"/>
+    <arg column="userActCode" javaType="string"/><arg column="reasonCode" javaType="string"/>
+    <arg column="actedBy" javaType="string"/><arg column="actedAt" javaType="java.time.Instant"/>
+  </constructor></resultMap>
+  <sql id="logs">
+    SELECT l.RCMD_ID::text AS "recommendationId",l.RANK_ORD::int AS "rankOrder",
+      CASE WHEN l.PROJ_ID IS NOT NULL THEN 'project' ELSE 'opportunity' END AS "targetType",
+      COALESCE(l.PROJ_ID,l.OPP_ID) AS "targetId",l.JOB_CD AS "jobCode",
+      l.BGN_YM AS "startMonth",l.REQ_GRADE_CD AS "gradeCode",l.NEED_SN::int AS "needSn",
+      l.DEV_ID AS "developerId",l.TOT_SCORE AS "totalScore",l.SCORE_DTL AS "scoreDetail",
+      l.RCMD_RSN AS "reason",l.USER_ACT_CD AS "userActCode",l.RCMD_EXCL_CD AS "reasonCode",
+      l.ACT_USER_ID AS "actedBy",l.ACT_DTTM AS "actedAt" FROM TB_SL_RCMD_LOG l
+  </sql>
+  <select id="replay" resultMap="log">
+    <include refid="logs"/> WHERE l.RCMD_TYPE_CD='AI'
+      <choose><when test="targetType == 'project'">AND l.PROJ_ID=#{targetId}</when><otherwise>AND l.OPP_ID=#{targetId}</otherwise></choose>
+      AND l.SCORE_DTL LIKE '%&quot;f&quot;:&quot;' || #{fingerprint} || '&quot;%'
+      AND CASE WHEN left(l.SCORE_DTL,6)='{&quot;v&quot;:1' THEN l.SCORE_DTL::jsonb-&gt;&gt;'f' ELSE NULL END=#{fingerprint}
+    ORDER BY l.RCMD_ID,l.RANK_ORD
+  </select>
+  <select id="execution" resultMap="log"><include refid="logs"/> WHERE l.RCMD_ID=CAST(#{id} AS numeric) AND l.RCMD_TYPE_CD='AI' ORDER BY l.RANK_ORD</select>
+  <select id="candidate" resultMap="log"><include refid="logs"/> WHERE l.RCMD_ID=CAST(#{id} AS numeric) AND l.DEV_ID=#{developerId} AND l.RCMD_TYPE_CD='AI'</select>
+  <select id="lockCandidate" resultMap="log"><include refid="logs"/> WHERE l.RCMD_ID=CAST(#{id} AS numeric) AND l.DEV_ID=#{developerId} AND l.RCMD_TYPE_CD='AI' FOR UPDATE OF l</select>
+  <resultMap id="assignment" type="com.company.common.airecommendations.mapper.AiRecommendationRows$Assignment" autoMapping="false"><constructor>
+    <arg column="assignmentId" javaType="string"/><arg column="developerId" javaType="string"/><arg column="projectId" javaType="string"/>
+    <arg column="statusCode" javaType="string"/>
+  </constructor></resultMap>
+  <select id="assignment" resultMap="assignment">
+    SELECT a.ASGN_ID AS "assignmentId",a.DEV_ID AS "developerId",a.PROJ_ID AS "projectId",a.ASGN_STAT_CD AS "statusCode"
+    FROM TB_PJ_ASGN a WHERE a.ASGN_ID=#{id}
+  </select>
+  <insert id="insert">
+    INSERT INTO TB_SL_RCMD_LOG(RCMD_ID,RANK_ORD,RCMD_TYPE_CD,OPP_ID,PROJ_ID,NEED_SN,
+      JOB_CD,BGN_YM,REQ_GRADE_CD,DEV_ID,TOT_SCORE,SCORE_DTL,RCMD_RSN,REG_USER_ID,REG_DTTM)
+    VALUES(CAST(#{log.recommendationId} AS numeric),#{log.rankOrder},'AI',
+      <choose><when test="log.targetType == 'opportunity'">#{log.targetId},NULL,</when><otherwise>NULL,#{log.targetId},</otherwise></choose>
+      #{log.needSn,jdbcType=NUMERIC},#{log.jobCode},#{log.startMonth},#{log.gradeCode},#{log.developerId},
+      #{log.totalScore},#{log.scoreDetail},#{log.reason},#{actor},clock_timestamp())
+  </insert>
+  <!-- 앞 상태 지킴: 제외(EXCL)한 줄은 바꾸지 않는다. 가배정(TENT)은 처리 전·가배정 줄만, 배정(ASGN)은 배정한 줄도. -->
+  <update id="action">
+    UPDATE TB_SL_RCMD_LOG SET USER_ACT_CD=#{action},ACT_USER_ID=#{actor},ACT_DTTM=clock_timestamp()
+      <if test="action == 'TENT'">,NEED_SN=#{needSn}</if>
+    WHERE RCMD_ID=CAST(#{recommendationId} AS numeric) AND DEV_ID=#{developerId} AND RCMD_TYPE_CD='AI'
+      <choose><when test="action == 'ASGN'">AND (USER_ACT_CD IS NULL OR USER_ACT_CD IN ('TENT','ASGN'))</when>
+        <otherwise>AND (USER_ACT_CD IS NULL OR USER_ACT_CD='TENT')</otherwise></choose>
+  </update>
+  <!-- 제외는 아직 처리하지 않은 줄에만(가배정·배정한 줄을 덮지 않음). -->
+  <update id="exclude">
+    UPDATE TB_SL_RCMD_LOG SET USER_ACT_CD='EXCL',RCMD_EXCL_CD=#{action.reasonCode},
+      ACT_USER_ID=#{action.actor},ACT_DTTM=clock_timestamp(),SCORE_DTL=#{scoreDetail}
+    WHERE RCMD_ID=CAST(#{action.recommendationId} AS numeric) AND DEV_ID=#{action.developerId} AND RCMD_TYPE_CD='AI'
+      AND USER_ACT_CD IS NULL
+  </update>
+</mapper>

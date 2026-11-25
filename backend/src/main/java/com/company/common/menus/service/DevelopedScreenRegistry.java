@@ -20,7 +20,8 @@ public class DevelopedScreenRegistry {
             new Screen("UI-09", "순이익표"), new Screen("UI-14", "월 마감"), new Screen("UI-18", "사업계획 대비 실적"),
             new Screen("UI-21", "자금수지표"), new Screen("UI-33", "외부 인력 후보"),
             new Screen("UI-29", "영업 파이프라인"), new Screen("UI-28", "인력 운영 보드"),
-            new Screen("UI-17", "인력 수요 예측"), new Screen("UI-16", "대시보드"));
+            new Screen("UI-17", "인력 수요 예측"), new Screen("UI-16", "대시보드"),
+            new Screen("UI-30", "AI 인력 추천"));
     }
 
     public boolean contains(String scrnId) {

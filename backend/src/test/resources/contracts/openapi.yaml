@@ -13875,8 +13875,675 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/dashboard:
+    get:
+      operationId: getCommonDashboard
+      summary: 대시보드 전체 현황 조회
+      security: []
+      description: 고정 관리자 전체 모양. 기존 화면 서버 계산을 직접 재사용하는 묶음 조회이며 칸마다 HTTP를 호출하지 않는다. 가동률만 식-37로 새 계산. 읽기 전용·새 표/뷰/배치
+        없음.
+      x-related-requirements:
+      - REQ-1531
+      - REQ-1532
+      - REQ-1533
+      - REQ-1534
+      - REQ-1535
+      - REQ-1536
+      - REQ-1537
+      - REQ-1538
+      - REQ-1539
+      - REQ-1540
+      - REQ-1541
+      - REQ-1542
+      - REQ-1543
+      - REQ-1544
+      - REQ-1545
+      - REQ-1546
+      - REQ-1547
+      - REQ-1549
+      - REQ-1550
+      - REQ-1551
+      - REQ-1517
+      - REQ-1520
+      - REQ-1503
+      - REQ-1508
+      - REQ-1518
+      - REQ-1515
+      - REQ-1516
+      - REQ-1525
+      - REQ-1530
+      parameters:
+      - in: query
+        name: yearMonth
+        required: true
+        schema:
+          type: string
+          description: 조회 월 yyyy-MM
+          pattern: ^\d{4}-(0[1-9]|1[0-2])$
+        description: PeriodSelector의 현재 선택월. 최초 이번 달은 화면에서 채운다. 기존 periodRules.ts UI-16 허용범위 보존(OQ-PERIOD-016). 누락/형식
+          오류는 400.
+      x-pagination-contract:
+        mode: none
+        reason: 한 화면의 집계·기간 그래프·요약 전체를 한 응답으로 반환하며 페이지를 분할하지 않는다.
+      x-filtering-contract:
+        mode: query
+        fields:
+        - yearMonth
+        reason: 선택월만 입력하며 역할/파트/직무 임의필터를 새로 만들지 않는다.
+      x-aiops-query-role:
+        entity: TB_CO_MON_PL
+        result_path:
+        - data
+      x-business-rules:
+      - 매출/이익/누계/가동률·마감·추이·파트·청구누락만 선택월을 따르고 미수·나머지 할일·경보·수급·파이프라인·자금은 오늘 기준이다. 과거월에는 이 차이를 안내한다.
+      - 요청30행 화면별 서버 계산을 재사용하고 가동률만 새로 계산한다. 같은 계산의 새 SQL과 다른 화면 API 응답 변경은 금지한다.
+      - 저장·수정·업로드를 제공하지 않으며 엑셀도 업무 데이터를 바꾸지 않고 DNLD만 남긴다.
+      - 입금 예정일 다음 날부터 연체 미수를 급함(빨강)으로 표시하고 식-89 알림 단계와 분리한다.
+      responses:
+        '200':
+          description: 선택월·오늘 기준이 구분된 요약/할일/마감/경보/추이/6개월수급/하단3칸
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonDashboardResult'
+        '400':
+          description: yearMonth 누락 또는 yyyy-MM 형식/유효 월 오류; errors[].field=yearMonth, 업무행 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/dashboard/excel:
+    get:
+      operationId: getCommonDashboardExcel
+      summary: 대시보드 숫자 엑셀
+      security: []
+      parameters:
+      - in: query
+        name: yearMonth
+        required: true
+        schema:
+          type: string
+          description: 조회 월 yyyy-MM
+          pattern: ^\d{4}-(0[1-9]|1[0-2])$
+        description: PeriodSelector의 현재 선택월. 최초 이번 달은 화면에서 채운다. 기존 periodRules.ts UI-16 허용범위 보존(OQ-PERIOD-016). 누락/형식
+          오류는 400.
+      x-related-requirements:
+      - REQ-1555
+      - REQ-1521
+      - REQ-1522
+      - REQ-1523
+      - REQ-1508
+      description: 같은 조합 projection을 ExcelExportService로 생성한다. 첫행 수신자/시각·대시보드_기간_다운로드일시.xlsx. 기간 표시는 2026년 11월 같은
+        형식이다. 파일 건수 단위는 OQ-XLS-016이며 UI-17 달 수 규칙을 복사하지 않는다.
+      x-pagination-contract:
+        mode: none
+        reason: 현재 대시보드 전체 숫자를 한 파일로 받는다.
+      x-filtering-contract:
+        mode: query
+        fields:
+        - yearMonth
+        reason: 화면 조회와 같은 기준월이며 오늘 기준 영역은 오늘 값을 쓴다.
+      x-business-rules:
+      - 현재 대시보드 조회 기준과 같은 숫자를 실제 xlsx로 내려받는다.
+      - 저장·수정·업로드를 제공하지 않으며 엑셀도 업무 데이터를 바꾸지 않고 DNLD만 남긴다.
+      - 로그인·메뉴 권한 검사는 만들지 않고 고정 관리자 전체 모양만 제공하며 역할 이름 분기 코드를 넣지 않는다.
+      x-side-effects:
+      - 정상 파일 제공 시 기존 TB_SY_ACCS_LOG에 UI-16·DNLD·실행자·시각을 기록한다.
+      - 업무 표·마감 상태·예측 원천은 불변이다.
+      x-state-transitions:
+      - 업무 상태 전이 없음; 정상 파일 제공 사실만 UI-16 DNLD 접근기록으로 추가한다.
+      x-required-tests:
+      - 'happy: 유효 yearMonth로 조회 후 다운로드 -> xlsx 숫자가 같은 CommonDashboardResult와 같고 TB_CO_MON_PL 재조회 값은 원래 값이다.'
+      - 'auth: 인증 헤더 없는 고정 관리자 개발모드에서 대시보드 엑셀 요청 -> 200 binary; UI-22 전 거부 역할·401/403은 근거가 없어 신설하지 않는다.'
+      - 'validation: yearMonth=2026-13으로 대시보드 엑셀 요청 -> 400 ApiError errors[].field=yearMonth이고 업무행은 불변이다.'
+      - 'business: 저장/수정 없이 마감월과 미마감월에서 각각 대시보드 엑셀 요청 -> 두 경우 모두 읽기 가능하며 TB_CL_CLOSE 상태는 재조회 시 동일하다; 추가 업무 거부 규칙은
+        원문에 없다.'
+      - 'side-effect: 정상 대시보드 파일 제공 후 기존 접근기록 조회 -> TB_SY_ACCS_LOG에 UI-16·DNLD가 있으며 다른 화면 DNLD로 기록되지 않는다.'
+      responses:
+        '200':
+          description: 실제 xlsx·첫행 수신자/시각·공통 파일명·UI-16 DNLD
+          headers:
+            X-Total-Count:
+              description: 공통 내려받기의 조회 결과 건수; 대시보드 복합영역의 집계단위는 OQ-XLS-016 reviewer 결정 전 임의 고정 금지
+              schema:
+                type: integer
+                minimum: 0
+            Content-Disposition:
+              description: 대시보드_기간_다운로드일시.xlsx 파일명
+              schema:
+                type: string
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: yearMonth 누락 또는 yyyy-MM 형식/유효 월 오류; errors[].field=yearMonth, 업무행 불변
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
+    CommonDashboardSummary:
+      type: object
+      required:
+      - revenue
+      - revenuePreviousComparison
+      - revenueTargetRate
+      - operatingProfit
+      - operatingProfitRate
+      - operatingProfitPreviousComparison
+      - cumulativeOperatingProfit
+      - cumulativeAchievementRate
+      - utilizationRate
+      - utilizationTargetRate
+      - idlePeople
+      - unpaidAmount
+      - unpaidCount
+      - overdueCount
+      - overdueAmount
+      properties:
+        revenue:
+          type: number
+          description: 선택월 매출; operatingprofitstatements 재사용
+          nullable: true
+        revenuePreviousComparison:
+          type: number
+          description: 매출 전월 대비; 기존 원천 단위 유지
+          nullable: true
+        revenueTargetRate:
+          type: number
+          description: 목표 대비 매출 비율
+          nullable: true
+        operatingProfit:
+          type: number
+          description: 선택월 영업이익
+          nullable: true
+        operatingProfitRate:
+          type: number
+          description: 선택월 영업이익률; 영업이익표 「영업이익률」 줄 값
+          nullable: true
+        operatingProfitPreviousComparison:
+          type: number
+          description: 영업이익 전월 대비; 원천 단위 유지
+          nullable: true
+        cumulativeOperatingProfit:
+          type: number
+          description: 선택월까지 누계 영업이익
+          nullable: true
+        cumulativeAchievementRate:
+          type: number
+          description: UI-18 식-36 누계 영업이익 달성률과 동일
+          nullable: true
+        utilizationRate:
+          type: number
+          description: DB 식-37 가동률; 전체=직접 인력
+          nullable: true
+        utilizationTargetRate:
+          type: number
+          description: 목표 90%; 운영기준 원천 유지
+          nullable: true
+        idlePeople:
+          type: integer
+          description: 인력 운영 보드 「지금 비어 있는 인원」(이번 달, 휴직·퇴사·입사 전 제외)
+          minimum: 0
+        unpaidAmount:
+          type: number
+          description: 오늘 기준 미수 잔액; 메뉴 배지(unpaid-count)와 같은 조건의 모든 해 청구(식-06)
+          nullable: true
+        unpaidCount:
+          type: integer
+          description: 미수가 남은 청구 건수; /api/common/bills/unpaid-count와 같은 값
+          minimum: 0
+        overdueCount:
+          type: integer
+          description: 오늘 기준 연체 건수; 청구 상태 LATE
+          minimum: 0
+        overdueAmount:
+          type: number
+          description: 오늘 기준 연체 청구의 남은 미수 잔액
+          nullable: true
+      description: 다섯 카드의 readonly 숫자. nullable은 기존 원천의 분모0/누락 규칙을 보존하며 임의0 대체를 승인하지 않는다(OQ-CALC-016).
+    CommonDashboardTodo:
+      type: object
+      required:
+      - key
+      - title
+      - count
+      - description
+      - amount
+      - targetScreenId
+      - targetScreenName
+      - tone
+      - urgent
+      - alwaysVisible
+      - visible
+      properties:
+        key:
+          type: string
+          description: 줄 구분(시안 순서)
+          enum:
+          - overdueBills
+          - taxPayment
+          - cashShortage
+          - manpowerShortage
+          - overAllocated
+          - preContract
+          - withdrawal
+          - riskProjects
+          - overdueIssues
+          - billingMissing
+          - pendingQuotes
+          - staleProjects
+          - unassignedSalesPart
+        title:
+          type: string
+          description: 시안 제목(건수 포함, 예 「미수 연체 2건」·「2026-12 자금 부족 예상」)
+        count:
+          type: integer
+          description: 해당 조건 건수
+          minimum: 0
+        description:
+          type: string
+          description: 시안 설명 줄(금액은 시안 kor 형식, 프로젝트 이름 등)
+        amount:
+          type: number
+          description: 설명 줄의 금액 원값(연체·자금·청구 누락), 없으면 null
+          nullable: true
+        targetScreenId:
+          type: string
+          description: 이동 화면
+          nullable: true
+        targetScreenName:
+          type: string
+          description: 이동 화면 이름(시안 「청구·입금 ›」)
+          nullable: true
+        tone:
+          type: string
+          description: 시안 색
+          enum:
+          - bad
+          - warn
+        urgent:
+          type: boolean
+          description: tone이 bad이고 건수가 있으면 true(급함 n건)
+        alwaysVisible:
+          type: boolean
+          description: 0건이어도 보이는 줄(철수 예정)
+        visible:
+          type: boolean
+          description: 화면에 그릴 줄(0건 줄은 false, 시안 filter(Boolean))
+    CommonDashboardClosingItem:
+      type: object
+      required:
+      - name
+      - status
+      - description
+      - targetScreenId
+      properties:
+        name:
+          type: string
+          description: 남은 점검 항목 이름
+        status:
+          type: string
+          description: 월 마감 점검 상태 표시
+          nullable: true
+        description:
+          type: string
+          description: 월 마감 점검 한 줄 설명(시안 cl 회색 글자)
+          nullable: true
+        targetScreenId:
+          type: string
+          description: 월 마감 점검의 이동 화면
+          nullable: true
+    CommonDashboardAlertBadge:
+      type: object
+      required:
+      - name
+      - tone
+      properties:
+        name:
+          type: string
+          description: 경보 이름
+        tone:
+          type: string
+          description: 예산 초과는 bad, 나머지는 warn
+          enum:
+          - bad
+          - warn
+    CommonDashboardClosing:
+      type: object
+      required:
+      - completedCount
+      - totalCount
+      - remainingItems
+      properties:
+        completedCount:
+          type: integer
+          description: 선택월 점검 완료 수
+          minimum: 0
+        totalCount:
+          type: integer
+          description: 전체 점검 수
+          minimum: 0
+        remainingItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonDashboardClosingItem'
+          description: 남은 항목(이름·설명·이동 화면); monthcloses 재사용
+    CommonDashboardProjectAlert:
+      type: object
+      required:
+      - projectId
+      - projectName
+      - contractType
+      - marginLabel
+      - marginRate
+      - budgetBurnRate
+      - alerts
+      - alertBadges
+      - alertName
+      - mainCause
+      - mainCauseAmount
+      properties:
+        projectId:
+          type: string
+          description: 기존 원가 상세 진입 식별자
+        projectName:
+          type: string
+          description: 프로젝트 표시명
+        contractType:
+          type: string
+          description: 계약 유형 코드(TK면 예상 최종 마진율)
+          nullable: true
+        marginLabel:
+          type: string
+          description: 시안 마진 이름
+          enum:
+          - 예상 최종 마진율
+          - 월간 마진율
+        marginRate:
+          type: number
+          description: 턴키는 예상 최종 마진율, 아니면 월간 마진율(원가 분석 값)
+          nullable: true
+        budgetBurnRate:
+          type: number
+          description: 예산 소진율(원가 분석 budgetUsageRate)
+          nullable: true
+        alerts:
+          type: array
+          items:
+            type: string
+          description: 경보 이름(저마진·예산 초과)
+        alertBadges:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonDashboardAlertBadge'
+        alertName:
+          type: string
+          description: 저마진·예산 초과 표시명(· 로 이음)
+        mainCause:
+          type: string
+          description: 원가 분석의 주원인 이름(금액이 없으면 null)
+          nullable: true
+        mainCauseAmount:
+          type: number
+          description: 주원인 금액
+          nullable: true
+    CommonDashboardTrendMonth:
+      type: object
+      required:
+      - month
+      - revenue
+      - cost
+      - targetRevenue
+      properties:
+        month:
+          type: string
+          description: 조회 월 yyyy-MM
+          pattern: ^\d{4}-(0[1-9]|1[0-2])$
+        revenue:
+          type: number
+          description: 해당월 영업이익표 매출
+          nullable: true
+        cost:
+          type: number
+          description: 해당월 영업이익표 원가
+          nullable: true
+        targetRevenue:
+          type: number
+          description: 해당월 목표 매출; 점선(12달 모두). 매출·원가는 고른 달 뒤는 null
+          nullable: true
+    CommonDashboardManpowerMonth:
+      type: object
+      required:
+      - month
+      - supply
+      - demand
+      - difference
+      - shortage
+      properties:
+        month:
+          type: string
+          description: 조회 월 yyyy-MM
+          pattern: ^\d{4}-(0[1-9]|1[0-2])$
+        supply:
+          type: number
+          description: 인력 수요 예측 공통 계산의 회사 전체 가용 MM
+          nullable: true
+        demand:
+          type: number
+          description: 같은 계산의 회사 전체 필요 MM
+          nullable: true
+        difference:
+          type: number
+          description: 같은 계산의 가용−필요
+          nullable: true
+        shortage:
+          type: boolean
+          description: 원천의 부족 달 판단; 임의 임계값 도입 금지
+    CommonDashboardSalesPart:
+      type: object
+      required:
+      - partId
+      - partName
+      - revenue
+      - profitRate
+      properties:
+        partId:
+          type: string
+          description: 기존 영업 파트 식별자
+        partName:
+          type: string
+          description: 영업 파트 표시명
+        revenue:
+          type: number
+          description: 선택월 파트 매출
+          nullable: true
+        profitRate:
+          type: number
+          description: 선택월 파트 이익률
+          nullable: true
+    CommonDashboardOpportunity:
+      type: object
+      required:
+      - opportunityId
+      - opportunityName
+      - startMonth
+      - stageName
+      - probability
+      properties:
+        opportunityId:
+          type: string
+          description: 영업 기회 식별자
+        opportunityName:
+          type: string
+          description: 곧 시작할 기회 표시명
+        startMonth:
+          type: string
+          description: 조회 월 yyyy-MM
+          pattern: ^\d{4}-(0[1-9]|1[0-2])$
+        stageName:
+          type: string
+          description: 영업 단계 이름(배지)
+          nullable: true
+        probability:
+          type: number
+          description: 수주 확률(%)
+          nullable: true
+    CommonDashboardPipeline:
+      type: object
+      required:
+      - activeCount
+      - weightedExpectedRevenue
+      - upcoming
+      properties:
+        activeCount:
+          type: integer
+          description: 오늘 진행 기회 수
+          minimum: 0
+        weightedExpectedRevenue:
+          type: number
+          description: 오늘 확률 반영 예상 매출
+          nullable: true
+        upcoming:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonDashboardOpportunity'
+          maxItems: 3
+      description: 진행 기회 중 시작월이 오늘+3개월 이내(이미 시작 포함), 확률 높은 순 3건(시안 soon).
+    CommonDashboardCashMonth:
+      type: object
+      required:
+      - month
+      - monthEndBalance
+      - shortage
+      - warning
+      properties:
+        month:
+          type: string
+          description: 조회 월 yyyy-MM
+          pattern: ^\d{4}-(0[1-9]|1[0-2])$
+        monthEndBalance:
+          type: number
+          description: 자금수지표의 동일 월말 잔액; 기초없음 등 원천 null 유지
+          nullable: true
+        shortage:
+          type: boolean
+          description: 원천의 자금 부족 판단
+        warning:
+          type: string
+          description: 원천 경고 문구; 부족 아님은 기존 원천 표현 유지
+          nullable: true
+    CommonDashboardResult:
+      type: object
+      required:
+      - selectedMonth
+      - today
+      - closingState
+      - lastClosedMonth
+      - provisional
+      - asOfText
+      - provisionalNotice
+      - mixedBasisNotice
+      - summary
+      - todos
+      - closing
+      - projectAlerts
+      - projectAlertMonth
+      - trend
+      - manpower
+      - salesParts
+      - pipeline
+      - cash
+      - minimumCash
+      properties:
+        selectedMonth:
+          type: string
+          description: 조회 월 yyyy-MM
+          pattern: ^\d{4}-(0[1-9]|1[0-2])$
+        today:
+          type: string
+          description: 서버 오늘; 공통 시간 원천
+          format: date
+        closingState:
+          type: string
+          description: 선택월 상태 표시명
+          enum:
+          - 작업중
+          - 마감
+        lastClosedMonth:
+          type: string
+          description: 최종 마감월; 없으면 null
+          pattern: ^\d{4}-(0[1-9]|1[0-2])$
+          nullable: true
+        provisional:
+          type: boolean
+          description: 선택월 미마감이면 true
+        asOfText:
+          type: string
+          description: 시안 기준 줄 「오늘 yyyy-MM-dd · n월까지 마감」(마감이 없으면 뒤 부분 없음)
+        provisionalNotice:
+          type: string
+          description: 고른 달이 마감 전이면 「n월은 마감 전이라 숫자는 잠정입니다」(앞에 잠정 배지), 마감이면 null
+          nullable: true
+        mixedBasisNotice:
+          type: string
+          description: 지난달을 고르면 「미수금·확인할 일·프로젝트 경보·인력 수급·파이프라인·자금은 오늘 기준(청구 누락 의심은 고른 달)」, 이번 달이면 null
+          nullable: true
+        summary:
+          $ref: '#/components/schemas/CommonDashboardSummary'
+        todos:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonDashboardTodo'
+        closing:
+          $ref: '#/components/schemas/CommonDashboardClosing'
+        projectAlerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonDashboardProjectAlert'
+        projectAlertMonth:
+          type: string
+          description: 프로젝트 경보를 읽은 달 yyyy-MM(첫 미마감 달과 오늘 달 중 빠른 달); 경보를 누르면 원가 분석을 이 달로 연다
+          pattern: ^\d{4}-(0[1-9]|1[0-2])$
+        trend:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonDashboardTrendMonth'
+        manpower:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonDashboardManpowerMonth'
+          minItems: 6
+          maxItems: 6
+        salesParts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonDashboardSalesPart'
+        pipeline:
+          $ref: '#/components/schemas/CommonDashboardPipeline'
+        cash:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonDashboardCashMonth'
+          minItems: 3
+          maxItems: 3
+          description: 마지막 마감 달 다음 달부터 3달(시안 CF.m > closedTo), 자금수지표 값
+        minimumCash:
+          type: number
+          description: 최소 운영자금(MIN_CASH), 자금수지표와 같은 값
+          nullable: true
+      description: '업무 데이터 저장 없는 실시간 projection. 선택월: 매출/이익/누계/가동률/마감/추이/파트/청구누락. 오늘: 미수/나머지할일/경보/수급/파이프라인/자금. 추이는 선택월까지,
+        수급6개월·자금3개월은 오늘 기준이다.'
     CommonManpowerForecastMonth:
       type: object
       properties:

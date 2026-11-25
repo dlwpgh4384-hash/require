@@ -44,6 +44,16 @@ public class CalculationRuleService {
         return row.value();
     }
 
+    /**
+     * 기준값이 없어도 오류를 던지지 않고 null(보여 주기만 하는 칸용). 바깥 트랜잭션 안에서 CodeFailure를 던지면
+     * 그 트랜잭션이 롤백 전용으로 표시되어, 잡아도 끝에 UnexpectedRollbackException이 나기 때문이다.
+     */
+    public Standard findEffectiveStandard(String standardCode, YearMonth month) {
+        if (standardCode == null || standardCode.isBlank() || standardCode.length() > 30 || month == null) return null;
+        var row = mapper.selectEffectiveStandard(standardCode, month.format(MONTH));
+        return row == null ? null : row.value();
+    }
+
     public EffectiveValue resolve(ValueRequest request) {
         if (request == null || request.month() == null) {
             throw CodeFailure.invalid("effectiveMonth", "적용 월을 확인해 주세요.");

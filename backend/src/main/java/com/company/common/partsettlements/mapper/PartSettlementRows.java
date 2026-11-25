@@ -11,6 +11,7 @@ public final class PartSettlementRows {
         public BigDecimal distributionRate, salesExpense;
     }
     public static class Header {
+        public String partId;
         public String state, confirmedBy, confirmedByName, cancelReason;
         public BigDecimal card, profit;
         public Instant confirmedAt, modifiedAt;
@@ -28,6 +29,7 @@ public final class PartSettlementRows {
         public BigDecimal id;
     }
     public static class Detail {
+        public String partId;
         public String developerId, developerName, employeeTypeCode, projectNames, notes;
         public BigDecimal monthlyMm, unitPrice, salary, salesExpense, retirementAmount, totalCost, profit, profitShare;
     }

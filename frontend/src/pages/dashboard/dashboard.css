@@ -1,0 +1,232 @@
+/* 시안 UI-16 대시보드(전체 모양). 색은 공통 변수만 쓴다(다크 모드). */
+.dashboard-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+/* 시안: 기간 줄과 기준 줄 사이는 본문 간격(24, 휴대폰 16)만. 공통 기간 부품의 아래 여백은 뺀다. */
+.dashboard-page > .period-selector {
+  margin-bottom: 0;
+}
+/* 시안 asof: .pbar 안 .cap 글 줄 */
+.dashboard-asof {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.dashboard-asof .ls-b {
+  vertical-align: 1px;
+}
+.dashboard-ok {
+  color: var(--ls-ok);
+}
+.dashboard-warn {
+  color: var(--ls-warn);
+}
+.dashboard-bad {
+  color: var(--ls-bad);
+}
+.dashboard-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-sub);
+}
+.dashboard-page .profit-card-h h2 .dashboard-count {
+  font-weight: 400;
+}
+/* 시안 .dgrid: 왼쪽 확인할 일 2 : 오른쪽 마감 진행·프로젝트 경보 1 */
+.dashboard-dgrid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.dashboard-side {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+.dashboard-todos {
+  gap: 4px;
+}
+.dashboard-close,
+.dashboard-alerts {
+  gap: 10px;
+}
+/* 시안 .witem: 한 줄 목록(위 구분선, 아이콘 · 굵은 제목+설명 · 오른쪽 화면 이름 ›) */
+.dashboard-witem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 4px;
+  border: 0;
+  border-top: 1px solid var(--divider, var(--border));
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dashboard-witem:hover {
+  background: var(--hover);
+}
+.dashboard-witem:disabled {
+  cursor: default;
+}
+.dashboard-witem > span[aria-hidden] {
+  display: flex;
+  flex: none;
+}
+.dashboard-wt {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dashboard-wt .ls-cap {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dashboard-wgo {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+.dashboard-alert {
+  padding: 8px 0;
+}
+.dashboard-alert strong {
+  font-size: 13px;
+}
+.dashboard-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: none;
+}
+/* 시안 .bar .track/.fill: 회색 바탕 줄 위 파란 채움(--c1) */
+.dashboard-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dashboard-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--divider, var(--border));
+  overflow: hidden;
+}
+.dashboard-fill {
+  height: 100%;
+  background: var(--primary-text);
+}
+.dashboard-close-item {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+}
+/* 시안 .g2 · .grid3 */
+.dashboard-g2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.dashboard-grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+/* 시안 details.tbl 「표로 보기」 */
+.dashboard-tbl summary {
+  width: max-content;
+  font-size: 13px;
+  color: var(--primary-text);
+  cursor: pointer;
+}
+.dashboard-tbl[open] summary {
+  margin-bottom: 8px;
+}
+.dashboard-page .dashboard-twrap {
+  max-height: none;
+  max-width: 100%;
+  overflow: auto;
+}
+/* 시안 .kv2 */
+.dashboard-kv2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.dashboard-kv2 > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dashboard-kv2 strong {
+  font-size: 18px;
+}
+.dashboard-opp {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--divider, var(--border));
+  font-size: 13px;
+}
+.dashboard-opp-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dashboard-opp-stage {
+  flex: none;
+  white-space: nowrap;
+}
+.dashboard-cash-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.dashboard-cash-row svg {
+  vertical-align: -2px;
+}
+@media (max-width: 1279px) {
+  .dashboard-dgrid,
+  .dashboard-g2,
+  .dashboard-grid3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* 시안 휴대폰(767px 이하): 요약 2칸씩(마지막 칸은 한 줄 가득), 확인할 일 오른쪽 화면 이름 숨김 */
+@media (max-width: 767px) {
+  .dashboard-kpis .ls-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .dashboard-kpis .ls-kpi {
+    padding: 12px;
+  }
+  .dashboard-kpis .ls-kpi .v {
+    font-size: 20px;
+  }
+  .dashboard-kpis .ls-kpi:last-child {
+    grid-column: 1 / -1;
+  }
+  .dashboard-wgo {
+    display: none;
+  }
+  /* 시안 .card는 휴대폰에서도 20·24 여백(UI-07 공통 카드의 16을 되돌림) */
+  .dashboard-page .profit-card {
+    padding: 20px 24px;
+  }
+}

@@ -68,6 +68,11 @@ public class CommonProjectService implements org.springframework.context.Applica
         rows.forEach(this::decorate);
         return new ProjectList(rows, rows.stream().filter(p -> !internal(p) && p.salesPartId == null).count());
     }
+    /** 목록의 unassignedCount(내부 제외·영업 파트 미지정)와 같은 수. 진행률 계산 없이 같은 목록 쿼리만 읽는다(대시보드 UI-16). */
+    public long getCommonProjectUnassignedCount() {
+        return mapper.selectProjects(calendar.today(), currentMonth()).stream()
+            .filter(p -> !internal(p) && p.salesPartId == null).count();
+    }
     /** 목록 엑셀 다운로드: 화면과 같은 조건(연도·계약유형·상태·영업 파트·프로젝트명 또는 고객사), 시작일 늦은 순. */
     public List<Project> getCommonProjectsForDownload(ExcelFilter f) {
         int year = f.year() == null ? calendar.today().getYear() : f.year();

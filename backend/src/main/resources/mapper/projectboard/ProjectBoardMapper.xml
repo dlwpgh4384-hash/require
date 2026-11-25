@@ -60,10 +60,17 @@
     ORDER BY p.CTRT_BGN_DT DESC, p.PROJ_ID ASC
   </select>
   <select id="issues" resultMap="issue">
-    SELECT i.ISSUE_ID::text AS "issueId", i.IMPR_CD AS "importanceCode",
-      i.ISSUE_STAT_CD AS "statusCode", i.DDLN_DT AS "dueDate"
-    FROM TB_PJ_ISSUE i WHERE i.PROJ_ID=#{projectId} ORDER BY i.ISSUE_ID
+    SELECT <include refid="issueColumns"/> FROM TB_PJ_ISSUE i WHERE i.PROJ_ID=#{projectId} ORDER BY i.ISSUE_ID
   </select>
+  <select id="boardIssues" resultType="com.company.common.projectboard.mapper.ProjectBoardMapper$BoardIssue">
+    SELECT i.PROJ_ID AS "projectId",<include refid="issueColumns"/> FROM TB_PJ_ISSUE i
+    WHERE i.PROJ_ID IN <foreach collection="ids" item="id" open="(" close=")" separator=",">#{id}</foreach>
+    ORDER BY i.PROJ_ID,i.ISSUE_ID
+  </select>
+  <sql id="issueColumns">
+    i.ISSUE_ID::text AS "issueId", i.IMPR_CD AS "importanceCode",
+      i.ISSUE_STAT_CD AS "statusCode", i.DDLN_DT AS "dueDate"
+  </sql>
   <select id="partExists" resultType="boolean">
     SELECT EXISTS (SELECT 1 FROM TB_BS_PART p WHERE p.PART_ID=#{partId})
   </select>

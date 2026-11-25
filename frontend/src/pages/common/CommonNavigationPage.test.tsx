@@ -1237,12 +1237,12 @@ describe("common placeholder screen contract", () => {
     expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/FIRST");
   });
 
-  it("initial menu fixture opens UI-16 without choosing a business dashboard", async () => {
+  it("initial menu fixture opens the developed UI-16 dashboard", async () => {
     respond(fixture());
     mount();
     expect(
       await screen.findByRole("region", { name: "UI-16 본문" }),
-    ).toHaveTextContent("준비 중");
+    ).toHaveAttribute("data-testid", "dashboard-page");
   });
 
   it("chooses leaves in global sort order even when parent order differs", async () => {
@@ -1395,7 +1395,7 @@ describe("common placeholder screen contract", () => {
     fireEvent.click(screen.getByRole("link", { name: "첫 화면으로 가기" }));
     expect(
       await screen.findByRole("region", { name: "UI-16 본문" }),
-    ).toHaveTextContent("준비 중");
+    ).toHaveAttribute("data-testid", "dashboard-page");
     expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-16");
   });
 
@@ -1526,7 +1526,11 @@ describe("common placeholder screen contract", () => {
     mount();
     await screen.findByRole("region", { name: "UI-16 본문" });
     expect(screen.getByTestId("screen-tab-list")).toBeInTheDocument();
-    expect(screen.getByTestId("screen-actions")).toBeEmptyDOMElement();
+    expect(
+      within(screen.getByTestId("screen-actions")).getByTestId(
+        "dashboard-excel",
+      ),
+    ).toBeDisabled();
     for (const name of ["즐겨찾기", "최근 본 화면", "단축키", "알림"]) {
       const control = screen.getByRole("button", { name: `${name} 준비 중` });
       expect(control).toBeDisabled();
@@ -1562,6 +1566,7 @@ describe("common placeholder screen contract", () => {
         ),
     ).toEqual([
       "/api/common/menus",
+      "/api/common/user-preferences/PERIOD/UI-16",
       "/api/common/clients?useYn=Y",
       "/api/common/code-groups/CLNT_TYPE/codes",
       "/api/common/code-groups/INDUTY/codes",

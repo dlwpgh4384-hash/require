@@ -107,7 +107,9 @@ class MenuRegistrationControllerTest {
         mvc.perform(get("/api/common/menu-options").param("menuLvl", "2"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.upperMenus[0].menuId").value("G007"))
             .andExpect(jsonPath("$.data.screens[*].scrnId")
-                .value(org.hamcrest.Matchers.contains("UI-23", "UI-24", "UI-25", "UI-27", "UI-15", "UI-02", "UI-01", "UI-12", "UI-05", "UI-11", "UI-31", "UI-13", "UI-03", "UI-04", "UI-19", "UI-32", "UI-10", "UI-07", "UI-08", "UI-09", "UI-14", "UI-18", "UI-21", "UI-33", "UI-29", "UI-28", "UI-17")))
+                .value(org.hamcrest.Matchers.contains("UI-23", "UI-24", "UI-25", "UI-27", "UI-15", "UI-02", "UI-01", "UI-12", "UI-05", "UI-11", "UI-31", "UI-13", "UI-03", "UI-04", "UI-19", "UI-32", "UI-10", "UI-07", "UI-08", "UI-09", "UI-14", "UI-18", "UI-21", "UI-33", "UI-29", "UI-28", "UI-17", "UI-16")))
+            .andExpect(jsonPath("$.data.screens[?(@.scrnId == 'UI-16')].menuNm")
+                .value(org.hamcrest.Matchers.contains("대시보드")))
             .andExpect(jsonPath("$.data.screens[?(@.scrnId == 'UI-17')].menuNm")
                 .value(org.hamcrest.Matchers.contains("인력 수요 예측")))
             .andExpect(jsonPath("$.data.screens[?(@.scrnId == 'UI-28')].menuNm")
@@ -236,7 +238,12 @@ class MenuRegistrationControllerTest {
         verify(mapper).screenExists("UI-12");
         verify(mapper).insertMenu(org.mockito.ArgumentMatchers.argThat(item -> "UI-12".equals(item.scrnId())));
     }
-    @ParameterizedTest @ValueSource(strings = {"UI-26", "UI-16", "ui-25", " UI-25"})
+    @Test void dashboardScreenIsSelectableForAnonymousMenuRegistration() throws Exception {
+        create(child().put("scrnId", "UI-16"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.scrnId").value("UI-16"));
+        verify(mapper).insertMenu(org.mockito.ArgumentMatchers.argThat(item -> "UI-16".equals(item.scrnId())));
+    }
+    @ParameterizedTest @ValueSource(strings = {"UI-26", "UI-30", "ui-25", " UI-25"})
     void placeholderAndNormalizedScreenIdsAreNotDeveloped(String id) throws Exception {
         create(child().put("scrnId", id)).andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("scrnId"));

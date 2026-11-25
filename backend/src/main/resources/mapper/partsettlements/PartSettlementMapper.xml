@@ -11,6 +11,7 @@
     <result column="sales_exps_amt" property="salesExpense"/>
   </resultMap>
   <resultMap id="header" type="com.company.common.partsettlements.mapper.PartSettlementRows$Header" autoMapping="false">
+    <result column="part_id" property="partId"/>
     <result column="setl_stat_cd" property="state"/>
     <result column="cnfm_user_id" property="confirmedBy"/>
     <result column="cnfm_user_nm" property="confirmedByName"/>
@@ -56,6 +57,7 @@
   </resultMap>
   <resultMap id="detail" type="com.company.common.partsettlements.mapper.PartSettlementRows$Detail" autoMapping="false">
     <id column="dev_id" property="developerId"/>
+    <result column="part_id" property="partId"/>
     <result column="dev_nm" property="developerName"/>
     <result column="emp_type_cd" property="employeeTypeCode"/>
     <result column="proj_nm_list" property="projectNames"/>
@@ -77,9 +79,15 @@
     ) s ON true LEFT JOIN TB_SY_USER u ON u.user_id=s.part_ldr_user_id ORDER BY p.part_nm, p.part_id
   </select>
   <select id="selectHeader" resultMap="header">
-    SELECT s.setl_stat_cd,s.cnfm_user_id,u.user_nm AS cnfm_user_nm,s.cnfm_dttm,s.cncl_rsn,s.corp_card_amt,s.part_prft_amt,s.mod_dttm
-    FROM TB_CO_PART_SETL s LEFT JOIN TB_SY_USER u ON u.user_id=s.cnfm_user_id
+    <include refid="headerSource"/>
     WHERE s.part_id=#{partId} AND s.setl_ym=#{month}
+  </select>
+  <sql id="headerSource">
+    SELECT s.part_id,s.setl_stat_cd,s.cnfm_user_id,u.user_nm AS cnfm_user_nm,s.cnfm_dttm,s.cncl_rsn,s.corp_card_amt,s.part_prft_amt,s.mod_dttm
+    FROM TB_CO_PART_SETL s LEFT JOIN TB_SY_USER u ON u.user_id=s.cnfm_user_id
+  </sql>
+  <select id="selectHeaders" resultMap="header">
+    <include refid="headerSource"/> WHERE s.setl_ym=#{month}
   </select>
   <select id="isClosed" resultType="boolean">
     SELECT EXISTS(SELECT 1 FROM TB_CL_CLOSE WHERE close_ym=#{month} AND close_stat_cd='CLOSE')
@@ -134,14 +142,20 @@
     ORDER BY d.dev_id,p.proj_id,a.asgn_id
   </select>
   <select id="selectDetails" resultMap="detail">
-    SELECT x.dev_id,COALESCE(n.bfr_val,d.dev_nm) AS dev_nm,x.emp_type_cd,x.proj_nm_list,x.mm,x.uprc_amt,
+    <include refid="detailSource"/>
+    WHERE x.part_id=#{partId} AND x.setl_ym=#{month} ORDER BY dev_nm,x.dev_id
+  </select>
+  <select id="selectAllDetails" resultMap="detail">
+    <include refid="detailSource"/> WHERE x.setl_ym=#{month} ORDER BY x.part_id,dev_nm,x.dev_id
+  </select>
+  <sql id="detailSource">
+    SELECT x.part_id,x.dev_id,COALESCE(n.bfr_val,d.dev_nm) AS dev_nm,x.emp_type_cd,x.proj_nm_list,x.mm,x.uprc_amt,
       x.pay_amt,x.sales_exps_amt,x.retire_amt,x.cost_amt,x.diff_amt,x.prft_amt,x.rmrk
     FROM TB_CO_PART_SETL_DTL x JOIN TB_HR_DEV d ON d.dev_id=x.dev_id
     LEFT JOIN LATERAL (SELECT h.bfr_val FROM TB_SY_CHG_HIST h WHERE h.trgt_tbl_nm='TB_HR_DEV'
       AND h.trgt_key=x.dev_id AND h.chg_item_nm='이름' AND h.reg_dttm &gt; x.reg_dttm
       ORDER BY h.reg_dttm,h.hist_id LIMIT 1) n ON true
-    WHERE x.part_id=#{partId} AND x.setl_ym=#{month} ORDER BY dev_nm,x.dev_id
-  </select>
+  </sql>
   <select id="selectCodeName" resultType="string">
     SELECT code_nm FROM TB_SY_CODE WHERE code_grp_id=#{group} AND code=#{code}
   </select>

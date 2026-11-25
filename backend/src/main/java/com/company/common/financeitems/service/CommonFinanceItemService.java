@@ -31,6 +31,12 @@ public class CommonFinanceItemService {
         var rules=definitions.definitions();
         return new Response<>(true,Map.of("calculationRules",rules),read(month(value)));
     }
+    @Transactional(readOnly=true)
+    public List<TaxPayment> overdueTaxPayments(LocalDate today) {
+        // 재무 항목 화면의 법인세 납부 줄(payments: 올해 + 지난해 확정 신고 + 전에 안 낸 것)에서 상태 「확인 필요」만.
+        return mapper.payments(String.format("%04d",today.getYear())).stream()
+            .filter(p -> "확인 필요".equals(p.status())).toList();
+    }
     public TaxEstimate estimate(YearMonth month) {
         var stored=mapper.estimate(String.format("%04d",month.getYear()));
         var annual=stored==null ? ZERO : stored.estimatedTaxAmount();

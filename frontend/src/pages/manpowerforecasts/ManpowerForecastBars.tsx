@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import { formatDecimal } from "../../shared/list";
 import {
   axisScale,
@@ -37,7 +38,25 @@ export function ManpowerForecastBars({
     PR = 16,
     PT = 38,
     PB = 28;
-  const fs = months.length > 6 ? 9 : 11;
+  // 시안 fitCharts(): 이 그래프만 폭과 상관없이 글자를 화면 13px로 맞춘다(svg 단위 = 13 × viewBox 폭 ÷ 그려진 폭).
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [unit, setUnit] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const measure = () => {
+      const width = svg.getBoundingClientRect().width;
+      setUnit(width > 0 ? W / width : null);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(svg);
+    return () => observer.disconnect();
+  }, []);
+  const fit = unit === null ? null : 13 * unit;
+  const fs = fit ?? (months.length > 6 ? 9 : 11);
+  const textStyle = fit === null ? undefined : { fontSize: `${fit}px` };
   const values = series.flatMap((s) => s.values);
   const { high, ticks } = axisScale(values.some((v) => v > 0) ? values : [1]);
   const y = (value: number) => PT + (H - PT - PB) * (1 - value / high);
@@ -50,6 +69,7 @@ export function ManpowerForecastBars({
         <span className="ls-cap">단위: 명(MM)</span>
       </div>
       <svg
+        ref={svgRef}
         className="profit-chart"
         viewBox={`0 0 ${W} ${H}`}
         role="img"
@@ -65,7 +85,7 @@ export function ManpowerForecastBars({
               y1={y(value)}
               y2={y(value)}
             />
-            <text className="ax" x={PL - 8} y={y(value) + 4} textAnchor="end">
+            <text className="ax" x={PL - 8} y={y(value) + 4} textAnchor="end" style={textStyle}>
               {value.toFixed(0)}
             </text>
           </g>
@@ -78,7 +98,7 @@ export function ManpowerForecastBars({
           const lines = labels[index];
           return (
             <g key={m.month} data-testid={`manpower-forecast-bars-${m.month}`}>
-              <text className="ax" x={cx} y={H - 8} textAnchor="middle">
+              <text className="ax" x={cx} y={H - 8} textAnchor="middle" style={textStyle}>
                 {Number(m.month.slice(5))}월
               </text>
               {series.map((s, j) => {

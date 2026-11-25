@@ -28,6 +28,8 @@ public interface SalesOpportunityMapper {
     List<BigDecimal> manpowerPlans(@Param("id") String id);
     boolean customer(@Param("id") String id);
     boolean part(@Param("id") String id);
+    /** 근무지 지역: 행정구역 표에 있고 사용 중(USE_YN='Y')인 코드인지(2026-11-25). */
+    boolean area(@Param("code") String code);
     boolean developer(@Param("id") String id);
     BigDecimal defaultPrice(@Param("jobCode") String jobCode);
     BigDecimal monthlyCost(@Param("jobCode") String jobCode, @Param("gradeCode") String gradeCode);

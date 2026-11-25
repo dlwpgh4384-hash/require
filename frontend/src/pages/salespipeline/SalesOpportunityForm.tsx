@@ -17,6 +17,7 @@ import { formatKoreanMoney, formatMoney } from "../../shared/list/moneyUnit";
 import { formatDate, koreanThisMonth } from "../../shared/time";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { useScreenTitleOverride } from "../../shared/layout/ScreenTitleOverride";
+import { AreaSelect, areaLevelLocked, useAreaPicker } from "../../shared/area/AreaPicker";
 import "../../shared/list/list.css";
 import "./salesOpportunities.css";
 import {
@@ -326,6 +327,10 @@ export function SalesOpportunityForm({
   );
   const [version, setVersion] = useState(opportunity?.modifiedAt);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  /** 필요 인력 숫자 칸(글 칸)에 지금 치는 글. 「0.」처럼 아직 숫자가 아닌 글도 그대로 보이게 한다. */
+  const [numberText, setNumberText] = useState<{ key: string; text: string } | null>(
+    null,
+  );
   const [toast, setToast] = useState<SalesNotice | null>(null);
   const [conflict, setConflict] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -335,6 +340,8 @@ export function SalesOpportunityForm({
   const [quote, setQuote] = useState<SalesQuote | null>(null);
   const [quoteError, setQuoteError] = useState("");
   const [warnings, setWarnings] = useState<SalesTentativeWarning[]>([]);
+  // 근무지 지역(2026-11-25): 시·도 → 시·군·구 → 동, 모두 선택. 고른 마지막 단계의 코드를 저장하고 수주 처리 때 프로젝트로 넘긴다.
+  const area = useAreaPicker(initial.workAreaCode);
   const form = useRef<HTMLFormElement>(null);
   // 저장 오류 뒤 첫 오류 칸으로(공통 focusFirstError). 오류 칸·busy 해제가 그려진 뒤에 옮긴다.
   const [focusRequest, setFocusRequest] = useState(0);
@@ -621,6 +628,33 @@ export function SalesOpportunityForm({
       </div>
     </div>
   );
+  /** 근무지 지역 한 단계. 목록을 못 읽으면 시·도 칸 아래에 알리고 [다시 시도](저장은 막지 않음, 처음 코드 그대로). */
+  const areaField = (level: number, key: string, label: string, help: string) =>
+    fld(
+      key,
+      label,
+      <>
+        <AreaSelect
+          picker={area}
+          level={level}
+          id={`so-${key}`}
+          testId={`sales-opportunity-area-${level}`}
+          className={`so-in${level === 0 && errors.workAreaCode ? " so-err" : ""}`}
+          invalid={level === 0 && !!errors.workAreaCode}
+          disabled={busy || area.busy || areaLevelLocked(area, level)}
+          onPick={(l, value) => change("workAreaCode", area.select(l, value))}
+        />
+        {level === 0 && area.error && (
+          <span className="so-errmsg" role="alert" data-testid="sales-opportunity-area-error">
+            {area.error}{" "}
+            <button type="button" className="ls-btn ls-btn-sm" data-testid="sales-opportunity-area-retry" onClick={() => area.retry(draft.workAreaCode)}>
+              다시 시도
+            </button>
+          </span>
+        )}
+      </>,
+      { help },
+    );
   const text = (
     key: "opportunityName" | "workplace" | "nextAction",
     maxLength: number,
@@ -895,8 +929,11 @@ export function SalesOpportunityForm({
             )}
             {fld("workplace", "근무지", text("workplace", 200), {
               full: true,
-              help: "근무지 주소 전체를 적습니다(예: 서울 중구 을지로 66). 맨 앞 시·도로 AI 인력 추천의 근무지 점수를 매기고, 수주 처리하면 프로젝트 근무지로 넘어갑니다.",
+              help: "근무지 주소 전체를 적습니다(예: 서울 중구 을지로 66). 확인용 글자이고, AI 인력 추천 근무지 점수는 아래 근무지 지역으로 매깁니다. 수주 처리하면 둘 다 프로젝트로 넘어갑니다.",
             })}
+            {areaField(0, "workAreaCode", "근무지 시·도", "근무지 지역은 시·도, 시·군·구, 동 순서로 고릅니다(모두 선택). 고른 마지막 단계까지 저장하고, 수주 처리하면 프로젝트로 넘어갑니다.")}
+            {areaField(1, "workAreaSgg", "근무지 시·군·구", "시·도를 먼저 고르면 그 시·도의 시·군·구가 나옵니다. 선택.")}
+            {areaField(2, "workAreaDong", "근무지 동", "시·군·구를 먼저 고르면 그 시·군·구의 읍·면·동이 나옵니다. 선택.")}
           </div>
         </section>
         <section className="so-card">
@@ -1000,26 +1037,33 @@ export function SalesOpportunityForm({
                     key: "requiredCount" | "months" | "monthlyMm",
                     width: number,
                     label: string,
-                  ) => (
-                    <input
-                      className={`so-in so-in-sm so-num${invalid(key) ? " so-err" : ""}`}
-                      style={{ width }}
-                      type="number"
-                      step={key === "monthlyMm" ? "0.01" : "1"}
-                      data-testid={`sales-need-${index}-${key.toLowerCase()}`}
-                      name={`needs[${index}].${key}`}
-                      aria-label={`${index + 1}번째 줄 ${label}`}
-                      aria-invalid={invalid(key)}
-                      value={numberValue(need[key])}
-                      onChange={(e) =>
-                        needChange(
-                          index,
-                          key,
-                          e.target.value === "" ? NaN : Number(e.target.value),
-                        )
-                      }
-                    />
-                  );
+                  ) => {
+                    const textKey = `${index}.${key}`;
+                    // 시안: 글 칸 + 숫자 자판(inputmode decimal). 숫자·소수점 아닌 글자는 바로 지운다.
+                    return (
+                      <input
+                        className={`so-in so-in-sm so-num${invalid(key) ? " so-err" : ""}`}
+                        style={{ width }}
+                        type="text"
+                        inputMode="decimal"
+                        data-testid={`sales-need-${index}-${key.toLowerCase()}`}
+                        name={`needs[${index}].${key}`}
+                        aria-label={`${index + 1}번째 줄 ${label}`}
+                        aria-invalid={invalid(key)}
+                        value={
+                          numberText?.key === textKey
+                            ? numberText.text
+                            : numberValue(need[key])
+                        }
+                        onChange={(e) => {
+                          const text = e.target.value.replace(/[^0-9.]/g, "");
+                          setNumberText({ key: textKey, text });
+                          needChange(index, key, text === "" ? NaN : Number(text));
+                        }}
+                        onBlur={() => setNumberText(null)}
+                      />
+                    );
+                  };
                   const jobPrice = jobs.find(
                     (c) => c.code === need.jobCode,
                   )?.estimateUnitPrice;

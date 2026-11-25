@@ -11,6 +11,9 @@
     CASE WHEN p.CTRT_TYPE_CD='IN' THEN '(자체)' ELSE c.CLNT_NM END AS "customerName",
     p.CTRT_TYPE_CD AS "contractTypeCode", t.CODE_NM AS "contractTypeName",
     p.CTRT_BGN_DT AS "startDate", p.CTRT_END_DT AS "endDate", p.WORK_PLC_ADDR AS "workplace",
+    <!-- 근무지 지역(2026-11-25): 개발자 거주지와 같이 시·도 줄임 이름 + 시·군·구 + 동. 쓰지 않게 된 구역(USE_YN='N')도 그대로 보인다. -->
+    p.WORK_AREA_CD AS "workAreaCode",
+    (SELECT concat_ws(' ', wa.SIDO_NM, wa.SGG_NM, wa.EMD_NM) FROM TB_SY_ADM_AREA wa WHERE wa.AREA_CD=p.WORK_AREA_CD) AS "workAreaName",
     CASE WHEN p.PROJ_STAT_CD!='LOSE' AND p.CTRT_END_DT &lt; #{today} THEN 'END'
       ELSE p.PROJ_STAT_CD END AS "statusCode",
     (SELECT s.CODE_NM FROM TB_SY_CODE s WHERE s.CODE_GRP_ID='PROJ_STAT' AND s.CODE=
@@ -58,16 +61,17 @@
   <select id="projectIds" resultType="string">SELECT PROJ_ID FROM TB_PJ_PROJ ORDER BY PROJ_ID</select>
   <insert id="insertProject">
     INSERT INTO TB_PJ_PROJ (PROJ_ID, PROJ_NM, CUST_CLNT_ID, CTRT_TYPE_CD, PROJ_STAT_CD,
-      CTRT_BGN_DT, CTRT_END_DT, WORK_PLC_ADDR, EST_AMT, ORGNL_CTRT_AMT, CTRT_AMT, BDGT_AMT,
+      CTRT_BGN_DT, CTRT_END_DT, WORK_PLC_ADDR, WORK_AREA_CD, EST_AMT, ORGNL_CTRT_AMT, CTRT_AMT, BDGT_AMT,
       BDGT_MANUAL_YN, TEAM_EXPS_AMT, PROJ_EXPS_AMT, FEATURE_CN, REG_USER_ID, REG_DTTM)
     VALUES (#{project.projectId}, #{project.projectName}, #{project.customerId}, #{project.contractTypeCode},
-      #{project.statusCode}, #{project.startDate}, #{project.endDate}, #{project.workplace},
+      #{project.statusCode}, #{project.startDate}, #{project.endDate}, #{project.workplace}, #{project.workAreaCode,jdbcType=VARCHAR},
       #{project.estimateAmount}, #{project.originalContractAmount}, #{project.contractAmount}, #{project.budgetAmount},
       #{project.budgetManualYn}, #{project.teamExpenseAmount}, #{project.projectExpenseAmount}, #{project.feature}, #{actor}, clock_timestamp())
   </insert>
   <update id="updateProject">
     UPDATE TB_PJ_PROJ SET PROJ_NM=#{project.projectName}, CUST_CLNT_ID=#{project.customerId},
       CTRT_BGN_DT=#{project.startDate}, CTRT_END_DT=#{project.endDate}, WORK_PLC_ADDR=#{project.workplace},
+      WORK_AREA_CD=#{project.workAreaCode,jdbcType=VARCHAR},
       EST_AMT=#{project.estimateAmount}, ORGNL_CTRT_AMT=#{project.originalContractAmount}, CTRT_AMT=#{project.contractAmount},
       BDGT_AMT=#{project.budgetAmount}, BDGT_MANUAL_YN=#{project.budgetManualYn},
       TEAM_EXPS_AMT=#{project.teamExpenseAmount}, PROJ_EXPS_AMT=#{project.projectExpenseAmount},
@@ -114,6 +118,12 @@
   </select>
   <select id="eligiblePart" resultType="boolean">
     SELECT EXISTS (SELECT 1 FROM TB_BS_PART WHERE PART_ID=#{id} AND USE_YN='Y')
+  </select>
+  <select id="usableArea" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_SY_ADM_AREA WHERE AREA_CD=#{code} AND USE_YN='Y')
+  </select>
+  <select id="areaName" resultType="string">
+    SELECT concat_ws(' ', SIDO_NM, SGG_NM, EMD_NM) FROM TB_SY_ADM_AREA WHERE AREA_CD=#{code}
   </select>
   <select id="customerName" resultType="string">SELECT CLNT_NM FROM TB_BS_CLNT WHERE CLNT_ID=#{id}</select>
   <select id="codeName" resultType="string">

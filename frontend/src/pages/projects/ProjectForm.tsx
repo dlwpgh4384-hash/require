@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Dialog } from "../../shared/feedback/Dialog";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { useScreenTitleOverride } from "../../shared/layout/ScreenTitleOverride";
+import { AreaSelect, areaLevelLocked, useAreaPicker } from "../../shared/area/AreaPicker";
 import { getCommonCodes } from "../codegroups/codeGroups";
 import { getCommonClients } from "../clients/clients";
 import { getCommonParts } from "../parts/parts";
@@ -56,6 +57,7 @@ export function ProjectForm({
     statusCode: project?.statusCode ?? "ING",
     salesPartId: project?.salesPartId ?? "",
     workplace: project?.workplace ?? "",
+    workAreaCode: project?.workAreaCode ?? (null as string | null),
     estimateAmount: money(project?.estimateAmount),
     contractAmount: project && project.contractTypeCode !== "IN" ? money(project.contractAmount) : "",
     budgetAmount: money(project?.budgetAmount),
@@ -138,7 +140,9 @@ export function ProjectForm({
     };
   }, [project]);
   const internal = draft.contractTypeCode === "IN";
-  const change = <K extends keyof Draft>(key: K, value: Draft[K]) => {
+  // 근무지 지역(2026-11-25): 시·도 → 시·군·구 → 동, 모두 선택. 고른 마지막 단계의 코드를 저장(개발자 거주지와 같은 고르기).
+  const area = useAreaPicker(project?.workAreaCode);
+  const change =<K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((d) => {
       const next = { ...d, [key]: value };
       // 시안: 계약금액을 넣으면 예산 기본값(식-19)을 채운다. 사람이 예산을 고친 뒤에는 덮어쓰지 않는다.
@@ -230,6 +234,7 @@ export function ProjectForm({
     if (!internal) {
       body.customerId = draft.customerId;
       body.workplace = draft.workplace;
+      body.workAreaCode = draft.workAreaCode;
       if (budgetTouched && digits(draft.budgetAmount)) body.budgetAmount = amount(draft.budgetAmount);
     }
     saving.current = true;
@@ -292,7 +297,7 @@ export function ProjectForm({
         data-testid={`project-${key}`}
         className="ls-in"
         aria-invalid={!!errors[key]}
-        value={draft[key]}
+        value={draft[key] ?? ""}
         disabled={busy}
         onChange={(e) => pick(key, e.target.value)}
       >
@@ -369,6 +374,33 @@ export function ProjectForm({
       </span>,
       help,
     );
+  /** 근무지 지역 한 단계. 목록을 못 읽으면 시·도 칸 아래에 알리고 [다시 시도](저장은 막지 않음, 처음 코드 그대로). */
+  const areaField = (level: number, key: string, label: string, help: string) =>
+    fld(
+      key,
+      label,
+      false,
+      <>
+        <AreaSelect
+          picker={area}
+          level={level}
+          id={`project-${key}`}
+          testId={`project-area-${level}`}
+          invalid={level === 0 && !!errors.workAreaCode}
+          disabled={busy || area.busy || areaLevelLocked(area, level)}
+          onPick={(l, value) => change("workAreaCode", area.select(l, value))}
+        />
+        {level === 0 && area.error && (
+          <small role="alert" className="field-error" data-testid="project-area-error">
+            {area.error}{" "}
+            <button type="button" className="ls-btn ls-btn-sm" data-testid="project-area-retry" onClick={() => area.retry(draft.workAreaCode)}>
+              다시 시도
+            </button>
+          </small>
+        )}
+      </>,
+      help,
+    );
   const nameOf = (items: Option[], value: string) => items.find(([v]) => v === value)?.[1] ?? value;
   const fee = (value: number | null) => (value == null ? "" : `${value.toLocaleString("ko-KR")}원`);
   const margin = rule
@@ -412,8 +444,11 @@ export function ProjectForm({
               "근무지",
               false,
               200,
-              "근무지 주소 전체를 적습니다(예: 서울 중구 을지로 66). 맨 앞 시·도로 AI 인력 추천의 근무지 점수를 매깁니다.",
+              "근무지 주소 전체를 적습니다(예: 서울 중구 을지로 66). 확인용 글자이고, AI 인력 추천 근무지 점수는 아래 근무지 지역으로 매깁니다.",
             )}
+          {!internal && areaField(0, "workAreaCode", "근무지 시·도", "근무지 지역은 시·도, 시·군·구, 동 순서로 고릅니다(모두 선택). 고른 마지막 단계까지 저장합니다.")}
+          {!internal && areaField(1, "workAreaSgg", "근무지 시·군·구", "시·도를 먼저 고르면 그 시·도의 시·군·구가 나옵니다. 선택.")}
+          {!internal && areaField(2, "workAreaDong", "근무지 동", "시·군·구를 먼저 고르면 그 시·군·구의 읍·면·동이 나옵니다. 선택.")}
         </div>
       </section>
       <section className="project-card">

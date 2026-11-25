@@ -17,6 +17,8 @@ public final class ProjectContracts {
         public String projectId, projectName, customerId, customerName, contractTypeCode, contractTypeName;
         public LocalDate startDate, endDate, loseDate;
         public String salesPartId, salesPartName, workplace, statusCode, statusName;
+        /** 근무지 지역(2026-11-25): 고른 마지막 단계의 행정구역 코드와 보여 주기 글자(「서울 중구 을지로동」). 내부·없음은 null. */
+        public String workAreaCode, workAreaName;
         public BigDecimal estimateAmount, originalContractAmount, contractAmount, budgetAmount;
         public String budgetManualYn;
         public BigDecimal teamExpenseAmount, projectExpenseAmount;
@@ -47,7 +49,7 @@ public final class ProjectContracts {
         public Integer actualProgressRate;
     }
     public record Input(String projectName, String customerId, String contractTypeCode,
-        LocalDate startDate, LocalDate endDate, String salesPartId, String workplace,
+        LocalDate startDate, LocalDate endDate, String salesPartId, String workplace, String workAreaCode,
         String statusCode, BigDecimal estimateAmount, BigDecimal contractAmount,
         BigDecimal budgetAmount, BigDecimal teamExpenseAmount, BigDecimal projectExpenseAmount,
         String feature) {}

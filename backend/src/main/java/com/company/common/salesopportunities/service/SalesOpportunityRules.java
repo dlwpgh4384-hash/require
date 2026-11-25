@@ -87,7 +87,7 @@ public final class SalesOpportunityRules {
     public static Input input(JsonNode body, boolean update) {
         var fields = new HashSet<>(Set.of("opportunityName", "customerId", "salesPartId", "stageCode",
             "winningProbability", "expectedAmount", "contractTypeCode", "startMonth", "expectedMonths",
-            "workplace", "nextAction", "nextActionDueDate", "memo", "needs"));
+            "workplace", "workAreaCode", "nextAction", "nextActionDueDate", "memo", "needs"));
         if (update) fields.add("modifiedAt");
         ClientRules.object(body, fields);
         // 확률을 비우면 단계 기본값으로 저장한다(SFR-129-07, 서비스에서 정함).
@@ -108,7 +108,7 @@ public final class SalesOpportunityRules {
             text(body, "salesPartId", 20, true), text(body, "stageCode", 10, true), probability, amount,
             text(body, "contractTypeCode", 10, false), month(body, "startMonth"),
             integer(body, "expectedMonths", 6), text(body, "workplace", 200, false),
-            text(body, "nextAction", 200, false), date(body, "nextActionDueDate", false),
+            com.company.common.projects.service.ProjectRules.workAreaCode(body), text(body, "nextAction", 200, false), date(body, "nextActionDueDate", false),
             text(body, "memo", 500, false), List.copyOf(needs));
     }
     /** 필요 인력 줄 칸 오류: 「n번째 줄의 ○○ 칸을 확인해 주세요.」(칸 이름은 폼 머리 글자, 영어 칸 이름은 보이지 않는다). */

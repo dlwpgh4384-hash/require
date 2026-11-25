@@ -14,12 +14,17 @@ public final class SalesOpportunityContracts {
     public record Input(String opportunityName, String customerId, String salesPartId,
         String stageCode, BigDecimal winningProbability, BigDecimal expectedAmount,
         String contractTypeCode, String startMonth, int expectedMonths, String workplace,
+        /** 근무지 지역(선택, 2026-11-25): 고른 마지막 단계의 행정구역 코드. */
+        String workAreaCode,
         String nextAction, LocalDate nextActionDueDate, String memo, List<Need> needs) {}
     public record ApprovalHistory(String actionCode, Instant actedAt, String reason) {}
     public record Opportunity(String opportunityId, String opportunityName, String customerId,
         String customerName, String salesPartId, String stageCode, BigDecimal winningProbability,
         BigDecimal expectedAmount, String contractTypeCode, String startMonth, int expectedMonths,
-        String workplace, String nextAction, LocalDate nextActionDueDate, String memo,
+        String workplace,
+        /** 근무지 지역 코드와 보여 주기 글자(시·도 줄임 이름 + 시·군·구 + 동, 예: 「서울 중구 을지로동」). 없으면 null. */
+        String workAreaCode, String workAreaName,
+        String nextAction, LocalDate nextActionDueDate, String memo,
         List<Need> needs, List<String> requiredJobs, boolean stale, String approvalStatusCode,
         Instant modifiedAt, String projectId, LocalDate resultDate, String opportunityStatusCode,
         String lossReasonCode, List<ApprovalHistory> approvalHistory, String lossMemo,

@@ -14,7 +14,7 @@ import java.util.Set;
 public final class ProjectRules {
     private ProjectRules() {}
     private static final Set<String> MUTABLE = Set.of("projectName", "customerId", "startDate", "endDate",
-        "workplace", "estimateAmount", "contractAmount", "budgetAmount", "teamExpenseAmount",
+        "workplace", "workAreaCode", "estimateAmount", "contractAmount", "budgetAmount", "teamExpenseAmount",
         "projectExpenseAmount", "feature");
     public static Input input(JsonNode body, boolean update) {
         var allowed = new HashSet<>(MUTABLE);
@@ -28,10 +28,27 @@ public final class ProjectRules {
         if (!update && !Set.of("ING", "PRE").contains(status)) throw invalid("statusCode");
         return new Input(text(body, "projectName", 100, true), text(body, "customerId", 20, false),
             type, start, end, update ? null : text(body, "salesPartId", 20, false),
-            text(body, "workplace", 200, false), status, money(body, "estimateAmount", false),
+            text(body, "workplace", 200, false), workAreaCode(body), status, money(body, "estimateAmount", false),
             money(body, "contractAmount", false), money(body, "budgetAmount", false),
             money(body, "teamExpenseAmount", false), money(body, "projectExpenseAmount", false),
             text(body, "feature", 500, false));
+    }
+    /**
+     * 근무지 지역 코드(선택, 2026-11-25): 비우거나 null이면 없음. 행정구역 코드(숫자 10자리 이내)만 받고,
+     * 표에 있는지·사용 중인지는 서비스가 본다. 영업 기회 입력도 같은 규칙을 쓴다.
+     */
+    public static String workAreaCode(JsonNode body) {
+        JsonNode n = body.get("workAreaCode");
+        if (n == null || n.isNull()) return null;
+        if (!n.isTextual()) throw invalidWorkArea();
+        String value = n.textValue().trim();
+        if (value.isEmpty()) return null;
+        if (!value.matches("[0-9]{1,10}")) throw invalidWorkArea();
+        return value;
+    }
+    /** 근무지 지역이 목록에 없거나 쓰지 않는 구역일 때(400). */
+    public static CodeFailure invalidWorkArea() {
+        return CodeFailure.invalid("workAreaCode", "근무지 지역을 목록에서 다시 골라 주세요.");
     }
     public static String text(JsonNode body, String field, int limit, boolean required) {
         JsonNode n = body.get(field);

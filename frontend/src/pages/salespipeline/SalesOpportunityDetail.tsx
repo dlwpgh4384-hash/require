@@ -573,6 +573,8 @@ export function SalesOpportunityDetail({
                     ),
                   ],
                   ["근무지", row.workplace || "–"],
+                  // 근무지 지역(2026-11-25): 고른 행정구역(시·도 줄임 이름 + 시·군·구 + 동).
+                  ["근무지 지역", row.workAreaName || "–"],
                   ["비고", row.memo || "–"],
                   ["마지막 수정", formatDate(row.modifiedAt)],
                 ]}
@@ -630,7 +632,18 @@ export function SalesOpportunityDetail({
                         const d = developer(id);
                         return (
                           <tr key={`${id}-${index}`} data-testid={`sales-detail-tentative-${id}`}>
-                            <td>{d?.name || "–"}</td>
+                            <td>
+                              {d ? (
+                                <span className="so-pname">
+                                  {d.name || "–"}
+                                  {d.managementNumber && (
+                                    <small>{d.managementNumber}</small>
+                                  )}
+                                </span>
+                              ) : (
+                                "–"
+                              )}
+                            </td>
                             <td>
                               {d?.primaryJobName ||
                                 (d?.primaryJobCode

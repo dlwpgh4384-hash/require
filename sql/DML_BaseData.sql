@@ -1,6 +1,6 @@
 -- 초기 데이터: 공통코드·운영 기준값·역할·메뉴·역할별 권한 처음 값·첫 시스템 관리자 계정
 -- 근거: 06 5장(공통코드 초기값)·6장(운영 기준값 초기값), 04 SFR-124-01~04(역할·권한 처음 값), 04 SFR-125-01·03·06(메뉴), 시안 v1.7
--- 실행 순서: 07_DDL_PostgreSQL.sql → 이 파일 → 07_DML_행정구역_초기데이터.sql(순서는 서로 상관없음)
+-- 실행 순서: DDL_PostgreSQL.sql → 이 파일 → DML_Addr_BaseData.sql(행정구역, 순서는 서로 상관없음)
 -- 운영 기준값의 적용 시작월(APLY_BGN_YM)은 시스템을 쓰기 시작한 달(CASH_BASE_YM과 같게)로 둔다. 다른 달에 시작하면 이 파일의 202601을 모두 바꾼다
 BEGIN;
 
@@ -729,8 +729,7 @@ INSERT INTO TB_SY_USER_ROLE (USER_ID, ROLE_ID, REG_USER_ID) VALUES
 
 
 -- 계산규칙 처음 값: 식 93개 + 계산 공통 원칙(식-00)
--- 실행 순서: 07_DDL_계산규칙.sql 다음
-BEGIN;
+-- 같은 거래(맨 위 BEGIN) 안에서 이어서 넣는다.
 
 INSERT INTO TB_SY_CALC_RULE (CALC_ID, SFR_ID, CALC_NM, FRML_CN, DTL_CN, USE_SCRN_CN, SORT_ORD, REG_USER_ID) VALUES
 ('식-00', NULL, '계산 공통 원칙', '(수식 없음, 모든 식에 적용하는 원칙)', '- 요구사항 ID: 계산식 장마다 SFR-9nn(1장 → SFR-901). 식 번호(식-nn)는 원본 그대로 둔다

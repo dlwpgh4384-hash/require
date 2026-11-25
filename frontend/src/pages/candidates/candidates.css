@@ -125,14 +125,21 @@
   min-width: 0;
   box-sizing: border-box;
 }
+/* 시안 textarea.in: 높이 자동·최소 76, 안쪽 8·10, 줄 높이 20, 세로로만 늘림, 폭 100%.
+   .ls-in의 높이 36이 메모 칸을 한 줄로 보이게 해서 여기서 높이를 푼다. */
 .candidate-form textarea,
 .candidate-contact-form textarea {
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--surface);
   color: var(--text);
-  padding: 6px 10px;
-  font: inherit;
+  height: auto;
+  min-height: 76px;
+  width: 100%;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 20px;
   resize: vertical;
 }
 .candidate-form .candidate-money {

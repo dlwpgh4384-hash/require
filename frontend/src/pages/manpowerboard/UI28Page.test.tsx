@@ -18,6 +18,11 @@ import {
 import * as board from "./manpowerBoard";
 import * as pipeline from "../salespipeline/salesPipeline";
 import { DeveloperDetail } from "../developers/DeveloperDetail";
+import {
+  subscribeDeveloperAction,
+  type DeveloperRequest,
+} from "../developers/developerRequest";
+import type { Developer } from "../developers/developers";
 import { getCommonCodes } from "../codegroups/codeGroups";
 import { ProjectRequestError } from "../projects/projects";
 
@@ -320,7 +325,7 @@ it("renders mockup footer rows: idle n명 in red, free MM with one decimal, past
   ).toEqual([...Array(10).fill("–"), "3.6", "3.6"]);
 });
 
-it("opens the existing readonly detail from the row click only and preserves calendar filters on close", async () => {
+it("opens the developer pool detail (with [수정]·[사용 중지]) from the row click only and preserves calendar filters on close", async () => {
   mount();
   const row = await screen.findByTestId("manpower-board-person-person-0");
   expect(DeveloperDetail).not.toHaveBeenCalled();
@@ -328,11 +333,16 @@ it("opens the existing readonly detail from the row click only and preserves cal
   fireEvent.click(within(row).getByText("인력 2026-0"));
   await screen.findByTestId("existing-developer-detail");
   const props = vi.mocked(DeveloperDetail).mock.calls.at(-1)?.[0];
+  // 시안 openPerson: 개발자 풀과 같은 상세(보기 전용 아님)
   expect(props).toEqual({
     developerId: "person-0",
-    readOnly: true,
     onClose: expect.any(Function),
+    onEdit: expect.any(Function),
+    onStop: expect.any(Function),
+    onNotice: expect.any(Function),
+    onChanged: expect.any(Function),
   });
+  expect(props).not.toHaveProperty("readOnly");
   const calls = vi.mocked(board.getCommonManpowerBoard).mock.calls.length;
   fireEvent.click(screen.getByTestId("detail-close"));
   expect(
@@ -343,6 +353,49 @@ it("opens the existing readonly detail from the row click only and preserves cal
   expect(
     await screen.findByTestId("existing-developer-detail"),
   ).toBeInTheDocument();
+});
+
+it.each(["edit", "stop"] as const)(
+  "detail [%s] closes the drawer and hands the developer to 개발자 풀 (시안 editform)",
+  async (action) => {
+    mount();
+    fireEvent.click(
+      await screen.findByTestId("manpower-board-person-person-0"),
+    );
+    await screen.findByTestId("existing-developer-detail");
+    const props = vi.mocked(DeveloperDetail).mock.calls.at(-1)![0] as {
+      onEdit: (developer: Developer) => void;
+      onStop: (developer: Developer) => void;
+    };
+    const developer = { developerId: "person-0", name: "인력" } as Developer;
+    act(() => (action === "edit" ? props.onEdit : props.onStop)(developer));
+    expect(
+      screen.queryByTestId("existing-developer-detail"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/screens/UI-02");
+    // 개발자 풀 화면이 열리면 남은 요청을 받아 수정 폼·사용 중지 확인 창을 연다.
+    const received: DeveloperRequest[] = [];
+    const stop = subscribeDeveloperAction((request) => received.push(request));
+    stop();
+    expect(received).toEqual([{ developer, action }]);
+  },
+);
+
+it("detail status changes refresh the board and show the message", async () => {
+  mount();
+  fireEvent.click(await screen.findByTestId("manpower-board-person-person-0"));
+  await screen.findByTestId("existing-developer-detail");
+  const props = vi.mocked(DeveloperDetail).mock.calls.at(-1)![0] as {
+    onChanged: (message?: string) => void;
+  };
+  const calls = vi.mocked(board.getCommonManpowerBoard).mock.calls.length;
+  act(() => props.onChanged("휴직을 등록했습니다."));
+  await waitFor(() =>
+    expect(board.getCommonManpowerBoard).toHaveBeenCalledTimes(calls + 1),
+  );
+  expect(screen.getByTestId("manpower-board-toast")).toHaveTextContent(
+    "휴직을 등록했습니다.",
+  );
 });
 
 it("shows the person number under the name, falling back to the developer id", async () => {

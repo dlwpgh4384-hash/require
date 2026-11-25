@@ -134,8 +134,8 @@ export function PersonalScreenLists({
             ) : list.length === 0 ? (
               <p>
                 {type === "FAV"
-                  ? "화면 제목 옆 ☆를 누르면 추가됩니다"
-                  : "아직 없습니다"}
+                  ? "화면 제목 옆 ☆를 누르면 추가됩니다."
+                  : "아직 없습니다."}
               </p>
             ) : (
               <ul>
@@ -149,7 +149,8 @@ export function PersonalScreenLists({
                       data-testid={`${type.toLowerCase()}-open-${item.scrnId!.toLowerCase()}`}
                       onClick={() => onNavigate(item.scrnId!)}
                     >
-                      {item.menuNm} <small>{item.scrnId}</small>
+                      {/* 시안 navLink: 화면 이름만(화면 ID는 보이지 않음) */}
+                      {item.menuNm}
                     </button>
                   </li>
                 ))}

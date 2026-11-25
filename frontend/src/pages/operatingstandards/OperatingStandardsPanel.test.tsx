@@ -170,7 +170,7 @@ it("renders API values in the mockup table rows with eight AI inputs in one row"
   await mount();
   for (const [code, value] of [
     ["part-dstrb-rt", "40"],
-    ["part-sales-exps", "1500000"],
+    ["part-sales-exps", "1,500,000"],
     ["vat-rt", "10"],
     ["tgt-util-rt", "90"],
     ["tgt-mrgn-rt", "20"],
@@ -449,6 +449,48 @@ it("opening balance shows commas but saves the plain number", async () => {
   expect(
     JSON.parse(String((writes()[0][1] as RequestInit).body)).items[0],
   ).toMatchObject({ standardCode: "CASH_BASE_AMT", value: "2000000" });
+});
+it("every 원 value shows commas in the list, the save dialog and history but saves plain digits", async () => {
+  await mount();
+  expect(screen.getByLabelText("공통관리비")).toHaveValue("1,500,000");
+  expect(screen.getByLabelText("부가세율")).toHaveValue("10");
+  fireEvent.change(screen.getByLabelText("공통관리비"), {
+    target: { value: "2,500,000" },
+  });
+  openSave();
+  expect(
+    screen.getByTestId("operating-change-part-sales-exps"),
+  ).toHaveTextContent("공통관리비: 1,500,000 → 2,500,000 원");
+  await confirm();
+  expect(
+    JSON.parse(String((writes()[0][1] as RequestInit).body)).items[0],
+  ).toMatchObject({ standardCode: "PART_SALES_EXPS", value: "2500000" });
+  fireEvent.click(screen.getByTestId("operating-history-part-sales-exps"));
+  expect(
+    screen.getByTestId("operating-history-row-part-sales-exps-2026-01"),
+  ).toHaveTextContent("1,500,000 원");
+});
+it("save dialog is one mockup body with a required month label and one error line", async () => {
+  closedMonth = "2026-11";
+  await mount();
+  change("vat-rt", "11");
+  openSave();
+  const dialog = screen.getByTestId("operating-save-dialog");
+  const body = dialog.querySelector(".operating-save-body")!;
+  expect(body).toContainElement(screen.getByTestId("operating-save-summary"));
+  expect(body).toContainElement(screen.getByTestId("operating-effective-month"));
+  expect(
+    within(dialog).getByText("*", { selector: ".field-required" }),
+  ).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("operating-effective-month"), {
+    target: { value: "2026-11" },
+  });
+  fireEvent.click(screen.getByTestId("operating-save-confirm"));
+  expect(within(dialog).getAllByRole("alert")).toHaveLength(1);
+  expect(body).toContainElement(screen.getByTestId("operating-save-error"));
+  expect(screen.getByTestId("operating-save-error")).toHaveTextContent(
+    "적용 시작월은 2026-12 이후로 골라 주세요.",
+  );
 });
 it("cash-only save has no effective month and sends null while unlocked", async () => {
   await mount();

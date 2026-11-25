@@ -99,7 +99,7 @@ public class CommonSalesOpportunityService {
         return new Opportunity(row.opportunityId(), row.opportunityName(), row.customerId(), row.customerName(),
             row.salesPartId(), row.stageCode(), row.winningProbability(), row.expectedAmount(), row.contractTypeCode(),
             month(row.startMonth()), row.expectedMonths() == null ? 6 : row.expectedMonths(), row.workplace(),
-            row.nextAction(), row.nextActionDueDate(), row.memo(), needs, jobs, stale, row.approvalStatus(),
+            row.workAreaCode(), row.workAreaName(), row.nextAction(), row.nextActionDueDate(), row.memo(), needs, jobs, stale, row.approvalStatus(),
             row.modifiedAt(), row.projectId(), row.resultDate(), row.status(), row.lossReasonCode(),
             mapper.history(row.opportunityId()), row.lossMemo(), row.profitRate(), row.approvedProfitRate(),
             calculations.approvalRate());
@@ -130,6 +130,10 @@ public class CommonSalesOpportunityService {
         if (!mapper.part(in.salesPartId())) throw SalesOpportunityRules.invalid("salesPartId");
         selectable("SALES_STEP", in.stageCode(), "stageCode");
         contractType(in.contractTypeCode());
+        // 근무지 지역(2026-11-25): 사용 중인 행정구역만. 고치지 않은 저장값은 나중에 쓰지 않게 된 구역이어도 그대로 둔다.
+        if (in.workAreaCode() != null && !(old != null && in.workAreaCode().equals(old.workAreaCode()))
+            && !mapper.area(in.workAreaCode()))
+            throw com.company.common.projects.service.ProjectRules.invalidWorkArea();
         String opportunityId = old == null ? null : old.opportunityId();
         var existing = old == null ? List.<NeedRow>of() : mapper.needs(old.opportunityId());
         var used = new HashSet<Integer>();
@@ -168,12 +172,12 @@ public class CommonSalesOpportunityService {
             throw CodeFailure.invalid("needs", "투입 후보 이력이 있는 필요 인력 줄은 지울 수 없습니다.");
         return probability(new Input(in.opportunityName(), in.customerId(), in.salesPartId(), in.stageCode(),
             in.winningProbability(), in.expectedAmount(), in.contractTypeCode(), in.startMonth(), in.expectedMonths(),
-            in.workplace(), in.nextAction(), in.nextActionDueDate(), in.memo(), List.copyOf(prepared)), old);
+            in.workplace(), in.workAreaCode(), in.nextAction(), in.nextActionDueDate(), in.memo(), List.copyOf(prepared)), old);
     }
     private static Input withProbability(Input in, BigDecimal probability) {
         return new Input(in.opportunityName(), in.customerId(), in.salesPartId(), in.stageCode(), probability,
             in.expectedAmount(), in.contractTypeCode(), in.startMonth(), in.expectedMonths(), in.workplace(),
-            in.nextAction(), in.nextActionDueDate(), in.memo(), in.needs());
+            in.workAreaCode(), in.nextAction(), in.nextActionDueDate(), in.memo(), in.needs());
     }
     private void history(String id, String action, BigDecimal profit, String reason) {
         mapper.appendHistory(new ApprovalWrite(id, action, profit, reason, actor.userId()));

@@ -96,14 +96,32 @@
 .preference-user-menu .hd-pop-i:hover {
   background: var(--hover);
 }
+/* 시안 .nav-quick: 줄 사이 2px(바깥 아래 8px·줄은 .quick-access가 맡음),
+   제목 .nq-t(위 8·좌우 12·아래 4, 12px 600 회색), 빈 글 .nq-empty(12px, 위 2·좌우 12·아래 4). */
+.preference-personal-lists,
+.preference-personal-lists section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .preference-personal-lists h2 {
   font-size: 12px;
+  font-weight: 600;
   color: var(--text-sub);
-  margin: 12px 4px 4px;
+  margin: 0;
+  padding: 8px 12px 4px;
 }
 .preference-personal-lists p {
   font-size: 12px;
-  margin: 8px 4px;
+  color: var(--text-sub);
+  margin: 0;
+  padding: 2px 12px 4px;
+}
+.preference-personal-lists ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
 }
 .preference-personal-lists ul,
 .preference-search-results {

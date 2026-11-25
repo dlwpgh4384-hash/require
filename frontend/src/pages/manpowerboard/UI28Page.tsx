@@ -22,6 +22,7 @@ import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { koreanToday } from "../../shared/time";
 import { getCommonCodes } from "../codegroups/codeGroups";
 import { DeveloperDetail } from "../developers/DeveloperDetail";
+import { useOpenDeveloperAction } from "../developers/developerRequest";
 import { projectFailure, ProjectRequestError } from "../projects/projects";
 import {
   getCommonSalesPipelineForecast,
@@ -111,11 +112,13 @@ function BoardCell({ cell }: { cell: ManpowerBoardCell }) {
   );
 }
 
-// SCR-UI-28: 업무자료는 조회 전용이며 상세 역시 readOnly 모드만 사용한다.
+// SCR-UI-28: 업무자료는 조회 전용이다. 사람 상세는 시안 openPerson대로 개발자 풀과 같은 상세([수정]·[사용 중지])를 쓰고,
+// [수정]·[사용 중지]는 상세를 닫고 개발자 풀(UI-02)의 수정 폼·확인 창으로 넘긴다(시안 editform, 개인 원가·수익표와 같은 통로).
 export function UI28Page({
   renderActions,
 }: { renderActions?: (actions: ReactNode) => ReactNode } = {}) {
   const navigate = useNavigate();
+  const openDeveloperAction = useOpenDeveloperAction();
   const period = useScreenPeriod("UI-28", periodOptions);
   // 오늘(한국 날짜)은 한 번만 구한다.
   const today = useMemo(() => koreanToday(), []);
@@ -682,9 +685,27 @@ export function UI28Page({
       )}
       {detail && (
         <DeveloperDetail
-          readOnly
+          key={detail}
           developerId={detail}
           onClose={() => setDetail(null)}
+          onEdit={(developer) => {
+            setDetail(null);
+            openDeveloperAction({ developer, action: "edit" });
+          }}
+          onStop={(developer) => {
+            setDetail(null);
+            openDeveloperAction({ developer, action: "stop" });
+          }}
+          onNotice={(message) => setNotice({ kind: "warn", message })}
+          onChanged={(message) => {
+            // 상세 안에서 근무 상태를 바꾸면 달력을 다시 읽는다(개발자 풀과 같은 알림 종류).
+            setRevision((n) => n + 1);
+            if (message)
+              setNotice({
+                kind: message.includes("투입 배정이") ? "info" : "ok",
+                message,
+              });
+          }}
         />
       )}
       {notice && (

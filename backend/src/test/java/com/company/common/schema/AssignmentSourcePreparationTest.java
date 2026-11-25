@@ -63,9 +63,20 @@ class AssignmentSourcePreparationTest {
         assertThat(text("SELECT string_agg(column_name,',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='tb_sl_tent_asgn'"))
             .isEqualTo("tent_id,opp_id,need_sn,dev_id,bgn_ym,tent_stat_cd,src_scrn_id,proc_dttm,reg_user_id,reg_dttm,mod_user_id,mod_dttm");
         assertThat(text("SELECT count(*)::text FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND contype='f' AND (conrelid::regclass::text LIKE 'tb_sl_%' OR conname='fk_tb_pj_proj_02')"))
-            .isEqualTo("11"); // V21의 FK_TB_SL_APRV_HIST_01 하나를 더함
+            .isEqualTo("12"); // V21의 FK_TB_SL_APRV_HIST_01, 근무지 지역 FK_TB_SL_OPP_04(2026-11-25)를 더함
         assertThat(text("SELECT count(*)::text FROM pg_indexes WHERE schemaname=current_schema() AND indexname LIKE 'ix_tb_sl_%'"))
-            .isEqualTo("10");
+            .isEqualTo("11");
+        // 근무지 지역(2026-11-25): 프로젝트·영업 기회 모두 맨 뒤 칸 WORK_AREA_CD → TB_SY_ADM_AREA, 색인 있음.
+        for (String table : new String[]{"tb_pj_proj", "tb_sl_opp"}) {
+            assertThat(text("SELECT column_name||':'||data_type||':'||character_maximum_length||':'||is_nullable FROM information_schema.columns "
+                + "WHERE table_schema=current_schema() AND table_name='" + table + "' ORDER BY ordinal_position DESC LIMIT 1"))
+                .as(table).isEqualTo("work_area_cd:character varying:10:YES");
+            assertThat(text("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='" + table + "'::regclass AND contype='f' "
+                + "AND conname=" + ("tb_pj_proj".equals(table) ? "'fk_tb_pj_proj_03'" : "'fk_tb_sl_opp_04'")))
+                .as(table).isEqualTo("FOREIGN KEY (work_area_cd) REFERENCES tb_sy_adm_area(area_cd)");
+            assertThat(text("SELECT indexdef FROM pg_indexes WHERE schemaname=current_schema() AND indexname="
+                + ("tb_pj_proj".equals(table) ? "'ix_tb_pj_proj_05'" : "'ix_tb_sl_opp_05'"))).as(table).contains("(work_area_cd)");
+        }
     }
 
     @Test

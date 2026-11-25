@@ -93,7 +93,7 @@ class CommonSalesOpportunityControllerTest {
         when(mapper.approval(any())).thenAnswer(c -> { ApprovalWrite w = c.getArgument(0); var old = headers.get(w.id()); headers.put(w.id(), header(w.id(), input(old, old.stageCode(), old.winningProbability()), old.status(), w.status(), old.manualYn(), old.profitRate(), "OK".equals(w.status()) ? old.profitRate() : old.approvedProfitRate(), old.projectId())); return 1; });
         when(mapper.appendHistory(any())).thenAnswer(c -> { ApprovalWrite w = c.getArgument(0); histories.computeIfAbsent(w.id(), k -> new ArrayList<>()).add(new ApprovalHistory(w.status(), now.plusSeconds(++sequence), w.reason())); return 1; });
         when(mapper.notifyOwner(any())).thenAnswer(c -> { notifications.add(c.getArgument(0)); return 1; });
-        when(mapper.result(any())).thenAnswer(c -> { ResultWrite w = c.getArgument(0); var old = headers.get(w.id()); var h = header(w.id(), input(old, old.stageCode(), old.winningProbability()), w.status(), old.approvalStatus(), old.manualYn(), old.profitRate(), old.approvedProfitRate(), old.projectId()); headers.put(w.id(), new Header(h.opportunityId(), h.opportunityName(), h.customerId(), h.customerName(), h.salesPartId(), h.stageCode(), h.winningProbability(), h.manualYn(), h.expectedAmount(), h.contractTypeCode(), h.startMonth(), h.expectedMonths(), h.workplace(), h.nextAction(), h.nextActionDueDate(), h.memo(), h.status(), h.profitRate(), h.approvalStatus(), h.approvedProfitRate(), w.date(), w.reason(), w.memo(), h.projectId(), h.creator(), h.modifiedAt())); return 1; });
+        when(mapper.result(any())).thenAnswer(c -> { ResultWrite w = c.getArgument(0); var old = headers.get(w.id()); var h = header(w.id(), input(old, old.stageCode(), old.winningProbability()), w.status(), old.approvalStatus(), old.manualYn(), old.profitRate(), old.approvedProfitRate(), old.projectId()); headers.put(w.id(), new Header(h.opportunityId(), h.opportunityName(), h.customerId(), h.customerName(), h.salesPartId(), h.stageCode(), h.winningProbability(), h.manualYn(), h.expectedAmount(), h.contractTypeCode(), h.startMonth(), h.expectedMonths(), h.workplace(), h.workAreaCode(), h.workAreaName(), h.nextAction(), h.nextActionDueDate(), h.memo(), h.status(), h.profitRate(), h.approvalStatus(), h.approvedProfitRate(), w.date(), w.reason(), w.memo(), h.projectId(), h.creator(), h.modifiedAt())); return 1; });
         when(mapper.releaseAll(anyString(), anyString())).thenAnswer(c -> { reservations.removeIf(r -> r.opportunityId().equals(c.getArgument(0)) && "ACT".equals(r.status())); return 1; });
         when(mapper.release(anyLong(), anyString())).thenAnswer(c -> { reservations.removeIf(r -> r.tentativeId() == (long)c.getArgument(0)); return 1; });
         when(mapper.tentative(any())).thenAnswer(c -> { TentativeWrite w = c.getArgument(0); reservations.removeIf(r -> r.opportunityId().equals(w.id()) && r.needSn() == w.needSn() && r.developerId().equals(w.developerId())); reservations.add(new Reservation(++sequence, w.id(), headers.get(w.id()).opportunityName(), w.needSn(), w.developerId(), w.startMonth().replace("-", ""), "ACT")); return 1; });
@@ -104,9 +104,9 @@ class CommonSalesOpportunityControllerTest {
     }
     SalesOpportunityCalculations.Evaluation evaluation(String rate) { return new SalesOpportunityCalculations.Evaluation(new BigDecimal(rate), new SalesPipelineApprovalStandards.Values(new BigDecimal("15"), new BigDecimal("0.5"))); }
     Header header(String id, Input in, String status, String approval, String manual, BigDecimal profit, BigDecimal baseline, String projectId) {
-        return new Header(id, in.opportunityName(), in.customerId(), "고객", in.salesPartId(), in.stageCode(), in.winningProbability(), manual, in.expectedAmount(), in.contractTypeCode(), in.startMonth().replace("-", ""), in.expectedMonths(), in.workplace(), in.nextAction(), in.nextActionDueDate(), in.memo(), status, profit, approval, baseline, null, null, null, projectId, "admin", now.plusSeconds(++sequence));
+        return new Header(id, in.opportunityName(), in.customerId(), "고객", in.salesPartId(), in.stageCode(), in.winningProbability(), manual, in.expectedAmount(), in.contractTypeCode(), in.startMonth().replace("-", ""), in.expectedMonths(), in.workplace(), in.workAreaCode(), in.workAreaCode() == null ? null : "서울 중구 을지로동", in.nextAction(), in.nextActionDueDate(), in.memo(), status, profit, approval, baseline, null, null, null, projectId, "admin", now.plusSeconds(++sequence));
     }
-    Input input(Header h, String stage, BigDecimal probability) { return new Input(h.opportunityName(), h.customerId(), h.salesPartId(), stage, probability, h.expectedAmount(), h.contractTypeCode(), "2026-11", 6, h.workplace(), h.nextAction(), h.nextActionDueDate(), h.memo(), List.of()); }
+    Input input(Header h, String stage, BigDecimal probability) { return new Input(h.opportunityName(), h.customerId(), h.salesPartId(), stage, probability, h.expectedAmount(), h.contractTypeCode(), "2026-11", 6, h.workplace(), h.workAreaCode(), h.nextAction(), h.nextActionDueDate(), h.memo(), List.of()); }
     NeedRow needRow(Need n) { return new NeedRow(n.needSn(), n.jobCode(), n.gradeCode(), n.requiredCount(), n.startMonth().replace("-", ""), n.months(), n.monthlyMm(), n.estimatedUnitPrice()); }
     ObjectNode valid() throws Exception { return (ObjectNode) json.readTree("""
         {"opportunityName":"새 기회","customerId":"customer","salesPartId":"part","stageCode":"FIND","winningProbability":10,"expectedAmount":60000000,"startMonth":"2026-11","needs":[{"jobCode":"BE","requiredCount":1,"startMonth":"2026-11","months":6,"monthlyMm":1.0}]}
@@ -398,6 +398,43 @@ class CommonSalesOpportunityControllerTest {
             .andExpect(jsonPath("$.data.approvalRate").value(15));
         mvc.perform(put(root + "/" + id + "/approve").contentType("application/json").content(version(id).toString())).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.approvedProfitRate").value(14.0));
+    }
+    // 근무지 지역(2026-11-25): 고른 마지막 단계의 행정구역 코드. 사용 중인 코드만, 비우면 없음, 상세는 이름도 보인다.
+    @Test void workAreaCodeIsSavedAndShownWithItsName() throws Exception {
+        when(mapper.area("1114000000")).thenReturn(true);
+        var id = json.readTree(mvc.perform(post(root).contentType("application/json").content(valid().put("workAreaCode", "1114000000").toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.workAreaCode").value("1114000000"))
+            .andReturn().getResponse().getContentAsString()).path("data").path("opportunityId").asText();
+        verify(mapper).insert(argThat(w -> "1114000000".equals(w.input().workAreaCode())));
+        mvc.perform(get(root + "/" + id)).andExpect(jsonPath("$.data.workAreaName").value("서울 중구 을지로동"));
+        mvc.perform(put(root + "/" + id).contentType("application/json").content(update(id).putNull("workAreaCode").toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.workAreaCode").doesNotExist());
+        assertThat(headers.get(id).workAreaCode()).isNull();
+    }
+    @Test void unknownOrUnusedWorkAreaCodeIsKoreanFieldErrorWithoutWrite() throws Exception {
+        for (String code : new String[]{"9999999999", "서울"}) {
+            mvc.perform(post(root).contentType("application/json").content(valid().put("workAreaCode", code).toString()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("workAreaCode"))
+                .andExpect(jsonPath("$.errors[0].message").value("근무지 지역을 목록에서 다시 골라 주세요."));
+        }
+        verify(mapper, never()).insert(any());
+    }
+    @Test void unchangedStoredWorkAreaCodeIsKeptEvenAfterTheAreaStopsBeingUsed() throws Exception {
+        when(mapper.area("1114000000")).thenReturn(true);
+        var id = json.readTree(mvc.perform(post(root).contentType("application/json").content(valid().put("workAreaCode", "1114000000").toString()))
+            .andReturn().getResponse().getContentAsString()).path("data").path("opportunityId").asText();
+        when(mapper.area("1114000000")).thenReturn(false);
+        mvc.perform(put(root + "/" + id).contentType("application/json").content(update(id).put("workAreaCode", "1114000000").toString()))
+            .andExpect(status().isOk());
+        assertThat(headers.get(id).workAreaCode()).isEqualTo("1114000000");
+    }
+    @Test void winHandsTheStoredWorkAreaToProjectCreation() throws Exception {
+        when(mapper.area("1114000000")).thenReturn(true);
+        when(calculations.evaluate(anyList())).thenReturn(evaluation("30"));
+        var id = json.readTree(mvc.perform(post(root).contentType("application/json").content(valid().put("workAreaCode", "1114000000").toString()))
+            .andReturn().getResponse().getContentAsString()).path("data").path("opportunityId").asText();
+        postAction(id, "win", winBody(id), 200);
+        verify(projects).create(argThat(h -> "1114000000".equals(h.workAreaCode())), any());
     }
     @Test void equalWinDatesRejectBeforeProjectCreation() throws Exception { var id = create(); var before = headers.get(id); mvc.perform(post(root + "/" + id + "/win").contentType("application/json").content(winBody(id).put("contractEndDate", "2026-11-01").toString())).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("contractEndDate")); assertThat(headers.get(id)).isEqualTo(before); verify(projects, never()).create(any(), any()); }
 }

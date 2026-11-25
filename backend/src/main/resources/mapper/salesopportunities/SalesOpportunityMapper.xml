@@ -10,6 +10,7 @@
       <arg column="prbl_manual_yn" javaType="string"/><arg column="expct_amt" javaType="java.math.BigDecimal"/>
       <arg column="ctrt_type_cd" javaType="string"/><arg column="bgn_plan_ym" javaType="string"/>
       <arg column="expct_prd_mcnt" javaType="java.lang.Integer"/><arg column="work_plc_addr" javaType="string"/>
+      <arg column="work_area_cd" javaType="string"/><arg column="work_area_name" javaType="string"/>
       <arg column="next_todo_cn" javaType="string"/><arg column="next_todo_ddln_dt" javaType="java.time.LocalDate"/>
       <arg column="rmrk" javaType="string"/><arg column="opp_stat_cd" javaType="string"/>
       <arg column="expct_prft_rt" javaType="java.math.BigDecimal"/><arg column="aprv_stat_cd" javaType="string"/>
@@ -22,7 +23,9 @@
   <sql id="columns">
     o.opp_id,o.opp_nm,o.cust_clnt_id,c.clnt_nm AS customer_name,o.part_id,o.sales_step_cd,
     o.win_prbl_rt,o.prbl_manual_yn,o.expct_amt,o.ctrt_type_cd,o.bgn_plan_ym,o.expct_prd_mcnt::int,
-    o.work_plc_addr,o.next_todo_cn,o.next_todo_ddln_dt,o.rmrk,o.opp_stat_cd,o.expct_prft_rt,
+    o.work_plc_addr,o.work_area_cd,
+    (SELECT concat_ws(' ',wa.sido_nm,wa.sgg_nm,wa.emd_nm) FROM TB_SY_ADM_AREA wa WHERE wa.area_cd=o.work_area_cd) AS work_area_name,
+    o.next_todo_cn,o.next_todo_ddln_dt,o.rmrk,o.opp_stat_cd,o.expct_prft_rt,
     o.aprv_stat_cd,o.aprv_prft_rt,o.rslt_dt,o.lose_rsn_cd,o.lose_memo,o.proj_id,o.reg_user_id,
     COALESCE(o.mod_dttm,o.reg_dttm) AS modified_at
   </sql>
@@ -96,6 +99,9 @@
   <select id="part" resultType="boolean">
     SELECT EXISTS(SELECT 1 FROM TB_BS_PART p WHERE p.part_id=#{id} AND p.use_yn='Y')
   </select>
+  <select id="area" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM TB_SY_ADM_AREA a WHERE a.area_cd=#{code} AND a.use_yn='Y')
+  </select>
   <select id="developer" resultType="boolean">
     SELECT EXISTS(SELECT 1 FROM TB_HR_DEV d WHERE d.dev_id=#{id} AND d.use_yn='Y')
   </select>
@@ -133,12 +139,12 @@
   </select>
   <insert id="insert">
     INSERT INTO TB_SL_OPP(opp_id,opp_nm,cust_clnt_id,part_id,sales_step_cd,win_prbl_rt,prbl_manual_yn,
-      expct_amt,ctrt_type_cd,bgn_plan_ym,expct_prd_mcnt,work_plc_addr,next_todo_cn,next_todo_ddln_dt,rmrk,
+      expct_amt,ctrt_type_cd,bgn_plan_ym,expct_prd_mcnt,work_plc_addr,work_area_cd,next_todo_cn,next_todo_ddln_dt,rmrk,
       opp_stat_cd,expct_prft_rt,aprv_stat_cd,reg_user_id,reg_dttm,mod_user_id,mod_dttm)
     VALUES(#{id},#{input.opportunityName},#{input.customerId},#{input.salesPartId},#{input.stageCode},
       #{input.winningProbability},#{manualYn},#{input.expectedAmount},#{input.contractTypeCode,jdbcType=VARCHAR},
       replace(#{input.startMonth},'-',''),#{input.expectedMonths},#{input.workplace,jdbcType=VARCHAR},
-      #{input.nextAction,jdbcType=VARCHAR},#{input.nextActionDueDate,jdbcType=DATE},#{input.memo,jdbcType=VARCHAR},
+      #{input.workAreaCode,jdbcType=VARCHAR},#{input.nextAction,jdbcType=VARCHAR},#{input.nextActionDueDate,jdbcType=DATE},#{input.memo,jdbcType=VARCHAR},
       'ING',#{profit},#{approval},#{actor},clock_timestamp(),#{actor},clock_timestamp())
     ON CONFLICT ON CONSTRAINT PK_TB_SL_OPP DO NOTHING
   </insert>
@@ -147,7 +153,7 @@
       sales_step_cd=#{input.stageCode},win_prbl_rt=#{input.winningProbability},prbl_manual_yn=#{manualYn},
       expct_amt=#{input.expectedAmount},ctrt_type_cd=#{input.contractTypeCode,jdbcType=VARCHAR},
       bgn_plan_ym=replace(#{input.startMonth},'-',''),expct_prd_mcnt=#{input.expectedMonths},
-      work_plc_addr=#{input.workplace,jdbcType=VARCHAR},next_todo_cn=#{input.nextAction,jdbcType=VARCHAR},
+      work_plc_addr=#{input.workplace,jdbcType=VARCHAR},work_area_cd=#{input.workAreaCode,jdbcType=VARCHAR},next_todo_cn=#{input.nextAction,jdbcType=VARCHAR},
       next_todo_ddln_dt=#{input.nextActionDueDate,jdbcType=DATE},rmrk=#{input.memo,jdbcType=VARCHAR},
       expct_prft_rt=#{profit},aprv_stat_cd=#{approval},mod_user_id=#{actor},mod_dttm=clock_timestamp()
     WHERE opp_id=#{id}

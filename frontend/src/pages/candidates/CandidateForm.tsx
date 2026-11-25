@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Dialog, InlineConfirmation } from "../../shared/feedback/Dialog";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
-import {
-  developerFailure,
-  getCommonDeveloperAreas,
-  type DeveloperArea,
-} from "../developers/developers";
+import { useAreaPicker } from "../../shared/area/AreaPicker";
+import { developerFailure } from "../developers/developers";
 import {
   CandidateRequestError,
   RESUME_ACCEPT,
@@ -56,13 +53,6 @@ export function CandidateForm({
   const [leaving, setLeaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
-  const [roots, setRoots] = useState<DeveloperArea[]>([]);
-  const [children, setChildren] = useState<DeveloperArea[]>([]);
-  const [location, setLocation] = useState(["", ""]);
-  const [areaBusy, setAreaBusy] = useState(true);
-  const [areaError, setAreaError] = useState("");
-  const [areaRevision, setAreaRevision] = useState(0);
-  const areaRequest = useRef(0);
   const [extracting, setExtracting] = useState(false);
   const extraction = useRef<AbortController | null>(null);
   const [resume, setResume] = useState<{
@@ -84,58 +74,14 @@ export function CandidateForm({
     nameRef.current?.focus();
     return () => extraction.current?.abort();
   }, []);
-  /** 저장된 거주지 코드(수정·이력서)를 시·도 → 시·군·구 고르기로 다시 채운다. */
-  async function showArea(code: string | null, list: DeveloperArea[]) {
-    const request = ++areaRequest.current;
-    const parent = code
-      ? list.find((area) => area.areaCode.slice(0, 2) === code.slice(0, 2))
-          ?.areaCode || ""
-      : "";
-    setLocation([parent, ""]);
-    setChildren([]);
-    if (!parent) return;
-    setAreaBusy(true);
-    setAreaError("");
-    try {
-      const items = (await getCommonDeveloperAreas(parent)).items;
-      if (request !== areaRequest.current) return;
-      setChildren(items);
-      const selected =
-        code && code !== parent
-          ? items.find((area) => area.areaCode.slice(0, 5) === code.slice(0, 5))
-              ?.areaCode || ""
-          : "";
-      setLocation([parent, selected]);
-    } catch (reason) {
-      if (request === areaRequest.current) setAreaError(developerFailure(reason));
-    } finally {
-      if (request === areaRequest.current) setAreaBusy(false);
-    }
-  }
-  // 시·도 목록은 창을 열 때 한 번(그리고 [다시 시도] 때)만 읽는다. 고를 때마다 다시 읽지 않는다.
-  useEffect(() => {
-    let active = true;
-    const request = ++areaRequest.current;
-    setAreaBusy(true);
-    setAreaError("");
-    void getCommonDeveloperAreas()
-      .then(async (value) => {
-        if (!active) return;
-        setRoots(value.items);
-        if (request === areaRequest.current) setAreaBusy(false);
-        await showArea(currentDraft.current.homeAreaCode, value.items);
-      })
-      .catch((reason) => {
-        if (!active) return;
-        setAreaError(developerFailure(reason));
-        setAreaBusy(false);
-      });
-    return () => {
-      active = false;
-      ++areaRequest.current;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [areaRevision]);
+  // 거주지 시·도 → 시·군·구(공통 행정구역 고르기, 두 단계). 시·도 목록은 창을 열 때 한 번(그리고 [다시 시도] 때)만 읽는다.
+  // 저장된 거주지 코드(수정·이력서)로 고르기를 다시 채운다.
+  const initialAreaCode = useRef(draft.homeAreaCode);
+  const area = useAreaPicker(initialAreaCode.current, 2);
+  const [roots, children] = area.lists;
+  const location = area.location;
+  const areaBusy = area.busy;
+  const areaError = area.error;
   function change<K extends keyof CandidateInput>(
     key: K,
     value: CandidateInput[K],
@@ -159,12 +105,11 @@ export function CandidateForm({
   const close = () => {
     if (!pending.current && !extracting) dirty ? setLeaving(true) : onCancel();
   };
-  async function selectArea(level: number, code: string) {
+  function selectArea(level: number, code: string) {
     if (level === 1) {
-      setLocation((old) => [old[0], code]);
       const selected = children.find((area) => area.areaCode === code);
       const parent = roots.find((area) => area.areaCode === location[0]);
-      change("homeAreaCode", code || location[0] || null);
+      change("homeAreaCode", area.select(1, code));
       change(
         "homeAddress",
         selected
@@ -173,25 +118,11 @@ export function CandidateForm({
       );
       return;
     }
-    const request = ++areaRequest.current;
-    setLocation([code, ""]);
-    setChildren([]);
-    change("homeAreaCode", code || null);
+    change("homeAreaCode", area.select(0, code));
     change(
       "homeAddress",
       roots.find((area) => area.areaCode === code)?.areaName || null,
     );
-    if (!code) return;
-    setAreaBusy(true);
-    setAreaError("");
-    try {
-      const response = await getCommonDeveloperAreas(code);
-      if (request === areaRequest.current) setChildren(response.items);
-    } catch (reason) {
-      if (request === areaRequest.current) setAreaError(developerFailure(reason));
-    } finally {
-      if (request === areaRequest.current) setAreaBusy(false);
-    }
   }
   const focusFirstError = () =>
     setTimeout(
@@ -282,7 +213,7 @@ export function CandidateForm({
             : null,
       });
       if (merged.applied.includes("homeAreaCode"))
-        void showArea(merged.input.homeAreaCode, roots);
+        area.show(merged.input.homeAreaCode);
     } catch (reason) {
       if (controller.signal.aborted) return;
       setError(
@@ -649,7 +580,7 @@ export function CandidateForm({
                 type="button"
                 className="ls-btn ls-btn-sm"
                 data-testid="candidate-area-retry"
-                onClick={() => setAreaRevision((value) => value + 1)}
+                onClick={() => area.retry(currentDraft.current.homeAreaCode)}
               >
                 다시 시도
               </button>

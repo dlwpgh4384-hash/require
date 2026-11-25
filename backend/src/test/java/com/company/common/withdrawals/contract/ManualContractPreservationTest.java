@@ -33,7 +33,9 @@ class ManualContractPreservationTest {
             //   approvedProfitRate·approvalRate)과 종료 탭 건수(CommonSalesPipelineSummary.closedCount)를 더하며 두 스키마 전체를 manual에 옮겨 다시 맞춤(LF 기준).
             // 2026-11-24 인력 운영 보드(UI-28): 예측 시작 달(GET /api/common/sales-pipeline/forecast startMonth) 경로와
             //   칸 상태 키·관리번호(CommonManpowerBoardCell.statusCode·CommonManpowerBoardPerson.managementNumber) 스키마를 manual에 옮겨 다시 맞춤(LF 기준).
-            assertThat(digest).isEqualTo("feba39a639286aa1b38c37ebacf83e76c636a242bcc96adbaa2da4c84ff8aafc");
+            // 2026-11-25 근무지 지역: 프로젝트(CommonProject·CommonProjectInput·CommonProjectUpdateInput)와 영업 기회(CommonSalesOpportunity)에
+            //   workAreaCode(·workAreaName) 칸을 더해 다시 맞춤(LF 기준).
+            assertThat(digest).isEqualTo("269faaf30abc1ff35733a3663947a6d7f802221d3ac0367c86ce08eef2ce1eb7");
         }
     }
 

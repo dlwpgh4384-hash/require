@@ -21,7 +21,6 @@ class DashboardUtilizationTest {
             .thenReturn(new Standard("TGT_UTIL_RT", month, new BigDecimal("87.5")));
         var result = new DashboardUtilizationService(mapper, rules).read(month);
         assertThat(result.rate()).isEqualByComparingTo("83.3");
-        assertThat(result.idle()).isEqualByComparingTo("1");
         assertThat(result.target()).isEqualByComparingTo("87.5");
         verify(rules).definition("식-00");
         verify(rules).definition("식-37");

@@ -46,19 +46,25 @@ it("띠 아이콘은 줄어들지 않는다", () => {
 });
 
 it("창 안 작은 글 회색 규칙이 칸 오류 빨강을 덮지 않는다", () => {
+  // 색 값을 시험에 적지 않는다: 창 밖 공통 칸 오류(.field-error) 색과 같고, 도움말은 공통 회색 변수.
   render(
-    <Dialog title="입력 확인" onClose={() => undefined}>
-      <small>도움말</small>
-      <small className="field-error" role="alert">
-        필수 입력입니다
+    <>
+      <small className="field-error" data-testid="outside-error">
+        바깥 오류
       </small>
-    </Dialog>,
+      <Dialog title="입력 확인" onClose={() => undefined}>
+        <small>도움말</small>
+        <small className="field-error" role="alert">
+          필수 입력입니다
+        </small>
+      </Dialog>
+    </>,
   );
+  const shared = getComputedStyle(screen.getByTestId("outside-error")).color;
+  expect(shared).not.toBe("");
   expect(screen.getByRole("alert")).toHaveTextContent("필수 입력입니다");
-  expect(getComputedStyle(screen.getByRole("alert")).color).toBe(
-    "rgb(220, 38, 38)",
-  );
-  expect(getComputedStyle(screen.getByText("도움말")).color).not.toBe(
-    "rgb(220, 38, 38)",
+  expect(getComputedStyle(screen.getByRole("alert")).color).toBe(shared);
+  expect(getComputedStyle(screen.getByText("도움말")).color).toBe(
+    "var(--text-sub)",
   );
 });

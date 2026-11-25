@@ -42,6 +42,7 @@ class CommonDashboardControllerTest {
     @MockBean DashboardFinancialService financial;
     @MockBean DashboardOutlookService outlook;
     @MockBean DashboardActivityService activity;
+    @MockBean DashboardAssignmentService assignments;
     @MockBean CommonMonthCloseService closes;
     @MockBean UserPreferencePeriodBasis periods;
     @MockBean BusinessCalendar calendar;
@@ -55,18 +56,40 @@ class CommonDashboardControllerTest {
         when(periods.metadata()).thenReturn(Map.of("periodBasis",
             new UserPreferencePeriodBasis.Basis("202611", "202601", List.of("202610"))));
         var summary = new Summary(new BigDecimal("1234"), null, null, new BigDecimal("-10"),
-            null, null, new BigDecimal("-40"), null, null, new BigDecimal("90"), BigDecimal.ZERO,
-            BigDecimal.ZERO, 0, BigDecimal.ZERO);
-        when(financial.read(any(), any())).thenReturn(new DashboardFinancialService.Financial(summary,
-            List.of(new TrendMonth("2026-11", new BigDecimal("1234"), null, null))));
+            null, null, new BigDecimal("-40"), null, null, new BigDecimal("90"), 3,
+            BigDecimal.ZERO, 0, 0, BigDecimal.ZERO);
+        when(assignments.read(any())).thenReturn(new DashboardAssignmentService.Counts(0, 3, 0, List.of()));
+        when(financial.read(any(), any(), anyInt())).thenReturn(new DashboardFinancialService.Financial(summary,
+            List.of(new TrendMonth("2026-11", new BigDecimal("1234"), null, null)), List.of()));
         var manpower = IntStream.range(0, 6).mapToObj(i -> new ManpowerMonth(first.plusMonths(i).toString(),
             BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.ONE, false)).toList();
         var cash = IntStream.range(0, 3).mapToObj(i -> new CashMonth(first.plusMonths(i).toString(), null, false, null)).toList();
-        when(outlook.read(any(), any())).thenReturn(new DashboardOutlookService.Outlook(manpower, List.of(),
-            new Pipeline(0, BigDecimal.ZERO, List.of()), cash, List.of(), 0));
-        when(activity.read(any(), any(), any(), any())).thenReturn(List.of());
+        when(outlook.read(any(), any(), any())).thenReturn(new DashboardOutlookService.Outlook(manpower, List.of(),
+            new Pipeline(0, BigDecimal.ZERO, List.of()), cash, new BigDecimal("50000000"), null, List.of(), List.of()));
+        when(activity.read(any(), any(), any(), any(), any())).thenReturn(List.of());
         when(closes.preview(any())).thenReturn(new CommonMonthCloseService.Preview(
-            new MonthClose("2026-11", false, false, null, null, null, 6, 1, List.of()), List.of("급여")));
+            new MonthClose("2026-11", false, false, null, null, null, 6, 1, List.of()),
+            List.of(new Check("급여 업로드", "확인 필요", "3명 — 급여 없음", "UI-26"))));
+    }
+
+    @Test void basisLinesFollowMockupForCurrentAndPastMonth() throws Exception {
+        var current = mvc.perform(get("/api/common/dashboard").param("yearMonth", "2026-11"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.asOfText").value("오늘 2026-11-25 · 10월까지 마감"))
+            .andExpect(jsonPath("$.data.provisionalNotice").value("11월은 마감 전이라 숫자는 잠정입니다"))
+            .andExpect(jsonPath("$.data.mixedBasisNotice").value(org.hamcrest.Matchers.nullValue()))
+            .andExpect(jsonPath("$.data.minimumCash").value(50000000))
+            .andExpect(jsonPath("$.data.summary.idlePeople").value(3))
+            .andExpect(jsonPath("$.data.closing.remainingItems[0].name").value("급여 업로드"))
+            .andExpect(jsonPath("$.data.closing.remainingItems[0].description").value("3명 — 급여 없음"))
+            .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(current).contains("asOfText");
+        mvc.perform(get("/api/common/dashboard").param("yearMonth", "2026-10"))
+            .andExpect(jsonPath("$.data.mixedBasisNotice")
+                .value("미수금·확인할 일·프로젝트 경보·인력 수급·파이프라인·자금은 오늘 기준(청구 누락 의심은 고른 달)"))
+            .andExpect(jsonPath("$.data.provisionalNotice").value("10월은 마감 전이라 숫자는 잠정입니다"));
+        // 마지막 마감(2026-10) 다음 달부터 자금을 본다(시안 CF.m > closedTo).
+        verify(outlook, atLeastOnce()).read(YearMonth.of(2026, 11), YearMonth.of(2026, 11), YearMonth.of(2026, 11));
     }
 
     @Test void publicQueryPreservesNullMixedBasisAndForwardWindowsWithoutDownloadAudit() throws Exception {
@@ -80,10 +103,29 @@ class CommonDashboardControllerTest {
             .andExpect(jsonPath("$.data.mixedBasisNotice").isString())
             .andExpect(jsonPath("$.data.manpower[5].month").value("2027-04"))
             .andExpect(jsonPath("$.data.cash[2].month").value("2027-01"));
-        verify(financial).read(YearMonth.of(2026, 10), LocalDate.of(2026, 11, 25));
-        verify(outlook).read(YearMonth.of(2026, 10), YearMonth.of(2026, 11));
+        verify(financial).read(YearMonth.of(2026, 10), LocalDate.of(2026, 11, 25), 3);
+        verify(outlook).read(YearMonth.of(2026, 10), YearMonth.of(2026, 11), YearMonth.of(2026, 11));
         verify(closes, never()).getCommonMonthClose(any());
         verifyNoInteractions(audit);
+    }
+
+    @Test void projectAlertMonthIsFirstOpenMonthWhenTodayIsLater() throws Exception {
+        // 마지막 마감 2026-09, 오늘 2026-11-25: 원가 분석은 2026-10까지만 받으니 경보도 그 달 기준.
+        when(periods.metadata()).thenReturn(Map.of("periodBasis",
+            new UserPreferencePeriodBasis.Basis("202610", "202601", List.of("202609"))));
+        mvc.perform(get("/api/common/dashboard").param("yearMonth", "2026-10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.projectAlertMonth").value("2026-10"));
+        verify(outlook).read(YearMonth.of(2026, 10), YearMonth.of(2026, 11), YearMonth.of(2026, 10));
+        assertThat(DashboardOutlookService.alertMonth(YearMonth.of(2026, 10), YearMonth.of(2026, 11)))
+            .isEqualTo(YearMonth.of(2026, 10));
+        assertThat(DashboardOutlookService.alertMonth(YearMonth.of(2026, 12), YearMonth.of(2026, 11)))
+            .isEqualTo(YearMonth.of(2026, 11));
+    }
+    @Test void projectAlertMonthIsTodayMonthWhenOpen() throws Exception {
+        mvc.perform(get("/api/common/dashboard").param("yearMonth", "2026-11"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.projectAlertMonth").value("2026-11"));
     }
 
     @ParameterizedTest @ValueSource(strings = {"", "202611", "2026-1", "2026-13", "2025-12", "2026-12"})
@@ -116,7 +158,7 @@ class CommonDashboardControllerTest {
         verify(closes, never()).getCommonMonthClose(any());
     }
     @Test void sourceFailureDoesNotLeakSqlOrRecordSuccessfulDownload() throws Exception {
-        when(financial.read(any(), any())).thenThrow(new IllegalStateException("SELECT secret FROM private_table"));
+        when(financial.read(any(), any(), anyInt())).thenThrow(new IllegalStateException("SELECT secret FROM private_table"));
         var response = mvc.perform(get("/api/common/dashboard/excel").param("yearMonth", "2026-11"))
             .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.success").value(false))
             .andReturn().getResponse();

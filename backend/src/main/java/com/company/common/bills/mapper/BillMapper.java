@@ -11,6 +11,8 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface BillMapper {
     List<Invoice> yearRows(int year);
+    /** unpaidCount와 같은 조건(취소 안 됨·미수 잔액 있음)의 모든 해 청구. */
+    List<Invoice> unpaidRows();
     Invoice invoice(String id);
     Invoice lockInvoice(String id);
     Project project(String id);

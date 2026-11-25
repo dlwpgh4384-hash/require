@@ -47,12 +47,12 @@ public class CommonMonthCloseService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Preview preview(String yearMonth) {
         var view = view(MonthCloseRules.month(yearMonth));
-        var remaining = new java.util.ArrayList<String>();
+        var remaining = new java.util.ArrayList<Check>();
         for (int i = 0; i < view.stored().size(); i++)
-            if ("WARN".equals(view.stored().get(i).statusCode())) remaining.add(view.close().checks().get(i).name());
+            if ("WARN".equals(view.stored().get(i).statusCode())) remaining.add(view.close().checks().get(i));
         return new Preview(view.close(), List.copyOf(remaining));
     }
-    public record Preview(MonthClose close, List<String> remaining) {}
+    public record Preview(MonthClose close, List<Check> remaining) {}
     private MonthClose read(YearMonth month) { return view(month).close(); }
     private View view(YearMonth month) {
         String db = period.db(month);

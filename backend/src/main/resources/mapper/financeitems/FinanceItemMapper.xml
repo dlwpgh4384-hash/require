@@ -139,10 +139,6 @@
     SELECT <include refid="paymentColumns"/> FROM TB_FI_TAX_PAY p
     LEFT JOIN TB_FI_CORP_TAX t ON t.tax_yr=p.tax_yr WHERE p.tax_yr=#{year} AND p.pay_type_cd=#{type}
   </select>
-  <select id="allPayments" resultMap="payment">
-    SELECT <include refid="paymentColumns"/> FROM TB_FI_TAX_PAY p
-    LEFT JOIN TB_FI_CORP_TAX t ON t.tax_yr=p.tax_yr ORDER BY p.pay_due_dt,p.tax_yr,p.pay_type_cd
-  </select>
   <select id="cardPayment" resultMap="cardPayment">
     SELECT cash_amt,(edit_yn='Y') AS manual,mod_dttm AS version FROM TB_FI_CARD_MON WHERE pay_ym=#{month}
   </select>

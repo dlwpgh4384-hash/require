@@ -100,11 +100,13 @@ function Grid({
   y,
   left = PL,
   right = W - PR,
+  format = million,
 }: {
   ticks: number[];
   y: (value: number) => number;
   left?: number;
   right?: number;
+  format?: (value: number) => string;
 }) {
   return (
     <>
@@ -118,7 +120,7 @@ function Grid({
             y2={y(value)}
           />
           <text className="ax" x={left - 8} y={y(value) + 4} textAnchor="end">
-            {million(value)}
+            {format(value)}
           </text>
         </g>
       ))}
@@ -230,19 +232,24 @@ export function LineChart({
   );
 }
 
-/** 시안 barChart(): 기간별 묶음 막대, 참고선(guide)은 점선. 값은 원, 눈금은 백만 원. */
+/**
+ * 시안 barChart(): 기간별 묶음 막대, 참고선(guide)은 점선. 값은 원, 눈금은 백만 원.
+ * format을 주면 시안 barChart의 fmt처럼 눈금 글자(tick)와 막대 풍선 글(value)을 그 모양으로 쓴다(예: 명(MM)).
+ */
 export function BarChart({
   series,
   labels,
   height = 220,
   guide,
   testId,
+  format,
 }: {
   series: ChartSeries[];
   labels: string[];
   height?: number;
   guide?: { name: string; values: Amount[] } | null;
   testId?: string;
+  format?: { tick: (value: number) => string; value: (value: number) => string };
 }) {
   const H = height;
   const values = series.flatMap((item) => numbers(item.values));
@@ -271,7 +278,7 @@ export function BarChart({
         aria-label={`${series.map((item) => item.name).join(", ")} 비교`}
         data-testid={testId}
       >
-        <Grid ticks={ticks} y={y} />
+        <Grid ticks={ticks} y={y} format={format?.tick} />
         {labels.map((label, index) => (
           <g key={`${label}-${index}`}>
             <text
@@ -298,7 +305,7 @@ export function BarChart({
                   rx={2}
                   style={{ fill: item.color }}
                 >
-                  <title>{`${label} ${item.name} ${Math.round(value).toLocaleString("ko-KR")}원`}</title>
+                  <title>{`${label} ${item.name} ${format ? format.value(value) : `${Math.round(value).toLocaleString("ko-KR")}원`}`}</title>
                 </rect>
               );
             })}

@@ -51,6 +51,12 @@ public class CommonBillService {
         return new UnpaidCount(mapper.unpaidCount());
     }
 
+    /** 메뉴 배지와 같은 조건의 모든 해 미수 청구(상태·연체 일수는 목록과 같은 판정). 대시보드(UI-16)가 쓴다. */
+    public List<Bill> getCommonUnpaidBills() {
+        boolean canReceive=!mapper.closed(calendar.toDatabaseMonth(calendar.currentMonth()));
+        return mapper.unpaidRows().stream().map(r -> view(r,canReceive)).toList();
+    }
+
     public BillList getCommonBills(Filter filter) {
         if (filter.year()==null || filter.year()<1 || filter.year()>9999)
             throw CodeFailure.invalid("year","연도를 확인해 주세요.");

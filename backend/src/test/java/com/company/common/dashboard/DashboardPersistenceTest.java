@@ -57,10 +57,7 @@ class DashboardPersistenceTest {
         person("dash-retiring", "DRCT", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 11, 1));
         person("dash-retired", "DRCT", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 10, 31));
         person("dash-future", "DRCT", LocalDate.of(2026, 12, 1), null);
-        for (String assignment : new String[]{"dash-a", "dash-b"}) {
-            db.update("INSERT INTO TB_PJ_ASGN(asgn_id,proj_id,dev_id,job_cd,input_bgn_dt,input_end_dt,ctrt_mm,input_type_cd,ext_cnt,asgn_stat_cd,reg_user_id) VALUES(?,'dash-project','dash-active','BE',DATE '2026-01-01',DATE '2026-12-31',0.5,'PAID',0,'CNFM','admin')", assignment);
-            db.update("INSERT INTO TB_PJ_ASGN_MON(asgn_id,input_ym,dev_id,proj_id,input_day_cnt,mon_mm,aply_uprc,sales_amt,reg_user_id) VALUES(?,'202611','dash-active','dash-project',20,0.5,0,0,'admin')", assignment);
-        }
+        for (String assignment : new String[]{"dash-a", "dash-b"}) assignment(assignment, "dash-active", "ACT");
         var before = db.queryForList("SELECT * FROM TB_PJ_ASGN_MON ORDER BY asgn_id");
         try (var session = factory.openSession()) {
             var row = session.getMapper(DashboardMapper.class).utilization("202611", LocalDate.of(2026,11,1), LocalDate.of(2026,11,30));
@@ -69,5 +66,26 @@ class DashboardPersistenceTest {
         }
         assertThat(db.queryForList("SELECT * FROM TB_PJ_ASGN_MON ORDER BY asgn_id")).isEqualTo(before);
         assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE scrn_id='UI-16'", Integer.class)).isZero();
+    }
+    /** 공통코드 ASGN_STAT: ACT(유효)만 투입으로 센다. 배정취소(CNCL)는 월별 줄이 남아 있어도 대기로 본다. */
+    @Test void cancelledAssignmentDoesNotCountAsAssigned() {
+        person("dash-valid", "DRCT", LocalDate.of(2026, 1, 1), null);
+        person("dash-cancelled", "DRCT", LocalDate.of(2026, 1, 1), null);
+        assignment("dash-act", "dash-valid", "ACT");
+        assignment("dash-cncl", "dash-cancelled", "CNCL");
+        try (var session = factory.openSession()) {
+            var row = session.getMapper(DashboardMapper.class).utilization("202611", LocalDate.of(2026,11,1), LocalDate.of(2026,11,30));
+            assertThat(row.totalPeople()).isEqualTo(2);
+            assertThat(row.assignedPeople()).isEqualTo(1);
+        }
+        db.update("UPDATE TB_PJ_ASGN SET asgn_stat_cd='CNCL' WHERE asgn_id='dash-act'");
+        try (var session = factory.openSession()) {
+            assertThat(session.getMapper(DashboardMapper.class).utilization("202611", LocalDate.of(2026,11,1),
+                LocalDate.of(2026,11,30)).assignedPeople()).isZero();
+        }
+    }
+    void assignment(String id, String developer, String status) {
+        db.update("INSERT INTO TB_PJ_ASGN(asgn_id,proj_id,dev_id,job_cd,input_bgn_dt,input_end_dt,ctrt_mm,input_type_cd,ext_cnt,asgn_stat_cd,reg_user_id,reg_dttm) VALUES(?,'dash-project',?,'BE',DATE '2026-01-01',DATE '2026-12-31',0.5,'PAID',0,?,'admin',clock_timestamp())", id, developer, status);
+        db.update("INSERT INTO TB_PJ_ASGN_MON(asgn_id,input_ym,dev_id,proj_id,input_day_cnt,mon_mm,aply_uprc,sales_amt,reg_user_id,reg_dttm) VALUES(?,'202611',?,'dash-project',20,0.5,0,0,'admin',clock_timestamp())", id, developer);
     }
 }

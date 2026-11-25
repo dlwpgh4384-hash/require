@@ -17,15 +17,17 @@ public class CommonDashboardService {
     private final DashboardFinancialService financial;
     private final DashboardOutlookService outlook;
     private final DashboardActivityService activity;
+    private final DashboardAssignmentService assignments;
     private final CommonMonthCloseService closes;
     private final UserPreferencePeriodBasis periods;
     private final BusinessCalendar calendar;
     public CommonDashboardService(DashboardFinancialService financial, DashboardOutlookService outlook,
-        DashboardActivityService activity, CommonMonthCloseService closes,
+        DashboardActivityService activity, DashboardAssignmentService assignments, CommonMonthCloseService closes,
         UserPreferencePeriodBasis periods, BusinessCalendar calendar) {
-        this.financial = financial; this.outlook = outlook; this.activity = activity;
+        this.financial = financial; this.outlook = outlook; this.activity = activity; this.assignments = assignments;
         this.closes = closes; this.periods = periods; this.calendar = calendar;
     }
+    static final String PAST_MONTH_NOTICE = "미수금·확인할 일·프로젝트 경보·인력 수급·파이프라인·자금은 오늘 기준(청구 누락 의심은 고른 달)";
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Response<Result> getCommonDashboard(String yearMonth) {
         var month = month(yearMonth);
@@ -37,18 +39,34 @@ public class CommonDashboardService {
             throw CodeFailure.invalid("yearMonth", "조회할 수 있는 기준월을 선택해 주세요.");
         var today = calendar.today();
         var current = YearMonth.from(today);
-        var money = financial.read(month, today);
-        var forward = outlook.read(month, current);
-        var checked = closes.preview(yearMonth);
-        var close = checked.close();
-        var closing = new Closing(close.totalCount() - close.attentionCount(), close.totalCount(), checked.remaining());
         String last = basis.closedMonths().stream().max(String::compareTo)
             .map(s -> s.substring(0, 4) + "-" + s.substring(4)).orElse(null);
+        var assigned = assignments.read(today);
+        var money = financial.read(month, today, assigned.idle());
+        var open = firstOpen(last, basis.cashBaseYm(), current);
+        var forward = outlook.read(month, current, open);
+        var checked = closes.preview(yearMonth);
+        var close = checked.close();
+        var closing = new Closing(close.totalCount() - close.attentionCount(), close.totalCount(),
+            checked.remaining().stream().map(c -> new ClosingItem(c.name(), c.status(), c.description(), c.targetScreenId())).toList());
+        // 시안 asof: 「오늘 날짜 · n월까지 마감」, 미마감이면 「[잠정] n월은 마감 전이라 숫자는 잠정입니다」, 지난달이면 오늘 기준 안내.
+        String asOf = "오늘 " + today + (last == null ? "" : " · " + YearMonth.parse(last).getMonthValue() + "월까지 마감");
+        String provisional = close.isClosed() ? null : month.getMonthValue() + "월은 마감 전이라 숫자는 잠정입니다";
         var result = new Result(yearMonth, today, close.isClosed() ? "마감" : "작업중", last, !close.isClosed(),
-            month.equals(current) ? null : "매출·이익·가동률·마감·추이·파트·청구 누락은 선택월 기준, 미수·나머지 할일·경보·수급·파이프라인·자금은 오늘 기준입니다.",
-            money.summary(), activity.read(month, today, money.summary(), forward), closing,
-            forward.alerts(), money.trend(), forward.manpower(), forward.parts(), forward.pipeline(), forward.cash());
+            asOf, provisional, month.equals(current) ? null : PAST_MONTH_NOTICE,
+            money.summary(), activity.read(month, today, money, forward, assigned), closing,
+            forward.alerts(), DashboardOutlookService.alertMonth(open, current).toString(), money.trend(), forward.manpower(), forward.parts(), forward.pipeline(), forward.cash(),
+            forward.minimumCash());
         return new Response<>(true, metadata, result);
+    }
+    /** 마지막 마감 달의 다음 달(시작 월 CASH_BASE_YM 전은 마감으로 본다). 둘 다 없으면 이번 달. */
+    static YearMonth firstOpen(String lastClosed, String cashBaseYm, YearMonth current) {
+        YearMonth open = lastClosed == null ? null : YearMonth.parse(lastClosed).plusMonths(1);
+        YearMonth base = null;
+        if (cashBaseYm != null && cashBaseYm.matches("[0-9]{6}"))
+            base = YearMonth.of(Integer.parseInt(cashBaseYm.substring(0, 4)), Integer.parseInt(cashBaseYm.substring(4)));
+        if (open == null) return base == null ? current : base;
+        return base != null && base.isAfter(open) ? base : open;
     }
     public static YearMonth month(String value) {
         if (value == null || !value.matches("[0-9]{4}-(0[1-9]|1[0-2])"))

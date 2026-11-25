@@ -96,8 +96,12 @@ public class CommonProjectBoardService {
         return compute(filter, false);
     }
 
-    /** 대시보드 전용 순수 읽기: 기본 단계 생성 없이 동일 판정을 묶음 입력에 적용한다. */
-    @Transactional(readOnly = true)
+    /**
+     * 대시보드 전용 순수 읽기: 기본 단계 생성 없이 동일 판정을 묶음 입력에 적용한다.
+     * 대시보드 트랜잭션에 끼지 않는다(NOT_SUPPORTED): 원가 분석 사용률을 못 읽는 달(usageRates의 CodeFailure)이
+     * 대시보드 전체를 rollback-only로 만들지 않게 한다.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Result preview(Filter filter) {
         validate(filter);
         return compute(filter, true);

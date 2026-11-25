@@ -74,8 +74,9 @@ public class SalesOpportunityCalculations {
     }
     /** 승인 띠의 「(기준 n%)」: 이번 달 견적 승인 기준 이익률. 기준값이 없으면 상세는 그대로 보이고 null. */
     public BigDecimal approvalRate() {
-        try { return approvals.effective(calendar.currentMonth()).approvalRate(); }
-        catch (CodeFailure failure) { return null; }
+        // 던지는 effective를 잡으면 바깥(대시보드 등) 트랜잭션이 롤백 전용이 되어 500이 나므로, 던지지 않는 조회를 쓴다.
+        var values = approvals.effectiveOrNull(calendar.currentMonth());
+        return values == null ? null : values.approvalRate();
     }
     public static String approval(String oldStatus, BigDecimal baseline, Evaluation evaluation) {
         if ("REJ".equals(oldStatus)) return "WAIT";

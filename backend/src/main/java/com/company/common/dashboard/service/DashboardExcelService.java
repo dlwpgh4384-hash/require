@@ -49,15 +49,24 @@ public class DashboardExcelService {
         add(rows, "요약", "가동률", month, "목표(%)", s.utilizationTargetRate());
         add(rows, "요약", "가동률", month, "대기 인원", s.idlePeople());
         add(rows, "요약", "미수금", today, "금액", s.unpaidAmount());
+        add(rows, "요약", "미수금", today, "미수 건수", s.unpaidCount());
         add(rows, "요약", "미수금", today, "연체 건수", s.overdueCount());
         add(rows, "요약", "미수금", today, "연체 금액", s.overdueAmount());
-        for (var t : data.todos()) add(rows, "확인할 일", t.title(),
-            "청구 누락 의심".equals(t.title()) ? month : today, t.description(), t.count());
+        // 화면에 보이는 줄만(0건 줄은 시안처럼 뺀다).
+        for (var t : data.todos()) if (t.visible()) add(rows, "확인할 일", t.title(),
+            "billingMissing".equals(t.key()) ? month : today, t.description(), t.count());
         add(rows, "마감", "점검", month, "완료 수", data.closing().completedCount());
         add(rows, "마감", "점검", month, "전체 수", data.closing().totalCount());
-        for (var item : data.closing().remainingItems()) add(rows, "마감", item, month, "남은 항목", item);
-        for (var a : data.projectAlerts()) add(rows, "프로젝트 경보", a.projectName(), today, a.alertName(), a.mainCause());
+        for (var item : data.closing().remainingItems()) add(rows, "마감", item.name(), month, "남은 항목", item.description());
+        for (var a : data.projectAlerts()) {
+            add(rows, "프로젝트 경보", a.projectName(), today, a.alertName(), a.mainCause());
+            add(rows, "프로젝트 경보", a.projectName(), today, a.marginLabel() + "(%)", a.marginRate());
+            add(rows, "프로젝트 경보", a.projectName(), today, "예산 소진(%)", a.budgetBurnRate());
+            if (a.mainCauseAmount() != null) add(rows, "프로젝트 경보", a.projectName(), today, "주원인 금액", a.mainCauseAmount());
+        }
+        // 숫자 표와 같게 매출·원가는 고른 달까지, 목표 매출도 그 달까지만 적는다(그래프 점선은 화면에서만 12달).
         for (var t : data.trend()) {
+            if (t.revenue() == null && t.cost() == null && t.month().compareTo(month) > 0) continue;
             add(rows, "추이", "전체", t.month(), "매출", t.revenue());
             add(rows, "추이", "전체", t.month(), "원가", t.cost());
             add(rows, "추이", "전체", t.month(), "목표 매출", t.targetRevenue());
@@ -73,8 +82,11 @@ public class DashboardExcelService {
         }
         add(rows, "파이프라인", "진행", today, "기회 수", data.pipeline().activeCount());
         add(rows, "파이프라인", "진행", today, "확률 반영 예상 매출", data.pipeline().weightedExpectedRevenue());
-        for (var p : data.pipeline().upcoming()) add(rows, "파이프라인", p.opportunityName(), p.startMonth(), "곧 시작", p.startMonth());
-        for (var c : data.cash()) add(rows, "자금 전망", c.warning(), c.month(), "월말 잔액", c.monthEndBalance());
+        for (var p : data.pipeline().upcoming()) add(rows, "파이프라인", p.opportunityName(), p.startMonth(),
+            "곧 시작 · " + (p.stageName() == null ? "" : p.stageName()) + " 확률(%)", p.probability());
+        // 항목은 다른 영역처럼 고정 이름, 부족 경고 글은 지표 뒤에 붙인다(「월말 잔액 · 경고」).
+        for (var c : data.cash()) add(rows, "자금 전망", "회사 전체", c.month(),
+            c.warning() == null ? "월말 잔액" : "월말 잔액 · " + c.warning(), c.monthEndBalance());
         return rows;
     }
     private static void add(List<List<String>> rows, String region, String item, String period, String metric, Object value) {

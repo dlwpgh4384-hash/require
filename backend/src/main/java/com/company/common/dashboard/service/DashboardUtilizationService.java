@@ -15,14 +15,14 @@ public class DashboardUtilizationService {
         this.mapper = mapper;
         this.rules = rules;
     }
-    public record Result(BigDecimal rate, BigDecimal target, BigDecimal idle) {}
+    /** 가동률(식-37)과 목표. 대기 인원은 인력 운영 보드의 「지금 비어 있는 인원」을 쓴다(DashboardAssignmentService). */
+    public record Result(BigDecimal rate, BigDecimal target) {}
     public Result read(YearMonth month) {
         rules.definition("식-00");
         rules.definition("식-37");
         var people = mapper.utilization(month.toString().replace("-", ""), month.atDay(1), month.atEndOfMonth());
         var rate = people.totalPeople() == 0 ? null : BigDecimal.valueOf(people.assignedPeople())
             .multiply(BigDecimal.valueOf(100)).divide(BigDecimal.valueOf(people.totalPeople()), 1, RoundingMode.HALF_UP);
-        return new Result(rate, rules.effectiveStandard("TGT_UTIL_RT", month).value(),
-            BigDecimal.valueOf(people.totalPeople() - people.assignedPeople()));
+        return new Result(rate, rules.effectiveStandard("TGT_UTIL_RT", month).value());
     }
 }

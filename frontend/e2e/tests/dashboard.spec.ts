@@ -20,11 +20,14 @@ test("UI-16 uses live summary, one body request, responsive layout and real Exce
   );
   await expect(page.getByTestId("dashboard-basis")).toContainText(data.today);
   await expect(page.getByTestId("dashboard-close-count")).toContainText(
-    `${data.closing.completedCount} / ${data.closing.totalCount}`,
+    `${data.closing.completedCount}/${data.closing.totalCount}`,
   );
   expect(requests).toHaveLength(1);
   expect(data.manpower).toHaveLength(6);
   expect(data.cash).toHaveLength(3);
+  // 수급 숫자 표는 닫힌 「표로 보기」 안에 있으니 열고 본다.
+  const supply = page.getByTestId("dashboard-supply");
+  await supply.locator("details summary").click();
   for (const month of data.manpower)
     await expect(
       page.getByTestId(`dashboard-manpower-${month.month}`),
@@ -57,15 +60,15 @@ test("UI-16 uses live summary, one body request, responsive layout and real Exce
   await expect(
     page.getByText(`엑셀 파일을 만들었습니다 (조회 결과 ${count}건)`),
   ).toBeVisible();
-  if (
-    data.todos.some((t: { targetScreenId: string | null }) => t.targetScreenId)
-  ) {
-    const index = data.todos.findIndex(
-      (t: { targetScreenId: string | null }) => t.targetScreenId,
-    );
+  // 화면은 visible=true 줄만 그리고 번호도 그 줄들 안에서 센다.
+  const visible = data.todos.filter(
+    (t: { visible: boolean }) => t.visible,
+  ) as { targetScreenId: string | null }[];
+  const index = visible.findIndex((t) => t.targetScreenId);
+  if (index >= 0) {
     await page.getByTestId(`dashboard-todo-${index}`).click();
     await expect(page).toHaveURL(
-      new RegExp(`/screens/${data.todos[index].targetScreenId}$`),
+      new RegExp(`/screens/${visible[index].targetScreenId}$`),
     );
     await page.getByTestId("header-logo").click();
     await expect(page.getByTestId("dashboard-page")).toBeVisible();

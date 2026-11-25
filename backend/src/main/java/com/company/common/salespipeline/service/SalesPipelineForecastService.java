@@ -58,7 +58,6 @@ public class SalesPipelineForecastService {
         SalesPipelineCalculationRules.require(loaded, "식-61", "필요 인원 × 월 MM × 수주 확률", "미충원");
         SalesPipelineCalculationRules.require(loaded, "식-92", "다음 달부터", "예상 금액 ÷ 예상 기간");
         SalesPipelineCalculationRules.require(loaded, "식-93", "첫 부족 월", "권장 시작 월");
-        var settings = workforceRules.settings();
         var jobs = mapper.jobs();
         BigDecimal threshold = calculations.standard("SHORT_PERSON");
         int lead = calculations.standard("HIRE_LEAD_MON").intValueExact();
@@ -71,16 +70,7 @@ public class SalesPipelineForecastService {
         // 식-92 턴키 나눗수와 식-61 미충원 나눗수는 시작 달과 상관없이 다음 달부터 센다(시안 unfilled f1).
         var revenues = mapper.revenues(windows, next.atDay(1)).stream()
             .collect(Collectors.toMap(MonthRevenue::month, r -> r, (a, b) -> a));
-        var supply = mapper.supply(windows).stream()
-            .collect(Collectors.groupingBy(r -> key(r.month(), r.jobCode()), LinkedHashMap::new, Collectors.toList()));
-        // 식-60: 끝난 투입은 종료 달이 이번 달 이상일 때만 연장 가능성만큼 뺀다(시안 forecast e >= BASE).
-        var extensions = mapper.extensions(windows, base.atDay(1)).stream()
-            .collect(Collectors.groupingBy(r -> key(r.month(), r.jobCode()) + "|" + r.developerId(),
-                LinkedHashMap::new, Collectors.toList()));
-        var opportunities = mapper.opportunityDemand(windows).stream()
-            .collect(Collectors.groupingBy(r -> key(r.month(), r.jobCode()), LinkedHashMap::new, Collectors.toList()));
-        var projects = mapper.projectDemand(windows, next.atDay(1)).stream()
-            .collect(Collectors.groupingBy(r -> key(r.month(), r.jobCode()), LinkedHashMap::new, Collectors.toList()));
+        var workforce = workforceForecast(windows, jobs);
         var opportunityRows = mapper.opportunityRevenues(windows);
         var months = new ArrayList<ForecastMonth>();
         var firstShortage = new LinkedHashMap<String, YearMonth>();
@@ -89,22 +79,9 @@ public class SalesPipelineForecastService {
             YearMonth month = first.plusMonths(offset);
             String dbMonth = windows.get(offset).month();
             var revenue = revenues.get(dbMonth);
-            BigDecimal totalSupply = BigDecimal.ZERO, totalDemand = BigDecimal.ZERO;
-            for (var job : jobs) {
-                String key = key(dbMonth, job.jobCode());
-                var people = supply.getOrDefault(key, List.of()).stream().map(person -> new SupplyPerson(person.confirmedMm(),
-                    extensions.getOrDefault(key + "|" + person.developerId(), List.of()).stream()
-                        .map(e -> new Extension(e.monthlyMm(), e.extensionPossibilityCode())).toList())).toList();
-                // 운영 기준은 예측 월의 미래값이 아니라 이번 한국 월의 적용값이다.
-                BigDecimal jobSupply = settings.supply(people, calendar.currentMonth());
-                var demandRows = opportunities.getOrDefault(key, List.of()).stream()
-                    .map(n -> new OpportunityDemand(n.requiredCount(), n.monthlyMm(), n.winningProbability())).toList();
-                var projectRows = projects.getOrDefault(key, List.of()).stream()
-                    .map(p -> new ProjectDemand(p.plannedMm(), p.confirmedMm(), p.remainingMonths())).toList();
-                BigDecimal demand = settings.demand(demandRows, projectRows);
-                totalSupply = totalSupply.add(jobSupply);
-                totalDemand = totalDemand.add(demand);
-                BigDecimal shortage = demand.subtract(jobSupply);
+            var workforceMonth = workforce.get(offset);
+            for (var job : workforceMonth.jobs()) {
+                BigDecimal shortage = job.demand().subtract(job.supply());
                 maximum.merge(job.jobCode(), shortage, BigDecimal::max);
                 if (shortage.compareTo(threshold) > 0) firstShortage.putIfAbsent(job.jobCode(), month);
             }
@@ -112,7 +89,7 @@ public class SalesPipelineForecastService {
             BigDecimal weighted = revenue == null ? BigDecimal.ZERO : revenue.weightedOpportunityRevenue();
             BigDecimal opportunity = revenue == null ? BigDecimal.ZERO : revenue.opportunityRevenue();
             months.add(new ForecastMonth(month.toString(), won(project), won(weighted), won(project.add(opportunity)),
-                mm(totalDemand), mm(totalSupply)));
+                mm(workforceMonth.demand()), mm(workforceMonth.supply())));
         }
         var candidates = mapper.candidates().stream()
             .collect(Collectors.toMap(CandidateCount::jobCode, CandidateCount::candidateCount, Integer::sum));
@@ -126,6 +103,54 @@ public class SalesPipelineForecastService {
                 candidates.getOrDefault(job.jobCode(), 0)));
         }
         return new Forecast(List.copyOf(months), List.copyOf(hiring), opportunityLines(opportunityRows, months));
+    }
+
+    public List<WorkforceMonth> getWorkforceForecast(List<MonthWindow> months) {
+        // 영업 파이프라인 예측(UI-29)과 같이 식-60·식-61 정의를 먼저 확인한다(인력 수요 예측 UI-17 입구).
+        var loaded = calculations.definitions();
+        SalesPipelineCalculationRules.require(loaded, "식-60", "max(0, 1", "소수 첫째 자리");
+        SalesPipelineCalculationRules.require(loaded, "식-61", "필요 인원 × 월 MM × 수주 확률", "미충원");
+        return workforceForecast(List.copyOf(months), mapper.jobs());
+    }
+
+    private List<WorkforceMonth> workforceForecast(List<MonthWindow> windows, List<Job> jobs) {
+        if (windows.isEmpty()) return Collections.emptyList();
+        var base = calendar.currentMonth();
+        var settings = workforceRules.settings();
+        var supply = mapper.supply(windows).stream()
+            .collect(Collectors.groupingBy(r -> key(r.month(), r.jobCode()), LinkedHashMap::new, Collectors.toList()));
+        var extensions = mapper.extensions(windows, base.atDay(1)).stream()
+            .collect(Collectors.groupingBy(r -> key(r.month(), r.jobCode()) + "|" + r.developerId(),
+                LinkedHashMap::new, Collectors.toList()));
+        var opportunities = mapper.opportunityDemand(windows).stream()
+            .collect(Collectors.groupingBy(r -> key(r.month(), r.jobCode()), LinkedHashMap::new, Collectors.toList()));
+        var projects = mapper.projectDemand(windows, base.plusMonths(1).atDay(1)).stream()
+            .collect(Collectors.groupingBy(r -> key(r.month(), r.jobCode()), LinkedHashMap::new, Collectors.toList()));
+        var result = new ArrayList<WorkforceMonth>();
+        for (var window : windows) {
+            BigDecimal totalSupply = BigDecimal.ZERO, totalDemand = BigDecimal.ZERO, unfilled = BigDecimal.ZERO;
+            var jobValues = new ArrayList<WorkforceJob>();
+            for (var job : jobs) {
+                String key = key(window.month(), job.jobCode());
+                var people = supply.getOrDefault(key, List.of()).stream().map(person -> new SupplyPerson(person.confirmedMm(),
+                    extensions.getOrDefault(key + "|" + person.developerId(), List.of()).stream()
+                        .map(e -> new Extension(e.monthlyMm(), e.extensionPossibilityCode())).toList())).toList();
+                BigDecimal jobSupply = settings.supply(people, base);
+                var demandRows = opportunities.getOrDefault(key, List.of()).stream()
+                    .map(n -> new OpportunityDemand(n.requiredCount(), n.monthlyMm(), n.winningProbability())).toList();
+                var projectRows = projects.getOrDefault(key, List.of()).stream()
+                    .map(p -> new ProjectDemand(p.plannedMm(), p.confirmedMm(), p.remainingMonths())).toList();
+                BigDecimal demand = settings.demand(demandRows, projectRows);
+                BigDecimal projectDemand = settings.demand(List.of(), projectRows);
+                jobValues.add(new WorkforceJob(job.jobCode(), job.jobName(), jobSupply, demand, projectDemand));
+                totalSupply = totalSupply.add(jobSupply);
+                totalDemand = totalDemand.add(demand);
+                unfilled = unfilled.add(projectDemand);
+            }
+            result.add(new WorkforceMonth(calendarMonth(window.month()), totalSupply, totalDemand,
+                unfilled, List.copyOf(jobValues)));
+        }
+        return List.copyOf(result);
     }
 
     /**

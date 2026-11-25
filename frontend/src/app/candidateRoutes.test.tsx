@@ -48,7 +48,7 @@ it("keeps the preference boundary mounted when navigating to and from UI-33", as
   mount("/screens/UI-02");
   await screen.findByText("UI-02");
   const preferences = screen.getByTestId("preferences-route");
-  for (const id of ["UI-33", "UI-17", "UI-02"]) {
+  for (const id of ["UI-33", "UI-30", "UI-02"]) {
     await act(async () => {
       await router!.navigate(`/screens/${id}`);
     });

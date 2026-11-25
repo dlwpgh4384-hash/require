@@ -12,6 +12,8 @@ public interface PartSettlementMapper {
     List<PartSettlementRows.Input> selectInputs(@Param("month") String month);
     List<PartSettlementRows.History> selectHistory();
     List<PartSettlementRows.Detail> selectDetails(Key key);
+    List<PartSettlementRows.Header> selectHeaders(@Param("month") String month);
+    List<PartSettlementRows.Detail> selectAllDetails(@Param("month") String month);
     boolean isClosed(@Param("month") String month);
     String selectCodeName(@Param("group") String group, @Param("code") String code);
     void lockSources();

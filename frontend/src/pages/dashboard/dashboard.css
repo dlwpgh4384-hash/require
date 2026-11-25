@@ -1,0 +1,110 @@
+.dashboard-page {
+  gap: 20px;
+}
+.dashboard-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.dashboard-basis {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary, var(--text));
+}
+.dashboard-kpis {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.dashboard-bottom {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.dashboard-wide {
+  grid-column: 1 / -1;
+}
+.dashboard-page h2 {
+  margin: 0;
+  font-size: 15px;
+}
+.dashboard-page h3 {
+  margin: 0;
+  font-size: 13px;
+}
+.dashboard-todos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.dashboard-todo {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--divider, var(--border));
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.dashboard-todo small {
+  color: var(--text-secondary, var(--text));
+}
+.dashboard-page .dashboard-shortage {
+  color: var(--ls-bad);
+}
+.dashboard-page progress {
+  width: 100%;
+  accent-color: var(--pf-c1);
+}
+.dashboard-scroll {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+.dashboard-scroll > svg {
+  min-width: 480px;
+}
+.dashboard-scroll table {
+  min-width: 360px;
+  width: 100%;
+}
+.dashboard-page .profit-card > p {
+  margin: 0;
+}
+@media (max-width: 1000px) {
+  .dashboard-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dashboard-bottom {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .dashboard-page {
+    gap: 16px;
+  }
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .dashboard-todos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dashboard-page .profit-card {
+    padding: 16px;
+  }
+  .dashboard-page .ls-kpi {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}

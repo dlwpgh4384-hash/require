@@ -45,6 +45,16 @@ public class CommonCashFlowStatementService {
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Response<Result> getCommonCashFlowStatements(Filter filter) {
+        return read(filter, null);
+    }
+
+    /** 동일 계산을 한 번 실행하여 연도를 넘는 구간을 반환한다. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public Result forward(YearMonth first, int count) {
+        return read(new Filter(first.getYear()), first.plusMonths(count - 1)).data();
+    }
+
+    private Response<Result> read(Filter filter, YearMonth through) {
         if (filter.year() == null || filter.year() < 1 || filter.year() > 9999)
             throw CodeFailure.invalid("year", "조회 연도를 확인해 주세요.");
         var rules = definitions.paymentRules();
@@ -78,7 +88,7 @@ public class CommonCashFlowStatementService {
         }
         YearMonth first = YearMonth.of(filter.year(), 1);
         YearMonth start = base != null && balance != null && base.isBefore(first) ? base : first;
-        YearMonth last = YearMonth.of(filter.year(), 12);
+        YearMonth last = through == null ? YearMonth.of(filter.year(), 12) : through;
         payroll(flows, new PayrollPeriod(start.minusMonths(1), last, now), isClosed, rules);
         var months = new ArrayList<Month>();
         var warnings = new ArrayList<Warning>();
@@ -102,7 +112,8 @@ public class CommonCashFlowStatementService {
             BigDecimal opening = supported ? balance : null;
             BigDecimal closing = supported ? opening.add(z(income)).subtract(z(expense)) : null;
             if (supported) balance = closing;
-            if (month.getYear() != filter.year()) continue;
+            if (through == null && month.getYear() != filter.year()) continue;
+            if (through != null && month.isBefore(first)) continue;
             var result = new Month(key, isClosed.test(key), opening, closing, cash, misc, loan, income,
                 regular, contract, vendor, unpaid, overhead, tax, expense);
             months.add(result);

@@ -31,6 +31,11 @@ public class CommonFinanceItemService {
         var rules=definitions.definitions();
         return new Response<>(true,Map.of("calculationRules",rules),read(month(value)));
     }
+    @Transactional(readOnly=true)
+    public List<TaxPayment> overdueTaxPayments(LocalDate today) {
+        return mapper.allPayments().stream().filter(p -> !"Y".equals(p.paidYn())
+            && p.scheduledDate() != null && p.scheduledDate().isBefore(today)).toList();
+    }
     public TaxEstimate estimate(YearMonth month) {
         var stored=mapper.estimate(String.format("%04d",month.getYear()));
         var annual=stored==null ? ZERO : stored.estimatedTaxAmount();

@@ -40,6 +40,20 @@ public class CommonManpowerForecastService {
             if (!month.isBefore(base))
                 windows.add(new MonthWindow(calendar.toDatabaseMonth(month), month.atDay(1), month.atEndOfMonth()));
         }
+        return project(windows, base);
+    }
+
+    /** 연말에도 끊기지 않는 오늘 기준 연속 구간. 기존 연도 조회와 같은 계산/반올림. */
+    public Result forward(YearMonth base, int count) {
+        var windows = new ArrayList<MonthWindow>();
+        for (int i = 0; i < count; i++) {
+            var month = base.plusMonths(i);
+            windows.add(new MonthWindow(calendar.toDatabaseMonth(month), month.atDay(1), month.atEndOfMonth()));
+        }
+        return project(windows, base);
+    }
+
+    private Result project(java.util.List<MonthWindow> windows, YearMonth base) {
         var core = forecast.getWorkforceForecast(windows);
         // 가용·필요·미충원은 인력 운영 보드(UI-28)가 쓰는 영업 파이프라인 예측과 같은 두 자리, 차이는 화면·엑셀에 보이는 한 자리 값끼리 뺀다.
         var months = core.stream().map(m -> {

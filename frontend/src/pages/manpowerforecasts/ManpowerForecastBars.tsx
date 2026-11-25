@@ -6,18 +6,23 @@ import {
   chartColor,
 } from "../profitstructures/ProfitStructureCharts";
 import { round1, type ManpowerForecastMonth } from "./manpowerForecasts";
+type ForecastBarsMonth = Omit<ManpowerForecastMonth, "unfilledDemand"> & {
+  unfilledDemand?: number;
+};
 
 /** 시안 barChart lab: 막대 묶음 위 두 줄 「필요 x.x」·「그중 미충원 x.x」(6달 넘으면 「미충원 x.x」). */
-export function forecastBarLabels(months: ManpowerForecastMonth[]) {
+export function forecastBarLabels(months: ForecastBarsMonth[]) {
   return months.map((m) => [
     `필요 ${formatDecimal(m.demand)}`,
-    `${months.length > 6 ? "" : "그중 "}미충원 ${formatDecimal(m.unfilledDemand)}`,
+    m.unfilledDemand == null
+      ? ""
+      : `${months.length > 6 ? "" : "그중 "}미충원 ${formatDecimal(m.unfilledDemand)}`,
   ]);
 }
 export function ManpowerForecastBars({
   months,
 }: {
-  months: ManpowerForecastMonth[];
+  months: ForecastBarsMonth[];
 }) {
   const series = [
     {
@@ -85,7 +90,13 @@ export function ManpowerForecastBars({
               y1={y(value)}
               y2={y(value)}
             />
-            <text className="ax" x={PL - 8} y={y(value) + 4} textAnchor="end" style={textStyle}>
+            <text
+              className="ax"
+              x={PL - 8}
+              y={y(value) + 4}
+              textAnchor="end"
+              style={textStyle}
+            >
               {value.toFixed(0)}
             </text>
           </g>
@@ -98,7 +109,13 @@ export function ManpowerForecastBars({
           const lines = labels[index];
           return (
             <g key={m.month} data-testid={`manpower-forecast-bars-${m.month}`}>
-              <text className="ax" x={cx} y={H - 8} textAnchor="middle" style={textStyle}>
+              <text
+                className="ax"
+                x={cx}
+                y={H - 8}
+                textAnchor="middle"
+                style={textStyle}
+              >
                 {Number(m.month.slice(5))}월
               </text>
               {series.map((s, j) => {

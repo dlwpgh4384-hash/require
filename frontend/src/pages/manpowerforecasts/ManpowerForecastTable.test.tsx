@@ -7,17 +7,37 @@ import {
 } from "./ManpowerForecastTable";
 const thresholds = { shortageThreshold: 0.4, surplusThreshold: 1 };
 afterEach(cleanup);
-async function readCss(path: string) {
-  const fs: { readFileSync(file: URL, encoding: "utf8"): string } =
-    await import("node:" + "fs");
-  return fs.readFileSync(new URL(path, import.meta.url), "utf8");
-}
-it("uses the shared bad and warning colors for shortage and surplus", async () => {
-  const css = await readCss("./manpowerForecast.css");
-  expect(css).toMatch(
-    /\.ls-t \.warn\s*\{\s*color:\s*var\(--ls-warn\);\s*\}/,
+import "./manpowerForecast.css?render-test";
+it("uses the shared bad and warning colors for shortage and surplus", () => {
+  render(
+    <div className="manpower-forecast-page">
+      <ManpowerForecastTable
+        months={[
+          {
+            month: "2026-12",
+            supply: 0,
+            demand: 2,
+            unfilledDemand: 0,
+            difference: -2,
+          },
+          {
+            month: "2027-01",
+            supply: 3,
+            demand: 1,
+            unfilledDemand: 0,
+            difference: 2,
+          },
+        ]}
+        thresholds={thresholds}
+      />
+    </div>,
   );
-  expect(css).toMatch(/\.ls-t \.bad\s*\{\s*color:\s*var\(--ls-bad\);\s*\}/);
+  const shortage = screen.getByText("2.0명 부족");
+  const surplus = screen.getByText("2.0명 남음");
+  expect(shortage).toHaveClass("bad");
+  expect(surplus).toHaveClass("warn");
+  expect(getComputedStyle(shortage).color).toBe("var(--ls-bad)");
+  expect(getComputedStyle(surplus).color).toBe("var(--ls-warn)");
 });
 it.each([
   [-0.4001, "bad"],

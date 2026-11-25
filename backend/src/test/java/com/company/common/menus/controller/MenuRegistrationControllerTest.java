@@ -236,7 +236,12 @@ class MenuRegistrationControllerTest {
         verify(mapper).screenExists("UI-12");
         verify(mapper).insertMenu(org.mockito.ArgumentMatchers.argThat(item -> "UI-12".equals(item.scrnId())));
     }
-    @ParameterizedTest @ValueSource(strings = {"UI-26", "UI-16", "ui-25", " UI-25"})
+    @Test void dashboardScreenIsSelectableForAnonymousMenuRegistration() throws Exception {
+        create(child().put("scrnId", "UI-16"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.scrnId").value("UI-16"));
+        verify(mapper).insertMenu(org.mockito.ArgumentMatchers.argThat(item -> "UI-16".equals(item.scrnId())));
+    }
+    @ParameterizedTest @ValueSource(strings = {"UI-26", "UI-30", "ui-25", " UI-25"})
     void placeholderAndNormalizedScreenIdsAreNotDeveloped(String id) throws Exception {
         create(child().put("scrnId", id)).andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("scrnId"));

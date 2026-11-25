@@ -43,6 +43,16 @@ public class CommonMonthCloseService {
         if (view.recordable()) recorder.record(period.db(month), view.stored(), actor.userId());
         return view.close();
     }
+    /** 대시보드는 다시 점검 결과를 저장하지 않는 동일 projection을 사용한다. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public Preview preview(String yearMonth) {
+        var view = view(MonthCloseRules.month(yearMonth));
+        var remaining = new java.util.ArrayList<String>();
+        for (int i = 0; i < view.stored().size(); i++)
+            if ("WARN".equals(view.stored().get(i).statusCode())) remaining.add(view.close().checks().get(i).name());
+        return new Preview(view.close(), List.copyOf(remaining));
+    }
+    public record Preview(MonthClose close, List<String> remaining) {}
     private MonthClose read(YearMonth month) { return view(month).close(); }
     private View view(YearMonth month) {
         String db = period.db(month);

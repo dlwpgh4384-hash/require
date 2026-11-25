@@ -124,6 +124,43 @@ public class CommonPartSettlementService {
         return inputs.stream().filter(i->"TK".equals(i.contractType) && nz(i.mm).signum()>0 && people.contains(i.developerId))
             .map(i->i.developerId).distinct().sorted().toList();
     }
+    public record Performance(String partId, String partName, BigDecimal revenue, BigDecimal profitRate) {}
+    /** 同一 인력 계산/확정 스냅샷. 파트별 DB 반복 조회 없이 입력을 공유한다. */
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+    public List<Performance> performance(String yearMonth) {
+        var month = month(yearMonth);
+        var rules = new PartSettlementRules(definitions.definitions());
+        var parts = mapper.selectParts(db(month));
+        var history = mapper.selectHistory();
+        var inputs = mapper.selectInputs(db(month));
+        var headers = mapper.selectHeaders(db(month)).stream().collect(Collectors.toMap(h -> h.partId, h -> h));
+        var details = mapper.selectAllDetails(db(month)).stream().collect(Collectors.groupingBy(d -> d.partId));
+        var people = inputs.stream().collect(Collectors.groupingBy(i -> i.developerId, LinkedHashMap::new, Collectors.toList()));
+        var memberships = new HashMap<String, String>();
+        for (var entry : people.entrySet()) memberships.put(entry.getKey(), membership(entry.getValue().get(0), month, parts, history).partId());
+        var result = new ArrayList<Performance>();
+        for (var part : parts) {
+            if (!closeTarget(part, month, history)) continue;
+            BigDecimal revenue = ZERO, profit = ZERO;
+            if (confirmed(headers.get(part.partId))) {
+                for (var detail : details.getOrDefault(part.partId, Collections.emptyList())) {
+                    revenue = revenue.add(detail.unitPrice);
+                    profit = profit.add(detail.profit);
+                }
+            } else {
+                for (var entry : people.entrySet()) if (part.partId.equals(memberships.get(entry.getKey()))) {
+                    for (var row : rules.calculate(part, month, entry.getValue(), List.of())) {
+                        revenue = revenue.add(row.unitPrice());
+                        profit = profit.add(row.profit());
+                    }
+                }
+            }
+            result.add(new Performance(part.partId, part.partName, revenue, revenue.signum() == 0 ? null
+                : profit.multiply(BigDecimal.valueOf(100)).divide(revenue, 1, java.math.RoundingMode.HALF_UP)));
+        }
+        return result;
+    }
+
     private static List<String> split(String value,String delimiter) {
         return value==null || value.isEmpty() ? List.of() : Arrays.asList(value.split(java.util.regex.Pattern.quote(delimiter),-1));
     }

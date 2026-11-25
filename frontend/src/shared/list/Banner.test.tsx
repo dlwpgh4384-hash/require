@@ -2,15 +2,9 @@ import { afterEach, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { Banner } from "./DetailPanel";
-// 시험 도구(vitest)는 CSS를 빈 글로 바꾸므로 파일을 직접 읽는다(node:fs, 타입 없이 동적 import).
-const readText = async (path: string): Promise<string> => {
-  const fs: { readFileSync(file: URL, encoding: "utf8"): string } = await import(
-    "node:" + "fs"
-  );
-  return fs.readFileSync(new URL(path, import.meta.url), "utf8");
-};
-const listCss = await readText("./list.css");
-const feedbackCss = await readText("../feedback/feedback.css");
+import { Dialog } from "../feedback/Dialog";
+import "./list.css?render-test";
+import "../feedback/feedback.css?render-test";
 
 afterEach(cleanup);
 
@@ -42,11 +36,29 @@ it("Banner: icon을 주지 않으면 예전과 같이 글 span 하나와 action"
   ]);
 });
 
-it("띠 아이콘은 줄어들지 않는다(list.css)", () => {
-  expect(listCss).toMatch(/\.ls-banner > svg[\s\S]*?flex: none/);
+it("띠 아이콘은 줄어들지 않는다", () => {
+  render(
+    <Banner kind="warn" icon={<svg data-testid="icon" />}>
+      안내
+    </Banner>,
+  );
+  expect(getComputedStyle(screen.getByTestId("icon")).flexShrink).toBe("0");
 });
 
-it("창 안 작은 글 회색 규칙이 칸 오류(.field-error) 빨강을 덮지 않는다(feedback.css)", () => {
-  expect(feedbackCss).toContain(".app-dialog small:not(.field-error)");
-  expect(feedbackCss).not.toMatch(/\.app-dialog small\s*\{/);
+it("창 안 작은 글 회색 규칙이 칸 오류 빨강을 덮지 않는다", () => {
+  render(
+    <Dialog title="입력 확인" onClose={() => undefined}>
+      <small>도움말</small>
+      <small className="field-error" role="alert">
+        필수 입력입니다
+      </small>
+    </Dialog>,
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent("필수 입력입니다");
+  expect(getComputedStyle(screen.getByRole("alert")).color).toBe(
+    "rgb(220, 38, 38)",
+  );
+  expect(getComputedStyle(screen.getByText("도움말")).color).not.toBe(
+    "rgb(220, 38, 38)",
+  );
 });

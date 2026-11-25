@@ -93,17 +93,38 @@ public class CommonProjectBoardService {
     }
 
     private Result compute(Filter filter) {
+        return compute(filter, false);
+    }
+
+    /** 대시보드 전용 순수 읽기: 기본 단계 생성 없이 동일 판정을 묶음 입력에 적용한다. */
+    @Transactional(readOnly = true)
+    public Result preview(Filter filter) {
+        validate(filter);
+        return compute(filter, true);
+    }
+
+    private Result compute(Filter filter, boolean batch) {
         LocalDate today = calendar.today();
         String month = today.format(DateTimeFormatter.ofPattern("uuuuMM"));
         var found = new ArrayList<Evaluated>();
         Map<String, BigDecimal> usageRates = usageRates(today);
-        for (var source : mapper.sources(filter, today, month)) {
+        var sources = mapper.sources(filter, today, month);
+        var ids = sources.stream().map(s -> s.projectId).toList();
+        var stepGroups = new java.util.HashMap<String, List<com.company.common.projects.dto.ProjectContracts.Step>>();
+        var issueGroups = new java.util.HashMap<String, List<ProjectBoardSignalRules.Issue>>();
+        if (batch && !ids.isEmpty()) {
+            for (var step : projects.boardSteps(ids)) stepGroups.computeIfAbsent(step.projectId, k -> new ArrayList<>()).add(step);
+            for (var issue : mapper.boardIssues(ids)) issueGroups.computeIfAbsent(issue.projectId, k -> new ArrayList<>()).add(issue.value());
+        }
+        for (var source : sources) {
             if (!ProjectBoardLifecycle.visible(ProjectBoardLifecycle.effectiveStatus(
                     source.statusCode, source.endDate, today))) continue;
             // Keep Java filtering aligned even when a caller supplies another mapper adapter.
             if (filter.contractTypeCode() != null && !filter.contractTypeCode().equals(source.contractTypeCode)) continue;
             if (filter.salesPartId() != null && !filter.salesPartId().equals(source.salesPartId)) continue;
-            var evaluated = evaluate(source, today, usageRates);
+            var steps = batch ? stepGroups.getOrDefault(source.projectId, java.util.Collections.emptyList()) : projects.steps(source.projectId);
+            var issues = batch ? issueGroups.getOrDefault(source.projectId, java.util.Collections.emptyList()) : mapper.issues(source.projectId);
+            var evaluated = evaluate(source, today, usageRates, steps, issues);
             if (filter.signal() == null || filter.signal().equals(evaluated.row().signal())) found.add(evaluated);
         }
         // 기본 정렬(시안 sortDef): 위험 → 주의 → 정상, 같으면 프로젝트명 가나다.
@@ -149,8 +170,8 @@ public class CommonProjectBoardService {
             return Map.of();
         }
     }
-    private Evaluated evaluate(ProjectBoardSource source, LocalDate today, Map<String, BigDecimal> usageRates) {
-        var steps = projects.steps(source.projectId);
+    private Evaluated evaluate(ProjectBoardSource source, LocalDate today, Map<String, BigDecimal> usageRates,
+        List<com.company.common.projects.dto.ProjectContracts.Step> steps, List<ProjectBoardSignalRules.Issue> issues) {
         BigDecimal actual = source.actualProgress;
         if (ProjectProgressRules.measured(source.contractTypeCode) && actual == null) actual = BigDecimal.ZERO;
         var rates = progress.progress(source.contractTypeCode, steps, actual, today);
@@ -167,7 +188,6 @@ public class CommonProjectBoardService {
                 : cost.multiply(BigDecimal.valueOf(100)).divide(source.budgetAmount, 1, RoundingMode.HALF_UP);
             if (actual != null) costGap = usage.subtract(actual).setScale(1, RoundingMode.HALF_UP);
         }
-        var issues = mapper.issues(source.projectId);
         long[] overdue = ProjectBoardSignalRules.overdue(issues, today);
         var signal = signals.evaluate(new ProjectBoardSignalRules.Source(source.contractTypeCode,
             planned, actual, costGap, source.latestMemoDate, source.stagesCreatedDate, overdue[0], overdue[1]), today);

@@ -223,7 +223,7 @@ it.each(["/screens/UI-21", "/"])(
                 menuId: "M024",
                 upperMenuId: "G007",
                 menuNm: "준비 화면",
-                scrnId: "UI-16",
+                scrnId: "UI-30",
                 menuLvl: 2,
                 sortOrd: 2,
                 pcOnlyYn: "N",
@@ -233,7 +233,7 @@ it.each(["/screens/UI-21", "/"])(
             {
               screenAccess: [
                 { scrnId: "UI-21", available: true, pcOnlyYn: "N" },
-                { scrnId: "UI-16", available: true, pcOnlyYn: "N" },
+                { scrnId: "UI-30", available: true, pcOnlyYn: "N" },
               ],
             },
           )
@@ -253,7 +253,7 @@ it.each(["/screens/UI-21", "/"])(
     ).toHaveLength(1);
     fireEvent.click(screen.getByRole("link", { name: "준비 화면" }));
     expect(
-      await screen.findByRole("region", { name: "UI-16 본문" }),
+      await screen.findByRole("region", { name: "UI-30 본문" }),
     ).toHaveTextContent("준비 중");
   },
 );
@@ -303,7 +303,9 @@ it("shows one warning banner listing shortage months with focusable header expla
   const banner = screen.getByTestId("cash-flow-warning");
   expect(within(banner).getByText("2026-11, 2026-12").tagName).toBe("STRONG");
   expect(banner).toHaveTextContent("예상 잔액 9.0억 원");
-  expect(within(banner).getByRole("button", { name: "미수금 보기" })).toHaveClass("ls-btn", "ls-btn-sm");
+  expect(
+    within(banner).getByRole("button", { name: "미수금 보기" }),
+  ).toHaveClass("ls-btn", "ls-btn-sm");
   expect(
     screen.getByRole("img", { name: "11월 자금 부족 예상" }),
   ).toHaveAttribute("tabindex", "0");
@@ -317,7 +319,9 @@ it("shows one warning banner listing shortage months with focusable header expla
   expect(excel).not.toHaveTextContent("⇩");
   expect(
     document.getElementById(icon.getAttribute("aria-describedby")!),
-  ).toHaveTextContent("월말 잔액이 최소 운영자금(10.0억 원)보다 적을 것으로 예상");
+  ).toHaveTextContent(
+    "월말 잔액이 최소 운영자금(10.0억 원)보다 적을 것으로 예상",
+  );
   fireEvent.click(screen.getByTestId("cash-flow-receivables"));
   expect(screen.getByTestId("current-location")).toHaveTextContent(
     "/screens/UI-13",
@@ -364,7 +368,9 @@ it("connects forecast to the last actual point and passes raw won to the guide",
   await screen.findByTestId("cash-flow-table");
   // 시안 lineChart guide: 가는 점선(5 4)과 글자, 범례에는 없음(46번 점검)
   const chart = screen.getByTestId("cash-flow-balance-chart");
-  expect(within(chart as unknown as HTMLElement).getByText("최소 운영자금")).toBeInTheDocument();
+  expect(
+    within(chart as unknown as HTMLElement).getByText("최소 운영자금"),
+  ).toBeInTheDocument();
   const paths = chart.querySelectorAll("path");
   expect(paths).toHaveLength(2);
   expect(paths[1]).toHaveAttribute("stroke-dasharray", "6 4");
@@ -388,7 +394,9 @@ it("keeps existing guide-less line chart rendering unchanged", () => {
     />,
   );
   expect(container.querySelectorAll("path")).toHaveLength(1);
-  expect(container.querySelector('line[stroke-dasharray="5 4"]')).not.toBeNull();
+  expect(
+    container.querySelector('line[stroke-dasharray="5 4"]'),
+  ).not.toBeNull();
   expect(screen.getByText("기준")).toBeInTheDocument();
 });
 it("renders errors and field validation then retries", async () => {

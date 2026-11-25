@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.dashboard.mapper.DashboardMapper">
+  <resultMap id="utilizationRow" type="com.company.common.dashboard.mapper.DashboardMapper$Utilization" autoMapping="false">
+    <constructor>
+      <arg column="totalPeople" javaType="_int"/>
+      <arg column="assignedPeople" javaType="_int"/>
+    </constructor>
+  </resultMap>
+  <select id="utilization" resultMap="utilizationRow">
+    SELECT count(*)::integer AS "totalPeople", count(*) FILTER (WHERE EXISTS (
+      SELECT 1 FROM TB_PJ_ASGN_MON m WHERE m.DEV_ID=d.DEV_ID AND m.INPUT_YM=#{month} AND m.MON_MM &gt; 0
+    ))::integer AS "assignedPeople"
+    FROM TB_HR_DEV d WHERE d.DRCT_CLS_CD='DRCT'
+      AND (d.JNCMP_DT IS NULL OR d.JNCMP_DT &lt;= #{last})
+      AND (d.RETIRE_DT IS NULL OR d.RETIRE_DT &gt;= #{first})
+  </select>
+  <insert id="insertAccess">
+    INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
+    VALUES (#{actor},'DNLD','UI-16',#{target},clock_timestamp(),#{actor},clock_timestamp())
+  </insert>
+</mapper>

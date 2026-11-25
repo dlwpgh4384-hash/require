@@ -58,6 +58,8 @@ public interface ProjectMapper {
     void insertExpense(ExpenseWrite write);
     int deleteExpense(ExpenseKey key);
     List<Step> steps(String id);
+    class BoardStep extends Step { public String projectId; }
+    List<BoardStep> boardSteps(@Param("ids") List<String> ids);
     List<Issue> issues(String id);
     List<Memo> memos(String id);
     /** SER-006 접근 기록(프로젝트 화면 UI-01): 목록 다운로드(DNLD). */

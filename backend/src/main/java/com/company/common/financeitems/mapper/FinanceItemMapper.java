@@ -20,6 +20,7 @@ public interface FinanceItemMapper {
     List<Card> cards(@Param("month") String month);
     TaxEstimate estimate(@Param("year") String year);
     List<TaxPayment> payments(@Param("year") String year);
+    List<TaxPayment> allPayments();
     TaxPayment payment(PaymentKey key);
     CardPayment cardPayment(@Param("month") String month);
     BigDecimal fixedTax(@Param("month") String month);

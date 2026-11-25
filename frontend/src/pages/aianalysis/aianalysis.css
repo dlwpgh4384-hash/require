@@ -1,0 +1,121 @@
+.ai-analysis-page {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 24px;
+  min-width: 0;
+}
+.ai-analysis-history {
+  border-right: 1px solid var(--divider);
+  padding-right: 16px;
+  min-width: 0;
+}
+.ai-analysis-history ul {
+  list-style: none;
+  padding: 0;
+}
+.ai-analysis-history button {
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  margin: 4px 0;
+  padding: 10px;
+}
+.ai-analysis-history small {
+  display: block;
+  color: var(--text-sub);
+}
+.ai-analysis-conversation,
+.ai-analysis-dialog {
+  min-width: 0;
+  max-width: 100%;
+}
+.ai-analysis-turns {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ai-analysis-turns section,
+.ai-analysis-answer {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ai-analysis-question {
+  margin-left: auto;
+  padding: 12px;
+  background: var(--primary-bg);
+  color: var(--primary-text);
+  border-radius: 8px;
+}
+.ai-analysis-answer {
+  border: 1px solid var(--border);
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--surface);
+}
+.ai-analysis-answer h3 {
+  font-size: 14px;
+  margin: 14px 0 6px;
+}
+.ai-analysis-table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.ai-analysis-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ai-analysis-table th,
+.ai-analysis-table td {
+  border-bottom: 1px solid var(--divider);
+  padding: 8px;
+  text-align: right;
+  white-space: nowrap;
+}
+.ai-analysis-table th {
+  background: var(--ls-head-bg);
+}
+.ai-analysis-actions,
+.ai-analysis-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.ai-analysis-suggestions button {
+  font-size: 12px;
+  white-space: normal;
+}
+.ai-analysis-conversation form {
+  margin-top: 16px;
+}
+.ai-analysis-conversation label {
+  display: block;
+  margin-bottom: 6px;
+}
+.ai-analysis-conversation textarea {
+  resize: vertical;
+  min-height: 76px;
+  width: 100%;
+  max-width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+}
+.ai-analysis-conversation [role="alert"] {
+  color: var(--ls-bad);
+}
+@media (max-width: 767px) {
+  .ai-analysis-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ai-analysis-history {
+    display: none;
+  }
+  .ai-analysis-answer {
+    padding: 12px;
+  }
+}

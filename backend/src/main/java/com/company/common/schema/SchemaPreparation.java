@@ -31,7 +31,8 @@ public class SchemaPreparation {
                         "db/migration/V18__business_plan_schema.sql",
                         "db/migration/V19__month_close_schema.sql",
                         "db/migration/V20__candidate_schema.sql",
-                        "db/migration/V21__sales_pipeline_schema.sql"}) {
+                        "db/migration/V21__sales_pipeline_schema.sql",
+                        "db/migration/V22__ai_analysis_schema.sql"}) {
                     String sql = new ClassPathResource(resource).getContentAsString(StandardCharsets.UTF_8);
                     try (var statement = session.getConnection().createStatement()) {
                         statement.execute(sql);

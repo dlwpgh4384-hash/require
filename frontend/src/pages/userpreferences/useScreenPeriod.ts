@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  publishScreenPeriod,
+  screenPeriodChannel,
+} from "../../shared/layout/screenPeriodChannel";
 import {
   isAllowed,
   latestPeriod,
@@ -44,6 +48,9 @@ export function useScreenPeriod(
   latestYm?: string,
 ) {
   const [state, setState] = useState<State>({ status: "loading" });
+  const pendingPeriod = useRef<
+    import("../../shared/layout/screenPeriodChannel").ScreenPeriod | null
+  >(null);
   // 화면마다 따로 차례로 저장한다(빨리 두 번 바꿔도 두 번째가 남고, 다른 화면의 수정 시각과 섞이지 않는다).
   const saver = useMemo(
     () => createPreferenceSaver("PERIOD", screenId),
@@ -151,5 +158,34 @@ export function useScreenPeriod(
       window.removeEventListener(PERIOD_BASIS_CHANGED_EVENT, listener);
     };
   }, [screenId, optionsKey, latestYm]);
+  useEffect(() => {
+    if (state.status !== "ready") return;
+    const { year, month } = state.value;
+    publishScreenPeriod(screenId, {
+      startMonth: `${year}-${String(options.kind === "yearCumulative" ? 1 : (month ?? 1)).padStart(2, "0")}`,
+      endMonth: `${year}-${String(month ?? 12).padStart(2, "0")}`,
+    });
+  }, [screenId, state]);
+  useEffect(
+    () =>
+      screenPeriodChannel(screenId).subscribe((period) => {
+        pendingPeriod.current = period;
+        setState((previous) => ({ ...previous }));
+      }),
+    [screenId, optionsKey],
+  );
+  useEffect(() => {
+    const period = pendingPeriod.current;
+    if (!period || state.status !== "ready") return;
+    pendingPeriod.current = null;
+    const next = {
+      year: Number(period.endMonth.slice(0, 4)),
+      ...(options.kind === "year"
+        ? {}
+        : { month: Number(period.endMonth.slice(5)) }),
+    };
+    if (isAllowed(next, state.basis, options))
+      setState({ ...state, value: next });
+  }, [state, optionsKey]);
   return { state, setValue };
 }

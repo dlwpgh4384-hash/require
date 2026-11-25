@@ -107,7 +107,7 @@ class MenuRegistrationControllerTest {
         mvc.perform(get("/api/common/menu-options").param("menuLvl", "2"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.upperMenus[0].menuId").value("G007"))
             .andExpect(jsonPath("$.data.screens[*].scrnId")
-                .value(org.hamcrest.Matchers.contains("UI-23", "UI-24", "UI-25", "UI-27", "UI-15", "UI-02", "UI-01", "UI-12", "UI-05", "UI-11", "UI-31", "UI-13", "UI-03", "UI-04", "UI-19", "UI-32", "UI-10", "UI-07", "UI-08", "UI-09", "UI-14", "UI-18", "UI-21", "UI-33", "UI-29", "UI-28", "UI-17", "UI-16", "UI-30")))
+                .value(org.hamcrest.Matchers.contains("UI-23", "UI-24", "UI-25", "UI-27", "UI-15", "UI-02", "UI-01", "UI-12", "UI-05", "UI-11", "UI-31", "UI-13", "UI-03", "UI-04", "UI-19", "UI-32", "UI-10", "UI-07", "UI-08", "UI-09", "UI-14", "UI-18", "UI-21", "UI-33", "UI-29", "UI-28", "UI-17", "UI-16", "UI-30", "UI-26")))
             .andExpect(jsonPath("$.data.screens[?(@.scrnId == 'UI-30')].menuNm")
                 .value(org.hamcrest.Matchers.contains("AI 인력 추천")))
             .andExpect(jsonPath("$.data.screens[?(@.scrnId == 'UI-16')].menuNm")
@@ -251,7 +251,13 @@ class MenuRegistrationControllerTest {
         verify(mapper).screenExists("UI-30");
         verify(mapper).insertMenu(org.mockito.ArgumentMatchers.argThat(item -> "UI-30".equals(item.scrnId())));
     }
-    @ParameterizedTest @ValueSource(strings = {"UI-26", "ui-25", " UI-25"})
+    @Test void aiAnalysisScreenIsSelectableForAnonymousMenuRegistration() throws Exception {
+        create(child().put("scrnId", "UI-26"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.scrnId").value("UI-26"));
+        verify(mapper).screenExists("UI-26");
+        verify(mapper).insertMenu(org.mockito.ArgumentMatchers.argThat(item -> "UI-26".equals(item.scrnId())));
+    }
+    @ParameterizedTest @ValueSource(strings = {"UI-22", "ui-25", " UI-25"})
     void placeholderAndNormalizedScreenIdsAreNotDeveloped(String id) throws Exception {
         create(child().put("scrnId", id)).andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("scrnId"));

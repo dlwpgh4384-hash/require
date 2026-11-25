@@ -79,6 +79,8 @@ function respond(body = response()) {
   return request;
 }
 function preferenceResponse(url: string) {
+  if (url === "/api/common/ai-analysis/questions")
+    return { success: true, meta: {}, data: { items: [] } };
   return {
     success: true,
     meta: {},
@@ -2637,7 +2639,7 @@ function respondWithAssignments() {
     {
       ...menus.data[0],
       menuId: "assistant-menu",
-      menuNm: "준비 화면",
+      menuNm: "AI 분석 도우미",
       scrnId: "UI-26",
       sortOrd: 3,
     },
@@ -2676,6 +2678,8 @@ function respondWithAssignments() {
     ): Promise<Pick<Response, "ok" | "status" | "json">> => {
       if (url === "/api/common/menus")
         return { ok: true, status: 200, json: async () => menus };
+      if (url === "/api/common/ai-analysis/questions")
+        return success({ items: [] });
       if (url.startsWith("/api/common/user-preferences/"))
         return {
           ok: true,
@@ -2926,7 +2930,7 @@ describe("assignment route composition", () => {
     expectSingleShell();
   });
 
-  it("UI-26 remains navigation-only and preserves the preferences scope on return", async () => {
+  it("UI-26 opens the analysis page and preserves the preferences scope on return", async () => {
     respondWithAssignments();
     mount("/screens/UI-12");
     await screen.findByTestId("assignment-empty");
@@ -2934,9 +2938,7 @@ describe("assignment route composition", () => {
     await act(async () => {
       await router!.navigate("/screens/UI-26");
     });
-    expect(
-      await screen.findByRole("region", { name: "UI-26 본문" }),
-    ).toHaveTextContent("준비 중");
+    expect(await screen.findByTestId("ai-analysis-page")).toBeVisible();
     expect(screen.queryByTestId("assignment-create")).not.toBeInTheDocument();
     expect(screen.getByTestId("user-preferences")).toBe(preferences);
     await act(async () => {

@@ -47,7 +47,7 @@ class SchemaPreparationTest {
 
     @Test
     void allPackagedResourcesExecuteBeforeSingleCommit() throws Exception {
-        assertThat(migrationCount()).isEqualTo(21);
+        assertThat(migrationCount()).isEqualTo(22);
         preparation.prepare();
         var ordered = inOrder(factory, session, connection, statement);
         ordered.verify(factory).openSession(false);
@@ -134,6 +134,10 @@ class SchemaPreparationTest {
         ordered.verify(session).getConnection();
         ordered.verify(connection).createStatement();
         ordered.verify(statement).execute(contains("DO $sales_pipeline_schema$"));
+        ordered.verify(statement).close();
+        ordered.verify(session).getConnection();
+        ordered.verify(connection).createStatement();
+        ordered.verify(statement).execute(contains("DO $ai_question$"));
         ordered.verify(statement).close();
         ordered.verify(session).commit(true);
         ordered.verify(session).close();
@@ -222,7 +226,7 @@ class SchemaPreparationTest {
             "TB_CO_PART_SETL_DTL", "TB_CL_CLOSE_CHK",
             "TB_CO_MON_PL", "TB_CO_PREV_ADJ", "TB_FI_ITEM", "TB_FI_CORP_TAX", "TB_FI_TAX_PAY", "TB_FI_LOAN",
             "TB_FI_CARD", "TB_FI_CARD_MON", "TB_FI_CARD_PAY", "TB_FI_XFER", "TB_FI_BIZ_PLAN", "TB_CL_CLOSE_HIST",
-            "TB_HR_CAND", "TB_HR_CAND_SKILL", "TB_HR_CAND_CNTC", "TB_SL_APRV_HIST");
+            "TB_HR_CAND", "TB_HR_CAND_SKILL", "TB_HR_CAND_CNTC", "TB_SL_APRV_HIST", "TB_SY_AI_QNA");
         assertThat(tables).isEqualTo(MigrationResources.tableNames());
         assertThat(tables).allMatch(name -> name.startsWith("TB_"));
         assertThat(tables).contains("TB_SY_CALC_RULE", "TB_SY_CHG_HIST", "TB_SY_CODE", "TB_SY_CODE_GRP",

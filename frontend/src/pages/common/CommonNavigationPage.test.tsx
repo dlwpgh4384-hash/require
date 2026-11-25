@@ -138,6 +138,8 @@ function fixture(): ShellMenuResponse {
 }
 function respond(body: ShellMenuResponse) {
   const withdrawalResponse = (url: string) => {
+    if (url === "/api/common/ai-analysis/questions")
+      return { success: true, meta: {}, data: { items: [] } };
     if (url === "/api/common/ai-recommendation-options")
       return {
         success: true,
@@ -614,6 +616,12 @@ type Content = ReturnType<typeof within>;
  * 화면 목록(screenRegistry)의 rootTestId로 모든 만든 화면에 똑같이 확인한다.
  */
 const deepChecks: Record<string, (content: Content) => Promise<void>> = {
+  "UI-26": async (content) => {
+    expect(await content.findByText("저장된 질문이 없습니다.")).toBeVisible();
+    expect(content.getByTestId("analysis-question")).toBeVisible();
+    expect(content.getByTestId("analysis-send")).toBeEnabled();
+    expect(content.queryByText("준비 중")).not.toBeInTheDocument();
+  },
   "UI-30": async (content) => {
     expect(
       await content.findByText("진행 중인 대상이 없습니다."),
@@ -1567,14 +1575,15 @@ describe("common placeholder screen contract", () => {
     );
     await expectScreenContent("UI-15");
     expect(setItem).not.toHaveBeenCalled();
-    // 메뉴 옆 미수 건수(SFR-001-04)·월 마감 「!」 배지는 읽기 요청이라 목록에서 뺀다(아래에서 쓰기 없음은 따로 확인).
+    // 공통 미수·마감 배지와 공유 AI 질문 기록 조회는 화면 이동과 무관한 읽기 요청이다.
     expect(
       requests.mock.calls
         .map(([url]) => url)
         .filter(
           (url) =>
             url !== "/api/common/bills/unpaid-count" &&
-            url !== "/api/common/month-close-badge",
+            url !== "/api/common/month-close-badge" &&
+            url !== "/api/common/ai-analysis/questions",
         ),
     ).toEqual([
       "/api/common/menus",

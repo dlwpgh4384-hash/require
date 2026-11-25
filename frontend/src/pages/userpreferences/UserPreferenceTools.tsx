@@ -4,6 +4,11 @@ import { ScreenSettingsDialog } from "./ScreenSettingsDialog";
 import { UserPreferenceDialog } from "./UserPreferenceDialog";
 import type { PreferenceMenu } from "./PersonalScreenPreferences";
 import { ShellIcon } from "../../shared/layout/ShellIcon";
+import { AiAnalysisDialog } from "../aianalysis/AiAnalysisDialog";
+import {
+  AiAnalysisWorkspaceProvider,
+  useOptionalAiAnalysis,
+} from "../aianalysis/AiAnalysisWorkspace";
 
 export function MenuSearchDialog({
   menus,
@@ -147,6 +152,7 @@ function SessionTimer({ onExtend }: { onExtend: () => void }) {
 export const CURRENT_USER = { name: "시스템 관리자", role: "관리자" };
 
 export function UserPreferenceTools({
+  screenId = "UI-26",
   menus,
   mobile,
   available,
@@ -155,6 +161,7 @@ export function UserPreferenceTools({
   menuError,
   onDirtyChange,
 }: {
+  screenId?: string;
   menus: PreferenceMenu[];
   mobile: boolean;
   available: (id: string) => boolean;
@@ -164,12 +171,15 @@ export function UserPreferenceTools({
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const analysis = useOptionalAiAnalysis();
   const [notice, setNotice] = useState("");
   const menuAnchor = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!menuOpen) return;
     const close = (event: MouseEvent) => {
-      if (!menuAnchor.current?.contains(event.target as Node)) setMenuOpen(false);
+      if (!menuAnchor.current?.contains(event.target as Node))
+        setMenuOpen(false);
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setMenuOpen(false);
@@ -211,10 +221,9 @@ export function UserPreferenceTools({
       <button
         type="button"
         className="hd-ai"
-        data-testid="ai-unavailable"
-        aria-label="AI에게 묻기 (준비 중)"
-        title="AI에게 묻기는 AI 분석 도우미 작업에서 붙입니다."
-        onClick={() => setNotice("AI에게 묻기는 준비 중입니다.")}
+        data-testid="ai-analysis-open"
+        aria-label="AI에게 묻기"
+        onClick={() => setAnalysisOpen(true)}
       >
         <ShellIcon name="spark" />
         {!mobile && <span>AI에게 묻기</span>}
@@ -241,7 +250,8 @@ export function UserPreferenceTools({
           <ShellIcon name="user" />
           {!mobile && (
             <span>
-              {CURRENT_USER.name} <span className="hd-sub">({CURRENT_USER.role})</span>
+              {CURRENT_USER.name}{" "}
+              <span className="hd-sub">({CURRENT_USER.role})</span>
             </span>
           )}
           <ShellIcon name="chevronDown" />
@@ -253,7 +263,8 @@ export function UserPreferenceTools({
             role="menu"
           >
             <div className="hd-pop-h">
-              {CURRENT_USER.name} <span className="hd-sub">{CURRENT_USER.role}</span>
+              {CURRENT_USER.name}{" "}
+              <span className="hd-sub">{CURRENT_USER.role}</span>
             </div>
             {(
               [
@@ -273,16 +284,37 @@ export function UserPreferenceTools({
                 onClick={() => {
                   setMenuOpen(false);
                   if (target) setDialog(target);
-                  else setNotice(`${label}은(는) 준비 중입니다. 마지막 로그인 작업에서 붙입니다.`);
+                  else
+                    setNotice(
+                      `${label}은(는) 준비 중입니다. 마지막 로그인 작업에서 붙입니다.`,
+                    );
                 }}
               >
                 {label}
               </button>
             ))}
-            <SessionTimer onExtend={() => setNotice("자동 로그아웃 시간을 30분으로 다시 늘렸습니다.")} />
+            <SessionTimer
+              onExtend={() =>
+                setNotice("자동 로그아웃 시간을 30분으로 다시 늘렸습니다.")
+              }
+            />
           </div>
         )}
       </div>
+      {analysisOpen &&
+        (analysis ? (
+          <AiAnalysisDialog
+            screenId={screenId}
+            onClose={() => setAnalysisOpen(false)}
+          />
+        ) : (
+          <AiAnalysisWorkspaceProvider>
+            <AiAnalysisDialog
+              screenId={screenId}
+              onClose={() => setAnalysisOpen(false)}
+            />
+          </AiAnalysisWorkspaceProvider>
+        ))}
       {notice && (
         <Toast
           message={notice}
@@ -334,7 +366,8 @@ export function usePreferenceBusinessShortcuts(
     const keydown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
       if (handlers.scope?.current?.closest("[hidden]")) return;
-      const save = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s";
+      const save =
+        (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s";
       // 숨은 화면 탭 안에 열려 있는 대화상자(상세 패널)는 세지 않는다(보이는 탭 Ctrl+S가 막히지 않게).
       const dialogs = Array.from(
         document.querySelectorAll('[role="dialog"], [role="alertdialog"]'),
@@ -368,16 +401,18 @@ export function usePreferenceBusinessShortcuts(
           "button,a[href],summary,[role='button'],[role='tab'],[role='checkbox'],[role='menuitem'],[role='link']",
         );
       if (editing && !save) return;
-      const handler =
-        save
-          ? handlers.onSave
-          : event.ctrlKey && event.key === "ArrowLeft"
-            ? handlers.onPreviousPage
-            : event.ctrlKey && event.key === "ArrowRight"
-              ? handlers.onNextPage
-              : !event.ctrlKey && !event.metaKey && event.key === "Enter" && !control
-                ? handlers.onSearch
-                : undefined;
+      const handler = save
+        ? handlers.onSave
+        : event.ctrlKey && event.key === "ArrowLeft"
+          ? handlers.onPreviousPage
+          : event.ctrlKey && event.key === "ArrowRight"
+            ? handlers.onNextPage
+            : !event.ctrlKey &&
+                !event.metaKey &&
+                event.key === "Enter" &&
+                !control
+              ? handlers.onSearch
+              : undefined;
       if (handler) {
         event.preventDefault();
         handler();

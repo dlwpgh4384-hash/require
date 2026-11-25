@@ -24,9 +24,18 @@ const screens = [
 ];
 /** 아직 만들지 않은 화면(화면 목록에 없음): 메뉴에는 있고 본문은 공통 「준비 중」. */
 const pending = [
-  { id: "UI-26", menuId: "M025", parent: "G009", title: "미구현 화면" },
+  {
+    id: "ADDED",
+    menuId: "pending-screen",
+    parent: "G004",
+    title: "미구현 화면",
+  },
 ];
-const menuScreens = [...screens, ...pending];
+const menuScreens = [
+  ...screens,
+  ...pending,
+  { id: "UI-26", menuId: "M025", parent: "G004", title: "AI 분석 도우미" },
+];
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -91,6 +100,7 @@ function respond() {
   const request = vi.fn(async (url: string, _init?: RequestInit) => {
     if (url === "/api/common/menus")
       return { ok: true, status: 200, json: async () => menus };
+    if (url === "/api/common/ai-analysis/questions") return ok({ items: [] });
     if (url.startsWith("/api/common/user-preferences/"))
       return ok({
         prefTypeCd: url.split("/").at(-2),
@@ -187,7 +197,7 @@ describe("withdrawal route composition", () => {
     },
   );
 
-  // 인력 수요 예측은 아직 만들지 않았다: 공통 「준비 중」이 보이고 가배정 자료를 읽지 않는다.
+  // DB에만 추가된 화면은 공통 「준비 중」을 보이고 가배정 자료를 읽지 않는다.
   it.each(pending)(
     "$id is not registered yet and shows the common placeholder",
     async (entry) => {
@@ -216,10 +226,7 @@ describe("withdrawal route composition", () => {
     await act(async () => {
       await router!.navigate("/screens/UI-26");
     });
-    const placeholder = await screen.findByRole("region", {
-      name: "UI-26 본문",
-    });
-    expect(placeholder).toHaveTextContent("준비 중");
+    expect(await screen.findByTestId("ai-analysis-page")).toBeVisible();
     expect(screen.getByTestId("list-download")).not.toBeVisible();
     await act(async () => {
       await router!.navigate("/screens/UI-05");

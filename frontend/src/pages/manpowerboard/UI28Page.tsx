@@ -33,6 +33,7 @@ import {
   forecastDifferenceText,
 } from "../manpowerforecasts/manpowerForecasts";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
+import { publishScreenPeriod } from "../../shared/layout/screenPeriodChannel";
 import {
   getCommonManpowerBoard,
   getCommonManpowerBoardExcel,
@@ -57,22 +58,33 @@ const one = (value: number | null | undefined) =>
   value == null ? "–" : (Math.round(value * 10 + 1e-9) / 10).toFixed(1); // 서버·엑셀(HALF_UP)과 같게
 // 시안 ic('info'): 안내 띠 아이콘
 const infoIcon = (
-  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    width={16}
+    height={16}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" />
   </svg>
 );
 /** 시안 lg: 칸 견본과 이름. */
-const legends: { cls: string; text?: string; label: string; part?: boolean }[] = [
-  { cls: "c-on", label: "투입 중" },
-  { cls: "c-on c-part", label: "일부 투입(1.0 미만)", part: true },
-  { cls: "c-on", text: "2건", label: "동시 투입" },
-  { cls: "c-end", label: "철수 예정" },
-  { cls: "c-idle", label: "비어 있음" },
-  { cls: "c-tent", label: "가배정" },
-  { cls: "c-leave", label: "휴직" },
-  { cls: "c-ret", label: "퇴사" },
-  { cls: "c-pre", text: "⚠", label: "미계약 선투입" },
-];
+const legends: { cls: string; text?: string; label: string; part?: boolean }[] =
+  [
+    { cls: "c-on", label: "투입 중" },
+    { cls: "c-on c-part", label: "일부 투입(1.0 미만)", part: true },
+    { cls: "c-on", text: "2건", label: "동시 투입" },
+    { cls: "c-end", label: "철수 예정" },
+    { cls: "c-idle", label: "비어 있음" },
+    { cls: "c-tent", label: "가배정" },
+    { cls: "c-leave", label: "휴직" },
+    { cls: "c-ret", label: "퇴사" },
+    { cls: "c-pre", text: "⚠", label: "미계약 선투입" },
+  ];
 /** 시안 cellHtml: 일부 투입(1.0 미만)은 투입·철수 예정·미계약 선투입 칸에만. */
 const isPart = (cell: ManpowerBoardCell) =>
   ["on", "end", "pre"].includes(cell.statusCode) && cell.totalMm < 1;
@@ -126,8 +138,7 @@ export function UI28Page({
   const currentYear = Number(today.slice(0, 4));
   const thisMonth = today.slice(0, 7);
   // 기간을 읽은 뒤에만 조회한다(처음 요청 한 번).
-  const year =
-    period.state.status === "ready" ? period.state.value.year : null;
+  const year = period.state.status === "ready" ? period.state.value.year : null;
   const [draft, setDraft] = useState<BoardConditions>({});
   const [applied, setApplied] = useState<BoardConditions>({});
   const [revision, setRevision] = useState(0);
@@ -144,6 +155,20 @@ export function UI28Page({
   const [tab, setTab] = useState<"calendar" | "forecast">("calendar");
   const [forecast, setForecast] = useState<SalesForecast | null>(null);
   const [forecastError, setForecastError] = useState("");
+  useEffect(() => {
+    const months = tab === "forecast" ? forecast?.months : undefined;
+    publishScreenPeriod(
+      "UI-28",
+      months?.length
+        ? {
+            startMonth: months[0].month,
+            endMonth: months[months.length - 1].month,
+          }
+        : year == null
+          ? undefined
+          : { startMonth: `${year}-01`, endMonth: `${year}-12` },
+    );
+  }, [tab, forecast, year]);
   const [forecastRevision, setForecastRevision] = useState(0);
   const forecastRequested = useRef<number | null>(null);
   const alive = useRef(true);
@@ -262,7 +287,17 @@ export function UI28Page({
       disabled={!data || downloading}
       onClick={() => void download()}
     >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
         <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
       </svg>{" "}
       {downloading ? "만드는 중…" : "엑셀 다운로드"}
@@ -535,13 +570,16 @@ export function UI28Page({
                       data-testid={`manpower-board-person-${person.developerId}`}
                       onClick={() => setDetail(person.developerId)}
                       onKeyDown={(event) => {
-                        if (event.key === "Enter") setDetail(person.developerId);
+                        if (event.key === "Enter")
+                          setDetail(person.developerId);
                       }}
                     >
                       <td className="ls-sc">
                         <span className="board-pname">
                           {person.name}
-                          <small>{person.managementNumber || person.developerId}</small>
+                          <small>
+                            {person.managementNumber || person.developerId}
+                          </small>
                         </span>
                       </td>
                       <td>{person.jobName}</td>

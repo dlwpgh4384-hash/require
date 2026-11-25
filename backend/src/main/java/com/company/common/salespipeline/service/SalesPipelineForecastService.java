@@ -114,6 +114,21 @@ public class SalesPipelineForecastService {
     }
 
     private List<WorkforceMonth> workforceForecast(List<MonthWindow> windows, List<Job> jobs) {
+        return workforceForecast(windows, jobs, null);
+    }
+
+    public List<WorkforceMonth> getWorkforceForecast(List<MonthWindow> months, BigDecimal probabilityOverride) {
+        if (probabilityOverride != null && (probabilityOverride.signum() < 0
+                || probabilityOverride.compareTo(BigDecimal.valueOf(100)) > 0))
+            throw CodeFailure.invalid("probability", "확률 범위를 확인해 주세요.");
+        var loaded = calculations.definitions();
+        SalesPipelineCalculationRules.require(loaded, "식-60", "max(0, 1", "소수 첫째 자리");
+        SalesPipelineCalculationRules.require(loaded, "식-61", "필요 인원 × 월 MM × 수주 확률", "미충원");
+        return workforceForecast(List.copyOf(months), mapper.jobs(), probabilityOverride);
+    }
+
+    private List<WorkforceMonth> workforceForecast(List<MonthWindow> windows, List<Job> jobs,
+        BigDecimal probabilityOverride) {
         if (windows.isEmpty()) return Collections.emptyList();
         var base = calendar.currentMonth();
         var settings = workforceRules.settings();
@@ -137,7 +152,8 @@ public class SalesPipelineForecastService {
                         .map(e -> new Extension(e.monthlyMm(), e.extensionPossibilityCode())).toList())).toList();
                 BigDecimal jobSupply = settings.supply(people, base);
                 var demandRows = opportunities.getOrDefault(key, List.of()).stream()
-                    .map(n -> new OpportunityDemand(n.requiredCount(), n.monthlyMm(), n.winningProbability())).toList();
+                    .map(n -> new OpportunityDemand(n.requiredCount(), n.monthlyMm(),
+                        probabilityOverride == null ? n.winningProbability() : probabilityOverride)).toList();
                 var projectRows = projects.getOrDefault(key, List.of()).stream()
                     .map(p -> new ProjectDemand(p.plannedMm(), p.confirmedMm(), p.remainingMonths())).toList();
                 BigDecimal demand = settings.demand(demandRows, projectRows);

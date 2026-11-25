@@ -14255,6 +14255,211 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/ai-analysis/questions:
+    get:
+      operationId: getCommonAiAnalysisQuestions
+      summary: 본인 질문 기록 조회
+      security: []
+      x-related-requirements:
+      - REQ-1648
+      - REQ-1658
+      x-pagination:
+        mode: none
+        reason: 원문은 왼쪽 본인 목록만 정의; 별도 페이지/기간 필터를 만들지 않음
+      x-filtering:
+        owner: 서버 CurrentBusinessActor; userId 입력 금지
+      x-aiops-query-role:
+        entity: TB_SY_AI_QNA
+        result_path:
+        - data
+        - items
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAiAnalysisHistory'
+                  required:
+                  - data
+        '400':
+          description: 입력 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    post:
+      operationId: postCommonAiAnalysisQuestion
+      summary: 숫자 질문과 예측 답변
+      security: []
+      x-related-requirements:
+      - REQ-1630
+      - REQ-1632
+      - REQ-1635
+      - REQ-1636
+      - REQ-1637
+      - REQ-1638
+      - REQ-1641
+      - REQ-1643
+      - REQ-1644
+      - REQ-1645
+      - REQ-1646
+      - REQ-1647
+      - REQ-1649
+      - REQ-1659
+      - REQ-1660
+      - REQ-1661
+      - REQ-1662
+      - REQ-1663
+      - REQ-1664
+      - REQ-1665
+      - REQ-1666
+      - REQ-1667
+      - REQ-1668
+      - REQ-1669
+      - REQ-1670
+      - REQ-1671
+      - REQ-1672
+      - REQ-1673
+      - REQ-1674
+      - REQ-1676
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonAiAnalysisQuestionInput'
+      x-business-rules:
+      - 기간 명시 우선; 생략은 헤더 화면기간 또는 UI-26 이번달
+      - 원래 Java 서비스 읽기전용 호출·HTTP/계산SQL/단계생성 금지
+      - RoleSensitivePolicy 동일투영; 급여 불허 NO_ANS·일부제외 답 가능 OK
+      - 미래 영업이익·함수/입력 결정불가 NO_ANS; 수치창작0
+      x-side-effects:
+      - 분리 기록 경계에 TB_SY_AI_QNA 질문당1행; 정상OK/답변불가NO_ANS/원천예외ERR
+      - 응답 저장 동일 민감투영·USE_DATA_DESC500자·업무원천불변
+      x-state-transitions:
+      - 질문 실행 → OK 또는 NO_ANS 또는 ERR; 기존 질문 갱신·삭제 없음
+      x-required-tests:
+      - 'happy: 이번달 매출 질문 정상 실행 -> TB_SY_AI_QNA OK1행과 F-01 동일 표를 본인 기록/응답에서 확인'
+      - 'auth: 민감끔 정책으로 급여 질문 -> HTTP200 NO_ANS와 이 내용을 볼 권한이 없습니다.·금액필드0; 현재admin 무인증이며 역할403은 UI-22 후속(OQ-AUTH-026)'
+      - 'validation: question 빈 문자열 -> HTTP400 ApiError errors[].field=question·새QNA0행'
+      - 'business: 미래 영업이익 예측 질문 -> HTTP200 NO_ANS·예측금액없음·업무표불변'
+      - 'side-effect: 원천서비스 예외 주입 뒤 질문/본인기록 조회 -> 별도 커밋 TB_SY_AI_QNA ERR1행·ANS_CN 오류답·원천변경0'
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAiAnalysisAnswer'
+                  required:
+                  - data
+        '400':
+          description: 입력 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 처리 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/ai-analysis/requests/{requestId}:
+    parameters:
+    - name: requestId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    get:
+      operationId: getCommonAiAnalysisProgress
+      summary: 질문 처리 단계 조회
+      security: []
+      x-related-requirements:
+      - REQ-1642
+      description: POST와 병행해 같은 요청의 실제 단계만 읽는다. 서버 실행 중 메모리 상태이며 결과/가짜대기 저장 없음. 타인 요청은 비공개(OQ-ACCESS-026).
+      x-aiops-query-role:
+        entity: AI 질문 실행 단계
+        result_path:
+        - data
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonAiAnalysisProgress'
+                  required:
+                  - data
+        '400':
+          description: 입력 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 질문 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/common/ai-analysis/questions/{questionId}/excel:
+    parameters:
+    - name: questionId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    get:
+      operationId: getCommonAiAnalysisQuestionExcel
+      summary: 저장 답 표 엑셀 다운로드
+      security: []
+      x-related-requirements:
+      - REQ-1652
+      - REQ-1645
+      - REQ-1648
+      description: 본인 저장 ANS_CN의 이미 정책 적용된 표만 공통 엑셀로 변환·DNLD. 업무 재계산 없음.
+      x-side-effects:
+      - 기존 TB_SY_ACCS_LOG UI-26 DNLD 기록; 결과파일영속저장0
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 입력 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: 답 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
     CommonDashboardSummary:
@@ -24892,3 +25097,267 @@ components:
       - reasonCode
       - actedBy
       - actedAt
+    CommonAiAnalysisPeriod:
+      type: object
+      properties:
+        startMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+        endMonth:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+      required:
+      - startMonth
+      - endMonth
+    CommonAiAnalysisQuestionInput:
+      type: object
+      properties:
+        requestId:
+          type: string
+          minLength: 1
+          description: 공통 요청번호 helper로 생성; UUID 지원 없음에도 유일
+        question:
+          type: string
+          minLength: 1
+          description: 물리 최대길이는 OQ-DATA-026; 직접 token/AI키 입력 없음
+        screenId:
+          type: string
+          description: 헤더의 현재 화면; UI-26은 UI-26
+        period:
+          $ref: '#/components/schemas/CommonAiAnalysisPeriod'
+      required:
+      - requestId
+      - question
+      - screenId
+    CommonAiAnalysisColumn:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+      required:
+      - key
+      - label
+    CommonAiAnalysisCell:
+      oneOf:
+      - type: number
+      - type: string
+        nullable: true
+    CommonAiAnalysisTable:
+      type: object
+      properties:
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAiAnalysisColumn'
+        rows:
+          type: array
+          items:
+            type: array
+            items:
+              $ref: '#/components/schemas/CommonAiAnalysisCell'
+      required:
+      - columns
+      - rows
+    CommonAiAnalysisAction:
+      type: object
+      properties:
+        label:
+          type: string
+        targetScreenId:
+          type: string
+        period:
+          $ref: '#/components/schemas/CommonAiAnalysisPeriod'
+      required:
+      - label
+      - targetScreenId
+      - period
+    CommonAiAnalysisAnswer:
+      type: object
+      properties:
+        questionId:
+          type: string
+        answerStatus:
+          type: string
+          enum:
+          - OK
+          - NO_ANS
+          - ERR
+        conclusion:
+          type: string
+        table:
+          $ref: '#/components/schemas/CommonAiAnalysisTable'
+        assumptions:
+          type: array
+          items:
+            type: string
+        usedData:
+          type: string
+          description: 대상·기간·기준월 작업중 여부; 저장 설명500자
+        baseMonth:
+          type: string
+        provisional:
+          type: boolean
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAiAnalysisAction'
+        suggestedQuestions:
+          type: array
+          items:
+            type: string
+      required:
+      - questionId
+      - answerStatus
+      - conclusion
+      - assumptions
+      - usedData
+      - baseMonth
+      - provisional
+      - actions
+      - suggestedQuestions
+    CommonAiAnalysisHistoryItem:
+      type: object
+      properties:
+        questionId:
+          type: string
+        question:
+          type: string
+        askedAt:
+          type: string
+          format: date-time
+        answerStatus:
+          type: string
+          enum:
+          - OK
+          - NO_ANS
+          - ERR
+      required:
+      - questionId
+      - question
+      - askedAt
+      - answerStatus
+    CommonAiAnalysisHistory:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAiAnalysisHistoryItem'
+      required:
+      - items
+    CommonAiAnalysisProgress:
+      type: object
+      properties:
+        requestId:
+          type: string
+        stage:
+          type: string
+          enum:
+          - 데이터 찾는 중
+          - 계산 중
+          - 정리 중
+        completed:
+          type: boolean
+      required:
+      - requestId
+      - stage
+      - completed
+x-uncovered-requirements:
+- canonical_id: REQ-1615
+  status: data-constraint
+  evidence: DB 계산식 원천 — DB 정의 교체 fixture에서 동일 원래 서비스의 계산 결과를 읽고 식 표 쓰기0을 확인한다.
+- canonical_id: REQ-1616
+  status: data-constraint
+  evidence: 공통코드 원천 — DATA_SCOPE부터 XFER_CLS까지 옵션을 기존 코드 원천과 대조하고 신규 제품 코드 seed0을 확인한다.
+- canonical_id: REQ-1617
+  status: out-of-scope
+  evidence: 로그인과 메뉴 검사 후속 — UI-26 직접 진입과 질문이 로그인 화면으로 이동하지 않는다.
+- canonical_id: REQ-1618
+  status: non-functional
+  evidence: 개발 실행 설정 보존 — 일반 기동 자동 migration0·인증 요구false·multipart 값 전후 동일을 확인한다.
+- canonical_id: REQ-1619
+  status: non-functional
+  evidence: 인증 정의 미추가 — 유효 계약의 세 인증 선언 부재를 확인하며 일반 scheme 필수 지시와의 충돌은 OQ-AUTH-026으로 공개한다.
+- canonical_id: REQ-1620
+  status: non-functional
+  evidence: 기존 OpenAPI 보존 — 모든 기존 path/method/schema/field의 구조 및 보존 네 파일 바이트가 유지된다.
+- canonical_id: REQ-1621
+  status: non-functional
+  evidence: OpenAPI 증가 한도 — 신규 경로 수·UTF-8 증가량·최종 바이트 수를 실제 병합 결과에서 측정한다.
+- canonical_id: REQ-1622
+  status: non-functional
+  evidence: 공통 화면 요청과 번호 — randomUUID 없는 시험에서도 서로 다른 화면 요청 번호가 전달된다.
+- canonical_id: REQ-1623
+  status: data-constraint
+  evidence: 응답과 결과 파일 최소화 — 질문 후 결과 파일0·응답 필드의 실제 UI 소비를 확인한다.
+- canonical_id: REQ-1624
+  status: data-constraint
+  evidence: 질문 표 비파괴 준비 — 빈 DB 준비 성공·재실행 기존값 불변·불일치 칸 보고를 확인한다.
+- canonical_id: REQ-1625
+  status: non-functional
+  evidence: 준비 목록 동기화 — 준비 목록22개와 신규 SQL 자원 일치·기존21개 보존을 확인한다.
+- canonical_id: REQ-1626
+  status: screen-only
+  evidence: UI-26 본문 등록/렌더링은 router 로컬 연결이고 질문 실행은 postCommonAiAnalysisQuestion이다.
+- canonical_id: REQ-1627
+  status: screen-only
+  evidence: UI-38 열기/닫기는 Header 로컬 동작이며 별도 창 전용 API 없이 동일 질문 연산을 소비한다.
+- canonical_id: REQ-1628
+  status: out-of-scope
+  evidence: 로그인 단계 연결점 — 현재 고정admin에서 창 사용 가능·알림 발송0이며 역할 연결은 후속으로 남는다.
+- canonical_id: REQ-1629
+  status: screen-only
+  evidence: 단일 React 대화 저장소와 서버 질문 서비스 인스턴스 공유를 컴포넌트/DI 시험으로 확인하며 중복 HTTP 연산은 없다.
+- canonical_id: REQ-1631
+  status: screen-only
+  evidence: 탭 종료/새로고침은 메모리 대화만 비우므로 삭제 API가 없고 QNA 영속 목록은 보존된다.
+- canonical_id: REQ-1633
+  status: out-of-scope
+  evidence: 외부 AI 경계 — 키 없는 실행은 외부 호출0·네트워크 없는 가짜 연결 시험만 수행한다.
+- canonical_id: REQ-1634
+  status: non-functional
+  evidence: Java 서비스 직접 재사용 — 각 어댑터 spy로 명시 서비스 호출을 확인하고 HTTP0·계산SQL추가0·preview 단계쓰기0을 확인한다.
+- canonical_id: REQ-1639
+  status: data-constraint
+  evidence: 운영 기준 소비 — 운영 기준 fixture 변경 시 색과 가정 확률이 바뀌며 원래 계산의 숫자는 그대로 사용한다.
+- canonical_id: REQ-1640
+  status: data-constraint
+  evidence: 업무 조회 읽기 전용 — 질문 전후 업무표 snapshot 동일·QNA만1줄 증가를 확인한다.
+- canonical_id: REQ-1650
+  status: data-constraint
+  evidence: 사용 데이터 길이 — 500자 설명은 그대로·501자는500자 저장이며 답 JSON은 설명과 달리 임의 절단하지 않는다.
+- canonical_id: REQ-1651
+  status: screen-only
+  evidence: 답 actions의 targetScreenId/period를 createScreenRequest로 인계하는 로컬 탐색이며 저장 명령은 없다.
+- canonical_id: REQ-1653
+  status: non-functional
+  evidence: 시안과 공통 UI — 실제 기록만 렌더링·375px 기록칸 숨김/문서넘침0·오류 답자리1번을 확인한다.
+- canonical_id: REQ-1654
+  status: non-functional
+  evidence: 시각 계약 — UTC/한국 월경계 fixture의 저장 순간과 한국 표시가 동일하다.
+- canonical_id: REQ-1655
+  status: non-functional
+  evidence: 화면 단위 구현 위치 — frontend/src/pages/aianalysis와 com.company.common.aianalysis에 신규 기능이 모인다.
+- canonical_id: REQ-1656
+  status: non-functional
+  evidence: 기존 시험과 목록 회귀 — 원문 열거 시험과 화면목록 UI-26 연결이 일치하고 기존 보존 시험이 통과한다.
+- canonical_id: REQ-1657
+  status: non-functional
+  evidence: 최종 staged 검증 — 실제 구현 Git 작업트리에서 명령 종료0·공백오류0을 기록한다. 현재 명세트리에는 Git이 없다.
+- canonical_id: REQ-1675
+  status: out-of-scope
+  evidence: 지급 현황 함수 제외 — 지급 현황 전용 함수·경로·SQL이 추가되지 않는다.
+- canonical_id: REQ-1677
+  status: non-functional
+  evidence: 함수 확장 계약 — 새 함수 등록 검토에서 네 항목 누락을 탐지한다.
+- canonical_id: REQ-1678
+  status: out-of-scope
+  evidence: 평가와 가정 편집 제외 — UI에 평가/가정편집 CTA0·TB_SY_AI_QNA EVAL_CD 추가0이다.
+- canonical_id: REQ-1679
+  status: screen-only
+  evidence: 원화면 대조는 로컬 화면열기다. 관리자 전달 채널은 OQ-ERROR-026 검토 전 새 알림/메일 API를 만들지 않는다.
+- canonical_id: REQ-1680
+  status: non-functional
+  evidence: 업무 사용자 — UI 인계 사용자 범위에 세 사용자명이 남으며 새 역할코드는 만들지 않는다.

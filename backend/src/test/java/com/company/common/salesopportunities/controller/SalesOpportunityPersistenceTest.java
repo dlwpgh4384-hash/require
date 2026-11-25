@@ -117,6 +117,24 @@ class SalesOpportunityPersistenceTest {
         assertThat(db.queryForMap("SELECT * FROM TB_SL_OPP WHERE opp_id=?", id).get("reg_user_id")).isEqualTo(before.get("reg_user_id"));
         mvc.perform(put("/api/common/sales-opportunities/{id}", id).contentType("application/json").content(body.toString())).andExpect(status().isConflict());
     }
+    // 근무지 지역(2026-11-25): 실제 행정구역 표의 코드로 저장·이름 읽기, 쓰지 않는 구역은 400으로 막는다.
+    @Test void workAreaCodePersistsWithItsNameAndUnusedAreaIsRejected() throws Exception {
+        var area = db.queryForMap("SELECT area_cd, concat_ws(' ',sido_nm,sgg_nm,emd_nm) AS name FROM TB_SY_ADM_AREA "
+            + "WHERE area_lvl_cd='EMD' AND use_yn='Y' ORDER BY area_cd LIMIT 1");
+        String code = (String) area.get("area_cd");
+        var body = input().put("workAreaCode", code);
+        var id = json.readTree(mvc.perform(post("/api/common/sales-opportunities").contentType("application/json").content(body.toString()))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("data").path("opportunityId").asText();
+        assertThat(db.queryForObject("SELECT work_area_cd FROM TB_SL_OPP WHERE opp_id=?", String.class, id)).isEqualTo(code);
+        mvc.perform(get("/api/common/sales-opportunities/{id}", id)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.workAreaCode").value(code)).andExpect(jsonPath("$.data.workAreaName").value(area.get("name")));
+        db.update("UPDATE TB_SY_ADM_AREA SET use_yn='N' WHERE area_cd=?", code);
+        mvc.perform(post("/api/common/sales-opportunities").contentType("application/json").content(input().put("workAreaCode", code).toString()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("workAreaCode"));
+        var edit = input().put("workAreaCode", code); edit.put("modifiedAt", version(id).path("modifiedAt").asText());
+        ((ObjectNode)edit.path("needs").get(0)).put("needSn", 1);
+        mvc.perform(put("/api/common/sales-opportunities/{id}", id).contentType("application/json").content(edit.toString())).andExpect(status().isOk());
+    }
     @Test void fullRejectionReasonPersistsAndSystemNotificationIsBounded() throws Exception {
         var id = create(); var reason = "가".repeat(300);
         mvc.perform(put("/api/common/sales-opportunities/{id}/reject", id).contentType("application/json").content(version(id).put("reason", reason).toString())).andExpect(status().isOk());

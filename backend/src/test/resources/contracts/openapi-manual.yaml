@@ -3111,6 +3111,16 @@ components:
           type: string
           maxLength: 200
           nullable: true
+        workAreaCode:
+          type: string
+          maxLength: 10
+          nullable: true
+          description: 근무지 지역 행정구역 코드(TB_SY_ADM_AREA, 고른 마지막 단계). 없으면 null(2026-11-25)
+        workAreaName:
+          type: string
+          nullable: true
+          readOnly: true
+          description: 근무지 지역 보여 주기 글자(시·도 줄임 이름 + 시·군·구 + 동, 예 서울 중구 을지로동). 근무지(workplace)는 참고용 글자(2026-11-25)
         statusCode:
           type: string
           description: PROJ_STAT 실제 DB코드; 값은 DML 원천
@@ -3424,6 +3434,11 @@ components:
           type: string
           maxLength: 200
           nullable: true
+        workAreaCode:
+          type: string
+          maxLength: 10
+          nullable: true
+          description: 근무지 지역 행정구역 코드(TB_SY_ADM_AREA, 시·도 → 시·군·구 → 동 중 고른 마지막 단계, 선택). 없거나 쓰지 않는 구역이면 400(2026-11-25)
         statusCode:
           type: string
           description: PROJ_STAT 실제 DB코드; 값은 DML 원천
@@ -3500,6 +3515,11 @@ components:
           type: string
           maxLength: 200
           nullable: true
+        workAreaCode:
+          type: string
+          maxLength: 10
+          nullable: true
+          description: 근무지 지역 행정구역 코드(TB_SY_ADM_AREA, 시·도 → 시·군·구 → 동 중 고른 마지막 단계, 선택). 없거나 쓰지 않는 구역이면 400(2026-11-25)
         estimateAmount:
           type: number
           nullable: true
@@ -3759,6 +3779,16 @@ components:
         workplace:
           type: string
           maxLength: 200
+        workAreaCode:
+          type: string
+          maxLength: 10
+          nullable: true
+          description: 근무지 지역 행정구역 코드(TB_SY_ADM_AREA, 고른 마지막 단계). 없으면 null(2026-11-25)
+        workAreaName:
+          type: string
+          nullable: true
+          readOnly: true
+          description: 근무지 지역 보여 주기 글자(시·도 줄임 이름 + 시·군·구 + 동, 예 서울 중구 을지로동). 근무지(workplace)는 참고용 글자(2026-11-25)
         nextAction:
           type: string
         nextActionDueDate:

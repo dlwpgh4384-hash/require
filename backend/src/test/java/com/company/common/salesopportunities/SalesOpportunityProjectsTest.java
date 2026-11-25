@@ -19,7 +19,7 @@ class SalesOpportunityProjectsTest {
         var projects = mock(CommonProjectService.class);
         var adapter = new SalesOpportunityProjects(mapper, projects);
         var header = new Header("opportunity", "기회명", "customer", "고객명", "sales-part", "PROP", BigDecimal.TEN,
-            "N", new BigDecimal("60000000"), null, "202611", 6, "서울", null, null, "기회 비고", "ING",
+            "N", new BigDecimal("60000000"), null, "202611", 6, "서울", "1114000000", "서울 중구", null, null, "기회 비고", "ING",
             new BigDecimal("14"), "WAIT", null, null, null, null, null, "admin", Instant.parse("2026-11-15T00:00:00Z"));
         var input = new Win(header.modifiedAt(), new BigDecimal("55000000"), "TK", LocalDate.of(2026, 11, 1), LocalDate.of(2027, 4, 30), "PRE");
         var project = new ProjectContracts.Project(); project.projectId = "P-0001";
@@ -32,6 +32,7 @@ class SalesOpportunityProjectsTest {
         assertThat(created.customerId()).isEqualTo("customer");
         assertThat(created.salesPartId()).isEqualTo("sales-part");
         assertThat(created.workplace()).isEqualTo("서울");
+        assertThat(created.workAreaCode()).isEqualTo("1114000000"); // 근무지 지역도 같이 넘김(2026-11-25)
         assertThat(created.contractAmount()).isEqualByComparingTo("55000000");
         assertThat(created.estimateAmount()).isEqualByComparingTo("60000000");
         assertThat(created.contractTypeCode()).isEqualTo("TK");

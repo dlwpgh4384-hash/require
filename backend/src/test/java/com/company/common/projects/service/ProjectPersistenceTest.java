@@ -48,7 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnabledIfEnvironmentVariable(named="NAVIGATION_TEST_DB_URL",matches="jdbc:postgresql:.*")
 @WebMvcTest({CommonProjectController.class,CommonUploadController.class})
 @ContextConfiguration(classes={CommonProjectController.class,CommonUploadController.class,CommonProjectService.class,
-    CommonUploadService.class,ProjectUploadForm.class,ProjectDistributionUploadForm.class,ProjectProgressRules.class,com.company.common.common.ProjectBoardSignalRules.class,
+    CommonUploadService.class,ProjectUploadForm.class,com.company.common.developers.service.UploadAreaResolver.class,ProjectDistributionUploadForm.class,ProjectProgressRules.class,com.company.common.common.ProjectBoardSignalRules.class,
     ProjectAmountRules.class,CalculationRuleService.class,CodeTextResolver.class,CurrentBusinessActor.class,
     UploadWorkbookService.class,ExcelExportService.class,CodeExceptionHandler.class,ApiExceptionHandler.class,
     ProjectPersistenceTest.Persistence.class})
@@ -71,12 +71,14 @@ class ProjectPersistenceTest {
         }
         @Bean SqlSessionFactory sqlSessionFactory(DataSource source) throws Exception {
             var f=new SqlSessionFactoryBean();f.setDataSource(source);
-            f.setMapperLocations(new ClassPathResource("mapper/projects/ProjectMapper.xml"),new ClassPathResource("mapper/uploads/UploadMapper.xml"),new ClassPathResource("mapper/UserMapper.xml"),new ClassPathResource("mapper/CalculationRuleMapper.xml"),new ClassPathResource("mapper/UserPreferencePeriodSourceMapper.xml"));
+            f.setMapperLocations(new ClassPathResource("mapper/projects/ProjectMapper.xml"),new ClassPathResource("mapper/developers/DeveloperMapper.xml"),new ClassPathResource("mapper/uploads/UploadMapper.xml"),new ClassPathResource("mapper/UserMapper.xml"),new ClassPathResource("mapper/CalculationRuleMapper.xml"),new ClassPathResource("mapper/UserPreferencePeriodSourceMapper.xml"));
             var c=new org.apache.ibatis.session.Configuration();c.setMapUnderscoreToCamelCase(false);c.setAutoMappingUnknownColumnBehavior(org.apache.ibatis.session.AutoMappingUnknownColumnBehavior.FAILING);f.setConfiguration(c);return f.getObject();
         }
         @Bean SqlSessionTemplate sqlSessionTemplate(SqlSessionFactory f){return new SqlSessionTemplate(f);}
         @Bean ProjectMapper projectMapper(SqlSessionTemplate s){return s.getMapper(ProjectMapper.class);}
         @Bean UploadMapper uploadMapper(SqlSessionTemplate s){return s.getMapper(UploadMapper.class);}
+        // B.9 근무지 지역 세 칸은 개발자 거주지와 같은 행정구역 찾기(UploadAreaResolver → DeveloperMapper)를 쓴다(2026-11-25).
+        @Bean com.company.common.developers.mapper.DeveloperMapper developerMapper(SqlSessionTemplate s){return s.getMapper(com.company.common.developers.mapper.DeveloperMapper.class);}
         @Bean UserMapper userMapper(SqlSessionTemplate s){return s.getMapper(UserMapper.class);}
         @Bean CalculationRuleMapper calculationRuleMapper(SqlSessionTemplate s){return s.getMapper(CalculationRuleMapper.class);}
         @Bean UserPreferencePeriodSourceMapper userPreferencePeriodSourceMapper(SqlSessionTemplate s){return s.getMapper(UserPreferencePeriodSourceMapper.class);}
@@ -164,6 +166,31 @@ class ProjectPersistenceTest {
             .isEqualTo("project-part-a");
         assertThat(db.queryForObject("SELECT COUNT(*) FROM TB_PJ_PROJ_CHG WHERE PROJ_ID=? AND CHG_ITEM_CD='CTRT' AND REG_USER_ID='admin'", Long.class, id))
             .isEqualTo(1);
+    }
+    // 근무지 지역(2026-11-25): 저장된 코드와 이름(시·도 줄임 이름 + 시·군·구 + 동)을 실제 행정구역 표로 읽고, B.9 세 칸도 같은 코드로 바꾼다.
+    @Test void workAreaCodeIsStoredReadWithItsNameAndB9ResolvesTheSameCode() throws Exception {
+        var area = db.queryForMap("SELECT area_cd, sido_full_nm, sgg_nm, emd_nm, concat_ws(' ',sido_nm,sgg_nm,emd_nm) AS name FROM TB_SY_ADM_AREA "
+            + "WHERE area_lvl_cd='EMD' AND use_yn='Y' AND sgg_nm IS NOT NULL ORDER BY area_cd LIMIT 1");
+        String code = (String) area.get("area_cd");
+        String id = registeredProject().path("projectId").asText();
+        var current = data(mvc.perform(get("/api/common/projects/" + id)).andExpect(status().isOk()));
+        var body = json.createObjectNode();
+        body.put("projectName", "등록 재조회 프로젝트").put("customerId", "project-customer")
+            .put("startDate", "2026-11-01").put("endDate", "2026-12-31").put("contractAmount", 1000000)
+            .put("workplace", "서울").put("workAreaCode", code).put("modifiedAt", current.path("modifiedAt").asText());
+        mvc.perform(put("/api/common/projects/" + id).contentType("application/json").content(body.toString())).andExpect(status().isOk());
+        var read = data(mvc.perform(get("/api/common/projects/" + id)).andExpect(status().isOk()));
+        assertThat(read.path("workAreaCode").asText()).isEqualTo(code);
+        assertThat(read.path("workAreaName").asText()).isEqualTo(area.get("name"));
+        assertThat(db.queryForObject("SELECT WORK_AREA_CD FROM TB_PJ_PROJ WHERE PROJ_ID=?", String.class, id)).isEqualTo(code);
+        var row = new ArrayList<>(List.of("", "지역 프로젝트", "프로젝트 고객사", "MO", "2026-11-01", "2026-12-31", "영업 가", "", "PRE",
+            "", "1000000", "", "", "", ""));
+        row.addAll(List.of((String) area.get("sido_full_nm"), (String) area.get("sgg_nm"), (String) area.get("emd_nm")));
+        var checked = uploadProjects(List.of(row));
+        assertThat(checked.path("errorCount").asInt()).isZero();
+        var applied = data(apply(checked).andExpect(status().isOk()));
+        String uploaded = applied.path("plannedProjects").get(0).path("projectId").asText();
+        assertThat(db.queryForObject("SELECT WORK_AREA_CD FROM TB_PJ_PROJ WHERE PROJ_ID=?", String.class, uploaded)).isEqualTo(code);
     }
     @Test void manualBudgetSurvivesContractUpdateAndHistoryIsReadable() throws Exception {
         String id = registeredProject().path("projectId").asText();

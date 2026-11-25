@@ -19,9 +19,11 @@ import static org.mockito.Mockito.*;
 class ProjectUploadTest {
     ProjectMapper mapper; CommonProjectService projects; CodeTextResolver resolver;
     ProjectUploadForm b9; ProjectDistributionUploadForm b6;
+    com.company.common.developers.mapper.DeveloperMapper areas;
     @BeforeEach void setup() {
         mapper=mock(ProjectMapper.class);projects=mock(CommonProjectService.class);resolver=mock(CodeTextResolver.class);
-        b9=new ProjectUploadForm(mapper,resolver,projects); b6=new ProjectDistributionUploadForm(mapper,projects,resolver,new CurrentBusinessActor());
+        areas=mock(com.company.common.developers.mapper.DeveloperMapper.class);
+        b9=new ProjectUploadForm(mapper,resolver,projects,new com.company.common.developers.service.UploadAreaResolver(areas)); b6=new ProjectDistributionUploadForm(mapper,projects,resolver,new CurrentBusinessActor());
         when(mapper.projectIds()).thenReturn(List.of("P-0001"));when(mapper.codeName(anyString(),anyString())).thenAnswer(c->c.getArgument(1));
         when(resolver.resolve(anyString(),anyString())).thenAnswer(c->new TextResolution(c.getArgument(0),c.getArgument(1),c.getArgument(1),null));
         when(projects.create(any(),anyString())).thenAnswer(c->{var p=new Project();p.projectId=c.getArgument(1);return p;});
@@ -113,6 +115,60 @@ class ProjectUploadTest {
             assertThat(rows.get(0).values().get(10)).isEqualTo("2");
             assertThat(b9.inspect(rows, null).issues()).noneMatch(issue -> issue.reason().contains("수식"));
         }
+    }
+    // 근무지 지역(2026-11-25): 맨 뒤 세 칸, 개발자 거주지와 같은 규칙(못 찾으면 찾은 단계까지 저장하고 경고).
+    static com.company.common.developers.mapper.DeveloperRows.Area area(String code,String name) {
+        var a=new com.company.common.developers.mapper.DeveloperRows.Area();a.areaCode=code;a.areaName=name;return a;
+    }
+    TabularRow external(String sido,String sgg,String dong) {
+        when(mapper.uploadCustomers()).thenReturn(List.of(new ProjectMapper.Customer("one","고객","111-11-11111")));
+        var part=new com.company.common.projects.mapper.ProjectRows.Job();part.code="part";part.name="영업";when(mapper.uploadParts()).thenReturn(List.of(part));
+        var values=new ArrayList<>(project(2,"").values());values.set(2,"고객");values.set(3,"TK");values.set(6,"part");values.set(10,"100");
+        values.addAll(List.of(sido,sgg,dong));
+        return new TabularRow(2,values,List.of());
+    }
+    @Test void b9WorkAreaStoresTheLastChosenLevel() {
+        when(areas.selectAreasByName("SIDO",null,"서울특별시")).thenReturn(List.of(area("1100000000","서울")));
+        when(areas.selectAreasByName("SGG","1100000000","중구")).thenReturn(List.of(area("1114000000","중구")));
+        when(areas.selectAreasByName("EMD","1114000000","을지로동")).thenReturn(List.of(area("1114010000","을지로동")));
+        var check=b9.inspect(List.of(external("서울특별시","중구","을지로동")),null);
+        assertThat(check.issues()).isEmpty();
+        assertThat(((ProjectUploadForm.Row)check.records().get(0)).input().workAreaCode()).isEqualTo("1114010000");
+        check=b9.inspect(List.of(external("서울특별시","중구","")),null);
+        assertThat(((ProjectUploadForm.Row)check.records().get(0)).input().workAreaCode()).isEqualTo("1114000000");
+        check=b9.inspect(List.of(external("","","")),null);
+        assertThat(check.issues()).isEmpty();
+        assertThat(((ProjectUploadForm.Row)check.records().get(0)).input().workAreaCode()).isNull();
+    }
+    @Test void b9UnknownWorkAreaPartsAreWarningsThatKeepTheFoundLevel() {
+        when(areas.selectAreasByName("SIDO",null,"서울특별시")).thenReturn(List.of(area("1100000000","서울")));
+        var check=b9.inspect(List.of(external("서울특별시","없는구","")),null);
+        assertThat(check.errorCount()).isZero();assertThat(check.warningCount()).isEqualTo(1);
+        assertThat(check.issues()).singleElement().satisfies(i->{
+            assertThat(i.column()).isEqualTo("근무지(시·군·구)");assertThat(i.severity()).isEqualTo("경고");
+            assertThat(i.reason()).isEqualTo("시·군·구를 못 찾아 비웠습니다. 「서울」까지 저장합니다.");});
+        assertThat(((ProjectUploadForm.Row)check.records().get(0)).input().workAreaCode()).isEqualTo("1100000000");
+        check=b9.inspect(List.of(external("없는도","","")),null);
+        assertThat(check.issues()).singleElement().satisfies(i->{
+            assertThat(i.column()).isEqualTo("근무지(시·도)");assertThat(i.reason()).isEqualTo("근무지를 못 찾아 비웠습니다.");});
+        assertThat(((ProjectUploadForm.Row)check.records().get(0)).input().workAreaCode()).isNull();
+        check=b9.inspect(List.of(external("","중구","")),null);
+        assertThat(check.issues()).singleElement().satisfies(i->{assertThat(i.inputValue()).isEqualTo("(빈칸)");assertThat(i.severity()).isEqualTo("경고");});
+    }
+    @Test void b9InternalProjectIgnoresWorkAreaAndShortRowsHaveNoArea() {
+        var values=new ArrayList<>(project(2,"").values());values.addAll(List.of("없는도","",""));
+        var check=b9.inspect(List.of(new TabularRow(2,values,List.of())),null);
+        assertThat(check.issues()).isEmpty();verifyNoInteractions(areas);
+        assertThat(b9.inspect(List.of(project(2,"")),null).errorCount()).isZero();
+    }
+    @Test void b9TemplateHasWorkAreaColumnsLastAndOldFilesWithoutThemStillRead() {
+        assertThat(b9.headers().subList(15,18)).containsExactly("근무지 시·도","근무지 시·군·구","근무지 동");
+        assertThat(b9.exampleRow()).hasSize(b9.headers().size());
+        var reader=new UploadWorkbookService(new ExcelExportService());
+        byte[] old=reader.tabularFile(b9.headers().subList(0,15),List.of(project(2,"").values()),null);
+        assertThatThrownBy(()->reader.readTabular("old.xlsx",old,b9.headers())).isInstanceOf(CodeFailure.class);
+        var rows=reader.readTabular("old.xlsx",old,b9.headers(),b9.optionalHeaders());
+        assertThat(rows).singleElement().satisfies(r->{assertThat(r.values()).hasSize(18);assertThat(r.values().subList(15,18)).containsOnly("");});
     }
     @Test void progressIsComputedInCodeEvenWhenDefinitionTextDiffers() {
         var metadata=mock(CalculationRuleService.class);var rules=new ProjectProgressRules(metadata,new com.company.common.common.ProjectBoardSignalRules());var step=new Step();step.weightRate=BigDecimal.TEN;step.plannedStartDate=LocalDate.of(2026,11,1);step.plannedEndDate=LocalDate.of(2026,11,10);

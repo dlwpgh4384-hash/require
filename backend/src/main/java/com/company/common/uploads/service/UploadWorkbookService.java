@@ -167,6 +167,13 @@ public class UploadWorkbookService {
     /** 이름으로 헤더를 찾는다. 수식 칸은 실행하지 않고 엑셀이 저장해 둔 결과값으로 읽는다(SFR-012-03). */
     public List<com.company.common.uploads.dto.UploadWorkbookContracts.TabularRow> readTabular(
         String fileName, byte[] bytes, List<String> headers) {
+        return readTabular(fileName, bytes, headers, java.util.Set.of());
+    }
+
+    /** optional: 파일에 없어도 되는 머리 글자. 없으면 그 칸은 모든 줄에서 빈칸으로 읽는다(옛 양식 그대로 받기). */
+    public List<com.company.common.uploads.dto.UploadWorkbookContracts.TabularRow> readTabular(
+        String fileName, byte[] bytes, List<String> headers, java.util.Set<String> optional) {
+        var required = headers.stream().filter(header -> !optional.contains(header)).toList();
         if (fileName == null || fileName.length() > 200 || fileName.contains("/") || fileName.contains("\\")
             || !fileName.toLowerCase(Locale.ROOT).endsWith(".xlsx") || bytes == null || bytes.length < 4
             || bytes.length > 10_000_000 || bytes[0] != 'P' || bytes[1] != 'K') throw invalid();
@@ -192,7 +199,7 @@ public class UploadWorkbookService {
                     String name = formatter.formatCellValue(cell).trim();
                     if (headers.contains(name) && columns.put(name, cell.getColumnIndex()) != null) throw invalid();
                 }
-                if (columns.keySet().containsAll(headers)) { headerIndex = row.getRowNum(); break; }
+                if (columns.keySet().containsAll(required)) { headerIndex = row.getRowNum(); break; }
                 if (row.getRowNum() >= 20) break;
             }
             if (headerIndex < 0) throw invalid();
@@ -202,7 +209,8 @@ public class UploadWorkbookService {
                 var values = new ArrayList<String>();
                 var formulas = new ArrayList<Integer>();
                 for (int index = 0; index < headers.size(); index++) {
-                    var cell = row.getCell(columns.get(headers.get(index)));
+                    Integer column = columns.get(headers.get(index));
+                    var cell = column == null ? null : row.getCell(column);
                     values.add(cellText(formatter, cell));
                 }
                 if (values.stream().allMatch(String::isBlank)) continue;

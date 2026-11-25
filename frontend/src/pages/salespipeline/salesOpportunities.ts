@@ -26,6 +26,8 @@ export interface SalesOpportunityInput {
   startMonth: string;
   expectedMonths: number | null;
   workplace: string | null;
+  /** 근무지 지역(선택, 2026-11-25): 고른 마지막 단계의 행정구역 코드. 수주 처리하면 프로젝트로 넘어간다. */
+  workAreaCode?: string | null;
   nextAction: string | null;
   nextActionDueDate: string | null;
   memo: string | null;
@@ -34,6 +36,8 @@ export interface SalesOpportunityInput {
 export interface SalesOpportunity extends SalesOpportunityInput {
   opportunityId: string;
   customerName: string;
+  /** 근무지 지역 보여 주기 글자(시·도 줄임 이름 + 시·군·구 + 동). 없으면 null. */
+  workAreaName?: string | null;
   modifiedAt: string;
   approvalStatusCode: string;
   opportunityStatusCode: string;
@@ -132,6 +136,7 @@ export function salesOpportunityPayload(
     startMonth: input.startMonth,
     expectedMonths: input.expectedMonths || null,
     workplace: input.workplace || null,
+    workAreaCode: input.workAreaCode || null,
     nextAction: input.nextAction || null,
     nextActionDueDate: input.nextActionDueDate || null,
     memo: input.memo || null,

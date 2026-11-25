@@ -30,11 +30,13 @@ public class DeveloperUploadForm implements UploadForm {
     private final CommonDeveloperService developers;
     private final DeveloperNumberReservations reservations;
     private final UserMapper management;
+    private final UploadAreaResolver areas;
 
     public DeveloperUploadForm(DeveloperMapper mapper, CodeTextResolver resolver, CommonDeveloperService developers,
         DeveloperNumberReservations reservations, UserMapper management) {
         this.mapper = mapper; this.resolver = resolver; this.developers = developers;
         this.reservations = reservations; this.management = management;
+        this.areas = new UploadAreaResolver(mapper);
     }
     @Override public String formTypeCode() { return "B8"; }
     @Override public String targetName() { return "개발자"; }
@@ -206,55 +208,14 @@ public class DeveloperUploadForm implements UploadForm {
         }
         return List.copyOf(result);
     }
-    /** SFR-021-04: 시·도 정식·줄임 이름 같이 봄, 행정동은 법정동으로 바꿈, 못 찾으면 찾은 단계까지만 저장하고 경고. */
-    /** 합쳐지기 전 이름도 같은 시·도로 본다(광주·전남 → 전남광주, 2026-11-02). */
-    private static final Set<String> MERGED = Set.of("광주광역시", "광주시", "광주", "전라남도", "전남");
-    private List<DeveloperRows.Area> sido(String text) {
-        String name = MERGED.contains(text) ? "전남광주" : text;
-        var rows = mapper.selectAreasByName("SIDO", null, name);
-        // 「줄임 이름+시」(서울시 → 서울)
-        if (rows.isEmpty() && name.endsWith("시") && name.length() > 1)
-            rows = mapper.selectAreasByName("SIDO", null, name.substring(0, name.length() - 1));
-        return rows;
-    }
+    /**
+     * SFR-021-04: 시·도 정식·줄임 이름 같이 봄, 행정동은 법정동으로 바꿈, 못 찾으면 찾은 단계까지만 저장하고 경고.
+     * 세 칸이 모두 비면 경고 없이 거주지 없음. 거주지는 선택 칸이라 못 찾아도 오류가 아니라 경고.
+     * 규칙은 프로젝트 근무지(B.9)와 같이 UploadAreaResolver에 있다.
+     */
     private String area(TabularRow row, List<Issue> issues) {
-        String sido = row.values().get(14).trim(), sgg = row.values().get(15).trim(), dong = row.values().get(16).trim();
-        // 세 칸이 모두 비면 경고 없이 거주지 없음. 거주지는 선택 칸이라 못 찾아도 오류가 아니라 경고(SFR-021-04).
-        if (sido.isEmpty()) {
-            if (!sgg.isEmpty() || !dong.isEmpty())
-                issue(issues, row, 14, "(빈칸)", "거주지를 못 찾아 비웠습니다.", "경고", "거주지(시·도)");
-            return null;
-        }
-        var sidoRows = sido(sido);
-        if (sidoRows.isEmpty()) {
-            issue(issues, row, 14, sido, "거주지를 못 찾아 비웠습니다.", "경고", "거주지(시·도)");
-            return null;
-        }
-        var top = sidoRows.get(0);
-        if (sgg.isEmpty()) {
-            if (!dong.isEmpty()) return emd(row, top.areaCode, top.areaName, dong, issues);
-            return top.areaCode;
-        }
-        var sggRows = mapper.selectAreasByName("SGG", top.areaCode, sgg);
-        if (sggRows.isEmpty()) {
-            issue(issues, row, 15, sgg, "시·군·구를 못 찾아 비웠습니다. 「" + top.areaName + "」까지 저장합니다.", "경고", "거주지(시·군·구)");
-            return top.areaCode;
-        }
-        var middle = sggRows.get(0);
-        if (dong.isEmpty()) return middle.areaCode;
-        return emd(row, middle.areaCode, middle.areaName, dong, issues);
-    }
-    private String emd(TabularRow row, String parent, String parentName, String dong, List<Issue> issues) {
-        var direct = mapper.selectAreasByName("EMD", parent, dong);
-        if (direct.size() == 1) return direct.get(0).areaCode;
-        String normalized = dong.replaceAll("제([0-9])", "$1");
-        var mapped = mapper.selectHdongAreas(parent, normalized);
-        if (mapped.size() == 1) {
-            issue(issues, row, 16, dong, CodeTextResolver.readAs(mapped.get(0).areaName), "경고", "거주지(동)");
-            return mapped.get(0).areaCode;
-        }
-        issue(issues, row, 16, dong, "동을 못 찾아 비웠습니다. 「" + parentName + "」까지 저장합니다.", "경고", "거주지(동)");
-        return parent;
+        return areas.resolve(row.values().get(14), row.values().get(15), row.values().get(16), 14, "거주지",
+            (column, value, reason, label) -> issue(issues, row, column, value, reason, "경고", label));
     }
     private void issue(List<Issue> issues, TabularRow row, int column, String reason, String severity) {
         issue(issues, row, column, row.values().get(column), reason, severity, null);

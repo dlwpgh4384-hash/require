@@ -1069,3 +1069,50 @@ it("failed detail displays error and no action controls", async () => {
     screen.queryByTestId("sales-opportunity-edit"),
   ).not.toBeInTheDocument();
 });
+
+// 근무지 지역(2026-11-25): 개발자 거주지와 같은 공통 고르기(시·도 → 시·군·구 → 동), 고른 마지막 단계 코드를 보낸다.
+const withAreas = () => {
+  const original = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) => {
+    const [path, query = ""] = url.split("?");
+    if (path !== "/api/common/developers/areas") return original(url, init);
+    const parent = new URLSearchParams(query).get("parentAreaCode");
+    const items: Record<string, { areaCode: string; areaName: string }[]> = {
+      "": [{ areaCode: "1100000000", areaName: "서울" }],
+      "1100000000": [{ areaCode: "1114000000", areaName: "중구" }],
+      "1114000000": [{ areaCode: "1114010000", areaName: "을지로동" }],
+    };
+    return ok({ items: items[parent ?? ""] ?? [] });
+  });
+};
+it("근무지 지역: 새 기회에서 시·도와 시·군·구만 고르면 시·군·구 코드를 보낸다", async () => {
+  withAreas();
+  form();
+  expect(screen.getByLabelText("근무지 시·도")).toBe(screen.getByTestId("sales-opportunity-area-0"));
+  await waitFor(() => expect(screen.getByTestId("sales-opportunity-area-0")).toBeEnabled());
+  expect(screen.getByTestId("sales-opportunity-area-1")).toBeDisabled();
+  fireEvent.change(screen.getByTestId("sales-opportunity-area-0"), { target: { value: "1100000000" } });
+  await waitFor(() => expect(screen.getByTestId("sales-opportunity-area-1")).toBeEnabled());
+  fireEvent.change(screen.getByTestId("sales-opportunity-area-1"), { target: { value: "1114000000" } });
+  await waitFor(() => expect(screen.getByTestId("sales-opportunity-area-2")).toBeEnabled());
+  fireEvent.click(screen.getByTestId("sales-opportunity-save"));
+  await waitFor(() => expect(writes()).toHaveLength(1));
+  expect(JSON.parse(String(writes()[0][1].body)).workAreaCode).toBe("1114000000");
+});
+it("근무지 지역: 수정은 저장된 동 코드로 세 칸을 채우고 그대로 다시 보내며, 상세에 이름을 보인다", async () => {
+  withAreas();
+  row.workAreaCode = "1114010000";
+  row.workAreaName = "서울 중구 을지로동";
+  form(true);
+  await waitFor(() => expect(screen.getByTestId("sales-opportunity-area-2")).toHaveValue("1114010000"));
+  expect(screen.getByTestId("sales-opportunity-area-0")).toHaveValue("1100000000");
+  expect(screen.getByTestId("sales-opportunity-area-1")).toHaveValue("1114000000");
+  fireEvent.click(screen.getByTestId("sales-opportunity-save"));
+  await waitFor(() => expect(writes()).toHaveLength(1));
+  const body = JSON.parse(String(writes()[0][1].body));
+  expect(body.workAreaCode).toBe("1114010000");
+  expect(body).not.toHaveProperty("workAreaName");
+  cleanup();
+  detail();
+  expect(await screen.findByTestId("kv-row-근무지 지역")).toHaveTextContent("서울 중구 을지로동");
+});

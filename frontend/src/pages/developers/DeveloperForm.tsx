@@ -9,19 +9,16 @@ import {
   developerFailure,
   directLabel,
   getCommonDeveloper,
-  getCommonDeveloperAreas,
   postCommonDeveloper,
   putCommonDeveloper,
   type Developer,
-  type DeveloperArea,
   type DeveloperInput,
   type DeveloperOptions,
 } from "./developers";
+import { AreaSelect, areaLevelLocked, useAreaPicker } from "../../shared/area/AreaPicker";
 import "./developers.css";
 
 const SELF = "__self";
-/** 법정동코드: 시·군·구 단계는 끝 5자리가 00000, 읍·면·동은 아니다(세종처럼 시·군·구가 없는 시·도 구분). */
-const isDong = (code: string) => code.slice(5) !== "00000";
 /** 시안 문구: 「직원구분을 입력해 주세요.」「주 직무를 입력해 주세요.」(받침에 따라 을/를) */
 const enter = (label: string) => {
   const code = label.charCodeAt(label.length - 1) - 0xac00;
@@ -86,12 +83,10 @@ export function DeveloperForm({
   const version = useRef(developer?.modifiedAt ?? null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const formRef = useRef<HTMLElement>(null);
-  const [areas, setAreas] = useState<DeveloperArea[][]>([[], [], []]);
-  const [location, setLocation] = useState(["", "", ""]);
-  const [areaBusy, setAreaBusy] = useState(true);
-  const [areaError, setAreaError] = useState("");
-  const [areaRevision, setAreaRevision] = useState(0);
-  const areaRequest = useRef(0);
+  // 거주지 시·도 → 시·군·구 → 동(공통 행정구역 고르기, 프로젝트·영업 기회 근무지 지역과 같음)
+  const area = useAreaPicker(developer?.homeAreaCode);
+  const areaBusy = area.busy;
+  const areaError = area.error;
   useEffect(() => {
     setDirty("UI-02", dirty);
     return () => setDirty("UI-02", false);
@@ -99,49 +94,6 @@ export function DeveloperForm({
   const leave = () => (dirty ? setLeaving(true) : onCancel());
   // 시안 제목 문구 그대로: 등록 「개발자 등록」, 수정 「개발자 등록 수정」
   useScreenTitleOverride("UI-02", developer ? "개발자 등록 수정" : "개발자 등록", leave);
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      setAreaBusy(true);
-      setAreaError("");
-      try {
-        const root = (await getCommonDeveloperAreas()).items;
-        const lists = [root, [] as DeveloperArea[], [] as DeveloperArea[]];
-        const selected = ["", "", ""];
-        const code = developer?.homeAreaCode;
-        if (code) {
-          selected[0] = root.find((a) => a.areaCode.slice(0, 2) === code.slice(0, 2))?.areaCode || "";
-          if (selected[0] && selected[0] !== code) {
-            const children = (await getCommonDeveloperAreas(selected[0])).items;
-            if (children.length && children.every((a) => isDong(a.areaCode))) {
-              // SFR-021-01: 시·군·구가 없는 시·도(세종)는 동 목록을 바로 보인다
-              lists[2] = children;
-              selected[2] = children.find((a) => a.areaCode === code)?.areaCode || "";
-            } else {
-              lists[1] = children;
-              selected[1] = lists[1].find((a) => a.areaCode.slice(0, 5) === code.slice(0, 5))?.areaCode || "";
-              if (selected[1] && selected[1] !== code) {
-                lists[2] = (await getCommonDeveloperAreas(selected[1])).items;
-                selected[2] = lists[2].find((a) => a.areaCode === code)?.areaCode || "";
-              }
-            }
-          }
-        }
-        if (active) {
-          setAreas(lists);
-          setLocation(selected);
-        }
-      } catch (reason) {
-        if (active) setAreaError(developerFailure(reason));
-      } finally {
-        if (active) setAreaBusy(false);
-      }
-    };
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [developer?.homeAreaCode, areaRevision]);
   const change = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((d) => ({ ...d, [key]: value }));
     setErrors((e) => {
@@ -156,30 +108,7 @@ export function DeveloperForm({
     change(key, value as never);
     check(key, { ...draft, [key]: value });
   };
-  const selectArea = async (level: number, value: string) => {
-    const request = ++areaRequest.current;
-    const next = location.map((v, i) => (i === level ? value : i > level ? "" : v));
-    setLocation(next);
-    change("homeAreaCode", next[2] || next[1] || next[0] || null);
-    setAreas((old) => old.map((list, i) => (i > level ? [] : list)));
-    setAreaError("");
-    if (!value || level === 2) {
-      setAreaBusy(false);
-      return;
-    }
-    setAreaBusy(true);
-    try {
-      const response = await getCommonDeveloperAreas(value);
-      // 시·도 아래가 바로 동이면(세종) 시·군·구 칸을 건너뛰고 동 목록에 넣는다
-      const skip = level === 0 && response.items.length > 0 && response.items.every((a) => isDong(a.areaCode));
-      if (request === areaRequest.current)
-        setAreas((old) => old.map((list, i) => (skip ? (i === 2 ? response.items : i === 1 ? [] : list) : i === level + 1 ? response.items : list)));
-    } catch (reason) {
-      if (request === areaRequest.current) setAreaError(developerFailure(reason));
-    } finally {
-      if (request === areaRequest.current) setAreaBusy(false);
-    }
-  };
+  const selectArea = (level: number, value: string) => change("homeAreaCode", area.select(level, value));
   const serverErrors = error instanceof DeveloperRequestError ? error.errors : [];
   const fieldError = (key: string) =>
     errors[key] || serverErrors.find((e) => e.field === (key === "organization" ? "organizationId" : key === "skills" ? "skillCodes" : key))?.message;
@@ -372,21 +301,14 @@ export function DeveloperForm({
       key,
       label,
       false,
-      <select
+      <AreaSelect
+        picker={area}
+        level={level}
         id={`developer-${key}`}
-        data-testid={`developer-area-${level}`}
-        className="ls-in"
-        value={location[level]}
-        disabled={busy || (level === 1 ? !location[0] || areas[1].length === 0 : level === 2 ? areas[2].length === 0 : false)}
-        onChange={(e) => void selectArea(level, e.target.value)}
-      >
-        <option value="">선택</option>
-        {areas[level].map((a) => (
-          <option key={a.areaCode} value={a.areaCode}>
-            {a.areaName}
-          </option>
-        ))}
-      </select>,
+        testId={`developer-area-${level}`}
+        disabled={busy || areaLevelLocked(area, level)}
+        onPick={selectArea}
+      />,
       help,
     );
   return (
@@ -531,7 +453,7 @@ export function DeveloperForm({
             </button>
           )}
           {areaError && (
-            <button type="button" data-testid="developer-area-retry" onClick={() => setAreaRevision((v) => v + 1)}>
+            <button type="button" data-testid="developer-area-retry" onClick={() => area.retry()}>
               다시 시도
             </button>
           )}

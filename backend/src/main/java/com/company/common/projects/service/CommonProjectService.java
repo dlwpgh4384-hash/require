@@ -189,6 +189,10 @@ public class CommonProjectService implements org.springframework.context.Applica
         p.startDate = input.startDate(); p.endDate = input.endDate();
         p.customerId = internal(p) ? null : input.customerId();
         p.workplace = internal(p) ? null : input.workplace();
+        // 근무지 지역(2026-11-25): 사용 중인 행정구역만. 고치지 않은 저장값은 나중에 쓰지 않게 된 구역이어도 그대로 둔다(개발자 거주지와 같음).
+        p.workAreaCode = internal(p) ? null : input.workAreaCode();
+        if (p.workAreaCode != null && !(old != null && p.workAreaCode.equals(old.workAreaCode))
+            && !mapper.usableArea(p.workAreaCode)) throw ProjectRules.invalidWorkArea();
         p.estimateAmount = input.estimateAmount();
         p.contractAmount = input.contractAmount();
         if (internal(p) && p.contractAmount == null) p.contractAmount = BigDecimal.ZERO;

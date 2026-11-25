@@ -15,22 +15,30 @@ import org.springframework.stereotype.Component;
 @Component
 public class ProjectUploadForm implements UploadForm {
     public static final List<String> HEADERS = List.of("프로젝트ID","프로젝트명","고객사","계약유형","시작일","종료일",
-        "영업 파트","근무지","상태","견적 금액","계약금액","예산","팀비","프로젝트경비","특징");
+        "영업 파트","근무지","상태","견적 금액","계약금액","예산","팀비","프로젝트경비","특징",
+        // 근무지 지역(2026-11-25): 개발자 거주지 세 칸과 같은 규칙. 칸을 더하기 전 양식도 받도록 맨 뒤에 두고 선택 칸으로 읽는다.
+        "근무지 시·도","근무지 시·군·구","근무지 동");
+    /** 근무지 지역 세 칸이 처음 나오는 칸 번호. */
+    private static final int AREA = 15;
     private static final List<String> FIELDS = List.of("projectId","projectName","customerId","contractTypeCode","startDate","endDate",
-        "salesPartId","workplace","statusCode","estimateAmount","contractAmount","budgetAmount","teamExpenseAmount","projectExpenseAmount","feature");
+        "salesPartId","workplace","statusCode","estimateAmount","contractAmount","budgetAmount","teamExpenseAmount","projectExpenseAmount","feature",
+        "workAreaCode","workAreaCode","workAreaCode");
     private final ProjectMapper mapper;
     private final CodeTextResolver resolver;
     private final CommonProjectService projects;
-    public ProjectUploadForm(ProjectMapper mapper, CodeTextResolver resolver, CommonProjectService projects) {
-        this.mapper=mapper; this.resolver=resolver; this.projects=projects;
+    private final com.company.common.developers.service.UploadAreaResolver areas;
+    public ProjectUploadForm(ProjectMapper mapper, CodeTextResolver resolver, CommonProjectService projects,
+            com.company.common.developers.service.UploadAreaResolver areas) {
+        this.mapper=mapper; this.resolver=resolver; this.projects=projects; this.areas=areas;
     }
     public String formTypeCode() { return "B9"; }
     public String targetName() { return "프로젝트"; }
     public String screenId() { return "UI-01"; }
     public List<String> headers() { return HEADERS; }
+    public Set<String> optionalHeaders() { return Set.copyOf(HEADERS.subList(AREA, AREA + 3)); }
     public String templateFileName() { return "project-template.xlsx"; }
-    public List<String> exampleRow() { return List.of("", "가온은행 차세대 여신", "가온은행", "턴키", "2026-01-01", "2026-12-31", "영업1파트", "서울 중구", "진행", "1200000000", "1000000000", "", "50000", "50000", ""); }
-    public String templateNote() { return "B.9 신규 등록 전용. 프로젝트ID를 비우면 P-nnnn 자동 발급. 고객사는 상호 또는 사업자번호. 상태는 진행/수주예정. 내부는 고객사·파트·근무지 생략. 상태를 비우면 진행. 금액은 원 단위 숫자(쉼표 가능)."; }
+    public List<String> exampleRow() { return List.of("", "가온은행 차세대 여신", "가온은행", "턴키", "2026-01-01", "2026-12-31", "영업1파트", "서울 중구", "진행", "1200000000", "1000000000", "", "50000", "50000", "", "서울특별시", "중구", "을지로동"); }
+    public String templateNote() { return "B.9 신규 등록 전용. 프로젝트ID를 비우면 P-nnnn 자동 발급. 고객사는 상호 또는 사업자번호. 상태는 진행/수주예정. 내부는 고객사·파트·근무지 생략. 상태를 비우면 진행. 금액은 원 단위 숫자(쉼표 가능). 근무지 시·도·시·군·구·동은 선택(동 칸에는 동 이름만), 못 찾으면 찾은 단계까지만 저장하고 경고. 근무지 글자는 참고용."; }
     public void lock() { mapper.lockSources(); }
     public record Row(int rowNumber, String id, Input input) {}
     public Inspection inspect(List<TabularRow> rows, YearMonth ignored) {
@@ -82,6 +90,10 @@ public class ProjectUploadForm implements UploadForm {
                 String workplace = values.get(7).trim();
                 if (workplace.codePointCount(0,workplace.length()) > 200) issue(local,row,7,"근무지는 200자 이내로 적어 주세요.","오류");
                 else if (!workplace.isEmpty()) body.put("workplace",workplace);
+                // 근무지 지역: 개발자 거주지(B.8)와 같은 규칙. 못 찾으면 찾은 단계까지만 저장하고 경고(오류 아님).
+                String area = areas.resolve(cell(row,AREA),cell(row,AREA+1),cell(row,AREA+2),AREA,"근무지",
+                    (column,value,reason,label) -> local.add(new Issue(row.rowNumber(),label,clip(value,200),clip(reason,300),"경고")));
+                if (area != null) body.put("workAreaCode",area);
             }
             String start = date(row,4,"시작일",local), end = date(row,5,"종료일",local);
             if (start != null) body.put("startDate",start);
@@ -122,6 +134,13 @@ public class ProjectUploadForm implements UploadForm {
         issues.sort(Comparator.comparingInt(i -> "오류".equals(i.severity())?0:1));
         return new Inspection(records,issues,successes,warnings,errors,rows.size(),assigned);
     }
+    /** 칸 글자. 줄이 짧으면(근무지 지역 칸을 더하기 전 모양) 빈칸으로 본다. */
+    private static String cell(TabularRow row,int col) {
+        return col < row.values().size() ? row.values().get(col) : "";
+    }
+    private static String clip(String value,int limit) {
+        return value.codePointCount(0,value.length()) <= limit ? value : value.substring(0,value.offsetByCodePoints(0,limit));
+    }
     /** 날짜 칸: SFR-012-03 — 2026-01-31·2026.01.31·2026/01/31 모두 받는다(개발자 업로드와 같은 규칙). */
     private static String date(TabularRow row,int col,String label,List<Issue> issues) {
         String text = row.values().get(col).trim();
@@ -145,7 +164,7 @@ public class ProjectUploadForm implements UploadForm {
         } catch(CodeFailure e) { issue(issues,row,col,e.getMessage(),"오류"); return ""; }
     }
     private static void issue(List<Issue> issues,TabularRow row,int col,String message,String severity) {
-        issues.add(new Issue(row.rowNumber(),HEADERS.get(col),row.values().get(col),message,severity));
+        issues.add(new Issue(row.rowNumber(),HEADERS.get(col),cell(row,col),message,severity));
     }
     public Map<Integer,String> apply(Inspection inspection,YearMonth month,long uploadId) {
         var assigned=new LinkedHashMap<Integer,String>();

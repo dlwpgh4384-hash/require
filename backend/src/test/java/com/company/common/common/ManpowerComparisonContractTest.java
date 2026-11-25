@@ -31,7 +31,7 @@ class ManpowerComparisonContractTest {
     @Test void manualBytesRemainTheExistingHumanApprovedBytes() throws Exception {
         try (var input = new ClassPathResource("contracts/openapi-manual.yaml").getInputStream()) {
             assertThat(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(input.readAllBytes())))
-                .isEqualTo("feba39a639286aa1b38c37ebacf83e76c636a242bcc96adbaa2da4c84ff8aafc"); // 2026-11-18 UI-11 엑셀 경로 추가, 2026-11-19 UI-31 이슈 엑셀 경로·프로젝트 신호등 이유 칸 추가, 2026-11-19 UI-13 청구 목록 엑셀 경로 추가, 2026-11-24 UI-29 저장 전 줄 가배정 점검 경로·카드 직무 인원 칸 추가, 2026-11-24 UI-29 매출 예측 기회별 줄 추가, 2026-11-24 UI-29 상세 저장 이익률·승인 기준·종료 탭 건수 칸 추가, 2026-11-24 UI-28 예측 시작 달 경로·보드 칸 상태 키·관리번호 스키마 추가(LF 기준)
+                .isEqualTo("269faaf30abc1ff35733a3663947a6d7f802221d3ac0367c86ce08eef2ce1eb7"); // 2026-11-18 UI-11 엑셀 경로 추가, 2026-11-19 UI-31 이슈 엑셀 경로·프로젝트 신호등 이유 칸 추가, 2026-11-19 UI-13 청구 목록 엑셀 경로 추가, 2026-11-24 UI-29 저장 전 줄 가배정 점검 경로·카드 직무 인원 칸 추가, 2026-11-24 UI-29 매출 예측 기회별 줄 추가, 2026-11-24 UI-29 상세 저장 이익률·승인 기준·종료 탭 건수 칸 추가, 2026-11-24 UI-28 예측 시작 달 경로·보드 칸 상태 키·관리번호 스키마 추가, 2026-11-25 프로젝트·영업 기회 근무지 지역(workAreaCode·workAreaName) 칸 추가(LF 기준)
         }
     }
 

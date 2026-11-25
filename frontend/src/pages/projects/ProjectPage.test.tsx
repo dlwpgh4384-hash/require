@@ -1184,3 +1184,94 @@ it("다른 화면 상세의 턴키 [배분표] 요청을 받으면 배분표 화
   act(() => requestProjectDistribution("P-0001"));
   expect(await screen.findByTestId("project-distribution")).toBeInTheDocument();
 });
+
+// 근무지 지역(2026-11-25): 개발자 거주지와 같은 공통 고르기(시·도 → 시·군·구 → 동), 고른 마지막 단계 코드를 보낸다.
+const withAreas = () => {
+  const original = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) => {
+    const [path, query = ""] = url.split("?");
+    if (path !== "/api/common/developers/areas") return original(url, init);
+    const parent = new URLSearchParams(query).get("parentAreaCode");
+    const items: Record<string, { areaCode: string; areaName: string }[]> = {
+      "": [
+        { areaCode: "1100000000", areaName: "서울" },
+        { areaCode: "2600000000", areaName: "부산" },
+      ],
+      "1100000000": [{ areaCode: "1114000000", areaName: "중구" }],
+      "1114000000": [{ areaCode: "1114010000", areaName: "을지로동" }],
+    };
+    return ok({ items: items[parent ?? ""] ?? [] });
+  });
+};
+it("근무지 지역: 등록 폼에서 시·도 → 시·군·구 → 동을 고르면 동 코드를 보내고, 내부는 칸이 없다", async () => {
+  withAreas();
+  shell();
+  fireEvent.click(await screen.findByTestId("project-register"));
+  const form = within(await screen.findByTestId("project-form"));
+  await waitFor(() =>
+    expect(form.getByTestId("project-teamExpenseAmount")).toHaveValue("50,000"),
+  );
+  expect(form.getByLabelText("근무지 시·도")).toBe(form.getByTestId("project-area-0"));
+  expect(form.getByTestId("project-area-1")).toBeDisabled();
+  fireEvent.change(form.getByTestId("project-contractTypeCode"), { target: { value: "IN" } });
+  expect(form.queryByTestId("project-area-0")).toBeNull();
+  fireEvent.change(form.getByTestId("project-contractTypeCode"), { target: { value: "TK" } });
+  await waitFor(() => expect(form.getByTestId("project-area-0")).toBeEnabled());
+  fireEvent.change(form.getByTestId("project-area-0"), { target: { value: "1100000000" } });
+  await waitFor(() => expect(form.getByTestId("project-area-1")).toBeEnabled());
+  fireEvent.change(form.getByTestId("project-area-1"), { target: { value: "1114000000" } });
+  await waitFor(() => expect(form.getByTestId("project-area-2")).toBeEnabled());
+  fireEvent.change(form.getByTestId("project-area-2"), { target: { value: "1114010000" } });
+  fireEvent.change(form.getByTestId("project-projectName"), { target: { value: "지역 프로젝트" } });
+  fireEvent.change(form.getByTestId("project-customerId"), { target: { value: "customer" } });
+  fireEvent.change(form.getByTestId("project-startDate"), { target: { value: "2026-11-01" } });
+  fireEvent.change(form.getByTestId("project-endDate"), { target: { value: "2027-04-30" } });
+  fireEvent.change(form.getByTestId("project-salesPartId"), { target: { value: "HQ" } });
+  fireEvent.change(form.getByTestId("project-contractAmount"), { target: { value: "2000000" } });
+  fireEvent.click(form.getByTestId("project-save"));
+  await waitFor(() => expect(writes()).toHaveLength(1));
+  expect(body(writes()[0])).toMatchObject({ workAreaCode: "1114010000", workplace: "" });
+});
+it("근무지 지역: 수정 폼은 저장된 코드로 세 칸을 다시 채우고, 동을 비우면 시·군·구 코드를 보낸다", async () => {
+  withAreas();
+  Object.assign(row, { workAreaCode: "1114010000", workAreaName: "서울 중구 을지로동" });
+  shell();
+  const detail = await openDetail();
+  expect(detail.getByText("근무지 지역")).toBeVisible();
+  expect(detail.getByText("서울 중구 을지로동")).toBeVisible();
+  fireEvent.click(await detail.findByTestId("project-edit"));
+  const form = within(await screen.findByTestId("project-form"));
+  await waitFor(() => expect(form.getByTestId("project-area-2")).toHaveValue("1114010000"));
+  expect(form.getByTestId("project-area-0")).toHaveValue("1100000000");
+  expect(form.getByTestId("project-area-1")).toHaveValue("1114000000");
+  fireEvent.change(form.getByTestId("project-area-2"), { target: { value: "" } });
+  fireEvent.click(form.getByTestId("project-save"));
+  await waitFor(() => expect(writes()).toHaveLength(1));
+  expect(body(writes()[0]).workAreaCode).toBe("1114000000");
+});
+it("근무지 지역: 서버가 거부하면(400 workAreaCode) 시·도 칸 아래에 문구를 보인다", async () => {
+  withAreas();
+  const original = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    init?.method === "PUT" && url === "/api/common/projects/P-0001"
+      ? {
+          ok: false,
+          status: 400,
+          json: async () => ({
+            success: false,
+            message: "입력 값을 확인해 주세요.",
+            errors: [{ field: "workAreaCode", message: "근무지 지역을 목록에서 다시 골라 주세요." }],
+          }),
+        }
+      : original(url, init),
+  );
+  shell();
+  const detail = await openDetail();
+  fireEvent.click(await detail.findByTestId("project-edit"));
+  const form = within(await screen.findByTestId("project-form"));
+  await waitFor(() => expect(form.getByTestId("project-area-0")).toBeEnabled());
+  fireEvent.change(form.getByTestId("project-area-0"), { target: { value: "2600000000" } });
+  fireEvent.click(form.getByTestId("project-save"));
+  expect(await form.findByText("근무지 지역을 목록에서 다시 골라 주세요.")).toBeVisible();
+  expect(form.getByTestId("project-area-0")).toHaveAttribute("aria-invalid", "true");
+});

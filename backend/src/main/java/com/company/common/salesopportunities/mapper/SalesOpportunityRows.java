@@ -10,7 +10,8 @@ public final class SalesOpportunityRows {
     public record Header(String opportunityId, String opportunityName, String customerId,
         String customerName, String salesPartId, String stageCode, BigDecimal winningProbability,
         String manualYn, BigDecimal expectedAmount, String contractTypeCode, String startMonth,
-        Integer expectedMonths, String workplace, String nextAction, LocalDate nextActionDueDate,
+        Integer expectedMonths, String workplace, String workAreaCode, String workAreaName,
+        String nextAction, LocalDate nextActionDueDate,
         String memo, String status, BigDecimal profitRate, String approvalStatus,
         BigDecimal approvedProfitRate, LocalDate resultDate, String lossReasonCode,
         String lossMemo, String projectId, String creator, Instant modifiedAt) {}

@@ -22,6 +22,11 @@ public interface UploadForm {
     String targetName();
     String screenId();
     List<String> headers();
+    /**
+     * headers() 가운데 파일에 없어도 되는 머리 글자(나중에 더한 선택 칸). 없으면 그 칸은 빈칸으로 읽어
+     * 칸을 더하기 전에 받은 양식도 그대로 올릴 수 있다. 양식 내려받기에는 늘 들어간다.
+     */
+    default java.util.Set<String> optionalHeaders() { return java.util.Set.of(); }
     String templateNote();
     String templateFileName();
     /** 한 달 양식(B.1 급여)이면 올릴 때 연월을 받는다(TB_SY_UPLD.TRGT_YM). */

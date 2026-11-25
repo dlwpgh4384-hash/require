@@ -80,7 +80,7 @@ public class CommonUploadService {
         UploadForm form = projectId == null && distributionStepCode == null && !"B6".equals(formTypeCode)
             ? form(formTypeCode) : form(formTypeCode).withContext(new UploadForm.Context(projectId, distributionStepCode));
         YearMonth month = month(form, yearMonth);
-        var rows = workbooks.readTabular(fileName, bytes, form.headers());
+        var rows = workbooks.readTabular(fileName, bytes, form.headers(), form.optionalHeaders());
         long[] retained = {0};
         try {
             return transaction.execute(status -> {
@@ -112,7 +112,7 @@ public class CommonUploadService {
         // 오류가 있는 파일도 시안처럼 오류 없는 줄의 붙을 번호를 보여 준다(반영은 막힘).
         if ("CHECKED".equals(row.statusCode) && Set.of("B8", "B9").contains(row.formTypeCode)) {
             UploadForm form = contextual(row);
-            assigned = form.inspect(workbooks.readTabular(row.fileName, files.read(row.uploadId), form.headers()),
+            assigned = form.inspect(workbooks.readTabular(row.fileName, files.read(row.uploadId), form.headers(), form.optionalHeaders()),
                 targetMonth(row)).assigned();
         }
         return result(row, assigned);
@@ -149,7 +149,7 @@ public class CommonUploadService {
         if (!Objects.equals(upload.modifiedAt, input.modifiedAt())) throw CodeFailure.conflict();
         YearMonth month = targetMonth(upload);
         if (month != null) form.checkMonth(month);
-        var rows = workbooks.readTabular(upload.fileName, files.read(id), form.headers());
+        var rows = workbooks.readTabular(upload.fileName, files.read(id), form.headers(), form.optionalHeaders());
         var inspection = form.inspect(rows, month);
         boolean applied = inspection.errorCount() == 0;
         Map<Integer, String> assigned = applied ? form.apply(inspection, month, id, input.closedMonthPolicy()) : Map.of();

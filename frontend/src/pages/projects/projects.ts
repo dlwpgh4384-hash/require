@@ -13,6 +13,9 @@ export interface Project {
   salesPartId: string | null;
   salesPartName: string | null;
   workplace: string | null;
+  /** 근무지 지역: 고른 마지막 단계의 행정구역 코드와 보여 주기 글자(「서울 중구 을지로동」). 없으면 빠지거나 null. */
+  workAreaCode?: string | null;
+  workAreaName?: string | null;
   statusCode: string;
   statusName: string;
   estimateAmount: number | null;
@@ -100,6 +103,7 @@ export interface ProjectInput {
   endDate: string;
   salesPartId?: string;
   workplace?: string;
+  workAreaCode?: string | null;
   statusCode?: string;
   estimateAmount?: number;
   contractAmount?: number;

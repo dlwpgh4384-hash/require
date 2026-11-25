@@ -327,6 +327,10 @@ export function SalesOpportunityForm({
   );
   const [version, setVersion] = useState(opportunity?.modifiedAt);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  /** 필요 인력 숫자 칸(글 칸)에 지금 치는 글. 「0.」처럼 아직 숫자가 아닌 글도 그대로 보이게 한다. */
+  const [numberText, setNumberText] = useState<{ key: string; text: string } | null>(
+    null,
+  );
   const [toast, setToast] = useState<SalesNotice | null>(null);
   const [conflict, setConflict] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1033,26 +1037,33 @@ export function SalesOpportunityForm({
                     key: "requiredCount" | "months" | "monthlyMm",
                     width: number,
                     label: string,
-                  ) => (
-                    <input
-                      className={`so-in so-in-sm so-num${invalid(key) ? " so-err" : ""}`}
-                      style={{ width }}
-                      type="number"
-                      step={key === "monthlyMm" ? "0.01" : "1"}
-                      data-testid={`sales-need-${index}-${key.toLowerCase()}`}
-                      name={`needs[${index}].${key}`}
-                      aria-label={`${index + 1}번째 줄 ${label}`}
-                      aria-invalid={invalid(key)}
-                      value={numberValue(need[key])}
-                      onChange={(e) =>
-                        needChange(
-                          index,
-                          key,
-                          e.target.value === "" ? NaN : Number(e.target.value),
-                        )
-                      }
-                    />
-                  );
+                  ) => {
+                    const textKey = `${index}.${key}`;
+                    // 시안: 글 칸 + 숫자 자판(inputmode decimal). 숫자·소수점 아닌 글자는 바로 지운다.
+                    return (
+                      <input
+                        className={`so-in so-in-sm so-num${invalid(key) ? " so-err" : ""}`}
+                        style={{ width }}
+                        type="text"
+                        inputMode="decimal"
+                        data-testid={`sales-need-${index}-${key.toLowerCase()}`}
+                        name={`needs[${index}].${key}`}
+                        aria-label={`${index + 1}번째 줄 ${label}`}
+                        aria-invalid={invalid(key)}
+                        value={
+                          numberText?.key === textKey
+                            ? numberText.text
+                            : numberValue(need[key])
+                        }
+                        onChange={(e) => {
+                          const text = e.target.value.replace(/[^0-9.]/g, "");
+                          setNumberText({ key: textKey, text });
+                          needChange(index, key, text === "" ? NaN : Number(text));
+                        }}
+                        onBlur={() => setNumberText(null)}
+                      />
+                    );
+                  };
                   const jobPrice = jobs.find(
                     (c) => c.code === need.jobCode,
                   )?.estimateUnitPrice;

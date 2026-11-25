@@ -632,7 +632,18 @@ export function SalesOpportunityDetail({
                         const d = developer(id);
                         return (
                           <tr key={`${id}-${index}`} data-testid={`sales-detail-tentative-${id}`}>
-                            <td>{d?.name || "–"}</td>
+                            <td>
+                              {d ? (
+                                <span className="so-pname">
+                                  {d.name || "–"}
+                                  {d.managementNumber && (
+                                    <small>{d.managementNumber}</small>
+                                  )}
+                                </span>
+                              ) : (
+                                "–"
+                              )}
+                            </td>
                             <td>
                               {d?.primaryJobName ||
                                 (d?.primaryJobCode

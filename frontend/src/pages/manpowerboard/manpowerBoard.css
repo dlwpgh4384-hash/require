@@ -18,7 +18,9 @@
   gap: 24px;
   min-width: 0;
 }
+/* 시안 .content > .tabs: 바깥 여백 없이(공통 .ls-tabs의 좌우 24px를 끈다), 아래 내용과 -8px */
 .manpower-board-page .ls-tabs {
+  padding: 0;
   margin-bottom: -8px;
 }
 .manpower-board-page .field-error {

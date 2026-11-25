@@ -70,7 +70,12 @@ const options: SalesOpportunityOptions = {
   customers: [{ clientId: "customer", clientName: "고객" }],
   parts: [{ partId: "part", partName: "파트" }],
   developers: [
-    { developerId: "dev", name: "개발자", primaryJobCode: "BE" },
+    {
+      developerId: "dev",
+      name: "개발자",
+      managementNumber: "E-0001",
+      primaryJobCode: "BE",
+    },
     { developerId: "dev2", name: "둘째", primaryJobCode: "BE" },
   ],
 };
@@ -950,6 +955,28 @@ it("needs tab lists lines and tentative people", async () => {
   expect(screen.getByTestId("sales-detail-tentative-dev")).toHaveTextContent(
     "1. 백엔드",
   );
+  // 시안 pname: 이름 아래 작은 관리번호
+  const name = within(screen.getByTestId("sales-detail-tentative-dev")).getByText(
+    "개발자",
+  );
+  expect(name).toHaveClass("so-pname");
+  expect(within(name).getByText("E-0001").tagName).toBe("SMALL");
+});
+it("needs table number boxes are text boxes with a decimal keypad and keep 「0.」 while typing", async () => {
+  form();
+  const mm = await screen.findByTestId("sales-need-0-monthlymm");
+  expect(mm).toHaveAttribute("type", "text");
+  expect(mm).toHaveAttribute("inputmode", "decimal");
+  fireEvent.change(mm, { target: { value: "0.a" } });
+  expect(mm).toHaveValue("0.");
+  fireEvent.change(mm, { target: { value: "0.5" } });
+  fireEvent.blur(mm);
+  expect(mm).toHaveValue("0.5");
+  for (const key of ["requiredcount", "months"])
+    expect(screen.getByTestId(`sales-need-0-${key}`)).toHaveAttribute(
+      "inputmode",
+      "decimal",
+    );
 });
 it("quote tab computes the saved needs", async () => {
   row.approvalStatusCode = "NONE";

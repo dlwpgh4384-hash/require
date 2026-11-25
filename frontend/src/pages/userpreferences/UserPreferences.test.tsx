@@ -318,9 +318,9 @@ describe("personal lists and tools", () => {
       />,
     );
     expect(
-      await screen.findByText("화면 제목 옆 ☆를 누르면 추가됩니다"),
+      await screen.findByText("화면 제목 옆 ☆를 누르면 추가됩니다."),
     ).toBeVisible();
-    expect(screen.getByText("아직 없습니다")).toBeVisible();
+    expect(screen.getByText("아직 없습니다.")).toBeVisible();
   });
   it("filters unavailable, removed and mobile PC-only entries without changing stored preferences", async () => {
     rows.set("FAV", row("FAV", '["UI-12","UI-14","UI-01","REMOVED"]'));
@@ -336,6 +336,9 @@ describe("personal lists and tools", () => {
     expect(
       await screen.findByRole("button", { name: /투입 배정/ }),
     ).toBeVisible();
+    // 시안 navLink: 화면 이름만 보이고 화면 ID는 보이지 않는다.
+    expect(screen.getByTestId("fav-open-ui-12")).toHaveTextContent(/^투입 배정$/);
+    expect(screen.queryByText("UI-12")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /월 마감|프로젝트/ }),
     ).not.toBeInTheDocument();

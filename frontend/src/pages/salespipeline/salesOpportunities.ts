@@ -69,6 +69,8 @@ export interface SalesOpportunityOptions {
   developers: {
     developerId: string;
     name: string;
+    /** 시안 pname: 이름 아래 관리번호(공통 개발자 목록 값). */
+    managementNumber?: string;
     primaryJobCode?: string;
     primaryJobName?: string;
     workStatusName?: string;

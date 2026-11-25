@@ -10,6 +10,65 @@ const readText = async (path: string): Promise<string> => {
 const projectBoardCss = await readText("./projectboard/projectBoard.css");
 const assignmentsCss = await readText("./assignments/assignments.css");
 const projectsCss = await readText("./projects/projects.css");
+const candidatesCss = await readText("./candidates/candidates.css");
+const salesCss = await readText("./salespipeline/salesOpportunities.css");
+const listCss = await readText("../shared/list/list.css");
+const boardCss = await readText("./manpowerboard/manpowerBoard.css");
+const preferencesCss = await readText("./userpreferences/userPreferences.css");
+const operatingCss = await readText(
+  "./operatingstandards/operatingStandards.css",
+);
+
+it("후보 메모 칸: 시안 textarea.in(높이 자동·최소 76·줄 높이 20)으로 .ls-in 높이 36을 푼다", () => {
+  const css = rule(candidatesCss, ".candidate-contact-form textarea");
+  expect(css).toContain("height: auto");
+  expect(css).toContain("min-height: 76px");
+  expect(css).toContain("line-height: 20px");
+  expect(css).toContain("resize: vertical");
+});
+
+it("영업 필요 인력 표: 칸 위 맞춤 없음(시안 가운데), 고르기 칸 오른쪽 4px", () => {
+  expect(salesCss).not.toContain(".so-needs td");
+  expect(rule(salesCss, ".so-needs select.so-in")).toContain(
+    "padding-right: 4px",
+  );
+});
+
+it("서랍 안 요약 칸은 시안 .db .kpis처럼 늘 두 칸, 사이 8px", () => {
+  const css = rule(listCss, ".ls-db .ls-kpis");
+  expect(css).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
+  expect(css).toContain("gap: 8px");
+});
+
+it("인력 운영 보드 탭 줄: 시안 .content>.tabs(좌우 여백 0, 아래 -8px)", () => {
+  const css = rule(boardCss, ".manpower-board-page .ls-tabs");
+  expect(css).toContain("padding: 0");
+  expect(css).toContain("margin-bottom: -8px");
+});
+
+it("왼쪽 즐겨찾기·최근 본 화면: 시안 .nq-t·.nq-empty 간격", () => {
+  expect(rule(preferencesCss, ".preference-personal-lists h2")).toContain(
+    "padding: 8px 12px 4px",
+  );
+  expect(rule(preferencesCss, ".preference-personal-lists p")).toContain(
+    "padding: 2px 12px 4px",
+  );
+  expect(rule(preferencesCss, ".preference-personal-lists ul")).toContain(
+    "margin: 0",
+  );
+});
+
+it("운영 기준값 저장 창: 시안 .mb·.mf 간격", () => {
+  const body = rule(operatingCss, ".operating-save-body");
+  expect(body).toContain("gap: 12px");
+  expect(body).toContain("padding: 4px 24px 16px");
+  expect(
+    rule(
+      operatingCss,
+      '.code-page .app-dialog[data-testid="operating-save-dialog"] > .app-actions',
+    ),
+  ).toContain("padding: 12px 24px 20px");
+});
 
 const rule = (css: string, selector: string) => {
   const at = css.indexOf(`${selector} {`);

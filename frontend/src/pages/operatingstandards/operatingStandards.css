@@ -211,6 +211,31 @@
   margin: 0 0 8px 18px;
   padding: 0;
 }
+/* 시안 opersave 창: 본문 .mb(위 4·좌우 24·아래 16, 사이 12, 글자 회색), 단추 줄 .mf(위 12·좌우 24·아래 20). */
+.operating-save-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 24px 16px;
+  color: var(--text-sub);
+}
+.code-page .app-dialog[data-testid="operating-save-dialog"] > .operating-save-body {
+  margin: 0;
+  padding: 4px 24px 16px;
+}
+.app-dialog .operating-save-body > *,
+.app-dialog .operating-save-summary > p {
+  margin: 0;
+}
+.operating-save-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.code-page .app-dialog[data-testid="operating-save-dialog"] > .app-actions {
+  margin: 0;
+  padding: 12px 24px 20px;
+}
 .operating-month-field {
   display: flex;
   flex-direction: column;

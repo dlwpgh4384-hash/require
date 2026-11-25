@@ -27,6 +27,9 @@ const withCommas = (value: string) => {
   const digits = whole.replace("-", "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return sign + digits + (fraction !== undefined ? `.${fraction}` : "");
 };
+/** 단위가 「원」인 기준값은 화면에만 콤마를 넣어 보인다(저장 값은 콤마 없음, 2026-11-25 사용자 결정). */
+const shownValue = (row: Pick<api.OperatingStandard, "unit">, value: string) =>
+  row.unit === "원" ? withCommas(value) : value;
 
 /** SCR-UI-27 운영 기준값 탭. 네 탭의 CodePage 작업 공간에서 이 패널을 사용한다. */
 export function OperatingStandardsPanel({
@@ -245,6 +248,10 @@ export function OperatingStandardsPanel({
     discard();
   };
   const blocked = busy || refreshPending;
+  /** 저장 창 오류는 한 줄로(같은 글은 한 번만). */
+  const saveMessages = [
+    ...new Set([failure, ...Object.values(errors)].filter(Boolean)),
+  ];
   const historyDef = api.operatingRows.find((def) => def.key === historyCode);
   // 이력 창: 같은 적용 시작월의 칸들을 한 줄로 묶는다(최신 달 먼저, 칸 순서는 시안 순서).
   const historyMonths = Object.values(
@@ -377,10 +384,8 @@ export function OperatingStandardsPanel({
                             : "decimal"
                         }
                         value={
-                          // 기초 잔액은 금액이라 콤마를 넣어 보인다(SFR-006-02, 2026-11-24 사용자 결정). 저장 값은 콤마 없음.
-                          row.standardCode === "CASH_BASE_AMT"
-                            ? withCommas(draft[row.standardCode] ?? row.value)
-                            : (draft[row.standardCode] ?? row.value)
+                          // 금액(단위 「원」)은 콤마를 넣어 보인다(SFR-006-02, 2026-11-24·11-25 사용자 결정). 저장 값은 콤마 없음.
+                          shownValue(row, draft[row.standardCode] ?? row.value)
                         }
                         disabled={blocked || (row.immediate && row.closed)}
                         aria-invalid={!!error}
@@ -543,8 +548,12 @@ export function OperatingStandardsPanel({
             if (!busy) setConfirmSave(false);
           }}
         >
-          {failure && <p role="alert">{failure}</p>}
-          <div data-testid="operating-save-summary">
+          {/* 시안 opersave: 본문(.mb) 한 덩어리 — 건수·바꿀 목록·적용 시작월·안내·오류 한 줄(.errmsg). */}
+          <div className="operating-save-body">
+          <div
+            className="operating-save-summary"
+            data-testid="operating-save-summary"
+          >
             <p>{changed.length}건을 바꿉니다.</p>
             <ul className="operating-change-list">
               {changed.map((row) => (
@@ -552,15 +561,18 @@ export function OperatingStandardsPanel({
                   key={row.standardCode}
                   data-testid={`operating-change-${api.operatingTestKey(row.standardCode)}`}
                 >
-                  {row.standardName}: {row.value} →{" "}
-                  <strong>{draft[row.standardCode]}</strong> {row.unit}
+                  {row.standardName}: {shownValue(row, row.value)} →{" "}
+                  <strong>{shownValue(row, draft[row.standardCode])}</strong>{" "}
+                  {row.unit}
                 </li>
               ))}
             </ul>
           </div>
           {changed.some((row) => !row.immediate) && (
             <label className="operating-month-field">
-              <span className="operating-field-label">적용 시작월 *</span>
+              <span className="operating-field-label">
+                적용 시작월 <span className="field-required">*</span>
+              </span>
               <input
                 type="month"
                 className="ls-in"
@@ -586,14 +598,16 @@ export function OperatingStandardsPanel({
               자금수지표를 다시 계산합니다.
             </p>
           )}
-          {errors.effectiveMonth && (
-            <p className="field-error" role="alert">
-              {errors.effectiveMonth}
+          {saveMessages.length > 0 && (
+            <p
+              className="field-error"
+              role="alert"
+              data-testid="operating-save-error"
+            >
+              {saveMessages.join(" ")}
             </p>
           )}
-          {Object.keys(errors).length > 0 && (
-            <p role="alert">{Object.values(errors).join(" ")}</p>
-          )}
+          </div>
           <div className="app-actions">
             <button
               type="button"
@@ -651,7 +665,8 @@ export function OperatingStandardsPanel({
                   >
                     <td>{first.effectiveMonth ?? "–"}</td>
                     <td className="operating-history-num">
-                      {rows.map((row) => row.value).join(" / ")} {first.unit}
+                      {rows.map((row) => shownValue(row, row.value)).join(" / ")}{" "}
+                      {first.unit}
                     </td>
                     <td>{first.changedBy ?? "처음 설정"}</td>
                   </tr>

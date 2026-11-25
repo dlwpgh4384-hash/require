@@ -151,6 +151,27 @@ class WithdrawalPersistenceTest {
         mvc.perform(get("/api/common/withdrawals/tentative-assignments").param("developerId","withdrawal-person-a"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].tentativeAssignment.needSn").value(2));
     }
+    /** 다음 배정: 확정된 다음 투입(ACT, 취소 CNCL 제외)과 배정 후보(CNVT)는 「다음 배정 있음」이라 안내 띠 B에서 빠진다. */
+    @Test void confirmedNextAssignmentAndHandedOffCandidateHideThePersonFromTheUnassignedCount()throws Exception {
+        db.update("INSERT INTO TB_PJ_PROJ(PROJ_ID,PROJ_NM,CUST_CLNT_ID,CTRT_TYPE_CD,PROJ_STAT_CD,CTRT_BGN_DT,CTRT_END_DT,CTRT_AMT,ORGNL_CTRT_AMT,TEAM_EXPS_AMT,PROJ_EXPS_AMT,REG_USER_ID) VALUES('P-NEXT','다음 프로젝트','withdrawal-client','MO','ING','2026-12-01','2027-12-31',100000000,100000000,0,0,'admin')");
+        String insert="INSERT INTO TB_PJ_ASGN(ASGN_ID,PROJ_ID,DEV_ID,JOB_CD,INPUT_BGN_DT,INPUT_END_DT,CTRT_MM,BILL_UPRC,INPUT_TYPE_CD,EXT_CNT,ASGN_STAT_CD,REG_USER_ID) VALUES(?,'P-NEXT','withdrawal-person-b',?,?,'2027-06-30',1,8000000,'NEW',0,?,'admin')";
+        db.update(insert,"A-NEXT-CNCL",job,java.sql.Date.valueOf("2026-12-01"),"CNCL");
+        db.update(insert,"A-NEXT-B",job,java.sql.Date.valueOf("2027-01-04"),"ACT");
+        var before=getData("/api/common/withdrawals?year=2026");
+        assertThat(before.path("banner").path("unassignedCount").asInt()).isEqualTo(1);
+        save("A-WITHDRAWAL-A",1);
+        db.update("UPDATE TB_SL_TENT_ASGN SET TENT_STAT_CD='CNVT' WHERE DEV_ID='withdrawal-person-a' AND TENT_STAT_CD='ACT'");
+        var list=getData("/api/common/withdrawals?year=2026");
+        var byId=new HashMap<String,JsonNode>();
+        list.path("items").forEach(i -> byId.put(i.path("assignmentId").asText(),i.path("nextAssignment")));
+        assertThat(byId.get("A-WITHDRAWAL-B").path("nextProjectName").asText()).isEqualTo("다음 프로젝트");
+        assertThat(byId.get("A-WITHDRAWAL-B").path("nextStartMonth").asText()).isEqualTo("2027-01");
+        assertThat(byId.get("A-WITHDRAWAL-B").path("recommendationTarget").asBoolean()).isFalse();
+        assertThat(byId.get("A-WITHDRAWAL-A").path("assignmentCandidate").asBoolean()).isTrue();
+        assertThat(byId.get("A-WITHDRAWAL-A").path("opportunityName").asText()).isEqualTo("시험 기회");
+        assertThat(list.path("banner").path("soonCount").asInt()).isEqualTo(2);
+        assertThat(list.path("banner").path("unassignedCount").asInt()).isZero();
+    }
     @Test void listUsesSetQueriesForReservationsHistoryAndSeatNames()throws Exception {
         save("A-WITHDRAWAL-A",1);
         db.update("INSERT INTO TB_PJ_ASGN_HIST(ASGN_ID,HIST_SN,ASGN_CHG_TYPE_CD,APLY_DT,BFR_VAL,AFT_VAL,RTRO_YN,CLOSE_CROSS_YN,CRCT_YN,REG_USER_ID) VALUES('A-WITHDRAWAL-B',1,'EARLY','2026-10-01','2026-12-31','2026-11-30','N','N','N','admin')");

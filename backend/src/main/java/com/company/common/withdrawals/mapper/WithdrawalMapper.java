@@ -19,6 +19,8 @@ public interface WithdrawalMapper {
     List<Reservation> reservations(@Param("developerId") String developerId);
     /** 여러 사람의 현재 가배정(ACT·CNVT)을 한 번에 읽는다. 빈 목록으로는 부르지 않는다. */
     List<Reservation> reservationsFor(@Param("developerIds") Collection<String> developerIds);
+    /** 여러 사람의 확정 투입(ACT, 취소 제외)을 시작일 순으로 한 번에 읽는다. 빈 목록으로는 부르지 않는다. */
+    List<FollowingRow> followingAssignments(@Param("developerIds") Collection<String> developerIds);
     /** 여러 배정의 조기 철수 이력을 한 번에 읽는다. 빈 목록으로는 부르지 않는다. */
     List<EarlyRow> earlyHistory(@Param("assignmentIds") Collection<String> assignmentIds);
     List<String> skills(@Param("developerId") String developerId);

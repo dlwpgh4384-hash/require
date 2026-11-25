@@ -77,9 +77,11 @@ public class CommonWithdrawalController {
             .header("X-Total-Count", Integer.toString(items.size())).body(bytes);
     }
 
-    /** 화면 다음 배정 칸과 같은 글자(시안): 가배정 → 철수 완료 → 추천 대상 아님 → 추천 n곳/없음. */
+    /** 화면 다음 배정 칸과 같은 글자(시안): 다음 투입 → 배정 후보 → 가배정 → 철수 완료 → 추천 대상 아님 → 추천 n곳/없음. */
     private static String nextLabel(Row row) {
         var next = row.nextAssignment();
+        if (next.nextProjectName() != null) return "다음 투입 · " + next.nextProjectName() + " (" + next.nextStartMonth() + "~)";
+        if (next.assignmentCandidate()) return "배정 후보 · " + next.opportunityName();
         if (next.hasTentativeAssignment()) return "가배정 · " + next.opportunityName();
         if (row.withdrawalCompleted()) return "–";
         if (!next.recommendationTarget()) return next.note() == null ? "–" : "– · " + next.note();

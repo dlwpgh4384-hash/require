@@ -153,6 +153,22 @@ class AssignmentPersistenceTest {
         db.update("UPDATE TB_PJ_PROJ SET CTRT_TYPE_CD='IN' WHERE PROJ_ID='P-TEST'");
         assertThat(warnings.get()).doesNotContain("영업 파트 다름");
     }
+    /** 수주로 만든 미래 프로젝트(파트 이력 202702부터): 지금 달(202611)이 아니라 배정 시작 달 파트로 비교한다. 같은 파트면 경고 없음, 다르면 두 파트 이름. */
+    @Test void futureStartProjectComparesPartsAtTheAssignmentStartMonth()throws Exception {
+        db.update("INSERT INTO TB_PJ_PROJ(PROJ_ID,PROJ_NM,CUST_CLNT_ID,CTRT_TYPE_CD,PROJ_STAT_CD,CTRT_BGN_DT,CTRT_END_DT,CTRT_AMT,ORGNL_CTRT_AMT,TEAM_EXPS_AMT,PROJ_EXPS_AMT,REG_USER_ID) VALUES('P-FUT','미래 프로젝트','assignment-customer','MO','PRE','2027-02-01','2028-01-31',100000000,100000000,0,0,'admin')");
+        db.update("INSERT INTO TB_PJ_PROJ_PART(PROJ_ID,APLY_BGN_YM,PART_ID,REG_USER_ID) VALUES('P-FUT','202702','assignment-part','admin')");
+        var body=input("assignment-dev-a").put("projectId","P-FUT").put("startDate","2027-02-01").put("endDate","2027-03-31");
+        var created=data(mvc.perform(post("/api/common/assignments").contentType("application/json").content(body.toString())).andExpect(status().isOk()));
+        String id=created.path("assignmentId").asText();
+        assertThat(created.path("warnings").toString()).doesNotContain("영업 파트").doesNotContain("null");
+        java.util.function.Supplier<String> list=()->{try{var items=data(mvc.perform(get("/api/common/assignments").param("year","2027")).andExpect(status().isOk())).path("items");
+            for(var i:items) if(i.path("assignmentId").asText().equals(id)) return i.path("warnings").toString(); return "";}catch(Exception e){throw new IllegalStateException(e);}};
+        assertThat(list.get()).doesNotContain("영업 파트 다름");
+        db.update("INSERT INTO TB_BS_PART(PART_ID,PART_NM,HQ_YN,USE_YN,REG_USER_ID) VALUES('assignment-part-2','다른 영업파트','N','Y','admin')");
+        db.update("UPDATE TB_HR_DEV SET PART_ID='assignment-part-2' WHERE DEV_ID='assignment-dev-a'");
+        assertThat(list.get()).contains("영업 파트 다름");
+        assertThat(detail(id).path("warnings").toString()).contains("다른 영업파트 소속, 프로젝트는 시험 영업파트입니다.").doesNotContain("null");
+    }
     @Test void overloadWarningOnlyCountsMonthsTheAssignmentCovers()throws Exception {
         String first=data(mvc.perform(post("/api/common/assignments").contentType("application/json").content(input("assignment-dev-a").put("startDate","2026-10-01").put("endDate","2026-11-30").toString())).andExpect(status().isOk())).path("assignmentId").asText();
         String second=data(mvc.perform(post("/api/common/assignments").contentType("application/json").content(input("assignment-dev-a").put("startDate","2026-11-01").put("endDate","2026-11-30").put("monthlyMm",0.5).toString())).andExpect(status().isOk())).path("assignmentId").asText();

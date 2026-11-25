@@ -195,7 +195,20 @@ class CommonAssignmentControllerTest {
     @Test void unknownWarningIsRejected() throws Exception {mvc.perform(get("/api/common/assignments").param("warning","unknown")).andExpect(status().isBadRequest());}
     @Test void detailNotFound() throws Exception {mvc.perform(get("/api/common/assignments/missing")).andExpect(status().isNotFound());}
     @Test void candidatesAreClippedWithoutAssignmentInsert() throws Exception {when(mapper.candidates()).thenReturn(List.of(new CandidateRow("12","P-0001","개발 프로젝트","developer","사람","DEV","개발","202610",2,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z"))));mvc.perform(get("/api/common/assignments/candidates")).andExpect(status().isOk()).andExpect(response("GET","/api/common/assignments/candidates")).andExpect(jsonPath("$.data.items[0].startDate").value("2026-11-15")).andExpect(jsonPath("$.data.items[0].endDate").value("2026-11-20")).andExpect(jsonPath("$.data.items[0].managementNumber").value("K-0001"));noWrites();}
-    @Test void badCandidateRowIsSkippedWithoutFailingTheList() throws Exception {when(mapper.candidates()).thenReturn(List.of(new CandidateRow("12","P-0001","개발 프로젝트","developer","사람","DEV","개발","202610",1,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z")),new CandidateRow("13","P-0001","개발 프로젝트","developer","사람","DEV","개발","202611",0,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z")),new CandidateRow("14","P-0001","개발 프로젝트","other","다른 사람","DEV","개발","202611",1,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z"))));mvc.perform(get("/api/common/assignments/candidates")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items.length()").value(1)).andExpect(jsonPath("$.data.items[0].candidateId").value("14")).andExpect(jsonPath("$.data.items[0].endDate").value("2026-11-20")).andExpect(jsonPath("$.data.items[0].managementNumber").value("K-0001"));noWrites();}
+    /** 시안 ASG_CAND: 끝은 가배정 기간 개월과 상관없이 프로젝트 계약 종료일, 시작은 가배정 시작 달 1일과 프로젝트 시작일 중 늦은 날. */
+    @Test void candidatePeriodRunsToTheProjectEndLikeTheMockup() throws Exception {
+        when(mapper.candidates()).thenReturn(List.of(
+            new CandidateRow("21","P-0001","개발 프로젝트","developer","사람","DEV","개발","202611",3,LocalDate.of(2026,11,1),LocalDate.of(2028,1,31),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z")),
+            new CandidateRow("22","P-0001","개발 프로젝트","other","다른 사람","DEV","개발","202702",2,LocalDate.of(2026,11,1),LocalDate.of(2028,1,31),"CNVT","K-0002",Instant.parse("2026-11-10T01:02:03.456789Z")),
+            new CandidateRow("23","P-0001","개발 프로젝트","third","셋째","DEV","개발","202612",2,LocalDate.of(2026,11,1),null,"CNVT","K-0003",Instant.parse("2026-11-10T01:02:03.456789Z"))));
+        mvc.perform(get("/api/common/assignments/candidates")).andExpect(status().isOk()).andExpect(response("GET","/api/common/assignments/candidates"))
+            .andExpect(jsonPath("$.data.items[0].startDate").value("2026-11-01")).andExpect(jsonPath("$.data.items[0].endDate").value("2028-01-31"))
+            .andExpect(jsonPath("$.data.items[1].startDate").value("2027-02-01")).andExpect(jsonPath("$.data.items[1].endDate").value("2028-01-31"))
+            // 프로젝트 종료일이 없을 때만 시작 달 + 기간 개월 − 1의 말일
+            .andExpect(jsonPath("$.data.items[2].startDate").value("2026-12-01")).andExpect(jsonPath("$.data.items[2].endDate").value("2027-01-31"));
+        noWrites();
+    }
+    @Test void badCandidateRowIsSkippedWithoutFailingTheList() throws Exception {when(mapper.candidates()).thenReturn(List.of(new CandidateRow("12","P-0001","개발 프로젝트","developer","사람","DEV","개발","202612",1,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z")),new CandidateRow("13","P-0001","개발 프로젝트","developer","사람","DEV","개발","202611",0,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z")),new CandidateRow("14","P-0001","개발 프로젝트","other","다른 사람","DEV","개발","202611",1,today,LocalDate.of(2026,11,20),"CNVT","K-0001",Instant.parse("2026-11-10T01:02:03.456789Z"))));mvc.perform(get("/api/common/assignments/candidates")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items.length()").value(1)).andExpect(jsonPath("$.data.items[0].candidateId").value("14")).andExpect(jsonPath("$.data.items[0].endDate").value("2026-11-20")).andExpect(jsonPath("$.data.items[0].managementNumber").value("K-0001"));noWrites();}
     @Test
     @DisplayName("happy auth side-effect: 후보만 제외하고 TB_PJ_ASGN 생성·삭제 없이 원배정 보존")
     void anonymousCandidateRemovalOnlyUpdatesSource() throws Exception {
@@ -355,6 +368,23 @@ class CommonAssignmentControllerTest {
         mvc.perform(post("/api/common/assignments").contentType("application/json").content(input().toString()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.warnings[0]").value("영업 파트가 다릅니다: 개발자님은 영업파트 소속, 프로젝트는 프로젝트 영업파트입니다. 매출은 프로젝트 파트로, 이 사람 이익금은 소속 파트(본사면 파트 정산 제외)로 잡힙니다. 파트를 잘못 골랐다면 개발자 풀에서 고쳐 주세요."));
         assertThat(rows).containsKey("A-0002");
+    }
+    /** 수주로 만든 미래 프로젝트는 파트 이력이 시작 달(202702)부터 있다: 지금 달이 아니라 배정 시작 달 파트로 비교하고, 문구에 null이 들어가지 않는다. */
+    @Test void futureStartProjectComparesThePartOfTheAssignmentStartMonth() throws Exception {
+        var noPart=new Project();noPart.projectId="P-0001";noPart.projectName="개발 프로젝트";noPart.contractTypeCode="MO";noPart.statusCode="PRE";
+        noPart.startDate=LocalDate.of(2027,2,1);noPart.endDate=LocalDate.of(2027,12,31);noPart.teamExpenseAmount=BigDecimal.ZERO;noPart.projectExpenseAmount=BigDecimal.ZERO;
+        project.startDate=noPart.startDate;project.statusCode="PRE";
+        when(projects.selectProject(anyString(),any(),anyString())).thenAnswer(c -> ((String)c.getArgument(2)).compareTo("202702")>=0?project:noPart);
+        when(mapper.firstPartMonth("P-0001")).thenReturn("202702");
+        var same=input();same.put("startDate","2027-02-01");same.put("endDate","2027-03-31");
+        mvc.perform(post("/api/common/assignments").contentType("application/json").content(same.toString())).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.warnings[*]").value(org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("영업 파트")))));
+        project.salesPartId="other";project.salesPartName="미래 영업파트";
+        // 시작 달(202701)에 이력이 없으면 가장 처음 이력(202702)의 파트로 본다.
+        var other=input();other.put("startDate","2027-01-15");other.put("endDate","2027-03-31");
+        mvc.perform(post("/api/common/assignments").contentType("application/json").content(other.toString())).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.warnings[*]").value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.startsWith("영업 파트가 다릅니다: 개발자님은 영업파트 소속, 프로젝트는 미래 영업파트입니다."))))
+            .andExpect(jsonPath("$.data.warnings[*]").value(org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("null")))));
     }
     @Test void equalStartAssignmentIsNotOfferedForTogether() throws Exception {
         mvc.perform(get("/api/common/assignments/contract-developers").param("projectId","P-0001")

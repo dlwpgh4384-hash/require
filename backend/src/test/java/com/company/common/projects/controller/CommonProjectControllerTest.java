@@ -186,6 +186,21 @@ class CommonProjectControllerTest {
             .andExpect(status().isOk());
         assertThat(projects.get("P-0001").workAreaCode).isNull();
     }
+    @Test void changingTheWorkAreaWritesALocHistoryLine() throws Exception {
+        when(mapper.usableArea("1114000000")).thenReturn(true);
+        when(mapper.areaName("1114000000")).thenReturn("서울 중구");
+        mvc.perform(put("/api/common/projects/P-0001").contentType("application/json").content(updateInput().put("workAreaCode","1114000000").toString()))
+            .andExpect(status().isOk());
+        assertThat(history).anySatisfy(h -> {
+            assertThat(h.code()).isEqualTo("LOC"); assertThat(h.name()).isEqualTo("근무지 지역");
+            assertThat(h.afterValue()).isEqualTo("서울 중구");
+        });
+        history.clear();
+        // 같은 지역으로 다시 저장하면 이력을 남기지 않는다.
+        mvc.perform(put("/api/common/projects/P-0001").contentType("application/json").content(updateInput().put("workAreaCode","1114000000").toString()))
+            .andExpect(status().isOk());
+        assertThat(history).noneSatisfy(h -> assertThat(h.name()).isEqualTo("근무지 지역"));
+    }
     @Test void internalBlankContractIsZeroAndHasNoCustomerBudgetOrWorkplace() throws Exception {
         var b=createInput(); b.put("contractTypeCode","IN"); b.remove(List.of("customerId","salesPartId","contractAmount"));
         mvc.perform(post("/api/common/projects").contentType("application/json").content(b.toString()))

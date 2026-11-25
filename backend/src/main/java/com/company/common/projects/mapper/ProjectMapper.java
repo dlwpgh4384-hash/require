@@ -37,6 +37,8 @@ public interface ProjectMapper {
     boolean eligiblePart(String id);
     /** 근무지 지역: 행정구역 표에 있고 사용 중(USE_YN='Y')인 코드인지. */
     boolean usableArea(String code);
+    /** 근무지 지역 보여 주기 이름(시·도 시·군·구 동). 변경 이력에 쓴다. */
+    String areaName(String code);
     String customerName(String id);
     String codeName(@Param("group") String group, @Param("code") String code);
     boolean hasBills(String id);

@@ -122,6 +122,9 @@
   <select id="usableArea" resultType="boolean">
     SELECT EXISTS (SELECT 1 FROM TB_SY_ADM_AREA WHERE AREA_CD=#{code} AND USE_YN='Y')
   </select>
+  <select id="areaName" resultType="string">
+    SELECT concat_ws(' ', SIDO_NM, SGG_NM, EMD_NM) FROM TB_SY_ADM_AREA WHERE AREA_CD=#{code}
+  </select>
   <select id="customerName" resultType="string">SELECT CLNT_NM FROM TB_BS_CLNT WHERE CLNT_ID=#{id}</select>
   <select id="codeName" resultType="string">
     SELECT CODE_NM FROM TB_SY_CODE WHERE CODE_GRP_ID=#{group} AND CODE=#{code} AND USE_YN='Y' AND DEL_YN='N'

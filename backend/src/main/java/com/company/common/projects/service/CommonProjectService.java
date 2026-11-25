@@ -180,7 +180,9 @@ public class CommonProjectService implements org.springframework.context.Applica
             if (p.contractAmount == null) throw ProjectRules.invalid("contractAmount");
         }
     }
-    private Project values(Input input, Project old) {
+    private Project values(Input input, Project old) { return values(input, old, false); }
+    /** carriedArea: 수주로 영업 기회에서 옮겨 온 근무지 지역은 사용 중인지 다시 막지 않는다(2026-11-25 사용자 결정). */
+    private Project values(Input input, Project old, boolean carriedArea) {
         var p = new Project();
         p.projectId = old == null ? null : old.projectId;
         p.contractTypeCode = old == null ? input.contractTypeCode() : old.contractTypeCode;
@@ -191,7 +193,7 @@ public class CommonProjectService implements org.springframework.context.Applica
         p.workplace = internal(p) ? null : input.workplace();
         // 근무지 지역(2026-11-25): 사용 중인 행정구역만. 고치지 않은 저장값은 나중에 쓰지 않게 된 구역이어도 그대로 둔다(개발자 거주지와 같음).
         p.workAreaCode = internal(p) ? null : input.workAreaCode();
-        if (p.workAreaCode != null && !(old != null && p.workAreaCode.equals(old.workAreaCode))
+        if (p.workAreaCode != null && !carriedArea && !(old != null && p.workAreaCode.equals(old.workAreaCode))
             && !mapper.usableArea(p.workAreaCode)) throw ProjectRules.invalidWorkArea();
         p.estimateAmount = input.estimateAmount();
         p.contractAmount = input.contractAmount();
@@ -217,11 +219,11 @@ public class CommonProjectService implements org.springframework.context.Applica
         return p;
     }
     public void validateRegistration(Input input) {
-        registration(input);
+        registration(input, false);
     }
-    private Project registration(Input input) {
+    private Project registration(Input input, boolean carriedArea) {
         if (!Set.of("ING", "PRE").contains(input.statusCode())) throw ProjectRules.invalid("statusCode");
-        Project p = values(input, null);
+        Project p = values(input, null, carriedArea);
         if (!internal(p) && input.salesPartId() == null) throw ProjectRules.invalid("salesPartId");
         references(p, input.salesPartId());
         return p;
@@ -233,9 +235,12 @@ public class CommonProjectService implements org.springframework.context.Applica
     }
     /** B9 apply uses the same invariant inside the upload engine's transaction. */
     @Transactional
-    public Project create(Input input, String explicitId) {
+    public Project create(Input input, String explicitId) { return create(input, explicitId, false); }
+    /** 영업 기회 수주로 만들 때(carriedArea=true): 옮겨 온 근무지 지역 코드는 그대로 저장한다. */
+    @Transactional
+    public Project create(Input input, String explicitId, boolean carriedArea) {
         mapper.lockSources();
-        Project p = registration(input);
+        Project p = registration(input, carriedArea);
         var ids = new HashSet<>(mapper.projectIds());
         if (explicitId == null) {
             int number = 1;
@@ -272,6 +277,10 @@ public class CommonProjectService implements org.springframework.context.Applica
         change(id, "ETC", "고객사", old.customerName, internal(p) ? "(자체)" : mapper.customerName(p.customerId));
         change(id, "PERIOD", "계약기간", old.startDate + "~" + old.endDate, p.startDate + "~" + p.endDate);
         change(id, "LOC", "근무지", old.workplace, p.workplace);
+        // 근무지 지역을 바꾸면 근무지와 같은 「근무지」 묶음으로 이력을 남긴다(2026-11-25 사용자 결정).
+        if (!Objects.equals(old.workAreaCode, p.workAreaCode))
+            history(id, "LOC", "근무지 지역", old.workAreaName,
+                p.workAreaCode == null ? null : mapper.areaName(p.workAreaCode));
         change(id, "ETC", "견적 금액", old.estimateAmount, p.estimateAmount);
         change(id, "AMT", "계약금액", old.contractAmount, p.contractAmount);
         change(id, "BUDGET", "예산(목표원가)", old.budgetAmount, p.budgetAmount);

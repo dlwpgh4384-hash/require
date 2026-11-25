@@ -23,10 +23,11 @@ class SalesOpportunityProjectsTest {
             new BigDecimal("14"), "WAIT", null, null, null, null, null, "admin", Instant.parse("2026-11-15T00:00:00Z"));
         var input = new Win(header.modifiedAt(), new BigDecimal("55000000"), "TK", LocalDate.of(2026, 11, 1), LocalDate.of(2027, 4, 30), "PRE");
         var project = new ProjectContracts.Project(); project.projectId = "P-0001";
-        when(projects.create(any(), isNull())).thenReturn(project);
+        when(projects.create(any(), isNull(), eq(true))).thenReturn(project);
         assertThat(adapter.create(header, input)).isEqualTo("P-0001");
         var capture = ArgumentCaptor.forClass(ProjectContracts.Input.class);
-        verify(projects).create(capture.capture(), isNull());
+        // 수주로 옮기는 근무지 지역은 사용 중인지 다시 막지 않는다(carriedArea=true).
+        verify(projects).create(capture.capture(), isNull(), eq(true));
         var created = capture.getValue();
         assertThat(created.projectName()).isEqualTo("기회명");
         assertThat(created.customerId()).isEqualTo("customer");

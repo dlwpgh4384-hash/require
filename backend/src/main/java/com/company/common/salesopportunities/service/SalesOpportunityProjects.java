@@ -22,7 +22,7 @@ public class SalesOpportunityProjects {
             opportunity.customerId(), input.contractTypeCode(), input.contractStartDate(), input.contractEndDate(),
             // 근무지 글자와 근무지 지역 코드를 같이 넘긴다(2026-11-25).
             opportunity.salesPartId(), opportunity.workplace(), opportunity.workAreaCode(), input.projectStatusCode(), opportunity.expectedAmount(),
-            input.contractAmount(), null, null, null, opportunity.memo()), null);
+            input.contractAmount(), null, null, null, opportunity.memo()), null, true);
         return project.projectId;
     }
 }

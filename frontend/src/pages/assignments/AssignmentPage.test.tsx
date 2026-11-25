@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { announcePeriodChanged } from "../userpreferences/userPreferences";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { AssignmentPage } from "./AssignmentPage";
@@ -192,7 +193,8 @@ const form = (props: Partial<Parameters<typeof AssignmentForm>[0]> = {}) =>
   inRouter(<AssignmentForm projects={[project]} roles={["FIN"]} onClose={vi.fn()} onSaved={vi.fn()} {...props} />);
 const detail = (readOnly = false, roles = ["FIN"]) =>
   inRouter(<AssignmentDetail id={row.assignmentId} roles={roles} readOnly={readOnly} onClose={vi.fn()} onChanged={vi.fn()} />);
-const writes = () => request.mock.calls.filter((c) => ["POST", "PUT"].includes((c[1] as RequestInit | undefined)?.method ?? "GET"));
+// 고른 연도 저장(사용자 설정 PERIOD)은 업무 쓰기가 아니라서 뺀다.
+const writes = () => request.mock.calls.filter((c) => ["POST", "PUT"].includes((c[1] as RequestInit | undefined)?.method ?? "GET") && !String(c[0]).startsWith("/api/common/user-preferences/"));
 const body = (n = 0) => JSON.parse(String((writes()[n][1] as RequestInit).body));
 const ready = () => waitFor(() => expect(screen.getByTestId("assignment-form-save")).not.toBeDisabled());
 const pick = async () => {
@@ -253,6 +255,42 @@ it("places template, upload and primary create in the title host and excel downl
   expect(list.getByTestId("list-download")).toHaveTextContent("엑셀 다운로드");
   expect(list.getByTestId("list-columns")).toHaveTextContent("열 설정");
   expect(list.getByTestId("list-density")).toHaveTextContent("좁게 보기");
+});
+
+it("reopening uses the saved year and changing the year saves it (FR-0105)", async () => {
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    String(url) === "/api/common/user-preferences/PERIOD/UI-12"
+      ? init?.method === "PUT"
+        ? ok({ prefTypeCd: "PERIOD", prefKey: "UI-12", found: true, prefVal: String(JSON.parse(String(init.body)).prefVal ?? ""), modDttm: "2026-11-24T00:00:00Z" })
+        : ok({ prefTypeCd: "PERIOD", prefKey: "UI-12", found: true, prefVal: '{"year":2025}', modDttm: "2026-11-23T00:00:00Z" })
+      : base(url, init),
+  );
+  page();
+  expect(await screen.findByTestId("assignment-lock-banner")).toHaveTextContent("2025년은 지난 해라 읽기만 할 수 있습니다.");
+  await waitFor(() =>
+    expect(request.mock.calls.some(([u]) => String(u).startsWith("/api/common/assignments?") && String(u).includes("year=2025"))).toBe(true),
+  );
+  fireEvent.click(screen.getByTestId("assignment-year-next"));
+  await waitFor(() =>
+    expect(
+      request.mock.calls.some(
+        ([u, i]) => String(u) === "/api/common/user-preferences/PERIOD/UI-12" && (i as RequestInit | undefined)?.method === "PUT"
+          && String((i as RequestInit).body).includes('\\"year\\":2026'),
+      ),
+    ).toBe(true),
+  );
+});
+
+it("an already open tab follows a period saved by month close [확인하기]", async () => {
+  page();
+  await screen.findByTestId("list-row-A-0001");
+  expect(screen.queryByTestId("assignment-lock-banner")).not.toBeInTheDocument();
+  act(() => announcePeriodChanged({ screenId: "UI-12", prefVal: '{"year":2025}', modDttm: null }));
+  expect(await screen.findByTestId("assignment-lock-banner")).toHaveTextContent("2025년은 지난 해라 읽기만 할 수 있습니다.");
+  // 다른 화면 신호는 무시한다.
+  act(() => announcePeriodChanged({ screenId: "UI-01", prefVal: '{"year":2024}', modDttm: null }));
+  expect(screen.getByTestId("assignment-lock-banner")).toHaveTextContent("2025년");
 });
 
 it("last year shows the lock banner and hides every editing control", async () => {
@@ -603,14 +641,18 @@ it("assign form validates with the mockup messages before any POST", async () =>
   expect(writes()).toHaveLength(0);
 });
 
-it("PM has no price field and is blocked when the pool has no monthly rate", async () => {
+it("PM has no price field; the server checks the rate and its message shows under the developer", async () => {
   developer.monthlyRate = null;
   form({ roles: ["PM"] });
   await pick();
   expect(screen.queryByTestId("assignment-billing-price")).not.toBeInTheDocument();
+  const message = "월 단가가 없어 배정할 수 없습니다. 파트장·재무에게 요청해 주세요.";
+  writeFailure = { status: 400, message: "입력 내용을 확인해 주세요.", errors: [{ field: "billingPrice", message }] };
   fireEvent.click(screen.getByTestId("assignment-form-save"));
-  expect(await screen.findByText("월 단가가 없어 배정할 수 없습니다. 파트장·재무에게 요청해 주세요.")).toBeInTheDocument();
-  expect(writes()).toHaveLength(0);
+  // PM 화면에는 금액이 오지 않으므로 화면이 미리 막지 않고 서버가 검사한다(2026-11-24 사용자 결정).
+  expect(await within(screen.getByTestId("assignment-field-developer")).findByText(message)).toBeInTheDocument();
+  expect(writes()).toHaveLength(1);
+  expect(JSON.parse(String((writes()[0][1] as RequestInit).body))).not.toHaveProperty("billingPrice");
 });
 
 it("finance sees the no-rate hint, free support hides price and turnkey shows the notice", async () => {
@@ -775,16 +817,16 @@ it("assign form subtitle follows how it was opened", async () => {
   expect(await screen.findByRole("dialog", { name: "투입 배정" })).toHaveTextContent("AI 인력 추천에서 채움");
 });
 
-it("shows the no-price notice whenever the price field is hidden", async () => {
+it("shows the no-price notice whenever the price field is hidden, with a reason that fits", async () => {
   form({ roles: ["PM"] });
   await ready();
-  expect(screen.getByTestId("assignment-no-price")).toHaveTextContent("내부 프로젝트는 매출이 없어 청구 단가 칸이 없습니다.");
+  expect(screen.getByTestId("assignment-no-price")).toHaveTextContent("청구 단가는 개발자 월 단가(대체투입은 계약상 인력 단가)로 저장됩니다. 단가는 파트장·재무가 고칩니다.");
   cleanup();
   form();
   await ready();
   expect(screen.queryByTestId("assignment-no-price")).not.toBeInTheDocument();
   fireEvent.change(screen.getByTestId("assignment-input-type"), { target: { value: "FREE" } });
-  expect(screen.getByTestId("assignment-no-price")).toHaveTextContent("내부 프로젝트는 매출이 없어 청구 단가 칸이 없습니다.");
+  expect(screen.getByTestId("assignment-no-price")).toHaveTextContent("무상지원은 매출이 없어 청구 단가를 0으로 저장합니다.");
 });
 
 it("monthly MM drops letters at once", async () => {
@@ -1050,4 +1092,43 @@ it("date helpers distinguish first open, project change and recommendation", () 
   expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
   expect(assignmentPriceEditable(["PM"])).toBe(false);
   expect(assignmentPriceEditable(["SALES_LDR"])).toBe(true);
+});
+
+it("a 409 on bulk cancel or bulk extension toasts and reloads the list, and cancel sends once on double click", async () => {
+  writeFailure = { status: 409, message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요." };
+  page();
+  fireEvent.click(await screen.findByTestId("list-select-A-0001"));
+  await waitFor(() => expect(listReads()).toBe(1));
+  fireEvent.click(screen.getByTestId("list-bulk-cancel"));
+  const button = within(screen.getByRole("alertdialog")).getByRole("button", { name: "배정 취소" });
+  fireEvent.click(button);
+  fireEvent.click(button);
+  expect(await screen.findByTestId("assignment-toast")).toHaveTextContent("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.");
+  expect(writes()).toHaveLength(1);
+  await waitFor(() => expect(listReads()).toBe(2));
+  fireEvent.click(await screen.findByTestId("list-select-A-0001"));
+  writeFailure = { status: 409, message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요." };
+  fireEvent.click(screen.getByTestId("list-bulk-extension"));
+  fireEvent.click(screen.getByTestId("assignment-bulk-save"));
+  await waitFor(() => expect(listReads()).toBe(3));
+  expect(screen.queryByTestId("assignment-bulk-dialog")).not.toBeInTheDocument();
+});
+
+it("a 409 on a change closes the dialog, reloads the detail and tells the page; server field errors go under the fields", async () => {
+  const onChanged = vi.fn();
+  inRouter(<AssignmentDetail id={row.assignmentId} roles={["FIN"]} readOnly={false} onClose={vi.fn()} onChanged={onChanged} />);
+  await openHistory();
+  fireEvent.click(await screen.findByTestId("assignment-change-open"));
+  fireEvent.change(screen.getByTestId("assignment-change-type"), { target: { value: "EXTP" } });
+  fireEvent.change(screen.getByTestId("assignment-change-extension"), { target: { value: "H" } });
+  writeFailure = { status: 400, message: "입력값을 확인해 주세요.", errors: [{ field: "reasonCode", message: "변경 사유를 골라 주세요." }] };
+  fireEvent.click(screen.getByTestId("assignment-change-save"));
+  expect(await within(screen.getByTestId("assignment-change-field-reason")).findByRole("alert")).toHaveTextContent("변경 사유를 골라 주세요.");
+  const reads = () => request.mock.calls.filter(([u, init]) => String(u) === "/api/common/assignments/A-0001" && !(init as RequestInit | undefined)?.method).length;
+  const before = reads();
+  writeFailure = { status: 409, message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요." };
+  fireEvent.click(screen.getByTestId("assignment-change-save"));
+  await waitFor(() => expect(onChanged).toHaveBeenCalledWith("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.", "warn"));
+  expect(screen.queryByTestId("assignment-change-dialog")).not.toBeInTheDocument();
+  await waitFor(() => expect(reads()).toBeGreaterThan(before));
 });

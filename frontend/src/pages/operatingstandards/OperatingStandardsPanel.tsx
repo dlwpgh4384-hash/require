@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Dialog, Toast } from "../../shared/feedback/Dialog";
+import { Dialog, Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { koreanThisMonth } from "../../shared/time";
 import { Banner } from "../../shared/list";
@@ -20,6 +20,13 @@ const nextMonth = (month: string) => {
   const date = new Date(Date.UTC(year, value, 1));
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 };
+/** 정수 부분에 세 자리마다 콤마(소수·음수 부호는 그대로). */
+const withCommas = (value: string) => {
+  const [whole, fraction] = value.split(".");
+  const sign = whole.startsWith("-") ? "-" : "";
+  const digits = whole.replace("-", "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return sign + digits + (fraction !== undefined ? `.${fraction}` : "");
+};
 
 /** SCR-UI-27 운영 기준값 탭. 네 탭의 CodePage 작업 공간에서 이 패널을 사용한다. */
 export function OperatingStandardsPanel({
@@ -34,8 +41,16 @@ export function OperatingStandardsPanel({
   );
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState("");
+  /** 409 뒤 [최신 버전 불러오기 (입력 유지)] 단추를 보일지(2026-11-24 사용자 결정). */
+  const [conflict, setConflict] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState("");
+  const [noticeKind, setNoticeKind] = useState<ToastKind>("ok");
+  /** 시안 알림 종류: 완료는 ok, 안내는 info, 동시 수정은 warn. */
+  const notify = (text: string, kind: ToastKind = "ok") => {
+    setNotice(text);
+    setNoticeKind(kind);
+  };
   const [busy, setBusy] = useState(false);
   const [refreshPending, setRefreshPending] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -100,6 +115,22 @@ export function OperatingStandardsPanel({
           ? "update"
           : "add",
     }));
+  /** 고친 칸(draft)은 그대로 두고, 표의 값·수정 시각만 최신으로 바꾼다. 안 고친 칸은 최신 값이 보인다. */
+  const reloadKeepingInput = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await api.getCommonOperatingStandards();
+      setSnapshot(result.items);
+      setClosedMonth(result.closedMonth ?? null);
+      setConflict(false);
+      setFailure("");
+    } catch (error) {
+      setFailure(message(error));
+    } finally {
+      setBusy(false);
+    }
+  };
   const refresh = async () => {
     const result = await api.getCommonOperatingStandards();
     setSnapshot(result.items);
@@ -128,6 +159,7 @@ export function OperatingStandardsPanel({
     lock.current = true;
     setBusy(true);
     setFailure("");
+    setConflict(false);
     let saved = false;
     try {
       const result = await api.putCommonOperatingStandards(changes);
@@ -138,13 +170,26 @@ export function OperatingStandardsPanel({
       setConfirmSave(false);
       // 시안: 운영 기준값 n건을 저장했습니다(2026-11부터 적용).
       const start = changes.find((row) => row.effectiveMonth)?.effectiveMonth;
-      setNotice(
+      notify(
         changes.some((row) => row.action === "delete")
           ? "운영 기준값 이력을 지웠습니다."
           : `운영 기준값 ${changes.length}건을 저장했습니다${start ? `(${start}부터 적용)` : ""}.`,
       );
       await refresh();
     } catch (error) {
+      if (
+        !saved &&
+        error instanceof api.OperatingStandardsRequestError &&
+        error.status === 409
+      ) {
+        // FR-0106: 다른 사람이 먼저 바꿨으면 창을 닫고 안내한다. 입력은 둔 채 [최신 버전 불러오기 (입력 유지)]를 보인다
+        // (2026-11-24 사용자 결정).
+        setConfirmSave(false);
+        notify(error.message, "warn");
+        setFailure(error.message);
+        setConflict(true);
+        return;
+      }
       if (saved) {
         setRefreshPending(true);
         setFailure(
@@ -166,7 +211,7 @@ export function OperatingStandardsPanel({
   };
   const openSave = () => {
     if (!changed.length) {
-      setNotice("바꾼 내용이 없습니다.");
+      notify("바꾼 내용이 없습니다.", "info");
       return;
     }
     const invalid = api.validateOperatingChanges(
@@ -196,7 +241,7 @@ export function OperatingStandardsPanel({
   };
   /** 시안 [취소] 알림. */
   const cancel = () => {
-    setNotice(dirty ? "변경을 취소했습니다." : "바꾼 내용이 없습니다.");
+    notify(dirty ? "변경을 취소했습니다." : "바꾼 내용이 없습니다.", "info");
     discard();
   };
   const blocked = busy || refreshPending;
@@ -331,7 +376,12 @@ export function OperatingStandardsPanel({
                             ? undefined
                             : "decimal"
                         }
-                        value={draft[row.standardCode] ?? row.value}
+                        value={
+                          // 기초 잔액은 금액이라 콤마를 넣어 보인다(SFR-006-02, 2026-11-24 사용자 결정). 저장 값은 콤마 없음.
+                          row.standardCode === "CASH_BASE_AMT"
+                            ? withCommas(draft[row.standardCode] ?? row.value)
+                            : (draft[row.standardCode] ?? row.value)
+                        }
                         disabled={blocked || (row.immediate && row.closed)}
                         aria-invalid={!!error}
                         onChange={(event) => {
@@ -447,6 +497,20 @@ export function OperatingStandardsPanel({
       {failure && (
         <div role="alert" data-testid="operating-failure">
           {failure}
+          {conflict && (
+            <>
+              {" "}
+              <button
+                type="button"
+                className="ls-btn ls-btn-sm"
+                data-testid="operating-version-refresh"
+                disabled={busy}
+                onClick={() => void reloadKeepingInput()}
+              >
+                최신 버전 불러오기 (입력 유지)
+              </button>
+            </>
+          )}
           {(!snapshot || refreshPending) && (
             <button
               type="button"
@@ -619,6 +683,7 @@ export function OperatingStandardsPanel({
         <Toast
           message={notice}
           testId="operating-toast"
+          kind={noticeKind}
           onDismiss={() => setNotice("")}
         />
       )}

@@ -171,9 +171,12 @@ public class CommonBillService {
         if (mapper.closed(month)) throw CodeFailure.invalid("billMonth",display(month)+"은 마감한 달이라 청구를 고칠 수 없습니다.");
     }
 
-    /** 새 청구를 만들 달: 올해이고 마감 전(시안 「YYYY-MM은 마감한 달이라 청구를 만들 수 없습니다.」). */
+    /**
+     * 새 청구를 만들 달: 올해이고 마감 전(시안 「YYYY-MM은 마감한 달이라 청구를 만들 수 없습니다.」).
+     * 12월에 [다음 달 청구]·[고쳐서 청구]로 만드는 다음 해 1월(이번 달의 다음 달)도 허용한다(2026-11-24 사용자 결정).
+     */
     private void creatable(String month) {
-        thisYear(month);
+        if (!calendar.fromDatabaseMonth(month).equals(calendar.currentMonth().plusMonths(1))) thisYear(month);
         if (mapper.closed(month)) throw CodeFailure.invalid("billMonth",display(month)+"은 마감한 달이라 청구를 만들 수 없습니다.");
     }
 

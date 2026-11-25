@@ -46,7 +46,7 @@ class ProjectBusinessPolicyTest {
         var service=new CommonProjectService(mapper,calendar,new CurrentBusinessActor(),mock(ProjectAmountRules.class),new ExcelExportService(),mock(ProjectProgressRules.class));
         service.setApplicationEventPublisher(event -> { throw new IllegalStateException("PROJ_STEP 공통코드 정의를 확인해 주세요."); });
         assertThat(service.postCommonProjectStart("P-pre").projectId).isEqualTo("P-pre");
-        verify(mapper).start("P-pre");
+        verify(mapper).start(eq("P-pre"), anyString());
     }
 }
 

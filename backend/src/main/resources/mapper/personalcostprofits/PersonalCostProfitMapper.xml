@@ -118,7 +118,8 @@
     LEFT JOIN TB_SY_CODE g ON g.CODE_GRP_ID='GRADE' AND g.CODE=h.GRADE_CD
     WHERE (h.JNCMP_DT IS NULL OR h.JNCMP_DT &lt; make_date(#{year},#{baseMonth},1)+interval '1 month')
       AND (h.RETIRE_DT IS NULL OR h.RETIRE_DT &gt;= make_date(#{year},1,1))
-    <if test="name != null and name != ''">AND position(lower(#{name}) in lower(h.DEV_NM)) &gt; 0</if>
+    <!-- 이름 앞뒤 공백은 빼고 찾는다(시안 st.name.trim()) -->
+    <if test="name != null and name.trim() != ''">AND position(lower(trim(#{name})) in lower(h.DEV_NM)) &gt; 0</if>
     <if test="employeeTypeCode != null and employeeTypeCode != ''">AND h.EMP_TYPE_CD=#{employeeTypeCode}</if>
     <!-- 소속 「자사」(__self) = 소속 거래처가 없는 사람 -->
     <if test="affiliationId == '__self'">AND h.BLNG_CLNT_ID IS NULL</if>
@@ -196,13 +197,16 @@
     ) d ON true
     WHERE a.mm &gt; 0 ORDER BY a.ym,a.DEV_ID,a.PROJ_ID,a.ASGN_ID
   </select>
+  <!-- 공통코드 정렬 순서(SORT_ORD)대로: 직무·등급별 인당 공헌이익 표의 직무 줄 순서에 쓴다 -->
   <select id="selectCodes" resultMap="code">
-    SELECT c.CODE_GRP_ID AS "groupCode",c.CODE AS "code",c.CODE_NM AS "name",c.CODE_VAL AS "value"
-    FROM TB_SY_CODE c WHERE c.USE_YN='Y' AND c.DEL_YN='N'
-    UNION ALL
-    SELECT 'affiliationId',c.CLNT_ID,c.CLNT_NM,NULL::numeric FROM TB_BS_CLNT c WHERE c.USE_YN='Y'
-    UNION ALL
-    SELECT 'salesPartId',p.PART_ID,p.PART_NM,NULL::numeric FROM TB_BS_PART p WHERE p.USE_YN='Y'
+    SELECT x."groupCode",x."code",x."name",x."value" FROM (
+      SELECT c.CODE_GRP_ID AS "groupCode",c.CODE AS "code",c.CODE_NM AS "name",c.CODE_VAL AS "value",c.SORT_ORD AS ord
+      FROM TB_SY_CODE c WHERE c.USE_YN='Y' AND c.DEL_YN='N'
+      UNION ALL
+      SELECT 'affiliationId',c.CLNT_ID,c.CLNT_NM,NULL::numeric,NULL::numeric FROM TB_BS_CLNT c WHERE c.USE_YN='Y'
+      UNION ALL
+      SELECT 'salesPartId',p.PART_ID,p.PART_NM,NULL::numeric,NULL::numeric FROM TB_BS_PART p WHERE p.USE_YN='Y'
+    ) x ORDER BY x."groupCode",x.ord NULLS LAST,x."code"
   </select>
   <select id="selectActorRoles" resultMap="role">
     SELECT r.ROLE_ID AS "roleId",r.ROLE_NM AS "roleName",r.DATA_SCOPE_CD AS "dataScopeCd",

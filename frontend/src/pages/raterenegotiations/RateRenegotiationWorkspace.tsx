@@ -39,6 +39,13 @@ import {
 } from "./rateRenegotiationFormulas";
 import "./rateRenegotiations.css";
 
+/** 시안 ic('warn',18): 다른 화면 경고 띠와 같은 아이콘 */
+const warnIcon = (
+  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01" />
+  </svg>
+);
+
 const moneyKeys = new Set<string>([
   "currentUnitPrice",
   "monthlyCost",
@@ -47,8 +54,11 @@ const moneyKeys = new Set<string>([
 ]);
 const kebab = (key: string) =>
   key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+/** 시안 pct(): 소수 한 자리 %, 음수는 「−」. */
 const percent = (value: number | null | undefined) =>
-  value == null ? "–" : `${value.toFixed(1)}%`;
+  value == null || !Number.isFinite(value)
+    ? "–"
+    : `${value < 0 ? "−" : ""}${Math.abs(value).toFixed(1)}%`;
 const plain = (value: number | null | undefined) =>
   value == null ? "–" : String(Number(value));
 /** 시안 갱신 시점 이름: 3·6개월 안, 12개월은 「1년 안」 */
@@ -250,6 +260,8 @@ export function RateRenegotiationWorkspace() {
       return row.requiredIncreaseRate > 0
         ? percent(row.requiredIncreaseRate)
         : "–";
+    // 시안 mmf(): MM은 소수 둘째 자리
+    if (key === "monthlyMm") return Number(row.monthlyMm).toFixed(2);
     return row[key];
   };
   const columns: ListColumn<RateRenegotiationRow>[] =
@@ -297,7 +309,7 @@ export function RateRenegotiationWorkspace() {
     <div className="rate-workspace" data-testid="rate-workspace" ref={root}>
       {data && (data.salaryEstimatedDeveloperIds ?? []).length > 0 && (
         <div data-testid="rate-salary-estimated">
-          <Banner kind="warn">
+          <Banner kind="warn" icon={warnIcon}>
             {`${Number(data.baseYearMonth.slice(-2))}월 급여 업로드 전: ${(data.salaryEstimatedDeveloperIds ?? []).length}명은 개발자 풀 월 급여로 계산한 값입니다.`}
           </Banner>
         </div>
@@ -423,9 +435,9 @@ export function RateRenegotiationWorkspace() {
             onChange={(e) => change("projectId", e.target.value)}
           >
             <option value="">전체</option>
-            {(options?.projects ?? []).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
+            {(data?.projectOptions ?? []).map((o) => (
+              <option key={o.projectId} value={o.projectId}>
+                {o.projectName}
               </option>
             ))}
           </select>

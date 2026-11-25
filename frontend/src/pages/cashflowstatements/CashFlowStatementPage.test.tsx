@@ -287,8 +287,7 @@ it("shows year-only selector and readonly fifteen-by-fifteen table", async () =>
 it("uses common year bounds and loads changed year without a month argument", async () => {
   open();
   await screen.findByTestId("cash-flow-table");
-  const year = screen.getByTestId("period-year");
-  fireEvent.change(year, { target: { value: "2025" } });
+  fireEvent.click(screen.getByTestId("period-year-prev"));
   await screen.findByText("2025년 자금수지 (부가세 포함)");
   const paths = request.mock.calls
     .map(([path]) => String(path))
@@ -310,9 +309,15 @@ it("shows one warning banner listing shortage months with focusable header expla
   ).toHaveAttribute("tabindex", "0");
   const icon = screen.getByRole("img", { name: "11월 자금 부족 예상" });
   expect(icon).toHaveClass("cash-flow-warning-icon");
+  // 시안 ic('warn',14)·ic('down',16): 글자(⚠·⇩) 대신 그림 아이콘
+  expect(icon.querySelector("svg")).toHaveAttribute("width", "14");
+  expect(icon).not.toHaveTextContent("⚠");
+  const excel = screen.getByTestId("cash-flow-excel");
+  expect(excel.querySelector("svg")).not.toBeNull();
+  expect(excel).not.toHaveTextContent("⇩");
   expect(
     document.getElementById(icon.getAttribute("aria-describedby")!),
-  ).toHaveTextContent("예상 잔액 9.0억 원 · 최소 운영자금 10.0억 원");
+  ).toHaveTextContent("월말 잔액이 최소 운영자금(10.0억 원)보다 적을 것으로 예상");
   fireEvent.click(screen.getByTestId("cash-flow-receivables"));
   expect(screen.getByTestId("current-location")).toHaveTextContent(
     "/screens/UI-13",
@@ -392,10 +397,10 @@ it("renders errors and field validation then retries", async () => {
   await screen.findByTestId("cash-flow-error");
   expect(
     within(screen.getByTestId("cash-flow-period")).getByText(
-      "year: 조회 연도를 확인해 주세요.",
+      "조회 연도를 확인해 주세요.",
     ),
   ).toBeVisible();
-  expect(screen.getByTestId("period-year")).toHaveFocus();
+  expect(screen.getByTestId("period-year-prev")).toHaveFocus();
   expect(screen.getByTestId("cash-flow-table-pending")).toBeVisible();
   expect(screen.getByTestId("cash-flow-balance-chart")).toBeInTheDocument();
   expect(screen.getByTestId("cash-flow-excel")).toBeDisabled();
@@ -421,7 +426,7 @@ it("downloads the selected year and displayed unit from the title portal", async
     expect(download).toHaveBeenCalledWith({ year: 2026 }, "원"),
   );
   expect(await screen.findByTestId("cash-flow-toast")).toHaveTextContent(
-    "내려받았습니다",
+    "엑셀 파일을 만들었습니다 (조회 결과",
   );
 });
 it("reports failed export without a false success toast", async () => {
@@ -454,7 +459,7 @@ it("places fallback year validation by its selector and focuses it", async () =>
   await screen.findByTestId("cash-flow-error");
   expect(
     within(screen.getByTestId("cash-flow-period")).getByText(
-      "year: 조회 연도를 확인해 주세요.",
+      "조회 연도를 확인해 주세요.",
     ),
   ).toBeVisible();
   expect(screen.getByTestId("cash-flow-year")).toHaveFocus();
@@ -475,9 +480,7 @@ it("keeps the chosen money unit when loading a different year", async () => {
   fireEvent.change(screen.getByTestId("money-unit"), {
     target: { value: "원" },
   });
-  fireEvent.change(screen.getByTestId("period-year"), {
-    target: { value: "2025" },
-  });
+  fireEvent.click(screen.getByTestId("period-year-prev"));
   await waitFor(() =>
     expect(request).toHaveBeenCalledWith(
       "/api/common/cash-flow-statements?year=2025",
@@ -522,9 +525,7 @@ it("ignores a slow old year response after the year changes", async () => {
   expect(screen.getByTestId("cash-flow-balance-chart")).toBeInTheDocument();
   expect(screen.getByTestId("cash-flow-excel")).toBeDisabled();
   expect(screen.queryByTestId("banner-bad")).not.toBeInTheDocument();
-  fireEvent.change(screen.getByTestId("period-year"), {
-    target: { value: "2025" },
-  });
+  fireEvent.click(screen.getByTestId("period-year-prev"));
   await screen.findByText("2025년 자금수지 (부가세 포함)");
   await act(async () => resolveOld(ok(report(2026))));
   expect(

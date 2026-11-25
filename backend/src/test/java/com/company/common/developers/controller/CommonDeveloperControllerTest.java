@@ -279,10 +279,18 @@ class CommonDeveloperControllerTest {
         existing("busy","K-0004");var a=new DeveloperRows.Assignment();a.startDate=today.minusDays(1);a.endDate=today;a.projectId="p";when(mapper.selectAssignments("busy")).thenReturn(List.of(a));
         mvc.perform(put("/api/common/developers/use-status").contentType("application/json").content("{\"developerIds\":[\"dev\",\"busy\"],\"useYn\":\"N\"}"))
             .andExpect(status().isOk()).andExpect(response("PUT","/api/common/developers/use-status")).andExpect(jsonPath("$.data.processedDeveloperIds[0]").value("dev"))
-            .andExpect(jsonPath("$.data.rejected[0].developerId").value("busy"));
+            .andExpect(jsonPath("$.data.rejected[0].developerId").value("busy"))
+            .andExpect(jsonPath("$.data.rejected[0].reason").value("투입 중인 배정이 있어 중지할 수 없습니다. 먼저 투입 배정의 [변경 기록]에서 조기 철수로 배정을 끝내 주세요."));
         assertThat(developers.get("dev").useYn).isEqualTo("N"); assertThat(developers.get("busy").useYn).isEqualTo("Y");
         verify(mapper).updateUse("dev","N","admin"); verify(mapper,never()).updateUse(eq("busy"),anyString(),anyString());
         mvc.perform(put("/api/common/developers/use-status").contentType("application/json").content("{\"developerIds\":[\"dev\"],\"useYn\":\"Y\"}")).andExpect(status().isOk());assertThat(developers.get("dev").useYn).isEqualTo("Y");
+    }
+    @Test void alreadyStoppedIsNotWrittenAgain() throws Exception {
+        developers.get("dev").useYn="N";
+        mvc.perform(put("/api/common/developers/use-status").contentType("application/json").content("{\"developerIds\":[\"dev\"],\"useYn\":\"N\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.processedDeveloperIds").isEmpty()).andExpect(jsonPath("$.data.rejected").isEmpty());
+        verify(mapper,never()).updateUse(anyString(),anyString(),anyString());
+        assertThat(audits).noneMatch(a -> "사용 여부".equals(a.fieldName()));
     }
     @Test void emptyBulkIdsHasNoWrites() throws Exception {mvc.perform(put("/api/common/developers/use-status").contentType("application/json").content("{\"developerIds\":[],\"useYn\":\"N\"}")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("developerIds"));verify(mapper,never()).updateUse(anyString(),anyString(),anyString());}
     @Test void pastRetirementCannotResume() throws Exception {state("RETIRE",1,today.minusDays(1),null);mvc.perform(put("/api/common/developers/use-status").contentType("application/json").content("{\"developerIds\":[\"dev\"],\"useYn\":\"Y\"}"))

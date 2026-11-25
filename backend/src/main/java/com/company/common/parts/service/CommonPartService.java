@@ -154,7 +154,7 @@ public class CommonPartService {
     @Transactional
     public Items<Standard> putCommonPartStandards(String id, StandardInput input) {
         lock();
-        current(id, input.modifiedAt());
+        var master = current(id, input.modifiedAt());
         validate(input.values());
         calculations.definition("식-00");
         calculations.definition("식-45");
@@ -171,15 +171,33 @@ public class CommonPartService {
             || before.salesExpense.compareTo(input.values().salesExpense()) != 0;
         if (amountChanged) {
             String confirmed = mapper.selectLastConfirmed(id, month);
-            if (confirmed != null) throw invalid("effectiveMonth", "확정 정산을 취소하거나 "
-                + fromDb(confirmed).plusMonths(1) + " 이후를 선택해 주세요.");
+            if (confirmed != null) {
+                // 시안·SFR-115-11 문구: 「10월 영업1파트 정산이 확정돼 있어 … 적용 시작월을 2026-11 이후로 고르세요.」
+                var months = mapper.selectConfirmedMonths(id, month);
+                if (months == null || months.isEmpty()) months = List.of(confirmed);
+                throw invalid("effectiveMonth", String.join("·", months.stream()
+                    .map(value -> fromDb(value).getMonthValue() + "월").toList()) + " " + master.partName
+                    + " 정산이 확정돼 있어 이익 배분율·공통관리비를 " + publicMonth(month)
+                    + "부터 바꿀 수 없습니다. 영업 파트 이익금에서 확정을 취소한 뒤 바꾸거나, 적용 시작월을 "
+                    + fromDb(confirmed).plusMonths(1) + " 이후로 고르세요.");
+            }
         }
-        var next = rows.stream().filter(row -> row.month.compareTo(month) > 0)
+        // 시안 partSave: 새 기준 뒤에 예정돼 있던 기준(아직 오지 않은 달)은 지우고 새 기준이 이어진다(2026-11-24 사용자 결정).
+        // 이미 적용된 달(이번 달 이하)의 줄은 지우지 않는다.
+        String current = mapper.selectCurrentMonth();
+        var scheduled = rows.stream()
+            .filter(row -> row.month.compareTo(month) > 0 && row.month.compareTo(current) > 0).toList();
+        var next = rows.stream().filter(row -> row.month.compareTo(month) > 0 && !scheduled.contains(row))
             .min(Comparator.comparing(row -> row.month)).orElse(null);
         String end = next == null ? null : db(fromDb(next.month).minusMonths(1));
         affected(mapper.touch(id, input.modifiedAt()));
+        for (var row : scheduled) {
+            affected(mapper.deletePeriod(id, row.month));
+            history("TB_BS_PART_STD", id + ":" + row.month, "DEL", "적용 기간",
+                publicMonth(row.month) + " ~ " + Objects.toString(publicMonth(row.endMonth), "계속"), null);
+        }
         if (same != null) {
-            affected(mapper.updatePeriod(new PeriodMutation(id, month, same.endMonth, input.values())));
+            affected(mapper.updatePeriod(new PeriodMutation(id, month, scheduled.isEmpty() ? same.endMonth : end, input.values())));
         } else {
             var previous = rows.stream().filter(row -> row.month.compareTo(month) < 0)
                 .max(Comparator.comparing(row -> row.month)).orElse(null);

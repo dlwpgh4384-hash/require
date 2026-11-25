@@ -14,6 +14,7 @@ import {
   type ClientChange,
   type ClientCode,
 } from "./clients";
+import { historyValue } from "../../shared/historyValue";
 
 const dash = (value: string | null | undefined) => (value ? value : "–");
 
@@ -34,7 +35,7 @@ export function ClientDetail({
   onEdit: (client: Client) => void;
   onStatus: (client: Client) => void;
   /** 시안 알림(toast). [보기]로 계좌 전체를 본 뒤 안내한다. */
-  onNotice?: (message: string, kind?: "ok" | "info") => void;
+  onNotice?: (message: string, kind?: "ok" | "info" | "warn") => void;
 }) {
   const [client, setClient] = useState<Client | null>(null);
   const [assignments, setAssignments] = useState<ClientAssignment[]>([]);
@@ -193,7 +194,10 @@ export function ClientDetail({
                               "info",
                             );
                           })
-                          .catch((reason) => setError(reason.message))
+                          // 계좌 보기 하나가 실패해도 상세 전체를 오류로 바꾸지 않는다(알림으로만).
+                          .catch((reason) =>
+                            onNotice ? onNotice(reason.message, "warn") : setError(reason.message),
+                          )
                           .finally(() => setAccountBusy(false));
                       }}
                     >
@@ -320,8 +324,8 @@ export function ClientDetail({
             <tr key={index} data-testid={`client-history-${index}`}>
               <td>{formatDateTime(line.changedAt)}</td>
               <td>{line.fieldName}</td>
-              <td>{dash(line.beforeValue)}</td>
-              <td>{dash(line.afterValue)}</td>
+              <td>{dash(historyValue(line.fieldName, line.beforeValue))}</td>
+              <td>{dash(historyValue(line.fieldName, line.afterValue))}</td>
               <td>{line.changedBy}</td>
             </tr>
           ))}

@@ -10,9 +10,12 @@ import java.util.*;
 public final class NetProfitStatementContributions {
     private NetProfitStatementContributions() {}
 
+    /** 시안 막대 순서: 턴키·월단위·파견. 코드 조회에 정렬이 없어 DB 순서에 기대지 않는다. */
+    private static final List<String> ORDER = List.of("TK", "MO", "DP");
+
     public static List<Contribution> of(List<ProjectValue> projects, List<Code> codes) {
         var types = codes.stream().filter(c -> "CTRT_TYPE".equals(c.groupCode())
-            && Set.of("TK", "MO", "DP").contains(c.code())).toList();
+            && ORDER.contains(c.code())).sorted(Comparator.comparingInt(c -> ORDER.indexOf(c.code()))).toList();
         var amounts = new TreeMap<String, BigDecimal>();
         types.forEach(c -> amounts.put(c.code(), BigDecimal.ZERO));
         for (var project : projects) {

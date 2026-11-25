@@ -20,6 +20,24 @@ const money = (value: string) =>
   digits(value) ? Number(digits(value)).toLocaleString("ko-KR") : "";
 const mm = (value: number | null | undefined) =>
   value == null ? "–" : Number(value).toFixed(2);
+/** 금액 항목(이력에는 숫자 그대로 저장, 원가 분석이 읽는다). */
+const AMOUNT_ITEMS = new Set([
+  "계약",
+  "계약금액",
+  "견적 금액",
+  "예산(목표원가)",
+  "팀비",
+  "팀비(월)",
+  "프로젝트경비",
+  "프로젝트경비(월)",
+]);
+/** 시안 계약 변경 이력: 금액은 「1,000,000 원」, 빈 값은 「–」. */
+const historyValue = (item: string, value: string | null) => {
+  if (value == null || value === "") return "–";
+  return AMOUNT_ITEMS.has(item) && /^\d+$/.test(value)
+    ? `${Number(value).toLocaleString("ko-KR")} 원`
+    : value;
+};
 const lightKind = (light: string | null) =>
   light === "위험"
     ? "bad"
@@ -146,7 +164,8 @@ export function ProjectDetail({
     setScreenDirty(dirtyScreenId, planDirty);
     return () => setScreenDirty(dirtyScreenId, false);
   }, [dirtyScreenId, planDirty, setScreenDirty]);
-  const load = async () => {
+  /** keepPlan: 저장하지 않은 인원 계획 입력이 있으면 그 입력은 지우지 않고 나머지(기본 정보 등)만 다시 읽는다. */
+  const load = async (keepPlan = false) => {
     const version = ++loadVersion.current;
     setError("");
     try {
@@ -165,10 +184,12 @@ export function ProjectDetail({
       setExpenses(e.items);
       setParts(s.items);
       setHistory(h.items);
-      setJobs(m.items);
-      setPlanText({});
       setPlanAllowed(m.canSave);
-      setPlanDirty(false);
+      if (!keepPlan) {
+        setJobs(m.items);
+        setPlanText({});
+        setPlanDirty(false);
+      }
     } catch (reason) {
       if (version === loadVersion.current) setError(api.projectFailure(reason));
     }
@@ -271,10 +292,19 @@ export function ProjectDetail({
         onClose();
         return;
       }
-      await load();
+      await load(planDirty);
       onChanged?.(message, kind);
     } catch (e) {
       setModalError(api.projectFailure(e));
+      // 확인 창(진행으로·경비 삭제)은 오류 칸이 없다: 창을 닫고 기본 정보 탭 위 띠로 알린다.
+      if (!mode) {
+        setStarting(false);
+        setRemove(null);
+        setTab("basic");
+      }
+      // FR-0106: 그 사이 다른 사람이 바꿨으면(409) 최신 값(수정 시각 포함)을 다시 읽는다.
+      // 저장하지 않은 인원 계획 입력은 지우지 않는다.
+      if (api.isProjectConflict(e)) await load(planDirty);
     } finally {
       setBusy(false);
     }
@@ -1211,8 +1241,8 @@ export function ProjectDetail({
               <tr key={i} data-testid={`project-history-${i}`}>
                 <td>{formatDateTime(h.changedAt).slice(0, 10)}</td>
                 <td>{h.itemName}</td>
-                <td>{h.beforeValue ?? ""}</td>
-                <td>{h.afterValue ?? ""}</td>
+                <td>{historyValue(h.itemName, h.beforeValue)}</td>
+                <td>{historyValue(h.itemName, h.afterValue)}</td>
                 <td>{h.changedBy}</td>
               </tr>
             ))}

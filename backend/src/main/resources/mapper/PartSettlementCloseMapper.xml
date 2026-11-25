@@ -22,8 +22,25 @@
          ORDER BY h.reg_dttm ASC, h.hist_id ASC
          LIMIT 1
       ) after_month ON true
+      LEFT JOIN LATERAL (
+        SELECT h.hist_id, h.bfr_val
+          FROM tb_sy_chg_hist h
+         WHERE h.trgt_tbl_nm = 'TB_BS_PART'
+           AND h.trgt_key = p.part_id
+           AND h.chg_item_nm = '사용 여부'
+           AND h.reg_dttm &gt;= (to_date(#{month} || '01', 'YYYYMMDD')::timestamp AT TIME ZONE 'Asia/Seoul')
+         ORDER BY h.reg_dttm ASC, h.hist_id ASC
+         LIMIT 1
+      ) from_month ON true
      WHERE p.hq_yn != 'Y'
-       AND CASE WHEN after_month.hist_id IS NULL THEN p.use_yn ELSE after_month.bfr_val END = 'Y'
+       <!-- 그 달에 하루라도 사용 중이면 대상: 달 첫날·말일 상태 또는 달 안의 바뀜 중 「사용」(PartSettlementRules.usedDuring와 같음, 2026-11-24) -->
+       AND (CASE WHEN from_month.hist_id IS NULL THEN p.use_yn ELSE from_month.bfr_val END = 'Y'
+         OR CASE WHEN after_month.hist_id IS NULL THEN p.use_yn ELSE after_month.bfr_val END = 'Y'
+         OR EXISTS (SELECT 1 FROM tb_sy_chg_hist w
+                     WHERE w.trgt_tbl_nm = 'TB_BS_PART' AND w.trgt_key = p.part_id AND w.chg_item_nm = '사용 여부'
+                       AND w.reg_dttm &gt;= (to_date(#{month} || '01', 'YYYYMMDD')::timestamp AT TIME ZONE 'Asia/Seoul')
+                       AND w.reg_dttm &lt; #{nextMonthStart,jdbcType=TIMESTAMP}
+                       AND 'Y' IN (w.bfr_val, w.aft_val)))
        AND EXISTS (
          SELECT 1 FROM tb_bs_part_std criteria
           WHERE criteria.part_id = p.part_id

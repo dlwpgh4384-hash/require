@@ -385,7 +385,9 @@ export function DeveloperPage({
     setDownloading(true);
     try {
       await downloadFile(developersExcelUrl(applied), "developers.xlsx");
-      setNotice(`엑셀 파일을 만들었습니다 (조회 결과 ${rows?.length ?? 0}건).`);
+      // 시안 xls: 안내(info) 알림, 0건이면 건수 없이
+      const count = rows?.length ?? 0;
+      info(`엑셀 파일을 만들었습니다${count ? ` (조회 결과 ${count}건)` : ""}.`);
     } catch (e) {
       setError(developerFailure(e));
     } finally {
@@ -441,6 +443,7 @@ export function DeveloperPage({
           onSaved={() => {
             setForm(null);
             setDetail(null);
+            setNoticeKind("ok");
             setNotice("저장했습니다.");
             refresh();
           }}

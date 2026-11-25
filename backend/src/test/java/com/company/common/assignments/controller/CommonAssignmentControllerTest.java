@@ -181,6 +181,8 @@ class CommonAssignmentControllerTest {
             .andExpect(jsonPath("$.data.assignmentId").value("A-0002"));
         assertThat(rows.get("A-0001").endDate()).isEqualTo(today.minusDays(1));
         assertThat(histories).extracting(HistoryRow::type).containsExactly("INPUT","EARLY");
+        // [같이 처리] 메모는 빠지는 사람의 조기 철수 줄에만(시안). 새 배정 「투입」 줄에는 없다.
+        assertThat(histories.get(0).memo()).isNull();
         verify(mapper).insertHistory(argThat(w -> "EARLY".equals(w.row().type())
             && "PERSON".equals(w.row().reasonCode()) && "대체 투입 확인".equals(w.row().memo())
             && "admin".equals(w.actor())));
@@ -264,6 +266,13 @@ class CommonAssignmentControllerTest {
         assertThat(months).isNotEmpty().allSatisfy(m -> assertThat(m.mm()).isEqualByComparingTo("0.8"));
         assertNoPreviousAdjustmentSql();
     }
+    @Test
+    @DisplayName("시안 hmRetro: 단가·월 MM 변경에서 이번 달을 고르면 소급이 아니라 사유 없이 저장되고 RTRO_YN=N")
+    void currentMonthRateChangeIsNotRetroactive() throws Exception {
+        var b=change("RATE").put("effectiveDate","2026-11-01").put("newMonthlyMm",0.8);
+        change(b,200);
+        assertThat(histories).singleElement().satisfies(h -> {assertThat(h.effectiveDate()).isEqualTo(LocalDate.of(2026,11,1));assertThat(h.retroactiveYn()).isEqualTo("N");});
+    }
     @ParameterizedTest @ValueSource(doubles={0,1.01}) void invalidMmDoesNotMutate(double value) throws Exception {var b=change("RATE");b.put("newMonthlyMm",value);change(b,400);noWrites();}
     @Test void extensionIncrementsCountWithHistory() throws Exception {var b=change("EXT");b.put("effectiveDate","2027-01-01");b.put("newEndDate","2027-01-31");change(b,200);assertThat(rows.get("A-0001").extensionCount()).isEqualTo(1);assertThat(histories).singleElement().satisfies(h -> assertThat(h.type()).isEqualTo("EXT"));}
     @Test void extensionPastProjectContractIsRejected() throws Exception {var b=change("EXT");b.put("newEndDate","2028-01-01");change(b,400);noWrites();}
@@ -285,7 +294,7 @@ class CommonAssignmentControllerTest {
     @Test void bulkOnlyChangesSelectedDistinctIdsAndNoOpHasNoHistory() throws Exception {rows.put("A-0002",row("A-0002","second",null,"NEW","MO"));var b=bulk("A-0001","A-0001");b.put("extensionPossibilityCode","H");mvc.perform(put("/api/common/assignments/extension-possibility").contentType("application/json").content(b.toString())).andExpect(status().isOk()).andExpect(response("PUT","/api/common/assignments/extension-possibility"));assertThat(rows.get("A-0002").extensionPossibilityCode()).isNull();assertThat(histories).hasSize(1);mvc.perform(put("/api/common/assignments/extension-possibility").contentType("application/json").content(b.toString())).andExpect(status().isOk());assertThat(histories).hasSize(1);}
     @Test void staleLaterBulkRowMeansZeroWrites() throws Exception {var b=bulk("A-0001","A-0002");rows.put("A-0002",row("A-0002","second",null,"NEW","MO"));((ObjectNode)b.get("assignments").get(1)).put("modifiedAt",now.toString());b.put("extensionPossibilityCode","H");mvc.perform(put("/api/common/assignments/extension-possibility").contentType("application/json").content(b.toString())).andExpect(status().isConflict());noWrites();}
     @Test void emptySelectionIsRejected() throws Exception {var b=bulk();b.put("extensionPossibilityCode","H");mvc.perform(put("/api/common/assignments/extension-possibility").contentType("application/json").content(b.toString())).andExpect(status().isBadRequest());noWrites();}
-    @Test void cancellationIsPublicRetainsRowAndHistoryAndIsIdempotent() throws Exception {var b=bulk("A-0001");mvc.perform(post("/api/common/assignments/cancel").contentType("application/json").content(b.toString())).andExpect(status().isOk()).andExpect(response("POST","/api/common/assignments/cancel"));assertThat(rows.get("A-0001").statusCode()).isEqualTo("CNCL");assertThat(histories).singleElement().satisfies(h -> {assertThat(h.afterValue()).isEqualTo("배정 취소");assertThat(h.actor()).isEqualTo("admin");});mvc.perform(post("/api/common/assignments/cancel").contentType("application/json").content(b.toString())).andExpect(status().isOk());assertThat(histories).hasSize(1);mvc.perform(get("/api/common/assignments")).andExpect(jsonPath("$.data.items").isEmpty());}
+    @Test void cancellationIsPublicRetainsRowAndHistoryAndIsIdempotent() throws Exception {var b=bulk("A-0001");mvc.perform(post("/api/common/assignments/cancel").contentType("application/json").content(b.toString())).andExpect(status().isOk()).andExpect(response("POST","/api/common/assignments/cancel"));assertThat(rows.get("A-0001").statusCode()).isEqualTo("CNCL");assertThat(histories).singleElement().satisfies(h -> {assertThat(h.beforeValue()).isEqualTo("2026-10-16 ~ 2026-12-31");assertThat(h.afterValue()).isEqualTo("배정 취소");assertThat(h.actor()).isEqualTo("admin");});mvc.perform(post("/api/common/assignments/cancel").contentType("application/json").content(b.toString())).andExpect(status().isOk());assertThat(histories).hasSize(1);mvc.perform(get("/api/common/assignments")).andExpect(jsonPath("$.data.items").isEmpty());}
     @Test void closedActualsDoNotBlockCancellation() throws Exception {when(mapper.closedMonths()).thenReturn(List.of("202610"));mvc.perform(post("/api/common/assignments/cancel").contentType("application/json").content(bulk("A-0001").toString())).andExpect(status().isOk());assertThat(rows.get("A-0001").statusCode()).isEqualTo("CNCL");verify(mapper,never()).saveMonth(any());}
     @Test void malformedBulkRowIsRejectedBeforeCancellation() throws Exception {var b=bulk("A-0001");((ObjectNode)b.get("assignments").get(0)).remove("assignmentId");mvc.perform(post("/api/common/assignments/cancel").contentType("application/json").content(b.toString())).andExpect(status().isBadRequest());noWrites();}
     HistoryRow history(String type,String corrected) {return new HistoryRow(1,"A-0001",type,today,"이전","이후","PERSON","메모",null,null,"N","N",corrected,null,"admin",now);}

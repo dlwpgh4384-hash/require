@@ -29,10 +29,14 @@ const actionLabels: Record<string, string> = {
 export const billCheckActionLabel = (action: string) =>
   actionLabels[action] ?? "";
 
-type DateField = "billDate" | "payDueDate";
-const DATE_INPUT: Record<DateField, string> = {
+/** 칸 오류는 그 칸 밑에 보이고 그 칸으로 간다(00-1 FR-0106). 서버 errors[].field도 같은 이름. */
+type FormField = "supplyAmount" | "vatRate" | "billDate" | "payDueDate" | "taxInvoiceNo";
+const FIELD_INPUT: Record<FormField, string> = {
+  supplyAmount: "bill-check-supply",
+  vatRate: "bill-check-vat-rate",
   billDate: "bill-check-bill-date",
   payDueDate: "bill-check-due-date",
+  taxInvoiceNo: "bill-check-tax-number",
 };
 const won = (value: number) => value.toLocaleString("ko-KR");
 const digits = (value: string) => value.replace(/[^\d]/g, "");
@@ -70,9 +74,9 @@ export function BillCheckForm({
   const [title, setTitle] = useState(billCheckActionLabel(row.allowedAction));
   const [customer, setCustomer] = useState("");
   const [error, setError] = useState("");
-  // 날짜 칸 오류는 그 칸 밑에 보이고 그 칸으로 간다(00-1 FR-0106)
+  // 칸 오류(공급가·세율·날짜·계산서 번호)는 그 칸 밑에 보이고 그 칸으로 간다(00-1 FR-0106)
   const [fieldErrors, setFieldErrors] = useState<
-    Partial<Record<DateField, string>>
+    Partial<Record<FormField, string>>
   >({});
   const [saving, setSaving] = useState(false);
   const [discard, setDiscard] = useState(false);
@@ -153,22 +157,22 @@ export function BillCheckForm({
   const change = (field: keyof typeof values, value: string) => {
     setValues((previous) => ({ ...previous, [field]: value }));
     setError("");
-    if (field === "billDate" || field === "payDueDate")
-      setFieldErrors((previous) => {
-        if (!previous[field]) return previous;
-        const next = { ...previous };
-        delete next[field];
-        return next;
-      });
+    const key: FormField = field === "supply" ? "supplyAmount" : field;
+    setFieldErrors((previous) => {
+      if (!previous[key]) return previous;
+      const next = { ...previous };
+      delete next[key];
+      return next;
+    });
   };
-  const showFieldError = (field: DateField, text: string) => {
+  const showFieldError = (field: FormField, text: string) => {
     setFieldErrors({ [field]: text });
     window.setTimeout(
-      () => document.getElementById(DATE_INPUT[field])?.focus(),
+      () => document.getElementById(FIELD_INPUT[field])?.focus(),
       0,
     );
   };
-  const dateError = (field: DateField) =>
+  const fieldError = (field: FormField) =>
     fieldErrors[field] ? (
       <small
         role="alert"
@@ -182,9 +186,10 @@ export function BillCheckForm({
     if (!initial || saving) return;
     const supply = digits(values.supply);
     const rate = values.vatRate.trim();
-    if (!supply || Number(supply) <= 0) return setError("공급가를 입력해 주세요.");
+    if (!supply || Number(supply) <= 0)
+      return showFieldError("supplyAmount", "공급가를 입력해 주세요.");
     if (rate === "" || !/^\d+(\.\d{1,2})?$/.test(rate) || Number(rate) > 100)
-      return setError("부가세율을 0~100 사이로 입력해 주세요.");
+      return showFieldError("vatRate", "부가세율을 0~100 사이로 입력해 주세요.");
     if (!values.payDueDate)
       return showFieldError("payDueDate", "입금 예정일을 입력해 주세요.");
     if (values.payDueDate < values.billDate)
@@ -217,16 +222,15 @@ export function BillCheckForm({
           : `${row.projectName} ${billMonthLabel(checkMonth)} 청구를 등록했습니다.`,
       );
     } catch (failure) {
-      // 서버 칸 오류(errors[].field)가 날짜 칸이면 그 칸 밑에 붙인다. 나머지만 아래 줄에 보인다
-      const dated =
+      // 서버 칸 오류(errors[].field)가 창의 칸이면 그 칸 밑에 붙인다. 나머지만 아래 줄에 보인다
+      const placed =
         failure instanceof ProjectRequestError
-          ? failure.errors.find(
-              (item) =>
-                item.field === "payDueDate" || item.field === "billDate",
+          ? failure.errors.find((item) =>
+              Object.prototype.hasOwnProperty.call(FIELD_INPUT, item.field),
             )
           : undefined;
       if (isConflict(failure) && onConflict) onConflict(failureMessage(failure, ""));
-      else if (dated) showFieldError(dated.field as DateField, dated.message);
+      else if (placed) showFieldError(placed.field as FormField, placed.message);
       else
         setError(
           failure instanceof ProjectRequestError || failure instanceof Error
@@ -288,6 +292,7 @@ export function BillCheckForm({
                 className="bill-money"
                 value={values.supply}
                 disabled={!initial || saving}
+                aria-invalid={fieldErrors.supplyAmount ? true : undefined}
                 onChange={(e) => {
                   const raw = digits(e.target.value);
                   change("supply", raw === "" ? "" : Number(raw).toLocaleString("ko-KR"));
@@ -295,6 +300,7 @@ export function BillCheckForm({
               />
               <span className="bill-sub">원</span>
             </div>
+            {fieldError("supplyAmount")}
             <small>
               월단위·파견은 그 달 투입 MM × 청구 단가 합계(식-02)로 채웁니다. 턴키는 직접 넣으세요.
             </small>
@@ -311,10 +317,12 @@ export function BillCheckForm({
                 className="bill-rate"
                 value={values.vatRate}
                 disabled={!initial || saving}
+                aria-invalid={fieldErrors.vatRate ? true : undefined}
                 onChange={(e) => change("vatRate", e.target.value)}
               />
               <span className="bill-sub">%</span>
             </div>
+            {fieldError("vatRate")}
             <small>
               기본 10%. 면세·영세율은 0. 부가세 금액은 저장할 때 공급가 × 세율(원 단위 버림)로 계산합니다.
             </small>
@@ -332,7 +340,7 @@ export function BillCheckForm({
               aria-invalid={fieldErrors.billDate ? true : undefined}
               onChange={(e) => change("billDate", e.target.value)}
             />
-            {dateError("billDate")}
+            {fieldError("billDate")}
           </div>
           <div className="bill-fc">
             <label htmlFor="bill-check-due-date">
@@ -347,7 +355,7 @@ export function BillCheckForm({
               aria-invalid={fieldErrors.payDueDate ? true : undefined}
               onChange={(e) => change("payDueDate", e.target.value)}
             />
-            {dateError("payDueDate")}
+            {fieldError("payDueDate")}
             <small>기본은 청구월 다음 달 25일. 연체와 미수 알림이 이 날짜부터 셉니다.</small>
           </div>
           <div className="bill-fc">
@@ -359,8 +367,10 @@ export function BillCheckForm({
               placeholder="예: 20261025-41000012-01"
               value={values.taxInvoiceNo}
               disabled={!initial || saving}
+              aria-invalid={fieldErrors.taxInvoiceNo ? true : undefined}
               onChange={(e) => change("taxInvoiceNo", e.target.value)}
             />
+            {fieldError("taxInvoiceNo")}
             <small>
               계산서를 아직 안 끊었으면 비워 두세요. 비어 있으면 “번호 미입력”으로 표시되고 월 마감 점검에 잡힙니다.
             </small>

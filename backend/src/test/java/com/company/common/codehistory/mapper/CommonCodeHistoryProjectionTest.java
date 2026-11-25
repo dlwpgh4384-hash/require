@@ -46,9 +46,9 @@ class CommonCodeHistoryProjectionTest {
         assertThat(sql).contains("FROM TB_SY_CHG_HIST h",
             "WHERE h.trgt_tbl_nm IN ('TB_SY_CODE_GRP', 'TB_SY_CODE', 'TB_SY_OPER_STD', 'TB_SY_CODE_MAP')",
             "ORDER BY h.reg_dttm DESC, h.hist_id DESC",
-            "COALESCE(h.chg_item_nm, h.trgt_key) AS item",
-            "COALESCE(h.bfr_val, '') AS before_value", "COALESCE(h.aft_val, '') AS after_value");
-        assertThat(sql).doesNotContain("LIMIT", "OFFSET", "JOIN", "TB_SY_USER", "chg_type_cd=");
+            "END AS item", "END AS before_value", "END AS after_value",
+            "LEFT JOIN TB_SY_USER u ON u.user_id = h.reg_user_id");
+        assertThat(sql).doesNotContain("LIMIT", "OFFSET", "chg_type_cd=");
         assertThat(statement.getBoundSql(null).getParameterMappings()).isEmpty();
     }
 }

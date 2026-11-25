@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Dialog, InlineConfirmation } from "../../shared/feedback/Dialog";
+import { focusFirstError } from "../../shared/feedback/messages";
 import { koreanToday } from "../../shared/time";
 import { ProjectRequestError } from "../projects/projects";
 import {
@@ -56,6 +57,13 @@ export function BillingReceiptDialog({
   const [dirty, setDirty] = useState(false);
   const [closing, setClosing] = useState(false);
   const pending = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  // 틀린 칸 밑에 이유를 보인 뒤 첫 오류 칸으로 간다(00-1 FR-0106, 청구 등록 창과 같다).
+  const showErrors = (next: Record<string, string>) => {
+    setErrors(next);
+    if (Object.keys(next).length)
+      window.setTimeout(() => focusFirstError(formRef.current), 0);
+  };
   const close = () => {
     if (!pending.current) {
       if (dirty) setClosing(true);
@@ -97,7 +105,7 @@ export function BillingReceiptDialog({
       else if (amount > bill.unpaidAmount)
         fields[bill.billId] = "입금액이 미수금보다 큽니다.";
     }
-    setErrors(fields);
+    showErrors(fields);
     setFailure("");
     if (Object.keys(fields).length || !eligible.length) return;
     pending.current = true;
@@ -127,7 +135,7 @@ export function BillingReceiptDialog({
           }
         }
       }
-      setErrors(next);
+      showErrors(next);
       // 칸에 붙인 오류가 없을 때만 아래 줄에 보인다.
       setFailure(
         Object.keys(next).length
@@ -178,6 +186,7 @@ export function BillingReceiptDialog({
       testId="billing-receipt-dialog"
     >
       <form
+        ref={formRef}
         className="billing-receipt-form bill-form"
         data-screen-id="UI-13-M2"
         noValidate

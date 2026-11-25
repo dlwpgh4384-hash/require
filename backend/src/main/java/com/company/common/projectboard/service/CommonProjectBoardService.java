@@ -6,6 +6,7 @@ import com.company.common.common.ProjectBoardSignalRules;
 import com.company.common.projectboard.dto.CommonProjectBoardContracts.*;
 import com.company.common.projectboard.mapper.ProjectBoardMapper;
 import com.company.common.projectboard.mapper.ProjectBoardSource;
+import com.company.common.projectcostanalyses.service.CommonProjectCostAnalysisService;
 import com.company.common.projects.mapper.ProjectMapper;
 import com.company.common.projects.service.ProjectProgressRules;
 import com.company.common.projects.service.ProjectStageService;
@@ -20,6 +21,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import org.springframework.beans.factory.ObjectProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -40,11 +43,13 @@ public class CommonProjectBoardService {
     private final ProjectProgressRules progress;
     private final ProjectStageService stages;
     private final TransactionTemplate reading;
+    /** 원가 사용률은 원가 분석(UI-04)의 예산 소진율과 같은 계산(식-75). 없으면(시험 등) 마감 원가로 계산. */
+    private final ObjectProvider<CommonProjectCostAnalysisService> costAnalyses;
 
     public CommonProjectBoardService(ProjectBoardMapper mapper, ProjectMapper projects,
             BusinessCalendar calendar, CalculationRuleService definitions,
             ProjectBoardSignalRules signals, ProjectProgressRules progress, ProjectStageService stages,
-            PlatformTransactionManager transactions) {
+            PlatformTransactionManager transactions, ObjectProvider<CommonProjectCostAnalysisService> costAnalyses) {
         this.mapper = mapper;
         this.projects = projects;
         this.calendar = calendar;
@@ -52,6 +57,7 @@ public class CommonProjectBoardService {
         this.signals = signals;
         this.progress = progress;
         this.stages = stages;
+        this.costAnalyses = costAnalyses;
         this.reading = new TransactionTemplate(transactions);
         this.reading.setReadOnly(true);
         this.reading.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
@@ -70,16 +76,16 @@ public class CommonProjectBoardService {
 
     private record Evaluated(ProjectBoardSource source, Row row, long high) {}
 
-    /**
-     * 현황판 조회. 먼저 현황판에 나오는데 단계가 없는 프로젝트에 기본 단계를 만든다(프로젝트마다 따로 저장, 여러 번 불러도 한 벌).
-     * 그다음 한 읽기 묶음(반복 읽기)에서 표를 계산한다. 신호등은 저장하지 않고 볼 때마다 계산한다.
-     */
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     /** 현황판 엑셀을 받으면 접근 기록(DNLD)을 남긴다(SFR-011-03, 이슈 엑셀과 같은 방식). */
     public void recordExcelDownload(String userId, int count) {
         mapper.insertAccess(userId, "UI-31 현황판 " + count + "건");
     }
 
+    /**
+     * 현황판 조회. 먼저 현황판에 나오는데 단계가 없는 프로젝트에 기본 단계를 만든다(프로젝트마다 따로 저장, 여러 번 불러도 한 벌).
+     * 그다음 한 읽기 묶음(반복 읽기)에서 표를 계산한다. 신호등은 저장하지 않고 볼 때마다 계산한다.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Result getCommonProjectBoard(Filter filter) {
         validate(filter);
         stages.ensureMissingStages();
@@ -90,13 +96,14 @@ public class CommonProjectBoardService {
         LocalDate today = calendar.today();
         String month = today.format(DateTimeFormatter.ofPattern("uuuuMM"));
         var found = new ArrayList<Evaluated>();
+        Map<String, BigDecimal> usageRates = usageRates(today);
         for (var source : mapper.sources(filter, today, month)) {
             if (!ProjectBoardLifecycle.visible(ProjectBoardLifecycle.effectiveStatus(
                     source.statusCode, source.endDate, today))) continue;
             // Keep Java filtering aligned even when a caller supplies another mapper adapter.
             if (filter.contractTypeCode() != null && !filter.contractTypeCode().equals(source.contractTypeCode)) continue;
             if (filter.salesPartId() != null && !filter.salesPartId().equals(source.salesPartId)) continue;
-            var evaluated = evaluate(source, today);
+            var evaluated = evaluate(source, today, usageRates);
             if (filter.signal() == null || filter.signal().equals(evaluated.row().signal())) found.add(evaluated);
         }
         // 기본 정렬(시안 sortDef): 위험 → 주의 → 정상, 같으면 프로젝트명 가나다.
@@ -132,7 +139,17 @@ public class CommonProjectBoardService {
         return String.join("\n\n", methods);
     }
 
-    private Evaluated evaluate(ProjectBoardSource source, LocalDate today) {
+    private Map<String, BigDecimal> usageRates(LocalDate today) {
+        var service = costAnalyses.getIfAvailable();
+        if (service == null) return Map.of();
+        try {
+            return service.budgetUsageRates(today.getYear(), today.getMonthValue());
+        } catch (CodeFailure unavailable) {
+            // 원가 분석 기준(시작 월 등)을 못 쓰는 달이면 마감 원가 계산으로 둔다.
+            return Map.of();
+        }
+    }
+    private Evaluated evaluate(ProjectBoardSource source, LocalDate today, Map<String, BigDecimal> usageRates) {
         var steps = projects.steps(source.projectId);
         BigDecimal actual = source.actualProgress;
         if (ProjectProgressRules.measured(source.contractTypeCode) && actual == null) actual = BigDecimal.ZERO;
@@ -145,7 +162,9 @@ public class CommonProjectBoardService {
             && (source.budgetAmount == null || source.budgetAmount.signum() <= 0);
         if ("TK".equals(source.contractTypeCode) && !missingBudget) {
             BigDecimal cost = source.costAmount == null ? BigDecimal.ZERO : source.costAmount;
-            usage = cost.multiply(BigDecimal.valueOf(100)).divide(source.budgetAmount, 1, RoundingMode.HALF_UP);
+            BigDecimal shared = usageRates.get(source.projectId);
+            usage = shared != null ? shared.setScale(1, RoundingMode.HALF_UP)
+                : cost.multiply(BigDecimal.valueOf(100)).divide(source.budgetAmount, 1, RoundingMode.HALF_UP);
             if (actual != null) costGap = usage.subtract(actual).setScale(1, RoundingMode.HALF_UP);
         }
         var issues = mapper.issues(source.projectId);

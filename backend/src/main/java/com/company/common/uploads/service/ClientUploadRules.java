@@ -49,7 +49,8 @@ public class ClientUploadRules implements UploadForm {
     }
     public Inspection inspect(List<TabularRow> rows) {
         var frequencies = new HashMap<String, Integer>();
-        for (var row : rows) frequencies.merge(row.values().get(2).trim(), 1, Integer::sum);
+        for (var row : rows) frequencies.merge(
+            com.company.common.clients.service.ClientRules.businessNumber(row.values().get(2).trim()), 1, Integer::sum);
         var issues = new ArrayList<Issue>();
         var inputs = new ArrayList<Input>();
         int success = 0, warnings = 0, errors = 0;
@@ -78,7 +79,8 @@ public class ClientUploadRules implements UploadForm {
                 if (value.codePointCount(0, value.length()) > lengths[column])
                     issue(local, row, column, lengths[column] + "자 이내로 입력해 주세요.", "오류");
             }
-            String number = values.get(2);
+            // 하이픈 없이 10자리로 적어도 「000-00-00000」으로 받는다(등록 창과 같음).
+            String number = com.company.common.clients.service.ClientRules.businessNumber(values.get(2));
             if (!number.isEmpty() && !number.matches("[0-9]{3}-[0-9]{2}-[0-9]{5}"))
                 issue(local, row, 2, "사업자등록번호 형식을 확인해 주세요.", "오류");
             if (!number.isEmpty() && frequencies.get(number) > 1)

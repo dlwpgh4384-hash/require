@@ -3,7 +3,7 @@ import { ConfirmDialog, Dialog } from "../../shared/feedback/Dialog";
 import { Badge } from "../../shared/list";
 import { addDays, formatMonthDay, koreanToday } from "../../shared/time";
 import { ProjectField } from "./ProjectField";
-import { projectFailure } from "./projects";
+import { isProjectConflict, projectFailure } from "./projects";
 import * as api from "./projectBoardDetails";
 
 /** 식-74 단계 상태: 완료 / 지연(예정 종료일 지남) / 진행 중 / 예정. */
@@ -176,10 +176,17 @@ export function ProjectProgressPanel({
       onChanged?.(message);
     } catch (reason) {
       const text = projectFailure(reason);
-      if (inModal) setModalError(text);
+      // FR-0106: 그 사이 다른 사람이 바꿨으면(409) 창을 닫고 최신 값(수정 시각 포함)을 다시 읽는다.
+      // 옛 수정 시각으로 다시 보내 계속 409가 나지 않게 한다.
+      const conflict = isProjectConflict(reason);
+      if (inModal && conflict) {
+        setModal(null);
+        setDirty(false);
+      }
+      // load()가 시작할 때 오류 문구를 지우므로, 다시 읽은 뒤에 문구를 보인다.
+      await load();
+      if (inModal && !conflict) setModalError(text);
       else setError(text);
-      // 그 사이 다른 사람이 바꿨으면(409) 최신 값을 다시 불러 둔다.
-      void load();
     } finally {
       pending.current = false;
       setBusy(false);
@@ -187,6 +194,11 @@ export function ProjectProgressPanel({
   }
   // 진척률 칸 오류일 때 그 칸에 빨간 테두리
   const progressInvalid = modalError.startsWith("실적 진척률");
+  // FR-0106: 오류가 난 첫 칸으로 커서를 옮긴다.
+  const fail = (id: string, message: string) => {
+    setModalError(message);
+    document.getElementById(id)?.focus();
+  };
   function saveMemo() {
     const done = input.workDone.trim();
     const next = input.nextWork.trim();
@@ -194,15 +206,21 @@ export function ProjectProgressPanel({
     let progress: number | null = null;
     // 실적 진척률은 필수(시안 「실적 진척률 *」, 2026-11-20 사용자 결정). 0~100 정수.
     if (!operational && input.actualProgress.trim() === "")
-      return setModalError("실적 진척률을 입력해 주세요.");
+      return fail("project-memo-progress", "실적 진척률을 입력해 주세요.");
     if (!operational) {
       progress = Number(input.actualProgress.trim());
       if (!Number.isInteger(progress) || progress < 0 || progress > 100)
-        return setModalError("실적 진척률은 0~100 사이 정수로 넣어 주세요.");
+        return fail(
+          "project-memo-progress",
+          "실적 진척률은 0~100 사이 정수로 넣어 주세요.",
+        );
     }
     // 한 일·할 일은 선택. 운영형(진척률 칸 없음)은 셋 중 하나는 적어야 한다.
     if (operational && !done && !next && !request)
-      return setModalError("한 일, 할 일, 요청 사항 중 하나는 적어 주세요.");
+      return fail(
+        "project-memo-workDone",
+        "한 일, 할 일, 요청 사항 중 하나는 적어 주세요.",
+      );
     const body: api.MemoInput = {
       workDone: done || null,
       nextWork: next || null,

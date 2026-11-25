@@ -108,10 +108,11 @@
     <arg column="assignmentId" javaType="string"/><arg column="effectiveDate" javaType="java.time.LocalDate"/>
     <arg column="afterValue" javaType="string"/>
   </constructor></resultMap>
-  <!-- 투입 배정 변경 이력 조회와 같은 순서(등록 시각·순번 내림차순)로 조기 철수 줄만 한 번에 읽는다 -->
+  <!-- 투입 배정 변경 이력 조회와 같은 순서(등록 시각·순번 내림차순)로 조기 철수 줄만 한 번에 읽는다.
+       정정된 줄(CRCT_YN='Y')은 뺀다(시안: 조기 철수 이력 배지는 정정되지 않은 이력만). -->
   <select id="earlyHistory" resultMap="early">
     SELECT h.ASGN_ID AS "assignmentId",h.APLY_DT AS "effectiveDate",COALESCE(h.AFT_VAL,'') AS "afterValue"
-    FROM TB_PJ_ASGN_HIST h WHERE h.ASGN_CHG_TYPE_CD='EARLY' AND h.ASGN_ID IN
+    FROM TB_PJ_ASGN_HIST h WHERE h.ASGN_CHG_TYPE_CD='EARLY' AND h.CRCT_YN='N' AND h.ASGN_ID IN
       <foreach collection="assignmentIds" item="id" open="(" separator="," close=")">#{id}</foreach>
     ORDER BY h.ASGN_ID,h.REG_DTTM DESC,h.HIST_SN DESC
   </select>

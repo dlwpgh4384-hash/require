@@ -214,6 +214,10 @@ it("행을 누르면 오른쪽 상세 패널에 계정 정보·접근 기록·�
   expect(
     within(panel).getByText("비밀번호를 5번 틀려 잠겼습니다."),
   ).toBeInTheDocument();
+  // 시안 banner warn: 앞에 경고 아이콘
+  expect(
+    within(panel).getByTestId("banner-warn").querySelector("svg"),
+  ).not.toBeNull();
   expect(
     within(panel).getByText("이 프로젝트들의 PM으로 표시됩니다."),
   ).toBeInTheDocument();
@@ -357,6 +361,86 @@ it("[수정]은 「사용자 수정」 창에서 아이디를 잠그고 이름·
   );
 });
 
+it("리뷰: 수정 저장이 409면 입력은 남기고 [최신 버전 불러오기 (입력 유지)] 뒤 새 수정 시각으로 다시 저장한다", async () => {
+  const newer = "2026-01-03T00:00:00.000001Z";
+  const base = request.getMockImplementation()!;
+  let conflict = true;
+  request.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (conflict && url === "/api/common/users/test" && init?.method === "PUT") {
+      conflict = false;
+      account = { ...account, modDttm: newer };
+      return {
+        ok: false,
+        status: 409,
+        json: async () => ({
+          success: false,
+          message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+          errors: [],
+        }),
+      };
+    }
+    return base(url, init);
+  });
+  page();
+  fireEvent.click(await screen.findByTestId("list-row-test"));
+  const panel = await screen.findByTestId("user-detail");
+  fireEvent.click(await within(panel).findByTestId("user-edit"));
+  const dialog = await screen.findByTestId("user-dialog");
+  fireEvent.change(within(dialog).getByTestId("user-name-input"), {
+    target: { value: "바꾼 이름" },
+  });
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  expect(
+    await within(dialog).findByText("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요."),
+  ).toBeInTheDocument();
+  expect(within(dialog).getByTestId("user-name-input")).toHaveValue("바꾼 이름");
+  fireEvent.click(within(dialog).getByTestId("user-version-refresh"));
+  await waitFor(() =>
+    expect(within(dialog).queryByTestId("user-version-refresh")).not.toBeInTheDocument(),
+  );
+  expect(within(dialog).getByTestId("user-name-input")).toHaveValue("바꾼 이름");
+  fireEvent.click(within(screen.getByTestId("user-dialog")).getByTestId("user-save"));
+  await waitFor(() => expect(writes()).toHaveLength(2));
+  expect(JSON.parse(String((writes()[1][1] as RequestInit).body))).toMatchObject({
+    name: "바꾼 이름",
+    modDttm: newer,
+  });
+});
+
+it("리뷰: 409 뒤 [최신 버전 불러오기]를 누르지 않고 다시 저장하면 옛 수정 시각 그대로라 다른 사람 것을 덮어쓰지 않는다", async () => {
+  const older = account.modDttm;
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url === "/api/common/users/test" && init?.method === "PUT") {
+      account = { ...account, modDttm: "2026-01-03T00:00:00.000001Z" };
+      return {
+        ok: false,
+        status: 409,
+        json: async () => ({
+          success: false,
+          message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+          errors: [],
+        }),
+      };
+    }
+    return base(url, init);
+  });
+  page();
+  fireEvent.click(await screen.findByTestId("list-row-test"));
+  const panel = await screen.findByTestId("user-detail");
+  fireEvent.click(await within(panel).findByTestId("user-edit"));
+  const dialog = await screen.findByTestId("user-dialog");
+  fireEvent.change(within(dialog).getByTestId("user-name-input"), {
+    target: { value: "바꾼 이름" },
+  });
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  expect(await within(dialog).findByTestId("user-version-refresh")).toBeInTheDocument();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  await waitFor(() => expect(writes()).toHaveLength(2));
+  expect(JSON.parse(String((writes()[1][1] as RequestInit).body)).modDttm).toBe(older);
+});
+
 it("체크하면 「N건 선택」과 일괄 [사용 중지]가 나오고, 확인 창은 시안 문구를 쓴다", async () => {
   page();
   await screen.findByTestId("list-row-test");
@@ -482,11 +566,101 @@ it("중지 요청이 실패하면 행과 선택을 임의로 제거하지 않는
   fireEvent.click(screen.getByTestId("list-select-test"));
   fireEvent.click(screen.getByTestId("list-bulk-stop"));
   const confirm = await screen.findByTestId("user-stop-confirm");
+  const listReads = gets("users?").length;
   fireEvent.click(within(confirm).getByTestId("confirmation-proceed"));
-  expect(await screen.findByText("다시 불러와 주세요.")).toBeInTheDocument();
-  expect(screen.getByTestId("list-row-test")).toBeInTheDocument();
+  expect(await screen.findByTestId("user-warn-toast")).toHaveTextContent(
+    "다시 불러와 주세요.",
+  );
+  // 409면 목록을 다시 읽어 새 수정 시각을 받는다(선택은 그대로).
+  await waitFor(() => expect(gets("users?").length).toBeGreaterThan(listReads));
+  expect(await screen.findByTestId("list-row-test")).toBeInTheDocument();
   expect(screen.getByTestId("list-select-test")).toBeChecked();
   expect(writes()).toHaveLength(1);
+});
+
+it("상세 창 처리가 409면 문구를 남기고 계정을 다시 읽는다", async () => {
+  account = { ...account, userStatCd: "USE" };
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    url.endsWith("/password-reset") && init?.method === "PUT"
+      ? {
+          ok: false,
+          status: 409,
+          json: async () => ({
+            success: false,
+            message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+            errors: [{ field: "modDttm", message: "x" }],
+          }),
+        }
+      : base(url, init),
+  );
+  const accountReads = () =>
+    gets("/api/common/users/test").filter(
+      (url) => url === "/api/common/users/test",
+    ).length;
+  page();
+  fireEvent.click(await screen.findByTestId("list-row-test"));
+  const panel = await screen.findByTestId("user-detail");
+  await within(panel).findByText(account.email);
+  const reads = accountReads();
+  fireEvent.click(within(panel).getByTestId("user-password-reset"));
+  fireEvent.click(
+    within(await screen.findByTestId("user-reset-confirm")).getByTestId(
+      "confirmation-proceed",
+    ),
+  );
+  await waitFor(() => expect(accountReads()).toBeGreaterThan(reads));
+  expect(
+    await screen.findByText("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요."),
+  ).toBeInTheDocument();
+});
+
+it("역할을 바꿔 담당 프로젝트를 지우기로 하면 지운 프로젝트는 빼고 저장한다", async () => {
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    url.includes("change-impact")
+      ? response({
+          projectCount: 1,
+          projects: account.projects,
+          blockedUsers: [],
+        })
+      : base(url, init),
+  );
+  const onSaved = vi.fn();
+  render(
+    <UserDialog
+      account={account}
+      options={options}
+      onClose={vi.fn()}
+      onSaved={onSaved}
+    />,
+  );
+  const dialog = screen.getByTestId("user-dialog");
+  fireEvent.click(within(dialog).getByTestId("user-role-input-0"));
+  fireEvent.click(within(dialog).getByTestId("user-role-input-2"));
+  fireEvent.click(within(dialog).getByTestId("user-save"));
+  const confirm = await screen.findByTestId("inline-confirmation");
+  expect(confirm).toHaveTextContent("PM이 비게 됩니다.");
+  fireEvent.click(within(confirm).getByTestId("confirmation-proceed"));
+  await waitFor(() => expect(writes()).toHaveLength(1));
+  expect(
+    JSON.parse(String((writes()[0][1] as RequestInit).body)),
+  ).toMatchObject({
+    roleCds: ["EXEC"],
+    projectIds: [],
+    confirmedProjectIds: ["project-a"],
+  });
+  await waitFor(() => expect(onSaved).toHaveBeenCalled());
+});
+
+it("「사용 중지 포함」을 바꾸면 체크한 계정 선택을 푼다", async () => {
+  page();
+  await screen.findByTestId("list-row-test");
+  fireEvent.click(screen.getByTestId("list-select-test"));
+  expect(screen.getByTestId("list-count")).toHaveTextContent("1건 선택");
+  fireEvent.click(screen.getByTestId("user-include-stopped"));
+  expect(await screen.findByTestId("list-row-test")).toBeInTheDocument();
+  expect(screen.getByTestId("list-select-test")).not.toBeChecked();
 });
 
 it("서버가 막은 계정만 고르면 확인 창 없이 이유를 알린다", async () => {
@@ -514,6 +688,34 @@ it("서버가 막은 계정만 고르면 확인 창 없이 이유를 알린다",
     "영업1 파트장입니다.",
   );
   expect(screen.queryByTestId("user-stop-confirm")).not.toBeInTheDocument();
+});
+
+it("일괄 중지에서 파트장이라 못 한 건은 시안 문구(건수·영업 파트 탭 안내)로 알린다", async () => {
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    url.endsWith("/stop") && init?.method === "PUT"
+      ? response({
+          processedUserIds: [],
+          unprocessedCount: 1,
+          unprocessed: [
+            {
+              userId: "test",
+              reason:
+                "영업1 파트장입니다. 영업 파트 탭에서 먼저 파트장을 바꾸세요.",
+            },
+          ],
+        })
+      : base(url, init),
+  );
+  page();
+  await screen.findByTestId("list-row-test");
+  fireEvent.click(screen.getByTestId("list-select-test"));
+  fireEvent.click(screen.getByTestId("list-bulk-stop"));
+  const confirm = await screen.findByTestId("user-stop-confirm");
+  fireEvent.click(within(confirm).getByTestId("confirmation-proceed"));
+  expect(await screen.findByTestId("user-toast")).toHaveTextContent(
+    "0건의 사용을 중지했습니다. 1건은 파트장이라 중지하지 못했습니다. 영업 파트 탭에서 먼저 파트장을 바꾸세요.",
+  );
 });
 
 it.each(["USE", "LOCK", "STOP"] as const)(

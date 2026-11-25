@@ -54,6 +54,8 @@ public final class PartTestData {
         when(mapper.endPeriod(anyString(), anyString(), anyString())).thenAnswer(call -> {
             rows.get(call.getArgument(0) + ":" + call.getArgument(1)).endMonth = call.getArgument(2); return 1;
         });
+        when(mapper.deletePeriod(anyString(), anyString())).thenAnswer(call ->
+            rows.remove(call.getArgument(0) + ":" + call.getArgument(1)) == null ? 0 : 1);
         when(mapper.touch(anyString(), nullable(Instant.class))).thenAnswer(call -> {
             masters.get(call.getArgument(0)).modifiedAt = Instant.parse("2026-09-01T00:00:00Z").plusSeconds(++revision);
             return 1;

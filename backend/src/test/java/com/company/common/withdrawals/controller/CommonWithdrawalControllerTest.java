@@ -268,6 +268,7 @@ class CommonWithdrawalControllerTest {
         verify(assignments,never()).update(any());verify(assignments,never()).saveMonth(any());
         verify(assignments,never()).insert(any());verify(assignments,never()).insertHistory(any());
         verify(mapper).insertReservation(argThat(w -> "person".equals(w.developerId()) && "admin".equals(w.actor()) && w.needSn()==1));
+        verify(mapper).touchOpportunity("O-0001","admin");
         mvc.perform(get("/api/common/withdrawals/tentative-assignments").param("developerId","person"))
             .andExpect(status().isOk()).andExpect(contract("GET","/api/common/withdrawals/tentative-assignments"))
             .andExpect(jsonPath("$.data.items[0].tentativeAssignment.opportunityId").value("O-0001"));

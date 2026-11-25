@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { mergeKeepingEdits } from "../../shared/mergeKeepingEdits";
 import { requestMenuRefresh } from "../../app/menuRefresh";
-import { Toast } from "../../shared/feedback/Dialog";
+import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { Banner } from "../../shared/list";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { MenuRegistration } from "../commonops/MenuRegistration";
@@ -41,6 +42,23 @@ function LockIcon({ group = false }: { group?: boolean }) {
   );
 }
 
+/** 시안 .banner.warn: 경고 아이콘. */
+const warnIcon = (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M12 3l9 16H3zM12 10v4M12 17h.01" />
+  </svg>
+);
+
 const message = (error: unknown) =>
   error instanceof Error ? error.message : "메뉴를 처리하지 못했습니다.";
 
@@ -50,12 +68,20 @@ export function MenuPage() {
   const [draft, setDraft] = useState<api.MenuSettingItem[]>([]);
   const [moved, setMoved] = useState<string[]>([]);
   const [failure, setFailure] = useState("");
+  /** 409 뒤 [최신 버전 불러오기 (입력 유지)] 단추를 보일지(2026-11-24 사용자 결정). */
+  const [conflict, setConflict] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   /** 저장 전 이름 검사에 걸린 줄(시안: 문구는 알림 한 줄, 칸은 빨간 테두리만). */
   const [badNames, setBadNames] = useState<string[]>([]);
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
+  /** 시안: 저장만 완료(ok) 알림, 취소·이동·검사 안내는 info, 동시 수정은 warn. */
+  const [notice, setNoticeState] = useState<{ text: string; kind: ToastKind }>({
+    text: "",
+    kind: "info",
+  });
+  const setNotice = (text: string, kind: ToastKind = "info") =>
+    setNoticeState({ text, kind });
   const [dialogDirty, setDialogDirty] = useState(false);
   const [refreshPending, setRefreshPending] = useState(false);
   const root = useRef<HTMLElement>(null);
@@ -108,6 +134,23 @@ export function MenuPage() {
         ?.querySelector<HTMLElement>("[aria-invalid='true']")
         ?.focus();
   }, [errors, badNames]);
+  /** 내가 고친 줄은 그대로(표 수정 시각만 최신), 안 고친 줄은 최신 값으로 합친다. */
+  const reloadKeepingInput = async () => {
+    if (!snapshot || busy) return;
+    setBusy(true);
+    try {
+      const result = await api.getCommonMenuSettings();
+      setDraft((current) => mergeKeepingEdits(current, snapshot, result.items, (row) => row.menuId));
+      version.current = result.modifiedAt ?? null;
+      setSnapshot(result.items);
+      setConflict(false);
+      setFailure("");
+    } catch (error) {
+      setFailure(message(error));
+    } finally {
+      setBusy(false);
+    }
+  };
   const refresh = async () => {
     const result = await api.getCommonMenuSettings();
     version.current = result.modifiedAt ?? null;
@@ -136,10 +179,22 @@ export function MenuPage() {
       setNotice("바꾼 내용이 없습니다.");
       return;
     }
+    // 시안 SFR-125-06: 시스템 메뉴는 화면에서 막지 않고 저장할 때 알림으로 거부한다(서버도 막는다).
+    // 바꾼 줄만 본다(DB에 이미 꺼진 시스템 메뉴가 있어도 다른 줄 저장은 막지 않는다).
+    const off = changed.filter(
+      (row) => row.menuLvl === 2 && row.lockYn === "Y" && row.useYn === "N",
+    );
+    if (off.length) {
+      setNotice(
+        `「${off.map((row) => row.menuNm).join("」·「")}」은 시스템 메뉴라 끌 수 없습니다. 사용을 다시 켜야 저장됩니다.`,
+      );
+      return;
+    }
     const invalid = changed
       .filter((row) => !row.menuNm.trim() || [...row.menuNm].length > 50)
       .map((row) => row.menuId);
     setErrors({});
+    setConflict(false);
     setBadNames(invalid);
     if (invalid.length) {
       setNotice("메뉴 이름은 비울 수 없고 50자 이내여야 합니다.");
@@ -166,6 +221,7 @@ export function MenuPage() {
       requestMenuRefresh();
       setNotice(
         "메뉴를 저장했습니다. 모든 사용자 메뉴에 바로 반영되고 변경 이력에 남겼습니다.",
+        "ok",
       );
       await refresh();
     } catch (error) {
@@ -174,6 +230,14 @@ export function MenuPage() {
         setFailure(
           "저장은 완료되었으나 표를 다시 읽지 못했습니다. 재조회해 주세요.",
         );
+      } else if (
+        error instanceof MenuRegistrationRequestError &&
+        error.status === 409
+      ) {
+        // FR-0106: 다른 사람이 먼저 바꿨으면 안내하고, 입력은 둔 채 [최신 버전 불러오기 (입력 유지)]를 보인다(2026-11-24 사용자 결정).
+        setNotice(error.message, "warn");
+        setFailure(error.message);
+        setConflict(true);
       } else {
         setFailure(message(error));
         if (error instanceof MenuRegistrationRequestError)
@@ -249,7 +313,7 @@ export function MenuPage() {
         />
       </div>
       {dirty && (
-        <Banner kind="warn">
+        <Banner kind="warn" icon={warnIcon}>
           저장하지 않은 변경이 있습니다. 아래 [저장]을 눌러야 모든 사용자 메뉴에
           반영됩니다.
         </Banner>
@@ -294,7 +358,9 @@ export function MenuPage() {
                         className={
                           row.menuLvl === 1
                             ? "menu-settings-group"
-                            : "menu-settings-child"
+                            : row.useYn === "N"
+                              ? "menu-settings-child menu-settings-muted"
+                              : "menu-settings-child"
                         }
                         onDragOver={(event) => event.preventDefault()}
                         onDrop={(event) => {
@@ -469,6 +535,20 @@ export function MenuPage() {
       {failure && (
         <div role="alert" data-testid="menu-settings-failure">
           {failure}
+          {conflict && (
+            <>
+              {" "}
+              <button
+                type="button"
+                className="ls-btn ls-btn-sm"
+                data-testid="menu-settings-version-refresh"
+                disabled={busy}
+                onClick={() => void reloadKeepingInput()}
+              >
+                최신 버전 불러오기 (입력 유지)
+              </button>
+            </>
+          )}
           {(!snapshot || refreshPending) && (
             <button
               type="button"
@@ -492,9 +572,10 @@ export function MenuPage() {
           )}
         </div>
       )}
-      {notice && (
+      {notice.text && (
         <Toast
-          message={notice}
+          message={notice.text}
+          kind={notice.kind}
           testId="menu-settings-toast"
           onDismiss={() => setNotice("")}
         />

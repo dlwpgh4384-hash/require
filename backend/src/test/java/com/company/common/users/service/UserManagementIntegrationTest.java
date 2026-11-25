@@ -141,6 +141,17 @@ class UserManagementIntegrationTest {
         assertThat(count("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE user_id='test'")).isEqualTo(1);
         assertThat(db.queryForObject("SELECT mod_user_id FROM TB_SY_USER WHERE user_id='test'", String.class)).isEqualTo("admin");
     }
+    @Test void roleBadgesFollowRoleSortOrderNotRoleId() throws Exception {
+        db.update("INSERT INTO TB_SY_ROLE(role_id,role_nm,data_scope_cd,sort_ord,reg_user_id,reg_dttm) VALUES ('AAA_LAST','시험 뒤 역할','PROJ',999,'admin',clock_timestamp())");
+        db.update("INSERT INTO TB_SY_USER_ROLE(user_id,role_id,reg_user_id,reg_dttm) VALUES ('admin','AAA_LAST','admin',clock_timestamp())");
+        db.update("INSERT INTO TB_SY_USER_ROLE(user_id,role_id,reg_user_id,reg_dttm) VALUES ('admin','PROJECT_READER','admin',clock_timestamp())");
+        var body = json.readTree(mvc.perform(get("/api/common/users/admin")).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).path("data");
+        // 역할 번호 순이면 AAA_LAST가 맨 앞. 정렬 순서(ADMIN 기본값 < 90 < 999)면 맨 뒤.
+        assertThat(body.path("roleCds").toString()).isEqualTo("[\"ADMIN\",\"PROJECT_READER\",\"AAA_LAST\"]");
+        assertThat(body.path("roleNames").get(1).asText()).isEqualTo("시험 프로젝트 조회");
+        assertThat(body.path("roleNames").get(2).asText()).isEqualTo("시험 뒤 역할");
+    }
     @Test void accessLogWithMissingTargetStillReturnsContractString() throws Exception {
         db.update("INSERT INTO TB_SY_ACCS_LOG(user_id,act_type_cd,act_dttm,reg_user_id) VALUES ('admin','LOGIN',CURRENT_TIMESTAMP,'admin')");
         mvc.perform(get("/api/common/users/admin/access-logs"))

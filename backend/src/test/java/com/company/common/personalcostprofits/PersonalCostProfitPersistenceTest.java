@@ -182,6 +182,8 @@ class PersonalCostProfitPersistenceTest {
     @Test void literalSubstringReturnsEveryMatchingPersonWithoutSqlWildcardInterpretation() throws Exception {
         person("personal-b","검색%동일", "CT"); person("personal-c","검색다름", "CT");
         assertThat(read("연누계","%동일").path("items")).hasSize(2);
+        // 앞뒤 공백은 빼고 찾는다(시안 trim)
+        assertThat(read("연누계"," %동일 ").path("items")).hasSize(2);
         assertThat(read("연누계","없는 사람").path("items")).isEmpty();
     }
     @Test void selfAffiliationFindsPeopleWithoutClient() throws Exception {

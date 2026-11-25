@@ -484,12 +484,29 @@ it("Ctrl+S saves active form once and cleans up listener", async () => {
     />,
   );
   // 바뀐 것이 있어야 저장한다(시안: 없으면 「바뀐 내용이 없습니다.」).
-  fireEvent.change(screen.getByLabelText("담당자"), { target: { value: "새 담당" } });
-  fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+  const contact = screen.getByLabelText("담당자");
+  fireEvent.change(contact, { target: { value: "새 담당" } });
+  contact.focus();
+  fireEvent.keyDown(contact, { key: "s", ctrlKey: true });
   await waitFor(() => expect(writes()).toHaveLength(1));
   mounted.unmount();
   fireEvent.keyDown(window, { key: "s", ctrlKey: true });
   expect(writes()).toHaveLength(1);
+});
+it("Ctrl+S in another (hidden) screen tab does not save the client form", async () => {
+  render(
+    <div hidden>
+      <ClientForm codes={codes} onCancel={vi.fn()} onSaved={vi.fn()} />
+    </div>,
+  );
+  fireEvent.change(screen.getByLabelText("상호", { selector: "input" }), {
+    target: { value: "숨은 탭 거래처" },
+  });
+  fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  // 저장을 시도했다면 구분 칸 검사 알림이 떴을 것이다.
+  expect(screen.queryByText("구분을 골라 주세요.")).toBeNull();
+  expect(writes()).toHaveLength(0);
 });
 it("payload removes hidden fields and required nullable token is preserved", () => {
   expect(
@@ -694,4 +711,23 @@ it("bulk resume asks with the mockup sentence and reports n건을 다시 사용�
   expect(dialog).toHaveTextContent("거래처A — 상태가 「사용」으로 돌아가고 변경 이력에 남습니다.");
   fireEvent.click(screen.getByTestId("client-status-save"));
   expect(await screen.findByTestId("client-toast")).toHaveTextContent("1건을 다시 사용합니다.");
+});
+it("409 on resume shows a warning toast and reloads the list (FR-0106)", async () => {
+  row = { ...row, useYn: "N" };
+  render(<ClientPage />);
+  await screen.findByText("거래처A");
+  const reads = () =>
+    request.mock.calls.filter((call: unknown[]) =>
+      String(call[0]).startsWith("/api/common/clients?"),
+    ).length;
+  const before = reads();
+  saveError = 409;
+  fireEvent.click(screen.getByTestId("list-select-client-a"));
+  fireEvent.click(screen.getByTestId("list-bulk-resume"));
+  fireEvent.click(screen.getByTestId("client-status-save"));
+  const toast = await screen.findByTestId("client-toast");
+  expect(toast).toHaveTextContent("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.");
+  expect(toast).toHaveClass("app-toast-warn");
+  await waitFor(() => expect(reads()).toBeGreaterThan(before));
+  expect(screen.queryByTestId("client-failure")).not.toBeInTheDocument();
 });

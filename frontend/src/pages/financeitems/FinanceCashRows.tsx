@@ -243,6 +243,7 @@ export function FinanceTransferSection({
                     className="ls-in ls-in-sm"
                     aria-label="내용"
                     placeholder="예: 장비 임대"
+                    maxLength={100}
                     style={{ width: 130 }}
                     disabled={disabled}
                     value={item}
@@ -254,6 +255,7 @@ export function FinanceTransferSection({
                     className="ls-in ls-in-sm"
                     aria-label="받는 곳"
                     placeholder="업체 이름"
+                    maxLength={100}
                     style={{ width: 120 }}
                     disabled={disabled}
                     value={who}
@@ -278,6 +280,7 @@ export function FinanceTransferSection({
                   <input
                     className="ls-in ls-in-sm"
                     aria-label="메모"
+                    maxLength={200}
                     style={{ width: 150 }}
                     disabled={disabled}
                     value={memo}
@@ -523,6 +526,7 @@ export function FinanceLoanSection({
                     className="ls-in ls-in-sm"
                     aria-label="상대"
                     placeholder="대표이사·은행 등"
+                    maxLength={100}
                     style={{ width: 130 }}
                     disabled={disabled}
                     value={who}
@@ -533,6 +537,7 @@ export function FinanceLoanSection({
                   <input
                     className="ls-in ls-in-sm"
                     aria-label="메모"
+                    maxLength={200}
                     style={{ width: 140 }}
                     disabled={disabled}
                     value={memo}

@@ -84,6 +84,8 @@ export function BillDetailDialog({
     const value = reason.trim();
     if (!value) {
       setReasonError("취소 사유를 입력해 주세요.");
+      // 오류 칸으로 간다(00-1 FR-0106)
+      window.setTimeout(() => document.getElementById("bill-cancel-reason")?.focus(), 0);
       return;
     }
     pending.current = true;

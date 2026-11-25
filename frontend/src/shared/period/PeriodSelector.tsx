@@ -27,8 +27,72 @@ export interface PeriodSelectorProps extends PeriodOptions {
    * 연도+월(kind "yearMonth")에서만 쓴다. 휴대폰에서는 드롭다운과 배지만 보인다.
    * "cumulativeBar"는 시안 periodBar의 연도+누계 기준월 모양:
    * 「‹ 2026년 › 누계 기준월 [11월 ▾] 1~11월 누계 · 진행 중/결산 완료」. 누계(kind "yearCumulative")에서만 쓴다.
+   * "yearBar"는 시안 periodBar의 연도만 모양: 「‹ 2026년 › 진행 중/결산 완료」(자금수지표). 연도(kind "year")에서만 쓴다.
    */
-  variant?: "default" | "monthBox" | "cumulativeBar";
+  variant?: "default" | "monthBox" | "cumulativeBar" | "yearBar";
+}
+
+/** 시안 periodBar(kind 'year', 자금수지표): ‹ 2026년 › · 올해는 「진행 중」, 지난 해는 「결산 완료」. */
+function YearBar({
+  basis,
+  value,
+  onChange,
+  disabled,
+  options,
+}: {
+  basis: PeriodBasis;
+  value: PeriodValue;
+  onChange: (value: PeriodValue) => void;
+  disabled: boolean;
+  options: PeriodOptions;
+}) {
+  const years = yearRange(basis, options);
+  const done = value.year < Number(basis.latestYm.slice(0, 4));
+  const setYear = (year: number) => {
+    const next = withYear(value, year, basis, options);
+    if (!disabled && isAllowed(next, basis, options)) onChange(next);
+  };
+  return (
+    <div
+      className="period-cumulative-bar"
+      data-testid="period-selector"
+      data-kind={options.kind}
+      data-variant="yearBar"
+      role="group"
+      aria-label="조회 기간"
+    >
+      <div className="year-bar-nav">
+        <button
+          type="button"
+          className="year-bar-arrow"
+          data-testid="period-year-prev"
+          aria-label="이전 해"
+          disabled={disabled || value.year <= years.min}
+          onClick={() => setYear(value.year - 1)}
+        >
+          {chevron("M15 18l-6-6 6-6")}
+        </button>
+        <strong data-testid="period-year">{value.year}년</strong>
+        <button
+          type="button"
+          className="year-bar-arrow"
+          data-testid="period-year-next"
+          aria-label="다음 해"
+          disabled={disabled || value.year >= years.max}
+          onClick={() => setYear(value.year + 1)}
+        >
+          {chevron("M9 18l6-6-6-6")}
+        </button>
+      </div>
+      <span aria-live="polite" data-testid="period-status">
+        {done ? (
+          <Badge kind="lock">결산 완료</Badge>
+        ) : (
+          <Badge kind="info">진행 중</Badge>
+        )}
+      </span>
+    </div>
+  );
 }
 
 const range = (min: number, max: number) =>
@@ -254,6 +318,16 @@ export function PeriodSelector({
         value={value}
         onChange={onChange}
         mobile={mobile}
+        disabled={disabled}
+        options={options}
+      />
+    );
+  if (variant === "yearBar" && options.kind === "year")
+    return (
+      <YearBar
+        basis={basis}
+        value={value}
+        onChange={onChange}
         disabled={disabled}
         options={options}
       />

@@ -154,12 +154,15 @@ class WithdrawalPersistenceTest {
     @Test void listUsesSetQueriesForReservationsHistoryAndSeatNames()throws Exception {
         save("A-WITHDRAWAL-A",1);
         db.update("INSERT INTO TB_PJ_ASGN_HIST(ASGN_ID,HIST_SN,ASGN_CHG_TYPE_CD,APLY_DT,BFR_VAL,AFT_VAL,RTRO_YN,CLOSE_CROSS_YN,CRCT_YN,REG_USER_ID) VALUES('A-WITHDRAWAL-B',1,'EARLY','2026-10-01','2026-12-31','2026-11-30','N','N','N','admin')");
+        // 정정된 조기 철수 줄은 「조기 철수 이력」에 넣지 않는다(시안 !x.fixed).
+        db.update("INSERT INTO TB_PJ_ASGN_HIST(ASGN_ID,HIST_SN,ASGN_CHG_TYPE_CD,APLY_DT,BFR_VAL,AFT_VAL,RTRO_YN,CLOSE_CROSS_YN,CRCT_YN,REG_USER_ID) VALUES('A-WITHDRAWAL-A',91,'EARLY','2026-09-01','2026-12-31','2026-11-15','N','N','Y','admin')");
         var list=getData("/api/common/withdrawals?year=2026");
         var byId=new HashMap<String,JsonNode>();
         list.path("items").forEach(i -> byId.put(i.path("assignmentId").asText(),i));
         assertThat(byId.get("A-WITHDRAWAL-A").path("nextAssignment").path("hasTentativeAssignment").asBoolean()).isTrue();
         assertThat(byId.get("A-WITHDRAWAL-B").path("nextAssignment").path("recommendationCount").asInt()).isEqualTo(1);
         assertThat(byId.get("A-WITHDRAWAL-B").path("earlyWithdrawalHistory").get(0).asText()).isEqualTo("2026-10-01 · 2026-11-30");
+        assertThat(byId.get("A-WITHDRAWAL-A").path("earlyWithdrawalHistory").size()).isZero();
         assertThat(list.path("banner").path("soonCount").asInt()).isEqualTo(2);
         assertThat(list.path("banner").path("unassignedCount").asInt()).isEqualTo(1);
         var recommendations=getData("/api/common/withdrawals/A-WITHDRAWAL-B/recommendations");

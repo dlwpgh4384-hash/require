@@ -30,12 +30,15 @@ export function ReceiptCancelDialog({
   async function save() {
     if (pending.current) return;
     const value = reason.trim();
-    if (!value) {
-      setError("취소 사유를 입력해 주세요.");
-      return;
-    }
-    if ([...value].length > 500) {
-      setError("취소 사유는 500자까지 입력해 주세요.");
+    const invalid = !value
+      ? "취소 사유를 입력해 주세요."
+      : [...value].length > 500
+        ? "취소 사유는 500자까지 입력해 주세요."
+        : "";
+    if (invalid) {
+      setError(invalid);
+      // 오류 칸으로 간다(00-1 FR-0106)
+      window.setTimeout(() => document.getElementById("receipt-cancel-reason")?.focus(), 0);
       return;
     }
     pending.current = true;

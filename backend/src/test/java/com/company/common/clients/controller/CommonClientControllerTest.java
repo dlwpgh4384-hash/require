@@ -171,6 +171,28 @@ class CommonClientControllerTest {
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("이미 등록된 사업자번호입니다 (거래처)"));
         assertThat(rows).hasSize(1); assertThat(histories).hasSize(1);
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"1234567890", "123 45 67890", "123-45-67890"})
+    void businessNumberWithoutHyphensIsStoredInDdlShape(String typed) throws Exception {
+        mvc.perform(post("/api/common/clients").contentType("application/json")
+            .content(input("CUST").put("businessNumber", typed).toString())).andExpect(status().isOk());
+        assertThat(rows.values()).extracting(row -> row.businessNumber).containsExactly("123-45-67890");
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"123456789", "12345678901", "12345A7890", "abc-de-fghij", "----------"})
+    void businessNumberThatIsNotTenDigitsIsStillRefused(String typed) throws Exception {
+        mvc.perform(post("/api/common/clients").contentType("application/json")
+            .content(input("CUST").put("businessNumber", typed).toString()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("businessNumber"));
+        assertThat(rows).isEmpty();
+    }
+    @Test void duplicateOfHyphenlessBusinessNumberIsCaught() throws Exception {
+        create("CUST");
+        mvc.perform(post("/api/common/clients").contentType("application/json")
+            .content(input("CUST").put("businessNumber", "1234567890").toString()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("이미 등록된 사업자번호입니다 (거래처)"));
+        assertThat(rows).hasSize(1);
+    }
     @Test void sameNameDifferentBusinessNumberWarnsButCreates() throws Exception {
         create("CUST"); mvc.perform(post("/api/common/clients").contentType("application/json").content(input("CUST").put("businessNumber", "987-65-43210").toString()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.warnings[0]").value("같은 상호의 거래처가 이미 있습니다(사업자번호 123-45-67890). 사업자번호가 달라 등록은 되었습니다(지점 등). 맞는지 확인해 주세요.")); assertThat(rows).hasSize(2);

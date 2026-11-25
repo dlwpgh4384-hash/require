@@ -95,9 +95,9 @@
   </delete>
   <insert id="saveAssignment">
     INSERT INTO TB_PJ_ASGN_MON(ASGN_ID, INPUT_YM, DEV_ID, PROJ_ID, INPUT_DAY_CNT, MON_MM,
-      APLY_UPRC, SALES_AMT, FIX_YN, REG_USER_ID, MOD_USER_ID, MOD_DTTM)
+      APLY_UPRC, SALES_AMT, FIX_YN, REG_USER_ID, REG_DTTM, MOD_USER_ID, MOD_DTTM)
     VALUES(#{assignmentId}, #{month}, #{developerId}, #{projectId}, #{days}, #{mm}, #{price},
-      #{sales}, 'Y', #{actor}, #{actor}, clock_timestamp())
+      #{sales}, 'Y', #{actor}, clock_timestamp(), #{actor}, clock_timestamp())
   </insert>
   <delete id="deleteOpenCosts">
     DELETE FROM TB_CO_MON_COST WHERE COST_YM = #{month} AND FIX_YN = 'N'
@@ -105,22 +105,22 @@
   <insert id="saveCost">
     INSERT INTO TB_CO_MON_COST(COST_YM, DEV_ID, PROJ_ID, ASGN_ID, ASGN_MM, FREE_MM, SALES_AMT,
       LABOR_ALLOC_AMT, TEAM_EXPS_AMT, PROJ_EXPS_AMT, DRCT_EXPS_AMT, COST_CLS_CD, CTRT_TYPE_CD,
-      PART_ID, FIX_YN, REG_USER_ID, MOD_USER_ID, MOD_DTTM)
+      PART_ID, FIX_YN, REG_USER_ID, REG_DTTM, MOD_USER_ID, MOD_DTTM)
     VALUES(#{row.yearMonth}, #{row.developerId}, #{row.projectId}, #{row.assignmentId}, #{row.mm},
       CASE WHEN #{row.inputTypeCode,jdbcType=VARCHAR} = 'FREE' THEN #{row.mm} ELSE 0 END,
       #{row.revenue}, #{row.labor}, #{row.team}, #{row.expense}, #{row.team} + #{row.expense},
       #{classification}, #{row.contractTypeCode,jdbcType=VARCHAR}, #{partId,jdbcType=VARCHAR},
-      'Y', #{actor}, #{actor}, clock_timestamp())
+      'Y', #{actor}, clock_timestamp(), #{actor}, clock_timestamp())
   </insert>
   <insert id="saveProfit">
     INSERT INTO TB_CO_MON_PL(PL_YM, SALES_AMT, ALLOC_COST_AMT, IDLE_COST_AMT, DRCT_EXPS_AMT,
       SALES_COST_AMT, GROSS_PRFT_AMT, SGA_INPUT_AMT, INDRCT_LABOR_AMT, RND_AMT, SGA_TOT_AMT,
       PREV_ADJ_AMT, OPRT_PRFT_AMT, NOPR_INCM_AMT, NOPR_EXPS_AMT, CORP_TAX_AMT, NET_PRFT_AMT,
-      MIGR_YN, FIX_YN, REG_USER_ID, MOD_USER_ID, MOD_DTTM)
+      MIGR_YN, FIX_YN, REG_USER_ID, REG_DTTM, MOD_USER_ID, MOD_DTTM)
     VALUES(#{row.month}, #{row.revenue}, #{row.allocatedCost}, #{row.idleCost}, #{row.directExpense},
       #{row.costOfSales}, #{row.grossProfit}, #{row.sellingAdministrativeInput}, #{row.indirectLaborCost},
       #{row.internalResearchCost}, #{row.sga}, #{row.previousAdjustment}, #{row.operatingProfit},
-      #{row.income}, #{row.expense}, #{row.tax}, #{row.netProfit}, 'N', 'Y', #{actor}, #{actor}, clock_timestamp())
+      #{row.income}, #{row.expense}, #{row.tax}, #{row.netProfit}, 'N', 'Y', #{actor}, clock_timestamp(), #{actor}, clock_timestamp())
     ON CONFLICT(PL_YM) DO UPDATE SET SALES_AMT = excluded.SALES_AMT,
       ALLOC_COST_AMT = excluded.ALLOC_COST_AMT, IDLE_COST_AMT = excluded.IDLE_COST_AMT,
       DRCT_EXPS_AMT = excluded.DRCT_EXPS_AMT, SALES_COST_AMT = excluded.SALES_COST_AMT,
@@ -133,7 +133,10 @@
       MOD_USER_ID = excluded.MOD_USER_ID, MOD_DTTM = clock_timestamp()
     WHERE TB_CO_MON_PL.FIX_YN = 'N'
   </insert>
-  <update id="unfixAssignments">UPDATE TB_PJ_ASGN_MON SET FIX_YN = 'N' WHERE INPUT_YM = #{month} AND FIX_YN = 'Y'</update>
-  <update id="unfixCosts">UPDATE TB_CO_MON_COST SET FIX_YN = 'N' WHERE COST_YM = #{month} AND FIX_YN = 'Y'</update>
-  <update id="unfixProfit">UPDATE TB_CO_MON_PL SET FIX_YN = 'N' WHERE PL_YM = #{month} AND FIX_YN = 'Y'</update>
+  <update id="unfixAssignments">UPDATE TB_PJ_ASGN_MON SET FIX_YN = 'N', MOD_USER_ID = #{actor}, MOD_DTTM = clock_timestamp()
+    WHERE INPUT_YM = #{month} AND FIX_YN = 'Y'</update>
+  <update id="unfixCosts">UPDATE TB_CO_MON_COST SET FIX_YN = 'N', MOD_USER_ID = #{actor}, MOD_DTTM = clock_timestamp()
+    WHERE COST_YM = #{month} AND FIX_YN = 'Y'</update>
+  <update id="unfixProfit">UPDATE TB_CO_MON_PL SET FIX_YN = 'N', MOD_USER_ID = #{actor}, MOD_DTTM = clock_timestamp()
+    WHERE PL_YM = #{month} AND FIX_YN = 'Y'</update>
 </mapper>

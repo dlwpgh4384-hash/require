@@ -436,6 +436,20 @@ it("closed application month rejection keeps draft and shows field error in M4",
   expect(screen.getByLabelText("부가세율")).toHaveValue("11");
   expect(rows.find((item) => item.standardCode === "VAT_RT")!.value).toBe("10");
 });
+it("opening balance shows commas but saves the plain number", async () => {
+  await mount();
+  expect(screen.getByLabelText("자금수지 기초 잔액")).toHaveValue("1,150,000,000");
+  fireEvent.change(screen.getByLabelText("자금수지 기초 잔액"), {
+    target: { value: "2,000,000" },
+  });
+  expect(screen.getByLabelText("자금수지 기초 잔액")).toHaveValue("2,000,000");
+  openSave();
+  fireEvent.click(screen.getByTestId("operating-save-confirm"));
+  await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
+  expect(
+    JSON.parse(String((writes()[0][1] as RequestInit).body)).items[0],
+  ).toMatchObject({ standardCode: "CASH_BASE_AMT", value: "2000000" });
+});
 it("cash-only save has no effective month and sends null while unlocked", async () => {
   await mount();
   change("cash-base-amt", "123.1250");
@@ -623,4 +637,59 @@ it("cash base rows stay editable without the lock note until the start month is 
   expect(screen.getByLabelText("자금수지 시작 월")).not.toBeDisabled();
   expect(screen.getByLabelText("자금수지 기초 잔액")).not.toBeDisabled();
   expect(document.querySelector(".operating-lock-note")).toBeNull();
+});
+
+// FR-0106: 저장 409면 창을 닫고 경고 알림, 입력은 두고 [최신 버전 불러오기 (입력 유지)](2026-11-24 사용자 결정).
+it("save 409 closes the dialog, warns, keeps the input and reloads versions on request (FR-0106)", async () => {
+  await mount();
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (path: string, init?: RequestInit) =>
+    init?.method === "PUT"
+      ? {
+          ok: false,
+          status: 409,
+          json: async () => ({
+            success: false,
+            message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+          }),
+        }
+      : base(path, init),
+  );
+  const reads = request.mock.calls.length;
+  change("vat-rt", "11");
+  openSave();
+  fireEvent.change(screen.getByTestId("operating-effective-month"), {
+    target: { value: "2027-02" },
+  });
+  fireEvent.click(screen.getByTestId("operating-save-confirm"));
+  const toast = await screen.findByTestId("operating-toast");
+  expect(toast).toHaveTextContent("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.");
+  expect(toast).toHaveClass("app-toast-warn");
+  expect(screen.queryByTestId("operating-save-dialog")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("부가세율")).toHaveValue("11");
+  fireEvent.click(await screen.findByTestId("operating-version-refresh"));
+  await waitFor(() => expect(request.mock.calls.length).toBeGreaterThan(reads + 1));
+  await waitFor(() =>
+    expect(screen.queryByTestId("operating-version-refresh")).not.toBeInTheDocument(),
+  );
+  expect(screen.getByLabelText("부가세율")).toHaveValue("11");
+});
+it("withdrawal notice days must be a whole number of 1 or more (시안 operCheck)", async () => {
+  await mount();
+  change("wthdr-noti-d", "0");
+  openSave();
+  expect(
+    screen.getByText("철수 알림: 1일 이상 정수로 넣어 주세요."),
+  ).toBeInTheDocument();
+  change("wthdr-noti-d", "1.5");
+  openSave();
+  expect(
+    screen.getByText("철수 알림: 1일 이상 정수로 넣어 주세요."),
+  ).toBeInTheDocument();
+  expect(writes()).toHaveLength(0);
+});
+it("nothing-changed and cancel notices are the info kind (시안)", async () => {
+  await mount();
+  openSave();
+  expect(await screen.findByTestId("operating-toast")).toHaveClass("app-toast-info");
 });

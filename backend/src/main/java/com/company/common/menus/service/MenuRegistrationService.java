@@ -38,6 +38,8 @@ public class MenuRegistrationService {
         management.lockManagement();
         MenuRegistrationRules.validate(input);
         boolean group = input.menuLvl() == 1;
+        if (group && mapper.groupNameExists(input.menuNm()))
+            throw new MenuRegistrationFailure("menuNm", "같은 이름의 대메뉴가 있습니다.");
         if (!group) {
             var parent = mapper.selectMenu(input.upperMenuId());
             if (parent == null || parent.menuLvl != 1)

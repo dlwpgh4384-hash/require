@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { DetailPanel, KeyValues } from "../../shared/list";
+import { AssignmentRequestError } from "../assignments/assignments";
 import { projectFailure } from "../projects/projects";
 import {
   getCommonWithdrawalRecommendations,
@@ -79,6 +80,11 @@ export function WithdrawalRecommendations({
       setRevision((n) => n + 1);
     } catch (reason) {
       setError(projectFailure(reason));
+      // 409(남은 자리 없음·먼저 바뀜)면 알림은 둔 채 카드와 목록을 최신으로 다시 읽는다(FR-0106).
+      if (reason instanceof AssignmentRequestError && reason.status === 409) {
+        notifyWithdrawalChanged();
+        getCommonWithdrawalRecommendations(row.assignmentId, replace).then(setData, () => undefined);
+      }
     } finally {
       saving.current = false;
       setBusy(false);

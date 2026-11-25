@@ -218,10 +218,12 @@
     SELECT s.DEV_ID AS "developerId",s.BGN_DT AS "startDate",s.END_DT AS "endDate"
     FROM TB_HR_DEV_STAT s WHERE s.WORK_STAT_CD='LEAVE'
       AND s.BGN_DT &lt; make_date(#{year},#{baseMonth},1)+interval '1 month'
+    ORDER BY s.DEV_ID,s.BGN_DT
   </select>
   <select id="selectCodes" resultMap="com.company.common.personalcostprofits.mapper.PersonalCostProfitMapper.code">
     SELECT c.CODE_GRP_ID AS "groupCode",c.CODE AS "code",c.CODE_NM AS "name",c.CODE_VAL AS "value"
     FROM TB_SY_CODE c WHERE c.USE_YN='Y' AND c.DEL_YN='N'
+    ORDER BY c.CODE_GRP_ID,c.SORT_ORD NULLS LAST,c.CODE
   </select>
   <insert id="insertAccess">
     INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)

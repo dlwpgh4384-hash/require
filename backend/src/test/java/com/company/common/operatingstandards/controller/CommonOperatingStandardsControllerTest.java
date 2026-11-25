@@ -155,6 +155,11 @@ class CommonOperatingStandardsControllerTest {
         save(item("STEP_PRBL_1", "2027-01", "add", value)).andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("value")); unchanged();
     }
+    @Test void cashStartMonthCannotMoveEarlierEvenWithoutClosedMonths() throws Exception {
+        save(item("CASH_BASE_YM", null, "update", "2025-12")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("value"))
+            .andExpect(jsonPath("$.message").value("시작 월은 앞당길 수 없습니다.")); unchanged();
+    }
     @Test void immediateCashRetainsBothPhysicalKeysWithoutMonthlyHistories() throws Exception {
         save(item("CASH_BASE_YM", null, "update", "2026-02"), item("CASH_BASE_AMT", null, "update", "123456789.1234"))
             .andExpect(status().isOk());

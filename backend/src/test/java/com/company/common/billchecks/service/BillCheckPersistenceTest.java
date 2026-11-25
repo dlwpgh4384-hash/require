@@ -194,7 +194,10 @@ class BillCheckPersistenceTest {
     @Test void receiptFloorUsesNormalRowsAndRollsBackCorrection()throws Exception {
         invoice("B-202611-001",1,10000000);
         db.update("INSERT INTO TB_BL_RCPT(BILL_ID,RCPT_DT,RCPT_AMT,REG_USER_ID) VALUES('B-202611-001','2026-11-15',9000000,'admin')");
-        Object before=bills();command("correction",input()).andExpect(status().isBadRequest());assertThat(bills()).isEqualTo(before);
+        Object before=bills();command("correction",input()).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("supplyAmount"))
+            .andExpect(jsonPath("$.errors[0].message").value("합계가 이미 받은 금액(9,000,000원)보다 작습니다."));
+        assertThat(bills()).isEqualTo(before);
         db.update("UPDATE TB_BL_RCPT SET CNCL_YN='Y'");
         var detail=data(command("correction",input()).andExpect(status().isOk()));
         assertThat(detail.path("bill").path("receiptSumAmount").decimalValue()).isEqualByComparingTo("0");

@@ -91,6 +91,7 @@ async function request<T>(
     throw new ProjectRequestError(
       body.message || "파트 이익금을 처리하지 못했습니다.",
       body.errors ?? [],
+      response.status,
     );
   return body;
 }

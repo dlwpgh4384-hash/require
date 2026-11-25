@@ -34,9 +34,11 @@ public class CommonRateRenegotiationService {
         var context = source.read();
         var today = calendar.today();
         var candidates = new ArrayList<Candidate>();
+        var options = new java.util.TreeMap<String, String>();
         // Roles are read in the same snapshot at the future projection seam. This release is public fixed admin.
         java.util.Objects.requireNonNull(context.roles());
         for (var a : mapper.selectAssignmentInfo(context.yearMonth(), context.closed())) {
+            if (RateRenegotiationRules.candidate(a, today)) options.putIfAbsent(a.projectId(), a.projectName());
             var cost = context.costs().stream().filter(c -> a.assignmentId().equals(c.assignmentId())
                 && a.developerId().equals(c.developerId()) && a.projectId().equals(c.projectId())).findFirst().orElse(null);
             if (cost == null || !eligible(a, cost.mm(), filter, today)) continue;
@@ -58,10 +60,12 @@ public class CommonRateRenegotiationService {
         // 시안 KPI: 대상 전체 (매출 합 − 월 원가 합) ÷ 매출 합 × 100 (매출 가중, 사람별 이익률의 단순 평균 아님)
         BigDecimal average = sumRevenue.signum() == 0 ? null
             : sumRevenue.subtract(sumCost).multiply(BigDecimal.valueOf(100)).divide(sumRevenue, 1, RoundingMode.HALF_UP);
-        var summary = new Summary(people.size(), average, context.targetRate(), assumed, target);
+        var summary = new Summary(candidates.size(), average, context.targetRate(), assumed, target);
         String ym = context.yearMonth();
         return new Result(ym.substring(0, 4) + "-" + ym.substring(4), filter.increaseRate(),
             candidates.stream().map(Candidate::row).toList(), summary, assumed, context.help(),
-            people.stream().filter(context.salaryEstimated()::contains).sorted().toList());
+            people.stream().filter(context.salaryEstimated()::contains).sorted().toList(),
+            options.entrySet().stream().map(e -> new ProjectOption(e.getKey(), e.getValue()))
+                .sorted(java.util.Comparator.comparing(ProjectOption::projectName).thenComparing(ProjectOption::projectId)).toList());
     }
 }

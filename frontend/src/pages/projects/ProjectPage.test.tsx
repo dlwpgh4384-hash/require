@@ -39,11 +39,12 @@ const ok = (data: unknown) => ({
   status: 200,
   json: async () => ({ success: true, meta: {}, data: structuredClone(data) }),
 });
+// 고른 연도 저장(사용자 설정 PERIOD)은 업무 쓰기가 아니라서 뺀다.
 const writes = () =>
-  request.mock.calls.filter((c) =>
-    ["POST", "PUT"].includes(
-      (c[1] as RequestInit | undefined)?.method ?? "GET",
-    ),
+  request.mock.calls.filter(
+    (c) =>
+      ["POST", "PUT"].includes((c[1] as RequestInit | undefined)?.method ?? "GET") &&
+      !String(c[0]).startsWith("/api/common/user-preferences/"),
   );
 const body = (call: unknown[]) =>
   JSON.parse(((call[1] as RequestInit).body as string) ?? "{}");
@@ -641,6 +642,131 @@ it("edit sends the read modifiedAt and shows the conflict message on 409", async
     "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
   );
   expect(body(writes()[0]).modifiedAt).toBe("2026-11-14T01:00:00Z");
+  // FR-0106: 최신 수정 시각을 다시 받아 입력은 그대로 두고 다시 저장할 수 있다.
+  row.modifiedAt = "2026-11-14T02:00:00Z";
+  fireEvent.click(form.getByTestId("project-version-refresh"));
+  await waitFor(() =>
+    expect(form.queryByTestId("project-form-error")).not.toBeInTheDocument(),
+  );
+  expect(form.getByTestId("project-projectName")).toHaveValue("이름 바꿈");
+  fireEvent.click(form.getByTestId("project-save"));
+  await waitFor(() => expect(writes()).toHaveLength(2));
+  expect(body(writes()[1]).modifiedAt).toBe("2026-11-14T02:00:00Z");
+});
+
+it("budget 409 reloads the project so the next save sends the new modifiedAt", async () => {
+  const original = request.getMockImplementation()!;
+  let conflicted = false;
+  request.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (init?.method === "PUT" && url.endsWith("/budget") && !conflicted) {
+      conflicted = true;
+      row.modifiedAt = "2026-11-14T03:00:00Z";
+      return {
+        ok: false,
+        status: 409,
+        json: async () => ({
+          success: false,
+          message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+          errors: [],
+        }),
+      };
+    }
+    return original(url, init);
+  });
+  shell();
+  const detail = await openDetail();
+  fireEvent.click(await detail.findByTestId("project-budget-change"));
+  const dialog = within(await screen.findByTestId("project-command-dialog"));
+  fireEvent.change(dialog.getByTestId("project-budget-value"), {
+    target: { value: "900000" },
+  });
+  fireEvent.click(dialog.getByTestId("project-command-save"));
+  expect(await dialog.findByTestId("project-command-error")).toHaveTextContent(
+    "다른 사람이 먼저 바꿨습니다.",
+  );
+  await waitFor(() =>
+    expect(dialog.getByTestId("project-command-save")).toBeEnabled(),
+  );
+  fireEvent.click(dialog.getByTestId("project-command-save"));
+  await waitFor(() => expect(writes()).toHaveLength(2));
+  expect(body(writes()[1]).modifiedAt).toBe("2026-11-14T03:00:00Z");
+});
+
+it("리뷰: 409로 다시 읽어도 저장하지 않은 인원 계획 입력은 지우지 않는다", async () => {
+  const original = request.getMockImplementation()!;
+  let conflicted = false;
+  request.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (init?.method === "PUT" && url.endsWith("/budget") && !conflicted) {
+      conflicted = true;
+      row.modifiedAt = "2026-11-14T03:00:00Z";
+      return {
+        ok: false,
+        status: 409,
+        json: async () => ({
+          success: false,
+          message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+          errors: [],
+        }),
+      };
+    }
+    return original(url, init);
+  });
+  shell();
+  const detail = await openDetail();
+  fireEvent.click(await detail.findByTestId("project-detail-tab-plan"));
+  fireEvent.change(await detail.findByTestId("project-job-mm-be"), {
+    target: { value: "2.5" },
+  });
+  fireEvent.click(detail.getByTestId("project-detail-tab-basic"));
+  fireEvent.click(await detail.findByTestId("project-budget-change"));
+  const dialog = within(await screen.findByTestId("project-command-dialog"));
+  fireEvent.change(dialog.getByTestId("project-budget-value"), {
+    target: { value: "900000" },
+  });
+  fireEvent.click(dialog.getByTestId("project-command-save"));
+  expect(await dialog.findByTestId("project-command-error")).toHaveTextContent(
+    "다른 사람이 먼저 바꿨습니다.",
+  );
+  await waitFor(() =>
+    expect(dialog.getByTestId("project-command-save")).toBeEnabled(),
+  );
+  // 기본 정보는 새로 읽었다(다음 저장이 새 수정 시각을 보냄).
+  fireEvent.click(dialog.getByTestId("project-command-save"));
+  await waitFor(() => expect(writes()).toHaveLength(2));
+  expect(body(writes()[1]).modifiedAt).toBe("2026-11-14T03:00:00Z");
+  fireEvent.click(detail.getByTestId("project-detail-tab-plan"));
+  expect(await detail.findByTestId("project-job-mm-be")).toHaveValue("2.5");
+  expect(detail.getByText("저장하지 않은 변경이 있습니다")).toBeVisible();
+});
+
+it("a failed 진행으로 closes the confirm and shows the error on the basic tab", async () => {
+  const original = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    init?.method === "POST" && url.endsWith("/start")
+      ? {
+          ok: false,
+          status: 400,
+          json: async () => ({
+            success: false,
+            message: "입력 값을 확인해 주세요.",
+            errors: [],
+          }),
+        }
+      : original(url, init),
+  );
+  shell();
+  const detail = await openDetail();
+  fireEvent.click(await detail.findByTestId("project-detail-tab-history"));
+  fireEvent.click(await detail.findByTestId("project-more"));
+  fireEvent.click(detail.getByTestId("project-start"));
+  const confirm = within(await screen.findByTestId("project-start-confirm"));
+  fireEvent.click(confirm.getByText("진행으로"));
+  await waitFor(() =>
+    expect(screen.queryByTestId("project-start-confirm")).not.toBeInTheDocument(),
+  );
+  expect(await detail.findByTestId("project-detail-error")).toHaveTextContent(
+    "입력 값을 확인해 주세요.",
+  );
 });
 
 it("change history shows the Korean date of a UTC time", async () => {
@@ -649,6 +775,24 @@ it("change history shows the Korean date of a UTC time", async () => {
   fireEvent.click(await detail.findByTestId("project-detail-tab-history"));
   // 2026-11-14T16:30Z = 한국 2026-11-15 01:30
   expect(await detail.findByText("2026-11-15")).toBeVisible();
+});
+
+it("시안 UI-01: 계약 변경 이력 금액은 「1,000,000 원」, 빈 값은 「–」", async () => {
+  history = [
+    { changedAt: "2026-11-14T16:30:00Z", itemName: "계약", beforeValue: null, afterValue: "1000000", changedBy: "관리자" },
+    { changedAt: "2026-11-14T16:30:00Z", itemName: "팀비(월)", beforeValue: "50000", afterValue: "70000", changedBy: "관리자" },
+    { changedAt: "2026-11-14T16:30:00Z", itemName: "근무지", beforeValue: null, afterValue: "서울 중구", changedBy: "관리자" },
+  ];
+  shell();
+  const detail = await openDetail();
+  fireEvent.click(await detail.findByTestId("project-detail-tab-history"));
+  const first = within(await detail.findByTestId("project-history-0"));
+  expect(first.getByText("–")).toBeVisible();
+  expect(first.getByText("1,000,000 원")).toBeVisible();
+  const second = within(detail.getByTestId("project-history-1"));
+  expect(second.getByText("50,000 원")).toBeVisible();
+  expect(second.getByText("70,000 원")).toBeVisible();
+  expect(within(detail.getByTestId("project-history-2")).getByText("서울 중구")).toBeVisible();
 });
 
 it("registration form: mockup cards, required messages, budget default from the server rule", async () => {

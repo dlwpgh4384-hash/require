@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { formatDateTime } from "../../shared/time";
 import * as api from "./parts";
+import { historyValue } from "../../shared/historyValue";
 
 export function PartChangeHistoryPanel({
   partId,
@@ -64,8 +65,8 @@ export function PartChangeHistoryPanel({
                 >
                   <td>{formatDateTime(row.changedAt)}</td>
                   <td>{row.fieldName}</td>
-                  <td>{row.beforeValue ?? "–"}</td>
-                  <td>{row.afterValue ?? "–"}</td>
+                  <td>{historyValue(row.fieldName, row.beforeValue) ?? "–"}</td>
+                  <td>{historyValue(row.fieldName, row.afterValue) ?? "–"}</td>
                   <td>{row.changedBy}</td>
                 </tr>
               ))}

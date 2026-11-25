@@ -422,8 +422,8 @@ it("offers 자사 in the affiliation filter and the mockup detail options with a
     "placeholder",
     "이름 일부",
   );
-  // 서버 한도(100자)와 같게 입력 칸에서 막는다
-  expect(screen.getByLabelText("이름")).toHaveAttribute("maxLength", "100");
+  // 이름 칸 길이(DEV_NM 50자)·서버 한도와 같게 입력 칸에서 막는다
+  expect(screen.getByLabelText("이름")).toHaveAttribute("maxLength", "50");
   expect(screen.getByLabelText("직원 구분")).toBeVisible();
   expect(screen.queryByLabelText("보기")).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId("personal-advanced"));
@@ -717,6 +717,32 @@ it("시안 openPerson: 사람을 누르면 개발자 풀과 같은 상세 — [�
   } finally {
     stop();
   }
+});
+it("시안 wr(): 가동률 칸에 마우스를 올리면 「N달 ÷ M달」", async () => {
+  result.items[0] = { ...row(), operatingMonths: 9, employedMonths: 10, operatingRate: 90 };
+  mount();
+  await ready();
+  const cell = within(screen.getByTestId("list-row-D1")).getByText("90.0%");
+  expect(cell.closest("[title]")).toHaveAttribute("title", "9달 ÷ 10달");
+});
+it("엑셀 받기에 실패하면 주의(warn) 알림으로 보인다", async () => {
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (path: string, init?: unknown) =>
+    String(path).startsWith("/api/common/personal-cost-profits/excel?")
+      ? {
+          ok: false,
+          status: 500,
+          headers: new Headers(),
+          json: async () => ({ success: false, message: "엑셀 실패" }),
+        }
+      : base(path, init),
+  );
+  mount();
+  await ready();
+  fireEvent.click(screen.getByTestId("list-download"));
+  const toast = await screen.findByTestId("app-toast");
+  expect(toast).toHaveTextContent("엑셀 실패");
+  expect(toast).toHaveClass("app-toast-warn");
 });
 it("screen-body: 다른 업무 화면처럼 흰 카드로 감싸지 않는다", async () => {
   mount();

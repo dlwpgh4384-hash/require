@@ -143,7 +143,26 @@ public class BusinessPlanUploadForm implements UploadForm {
                     failure instanceof IllegalArgumentException ? failure.getMessage() : "입력값을 확인해 주세요.", "오류"));
             }
         }
-        return new Inspection(records, issues, records.size() - warned, warned, rows.size() - records.size(), rows.size());
+        int errors = rows.size() - records.size();
+        // 파일에 줄 자체가 없는 달도 빈칸과 같이 0(목표 없음)으로 올리고 「목표가 빈 달」로 알린다(SFR-118-04·Q-18-3,
+        // 예전 목표가 남아 새 계획과 섞이지 않게, 2026-11-24). 오류 줄이 있으면 그 달은 오류로 남긴다.
+        if (year != null && errors == 0) {
+            for (int m = 1; m <= 12; m++) {
+                var month = YearMonth.of(year, m);
+                if (counts.containsKey(month)) continue;
+                String ym = month.format(YM);
+                boolean isClosed = closed.contains(ym);
+                var before = existing.get(ym);
+                boolean changed = isClosed && registered && before != null
+                    && (before.revenueTarget().signum() != 0 || before.operatingProfitTarget().signum() != 0);
+                records.add(new PlanMonth(0, month, BigDecimal.ZERO, BigDecimal.ZERO, isClosed, changed));
+                String shown = month.format(SHOWN);
+                issues.add(new Issue(0, "연월", shown, EMPTY_TARGET, "경고"));
+                if (changed) issues.add(new Issue(0, "연월", shown, CLOSED_CHANGED, "경고"));
+                warned++;
+            }
+        }
+        return new Inspection(records, issues, records.size() - warned, warned, errors, rows.size());
     }
 
     public Map<Integer, String> apply(Inspection inspection, YearMonth month, long uploadId) {

@@ -58,6 +58,11 @@ class NetProfitStatementContributionsTest {
                 assertThat(v.sharePercent()).isNull();
             });
     }
+    @Test void barsKeepMockupOrderWhateverTheCodeRowOrder() {
+        var shuffled = List.of(CODES.get(3), CODES.get(2), CODES.get(0), CODES.get(1));
+        assertThat(NetProfitStatementContributions.of(List.of(), shuffled))
+            .extracting(v -> v.contractTypeCode()).containsExactly("TK", "MO", "DP");
+    }
     @Test void multipleProjectsOfSameTypeAreSummedBeforeShares() {
         var values = NetProfitStatementContributions.of(List.of(project("TK", 20, 10),
             project("TK", 10, 15), project("MO", 20, 5)), CODES);

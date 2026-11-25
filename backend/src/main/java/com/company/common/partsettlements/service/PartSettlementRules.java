@@ -44,10 +44,24 @@ public final class PartSettlementRules {
         return history.stream().filter(h -> table.equals(h.tableName) && target.equals(h.target)
             && item.equals(h.item) && !h.at.isBefore(cutoff)).min(order()).orElse(null);
     }
+    /**
+     * 정산 대상 파트: 본사가 아니고 그 달 기준이 있으며, 그 달에 하루라도 사용 중이었던 파트(달 중간에 중지·다시 사용해도 그 달은 대상,
+     * 2026-11-24 사용자 결정). 월 마감 점검(PartSettlementCloseMapper.selectTargets)과 영업 파트 이익금 탭이 같은 규칙을 쓴다.
+     */
     public static boolean closeTarget(Part part, YearMonth month, List<History> history) {
         if ("Y".equals(part.hqYn) || part.distributionRate == null) return false;
-        var later = next(history,"TB_BS_PART",part.partId,"사용 여부",cutoff(month.atEndOfMonth()));
-        return "Y".equals(later == null ? part.useYn : later.before);
+        return usedDuring(part, month, history);
+    }
+    public static boolean usedDuring(Part part, YearMonth month, List<History> history) {
+        Instant start = month.atDay(1).atStartOfDay(KOREA).toInstant(), end = cutoff(month.atEndOfMonth());
+        var atStart = next(history,"TB_BS_PART",part.partId,"사용 여부",start);
+        if ("Y".equals(atStart == null ? part.useYn : atStart.before)) return true;
+        var atEnd = next(history,"TB_BS_PART",part.partId,"사용 여부",end);
+        if ("Y".equals(atEnd == null ? part.useYn : atEnd.before)) return true;
+        // 달 안에서 중지했다가 다시 쓰고 또 중지한 경우처럼, 그 달 안의 바뀜 중 하나라도 「사용」이었으면 대상.
+        return history.stream().anyMatch(h -> "TB_BS_PART".equals(h.tableName) && part.partId.equals(h.target)
+            && "사용 여부".equals(h.item) && !h.at.isBefore(start) && h.at.isBefore(end)
+            && ("Y".equals(h.before) || "Y".equals(h.after)));
     }
     public record Membership(String partId, String warning) {}
     public static Membership membership(Input input, YearMonth month, List<Part> parts, List<History> history) {

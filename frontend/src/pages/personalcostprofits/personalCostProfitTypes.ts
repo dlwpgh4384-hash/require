@@ -38,6 +38,9 @@ export interface PersonalCostProfitRow {
   employeeTypeName: string;
   joinDate: string | null;
   operatingRate: number;
+  /** 식-96 도움말: 투입된 달 수 ÷ 재직한 달 수. */
+  operatingMonths?: number;
+  employedMonths?: number;
   mm: number;
   unitPrice: number;
   /** 민감 열(시안 SENS03): 권한이 없으면 서버가 뺀다. */

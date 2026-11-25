@@ -162,6 +162,19 @@ class CommonUploadControllerTest {
         verify(clients,never()).updateClient(any()); assertThat(writes).isEmpty();
     }
     @Test
+    @DisplayName("business: 하이픈 없이 적은 사업자번호도 000-00-00000으로 맞춰 등록 여부·파일 안 중복을 검사한다")
+    void hyphenlessBusinessNumberIsNormalizedBeforeEveryCheck() throws Exception {
+        when(clients.selectBusinessOwner("123-45-67890")).thenReturn("기존 거래처");
+        check(workbook(List.of(customer("1234567890")))).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.errorCount").value(1));
+        check(workbook(List.of(customer("9876543210"),customer("987-65-43210")))).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.errorCount").value(2));
+        check(workbook(List.of(customer("98765432")))).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.errorCount").value(1));
+        check(workbook(List.of(customer("9876543210")))).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.errorCount").value(0));
+    }
+    @Test
     @DisplayName("side-effect: 대응 표기는 TB_SY_UPLD_ERR 경고이며 TB_SY_UPLD 결과와 재조회가 일치")
     void mappedTextWarnsAndOriginalWarningSurvivesGet() throws Exception {
         var mapped=new CodeTextRow(); mapped.groupId="CLNT_TYPE"; mapped.code="CUST"; mapped.codeName="고객사";

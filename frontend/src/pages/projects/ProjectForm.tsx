@@ -9,7 +9,9 @@ import {
   HQ_PART,
   ProjectRequestError,
   defaultBudget,
+  getCommonProject,
   getCommonProjectBudgetRule,
+  isProjectConflict,
   postCommonProject,
   projectFailure,
   putCommonProject,
@@ -76,6 +78,9 @@ export function ProjectForm({
   const saving = useRef(false);
   const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState("");
+  /** FR-0106: 보낼 수정 시각. 409면 [최신 버전 불러오기]로 새 값을 받는다(입력은 그대로). */
+  const [version, setVersion] = useState(project?.modifiedAt ?? null);
+  const [conflict, setConflict] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const original = useRef(JSON.stringify(draft));
   const dirty = original.current !== JSON.stringify(draft);
@@ -216,7 +221,7 @@ export function ProjectForm({
       teamExpenseAmount: amount(draft.teamExpenseAmount),
       projectExpenseAmount: amount(draft.projectExpenseAmount),
     };
-    if (project) body.modifiedAt = project.modifiedAt ?? null;
+    if (project) body.modifiedAt = version;
     if (!project) {
       body.contractTypeCode = draft.contractTypeCode;
       body.statusCode = draft.statusCode;
@@ -230,6 +235,7 @@ export function ProjectForm({
     saving.current = true;
     setBusy(true);
     setError("");
+    setConflict(false);
     try {
       const saved = project ? await putCommonProject(project.projectId, body) : await postCommonProject(body);
       original.current = JSON.stringify(draft);
@@ -237,6 +243,7 @@ export function ProjectForm({
       onSaved(saved);
     } catch (e) {
       setError(projectFailure(e));
+      setConflict(isProjectConflict(e));
       if (e instanceof ProjectRequestError) setErrors(Object.fromEntries(e.errors.map((f) => [f.field, f.message])));
     } finally {
       saving.current = false;
@@ -468,6 +475,25 @@ export function ProjectForm({
       {error && (
         <div role="alert" className="project-error" data-testid="project-form-error">
           {error}
+          {conflict && project && (
+            <button
+              type="button"
+              className="ls-btn ls-btn-sm"
+              data-testid="project-version-refresh"
+              disabled={busy}
+              onClick={() => {
+                void getCommonProject(project.projectId)
+                  .then((latest) => {
+                    setVersion(latest.modifiedAt ?? null);
+                    setConflict(false);
+                    setError("");
+                  })
+                  .catch((reason) => setError(projectFailure(reason)));
+              }}
+            >
+              최신 버전 불러오기 (입력 유지)
+            </button>
+          )}
         </div>
       )}
       <p className="project-note">

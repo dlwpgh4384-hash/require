@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useSavedYear } from "../userpreferences/useSavedYear";
 import { createPortal } from "react-dom";
 import {
   ConfirmDialog,
@@ -117,7 +118,11 @@ export function AssignmentPage({
   const host = useAssignmentTitleHost();
   const presentation = useListPresentation();
   const currentYear = Number(koreanToday().slice(0, 4));
-  const [year, setYear] = useState(currentYear);
+  // 고른 연도를 기억한다(FR-0105, 2026-11-24 사용자 결정).
+  const [year, setYear] = useSavedYear("UI-12", currentYear, 1, currentYear + 1, () => {
+    setPage(1);
+    setDetail(null);
+  });
   const [filter, setFilter] = useState(emptyFilter);
   const [applied, setApplied] = useState(emptyFilter);
   const [rows, setRows] = useState<Assignment[] | null>(null);
@@ -359,7 +364,9 @@ export function AssignmentPage({
       );
     } catch (reason) {
       setBulk(false);
-      toast(projectFailure(reason), "warn");
+      // 다른 사람이 먼저 바꿨으면(409) 목록을 다시 읽어 새 수정 시각을 받는다.
+      if (isAssignmentConflict(reason)) conflict(reason);
+      else toast(projectFailure(reason), "warn");
     } finally {
       setBusy(false);
     }
@@ -379,6 +386,9 @@ export function AssignmentPage({
     return () => window.removeEventListener("keydown", handler);
   }, [bulk]);
   const cancelAssignments = async () => {
+    // 확인 창 단추는 보내는 동안 막히지 않으므로 두 번 눌러도 한 번만 보낸다.
+    if (busyRef.current) return;
+    busyRef.current = true;
     const count = targets.length;
     setBusy(true);
     try {
@@ -389,12 +399,15 @@ export function AssignmentPage({
       );
     } catch (reason) {
       setCancelling(false);
-      toast(projectFailure(reason), "warn");
+      if (isAssignmentConflict(reason)) conflict(reason);
+      else toast(projectFailure(reason), "warn");
     } finally {
       setBusy(false);
     }
   };
   const dropCandidate = async (c: AssignmentCandidate) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       await postCommonAssignmentCandidateRemove(c);

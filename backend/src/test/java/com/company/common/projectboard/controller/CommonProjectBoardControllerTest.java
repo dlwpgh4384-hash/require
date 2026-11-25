@@ -50,6 +50,7 @@ class CommonProjectBoardControllerTest {
     @MockBean CalculationRuleService definitions;
     @MockBean PlatformTransactionManager transactions;
     @MockBean com.company.common.projects.service.ProjectStageService stages;
+    @MockBean com.company.common.projectcostanalyses.service.CommonProjectCostAnalysisService costAnalyses;
     final LocalDate today = LocalDate.of(2026, 11, 15);
     List<ProjectBoardSource> sources;
 
@@ -89,6 +90,15 @@ class CommonProjectBoardControllerTest {
         source.actualProgress = new BigDecimal("50");
         sources.add(source);
         return source;
+    }
+
+    @org.junit.jupiter.api.Test void turnkeyCostUsageIsTheCostAnalysisBudgetUsageRate() throws Exception {
+        // 식-75: 원가 사용률은 원가 분석(UI-04)의 예산 소진율과 같은 값(마감 전 달 원가 포함, 2026-11-24 사용자 결정).
+        source("shared", "TK");
+        org.mockito.Mockito.when(costAnalyses.budgetUsageRates(2026, 11)).thenReturn(java.util.Map.of("shared", new BigDecimal("23.46")));
+        var row = board().path("items").get(0);
+        assertThat(row.path("costUsageRate").decimalValue()).isEqualByComparingTo("23.5");
+        assertThat(row.path("costProgressGap").decimalValue()).isEqualByComparingTo("-26.5");
     }
 
     com.fasterxml.jackson.databind.JsonNode board(String... params) throws Exception {

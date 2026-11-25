@@ -195,6 +195,26 @@ class CommonProjectCostAnalysisControllerTest {
         when(periods.selectClosedMonths()).thenReturn(List.of("202512", "202601"));
         mvc.perform(request("")).andExpect(jsonPath("$.data.monthlyMarginNotice").value(org.hamcrest.Matchers.nullValue()));
     }
+    @Test void openMonthWithoutPayrollLeavesThatMonthMarginEmptyInTheMonthlyDetail() throws Exception {
+        // 상세 월별 원가 표도 목록 월간 마진과 같이: 급여 없는 작업중 달(202601)의 마진율은 비운다
+        when(periods.selectClosedMonths()).thenReturn(List.of("202512"));
+        mvc.perform(request("/P/monthly-costs")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[1].yearMonth").value("202601"))
+            .andExpect(jsonPath("$.data.items[1].revenue").isNumber())
+            .andExpect(jsonPath("$.data.items[1].marginRate").value(org.hamcrest.Matchers.nullValue()));
+    }
+    @Test void projectEditedAfterTheBaseMonthKeepsItsAmountsWithoutAmountHistory() throws Exception {
+        // 이름만 고쳐 수정 시각이 기준월 뒤여도 금액 이력이 없으면 지금 금액이 그때 금액이다
+        var before = json.readTree(mvc.perform(request("")).andReturn().getResponse().getContentAsString()).path("data");
+        var p = project("P","MO");
+        when(mapper.selectProjects()).thenReturn(List.of(new Project(p.projectId(),p.projectName(),p.contractTypeCode(),p.contractTypeName(),
+            p.statusCode(),p.startDate(),p.endDate(),p.originalAmount(),p.contractAmount(),p.budget(),p.team(),p.expense(),p.plannedMm(),
+            java.time.LocalDate.of(2026,2,10))));
+        when(mapper.selectHistory()).thenReturn(List.of(new History("P","ETC","프로젝트명","옛 이름","프로젝트 P",java.time.LocalDate.of(2026,2,10))));
+        var after = json.readTree(mvc.perform(request("")).andReturn().getResponse().getContentAsString()).path("data");
+        assertThat(after.path("items").get(0).path("contractAmount").decimalValue()).isEqualByComparingTo("1250");
+        assertThat(after).isEqualTo(before);
+    }
     @Test void periodMustBeBetweenCashBaseAndLatestMonth() throws Exception {
         // 마감 202512·202601 → 가장 최근 달 202602
         mvc.perform(request("").param("baseMonth","2")).andExpect(status().isOk());

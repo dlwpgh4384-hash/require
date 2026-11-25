@@ -7,7 +7,7 @@ import com.company.common.common.BillingCalculationRules;
 import com.company.common.projects.mapper.ProjectMapper;
 import com.company.common.support.service.*;
 import java.nio.file.Path;
-import java.util.stream.Collectors;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -42,6 +42,31 @@ public class BillDunningService {
         return deliver(id,false);
     }
 
+    /**
+     * 미수 알림을 받을 사람 이름(보내기와 같은 규칙: 1단계 PM이 없으면 2단계 받는 사람). 목록 「다음 알림」 칸에 쓴다
+     * (시안 「날짜 n단계 → 받는 사람」, 2026-11-24 사용자 결정).
+     */
+    public List<String> recipientNames(String projectId, int step) {
+        String month=calendar.toDatabaseMonth(calendar.currentMonth());
+        var recipients=mapper.recipients(new RecipientFilter(projectId,month,step));
+        if (recipients.isEmpty() && step==1) recipients=mapper.recipients(new RecipientFilter(projectId,month,2));
+        return recipients.stream().map(r -> r.name()).toList();
+    }
+
+    /** 받는 사람 설명이 300자(TB 칸 길이)를 넘으면 앞사람부터 넣고 「외 n명」으로 줄인다(2026-11-24 사용자 결정). */
+    static String fitDescription(List<String> people, String tail) {
+        String full=String.join(", ",people)+tail;
+        if (full.codePointCount(0,full.length())<=300) return full;
+        for (int keep=people.size()-1;keep>=1;keep--) {
+            String text=String.join(", ",people.subList(0,keep))+" 외 "+(people.size()-keep)+"명"+tail;
+            if (text.codePointCount(0,text.length())<=300) return text;
+        }
+        String first=people.get(0);
+        String suffix=" 외 "+(people.size()-1)+"명"+tail;
+        int room=Math.max(1,300-suffix.codePointCount(0,suffix.length())-1);
+        return first.substring(0,first.offsetByCodePoints(0,Math.min(room,first.codePointCount(0,first.length()))))+"…"+suffix;
+    }
+
     private SendResult deliver(String id, boolean resend) {
         if (id==null || id.isBlank() || id.length()>20 || id.chars().anyMatch(Character::isISOControl))
             throw CodeFailure.invalid("billId","청구번호를 확인해 주세요.");
@@ -68,11 +93,8 @@ public class BillDunningService {
         if (recipients.isEmpty()) throw CodeFailure.invalid("delivery","현재 단계의 받는 사람이 없습니다.");
         // 메일 주소가 없거나 틀린 사람이 있어도 다른 사람에게는 보내고(시스템 알림은 모두), 이력에 「메일 없음」을 남긴다.
         var mailable=recipients.stream().filter(BillLocalMailbox::deliverable).toList();
-        String description=recipients.stream().map(r -> r.name()+" ("+r.userId()+")"
-                +(BillLocalMailbox.deliverable(r)?"":" (메일 없음)"))
-            .collect(Collectors.joining(", "))+(memo==null?"":" ("+memo+")");
-        if (description.codePointCount(0,description.length())>300)
-            throw CodeFailure.invalid("delivery","수신자 설명이 저장 범위를 초과합니다.");
+        String description=fitDescription(recipients.stream().map(r -> r.name()+" ("+r.userId()+")"
+                +(BillLocalMailbox.deliverable(r)?"":" (메일 없음)")).toList(), memo==null?"":" ("+memo+")");
         String content=content(bill,step,resend,balance);
         Path accepted=mailable.isEmpty()?null:mailbox.deliver(mailable,content);
         if (accepted!=null && TransactionSynchronizationManager.isSynchronizationActive()) {

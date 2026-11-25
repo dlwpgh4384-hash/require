@@ -49,6 +49,19 @@ export function RoleCopyDialog({
     if (dirty) setClosing(true);
     else onClose();
   };
+  // FR-0106: 틀린 칸 중 화면 순서로 첫 칸에 커서를 옮긴다.
+  const focusFirst = (invalid: Record<string, string>) => {
+    const ids: Record<string, string> = {
+      sourceRoleId: "role-copy-source",
+      roleName: "role-copy-name",
+      dataScopeCd: "role-copy-scope",
+    };
+    const order = adding
+      ? ["roleName", "dataScopeCd"]
+      : ["sourceRoleId", "roleName"];
+    const first = order.find((field) => invalid[field]);
+    if (first) document.getElementById(ids[first])?.focus();
+  };
   const submit = async () => {
     if (lock.current) return;
     const source = roles.find((role) => role.roleId === sourceId);
@@ -62,7 +75,10 @@ export function RoleCopyDialog({
     if (!adding && !source)
       invalid.sourceRoleId = "복사할 역할을 선택해 주세요.";
     setErrors(invalid);
-    if (Object.keys(invalid).length) return;
+    if (Object.keys(invalid).length) {
+      focusFirst(invalid);
+      return;
+    }
     lock.current = true;
     setBusy(true);
     setFailure("");
@@ -70,10 +86,10 @@ export function RoleCopyDialog({
       onSaved(
         await api.postCommonRoleCopy(
           adding
-            ? { roleName: name, dataScopeCd: scope }
+            ? { roleName: name.trim(), dataScopeCd: scope }
             : {
                 sourceRoleId: sourceId,
-                roleName: name,
+                roleName: name.trim(),
                 dataScopeCd: source!.dataScopeCd,
               },
         ),

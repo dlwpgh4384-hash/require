@@ -428,6 +428,17 @@ it("이름 공백과 51 Unicode code point는 거부, 50 code point는 그대로
   await screen.findByTestId("management-row-m031");
   expect(JSON.parse(String(writes()[0][1].body)).menuNm).toBe("😀".repeat(50));
 });
+it("시안: 메뉴 이름 앞뒤 공백은 빼고 등록한다", async () => {
+  await mount();
+  await open();
+  validChild();
+  fireEvent.change(screen.getByLabelText("메뉴 이름 *"), {
+    target: { value: "  새 합성 메뉴  " },
+  });
+  fireEvent.click(screen.getByTestId("menu-registration-submit"));
+  await screen.findByTestId("management-row-m031");
+  expect(JSON.parse(String(writes()[0][1].body)).menuNm).toBe("새 합성 메뉴");
+});
 it("서버 중복 errors 배열을 표시하고 선택값과 창을 보존", async () => {
   failCreate = true;
   await mount();

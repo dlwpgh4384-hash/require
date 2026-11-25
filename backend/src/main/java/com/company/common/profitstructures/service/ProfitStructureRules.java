@@ -18,9 +18,10 @@ public final class ProfitStructureRules {
     public static boolean projectedRoleAllows(Set<String> roles) {
         return roles != null && roles.stream().anyMatch(Set.of("FIN", "EXEC", "ADMIN")::contains);
     }
+    /** 비율(%)은 소수 첫째 자리 반올림(식-36 「소수 첫째 자리 반올림」·시안, 2026-11-24 사용자 결정). 금액 버림(SFR-006-03)과 다름. */
     public static BigDecimal ratio(BigDecimal numerator, BigDecimal denominator) {
         return numerator == null || denominator == null || denominator.signum() == 0 ? null
-            : numerator.multiply(BigDecimal.valueOf(100)).divide(denominator, 1, RoundingMode.DOWN);
+            : numerator.multiply(BigDecimal.valueOf(100)).divide(denominator, 1, RoundingMode.HALF_UP);
     }
     public static BigDecimal sum(List<Month> months, Function<Snapshot, BigDecimal> field) {
         BigDecimal total = ZERO;

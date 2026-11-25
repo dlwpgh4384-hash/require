@@ -21,6 +21,7 @@ import {
   type DeveloperStatusList,
   type DeveloperChange,
 } from "./developers";
+import { historyValue } from "../../shared/historyValue";
 
 type Action = {
   kind: "register" | "end" | "return" | "retire";
@@ -440,8 +441,8 @@ export function DeveloperDetail({
                     >
                       <td>{formatDateTime(c.changedAt).slice(0, 10)}</td>
                       <td>{c.fieldName}</td>
-                      <td>{c.beforeValue || "–"}</td>
-                      <td>{c.afterValue || "–"}</td>
+                      <td>{historyValue(c.fieldName, c.beforeValue) || "–"}</td>
+                      <td>{historyValue(c.fieldName, c.afterValue) || "–"}</td>
                       <td>{c.changedBy}</td>
                     </tr>
                   )),

@@ -11,6 +11,7 @@ import "@testing-library/jest-dom/vitest";
 import { DeveloperPage } from "./DeveloperPage";
 import { DeveloperForm } from "./DeveloperForm";
 import { DeveloperDetail } from "./DeveloperDetail";
+import { DetailPanel } from "../../shared/list/DetailPanel";
 import { requestDeveloperAction } from "./developerRequest";
 import {
   developerPayload,
@@ -875,4 +876,112 @@ it("다른 화면의 [사용 중지] 요청은 이 화면의 확인 창으로 �
   const box = await screen.findByTestId("developer-use-confirm-dialog");
   expect(box).toHaveTextContent("1명의 사용을 중지할까요?");
   expect(writes()).toHaveLength(0);
+});
+it("리뷰: Ctrl+S는 숨은 화면 탭의 개발자 폼을 저장하지 않는다(공통 단축키 훅)", async () => {
+  render(
+    <div hidden>
+      <DeveloperForm options={options} onSaved={vi.fn()} onCancel={vi.fn()} />
+    </div>,
+  );
+  fireEvent.change(screen.getByTestId("developer-name"), {
+    target: { value: "숨은 탭" },
+  });
+  fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  // 저장을 시도했다면 필수 칸 검사 문구가 떴을 것이다.
+  expect(screen.queryByText("직원구분을 입력해 주세요.")).toBeNull();
+  expect(writes()).toHaveLength(0);
+});
+it("리뷰: 보이는 개발자 폼은 Ctrl+S로 저장한다", async () => {
+  const saved = vi.fn();
+  render(
+    <DeveloperForm developer={row} options={options} onSaved={saved} onCancel={vi.fn()} />,
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("developer-area-2")).toHaveValue("1168010100"),
+  );
+  fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+  await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+});
+it("리뷰: 다른 숨은 탭에 상세 패널이 열려 있어도 보이는 개발자 폼은 Ctrl+S로 저장한다", async () => {
+  const saved = vi.fn();
+  render(
+    <>
+      <div hidden>
+        <DetailPanel title="숨은 탭 상세" onClose={vi.fn()} />
+      </div>
+      <DeveloperForm developer={row} options={options} onSaved={saved} onCancel={vi.fn()} />
+    </>,
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("developer-area-2")).toHaveValue("1168010100"),
+  );
+  screen.getByTestId("developer-name").focus();
+  // fireEvent가 false를 돌려주면 브라우저 기본 동작(페이지 저장)을 막은 것이다.
+  const notPrevented = fireEvent.keyDown(screen.getByTestId("developer-name"), {
+    key: "s",
+    ctrlKey: true,
+  });
+  expect(notPrevented).toBe(false);
+  await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+});
+it("리뷰: 409이면 입력을 지우지 않고 [최신 버전 불러오기]로 새 수정 시각을 받아 다시 저장한다(FR-0106)", async () => {
+  const base = request.getMockImplementation()!;
+  let conflict = true;
+  request.mockImplementation(async (path: string, init?: RequestInit) =>
+    conflict && init?.method === "PUT" && path === "/api/common/developers/d"
+      ? failure("modifiedAt", 409)
+      : base(path, init),
+  );
+  const saved = vi.fn();
+  render(
+    <DeveloperForm developer={row} options={options} onSaved={saved} onCancel={vi.fn()} />,
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("developer-area-2")).toHaveValue("1168010100"),
+  );
+  fireEvent.change(screen.getByTestId("developer-name"), {
+    target: { value: "내 입력" },
+  });
+  fireEvent.click(screen.getByTestId("developer-save"));
+  const refresh = await screen.findByTestId("developer-version-refresh");
+  expect(screen.getByTestId("developer-name")).toHaveValue("내 입력");
+  row = { ...row, modifiedAt: "2026-11-16T00:00:00Z" };
+  conflict = false;
+  fireEvent.click(refresh);
+  await waitFor(() =>
+    expect(screen.queryByTestId("developer-version-refresh")).toBeNull(),
+  );
+  fireEvent.click(screen.getByTestId("developer-save"));
+  await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+  const puts = writes().filter((c) => (c[1] as RequestInit).method === "PUT");
+  const body = JSON.parse(String((puts[puts.length - 1][1] as RequestInit).body));
+  expect(body.name).toBe("내 입력");
+  expect(body.modifiedAt).toBe("2026-11-16T00:00:00Z");
+});
+it("리뷰: 폼 위 안내 띠는 시안처럼 info 아이콘이 있는 공통 Banner", async () => {
+  render(<DeveloperForm options={options} onSaved={vi.fn()} onCancel={vi.fn()} />);
+  const banner = screen.getByTestId("banner-info");
+  expect(banner).toHaveTextContent("연락처는 받지 않습니다.");
+  expect(banner.querySelector("svg")).not.toBeNull();
+});
+it("리뷰: 목록 엑셀 내려받기 알림은 시안처럼 안내(info) 「엑셀 파일을 만들었습니다 (조회 결과 n건).」", async () => {
+  const base = request.getMockImplementation()!;
+  request.mockImplementation(async (path: string, init?: RequestInit) =>
+    path.startsWith("/api/common/developers/excel")
+      ? {
+          ok: true,
+          status: 200,
+          headers: new Headers(),
+          blob: async () => new Blob(["x"]),
+        }
+      : base(path, init),
+  );
+  vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:x", revokeObjectURL: () => {} }));
+  render(<DeveloperPage />);
+  await screen.findByText("김개발");
+  fireEvent.click(screen.getByTestId("list-download"));
+  const toast = await screen.findByTestId("app-toast");
+  expect(toast).toHaveTextContent("엑셀 파일을 만들었습니다 (조회 결과 1건).");
+  expect(toast).toHaveClass("app-toast-info");
 });

@@ -124,8 +124,8 @@ export function PersonalCostProfitFilters({
           className="ls-in personal-cost-profit-name-in"
           data-testid="personal-name"
           placeholder="이름 일부"
-          // 서버도 100자 넘으면 「이름은 100자 이내로 입력해 주세요.」
-          maxLength={100}
+          // 이름 칸 길이(TB_HR_DEV.DEV_NM 50자). 서버도 50자 넘으면 「이름은 50자 이내로 입력해 주세요.」
+          maxLength={50}
           value={value.name ?? ""}
           onChange={(event) =>
             onChange({ ...value, name: event.target.value || undefined })

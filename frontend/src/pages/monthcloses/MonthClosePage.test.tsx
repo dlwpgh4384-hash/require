@@ -384,9 +384,9 @@ it("one confirmation dialog permits remaining warnings and sends only the nullab
   expect(await screen.findByTestId("month-close-history-0")).toHaveTextContent(
     "영업 파트 정산",
   );
-  // 저장 결과를 그대로 쓴다: 점검·기간 기준을 다시 읽지 않고 이력만 다시 읽는다.
+  // 저장 결과를 그대로 쓴다: 점검은 다시 읽지 않고 이력만 다시 읽는다. 기간 기준은 열린 탭들이 새로 읽도록 한 번 다시 읽는다(2026-11-24).
   expect(detailReads()).toHaveLength(detailCount);
-  expect(preferenceReads()).toHaveLength(preferenceCount);
+  await waitFor(() => expect(preferenceReads()).toHaveLength(preferenceCount + 1));
   expect(historyReads()).toHaveLength(2);
   expect(screen.getByRole("combobox", { name: "조회 월" })).toHaveValue(
     "2026-10",
@@ -587,6 +587,10 @@ it("blank reason is focused and never sent", async () => {
   mount();
   const dialog = await openReopen();
   const submit = await readySubmit(dialog);
+  // 오류가 없을 때는 없는 오류 칸을 가리키지 않는다.
+  expect(within(dialog).getByLabelText("해제 사유 *")).not.toHaveAttribute(
+    "aria-describedby",
+  );
   fireEvent.change(within(dialog).getByLabelText("해제 사유 *"), {
     target: { value: "   " },
   });
@@ -595,6 +599,9 @@ it("blank reason is focused and never sent", async () => {
     await within(dialog).findByText("해제 사유를 입력해 주세요."),
   ).toBeInTheDocument();
   expect(within(dialog).getByLabelText("해제 사유 *")).toHaveFocus();
+  expect(within(dialog).getByLabelText("해제 사유 *")).toHaveAccessibleDescription(
+    "해제 사유를 입력해 주세요.",
+  );
   expect(writes()).toHaveLength(0);
 });
 it("server field failure retains reopen reason and focuses the field", async () => {
@@ -640,6 +647,9 @@ it.each([
 ])(
   "check %s saves the target screen's period shape before navigating to %s",
   async (index, target) => {
+    const signals: string[] = [];
+    const listener = (event: Event) => signals.push((event as CustomEvent).detail.screenId);
+    window.addEventListener("period-preference-changed", listener);
     mount();
     await ready();
     fireEvent.click(screen.getByTestId(`month-close-visit-${index}`));
@@ -656,6 +666,9 @@ it.each([
     expect(JSON.parse(JSON.parse(String(preference![1].body)).prefVal)).toEqual(
       target === "UI-19" ? { year: 2026, month: 10 } : { year: 2026 },
     );
+    // 이미 열린 탭도 바뀌게 알린다(2026-11-24 사용자 결정).
+    expect(signals).toEqual([target]);
+    window.removeEventListener("period-preference-changed", listener);
   },
 );
 it("double clicking 확인하기 navigates only once", async () => {

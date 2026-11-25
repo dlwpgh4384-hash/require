@@ -428,7 +428,7 @@ it("puts one 엑셀 다운로드 in the title bar, sends no columns and reports 
     name: "엑셀 다운로드",
   });
   fireEvent.click(button);
-  expect(await screen.findByTestId("profit-toast")).toHaveTextContent("엑셀 파일을 내려받았습니다.");
+  expect(await screen.findByTestId("profit-toast")).toHaveTextContent("엑셀 파일을 만들었습니다.");
   const call = request.mock.calls.find(([url]) =>
     String(url).startsWith("/api/common/profit-structures/excel?"),
   );

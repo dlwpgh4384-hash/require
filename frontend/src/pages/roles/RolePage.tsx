@@ -1,5 +1,10 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { ConfirmDialog, Toast } from "../../shared/feedback/Dialog";
+import { mergeKeepingEdits } from "../../shared/mergeKeepingEdits";
+import {
+  ConfirmDialog,
+  Toast,
+  type ToastKind,
+} from "../../shared/feedback/Dialog";
 import { feedbackMessages } from "../../shared/feedback/messages";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { getCommonUserOptions } from "../commonops/userOptions";
@@ -26,6 +31,8 @@ export function RolePage() {
   const [draft, setDraft] = useState<api.RoleUpdate | null>(null);
   const [listFailure, setListFailure] = useState("");
   const [failure, setFailure] = useState("");
+  /** 409 뒤 [최신 버전 불러오기 (입력 유지)] 단추를 보일지(2026-11-24 사용자 결정). */
+  const [conflict, setConflict] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [revision, setRevision] = useState(0);
   const [listRevision, setListRevision] = useState(0);
@@ -34,7 +41,12 @@ export function RolePage() {
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const root = useRef<HTMLElement>(null);
-  const [notice, setNotice] = useState("");
+  // 시안 toast(msg, kind): 저장·추가는 ok, 취소·바꾼 것 없음은 info, 동시 수정은 warn.
+  const [notice, setNoticeState] = useState<{ text: string; kind: ToastKind }>(
+    { text: "", kind: "ok" },
+  );
+  const setNotice = (text: string, kind: ToastKind = "ok") =>
+    setNoticeState({ text, kind });
   const [pending, setPending] = useState<(() => void) | null>(null);
   const [history, setHistory] = useState<api.RoleChange[] | null>(null);
   const [historyFailure, setHistoryFailure] = useState("");
@@ -135,6 +147,26 @@ export function RolePage() {
         : {},
     );
   };
+  /** 내가 바꾼 권한 칸은 그대로(변경 시각만 최신), 안 바꾼 칸은 최신 값으로 합친다. */
+  const reloadKeepingInput = async () => {
+    if (!selected || !settings || !draft) return;
+    try {
+      const latest = await api.getCommonRole(selected);
+      const original = api.roleDraft(settings);
+      const fresh = api.roleDraft(latest);
+      setDraft({
+        ...fresh,
+        dataScopeCd: draft.dataScopeCd !== original.dataScopeCd ? draft.dataScopeCd : fresh.dataScopeCd,
+        snstvViewYn: draft.snstvViewYn !== original.snstvViewYn ? draft.snstvViewYn : fresh.snstvViewYn,
+        menuAuths: mergeKeepingEdits(draft.menuAuths, original.menuAuths, fresh.menuAuths, (row) => row.menuId),
+      });
+      setSettings(latest);
+      setConflict(false);
+      setFailure("");
+    } catch (error) {
+      failed(error);
+    }
+  };
   const persist = async (confirmedAffectedUserIds: string[]) => {
     if (!draft || !settings) return;
     // 서버는 바뀐 항목마다 이력 1줄(데이터 범위·민감 항목·메뉴별 동작)을 남긴다. 시안 문구에 그 줄 수를 보여 준다.
@@ -142,6 +174,8 @@ export function RolePage() {
     const saved = await api.putCommonRole(selected, {
       ...draft,
       confirmedAffectedUserIds,
+      // FR-0106: 읽었을 때의 변경 시각. 그 사이 다른 사람이 저장했으면 서버가 409로 막는다.
+      modifiedAt: settings.modifiedAt ?? null,
     });
     setImpact(null);
     setSettings(saved);
@@ -158,12 +192,13 @@ export function RolePage() {
   const save = async (confirmed?: string[]) => {
     if (lock.current || !settings || !draft) return;
     if (!confirmed && !dirty) {
-      setNotice("바꾼 내용이 없습니다.");
+      setNotice("바꾼 내용이 없습니다.", "info");
       return;
     }
     lock.current = true;
     setBusy(true);
     setFailure("");
+    setConflict(false);
     setErrors({});
     try {
       if (confirmed) await persist(confirmed);
@@ -176,8 +211,15 @@ export function RolePage() {
         else await persist([]);
       } else await persist([]);
     } catch (error) {
-      failed(error);
       setImpact(null);
+      if (error instanceof api.RoleRequestError && error.status === 409) {
+        // 다른 사람이 먼저 바꿨으면 안내하고, 입력은 둔 채 [최신 버전 불러오기 (입력 유지)]를 보인다(2026-11-24 사용자 결정).
+        setNotice(error.message, "warn");
+        setFailure(error.message);
+        setConflict(true);
+        return;
+      }
+      failed(error);
       if (
         error instanceof api.RoleRequestError &&
         error.errors.some((item) => item.field === "confirmedAffectedUserIds")
@@ -198,13 +240,13 @@ export function RolePage() {
   const cancel = () => {
     if (!settings) return;
     if (!dirty) {
-      setNotice("바꾼 내용이 없습니다.");
+      setNotice("바꾼 내용이 없습니다.", "info");
       return;
     }
     // 「변경 내용을 버릴까요?」 확인(사용자 결정)은 그대로 두고, 되돌린 뒤 시안 알림을 띄운다.
     guard(() => {
       setDraft(api.roleDraft(settings));
-      setNotice("변경을 취소했습니다.");
+      setNotice("변경을 취소했습니다.", "info");
     });
   };
   const stop = async () => {
@@ -526,6 +568,19 @@ export function RolePage() {
       {failure && (
         <div role="alert" data-testid="role-failure" className="field-error">
           {failure}
+          {conflict && (
+            <>
+              {" "}
+              <button
+                type="button"
+                className="ls-btn ls-btn-sm"
+                data-testid="role-version-refresh"
+                onClick={() => void reloadKeepingInput()}
+              >
+                최신 버전 불러오기 (입력 유지)
+              </button>
+            </>
+          )}
           {Object.entries(errors).map(([field, text]) => (
             <p
               key={field}
@@ -614,9 +669,10 @@ export function RolePage() {
           }}
         />
       )}
-      {notice && (
+      {notice.text && (
         <Toast
-          message={notice}
+          message={notice.text}
+          kind={notice.kind}
           testId="role-toast"
           onDismiss={() => setNotice("")}
         />

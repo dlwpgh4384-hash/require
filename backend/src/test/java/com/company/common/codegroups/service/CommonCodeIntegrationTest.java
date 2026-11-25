@@ -149,7 +149,7 @@ class CommonCodeIntegrationTest {
     }
     @Test void additionalReferencesIncludeSoftDeletedRowsAndUseExactTokens() throws Exception {
         mvc.perform(post("/api/common/code-groups/JOB/codes").contentType("application/json")
-            .content("{\"code\":\"OWNED_JOB\",\"codeName\":\"시험 직무\",\"relatedJobs\":\"NONE\",\"estimateUnitPrice\":1}")).andExpect(status().isOk());
+            .content("{\"code\":\"OWNED_JOB\",\"codeName\":\"시험 직무\",\"relatedJobs\":\"PM\",\"estimateUnitPrice\":1}")).andExpect(status().isOk());
         db.update("INSERT INTO TB_SY_CODE(code_grp_id,code,code_nm,sort_ord,use_yn,del_yn,add_val1,reg_user_id) VALUES ('SKILL','OWNED_SKILL','시험 스킬',999,'N','Y','OTHER,OWNED_JOB','admin')");
         remove("JOB", "OWNED_JOB").andExpect(status().isBadRequest());
         db.update("UPDATE TB_SY_CODE SET add_val1='OTHER,OWNED_JOB_LONG' WHERE code_grp_id='SKILL' AND code='OWNED_SKILL'");

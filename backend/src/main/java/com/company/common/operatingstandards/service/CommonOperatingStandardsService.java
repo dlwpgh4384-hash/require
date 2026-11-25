@@ -120,6 +120,9 @@ public class CommonOperatingStandardsService {
             var old = history.get(month);
             if ("add".equals(change.action()) ? old != null : old == null) throw invalid("effectiveMonth");
             BigDecimal value = "delete".equals(change.action()) ? null : number(change);
+            // 시작 월 앞 달은 마감한 달로 보므로 앞당기기는 막는다. 문구는 이유에 맞게(2026-11-24 사용자 결정).
+            if ("CASH_BASE_YM".equals(change.standardCode()) && value != null && cashMonth(value).compareTo(base) < 0)
+                throw CodeFailure.invalid("value", "시작 월은 앞당길 수 없습니다.");
             if ("CASH_BASE_YM".equals(change.standardCode())) requireOpen(cashMonth(value), base, closed);
             var template = old == null ? history.lastEntry().getValue() : old;
             var mutation = new Mutation(change.standardCode(), month, value,

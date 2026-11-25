@@ -18,6 +18,7 @@ let request: ReturnType<typeof vi.fn>;
 let failGet: boolean;
 let failPut: boolean;
 let failAfterSave: boolean;
+let conflictPut: boolean;
 const success = (data: unknown) => ({
   ok: true,
   status: 200,
@@ -105,9 +106,31 @@ beforeEach(() => {
   failGet = false;
   failPut = false;
   failAfterSave = false;
+  conflictPut = false;
   request = vi.fn(async (path: string, init?: RequestInit) => {
     if (path === "/api/common/menu-settings") {
       if (init?.method === "PUT") {
+        if (conflictPut) {
+          conflictPut = false;
+          rows = rows.map((row) =>
+            row.menuId === "M001" ? { ...row, menuNm: "남이 바꾼 이름" } : row,
+          );
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({
+              success: false,
+              meta: {},
+              message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+              errors: [
+                {
+                  field: "modifiedAt",
+                  message: "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+                },
+              ],
+            }),
+          };
+        }
         if (failPut)
           return {
             ok: false,
@@ -299,15 +322,88 @@ it("잠금 메뉴 다른 묶음 drop은 draft에 반영하지 않음", async () 
   fireEvent.click(screen.getByTestId("menu-settings-save"));
   expect(writes()).toHaveLength(0);
 });
-it("잠금 메뉴 사용은 체크 가능하고 서버 거부 후 draft 보존", async () => {
+it("잠금 메뉴 사용은 체크 가능하고 저장 때 시안 알림으로 막고 draft 보존", async () => {
   await mount();
-  failPut = true;
   expect(screen.getByLabelText("M004 사용")).toBeEnabled();
   fireEvent.click(screen.getByLabelText("M004 사용"));
+  fireEvent.click(screen.getByTestId("menu-settings-save"));
+  expect(screen.getByTestId("menu-settings-toast")).toHaveTextContent(
+    "「잠금 메뉴」은 시스템 메뉴라 끌 수 없습니다. 사용을 다시 켜야 저장됩니다.",
+  );
+  expect(screen.getByTestId("menu-settings-toast")).toHaveClass("app-toast-info");
+  expect(writes()).toHaveLength(0);
+  expect(screen.getByLabelText("M004 사용")).not.toBeChecked();
+});
+it("리뷰: DB에 이미 꺼진 시스템 메뉴가 있어도 바꾸지 않았으면 다른 줄 저장은 막지 않는다", async () => {
+  rows = rows.map((row) => (row.menuId === "M004" ? { ...row, useYn: "N" } : row));
+  await mount();
+  fireEvent.click(screen.getByLabelText("M003 사용"));
+  await save();
+  expect(screen.queryByText(/시스템 메뉴라 끌 수 없습니다/)).toBeNull();
+  const body: MenuSettingsInput = JSON.parse(String(writes()[0][1].body));
+  expect(body.items.map((row) => row.menuId)).toEqual(["M003"]);
+});
+it("서버 거부(400)는 문구를 보이고 draft 보존", async () => {
+  await mount();
+  failPut = true;
+  fireEvent.click(screen.getByLabelText("M003 사용"));
   await save();
   await screen.findByText("시스템 메뉴는 사용 해제할 수 없습니다.");
-  expect(screen.getByLabelText("M004 사용")).not.toBeChecked();
-  expect(rows.find((row) => row.menuId === "M004")?.useYn).toBe("Y");
+  expect(screen.getByLabelText("M003 사용")).not.toBeChecked();
+  expect(rows.find((row) => row.menuId === "M003")?.useYn).toBe("Y");
+});
+it("FR-0106: 409면 입력은 두고, [최신 버전 불러오기 (입력 유지)]로 내가 안 고친 줄만 최신 값을 받는다", async () => {
+  await mount();
+  conflictPut = true;
+  fireEvent.change(screen.getByLabelText("M003 메뉴 이름"), {
+    target: { value: "내 이름" },
+  });
+  await save();
+  expect(JSON.parse(String(writes()[0][1].body))).toHaveProperty("modifiedAt");
+  const toast = await screen.findByTestId("menu-settings-toast");
+  expect(toast).toHaveTextContent("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.");
+  expect(toast).toHaveClass("app-toast-warn");
+  expect(screen.getByLabelText("M003 메뉴 이름")).toHaveValue("내 이름");
+  fireEvent.click(await screen.findByTestId("menu-settings-version-refresh"));
+  // 남이 바꾼 줄은 최신 값, 내가 고친 줄은 내 입력(2026-11-24 사용자 결정).
+  await waitFor(() =>
+    expect(screen.getByLabelText("M001 메뉴 이름")).toHaveValue("남이 바꾼 이름"),
+  );
+  expect(screen.getByLabelText("M003 메뉴 이름")).toHaveValue("내 이름");
+  expect(screen.queryByTestId("menu-settings-version-refresh")).not.toBeInTheDocument();
+  expect(screen.getByTestId("menu-settings-save")).toBeEnabled();
+});
+it("시안: 같은 묶음에서 아래로 끌면 놓은 줄 뒤로 간다", async () => {
+  await mount();
+  drag("M001", "M003");
+  await save();
+  const body: MenuSettingsInput = JSON.parse(String(writes()[0][1].body));
+  expect(body.items.find((row) => row.menuId === "M002")?.sortOrd).toBe(1);
+  expect(body.items.find((row) => row.menuId === "M003")?.sortOrd).toBe(2);
+  expect(body.items.find((row) => row.menuId === "M001")?.sortOrd).toBe(3);
+  expect(body.movedMenuIds).toEqual(["M001"]);
+});
+it("시안: 묶음을 다른 묶음의 메뉴 줄에 놓으면 그 묶음 자리로 옮긴다", async () => {
+  await mount();
+  drag("G002", "M001");
+  await save();
+  const body: MenuSettingsInput = JSON.parse(String(writes()[0][1].body));
+  expect(body.items.find((row) => row.menuId === "G002")?.sortOrd).toBe(1);
+  expect(body.items.find((row) => row.menuId === "G001")?.sortOrd).toBe(2);
+});
+it("시안: 사용 안 하는 메뉴 줄은 흐리게, 저장 알림만 완료 모양·취소 알림은 안내 모양", async () => {
+  await mount();
+  expect(screen.getByTestId("menu-settings-row-m002")).toHaveClass("menu-settings-muted");
+  expect(screen.getByTestId("menu-settings-row-m001")).not.toHaveClass("menu-settings-muted");
+  fireEvent.click(screen.getByTestId("menu-settings-cancel"));
+  expect(screen.getByTestId("menu-settings-toast")).toHaveClass("app-toast-info");
+  fireEvent.change(screen.getByLabelText("M003 메뉴 이름"), {
+    target: { value: "새 이름" },
+  });
+  await save();
+  await waitFor(() =>
+    expect(screen.getByTestId("menu-settings-toast")).toHaveClass("app-toast-ok"),
+  );
 });
 it("대메뉴 payload에는 useYn과 pcOnlyYn을 넣지 않는다", async () => {
   await mount();

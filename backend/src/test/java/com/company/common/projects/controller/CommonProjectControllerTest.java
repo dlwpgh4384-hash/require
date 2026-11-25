@@ -91,7 +91,7 @@ class CommonProjectControllerTest {
         doAnswer(c -> { PlanWrite w=c.getArgument(0); var p=new Manpower(); p.jobCode=w.job().jobCode(); p.jobName=p.jobCode;
             p.plannedMm=w.job().plannedMm(); p.actualMm=BigDecimal.ONE; p.differenceMm=p.actualMm.subtract(p.plannedMm);
             plans.removeIf(x -> x.jobCode.equals(p.jobCode)); plans.add(p); return null; }).when(mapper).savePlan(any());
-        doAnswer(c -> { projects.get((String)c.getArgument(0)).statusCode="ING"; return null; }).when(mapper).start(anyString());
+        doAnswer(c -> { projects.get((String)c.getArgument(0)).statusCode="ING"; return null; }).when(mapper).start(anyString(), anyString());
         doAnswer(c -> { LossWrite w=c.getArgument(0); var p=projects.get(w.projectId()); p.statusCode="LOSE";
             p.loseDate=w.today(); p.loseMemo=w.input().memo(); p.loseReasonName=w.input().reasonCode(); return null; }).when(mapper).lose(any());
         Project p = new Project(); p.projectId="P-0001"; p.projectName="연속 프로젝트"; p.contractTypeCode="MO";
@@ -135,7 +135,9 @@ class CommonProjectControllerTest {
             .andExpect(jsonPath("$.data.estimateAmount").value(1200000))
             .andExpect(jsonPath("$.data.budgetAmount").value(800000))
             .andExpect(jsonPath("$.data.budgetManualYn").value("N"));
-        assertThat(history).anySatisfy(h -> { assertThat(h.code()).isEqualTo("CTRT"); assertThat(h.actor()).isEqualTo("admin"); });
+        assertThat(history).anySatisfy(h -> { assertThat(h.code()).isEqualTo("CTRT"); assertThat(h.actor()).isEqualTo("admin");
+            // 시안: 「계약」 첫 줄의 변경 후는 계약금액(화면은 「1,000,000 원」으로 보인다)
+            assertThat(h.afterValue()).isEqualTo("1000000"); });
         assertThat(parts).anySatisfy(p -> assertThat(p.effectiveMonth).isEqualTo("2026-11"));
         assertThat(projects.get("P-0002").originalContractAmount).isEqualByComparingTo("1000000");
         verify(progressMapper, times(5)).insertStage(argThat(w -> w.projectId().equals("P-0002") && w.actor().equals("admin")));
@@ -408,7 +410,7 @@ class CommonProjectControllerTest {
         mvc.perform(post("/api/common/projects/P-0001/start")).andExpect(status().isOk())
             .andExpect(response("POST", "/api/common/projects/{projectId}/start"))
             .andExpect(jsonPath("$.data.statusCode").value("ING"));
-        verify(mapper).start("P-0001"); verify(mapper,never()).insertHistory(any());
+        verify(mapper).start("P-0001", "admin"); verify(mapper,never()).insertHistory(any());
         assertThat(history).isEmpty(); verify(mapper,never()).insertPart(any());
         verify(progressMapper, times(5)).insertStage(argThat(w -> w.projectId().equals("P-0001") && w.actor().equals("admin")));
     }
@@ -416,7 +418,7 @@ class CommonProjectControllerTest {
     @DisplayName("business: 진행·종료·실주는 진행전환 거부, PROJ_STAT_CD 보존")
     void startRejectsOtherStates(String status) throws Exception {
         projects.get("P-0001").statusCode=status;
-        mvc.perform(post("/api/common/projects/P-0001/start")).andExpect(status().isBadRequest()); verify(mapper,never()).start(anyString());
+        mvc.perform(post("/api/common/projects/P-0001/start")).andExpect(status().isBadRequest()); verify(mapper,never()).start(anyString(), anyString());
     }
     ActiveAssignment assignment(String id,String dev,int start,int end) {
         var a=new ActiveAssignment(); a.assignmentId=id; a.developerId=dev; a.startDate=today.plusDays(start); a.endDate=today.plusDays(end); return a;

@@ -107,6 +107,27 @@ export function putCommonUserPreference(
  * 앞 저장이 받은 수정 시각을 다음 저장에 쓰고, 409이면 한 번 다시 읽어 그 시각으로 다시 저장한다.
  * 빨리 연달아 바꿔도 마지막 값이 저장되고, 409를 조용히 버려 옛 값이 남는 일이 없다.
  */
+/**
+ * 다른 화면이 어떤 화면의 기간(PERIOD)을 바꿔 저장했음을 알린다(월 마감 [확인하기]). 이미 탭으로 열린 그 화면이
+ * 저장된 기간으로 바로 다시 읽게 한다(2026-11-24 사용자 결정).
+ */
+export const PERIOD_CHANGED_EVENT = "period-preference-changed";
+export interface PeriodChangedDetail {
+  screenId: string;
+  prefVal: string;
+  modDttm: string | null;
+}
+export function announcePeriodChanged(detail: PeriodChangedDetail) {
+  window.dispatchEvent(new CustomEvent<PeriodChangedDetail>(PERIOD_CHANGED_EVENT, { detail }));
+}
+/**
+ * 월을 마감하거나 마감을 해제했음을 알린다. 이미 탭으로 열린 화면이 기간 기준(마감한 달·가장 최근 달)을
+ * 다시 읽어, 처음 열 때 받은 옛 기준으로 고를 수 있는 달이 멈춰 있지 않게 한다(2026-11-24 사용자 지적).
+ */
+export const PERIOD_BASIS_CHANGED_EVENT = "period-basis-changed";
+export function announcePeriodBasisChanged() {
+  window.dispatchEvent(new Event(PERIOD_BASIS_CHANGED_EVENT));
+}
 export function createPreferenceSaver(type: PreferenceType, key: string) {
   let token: string | null = null;
   let chain: Promise<unknown> = Promise.resolve();

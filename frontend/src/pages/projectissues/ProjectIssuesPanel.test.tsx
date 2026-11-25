@@ -238,17 +238,84 @@ it("list: [이슈 등록] goes to the given title host, nothing when the host is
   host.remove();
 });
 
-it("list: excel uses the same conditions and reports through onChanged", async () => {
+it("list: excel uses the same conditions and only shows a toast (no reload through onChanged)", async () => {
   const onChanged = vi.fn();
   render(<ProjectIssuesPanel onChanged={onChanged} />);
   await screen.findByTestId("list-row-12");
+  const reads = request.mock.calls.length;
   fireEvent.click(screen.getByTestId("list-download"));
-  await waitFor(() =>
-    expect(onChanged).toHaveBeenCalledWith(
-      "엑셀 파일을 만들었습니다 (조회 결과 1건)",
-    ),
+  expect(await screen.findByTestId("project-issue-toast")).toHaveTextContent(
+    "엑셀 파일을 만들었습니다 (조회 결과 1건)",
   );
   expect(request).toHaveBeenCalledWith("/api/common/project-issues/excel");
+  expect(request.mock.calls.length).toBe(reads + 1);
+  expect(onChanged).not.toHaveBeenCalled();
+});
+
+it("list: a failed excel keeps the list and shows a warning toast", async () => {
+  render(<ProjectIssuesPanel />);
+  await screen.findByTestId("list-row-12");
+  const original = request.getMockImplementation()!;
+  request.mockImplementation(async (url: string, init?: RequestInit) =>
+    url.startsWith("/api/common/project-issues/excel")
+      ? fail(500, "엑셀 파일을 받지 못했습니다. 다시 시도해 주세요.")
+      : original(url, init),
+  );
+  fireEvent.click(screen.getByTestId("list-download"));
+  expect(await screen.findByTestId("project-issue-toast")).toHaveTextContent(
+    "엑셀 파일을 받지 못했습니다. 다시 시도해 주세요.",
+  );
+  expect(screen.getByTestId("list-row-12")).toBeVisible();
+});
+
+it("list: the open count for the tab is reported only for the unnarrowed list", async () => {
+  const onOpenCount = vi.fn();
+  render(<ProjectIssuesPanel onOpenCount={onOpenCount} />);
+  await screen.findByTestId("list-row-12");
+  await waitFor(() => expect(onOpenCount).toHaveBeenCalledWith(1));
+  onOpenCount.mockClear();
+  fireEvent.change(screen.getByTestId("project-issue-status-filter"), {
+    target: { value: "closed" },
+  });
+  fireEvent.click(screen.getByTestId("list-search"));
+  await screen.findByTestId("list-row-13");
+  expect(onOpenCount).not.toHaveBeenCalled();
+});
+
+it("list: edit 409 closes the dialog, reloads and warns", async () => {
+  render(<ProjectIssuesPanel />);
+  fireEvent.click(await screen.findByTestId("list-row-12"));
+  const dialog = within(await screen.findByTestId("project-issue-dialog"));
+  writeStatus = 409;
+  const listReads = () =>
+    request.mock.calls.filter(
+      ([url, init]) =>
+        String(url).startsWith("/api/common/project-issues") && !init?.method,
+    ).length;
+  const before = listReads();
+  fireEvent.click(dialog.getByTestId("project-issue-save"));
+  expect(await screen.findByTestId("project-issue-toast")).toHaveTextContent(
+    "다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.",
+  );
+  expect(screen.queryByTestId("project-issue-dialog")).not.toBeInTheDocument();
+  await waitFor(() => expect(listReads()).toBeGreaterThan(before));
+});
+
+it("dialog moves focus to the first field with an error", async () => {
+  render(<ProjectIssuesPanel />);
+  fireEvent.click(await screen.findByTestId("project-issue-create"));
+  const dialog = within(await screen.findByTestId("project-issue-dialog"));
+  fireEvent.click(dialog.getByTestId("project-issue-save"));
+  await waitFor(() =>
+    expect(dialog.getByTestId("project-issue-project")).toHaveFocus(),
+  );
+  fireEvent.change(dialog.getByTestId("project-issue-project"), {
+    target: { value: "P-selected" },
+  });
+  fireEvent.click(dialog.getByTestId("project-issue-save"));
+  await waitFor(() =>
+    expect(dialog.getByTestId("project-issue-title")).toHaveFocus(),
+  );
 });
 
 it("list: new issue dialog defaults, mockup errors and registration toast text", async () => {

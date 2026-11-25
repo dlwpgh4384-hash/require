@@ -95,6 +95,8 @@ public class ExcelExportService {
                 if (c >= row.size()) continue;
                 String value = row.get(c);
                 if (value == null || value.isBlank() || value.equals("–") || value.equals("-")) continue;
+                // 숫자 열 속 「배분표」·「무상지원」처럼 숫자가 하나도 없는 글은 빈칸처럼 본다(나머지 금액은 숫자 칸 그대로, 2026-11-24).
+                if (value.chars().noneMatch(Character::isDigit)) continue;
                 if (NUMBER.matcher(value).matches()) any = true; else if (!isLabelRow(row)) { all = false; break; }
             }
             numeric[c] = any && all;

@@ -132,7 +132,7 @@ class RateRenegotiationPersistenceTest {
         var before = snapshot(true);
         var result = read("5");
         assertThat(result.path("items")).hasSize(2);
-        assertThat(result.path("summary").path("targetCount").asInt()).isEqualTo(1);
+        assertThat(result.path("summary").path("targetCount").asInt()).isEqualTo(2);
         assertThat(result.path("items").get(0).path("monthlyCost").decimalValue()).isEqualByComparingTo("450000");
         assertThat(result.path("items").get(0).path("targetUnitPrice").decimalValue()).isEqualByComparingTo("1130000");
         assertThat(result.path("items").get(0).path("annualProfitIncrease").decimalValue()).isEqualByComparingTo("600000");

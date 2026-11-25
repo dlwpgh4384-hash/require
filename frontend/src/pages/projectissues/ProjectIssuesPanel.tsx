@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Toast } from "../../shared/feedback/Dialog";
+import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
   ListFilter,
@@ -95,6 +95,11 @@ export function ProjectIssuesPanel({
   const [optionError, setOptionError] = useState("");
   const [editing, setEditing] = useState<api.ProjectIssue | "new" | null>(null);
   const [notice, setNotice] = useState("");
+  const [noticeKind, setNoticeKind] = useState<ToastKind>("ok");
+  const showNotice = (message: string, kind: ToastKind = "ok") => {
+    setNoticeKind(kind);
+    setNotice(message);
+  };
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<ListSort | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -146,7 +151,16 @@ export function ProjectIssuesPanel({
       .then((result) => {
         if (!abort.signal.aborted) {
           setData({ items: result.items ?? [], openCount: result.openCount });
-          if (!projectId) onOpenCount?.(result.openCount);
+          // 탭 이름 「이슈 모아 보기 (n)」은 조건과 상관없이 열린 이슈 전체 수(시안 openI).
+          // 중요도·프로젝트·종료 조건으로 좁힌 결과의 수로 바꾸지 않는다.
+          if (
+            !projectId &&
+            !query.importanceCode &&
+            !query.projectId &&
+            !query.statusCode &&
+            !query.overdue
+          )
+            onOpenCount?.(result.openCount);
         }
       })
       .catch((reason) => {
@@ -160,7 +174,13 @@ export function ProjectIssuesPanel({
     setEditing(null);
     setReload((v) => v + 1);
     if (onChanged) onChanged(message);
-    else setNotice(message);
+    else showNotice(message);
+  };
+  // FR-0106: 그 사이 다른 사람이 고쳤으면(409) 창을 닫고 목록을 다시 읽어 새 수정 시각을 받는다.
+  const conflict = (message: string) => {
+    setEditing(null);
+    setReload((v) => v + 1);
+    showNotice(message, "warn");
   };
   const label = (items: CodeItem[] | undefined, code: string) =>
     items?.find((c) => c.code === code)?.codeName ?? code;
@@ -212,6 +232,7 @@ export function ProjectIssuesPanel({
       statuses={options.statuses}
       onClose={() => setEditing(null)}
       onSaved={saved}
+      onConflict={conflict}
       dirtyScreenId={dirtyScreenId}
     />
   );
@@ -231,7 +252,7 @@ export function ProjectIssuesPanel({
   const toast = notice && (
     <Toast
       message={notice}
-      kind="ok"
+      kind={noticeKind}
       testId="project-issue-toast"
       onDismiss={() => setNotice("")}
     />
@@ -433,11 +454,13 @@ export function ProjectIssuesPanel({
     setDownloading(true);
     try {
       await api.getCommonProjectBoardIssuesExcel(query);
-      const message = `엑셀 파일을 만들었습니다${rows.length ? ` (조회 결과 ${rows.length}건)` : ""}`;
-      if (onChanged) onChanged(message);
-      else setNotice(message);
+      // 엑셀은 데이터를 바꾸지 않으므로 화면을 다시 읽지 않고(onChanged 안 씀) 알림만 띄운다.
+      showNotice(
+        `엑셀 파일을 만들었습니다${rows.length ? ` (조회 결과 ${rows.length}건)` : ""}`,
+      );
     } catch (reason) {
-      setError(api.projectIssueFailure(reason));
+      // 실패해도 목록은 그대로 두고 경고 알림만(현황판 엑셀과 같게).
+      showNotice(api.projectIssueFailure(reason), "warn");
     } finally {
       setDownloading(false);
     }

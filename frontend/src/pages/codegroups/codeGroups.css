@@ -303,6 +303,15 @@
 .code-table-wrap .num {
   text-align: right;
 }
+/* 시안 tr.muted: 사용을 끈 줄은 흐린 글자 + 가운데 줄(이름 칸·끝 칸은 줄 없음) */
+.code-table-wrap tr.muted td {
+  color: var(--text-sub);
+  text-decoration: line-through;
+}
+.code-table-wrap tr.muted td:last-child,
+.code-table-wrap tr.muted td:nth-child(2) {
+  text-decoration: none;
+}
 .code-table-wrap .ls-in-sm {
   width: 200px;
   min-width: 0;

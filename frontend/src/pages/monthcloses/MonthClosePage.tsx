@@ -16,6 +16,8 @@ import { formatDateTime, koreanThisMonth } from "../../shared/time";
 import { requestMenuBadgeRefresh } from "../../app/menuBadges";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
 import {
+  announcePeriodBasisChanged,
+  announcePeriodChanged,
   createPreferenceSaver,
   getCommonUserPreference,
 } from "../userpreferences/userPreferences";
@@ -249,6 +251,7 @@ export function MonthClosePage({
       });
       refreshHistory((value) => value + 1);
       requestMenuBadgeRefresh();
+      announcePeriodBasisChanged();
     } catch (failure) {
       if (isConflict(failure)) {
         // 다른 사람이 먼저 바꿨다: 창을 닫고 지금 상태를 다시 읽는다.
@@ -295,7 +298,9 @@ export function MonthClosePage({
         screen === "UI-12" || screen === "UI-13"
           ? { year: period.value.year }
           : period.value;
-      await saver.save(JSON.stringify(targetPeriod));
+      const saved = await saver.save(JSON.stringify(targetPeriod));
+      // 이미 탭으로 열려 있는 화면도 이 기간으로 바꾸게 알린다(2026-11-24 사용자 결정).
+      announcePeriodChanged({ screenId: screen, prefVal: JSON.stringify(targetPeriod), modDttm: saved.data.modDttm });
       navigate(`/screens/${screen}`);
     } catch (failure) {
       visiting.current = false;
@@ -637,7 +642,9 @@ export function MonthClosePage({
                 if (event.target.value.trim()) setReasonError("");
               }}
               aria-invalid={!!reasonError}
-              aria-describedby="month-close-reason-error"
+              aria-describedby={
+                reasonError ? "month-close-reason-error" : undefined
+              }
             />
             {reasonError && (
               <span

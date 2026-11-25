@@ -281,20 +281,26 @@ it("formats MM with two decimals and no thousands comma", async () => {
   expect(screen.getByTestId("list-footer-plannedMm")).toHaveTextContent(/^1234\.50$/);
 });
 
-it("keeps year and conditions as draft and applies all current values exactly once", async () => {
+it("year change queries that year right away; unapplied conditions stay as draft until [조회] (mockup period bar)", async () => {
   page();
   await ready();
   await screen.findByRole("option", { name: "여러 해 프로젝트" });
   change("manpower-comparison-project", "P-across");
   change("manpower-comparison-difference", "부족");
   fireEvent.click(screen.getByRole("button", { name: "이전 해" }));
-  expect(calls()).toHaveLength(1);
+  await waitFor(() => expect(calls()).toHaveLength(2));
+  expect(params(calls()[1])).toEqual({ year: "2025" });
   expect(screen.getByTestId("manpower-comparison-project")).toHaveValue(
     "P-across",
   );
+  await waitFor(() =>
+    expect(screen.getByTestId("manpower-comparison-banner")).toHaveTextContent(
+      "2025년 몫 = 계획 MM × (2025년에 걸친",
+    ),
+  );
   fireEvent.click(screen.getByRole("button", { name: "조회" }));
-  await waitFor(() => expect(calls()).toHaveLength(2));
-  expect(params(calls()[1])).toEqual({
+  await waitFor(() => expect(calls()).toHaveLength(3));
+  expect(params(calls()[2])).toEqual({
     year: "2025",
     projectId: "P-across",
     differenceStatus: "부족",
@@ -305,11 +311,27 @@ it("keeps year and conditions as draft and applies all current values exactly on
     ),
   ).toHaveLength(0);
   expect(screen.getByText("지난 해 · 읽기 전용")).toBeInTheDocument();
-  await waitFor(() =>
-    expect(screen.getByTestId("manpower-comparison-banner")).toHaveTextContent(
-      "2025년 몫 = 계획 MM × (2025년에 걸친",
-    ),
-  );
+});
+
+it("year change keeps an applied project that overlaps the new year and drops one that does not", async () => {
+  page();
+  await ready();
+  await screen.findByRole("option", { name: "여러 해 프로젝트" });
+  change("manpower-comparison-project", "P-across");
+  fireEvent.click(screen.getByRole("button", { name: "조회" }));
+  await waitFor(() => expect(calls()).toHaveLength(2));
+  fireEvent.click(screen.getByRole("button", { name: "다음 해" }));
+  await waitFor(() => expect(calls()).toHaveLength(3));
+  expect(params(calls()[2])).toEqual({ year: "2027", projectId: "P-across" });
+  fireEvent.click(screen.getByRole("button", { name: "이전 해" }));
+  await waitFor(() => expect(calls()).toHaveLength(4));
+  change("manpower-comparison-project", "P-selected");
+  fireEvent.click(screen.getByRole("button", { name: "조회" }));
+  await waitFor(() => expect(calls()).toHaveLength(5));
+  fireEvent.click(screen.getByRole("button", { name: "이전 해" }));
+  await waitFor(() => expect(calls()).toHaveLength(6));
+  expect(params(calls()[5])).toEqual({ year: "2025" });
+  expect(screen.getByTestId("manpower-comparison-project")).toHaveValue("");
 });
 
 it("filters project options locally and only clears selection when draft year no longer overlaps", async () => {
@@ -325,7 +347,8 @@ it("filters project options locally and only clears selection when draft year no
   expect(
     screen.getByRole("option", { name: "지난 프로젝트" }),
   ).toBeInTheDocument();
-  expect(calls()).toHaveLength(1);
+  await waitFor(() => expect(calls()).toHaveLength(2));
+  expect(params(calls()[1])).toEqual({ year: "2025" });
 });
 
 it("[초기화] clears the conditions and queries again right away (mockup freset)", async () => {

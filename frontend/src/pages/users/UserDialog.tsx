@@ -44,16 +44,25 @@ export function UserDialog({
   options,
   onClose,
   onSaved,
+  onConflict,
+  onReloadVersion,
 }: {
   account: api.UserAccount | null;
   options: CommonUserOptionsResult;
   onClose: () => void;
   onSaved: (notice: string, account: api.UserAccount) => void;
+  /** 저장이 409(다른 사람이 먼저 바꿈)면 부른다(목록·상세 다시 읽기). */
+  onConflict?: () => void;
+  /** [최신 버전 불러오기 (입력 유지)]: 창의 계정(수정 시각)만 새로 읽는다. 입력은 그대로. */
+  onReloadVersion?: () => Promise<void>;
 }) {
   const editing = account !== null;
   const initial = account ? fromAccount(account) : blank;
   const [form, setForm] = useState<FormValue>(initial);
   const [error, setError] = useState("");
+  /** 409 뒤 최신 버전을 불러오기 전에는 같은 옛 수정 시각으로 다시 저장하지 않게 단추를 보인다. */
+  const [conflict, setConflict] = useState(false);
+  const [reloading, setReloading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -82,6 +91,12 @@ export function UserDialog({
   };
   const failure = (value: unknown) => {
     setError(message(value));
+    // 다른 사람이 먼저 바꿨으면(409) 화면이 목록·상세를 다시 읽는다. 창은 문구·입력과 함께 남기고
+    // [최신 버전 불러오기 (입력 유지)]를 보인다(거래처 화면과 같음, 2026-11-24 사용자 결정).
+    if (value instanceof api.UserRequestError && value.status === 409) {
+      if (editing) setConflict(true);
+      onConflict?.();
+    }
     if (value instanceof api.UserRequestError)
       setErrors(
         Object.fromEntries(
@@ -108,10 +123,11 @@ export function UserDialog({
       : "";
   };
   const persist = async (confirmed: string[]) => {
+    // 확인 창에서 지우기로 한 담당 프로젝트는 빼고 보낸다(서버는 역할 없이 남은 프로젝트를 막음).
     const assignments = {
       roleCds: form.roleCds,
       headquarters: form.headquarters,
-      projectIds: form.projectIds,
+      projectIds: form.projectIds.filter((project) => !confirmed.includes(project)),
     };
     const result = account
       ? await api.putCommonUser(account.userId, {
@@ -301,6 +317,28 @@ export function UserDialog({
                 data-testid="user-error"
               >
                 {bottomMessage}
+                {conflict && onReloadVersion && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      data-testid="user-version-refresh"
+                      disabled={reloading}
+                      onClick={() => {
+                        setReloading(true);
+                        onReloadVersion()
+                          .then(() => {
+                            setConflict(false);
+                            setError("");
+                          })
+                          .catch((reason) => setError(message(reason)))
+                          .finally(() => setReloading(false));
+                      }}
+                    >
+                      최신 버전 불러오기 (입력 유지)
+                    </button>
+                  </>
+                )}
               </p>
             )}
             <div className="app-actions">

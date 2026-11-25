@@ -76,6 +76,19 @@ class UserProjectionTest {
         }
         assertThat(UserRequests.filter(1,20,null,null,"_%!").keyword()).isEqualTo("%!_!%!!%");
     }
+    @Test void sortDirectionUsesNoTextSubstitutionAndKeepsTieBreaker() throws Exception {
+        var config = configuration();
+        var statement = config.getMappedStatement(UserMapper.class.getName() + ".selectUsers");
+        String desc = statement.getBoundSql(UserRequests.filter(1, 20, null, null, null, true, "name", "desc")).getSql()
+            .replaceAll("\\s+", " ").replace(" ,", ",");
+        String asc = statement.getBoundSql(UserRequests.filter(1, 20, null, null, null, true, "last", "asc")).getSql()
+            .replaceAll("\\s+", " ").replace(" ,", ",");
+        assertThat(desc).contains("ORDER BY u.user_nm DESC, u.user_id");
+        assertThat(asc).contains("ORDER BY u.last_login_dttm NULLS LAST, u.user_nm, u.user_id").doesNotContain("DESC");
+        try (var input = new ClassPathResource("mapper/UserMapper.xml").getInputStream()) {
+            assertThat(new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)).doesNotContain("${");
+        }
+    }
     @Test void logsHaveStableOrderAndEveryVersionWriteUsesNullSafeComparison() throws Exception {
         var config = configuration();
         String sql = config.getMappedStatement(UserMapper.class.getName() + ".selectLogs")

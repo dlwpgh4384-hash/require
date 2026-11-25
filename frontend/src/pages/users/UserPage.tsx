@@ -80,6 +80,7 @@ export function UserPage() {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [notice, setNotice] = useState("");
+  const [warning, setWarning] = useState("");
   const [highlight, setHighlight] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const root = useRef<HTMLElement>(null);
@@ -95,6 +96,11 @@ export function UserPage() {
   useEffect(() => {
     setPage(1);
   }, [presentation.pageSize, includeStopped]);
+  useEffect(() => {
+    // 「사용 중지 포함」을 바꾸면 조회 대상이 달라지므로 「조회된 N건 모두 선택」·체크를 푼다.
+    setSelected([]);
+    setAllResults(false);
+  }, [includeStopped]);
   useEffect(() => {
     const controller = new AbortController();
     setData(null);
@@ -224,18 +230,31 @@ export function UserPage() {
       );
       const skipped =
         stopTarget.impact.blockedUsers.length + value.unprocessedCount;
-      const reasons = [
-        ...stopTarget.impact.blockedUsers,
-        ...value.unprocessed,
-      ].map((item) => item.reason);
+      const all = [...stopTarget.impact.blockedUsers, ...value.unprocessed];
+      // 시안 문구: 파트장이라 못 한 건은 건수와 「영업 파트 탭에서 먼저 파트장을 바꾸세요.」(2026-11-24 사용자 결정).
+      const leaders = all.filter((item) => item.reason.includes(" 파트장입니다."));
+      const others = all
+        .filter((item) => !item.reason.includes(" 파트장입니다."))
+        .map((item) => item.reason);
+      const otherCount = skipped - leaders.length;
       clearSelection();
       setStopTarget(null);
       refresh(
-        `${value.processedUserIds.length}건의 사용을 중지했습니다.${skipped ? ` ${skipped}건은 중지하지 못했습니다. ${[...new Set(reasons)].join(" ")}` : ""}`,
+        `${value.processedUserIds.length}건의 사용을 중지했습니다.` +
+          (leaders.length
+            ? ` ${leaders.length}건은 파트장이라 중지하지 못했습니다. 영업 파트 탭에서 먼저 파트장을 바꾸세요.`
+            : "") +
+          (otherCount > 0
+            ? ` ${otherCount}건은 중지하지 못했습니다.${others.length ? ` ${[...new Set(others)].join(" ")}` : ""}`
+            : ""),
       );
     } catch (error) {
       setStopTarget(null);
-      setFailure(message(error));
+      if (error instanceof api.UserRequestError && error.status === 409) {
+        // 다른 사람이 먼저 바꿨으면 안내하고 목록을 다시 읽어 새 수정 시각을 받는다(선택은 그대로).
+        setWarning(message(error));
+        setRevision((value) => value + 1);
+      } else setFailure(message(error));
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -243,14 +262,24 @@ export function UserPage() {
   };
   const prepareResume = async () => {
     if (busyRef.current) return;
-    const targets = (await selectedUsers()).filter(
-      (item) => item.userStatCd === "STOP",
-    );
-    if (!targets.length) {
-      setNotice("고른 것 중 사용 중지된 계정이 없습니다.");
-      return;
+    busyRef.current = true;
+    setBusy(true);
+    setFailure("");
+    try {
+      const targets = (await selectedUsers()).filter(
+        (item) => item.userStatCd === "STOP",
+      );
+      if (!targets.length) {
+        setNotice("고른 것 중 사용 중지된 계정이 없습니다.");
+        return;
+      }
+      setResumeTarget(targets);
+    } catch (error) {
+      setFailure(message(error));
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
     }
-    setResumeTarget(targets);
   };
   const resume = async () => {
     if (!resumeTarget || busyRef.current) return;
@@ -438,6 +467,14 @@ export function UserPage() {
           testId="user-toast"
         />
       )}
+      {warning && (
+        <Toast
+          message={warning}
+          kind="warn"
+          onDismiss={() => setWarning("")}
+          testId="user-warn-toast"
+        />
+      )}
       {detailId && (
         <UserDetailPanel
           key={detailId}
@@ -465,7 +502,7 @@ export function UserPage() {
       {(registering || editing) &&
         (ready ? (
           <UserDialog
-            key={editing ? editing.userId : "create"}
+            key={editing ? `edit:${editing.userId}` : "create"}
             account={editing}
             options={options.data}
             onClose={() => {
@@ -478,6 +515,16 @@ export function UserPage() {
               setEditing(null);
               reloadOptions();
               refresh(text);
+            }}
+            onConflict={() => setRevision((value) => value + 1)}
+            onReloadVersion={async () => {
+              // [최신 버전 불러오기 (입력 유지)]: 열린 수정 창의 버전(modDttm)만 새로 읽은 계정으로 바꾼다(입력은 그대로, 창 key 같음).
+              const target = editing?.userId;
+              if (!target) return;
+              const latest = await api.getCommonUser(target);
+              setEditing((current) =>
+                current && current.userId === latest.userId ? latest : current,
+              );
             }}
           />
         ) : (

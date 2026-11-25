@@ -415,9 +415,26 @@ it("공급가를 비우면 보내지 않는다", async () => {
     target: { value: "" },
   });
   fireEvent.click(screen.getByTestId("bill-check-save"));
-  expect(screen.getByTestId("bill-check-error")).toHaveTextContent(
+  // 오류는 그 칸 밑에 보이고 그 칸으로 간다(00-1 FR-0106)
+  expect(screen.getByTestId("bill-check-error-supplyAmount")).toHaveTextContent(
     "공급가를 입력해 주세요.",
   );
+  expect(screen.getByTestId("bill-check-supply")).toHaveAttribute("aria-invalid", "true");
+  await waitFor(() => expect(screen.getByTestId("bill-check-supply")).toHaveFocus());
+  expect(screen.getByTestId("bill-check-error")).toBeEmptyDOMElement();
+  expect(posts()).toHaveLength(0);
+  fireEvent.change(screen.getByTestId("bill-check-supply"), {
+    target: { value: "1000" },
+  });
+  expect(screen.queryByTestId("bill-check-error-supplyAmount")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("bill-check-vat-rate"), {
+    target: { value: "101" },
+  });
+  fireEvent.click(screen.getByTestId("bill-check-save"));
+  expect(screen.getByTestId("bill-check-error-vatRate")).toHaveTextContent(
+    "부가세율을 0~100 사이로 입력해 주세요.",
+  );
+  await waitFor(() => expect(screen.getByTestId("bill-check-vat-rate")).toHaveFocus());
   expect(posts()).toHaveLength(0);
 });
 

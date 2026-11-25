@@ -232,7 +232,10 @@ class CommonCodeControllerTest {
         deleteCode("CUSTOM","NEW_CODE").andExpect(status().isOk()).andExpect(jsonPath("$.data.delYn").value("Y"));
         assertThat(codes.get("CUSTOM:NEW_CODE").delYn).isEqualTo("Y");
         assertThat(history.get(1)).isEqualTo(new History("TB_SY_CODE","CUSTOM:NEW_CODE","DEL","DEL_YN","N","Y"));
-        create("CUSTOM",item("new_code")).andExpect(status().isBadRequest());
+        create("CUSTOM",item("new_code")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].message").value("삭제한 코드 값은 다시 쓸 수 없습니다. 다른 코드를 넣어 주세요."));
+        create("CUSTOM",item("TWO")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].message").value("이미 있는 코드입니다."));
         assertThat(codes).containsKey("CUSTOM:NEW_CODE");
         mvc.perform(get("/api/common/code-groups/CUSTOM/codes")).andExpect(jsonPath("$.data.items.length()").value(2));
     }
@@ -253,10 +256,37 @@ class CommonCodeControllerTest {
             .andExpect(jsonPath("$.errors[0].field").value("targetField")); unchanged();
     }
     @Test void jobAdditionalValuesRoundTrip() throws Exception {
+        addCode("JOB","ONE"); addCode("JOB","TWO");
         create("JOB",item("new").put("relatedJobs","ONE,TWO").put("estimateUnitPrice",1234567.125))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.estimateUnitPrice").value(1234567.125));
         save("JOB",body(item("NEW").put("relatedJobs","TWO").put("estimateUnitPrice",4567.25))).andExpect(status().isOk());
-        mvc.perform(get("/api/common/code-groups/JOB/codes")).andExpect(jsonPath("$.data.items[0].relatedJobs").value("TWO"));
+        mvc.perform(get("/api/common/code-groups/JOB/codes"))
+            .andExpect(jsonPath("$.data.items[?(@.code == 'NEW')].relatedJobs").value(org.hamcrest.Matchers.contains("TWO")));
+    }
+    @Test void additionalCodeReferencesMustExist() throws Exception {
+        // 시안 addChk: 쉼표로 적은 직무·계약유형 코드는 그 그룹에 있어야 한다.
+        addCode("JOB","BE");
+        create("SKILL",item("NEW").put("requiredJobs","BE, NOPE")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("requiredJobs"))
+            .andExpect(jsonPath("$.errors[0].message").value("없는 코드입니다: NOPE"));
+        create("PROJ_STEP",item("NEW").put("weight",10).put("contractTypes","TK")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("contractTypes"));
+        unchanged();
+        create("SKILL",item("NEW").put("requiredJobs","BE")).andExpect(status().isOk());
+        // 예전 값이 이미 없는 코드여도 그 칸을 바꾸지 않으면 이름은 저장된다.
+        codes.get("SKILL:NEW").addVal1 = "GONE";
+        save("SKILL",body(item("NEW").put("codeName","바꾼 이름").put("requiredJobs","GONE"))).andExpect(status().isOk());
+    }
+    @Test void bankCodeAndWeightFollowMockupChecks() throws Exception {
+        create("BANK",item("NEW").put("bankCode","12")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].message").value("은행 코드는 숫자 3자리로 넣어 주세요."));
+        addGroup("CTRT_TYPE", true); addCode("CTRT_TYPE","TK");
+        create("PROJ_STEP",item("NEW").put("weight",101).put("contractTypes","TK")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].message").value("비중(%)은(는) 100 이하로 넣어 주세요."));
+        create("JOB",item("NEW").put("relatedJobs","NEW").put("estimateUnitPrice",-1)).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("estimateUnitPrice"));
+        unchanged();
+        create("BANK",item("NEW").put("bankCode","004")).andExpect(status().isOk());
     }
     @Test void allowanceMissingOrClearedValueIsZero() throws Exception {
         create("ALWNC",item("NEW")).andExpect(status().isOk()).andExpect(jsonPath("$.data.codeVal").value(0));

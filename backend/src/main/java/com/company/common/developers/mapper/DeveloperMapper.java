@@ -29,6 +29,7 @@ public interface DeveloperMapper {
     List<DeveloperRows.Assignment> selectAssignments(String id);
     boolean hasAssignmentHistory();
     BigDecimal selectAssignmentMm(@Param("id") String id, @Param("date") LocalDate date);
+    List<BigDecimal> selectAssignmentDailyMms(@Param("id") String id, @Param("start") LocalDate start, @Param("end") LocalDate end);
     List<DeveloperRows.State> selectStatuses(String id);
     int insertStatus(DeveloperRows.State row);
     int updateStatus(DeveloperRows.State row);

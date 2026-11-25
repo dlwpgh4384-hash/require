@@ -27,12 +27,15 @@ export interface RoleSettings {
   role: Role;
   menuAuths: RoleMenu[];
   dataScopes: { code: string; name: string }[];
+  /** FR-0106 동시 수정: 역할 마지막 변경 시각(UTC). 저장할 때 그대로 돌려보낸다. */
+  modifiedAt?: string | null;
 }
 export interface RoleUpdate {
   dataScopeCd: string;
   snstvViewYn: RoleFlag;
   menuAuths: RoleMenuInput[];
   confirmedAffectedUserIds: string[];
+  modifiedAt?: string | null;
 }
 /** sourceRoleId가 있으면 역할 복사, 없으면 역할 추가(모든 메뉴 권한 없음). */
 export interface RoleCopy {
@@ -57,11 +60,18 @@ export class RoleRequestError extends Error {
 }
 async function roleRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
-  const body = await response.json();
+  // JSON이 아닌 응답(프록시 오류 화면 등)이면 영문 해석 오류 대신 공통 안내를 보인다.
+  let body;
+  try {
+    body = await response.json();
+  } catch {
+    body = {};
+  }
   if (!response.ok || body.success !== true) {
     throw new RoleRequestError(
       response.status,
-      response.status === 400 && typeof body.message === "string"
+      (response.status === 400 || response.status === 409) &&
+        typeof body.message === "string"
         ? body.message
         : "권한 정보를 처리하지 못했습니다. 다시 시도해 주세요.",
       response.status === 400 && Array.isArray(body.errors) ? body.errors : [],

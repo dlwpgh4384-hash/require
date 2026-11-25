@@ -185,6 +185,17 @@
         AND h.asgn_chg_type_cd='RATE' AND h.new_ctrt_mm IS NOT NULL ORDER BY h.aply_dt,h.hist_sn LIMIT 1),a.ctrt_mm)
     FROM TB_PJ_ASGN a WHERE a.asgn_id=#{id}
   </select>
+  <!-- selectAssignmentMm과 같은 규칙을 기간의 날마다 한 번에 읽는다(목록 이번 달 MM, 날마다 따로 읽지 않게, 2026-11-24 사용자 결정). -->
+  <select id="selectAssignmentDailyMms" resultType="java.math.BigDecimal">
+    SELECT COALESCE((SELECT h.new_ctrt_mm FROM TB_PJ_ASGN_HIST h WHERE h.asgn_id=a.asgn_id AND h.aply_dt &lt;= d.day
+      AND h.asgn_chg_type_cd='RATE' AND h.new_ctrt_mm IS NOT NULL ORDER BY h.aply_dt DESC,h.hist_sn DESC LIMIT 1),
+      (SELECT h.bfr_val::numeric FROM TB_PJ_ASGN_HIST h WHERE h.asgn_id=a.asgn_id AND h.aply_dt &gt; d.day
+        AND h.asgn_chg_type_cd='RATE' AND h.new_ctrt_mm IS NOT NULL ORDER BY h.aply_dt,h.hist_sn LIMIT 1),a.ctrt_mm)
+    FROM TB_PJ_ASGN a
+    CROSS JOIN LATERAL (SELECT g::date AS day FROM generate_series(CAST(#{start} AS date), CAST(#{end} AS date), INTERVAL '1 day') g) d
+    WHERE a.asgn_id=#{id}
+    ORDER BY d.day
+  </select>
   <select id="selectStatuses" resultMap="state">
     SELECT dev_id,stat_sn,work_stat_cd,bgn_dt,end_dt,stat_rsn,close_leave_sn,orgnl_leave_end_dt,reg_user_id
     FROM TB_HR_DEV_STAT WHERE dev_id=#{id} ORDER BY bgn_dt DESC,stat_sn DESC
@@ -207,7 +218,15 @@
   <update id="updateDerived">
     UPDATE TB_HR_DEV SET retire_dt=#{retirement,jdbcType=DATE},work_stat_cd=#{code},
       use_yn=CASE WHEN #{retirement,jdbcType=DATE} &lt; #{today} THEN 'N' WHEN #{resume} THEN 'Y' ELSE use_yn END,
-      mod_user_id='admin',mod_dttm=clock_timestamp() WHERE dev_id=#{id}
+      <!-- 근무 상태만 날짜에 따라 바뀔 때는 수정 시각을 그대로 둔다(화면을 열기만 해도 괜한 409가 나지 않게, 2026-11-24 사용자 결정).
+           퇴사일·사용 여부가 바뀌면 수정 시각을 새로 남긴다. -->
+      mod_user_id=CASE WHEN retire_dt IS DISTINCT FROM #{retirement,jdbcType=DATE}
+          OR (#{retirement,jdbcType=DATE} &lt; #{today} AND use_yn!='N') OR (#{resume} AND use_yn!='Y')
+        THEN 'admin' ELSE mod_user_id END,
+      mod_dttm=CASE WHEN retire_dt IS DISTINCT FROM #{retirement,jdbcType=DATE}
+          OR (#{retirement,jdbcType=DATE} &lt; #{today} AND use_yn!='N') OR (#{resume} AND use_yn!='Y')
+        THEN clock_timestamp() ELSE mod_dttm END
+      WHERE dev_id=#{id}
       AND (retire_dt IS DISTINCT FROM #{retirement,jdbcType=DATE} OR work_stat_cd IS DISTINCT FROM #{code}
         OR (#{retirement,jdbcType=DATE} &lt; #{today} AND use_yn!='N') OR (#{resume} AND use_yn!='Y'))
   </update>

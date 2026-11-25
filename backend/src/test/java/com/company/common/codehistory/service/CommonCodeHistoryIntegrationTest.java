@@ -121,9 +121,9 @@ class CommonCodeHistoryIntegrationTest {
     }
 
     @Test void newestTimestampThenNewestIdentityDeterminesOrder() throws Exception {
-        history("TB_SY_CODE", "A", "먼저 입력", "a", "b", "2026-11-13T00:01:00Z");
-        history("TB_SY_CODE", "B", "동일 시각 나중 입력", "a", "b", "2026-11-13T00:01:00Z");
-        history("TB_SY_CODE", "C", "오래된 기록", "a", "b", "2026-11-12T00:01:00Z");
+        history("TB_SY_CODE_MAP", "A", "먼저 입력", "a", "b", "2026-11-13T00:01:00Z");
+        history("TB_SY_CODE_MAP", "B", "동일 시각 나중 입력", "a", "b", "2026-11-13T00:01:00Z");
+        history("TB_SY_CODE_MAP", "C", "오래된 기록", "a", "b", "2026-11-12T00:01:00Z");
         mvc.perform(get("/api/common/code-change-history"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.items[0].item").value("동일 시각 나중 입력"))
@@ -137,13 +137,33 @@ class CommonCodeHistoryIntegrationTest {
         history("TB_SY_CODE_MAP", "DELETED_MAP", "삭제", "이전 대응", null, "2026-11-13T00:01:00Z");
         mvc.perform(get("/api/common/code-change-history"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.items[0].after").value(""))
-            .andExpect(jsonPath("$.data.items[1].before").value(""))
-            .andExpect(jsonPath("$.data.items[1].item").value("NEW_GROUP"));
+            .andExpect(jsonPath("$.data.items[0].after").value("–"))
+            .andExpect(jsonPath("$.data.items[1].before").value("–"))
+            .andExpect(jsonPath("$.data.items[1].item").value("새 그룹"));
         assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_CHG_HIST WHERE bfr_val IS NULL", Long.class))
             .isEqualTo(1);
     }
 
+    @Test void historyUsesMockupWordsForCodeUseFlagStandardAndProcessor() throws Exception {
+        db.update("INSERT INTO TB_SY_CODE_GRP(code_grp_id,code_grp_nm,sys_code_yn,val_code_yn,sort_ord,use_yn,reg_user_id,reg_dttm) VALUES ('HIST_GRP','판관비 항목','N','N',999,'Y','admin',clock_timestamp())");
+        db.update("INSERT INTO TB_SY_OPER_STD(std_cd,aply_bgn_ym,std_nm,std_val,unit_nm,reg_user_id,reg_dttm) VALUES ('HIST_STD','202601','목표 가동률',88,'%','admin',clock_timestamp())");
+        db.update("INSERT INTO TB_SY_USER(user_id,user_nm,email_addr,pwd_hash,pwd_err_cnt,mfa_err_cnt,user_stat_cd,reg_user_id,reg_dttm) VALUES ('hist-user','관리자','hist@example.invalid','x',0,0,'USE','admin',clock_timestamp())");
+        history("TB_SY_CODE", "HIST_GRP:TRAV", "CODE_NM", "출장비", "여비교통비", "2026-11-13T00:03:00Z");
+        history("TB_SY_CODE", "HIST_GRP:TRAV", "USE_YN", "Y", "N", "2026-11-13T00:02:00Z");
+        history("TB_SY_OPER_STD", "HIST_STD:202610", "HIST_STD:2026-10", "88", "90", "2026-11-13T00:01:00Z");
+        db.update("UPDATE TB_SY_CHG_HIST SET reg_user_id='hist-user'");
+        mvc.perform(get("/api/common/code-change-history")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].item").value("판관비 항목 · TRAV"))
+            .andExpect(jsonPath("$.data.items[0].before").value("출장비"))
+            .andExpect(jsonPath("$.data.items[0].after").value("여비교통비"))
+            .andExpect(jsonPath("$.data.items[0].processor").value("관리자"))
+            .andExpect(jsonPath("$.data.items[1].item").value("판관비 항목 · TRAV · 사용"))
+            .andExpect(jsonPath("$.data.items[1].before").value("사용"))
+            .andExpect(jsonPath("$.data.items[1].after").value("사용 안 함"))
+            .andExpect(jsonPath("$.data.items[2].item").value("목표 가동률"))
+            .andExpect(jsonPath("$.data.items[2].before").value("88%"))
+            .andExpect(jsonPath("$.data.items[2].after").value("90% (2026-10부터)"));
+    }
     @Test void noServerPaginationOrActionTypeFilter() throws Exception {
         for (int i = 0; i < 125; i++)
             history("TB_SY_CODE", "OWNED:" + i, "CODE_NM", "전", "후", "2026-11-13T00:00:00Z");

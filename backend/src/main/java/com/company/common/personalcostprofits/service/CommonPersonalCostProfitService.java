@@ -73,6 +73,15 @@ public class CommonPersonalCostProfitService {
         var closedCosts = mapper.selectCosts(filter);
         var assignments = mapper.selectAssignments(filter);
         var leaves = mapper.selectLeaves(filter);
+        // 사람·달마다 목록 전체를 다시 훑지 않도록 한 번 묶어 둔다(인원이 많아도 느려지지 않게, 2026-11-24 사용자 결정).
+        var payBy = new HashMap<String, Pay>();
+        for (var p : pay) payBy.putIfAbsent(p.developerId() + ":" + p.yearMonth(), p);
+        var inputBy = new HashMap<String, List<Assignment>>();
+        for (var a : assignments) inputBy.computeIfAbsent(a.developerId() + ":" + a.yearMonth(), key -> new ArrayList<>()).add(a);
+        var closedBy = new HashMap<String, List<Cost>>();
+        for (var c : closedCosts) closedBy.computeIfAbsent(c.developerId() + ":" + c.yearMonth(), key -> new ArrayList<>()).add(c);
+        var leavesBy = new HashMap<String, List<Leave>>();
+        for (var l : leaves) leavesBy.computeIfAbsent(l.developerId(), key -> new ArrayList<>()).add(l);
         var rates = new HashMap<String, Rates>();
         List<Aggregate> visible = new ArrayList<>();
         Map<String, Object> leaveTotals = numeric();
@@ -80,24 +89,22 @@ public class CommonPersonalCostProfitService {
         BigDecimal employedCount = ZERO, operatingCount = ZERO, earningCount = ZERO;
         for (Person person : people) {
             Aggregate aggregate = new Aggregate(person);
-            var personalLeaves = leaves.stream().filter(l -> l.developerId().equals(person.developerId())).toList();
+            var personalLeaves = leavesBy.getOrDefault(person.developerId(), List.of());
             for (int m = 1; m <= filter.baseMonth(); m++) {
                 YearMonth month = YearMonth.of(filter.year(), m);
                 if (!employed(person, month)) continue;
                 String ym = month.format(YM);
 
                 boolean closed = ym.compareTo(basis.cashBaseYm()) < 0 || basis.closedMonths().contains(ym);
-                Pay payroll = pay.stream().filter(p -> p.developerId().equals(person.developerId())
-                    && p.yearMonth().equals(ym)).findFirst().orElse(null);
+                Pay payroll = payBy.get(person.developerId() + ":" + ym);
                 String type = payroll == null ? person.employeeTypeCode() : payroll.employeeTypeCode();
-                var input = assignments.stream().filter(a -> a.developerId().equals(person.developerId())
-                    && a.yearMonth().equals(ym)).toList();
+                var input = inputBy.getOrDefault(person.developerId() + ":" + ym, List.of());
                 boolean leave = leaveAt(personalLeaves, month.atEndOfMonth());
                 Rates rate = closed ? new Rates(ZERO, ZERO, ZERO, ZERO) : rates.computeIfAbsent(ym,
                     key -> new Rates(rate(codes, "ALLOW_TEAM"), rate(codes, "ALLOW_GROUP"),
                         rate(codes, "SEV_RATE"), calculation.effectiveStandard("WTHLD_RT", month).value()));
-                List<Cost> costs = closed ? closedCosts.stream().filter(c -> c.developerId().equals(person.developerId())
-                    && c.yearMonth().equals(ym)).toList() : live(person, payroll, input, ym, rate, leave);
+                List<Cost> costs = closed ? closedBy.getOrDefault(person.developerId() + ":" + ym, List.of())
+                    : live(person, payroll, input, ym, rate, leave);
                 Map<String, BigDecimal> payrollValues = payroll(person, closed && costs.isEmpty() ? null : payroll, rate, closed);
                 BigDecimal monthlyMm = costs.stream().filter(c -> !"IDLE".equals(c.projectId()))
                     .map(Cost::mm).reduce(ZERO, BigDecimal::add);
@@ -189,8 +196,9 @@ public class CommonPersonalCostProfitService {
             }
             boolean endLeave = leaveAt(personalLeaves, YearMonth.of(filter.year(), filter.baseMonth()).atEndOfMonth());
             BigDecimal profit = number(aggregate.values, "operatingProfit");
-            BigDecimal eligibilityProfit = aggregate.leaveAmounts.stream().map(a -> number(a, "operatingProfit")).reduce(profit, BigDecimal::add);
-            if ("적자만".equals(filter.view()) && eligibilityProfit.signum() >= 0) continue;
+            // 「적자만」은 표에 보이는 그 사람 영업이익으로 거른다. 휴직 비용은 대기 원가로 따로 보므로 더하지 않는다
+            // (명세 SFR-103-07·시안, 요약 「적자 인원」과 같은 기준, 2026-11-24 사용자 결정).
+            if ("적자만".equals(filter.view()) && profit.signum() >= 0) continue;
             if ("동시 투입·1.0 초과만".equals(filter.view()) && !aggregate.over && !aggregate.concurrent) continue;
             totalPeople++;
             employedCount = employedCount.add(BigDecimal.valueOf(aggregate.directMonths));
@@ -220,6 +228,9 @@ public class CommonPersonalCostProfitService {
             row.put("employeeTypeName", a.person.employeeTypeName());
             row.put("joinDate", a.person.joinDate());
             row.put("operatingRate", percent(BigDecimal.valueOf(a.operating), BigDecimal.valueOf(a.employed)));
+            // 식-96 칸 도움말 「투입된 달 ÷ 재직한 달」(시안 wr: "9달 ÷ 10달")
+            row.put("operatingMonths", a.operating);
+            row.put("employedMonths", a.employed);
             row.put("profitRate", number(row, "unitPrice").signum() == 0 ? null
                 : percent(number(row, "operatingProfit"), number(row, "unitPrice")));
             row.put("mmOverOne", a.over);
@@ -228,9 +239,17 @@ public class CommonPersonalCostProfitService {
         }
         var summary = summary(visible, totals, totalPeople, leavePeople,
             new BigDecimal[]{employedCount, operatingCount, earningCount}, filter);
+        // 총 인원(휴직 포함·월평균 가동/가득 인원)과 가동률·가득률은 조건과 상관없이 회사 전체(식-37·38 「그 달 재직 직접 인력」,
+        // SFR-103-04 「요약 칸 회사 전체 가득률」, 시안, 2026-11-24 사용자 결정). 조건이 있으면 조건 없이 한 번 더 계산해 가져온다.
+        if (narrowed(filter)) {
+            var company = calculate(new Filter(filter.year(), filter.baseMonth(), filter.displayMode(), null, null, null, null,
+                null, null, filter.includeTurnkey(), filter.columns())).result().summary();
+            for (String key : List.of("totalPeople", "leavePeople", "averageOperatingPeople", "averageEarningPeople",
+                "averageDirectPeople", "operatingRate", "earningRate")) summary.put(key, company.get(key));
+        }
         sum(totals, leaveTotals);
         return new Calculation(new Result(items, summary, PersonalCostProfitColumnPolicy.project(totals, columns),
-            contributions(visible)), columns, PersonalCostProfitColumnPolicy.project(leaveTotals, columns));
+            contributions(visible, codes)), columns, PersonalCostProfitColumnPolicy.project(leaveTotals, columns));
     }
 
     private static final class Aggregate {
@@ -283,7 +302,8 @@ public class CommonPersonalCostProfitService {
         if (f.view() != null && !Set.of("전체", "적자만", "동시 투입·1.0 초과만").contains(f.view())) {
             throw CodeFailure.invalid("view", "등록된 보기를 선택해 주세요.");
         }
-        if (f.name() != null && f.name().length() > 100) throw CodeFailure.invalid("name", "이름은 100자 이내로 입력해 주세요.");
+        // TB_HR_DEV.DEV_NM VARCHAR(50)
+        if (f.name() != null && f.name().length() > 50) throw CodeFailure.invalid("name", "이름은 50자 이내로 입력해 주세요.");
         if (f.columns() != null && f.columns().stream().anyMatch(c -> !PersonalCostProfitColumnPolicy.KEYS.contains(c))) {
             throw CodeFailure.invalid("columns", "등록된 열을 선택해 주세요.");
         }
@@ -301,6 +321,10 @@ public class CommonPersonalCostProfitService {
                 throw CodeFailure.invalid(field, "사용 가능한 값을 선택해 주세요.");
             }
         });
+    }
+    private static boolean narrowed(Filter f) {
+        return java.util.stream.Stream.of(f.name(), f.employeeTypeCode(), f.affiliationId(), f.salesPartId(), f.jobCode())
+            .anyMatch(v -> v != null && !v.isBlank()) || (f.view() != null && !f.view().isBlank() && !"전체".equals(f.view()));
     }
     private static Map<String, Object> summary(List<Aggregate> people, Map<String, Object> totals,
         int totalPeople, int leavePeople, BigDecimal[] headcounts, Filter filter) {
@@ -325,12 +349,17 @@ public class CommonPersonalCostProfitService {
         summary.put("earningRate", percent(earning, employed));
         return summary;
     }
-    private static List<Map<String, Object>> contributions(List<Aggregate> people) {
-        Map<String, List<Aggregate>> grouped = new TreeMap<>();
-        for (var a : people) if (a.person.gradeName() != null
-            && Set.of("초급", "중급", "고급", "특급").contains(a.person.gradeName())) {
-            grouped.computeIfAbsent(a.person.jobCode() + ":" + a.person.gradeCode(), key -> new ArrayList<>()).add(a);
-        }
+    private static List<Map<String, Object>> contributions(List<Aggregate> people, List<Code> codes) {
+        // 직무 줄은 공통코드 JOB 정렬 순서(시안 JOBS 순서), 같은 직무 안은 GRADE 정렬 순서. 코드에 없으면 뒤로
+        Comparator<String> byJob = order(codes, "JOB");
+        Comparator<String> byGrade = order(codes, "GRADE");
+        Map<String, List<Aggregate>> grouped = new LinkedHashMap<>();
+        people.stream().filter(a -> a.person.gradeName() != null
+                && Set.of("초급", "중급", "고급", "특급").contains(a.person.gradeName()))
+            .sorted(Comparator.comparing((Aggregate a) -> a.person.jobCode(), byJob)
+                .thenComparing(a -> a.person.gradeCode(), byGrade))
+            .forEach(a -> grouped.computeIfAbsent(a.person.jobCode() + ":" + a.person.gradeCode(),
+                key -> new ArrayList<>()).add(a));
         return grouped.values().stream().map(group -> {
             var p = group.get(0).person;
             Map<String, Object> row = new LinkedHashMap<>();
@@ -341,5 +370,13 @@ public class CommonPersonalCostProfitService {
                 .reduce(ZERO, BigDecimal::add), BigDecimal.valueOf(group.size()), 0));
             return row;
         }).toList();
+    }
+    /** selectCodes가 SORT_ORD 순서로 주는 그 그룹 코드의 순서. 없는 코드는 맨 뒤(코드 글자 순). */
+    private static Comparator<String> order(List<Code> codes, String group) {
+        List<String> ordered = codes.stream().filter(c -> group.equals(c.groupCode())).map(Code::code).toList();
+        return Comparator.<String>comparingInt(code -> {
+            int index = ordered.indexOf(code);
+            return index < 0 ? Integer.MAX_VALUE : index;
+        }).thenComparing(Comparator.nullsLast(Comparator.<String>naturalOrder()));
     }
 }

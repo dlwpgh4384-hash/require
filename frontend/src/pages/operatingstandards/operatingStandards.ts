@@ -27,6 +27,8 @@ export class OperatingStandardsRequestError extends Error {
   constructor(
     message: string,
     public errors: { field: string; message: string }[] = [],
+    /** HTTP 상태(409면 화면이 다시 읽는다, FR-0106). */
+    public status = 0,
   ) {
     super(message);
   }
@@ -43,6 +45,7 @@ async function operatingRequest(
         ? body.message
         : "운영 기준값을 처리하지 못했습니다. 다시 시도해 주세요.",
       response.status === 400 && Array.isArray(body.errors) ? body.errors : [],
+      response.status,
     );
   if (!Array.isArray(body.data?.items))
     throw new Error("운영 기준값 응답을 확인해 주세요.");
@@ -157,6 +160,12 @@ export function validateOperatingChanges(
     if (change.standardCode === "CASH_BASE_YM") {
       if (!/^[0-9]{4}-(0[1-9]|1[0-2])$/.test(change.value ?? ""))
         errors[change.standardCode] = `${label(change.standardCode)}: 연월을 골라 주세요.`;
+      continue;
+    }
+    // 시안 operCheck: 철수 알림은 1일 이상 정수.
+    if (change.standardCode === "WTHDR_NOTI_D") {
+      if (!/^[0-9]+$/.test(change.value ?? "") || Number(change.value) < 1)
+        errors[change.standardCode] = `${label(change.standardCode)}: 1일 이상 정수로 넣어 주세요.`;
       continue;
     }
     if (!/^-?[0-9]+(?:\.[0-9]{1,4})?$/.test(change.value ?? ""))

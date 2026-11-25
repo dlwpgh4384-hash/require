@@ -77,6 +77,16 @@ public class CommonProjectCostAnalysisService {
         return new CommonProjectCostAnalysisResult(summary, items, items.size(), options,
             population.target(), population.notice());
     }
+    /**
+     * 프로젝트별 예산 소진율(식-19, 목록 「예산 소진율」과 같은 값). 프로젝트 현황판의 원가 사용률(식-75 「예산 소진율과
+     * 같은 값」)이 같은 계산을 쓰게 한다(2026-11-24 사용자 결정). 값이 없는 프로젝트는 빠진다.
+     */
+    public java.util.Map<String, BigDecimal> budgetUsageRates(int year, int baseMonth) {
+        var rates = new java.util.HashMap<String, BigDecimal>();
+        for (var analysis : population(new Period(year, baseMonth)).projects())
+            if (analysis.row().budgetUsageRate() != null) rates.put(analysis.row().projectId(), analysis.row().budgetUsageRate());
+        return rates;
+    }
     /** 상세 창 월별 원가: 기준월까지 최근 12달(경과한 달만), 턴키 배분 기준 매출은 식-25. */
     public CommonProjectCostAnalysisMonthlyCosts getCommonProjectCostAnalysisMonthlyCosts(String projectId, Period period) {
         var population = population(period);
@@ -97,12 +107,14 @@ public class CommonProjectCostAnalysisService {
         }
         Map<String, BigDecimal> reference = turnkey ? reference(p, a, population, months, cost) : Map.of();
         List<CommonProjectCostAnalysisMonthlyCost> items = new ArrayList<>();
+        // 작업중 달에 급여가 없으면 그 달 마진율은 「–」(목록 월간 마진과 같은 규칙, 2026-11-20 결정 ⑧)
+        String unpaid = population.notice() == null ? null : population.cutoff().format(YM);
         for (String month : months.subList(Math.max(0, months.size() - 12), months.size())) {
             BigDecimal sales = internal || turnkey ? null : revenue.get(month);
             BigDecimal ref = turnkey ? reference.get(month) : null;
             BigDecimal basis = turnkey ? ref : sales;
             items.add(new CommonProjectCostAnalysisMonthlyCost(month, mm.get(month), cost.get(month), sales, ref,
-                internal || basis == null || basis.signum() == 0 ? null : rate(basis, cost.get(month))));
+                internal || month.equals(unpaid) || basis == null || basis.signum() == 0 ? null : rate(basis, cost.get(month))));
         }
         return new CommonProjectCostAnalysisMonthlyCosts(items);
     }

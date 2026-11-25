@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useSavedYear } from "../userpreferences/useSavedYear";
 import { createPortal } from "react-dom";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
@@ -77,7 +78,8 @@ export function BillingPage() {
   const currentYear = Number(today.slice(0, 4));
   const currentMonth = today.slice(0, 7).replace("-", "");
   const host = useBillingTitleHost();
-  const [year, setYear] = useState(currentYear);
+  // 고른 연도를 기억하고, 월 마감 [확인하기]로 바뀐 해도 받는다(FR-0105, 2026-11-24 사용자 결정).
+  const [year, setYear] = useSavedYear("UI-13", currentYear, 1, currentYear);
   const [tab, setTab] = useState<Tab>("list");
   const [draft, setDraft] = useState<Filter>({});
   const [applied, setApplied] = useState<Filter>({});

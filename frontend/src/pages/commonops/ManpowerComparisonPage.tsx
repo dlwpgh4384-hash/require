@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useSavedYear } from "../userpreferences/useSavedYear";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
   Badge,
@@ -78,6 +79,11 @@ export function ManpowerComparisonPage() {
     year: Math.min(2027, Math.max(2025, currentYear)),
   }));
   const [applied, setApplied] = useState<ManpowerComparisonFilter>(draft);
+  // 고른 연도를 기억한다(FR-0105, 2026-11-24 사용자 결정). 다시 열면 저장된 해로 바로 조회한다.
+  const [, saveYear] = useSavedYear("UI-11", draft.year, 2025, 2027, (year) => {
+    setDraft((previous) => ({ ...previous, year }));
+    setApplied((previous) => ({ ...previous, year }));
+  });
   const [revision, setRevision] = useState(0);
   const openEdit = useOpenProjectEdit();
   const [data, setData] = useState<ManpowerComparisonResult | null>(null);
@@ -146,18 +152,27 @@ export function ManpowerComparisonPage() {
     return () => abort.abort();
   }, [applied, revision]);
 
-  const changeYear = (year: number) =>
+  // 시안 기간 줄: 연도를 바꾸면 그 해로 바로 다시 조회한다(다른 연도 화면과 같음). 조회한 조건은 두고,
+  // 그 해에 걸치지 않는 프로젝트 선택만 푼다. 아직 [조회]하지 않은 조건은 입력 칸에만 남는다.
+  const keepProject = (projectId: string | undefined, year: number) =>
+    projectId &&
+    projects.some((p) => p.projectId === projectId && overlaps(p, year))
+      ? projectId
+      : undefined;
+  const changeYear = (year: number) => {
+    saveYear(year);
     setDraft((previous) => ({
       ...previous,
       year,
-      projectId:
-        previous.projectId &&
-        projects.some(
-          (p) => p.projectId === previous.projectId && overlaps(p, year),
-        )
-          ? previous.projectId
-          : undefined,
+      projectId: keepProject(previous.projectId, year),
     }));
+    setApplied((previous) => ({
+      ...previous,
+      year,
+      projectId: keepProject(previous.projectId, year),
+    }));
+    setPage(1);
+  };
   const search = () => {
     setApplied({ ...draft });
     setPage(1);

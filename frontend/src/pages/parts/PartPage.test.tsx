@@ -513,3 +513,19 @@ it("시안 UI-15: 중지 파트는 띠를 보이고 ⋯ [다시 사용]은 확�
     expect(within(screen.getByTestId("part-detail-panel")).queryByText("사용을 중지한 파트입니다.")).not.toBeInTheDocument(),
   );
 });
+it("[다시 사용]이 409면 경고 알림을 띄우고 목록을 다시 읽는다 (FR-0106)", async () => {
+  part.useYn = "N";
+  render(<PartPage />);
+  fireEvent.click(await screen.findByText("영업 1파트"));
+  await screen.findByTestId("part-detail-panel");
+  const lists = () =>
+    request.mock.calls.filter((call: unknown[]) => call[0] === "/api/common/parts").length;
+  const before = lists();
+  failureStatus = 409;
+  fireEvent.click(screen.getByTestId("part-more"));
+  fireEvent.click(screen.getByTestId("part-resume"));
+  const toast = await screen.findByTestId("part-saved-toast");
+  expect(toast).toHaveTextContent("다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.");
+  expect(toast).toHaveClass("app-toast-warn");
+  await waitFor(() => expect(lists()).toBeGreaterThan(before));
+});

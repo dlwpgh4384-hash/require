@@ -67,8 +67,12 @@ public class CommonCodeService {
         var group = group(id);
         business(group);
         var row = parse(id, body, null, mapper.nextCodeOrder(id), "Y".equals(group.valCodeYn));
-        if (mapper.selectCode(id, row.code) != null)
-            throw new CodeFailure("code", "이미 등록된 코드입니다. 삭제한 코드는 다시 사용할 수 없습니다.");
+        var existing = mapper.selectCode(id, row.code);
+        // 시안 문구: 있는 코드와 삭제한 코드(PK가 남음)를 나눠 알린다.
+        if (existing != null)
+            throw new CodeFailure("code", "N".equals(existing.delYn) ? "이미 있는 코드입니다."
+                : "삭제한 코드 값은 다시 쓸 수 없습니다. 다른 코드를 넣어 주세요.");
+        requireKnownReferences(row, null);
         if (mapper.insertCode(row) != 1) throw invalid("code");
         management.insertHistory(new History("TB_SY_CODE", key(row), "NEW", "CODE_NM", null, row.codeName));
         return row.value();
@@ -108,6 +112,7 @@ public class CommonCodeService {
                         throw new CodeFailure(publicField(field), "시스템 코드는 이름만 바꿀 수 있습니다.");
                 });
             }
+            requireKnownReferences(next, old);
             before.add(old);
             after.add(next);
         }
@@ -155,6 +160,30 @@ public class CommonCodeService {
         if (mapper.deleteCode(id, code) != 1) throw invalid("code");
         management.insertHistory(new History("TB_SY_CODE", key(row), "DEL", "DEL_YN", "N", "Y"));
         return new Deleted(id, code, "Y");
+    }
+    /**
+     * 시안 addChk: 추가값에 쉼표로 적은 코드(직무·계약유형)가 그 그룹에 있어야 한다. 「없는 코드입니다: X」.
+     * 새로 넣거나 값을 바꾼 칸만 본다(예전 값은 그대로 저장할 수 있게).
+     */
+    private void requireKnownReferences(CodeRows.Code row, CodeRows.Code old) {
+        String field;
+        String refGroup;
+        String value;
+        String before;
+        switch (row.groupId) {
+            case "JOB" -> { field = "relatedJobs"; refGroup = "JOB"; value = row.addVal1; before = old == null ? null : old.addVal1; }
+            case "SKILL" -> { field = "requiredJobs"; refGroup = "JOB"; value = row.addVal1; before = old == null ? null : old.addVal1; }
+            case "RSM_JOB_KW" -> { field = "job"; refGroup = "JOB"; value = row.addVal1; before = old == null ? null : old.addVal1; }
+            case "PROJ_STEP" -> { field = "contractTypes"; refGroup = "CTRT_TYPE"; value = row.addVal2; before = old == null ? null : old.addVal2; }
+            default -> { return; }
+        }
+        if (value == null || Objects.equals(value, before)) return;
+        var known = new HashSet<String>();
+        mapper.selectCodes(refGroup).forEach(code -> known.add(code.code));
+        if (row.groupId.equals(refGroup)) known.add(row.code);
+        var unknown = java.util.Arrays.stream(value.split(","))
+            .map(String::trim).filter(token -> !token.isEmpty() && !known.contains(token)).toList();
+        if (!unknown.isEmpty()) throw new CodeFailure(field, "없는 코드입니다: " + String.join(", ", unknown));
     }
     private void business(CodeRows.Group group) {
         if ("Y".equals(group.sysCodeYn)) throw new CodeFailure("code", "시스템 코드는 추가하거나 삭제할 수 없습니다.");

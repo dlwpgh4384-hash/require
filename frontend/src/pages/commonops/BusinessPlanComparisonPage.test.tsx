@@ -238,6 +238,19 @@ it("marks only valid underachievement red and gives both zero-target ratios a he
     screen.getByTestId("business-plan-achievementRate-202612"),
   ).not.toHaveClass("business-plan-under");
 });
+it("gives future zero-target months a plain dash without the no-target help", async () => {
+  noTargets = true;
+  mount();
+  await ready();
+  for (const field of ["achievementRate", "profitRateDifference"]) {
+    expect(
+      screen.getByTestId(`business-plan-${field}-202611`),
+    ).toHaveAttribute("title", "목표 없음");
+    const future = screen.getByTestId(`business-plan-${field}-202612`);
+    expect(future).toHaveTextContent("–");
+    expect(future).not.toHaveAttribute("title");
+  }
+});
 it("uses the report amounts in the shared raw-won bar chart and retains million-won chart units", async () => {
   mount();
   await ready();

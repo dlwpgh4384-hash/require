@@ -15,7 +15,7 @@ import {
   type MoneyUnit,
 } from "../../shared/list/moneyUnit";
 import type { ListColumn, ListSort } from "../../shared/list/listTypes";
-import { Toast } from "../../shared/feedback/Dialog";
+import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { getCommonCodes } from "../codegroups/codeGroups";
 import { ProjectRequestError, typeLabel } from "../projects/projects";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
@@ -75,7 +75,7 @@ export function ProjectCostAnalysisPage() {
   const [unit, setUnit] = useState<MoneyUnit>(DEFAULT_MONEY_UNIT);
   const [selected, setSelected] = useState<Row>();
   const [downloading, setDownloading] = useState(false);
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState<{ kind: ToastKind; message: string } | null>(null);
   const form = useRef<HTMLElement>(null);
   const periodBox = useRef<HTMLDivElement>(null);
   const request = selectedPeriod && {
@@ -124,12 +124,19 @@ export function ProjectCostAnalysisPage() {
       })
       .catch((failure) => {
         if (controller.signal.aborted) return;
-        setData(undefined);
-        setError(failure instanceof Error ? failure.message : "분석을 불러오지 못했습니다.");
-        const next =
+        const next: Record<string, string> =
           failure instanceof ProjectRequestError
             ? Object.fromEntries(failure.errors.map((item) => [item.field, item.message]))
             : {};
+        // 시안: 달을 바꿔 고른 프로젝트가 그 달 목록에 없으면 프로젝트 조건만 「전체」로 되돌리고 다시 조회한다
+        if (next.projectId && request.projectId) {
+          setDraft((current) => ({ ...current, projectId: "" }));
+          setFilter((current) => ({ ...current, projectId: "" }));
+          setToast({ kind: "info", message: "고른 프로젝트가 이 달에 없어 전체로 조회했습니다." });
+          return;
+        }
+        setData(undefined);
+        setError(failure instanceof Error ? failure.message : "분석을 불러오지 못했습니다.");
         setFields(next);
         const first = Object.keys(next)[0];
         // 기간 오류는 기간 상자로, 조건 오류는 그 조건 칸으로 옮겨 간다
@@ -357,11 +364,16 @@ export function ProjectCostAnalysisPage() {
   async function download() {
     if (!request) return;
     setDownloading(true);
+    const count = data?.totalCount ?? 0;
     try {
       await getCommonProjectCostAnalysesExcel(request);
-      setToast("엑셀 파일을 다운로드했습니다.");
+      // 시안 xls 알림 문구. 실패는 목록을 가리지 않고 주의 알림으로 보인다(다른 화면과 같음)
+      setToast({ kind: "ok", message: `엑셀 파일을 만들었습니다${count ? ` (조회 결과 ${count}건)` : ""}` });
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "엑셀을 받지 못했습니다.");
+      setToast({
+        kind: "warn",
+        message: failure instanceof Error ? failure.message : "엑셀을 받지 못했습니다.",
+      });
     } finally {
       setDownloading(false);
     }
@@ -608,7 +620,7 @@ export function ProjectCostAnalysisPage() {
           onClose={() => setSelected(undefined)}
         />
       )}
-      {toast && <Toast message={toast} onDismiss={() => setToast("")} />}
+      {toast && <Toast kind={toast.kind} message={toast.message} onDismiss={() => setToast(null)} />}
     </section>
   );
 }

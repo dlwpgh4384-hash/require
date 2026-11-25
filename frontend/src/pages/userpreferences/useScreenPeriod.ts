@@ -9,6 +9,9 @@ import {
 import {
   createPreferenceSaver,
   getCommonUserPreference,
+  PERIOD_BASIS_CHANGED_EVENT,
+  PERIOD_CHANGED_EVENT,
+  type PeriodChangedDetail,
 } from "./userPreferences";
 
 type State =
@@ -100,5 +103,51 @@ export function useScreenPeriod(
     },
     [save],
   );
+  // 다른 화면(월 마감 [확인하기])이 이 화면 기간을 바꿔 저장하면, 이미 열린 탭도 그 기간으로 바꾼다(다시 저장하지 않음).
+  useEffect(() => {
+    const current: PeriodOptions = JSON.parse(optionsKey);
+    const listener = (event: Event) => {
+      const detail = (event as CustomEvent<PeriodChangedDetail>).detail;
+      if (!detail || detail.screenId !== screenId) return;
+      const next = parseSaved(detail.prefVal);
+      if (!next) return;
+      saver.setToken(detail.modDttm);
+      setState((previous) =>
+        previous.status === "ready" && isAllowed(next, previous.basis, current)
+          ? { ...previous, value: next }
+          : previous,
+      );
+    };
+    window.addEventListener(PERIOD_CHANGED_EVENT, listener);
+    return () => window.removeEventListener(PERIOD_CHANGED_EVENT, listener);
+  }, [screenId, optionsKey, saver]);
+  // 월 마감·해제 뒤에는 기간 기준을 다시 읽는다. 고른 기간은 그대로 두고, 새 기준에서 고를 수 없게 되면 가장 최근 달로 바꾼다.
+  useEffect(() => {
+    const current: PeriodOptions = JSON.parse(optionsKey);
+    let controller: AbortController | null = null;
+    const listener = () => {
+      controller?.abort();
+      const active = new AbortController();
+      controller = active;
+      getCommonUserPreference("PERIOD", screenId, active.signal)
+        .then((response) => {
+          const basis = response.meta.periodBasis;
+          if (active.signal.aborted || !basis) return;
+          setState((previous) => {
+            if (previous.status !== "ready") return previous;
+            const value = isAllowed(previous.value, basis, current)
+              ? previous.value
+              : latestPeriod(basis, current.kind);
+            return { status: "ready", basis, value };
+          });
+        })
+        .catch(() => undefined);
+    };
+    window.addEventListener(PERIOD_BASIS_CHANGED_EVENT, listener);
+    return () => {
+      controller?.abort();
+      window.removeEventListener(PERIOD_BASIS_CHANGED_EVENT, listener);
+    };
+  }, [screenId, optionsKey]);
   return { state, setValue };
 }

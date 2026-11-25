@@ -30,6 +30,12 @@ public final class RateRenegotiationRules {
         BigDecimal increase = f.increaseRate() == null ? valueOf(5) : f.increaseRate().max(ZERO).min(valueOf(50));
         return new Filter(months, threshold, f.employeeTypeCode(), f.projectId(), increase);
     }
+    /** 조건과 상관없이 재협상 대상이 될 수 있는 투입(시안 all: 월단위·파견 진행 중, 무상지원 아님, 종료일 ≥ 오늘). */
+    public static boolean candidate(AssignmentInfo a, LocalDate today) {
+        return !"CNCL".equals(a.assignmentStatus()) && !"FREE".equals(a.inputTypeCode())
+            && "ING".equals(a.projectStatus()) && Set.of("MO", "DP").contains(a.contractTypeCode())
+            && ChronoUnit.DAYS.between(today, a.renewalDate()) >= 0;
+    }
     public static boolean eligible(AssignmentInfo a, BigDecimal mm, Filter f, LocalDate today) {
         long days = ChronoUnit.DAYS.between(today, a.renewalDate());
         int horizon = switch (f.renewalMonths()) { case 3 -> 92; case 6 -> 183; default -> 366; };
@@ -53,7 +59,8 @@ public final class RateRenegotiationRules {
         }
         BigDecimal denominator = mm.multiply(ONE.subtract(targetRate.movePointLeft(2))).multiply(TEN_THOUSAND);
         BigDecimal target = labor.divide(denominator, 0, RoundingMode.CEILING).multiply(TEN_THOUSAND);
-        BigDecimal needed = target.subtract(a.currentUnitPrice()).multiply(HUNDRED)
+        // 시안 need = Math.max(0, …): 목표 단가가 현재 단가보다 낮으면 0(화면 「–」).
+        BigDecimal needed = target.subtract(a.currentUnitPrice()).max(ZERO).multiply(HUNDRED)
             .divide(a.currentUnitPrice(), 1, RoundingMode.HALF_UP);
         return new Row(a.assignmentId(), a.developerId(), a.developerName(), a.employeeTypeName(), a.projectName(),
             a.renewalDate(), Math.toIntExact(ChronoUnit.DAYS.between(today, a.renewalDate())), mm,
@@ -65,6 +72,7 @@ public final class RateRenegotiationRules {
         return difference.multiply(contractMm).multiply(valueOf(12)).setScale(0, RoundingMode.DOWN);
     }
     public static BigDecimal targetAnnual(Row row, BigDecimal contractMm) {
-        return annual(row.targetUnitPrice().subtract(row.currentUnitPrice()), contractMm);
+        // 시안 gainT = Math.max(0, 목표 단가 − 현재 단가) × MM × 12
+        return annual(row.targetUnitPrice().subtract(row.currentUnitPrice()).max(ZERO), contractMm);
     }
 }

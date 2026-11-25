@@ -144,6 +144,15 @@ class PartSettlementRulesTest {
         assertThat(closeTarget(p,month,List.of(h))).isTrue();p.hqYn="Y";assertThat(closeTarget(p,month,List.of(h))).isFalse();
         p.hqYn="N";p.distributionRate=null;assertThat(closeTarget(p,month,List.of(h))).isFalse();
     }
+    @Test void partUsedForPartOfTheMonthIsATargetButOneStoppedBeforeTheMonthIsNot() {
+        // 그 달에 하루라도 사용 중이면 정산 대상(2026-11-24 사용자 결정).
+        var p=part("A");p.useYn="N";
+        var start=month.atDay(1).atStartOfDay(java.time.ZoneId.of("Asia/Seoul")).toInstant();
+        var mid=history("TB_BS_PART","A","사용 여부","Y",start.plus(java.time.Duration.ofDays(14)).toString(),1);
+        assertThat(closeTarget(p,month,List.of(mid))).isTrue();
+        var before=history("TB_BS_PART","A","사용 여부","Y",start.minus(java.time.Duration.ofDays(10)).toString(),2);
+        assertThat(closeTarget(p,month,List.of(before))).isFalse();
+    }
     static History history(String table,String target,String item,String before,String at,int id) {
         var h=new History();h.tableName=table;h.target=target;h.item=item;h.before=before;h.at=Instant.parse(at);h.id=n(Integer.toString(id));return h;
     }

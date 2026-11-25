@@ -1310,6 +1310,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '409':
+          description: 읽은 뒤 다른 사람이 이 역할을 먼저 저장했다(modifiedAt 다름). 기존 값은 보존한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
       requestBody:
         required: true
         content:
@@ -15939,6 +15945,20 @@ components:
           items:
             type: string
           description: 이 달 급여 업로드 전이라 개발자 풀 월 급여로 원가를 계산한 대상자 ID(정렬)
+        projectOptions:
+          type: array
+          description: 조건 「프로젝트」 목록. 재협상 대상이 될 수 있는 프로젝트만(월단위·파견 진행 중, 무상지원 아닌 투입, 종료일 ≥ 오늘). 사람이 더함(2026-11-24)
+          items:
+            type: object
+            properties:
+              projectId:
+                type: string
+              projectName:
+                type: string
+            required:
+            - projectId
+            - projectName
+            additionalProperties: false
       additionalProperties: false
     CommonProjectCostAnalysisSummary:
       type: object
@@ -18374,6 +18394,12 @@ components:
         operatingRate:
           type: number
           description: 가동률·식-96
+        operatingMonths:
+          type: integer
+          description: 가동률 도움말·투입된 달 수(식-96)
+        employedMonths:
+          type: integer
+          description: 가동률 도움말·재직한 달 수(식-96)
         mm:
           type: number
           description: MM
@@ -20192,6 +20218,11 @@ components:
               name:
                 type: string
             additionalProperties: false
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 역할 마지막 변경 시각(UTC, MOD_DTTM 없으면 REG_DTTM). 저장(PUT)에 그대로 돌려보내 동시 수정을 확인한다(FR-0106).
       additionalProperties: false
     CommonRoleList:
       type: object
@@ -20299,6 +20330,11 @@ components:
           type: array
           items:
             type: string
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: getCommonRole의 modifiedAt 그대로. 지금 값과 다르면 저장하지 않고 409(FR-0106).
       additionalProperties: false
     CommonRoleCopyInput:
       type: object

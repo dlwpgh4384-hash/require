@@ -31,6 +31,16 @@ public class CommonAssignmentService {
     private static final int CHUNK=500;
     public Instant now() { return calendar.now(); }
     public String userId() { return actor.userId(); }
+    /** 엑셀 「월 단가」: 화면 목록과 같이 턴키는 「배분표」, 무상지원은 「무상지원」, 그 밖은 금액(2026-11-24 사용자 결정). */
+    public String excelPrice(Assignment a, Map<String,String> contractTypes) {
+        String type=contractTypes.computeIfAbsent(a.projectId(), id -> {
+            var project=projects.selectProject(id,calendar.today(),db(calendar.currentMonth()));
+            return project==null?"":project.contractTypeCode;
+        });
+        if ("TK".equals(type)) return "배분표";
+        if ("FREE".equals(a.inputTypeCode())) return "무상지원";
+        return a.billingPrice()==null?"":a.billingPrice().toPlainString();
+    }
     public List<String> roles() { return new ArrayList<>(actor.roles()); }
     public static boolean blank(String s) { return s==null || s.isBlank(); }
     private static String db(YearMonth m) { return m.toString().replace("-",""); }
@@ -287,7 +297,8 @@ public class CommonAssignmentService {
         String id=allocate();
         Row row=new Row(id,projectId,developer,job,start,end,mm,price,input,contract,extension,0,"N","ACT",null,project.projectName,person.name(),null,code("JOB",job,""),project.contractTypeCode,project.statusCode);
         mapper.insert(new Write(row,userId(),null));
-        history(row,new Event("INPUT",start,"","투입",null,memo,price,mm,null));
+        // [같이 처리] 메모는 빠지는 사람의 조기 철수 이력에만 남긴다(시안, 2026-11-24 사용자 결정). 신규 투입처럼 「투입」 줄에는 넣지 않는다.
+        history(row,new Event("INPUT",start,"","투입",null,originals.isEmpty()?memo:null,price,mm,null));
         if (candidate!=null && mapper.confirmCandidate(candidate,userId())!=1) throw CodeFailure.conflict();
         for (Row source:originals) {
             Row withdrawn=replace(source,new Values(start.minusDays(1),source.monthlyMm(),source.billingPrice(),source.inputTypeCode(),source.extensionPossibilityCode(),source.extensionCount(),"Y",source.statusCode()));
@@ -334,8 +345,12 @@ public class CommonAssignmentService {
     private static Row replace(Row r,Values v) {
         return new Row(r.assignmentId(),r.projectId(),r.developerId(),r.jobCode(),r.startDate(),v.end(),v.mm(),v.price(),v.input(),r.contractDeveloperId(),v.extension(),v.count(),v.early(),v.status(),r.modifiedAt(),r.projectName(),r.name(),r.managementNumber(),r.jobName(),r.contractTypeCode(),r.projectStatusCode());
     }
+    /** 소급 입력: 지난 날짜. 단가·월 MM 변경은 달만 고르므로 지난 달일 때만(시안 hmRetro, 이번 달 1일은 소급 아님). */
+    private boolean retroactive(String type,LocalDate date) {
+        return Set.of("UPRC","RATE").contains(type)?YearMonth.from(date).isBefore(calendar.currentMonth()):date.isBefore(calendar.today());
+    }
     private void history(Row r,Event e) {
-        mapper.insertHistory(new HistoryWrite(new HistoryRow(mapper.nextHistory(r.assignmentId()),r.assignmentId(),e.type(),e.date(),e.before(),e.after(),e.reason(),e.memo(),e.price(),e.mm(),e.date().isBefore(calendar.today())?"Y":"N",crossesClose(e.date(),r.endDate())?"Y":"N","N",e.target(),userId(),null),userId()));
+        mapper.insertHistory(new HistoryWrite(new HistoryRow(mapper.nextHistory(r.assignmentId()),r.assignmentId(),e.type(),e.date(),e.before(),e.after(),e.reason(),e.memo(),e.price(),e.mm(),retroactive(e.type(),e.date())?"Y":"N",crossesClose(e.date(),r.endDate())?"Y":"N","N",e.target(),userId(),null),userId()));
     }
     /** 금액 화면 글: 천 단위 쉼표(원 단위 정수, 소수가 있으면 그대로 둔다). */
     static String price(BigDecimal value) {
@@ -363,7 +378,7 @@ public class CommonAssignmentService {
         if (monthOnly) effective=effective.withDayOfMonth(1);
         if (monthOnly?YearMonth.from(effective).isBefore(YearMonth.from(r.startDate())):effective.isBefore(r.startDate())) throw CodeFailure.invalid("effectiveDate","적용일은 투입일 이전일 수 없습니다.");
         String memo=ProjectRules.text(b,"memo",200,false),reason=ProjectRules.text(b,"reasonCode",10,false);
-        if (("EARLY".equals(type) || effective.isBefore(calendar.today()) || crossesClose(effective,r.endDate())) && blank(reason)) throw CodeFailure.invalid("reasonCode","변경 사유를 골라 주세요.");
+        if (("EARLY".equals(type) || retroactive(type,effective) || crossesClose(effective,r.endDate())) && blank(reason)) throw CodeFailure.invalid("reasonCode","변경 사유를 골라 주세요.");
         if (!blank(reason)) validCode("ASGN_CHG_RSN",reason,"reasonCode");
         LocalDate end=r.endDate(); BigDecimal mm=r.monthlyMm(),price=r.billingPrice(),newPrice=null,newMm=null;
         String input=r.inputTypeCode(),extension=r.extensionPossibilityCode(),early=r.earlyYn(); int count=r.extensionCount();
@@ -466,7 +481,7 @@ public class CommonAssignmentService {
         ClientRules.object(b,Set.of("assignments")); var rows=bulkRows(b);
         for(Row r:rows) if (!"CNCL".equals(r.statusCode())) {
             Row cancelled=replace(r,new Values(r.endDate(),r.monthlyMm(),r.billingPrice(),r.inputTypeCode(),r.extensionPossibilityCode(),r.extensionCount(),r.earlyYn(),"CNCL"));
-            update(r,cancelled); history(r,new Event("CNCL",calendar.today(),"투입","배정 취소",null,null,null,null,null)); recalculate(cancelled);
+            update(r,cancelled); history(r,new Event("CNCL",calendar.today(),r.startDate()+" ~ "+r.endDate(),"배정 취소",null,null,null,null,null)); recalculate(cancelled);
         }
         return new Items<>(rows.stream().map(r -> getCommonAssignment(r.assignmentId())).toList());
     }

@@ -7,6 +7,7 @@ import com.company.common.roles.mapper.RoleRows;
 import com.company.common.users.dto.UserContracts.ChangeHistory;
 import com.company.common.users.dto.UserContracts.History;
 import com.company.common.users.mapper.UserMapper;
+import com.company.common.support.service.CodeFailure;
 import java.math.BigInteger;
 import java.util.HashSet;
 import java.util.List;
@@ -41,9 +42,9 @@ public class CommonRoleService {
         return new RoleList(mapper.selectRoles().stream().map(RoleRows.Role::value).toList());
     }
     public Settings getCommonRole(String id) {
-        var role = require(id).value();
-        return new Settings(role, mapper.selectMenus(id).stream().map(RoleRows.Menu::value).toList(),
-            mapper.selectDataScopes().stream().map(RoleRows.ScopeCode::value).toList());
+        var row = require(id);
+        return new Settings(row.value(), mapper.selectMenus(id).stream().map(RoleRows.Menu::value).toList(),
+            mapper.selectDataScopes().stream().map(RoleRows.ScopeCode::value).toList(), row.modifiedAt);
     }
     private List<RoleRows.Scope> removable(RoleRows.Role old, String next) {
         if (old.dataScopeCd.equals(next) || !List.of("PART", "PROJ").contains(old.dataScopeCd))
@@ -116,8 +117,8 @@ public class CommonRoleService {
                 after = after == null ? null : scopes.getOrDefault(after, after);
             } else if ("SNSTV_VIEW_YN".equals(row.item)) {
                 item = "민감 항목";
-                before = flag(before, "보기", "안 보기");
-                after = flag(after, "보기", "안 보기");
+                before = flag(before, "봄", "안 봄");
+                after = flag(after, "봄", "안 봄");
             } else if ("ROLE_NM".equals(row.item)) {
                 item = "역할 이름";
             }
@@ -145,6 +146,8 @@ public class CommonRoleService {
     public Settings putCommonRole(String id, Update input) {
         management.lockManagement();
         var old = require(id);
+        // FR-0106 동시 수정: 화면이 읽은 뒤 다른 사람이 이 역할을 저장했으면 덮어쓰지 않는다.
+        if (input.modifiedAt() != null && !input.modifiedAt().equals(old.modifiedAt)) throw CodeFailure.conflict();
         scope(input.dataScopeCd());
         RoleRules.flag(input.snstvViewYn(), "snstvViewYn");
         var current = mapper.selectMenus(id).stream().map(RoleRows.Menu::value).toList();

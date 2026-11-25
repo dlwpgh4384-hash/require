@@ -86,18 +86,24 @@ public class CommonWithdrawalService {
         soon.forEach(s -> developers.add(s.developerId()));
         Map<String, List<Reservation>> reserved = developers.isEmpty() ? Map.of()
             : mapper.reservationsFor(developers).stream().collect(Collectors.groupingBy(Reservation::developerId));
+        Map<String, List<FollowingRow>> assigned = developers.isEmpty() ? Map.of()
+            : Objects.requireNonNullElse(mapper.followingAssignments(developers), List.<FollowingRow>of()).stream()
+                .collect(Collectors.groupingBy(FollowingRow::developerId));
         var assignmentIds = rows.stream().map(Source::assignmentId).distinct().toList();
         Map<String, List<EarlyRow>> early = assignmentIds.isEmpty() ? Map.of()
             : mapper.earlyHistory(assignmentIds).stream().collect(Collectors.groupingBy(EarlyRow::assignmentId));
         var items = rows.stream().map(source -> row(source,
             reserved.getOrDefault(source.developerId(), List.of()),
+            following(source, assigned),
             early.getOrDefault(source.assignmentId(), List.of()), context, today)).toList();
         Banner banner = null;
         if (currentYear) {
             int unassigned = 0, matched = 0;
             for (var source : soon) {
                 var current = reserved.getOrDefault(source.developerId(), List.of());
-                if (!context.rules().bannerCandidate(source.endDate(), today, source.extensionPossibilityCode(), !current.isEmpty())) continue;
+                // 식-82 B 「다음 배정 없음」: 가배정(ACT)·배정 후보(CNVT)·확정된 다음 투입이 모두 없을 때만.
+                boolean hasNext = !current.isEmpty() || following(source, assigned) != null;
+                if (!context.rules().bannerCandidate(source.endDate(), today, source.extensionPossibilityCode(), hasNext)) continue;
                 unassigned++;
                 if (recommendations.candidates(source, List.of(), false, context).size() >= context.rules().minimumSeats()) matched++;
             }
@@ -106,14 +112,23 @@ public class CommonWithdrawalService {
         return new WithdrawalList(items, items.size(), banner);
     }
 
-    private Row row(Source source, List<Reservation> current, List<EarlyRow> earlyRows,
+    /** 철수일 뒤에 시작하는 같은 사람의 확정 투입 중 가장 가까운 것(이 배정 자신은 뺀다). */
+    private static FollowingRow following(Source source, Map<String, List<FollowingRow>> assigned) {
+        return assigned.getOrDefault(source.developerId(), List.of()).stream()
+            .filter(f -> !f.assignmentId().equals(source.assignmentId()) && f.startDate() != null
+                && f.startDate().isAfter(source.endDate()))
+            .min(Comparator.comparing(FollowingRow::startDate).thenComparing(FollowingRow::assignmentId)).orElse(null);
+    }
+
+    private Row row(Source source, List<Reservation> current, FollowingRow following, List<EarlyRow> earlyRows,
         WithdrawalRecommendationService.Context context, LocalDate today) {
         var reservation = WithdrawalTentativeService.one(current);
         int days = context.rules().remainingDays(source.endDate(), today);
-        boolean target = reservation == null && recommendations.eligible(source, context);
+        // 다음 배정 칸 순서: 확정된 다음 투입 → 배정 후보(CNVT) → 가배정(ACT) → 철수 완료 → 추천.
+        boolean target = following == null && reservation == null && recommendations.eligible(source, context);
         int count = target ? recommendations.candidates(source, current, false, context).size() : 0;
         // 시안 다음 배정 칸의 작은 글자: 대상이 아니면 그 까닭, 대상인데 자리가 없으면 「맞는 자리 없음」.
-        String note = reservation != null || days < 0 ? null
+        String note = following != null || reservation != null || days < 0 ? null
             : target ? (count == 0 ? "맞는 자리 없음" : null)
             : "H".equals(source.extensionPossibilityCode()) ? "연장 가능성 높음" : "3개월 뒤 철수";
         var early = earlyRows.stream()
@@ -123,7 +138,10 @@ public class CommonWithdrawalService {
             codes.extensionResponseCode(source.extensionPossibilityCode()),
             context.codes().extensionName(source.extensionPossibilityCode()),
             new NextAssignment(reservation == null ? null : reservation.opportunityName(), count,
-                reservation != null, target, note),
+                reservation != null, target, note,
+                following == null ? null : following.projectName(),
+                following == null ? null : YearMonth.from(following.startDate()).toString(),
+                reservation != null && "CNVT".equals(reservation.statusCode())),
             source.modifiedAt(), source.projectId(), source.managementNumber());
     }
 

@@ -12,10 +12,13 @@ public final class WithdrawalContracts {
     /**
      * 다음 배정 칸. recommendationTarget은 식-79 추천 대상(3개월 안·높음 아님·가배정 없음)인지,
      * note는 시안의 작은 글자(「연장 가능성 높음」·「3개월 뒤 철수」·「맞는 자리 없음」, 없으면 null).
+     * nextProjectName·nextStartMonth(YYYY-MM)는 철수일 뒤 확정된 다음 투입(가장 가까운 것, 없으면 null),
+     * assignmentCandidate는 가배정이 수주로 넘어가 투입 배정 「배정 후보」(CNVT)에 있는지. 둘 다 「다음 배정 있음」으로 센다.
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record NextAssignment(String opportunityName, int recommendationCount, boolean hasTentativeAssignment,
-        boolean recommendationTarget, String note) {}
+        boolean recommendationTarget, String note, String nextProjectName, String nextStartMonth,
+        boolean assignmentCandidate) {}
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Row(String assignmentId, String developerId, String name, String projectName,
         String jobName, LocalDate endDate, int remainingDays, boolean withdrawalCompleted,

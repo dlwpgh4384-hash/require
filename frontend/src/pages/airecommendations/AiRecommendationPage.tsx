@@ -50,6 +50,9 @@ const failure = (error: unknown) =>
   error instanceof Error
     ? error.message
     : "요청을 처리하지 못했습니다. 다시 시도해 주세요.";
+/** [가배정]·[제외] 실패 글은 위 공통 배너에만 보인다([추천 받기] 아래에 또 보이지 않게). 제외 사유 칸 오류만 그 칸 아래에 둔다. */
+const ACTION_FIELDS: readonly string[] = [];
+const EXCLUSION_FIELDS: readonly string[] = ["reasonCode"];
 type Clamp = "project" | "past" | null;
 /** 시안 알림: 프로젝트 시작월로 올렸을 때는 시안 글, 이번 달로 올렸을 때는 「지난 달이라」. */
 const clampText = (kind: Exclude<Clamp, null>, month: string) =>
@@ -236,11 +239,16 @@ export function AiRecommendationPage() {
       muted.current = false;
     }
   };
-  const report = (reason: unknown) => {
+  /** 오류 글은 위 공통 배너에 한 번 보인다. 칸 아래 글은 `shownFields`에 든 칸만 남긴다(없으면 전부: [추천 받기] 검사 오류). */
+  const report = (reason: unknown, shownFields?: readonly string[]) => {
     setError(failure(reason));
     setFields(
       reason instanceof AssignmentRequestError
-        ? Object.fromEntries(reason.errors.map((e) => [e.field, e.message]))
+        ? Object.fromEntries(
+            reason.errors
+              .filter((e) => !shownFields || shownFields.includes(e.field))
+              .map((e) => [e.field, e.message]),
+          )
         : {},
     );
   };
@@ -479,14 +487,17 @@ export function AiRecommendationPage() {
     });
   };
   /** F18: 누르기 전에 자리 줄이 지워졌거나 기회가 닫혀 400·409가 오면 대상·자리 목록을 다시 읽는다. */
-  const reloadAfterRejected = (reason: unknown) => {
+  const reloadAfterRejected = (
+    reason: unknown,
+    shownFields: readonly string[],
+  ) => {
     if (
       reason instanceof AssignmentRequestError &&
       (reason.status === 400 || reason.status === 409)
     )
       // 대상이 바뀌어 다시 추천하면 오류 글이 지워지므로, 다 읽은 뒤 서버 글을 다시 보인다.
       void refreshTargets(true).then(() => {
-        if (mounted.current) report(reason);
+        if (mounted.current) report(reason, shownFields);
       });
   };
   const saveExclusion = async () => {
@@ -508,8 +519,8 @@ export function AiRecommendationPage() {
       await refill();
       show(`${name}님을 이 자리(${job}) 추천에서 뺐습니다.`);
     } catch (reason) {
-      report(reason);
-      reloadAfterRejected(reason);
+      report(reason, EXCLUSION_FIELDS);
+      reloadAfterRejected(reason, EXCLUSION_FIELDS);
     } finally {
       setBusy(false);
     }
@@ -530,8 +541,8 @@ export function AiRecommendationPage() {
       await refill();
       show(saved.message);
     } catch (reason) {
-      report(reason);
-      reloadAfterRejected(reason);
+      report(reason, ACTION_FIELDS);
+      reloadAfterRejected(reason, ACTION_FIELDS);
     } finally {
       setBusy(false);
     }

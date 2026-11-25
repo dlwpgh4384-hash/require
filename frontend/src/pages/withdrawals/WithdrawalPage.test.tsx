@@ -436,6 +436,38 @@ it("next assignment follows the mockup for tentative, target, non-target and com
   expect(recommend).toHaveClass("ls-btn", "ls-btn-sm");
   expect(recommend.querySelector("svg")).not.toBeNull();
 });
+it("a confirmed next assignment and a handed-off candidate show info badges without [추천]·[바꾸기]", async () => {
+  data.items[0].nextAssignment = {
+    opportunityName: "기존 기회",
+    recommendationCount: 0,
+    hasTentativeAssignment: true,
+    recommendationTarget: false,
+    note: null,
+    nextProjectName: "다음 프로젝트",
+    nextStartMonth: "2027-01",
+    assignmentCandidate: false,
+  };
+  data.items[1].nextAssignment = {
+    opportunityName: "수주한 기회",
+    recommendationCount: 0,
+    hasTentativeAssignment: true,
+    recommendationTarget: false,
+    note: null,
+    nextProjectName: null,
+    nextStartMonth: null,
+    assignmentCandidate: true,
+  };
+  page();
+  await ready();
+  // 다음 투입이 가배정보다 먼저다.
+  expect(screen.getByText("다음 투입 · 다음 프로젝트 (2027-01~)")).toHaveClass("ls-b-info");
+  expect(screen.queryByText("가배정 · 기존 기회")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("withdrawal-replace-a")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("withdrawal-recommend-a")).not.toBeInTheDocument();
+  expect(screen.getByText("배정 후보 · 수주한 기회")).toHaveClass("ls-b-info");
+  expect(screen.queryByTestId("withdrawal-replace-b")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("withdrawal-recommend-b")).not.toBeInTheDocument();
+});
 it("the list has no column settings like the mockup", async () => {
   page();
   await ready();

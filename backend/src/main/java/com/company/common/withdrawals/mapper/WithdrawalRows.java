@@ -23,6 +23,8 @@ public final class WithdrawalRows {
         String opportunityName, int needSn, String startMonth, String statusCode) {}
     public record ReservationWrite(String developerId, String opportunityId, int needSn,
         String startMonth, String actor, String sourceScreenId) {}
+    /** 사람의 확정 투입(ACT) 한 줄: 철수 뒤 다음 투입(「다음 투입 · 프로젝트 (YYYY-MM~)」)을 찾는 데 쓴다. */
+    public record FollowingRow(String developerId, String assignmentId, String projectName, LocalDate startDate) {}
     /** 조기 철수 이력 한 줄(목록 전체를 한 번에 읽는다). */
     public record EarlyRow(String assignmentId, LocalDate effectiveDate, String afterValue) {}
     /** baseMonth = 이번 달 1일(한국): 끝난 투입의 연장(식-60)과 미충원 나눗수 시작(식-61, 다음 달)을 정한다. */

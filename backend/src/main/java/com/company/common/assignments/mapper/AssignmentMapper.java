@@ -40,6 +40,8 @@ public interface AssignmentMapper {
     int saveMonth(MonthWrite write);
     BigDecimal latestPrice(String id);
     int insertAccess(@Param("userId") String userId,@Param("target") String target);
-    /** 목록 경고 「영업 파트 다름」 대상 배정 ID(month = YYYYMM, 지금 달 프로젝트 파트 기준). */
-    java.util.List<String> partMismatchIds(@org.apache.ibatis.annotations.Param("ids") java.util.List<String> ids, @org.apache.ibatis.annotations.Param("month") String month);
+    /** 목록 경고 「영업 파트 다름」 대상 배정 ID(배정 시작 달의 프로젝트 파트 기준, 그 달 이전 이력이 없으면 가장 처음 이력). */
+    java.util.List<String> partMismatchIds(@org.apache.ibatis.annotations.Param("ids") java.util.List<String> ids);
+    /** 프로젝트 영업 파트 이력의 가장 이른 적용 시작 달(YYYYMM), 없으면 null. */
+    String firstPartMonth(@Param("projectId") String projectId);
 }

@@ -104,6 +104,18 @@
       <foreach collection="developerIds" item="id" open="(" separator="," close=")">#{id}</foreach>
     ORDER BY t.DEV_ID,t.TENT_ID
   </select>
+  <resultMap id="following" type="com.company.common.withdrawals.mapper.WithdrawalRows$FollowingRow"><constructor>
+    <arg column="developerId" javaType="string"/><arg column="assignmentId" javaType="string"/>
+    <arg column="projectName" javaType="string"/><arg column="startDate" javaType="java.time.LocalDate"/>
+  </constructor></resultMap>
+  <!-- 다음 투입: 같은 사람의 확정 배정(ACT, 취소 CNCL 제외). 철수일 뒤에 시작하는 가장 가까운 줄은 서비스에서 고른다. -->
+  <select id="followingAssignments" resultMap="following">
+    SELECT a.DEV_ID AS "developerId",a.ASGN_ID AS "assignmentId",p.PROJ_NM AS "projectName",a.INPUT_BGN_DT AS "startDate"
+    FROM TB_PJ_ASGN a JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID
+    WHERE a.ASGN_STAT_CD='ACT' AND a.DEV_ID IN
+      <foreach collection="developerIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    ORDER BY a.DEV_ID,a.INPUT_BGN_DT,a.ASGN_ID
+  </select>
   <resultMap id="early" type="com.company.common.withdrawals.mapper.WithdrawalRows$EarlyRow"><constructor>
     <arg column="assignmentId" javaType="string"/><arg column="effectiveDate" javaType="java.time.LocalDate"/>
     <arg column="afterValue" javaType="string"/>

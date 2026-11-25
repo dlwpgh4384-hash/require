@@ -100,9 +100,8 @@ public class CommonAssignmentService {
     private java.util.Set<String> partMismatches(List<Row> rows) {
         var ids=rows.stream().map(Row::assignmentId).toList();
         var result=new java.util.HashSet<String>();
-        String month=db(calendar.currentMonth());
         for (int i=0;i<ids.size();i+=CHUNK) {
-            var found=mapper.partMismatchIds(ids.subList(i,Math.min(ids.size(),i+CHUNK)),month);
+            var found=mapper.partMismatchIds(ids.subList(i,Math.min(ids.size(),i+CHUNK)));
             if (found!=null) result.addAll(found);
         }
         return result;
@@ -126,14 +125,27 @@ public class CommonAssignmentService {
         if (p!=null && p.onLeave()) warnings.add("휴직 기간에 배정됩니다.");
         if (p!=null && "DP".equals(r.contractTypeCode()) && Set.of("FL","OS").contains(p.employeeTypeCode())) warnings.add("파견 프로젝트에 프리랜서/외주 인력을 배정합니다.");
         if (crossesClose(r.startDate(),r.endDate())) warnings.add("마감월 금액은 유지됩니다. 전월 조정은 UI-10에서 직접 입력해 주세요.");
-        var project=projects.selectProject(r.projectId(),calendar.today(),db(calendar.currentMonth()));
-        if (p!=null && project!=null && !"IN".equals(r.contractTypeCode()) && !Objects.equals(p.partId(),project.salesPartId))
-            warnings.add("영업 파트가 다릅니다: "+p.name()+"님은 "+p.partName()+" 소속, 프로젝트는 "+project.salesPartName+"입니다. 매출은 프로젝트 파트로, 이 사람 이익금은 소속 파트(본사면 파트 정산 제외)로 잡힙니다. 파트를 잘못 골랐다면 개발자 풀에서 고쳐 주세요.");
+        var project=projectPartAt(r.projectId(),r.startDate());
+        if (p!=null && !"IN".equals(r.contractTypeCode()) && partDiffers(project,p.partId()))
+            warnings.add("영업 파트가 다릅니다: "+p.name()+"님은 "+Objects.requireNonNullElse(p.partName(),p.partId())+" 소속, 프로젝트는 "+Objects.requireNonNullElse(project.salesPartName,project.salesPartId)+"입니다. 매출은 프로젝트 파트로, 이 사람 이익금은 소속 파트(본사면 파트 정산 제외)로 잡힙니다. 파트를 잘못 골랐다면 개발자 풀에서 고쳐 주세요.");
         if ("SUB".equals(r.inputTypeCode()) && "TK".equals(r.contractTypeCode()) && r.contractDeveloperId()!=null && mapper.distribution(r.projectId(),r.contractDeveloperId())) warnings.add("턴키 배분표는 다시 옮겨 올려 주셔야 합니다. 그 전까지는 배분 불일치 경고가 뜹니다.");
         boolean direct=AssignmentPricePolicy.direct(roles());
         // [변경 기록] 단가·월 MM 변경의 「지금 …」 안내와 같은 값 검사는 고른 달에 적용되는 값과 비교한다(SFR-112-07).
         var months=mapper.monthValues(r.assignmentId()).stream().map(m -> new AssignmentMonth(m.month(),m.monthlyMm(),direct?m.billingPrice():null)).toList();
         return assemble(r,fig,warnings,new HashMap<>(),direct,months);
+    }
+    /** 파트 비교용 프로젝트: 배정 시작 달에 적용되는 영업 파트(그 달 이전 이력이 없으면 가장 처음 이력). 미래에 시작하는 프로젝트도 지금 달이 아니라 이 기준으로 본다. */
+    private com.company.common.projects.dto.ProjectContracts.Project projectPartAt(String projectId,LocalDate start) {
+        var project=projects.selectProject(projectId,calendar.today(),db(YearMonth.from(start)));
+        if (project!=null && project.salesPartId==null) {
+            String first=mapper.firstPartMonth(projectId);
+            if (first!=null) project=projects.selectProject(projectId,calendar.today(),first);
+        }
+        return project;
+    }
+    /** 양쪽 파트를 모두 알 때만 다르다고 본다(목록 경고 SQL과 같은 기준, 문구에 빈 값이 들어가지 않게). */
+    private static boolean partDiffers(com.company.common.projects.dto.ProjectContracts.Project project,String personPartId) {
+        return project!=null && project.salesPartId!=null && personPartId!=null && !project.salesPartId.equals(personPartId);
     }
     private String code(String group,String value,String fallback) {
         return value==null?fallback:Objects.requireNonNullElse(projects.codeName(group,value),value);
@@ -148,14 +160,15 @@ public class CommonAssignmentService {
     public Items<Candidate> getCommonAssignmentCandidates() {
         return new Items<>(mapper.candidates().stream().map(this::candidate).flatMap(Optional::stream).toList());
     }
-    /** 예정 기간이 잘못된 후보 한 줄은 목록 전체를 막지 않고 뺀다. */
+    /** 예정 기간(시안 ASG_CAND): 시작 = 가배정 시작 달 1일과 프로젝트 시작일 중 늦은 날, 끝 = 프로젝트 계약 종료일(없을 때만 시작 달 + 기간 개월 − 1의 말일).
+     *  예정 기간이 잘못된 후보 한 줄은 목록 전체를 막지 않고 뺀다. */
     private Optional<Candidate> candidate(CandidateRow r) {
         YearMonth month;
         try { month=calendar.fromDatabaseMonth(r.month()); } catch (RuntimeException e) { return Optional.empty(); }
         if (month==null || r.months()<1) return Optional.empty();
-        LocalDate start=month.atDay(1),end=month.plusMonths(r.months()-1L).atEndOfMonth();
+        LocalDate start=month.atDay(1);
         if (r.projectStart()!=null && start.isBefore(r.projectStart())) start=r.projectStart();
-        if (r.projectEnd()!=null && end.isAfter(r.projectEnd())) end=r.projectEnd();
+        LocalDate end=r.projectEnd()!=null?r.projectEnd():month.plusMonths(r.months()-1L).atEndOfMonth();
         if (start.isAfter(end)) return Optional.empty();
         return Optional.of(new Candidate(r.candidateId(),r.projectId(),r.projectName(),r.developerId(),r.name(),r.managementNumber(),r.jobCode(),r.jobName(),start,end,r.modifiedAt()));
     }
@@ -220,7 +233,7 @@ public class CommonAssignmentService {
         if(!"SUB".equals(type) && contract!=null) throw CodeFailure.invalid("contractDeveloperId","대체투입에서만 계약상 인력을 선택합니다.");
         AssignmentPricePolicy.registration(roles(),p.contractTypeCode,type,ProjectRules.money(b,"billingPrice",false),person.defaultPrice());
         var warnings=new ArrayList<String>();
-        if(!"IN".equals(p.contractTypeCode) && !Objects.equals(p.salesPartId,person.partId())) warnings.add("영업 파트가 다른 배정");
+        if(!"IN".equals(p.contractTypeCode) && partDiffers(projectPartAt(projectId,start),person.partId())) warnings.add("영업 파트가 다른 배정");
         if(person.onLeave()) warnings.add("휴직 기간에 배정됩니다.");
         if(crossesClose(start,end)) warnings.add("마감월 금액은 유지됩니다. 전월 조정은 UI-10에서 직접 입력해 주세요.");
         return warnings;

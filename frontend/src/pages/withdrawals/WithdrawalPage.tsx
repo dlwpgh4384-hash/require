@@ -45,9 +45,9 @@ const sparkle = (size: number) =>
 const infoIcon = svg("M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01", 16);
 const lockIcon = svg("M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4", 12);
 const PERIODS = ["3개월 안", "3개월 뒤", "이미 철수"];
-/** 시안 다음 배정 정렬 값: 가배정 2, 추천 있음 1, 그 밖 0. */
+/** 시안 다음 배정 정렬 값: 다음 투입·배정 후보·가배정 2, 추천 있음 1, 그 밖 0. */
 const nextRank = (row: WithdrawalRow) =>
-  row.nextAssignment.hasTentativeAssignment
+  row.nextAssignment.nextProjectName || row.nextAssignment.hasTentativeAssignment
     ? 2
     : row.nextAssignment.recommendationCount > 0
       ? 1
@@ -207,6 +207,21 @@ export function WithdrawalPage({ roles = [] }: { roles?: readonly string[] }) {
   const sub = (text = "–") => <span className="project-sub">{text}</span>;
   const next = (row: WithdrawalRow) => {
     const n = row.nextAssignment;
+    // 확정된 다음 투입 → 배정 후보(수주로 넘김) → 가배정 순. 앞의 둘은 [추천]·[바꾸기]가 없다.
+    if (n.nextProjectName)
+      return (
+        <span className="withdrawal-next" data-testid={`withdrawal-next-${row.assignmentId}`}>
+          <Badge kind="info">
+            다음 투입 · {n.nextProjectName} ({n.nextStartMonth}~)
+          </Badge>
+        </span>
+      );
+    if (n.assignmentCandidate)
+      return (
+        <span className="withdrawal-next" data-testid={`withdrawal-next-${row.assignmentId}`}>
+          <Badge kind="info">배정 후보 · {n.opportunityName}</Badge>
+        </span>
+      );
     if (n.hasTentativeAssignment)
       return (
         <span className="withdrawal-next">
@@ -524,9 +539,13 @@ export function WithdrawalPage({ roles = [] }: { roles?: readonly string[] }) {
             <div className="ls-r2">
               <span>연장 {extensionText(row.extensionPossibilityName) || "미정"}</span>
               <span>
-                {row.nextAssignment.hasTentativeAssignment
-                  ? "가배정 있음"
-                  : "다음 배정 없음"}
+                {row.nextAssignment.nextProjectName
+                  ? "다음 투입 있음"
+                  : row.nextAssignment.assignmentCandidate
+                    ? "배정 후보"
+                    : row.nextAssignment.hasTentativeAssignment
+                      ? "가배정 있음"
+                      : "다음 배정 없음"}
               </span>
             </div>
           </>

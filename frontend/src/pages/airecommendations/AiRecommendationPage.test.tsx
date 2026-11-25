@@ -703,12 +703,18 @@ it("converted candidates show the badge and the click reaches the server 409", a
   vi.mocked(api.putCommonAiRecommendationTentativeAssignment).mockRejectedValueOnce(
     new AssignmentRequestError(
       "투입 배정으로 넘긴 후보입니다. 투입 상세에서 확인해 주세요.",
-      [],
+      [
+        {
+          field: "developerId",
+          message: "투입 배정으로 넘긴 후보입니다. 투입 상세에서 확인해 주세요.",
+        },
+      ],
       409,
     ),
   );
   page();
   await settled();
+  vi.mocked(api.getCommonAiRecommendationOptions).mockClear();
   expect(screen.getByText("투입 배정 후보")).toBeInTheDocument();
   const button = screen.getByTestId("ai-assign-person");
   expect(button).toBeEnabled();
@@ -716,6 +722,37 @@ it("converted candidates show the badge and the click reaches the server 409", a
   expect(await screen.findByTestId("ai-error")).toHaveTextContent(
     "투입 배정으로 넘긴 후보입니다. 투입 상세에서 확인해 주세요.",
   );
+  // 위 공통 배너에 한 번만: [추천 받기] 아래에 같은 글이 또 나오지 않는다(대상 다시 읽은 뒤에도).
+  await waitFor(() =>
+    expect(api.getCommonAiRecommendationOptions).toHaveBeenCalled(),
+  );
+  await waitFor(() =>
+    expect(
+      screen.getAllByText(
+        "투입 배정으로 넘긴 후보입니다. 투입 상세에서 확인해 주세요.",
+      ),
+    ).toHaveLength(1),
+  );
+});
+it("a rejected [제외] shows the server text once, in the top banner", async () => {
+  const text = "이미 처리된 추천입니다. 다시 추천을 받아 주세요.";
+  vi.mocked(api.postCommonAiRecommendationExclusion).mockRejectedValueOnce(
+    new AssignmentRequestError(
+      text,
+      [{ field: "recommendationId", message: text }],
+      409,
+    ),
+  );
+  page();
+  await settled();
+  vi.mocked(api.getCommonAiRecommendationOptions).mockClear();
+  fireEvent.click(screen.getByTestId("ai-exclude-person"));
+  fireEvent.click(screen.getByTestId("ai-exclusion-confirm"));
+  expect(await screen.findByTestId("ai-error")).toHaveTextContent(text);
+  await waitFor(() =>
+    expect(api.getCommonAiRecommendationOptions).toHaveBeenCalled(),
+  );
+  await waitFor(() => expect(screen.getAllByText(text)).toHaveLength(1));
 });
 it("empty candidates show actual empty message", async () => {
   cards = [];

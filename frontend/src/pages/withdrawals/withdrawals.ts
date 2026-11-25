@@ -21,6 +21,11 @@ export interface WithdrawalRow {
     recommendationTarget?: boolean;
     /** 시안 작은 글자: 연장 가능성 높음·3개월 뒤 철수·맞는 자리 없음. */
     note?: string | null;
+    /** 철수일 뒤 확정된 다음 투입(가장 가까운 것): 프로젝트명·시작 달(YYYY-MM). 없으면 null. */
+    nextProjectName?: string | null;
+    nextStartMonth?: string | null;
+    /** 가배정이 수주로 넘어가 투입 배정 「배정 후보」에 있는지(CNVT). */
+    assignmentCandidate?: boolean;
   };
   modifiedAt: string | null;
   projectId?: string | null;

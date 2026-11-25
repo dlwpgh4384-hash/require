@@ -458,6 +458,41 @@ class CommonWithdrawalControllerTest {
         }
         assertThat(labels).contains("– · 연장 가능성 높음","– · 3개월 뒤 철수","가배정 · 기회 O-0001","없음 · 맞는 자리 없음","–");
     }
+    /** 다음 배정 칸 순서: 확정된 다음 투입 → 배정 후보(CNVT) → 가배정(ACT). 둘 다 「다음 배정 있음」이라 안내 띠 B에서 빠지고 추천 대상이 아니다. */
+    @Test void confirmedNextAssignmentAndHandedOffCandidateCountAsHavingANextAssignment() throws Exception {
+        sources.put("A-0002",assignment("A-0002","won",today.plusDays(20),null));
+        sources.put("A-0003",assignment("A-0003","free",today.plusDays(25),null));
+        reservations.add(new Reservation("5","won","won-opp","수주한 기회",1,"202612","CNVT"));
+        // person: 자기 배정(A-0001)·철수 전 시작한 배정·취소 안 된 다음 두 배정 중 가장 가까운 것을 고른다. 가배정(ACT)이 있어도 다음 투입이 먼저.
+        reservations.add(new Reservation("6","person","O-0001","기회 O-0001",1,"202612","ACT"));
+        var following=List.of(new FollowingRow("person","A-0001","프로젝트",LocalDate.of(2026,1,1)),
+            new FollowingRow("person","A-0010","겹친 프로젝트",LocalDate.of(2026,11,20)),
+            new FollowingRow("person","A-0012","나중 프로젝트",LocalDate.of(2027,3,2)),
+            new FollowingRow("person","A-0011","다음 프로젝트",LocalDate.of(2027,1,4)));
+        when(mapper.followingAssignments(anyCollection())).thenAnswer(c -> {Collection<String> ids=c.getArgument(0); return following.stream().filter(f -> ids.contains(f.developerId())).toList();});
+        String body=mvc.perform(get("/api/common/withdrawals").param("year","2026")).andExpect(status().isOk())
+            .andExpect(contract("GET","/api/common/withdrawals"))
+            .andExpect(jsonPath("$.data.banner.soonCount").value(3))
+            .andExpect(jsonPath("$.data.banner.unassignedCount").value(1))
+            .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        var byId=new HashMap<String,com.fasterxml.jackson.databind.JsonNode>();
+        json.readTree(body).path("data").path("items").forEach(i -> byId.put(i.path("assignmentId").asText(), i.path("nextAssignment")));
+        assertThat(byId.get("A-0001").path("nextProjectName").asText()).isEqualTo("다음 프로젝트");
+        assertThat(byId.get("A-0001").path("nextStartMonth").asText()).isEqualTo("2027-01");
+        assertThat(byId.get("A-0001").path("recommendationTarget").asBoolean()).isFalse();
+        assertThat(byId.get("A-0001").path("recommendationCount").asInt()).isZero();
+        assertThat(byId.get("A-0002").path("assignmentCandidate").asBoolean()).isTrue();
+        assertThat(byId.get("A-0002").path("opportunityName").asText()).isEqualTo("수주한 기회");
+        assertThat(byId.get("A-0002").path("nextProjectName").isNull()).isTrue();
+        assertThat(byId.get("A-0003").path("assignmentCandidate").asBoolean()).isFalse();
+        assertThat(byId.get("A-0003").path("recommendationTarget").asBoolean()).isTrue();
+        var labels=new ArrayList<String>();
+        byte[] bytes=mvc.perform(get("/api/common/withdrawals/excel").param("year","2026")).andReturn().getResponse().getContentAsByteArray();
+        try(var book=new XSSFWorkbook(new java.io.ByteArrayInputStream(bytes))){
+            for(var row:book.getSheetAt(0)) if(row.getCell(7)!=null) labels.add(row.getCell(7).toString());
+        }
+        assertThat(labels).contains("다음 투입 · 다음 프로젝트 (2027-01~)","배정 후보 · 수주한 기회","추천 1곳");
+    }
     @Test void listReadsReservationsHistoryCodesFormulasAndNeedsOncePerRequest() throws Exception {
         // 줄마다 묻지 않는다: 가배정·조기 철수 이력은 묶음 조회 한 번, 식·공통코드·필요 인력 줄은 요청마다 한 번.
         for(int i=2;i<=30;i++)sources.put("A-"+i,assignment("A-"+i,"person"+i,today.plusDays(10),i%2==0?"M":null));

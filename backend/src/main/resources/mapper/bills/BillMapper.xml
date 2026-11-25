@@ -58,6 +58,12 @@
     WHERE b.BILL_YM BETWEEN CAST(CAST(#{year} AS text)||'01' AS CHAR(6)) AND CAST(CAST(#{year} AS text)||'12' AS CHAR(6))
     ORDER BY b.BILL_DT DESC,b.BILL_ID
   </select>
+  <!-- 메뉴 배지(unpaidCount)와 같은 조건의 모든 해 미수 청구(대시보드 미수금·연체, 식-06). -->
+  <select id="unpaidRows" resultMap="invoice">
+    <include refid="invoiceSelect"/>
+    WHERE b.CNCL_YN='N' AND b.UNPAID_AMT&gt;0
+    ORDER BY b.PAY_DUE_DT,b.BILL_ID
+  </select>
   <select id="invoice" resultMap="invoice">
     <include refid="invoiceSelect"/> WHERE b.BILL_ID=#{id}
   </select>

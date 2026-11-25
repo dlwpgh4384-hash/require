@@ -214,11 +214,21 @@
     DELETE FROM TB_PJ_DRCT_EXPS WHERE PROJ_ID=#{projectId} AND EXPS_YM=#{month} AND EXPS_SN=#{sequence}
   </delete>
   <select id="steps" resultType="com.company.common.projects.dto.ProjectContracts$Step">
-    SELECT c.CODE_NM AS "stepName",s.STEP_WGHT_RT AS "weightRate",s.PLAN_BGN_DT AS "plannedStartDate",
-      s.PLAN_END_DT AS "plannedEndDate",s.CMPL_DT AS "completedDate"
-    FROM TB_PJ_STEP s LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='PROJ_STEP' AND c.CODE=s.PROJ_STEP_CD
+    SELECT <include refid="stepColumns"/> <include refid="stepFrom"/>
     WHERE s.PROJ_ID=#{id} ORDER BY s.STEP_SN
   </select>
+  <select id="boardSteps" resultType="com.company.common.projects.mapper.ProjectMapper$BoardStep">
+    SELECT s.PROJ_ID AS "projectId",<include refid="stepColumns"/> <include refid="stepFrom"/>
+    WHERE s.PROJ_ID IN <foreach collection="ids" item="id" open="(" close=")" separator=",">#{id}</foreach>
+    ORDER BY s.PROJ_ID,s.STEP_SN
+  </select>
+  <sql id="stepColumns">
+    c.CODE_NM AS "stepName",s.STEP_WGHT_RT AS "weightRate",s.PLAN_BGN_DT AS "plannedStartDate",
+      s.PLAN_END_DT AS "plannedEndDate",s.CMPL_DT AS "completedDate"
+  </sql>
+  <sql id="stepFrom">
+    FROM TB_PJ_STEP s LEFT JOIN TB_SY_CODE c ON c.CODE_GRP_ID='PROJ_STEP' AND c.CODE=s.PROJ_STEP_CD
+  </sql>
   <select id="issues" resultType="com.company.common.projects.dto.ProjectContracts$Issue">
     SELECT i.ISSUE_TTL AS "issueTitle",i.IMPR_CD AS "importanceCode",c.CODE_NM AS "importanceName",i.DDLN_DT AS "dueDate",
       i.ISSUE_STAT_CD AS "statusCode",s.CODE_NM AS "statusName",i.ACTN_CN AS "action"

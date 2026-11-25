@@ -27,6 +27,21 @@ public class SalesPipelineApprovalStandards {
         return new Values(value("QUOTE_APRV_RT", month), value("QUOTE_REAPRV_GAP", month));
     }
 
+    /** effective와 같은 판단이지만, 쓸 수 있는 기준값이 없으면 오류 대신 null(트랜잭션을 롤백 전용으로 만들지 않음). */
+    @Transactional(readOnly = true)
+    public Values effectiveOrNull(YearMonth month) {
+        if (month == null) return null;
+        BigDecimal rate = valueOrNull("QUOTE_APRV_RT", month), gap = valueOrNull("QUOTE_REAPRV_GAP", month);
+        return rate == null || gap == null ? null : new Values(rate, gap);
+    }
+
+    private BigDecimal valueOrNull(String code, YearMonth month) {
+        Standard standard = standards.findEffectiveStandard(code, month);
+        if (standard == null || !code.equals(standard.standardCode()) || standard.value() == null
+            || standard.effectiveMonth() == null || standard.effectiveMonth().isAfter(month)) return null;
+        return standard.value();
+    }
+
     private BigDecimal value(String code, YearMonth month) {
         Standard standard = standards.effectiveStandard(code, month);
         if (standard == null || !code.equals(standard.standardCode()) || standard.value() == null

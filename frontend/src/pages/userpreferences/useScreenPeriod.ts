@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  publishScreenPeriod,
+  screenPeriodChannel,
+} from "../../shared/layout/screenPeriodChannel";
 import {
   isAllowed,
   latestPeriod,
@@ -42,8 +46,17 @@ export function useScreenPeriod(
   screenId: string,
   options: PeriodOptions,
   latestYm?: string,
+  /**
+   * publish=false: 화면이 [AI에게 묻기]에 넘길 기간을 직접 알린다(탭마다 기간이 다른 화면, 예: 인력 운영 보드 예측 탭).
+   * 그때 이 훅은 알리지도 지우지도 않는다(한 곳에서만 쓴다).
+   */
+  config: { publish?: boolean } = {},
 ) {
+  const publish = config.publish !== false;
   const [state, setState] = useState<State>({ status: "loading" });
+  const pendingPeriod = useRef<
+    import("../../shared/layout/screenPeriodChannel").ScreenPeriod | null
+  >(null);
   // 화면마다 따로 차례로 저장한다(빨리 두 번 바꿔도 두 번째가 남고, 다른 화면의 수정 시각과 섞이지 않는다).
   const saver = useMemo(
     () => createPreferenceSaver("PERIOD", screenId),
@@ -151,5 +164,43 @@ export function useScreenPeriod(
       window.removeEventListener(PERIOD_BASIS_CHANGED_EVENT, listener);
     };
   }, [screenId, optionsKey, latestYm]);
+  useEffect(() => {
+    if (!publish || state.status !== "ready") return;
+    const { year, month } = state.value;
+    publishScreenPeriod(screenId, {
+      startMonth: `${year}-${String(options.kind === "yearCumulative" ? 1 : (month ?? 1)).padStart(2, "0")}`,
+      endMonth: `${year}-${String(month ?? 12).padStart(2, "0")}`,
+    });
+  }, [screenId, state, publish]);
+  // 화면이 닫히면 알린 기간을 지운다(닫힌 화면 기간을 [AI에게 묻기]가 보내지 않게).
+  useEffect(() => {
+    if (!publish) return;
+    return () => publishScreenPeriod(screenId, undefined);
+  }, [screenId, publish]);
+  useEffect(
+    () =>
+      screenPeriodChannel(screenId).subscribe((period) => {
+        pendingPeriod.current = period;
+        setState((previous) => ({ ...previous }));
+      }),
+    [screenId, optionsKey],
+  );
+  // AI 답 [○○ 열기]가 넘긴 기간: 한 번 쓰고 비운다. 화면 기간처럼 저장한다(다시 열어도 그 기간, 월 마감 [확인하기]와 같음).
+  useEffect(() => {
+    const period = pendingPeriod.current;
+    if (!period || state.status !== "ready") return;
+    pendingPeriod.current = null;
+    const next: PeriodValue = {
+      year: Number(period.endMonth.slice(0, 4)),
+      ...(options.kind === "year"
+        ? {}
+        : { month: Number(period.endMonth.slice(5)) }),
+    };
+    if (
+      isAllowed(next, state.basis, options) &&
+      (next.year !== state.value.year || next.month !== state.value.month)
+    )
+      setValue(next);
+  }, [state, optionsKey, setValue]);
   return { state, setValue };
 }

@@ -100,16 +100,43 @@ public class CommonWithdrawalService {
         if (currentYear) {
             int unassigned = 0, matched = 0;
             for (var source : soon) {
-                var current = reserved.getOrDefault(source.developerId(), List.of());
-                // 식-82 B 「다음 배정 없음」: 가배정(ACT)·배정 후보(CNVT)·확정된 다음 투입이 모두 없을 때만.
-                boolean hasNext = !current.isEmpty() || following(source, assigned) != null;
-                if (!context.rules().bannerCandidate(source.endDate(), today, source.extensionPossibilityCode(), hasNext)) continue;
+                if (!unassigned(source, reserved, assigned, context, today)) continue;
                 unassigned++;
                 if (recommendations.candidates(source, List.of(), false, context).size() >= context.rules().minimumSeats()) matched++;
             }
             banner = new Banner(soon.size(), unassigned, matched);
         }
         return new WithdrawalList(items, items.size(), banner);
+    }
+
+    /**
+     * 식-82 B 「다음 배정 없음」을 목록 줄에 그대로 적용한다(안내 띠와 같은 판정: 3개월 안 철수 예정, 연장 가능성 높음 아님,
+     * 가배정·배정 후보·확정된 다음 투입이 모두 없음). AI 분석 도우미가 띠 숫자와 같은 사람을 고를 때 쓴다.
+     * 띠와 같은 자료(오늘부터 3개월 안 철수 예정 배정 전체)와 같은 판정(unassigned)으로 고른 배정만 남긴다.
+     */
+    public List<Row> withoutNextAssignment(List<Row> rows) {
+        if (rows == null || rows.isEmpty()) return List.of();
+        var context = recommendations.context();
+        LocalDate today = calendar.today();
+        List<Source> soon = mapper.list(new ListFilter(null, today, boundary(context), null, null));
+        var developers = new LinkedHashSet<String>();
+        soon.forEach(s -> developers.add(s.developerId()));
+        Map<String, List<Reservation>> reserved = developers.isEmpty() ? Map.of()
+            : mapper.reservationsFor(developers).stream().collect(Collectors.groupingBy(Reservation::developerId));
+        Map<String, List<FollowingRow>> assigned = developers.isEmpty() ? Map.of()
+            : Objects.requireNonNullElse(mapper.followingAssignments(developers), List.<FollowingRow>of()).stream()
+                .collect(Collectors.groupingBy(FollowingRow::developerId));
+        var ids = soon.stream().filter(s -> unassigned(s, reserved, assigned, context, today))
+            .map(Source::assignmentId).collect(Collectors.toSet());
+        return rows.stream().filter(row -> ids.contains(row.assignmentId())).toList();
+    }
+
+    /** 식-82 B 「다음 배정 없음」: 가배정(ACT)·배정 후보(CNVT)·확정된 다음 투입이 모두 없을 때만(안내 띠와 AI 답이 같이 쓴다). */
+    private static boolean unassigned(Source source, Map<String, List<Reservation>> reserved,
+        Map<String, List<FollowingRow>> assigned, WithdrawalRecommendationService.Context context, LocalDate today) {
+        var current = reserved.getOrDefault(source.developerId(), List.of());
+        boolean hasNext = !current.isEmpty() || following(source, assigned) != null;
+        return context.rules().bannerCandidate(source.endDate(), today, source.extensionPossibilityCode(), hasNext);
     }
 
     /** 철수일 뒤에 시작하는 같은 사람의 확정 투입 중 가장 가까운 것(이 배정 자신은 뺀다). */

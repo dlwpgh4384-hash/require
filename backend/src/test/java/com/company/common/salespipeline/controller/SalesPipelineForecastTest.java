@@ -152,6 +152,37 @@ class SalesPipelineForecastTest {
         verify(mapper).projectDemand(anyList(), eq(LocalDate.of(2026, 12, 1)));
         assertThat(service.getCommonSalesPipelineForecast("2026-12").months().get(0).month()).isEqualTo("2026-12");
     }
+    @Test void internalScenariosReuseAlgorithmAndKeepOriginalWeightedSignature() {
+        var ym = YearMonth.of(2026, 12);
+        var months = List.of(new MonthWindow("202612", ym.atDay(1), ym.atEndOfMonth()));
+        var basic = service.getWorkforceForecast(months).get(0);
+        var low = service.getWorkforceForecast(months, BigDecimal.ZERO).get(0);
+        var high = service.getWorkforceForecast(months, BigDecimal.valueOf(100)).get(0);
+        assertThat(low.demand()).isEqualByComparingTo(low.unfilledDemand());
+        assertThat(high.demand()).isGreaterThan(basic.demand());
+        assertThat(high.supply()).isEqualByComparingTo(basic.supply());
+        when(mapper.opportunityDemand(anyList())).thenReturn(everyMonthAll(m -> List.of(
+            new MonthOpportunityDemand(m, "BE", new BigDecimal("3"), BigDecimal.ONE, BigDecimal.valueOf(100)),
+            new MonthOpportunityDemand(m, "BE", new BigDecimal("2"), BigDecimal.ONE, BigDecimal.valueOf(100)))));
+        assertThat(service.getWorkforceForecast(months).get(0)).isEqualTo(high);
+        when(mapper.opportunityDemand(anyList())).thenReturn(everyMonthAll(m -> List.of(
+            new MonthOpportunityDemand(m, "BE", new BigDecimal("3"), BigDecimal.ONE, BigDecimal.ZERO))));
+        assertThat(service.getWorkforceForecast(months).get(0).demand()).isEqualByComparingTo(low.demand());
+    }
+    @Test void internalScenarioReadsCalendarQuarterOutsidePublicForecastWindow() {
+        var months = java.util.stream.IntStream.rangeClosed(7, 9).mapToObj(m -> {
+            var ym = YearMonth.of(2027, m); return new MonthWindow("20270" + m, ym.atDay(1), ym.atEndOfMonth());
+        }).toList();
+        assertThat(service.getWorkforceForecast(months, BigDecimal.valueOf(100))).extracting(m -> m.month())
+            .containsExactly("2027-07", "2027-08", "2027-09");
+        verify(mapper).opportunityDemand(months); verify(mapper).projectDemand(months, LocalDate.of(2026, 12, 1));
+    }
+    @Test void invalidScenarioProbabilityIsRejectedBeforeSourceReads() {
+        for (var probability : List.of(BigDecimal.valueOf(-1), BigDecimal.valueOf(101)))
+            assertThatThrownBy(() -> service.getWorkforceForecast(List.of(), probability))
+                .isInstanceOf(com.company.common.support.service.CodeFailure.class);
+        verifyNoInteractions(mapper);
+    }
     @Test void invalidOrOutOfRangeStartMonthIsRejected() {
         for (String bad : List.of("2026-1", "202611", "2026-13", "abc", "2026-10", "2027-01")) {
             assertThatThrownBy(() -> service.getCommonSalesPipelineForecast(bad))

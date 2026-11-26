@@ -60,7 +60,7 @@ function respond(available = true) {
       {
         menuId: "M025",
         upperMenuId: "G004",
-        menuNm: "준비 화면",
+        menuNm: "AI 분석 도우미",
         scrnId: "UI-26",
         menuLvl: 2,
         sortOrd: 2,
@@ -94,6 +94,7 @@ function respond(available = true) {
   const request = vi.fn(async (url: string, _init?: RequestInit) => {
     if (url === "/api/common/menus")
       return { ok: true, status: 200, json: async () => menus };
+    if (url === "/api/common/ai-analysis/questions") return ok({ items: [] });
     if (url.startsWith("/api/common/user-preferences/"))
       return ok({
         prefTypeCd: url.split("/").at(-2),
@@ -166,9 +167,7 @@ it.each(["/screens/UI-29", "/#UI-29"])(
 it("M011 under G004 opens UI-29 without replacing preferences and retains its selected tab", async () => {
   respond();
   mount("/screens/UI-26");
-  expect(
-    await screen.findByRole("region", { name: "UI-26 본문" }),
-  ).toHaveTextContent("준비 중");
+  expect(await screen.findByTestId("ai-analysis-page")).toBeVisible();
   const preferences = screen.getByTestId("user-preferences");
   const group = screen.getByTestId("menu-toggle-g004");
   if (group.getAttribute("aria-expanded") !== "true") fireEvent.click(group);

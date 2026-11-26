@@ -43,7 +43,7 @@ public class CommonDashboardService {
             .map(s -> s.substring(0, 4) + "-" + s.substring(4)).orElse(null);
         var assigned = assignments.read(today);
         var money = financial.read(month, today, assigned.idle());
-        var open = firstOpen(last, basis.cashBaseYm(), current);
+        var open = basis.firstOpen(current);
         var forward = outlook.read(month, current, open);
         var checked = closes.preview(yearMonth);
         var close = checked.close();
@@ -58,15 +58,6 @@ public class CommonDashboardService {
             forward.alerts(), DashboardOutlookService.alertMonth(open, current).toString(), money.trend(), forward.manpower(), forward.parts(), forward.pipeline(), forward.cash(),
             forward.minimumCash());
         return new Response<>(true, metadata, result);
-    }
-    /** 마지막 마감 달의 다음 달(시작 월 CASH_BASE_YM 전은 마감으로 본다). 둘 다 없으면 이번 달. */
-    static YearMonth firstOpen(String lastClosed, String cashBaseYm, YearMonth current) {
-        YearMonth open = lastClosed == null ? null : YearMonth.parse(lastClosed).plusMonths(1);
-        YearMonth base = null;
-        if (cashBaseYm != null && cashBaseYm.matches("[0-9]{6}"))
-            base = YearMonth.of(Integer.parseInt(cashBaseYm.substring(0, 4)), Integer.parseInt(cashBaseYm.substring(4)));
-        if (open == null) return base == null ? current : base;
-        return base != null && base.isAfter(open) ? base : open;
     }
     public static YearMonth month(String value) {
         if (value == null || !value.matches("[0-9]{4}-(0[1-9]|1[0-2])"))

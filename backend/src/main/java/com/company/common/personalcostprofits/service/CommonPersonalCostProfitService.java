@@ -48,7 +48,24 @@ public class CommonPersonalCostProfitService {
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Calculation calculate(Filter filter) {
+        return calculate(filter, 1);
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public Calculation calculate(Filter filter, int firstMonth) {
+        return calculate(filter, firstMonth, null);
+    }
+
+    /**
+     * lastMonth: 기준월 검사는 화면과 같이 하고(지난 해는 12월), 더하는 달만 firstMonth~lastMonth로 줄인다.
+     * AI 분석 도우미가 지난 해 한 달을 물을 때 쓴다. null이면 기준월까지.
+     */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public Calculation calculate(Filter filter, int firstMonth, Integer lastMonth) {
         validateShape(filter);
+        int last = lastMonth == null ? filter.baseMonth() : lastMonth;
+        if (last < 1 || last > filter.baseMonth() || firstMonth < 1 || firstMonth > last)
+            throw CodeFailure.invalid("firstMonth", "조회 시작월을 확인해 주세요.");
         var meta = periods.metadata();
         if (!(meta.get("periodBasis") instanceof UserPreferencePeriodBasis.Basis basis)) {
             throw CodeFailure.invalid("year", "기간 기준을 확인해 주세요.");
@@ -90,7 +107,7 @@ public class CommonPersonalCostProfitService {
         for (Person person : people) {
             Aggregate aggregate = new Aggregate(person);
             var personalLeaves = leavesBy.getOrDefault(person.developerId(), List.of());
-            for (int m = 1; m <= filter.baseMonth(); m++) {
+            for (int m = firstMonth; m <= last; m++) {
                 YearMonth month = YearMonth.of(filter.year(), m);
                 if (!employed(person, month)) continue;
                 String ym = month.format(YM);
@@ -194,7 +211,7 @@ public class CommonPersonalCostProfitService {
                         ? divide(number, BigDecimal.valueOf(aggregate.leaveAmounts.size()), 0) : value);
                 }
             }
-            boolean endLeave = leaveAt(personalLeaves, YearMonth.of(filter.year(), filter.baseMonth()).atEndOfMonth());
+            boolean endLeave = leaveAt(personalLeaves, YearMonth.of(filter.year(), last).atEndOfMonth());
             BigDecimal profit = number(aggregate.values, "operatingProfit");
             // 「적자만」은 표에 보이는 그 사람 영업이익으로 거른다. 휴직 비용은 대기 원가로 따로 보므로 더하지 않는다
             // (명세 SFR-103-07·시안, 요약 「적자 인원」과 같은 기준, 2026-11-24 사용자 결정).
@@ -243,7 +260,7 @@ public class CommonPersonalCostProfitService {
         // SFR-103-04 「요약 칸 회사 전체 가득률」, 시안, 2026-11-24 사용자 결정). 조건이 있으면 조건 없이 한 번 더 계산해 가져온다.
         if (narrowed(filter)) {
             var company = calculate(new Filter(filter.year(), filter.baseMonth(), filter.displayMode(), null, null, null, null,
-                null, null, filter.includeTurnkey(), filter.columns())).result().summary();
+                null, null, filter.includeTurnkey(), filter.columns()), firstMonth, lastMonth).result().summary();
             for (String key : List.of("totalPeople", "leavePeople", "averageOperatingPeople", "averageEarningPeople",
                 "averageDirectPeople", "operatingRate", "earningRate")) summary.put(key, company.get(key));
         }

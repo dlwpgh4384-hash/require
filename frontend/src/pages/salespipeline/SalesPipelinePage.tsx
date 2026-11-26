@@ -7,6 +7,10 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  publishScreenPeriod,
+  screenPeriodChannel,
+} from "../../shared/layout/screenPeriodChannel";
 import { requestAiRecommendation } from "../airecommendations/aiRecommendationRequest";
 import { withdrawalRefreshEvent } from "../withdrawals/withdrawals";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
@@ -188,6 +192,29 @@ export function SalesPipelinePage({
   const [closedError, setClosedError] = useState("");
   const [forecast, setForecast] = useState<SalesForecast | null>(null);
   const [forecastError, setForecastError] = useState("");
+  useEffect(
+    () =>
+      screenPeriodChannel("UI-29").subscribe((requested) => {
+        setTab(
+          requested.startMonth === requested.endMonth ? "ongoing" : "forecast",
+        );
+      }),
+    [],
+  );
+  useEffect(() => {
+    const months = tab === "forecast" ? forecast?.months : undefined;
+    publishScreenPeriod(
+      "UI-29",
+      months?.length
+        ? {
+            startMonth: months[0].month,
+            endMonth: months[months.length - 1].month,
+          }
+        : undefined,
+    );
+  }, [tab, forecast]);
+  // 화면이 닫히면 알린 기간을 지운다.
+  useEffect(() => () => publishScreenPeriod("UI-29", undefined), []);
   const [options, setOptions] = useState<SalesOpportunityOptions | null>(null);
   const [optionError, setOptionError] = useState("");
   const [resultDraft, setResultDraft] = useState("");

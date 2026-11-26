@@ -65,5 +65,18 @@ public class UserPreferencePeriodBasis {
         return meta;
     }
 
-    public record Basis(String latestYm, String cashBaseYm, List<String> closedMonths) {}
+    public record Basis(String latestYm, String cashBaseYm, List<String> closedMonths) {
+        /**
+         * 마지막 마감 달의 다음 달(시작 월 CASH_BASE_YM 전은 마감으로 본다). 둘 다 없으면 current.
+         * 대시보드 자금 3칸과 AI 분석 도우미 자금 예측이 같이 쓴다.
+         */
+        public YearMonth firstOpen(YearMonth current) {
+            String last = closedMonths == null ? null : closedMonths.stream().filter(m -> m != null && m.matches("[0-9]{6}"))
+                .max(String::compareTo).orElse(null);
+            YearMonth open = last == null ? null : YearMonth.parse(last, YM).plusMonths(1);
+            YearMonth base = cashBaseYm != null && cashBaseYm.matches("[0-9]{6}") ? YearMonth.parse(cashBaseYm, YM) : null;
+            if (open == null) return base == null ? current : base;
+            return base != null && base.isAfter(open) ? base : open;
+        }
+    }
 }

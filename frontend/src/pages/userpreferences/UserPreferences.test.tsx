@@ -70,6 +70,12 @@ beforeEach(() => {
   failureStatus = 500;
   failReads = false;
   request = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url === "/api/common/ai-analysis/questions")
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, meta: {}, data: { items: [] } }),
+      };
     const type = decodeURIComponent(url.split("/").at(-2)!) as PreferenceType;
     if (init?.method === "PUT") {
       if (failureType === type)
@@ -337,7 +343,9 @@ describe("personal lists and tools", () => {
       await screen.findByRole("button", { name: /투입 배정/ }),
     ).toBeVisible();
     // 시안 navLink: 화면 이름만 보이고 화면 ID는 보이지 않는다.
-    expect(screen.getByTestId("fav-open-ui-12")).toHaveTextContent(/^투입 배정$/);
+    expect(screen.getByTestId("fav-open-ui-12")).toHaveTextContent(
+      /^투입 배정$/,
+    );
     expect(screen.queryByText("UI-12")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /월 마감|프로젝트/ }),
@@ -505,7 +513,9 @@ describe("personal lists and tools", () => {
         onNavigate={vi.fn()}
       />,
     );
-    expect(screen.queryByRole("button", { name: "메뉴 찾기" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "메뉴 찾기" }),
+    ).not.toBeInTheDocument();
     const caller = screen.getByTestId("user-menu-open");
     caller.focus();
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
@@ -514,7 +524,7 @@ describe("personal lists and tools", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(caller).toHaveFocus();
   });
-  it("mobile Ctrl+K is inactive but search icon is usable and later tools only say 준비 중", () => {
+  it("mobile search and AI dialog are usable while later tools only say 준비 중", async () => {
     wrap(
       <UserPreferenceTools
         menus={menus}
@@ -528,15 +538,26 @@ describe("personal lists and tools", () => {
     fireEvent.click(screen.getByTestId("menu-search-open"));
     expect(screen.getByRole("dialog")).toBeVisible();
     fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(screen.getByTestId("ai-analysis-open"));
+    expect(screen.getByRole("dialog", { name: "AI에게 묻기" })).toBeVisible();
+    expect(screen.getByTestId("analysis-question")).toBeVisible();
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        "/api/common/ai-analysis/questions",
+        undefined,
+      ),
+    );
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByTestId("ai-analysis-dialog")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("user-menu-open"));
     for (const id of [
-      "ai-unavailable",
       "notification-unavailable",
       "profile-unavailable",
       "password-unavailable",
       "logout-unavailable",
     ]) {
-      if (!screen.queryByTestId(id)) fireEvent.click(screen.getByTestId("user-menu-open"));
+      if (!screen.queryByTestId(id))
+        fireEvent.click(screen.getByTestId("user-menu-open"));
       fireEvent.click(screen.getByTestId(id));
       expect(screen.getByTestId("header-notice")).toHaveTextContent("준비 중");
     }
@@ -614,7 +635,9 @@ describe("시안 맞춤: 자동 로그아웃 시간·[연장]", () => {
       />,
     );
     fireEvent.click(screen.getByTestId("user-menu-open"));
-    expect(screen.getByTestId("session-left")).toHaveTextContent(/자동 로그아웃까지 (29:5\d|30:00)/);
+    expect(screen.getByTestId("session-left")).toHaveTextContent(
+      /자동 로그아웃까지 (29:5\d|30:00)/,
+    );
     fireEvent.click(screen.getByTestId("session-extend"));
     expect(screen.getByTestId("session-left")).toHaveTextContent("30:00");
     expect(screen.getByTestId("header-notice")).toHaveTextContent(

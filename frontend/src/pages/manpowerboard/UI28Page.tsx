@@ -33,6 +33,7 @@ import {
   forecastDifferenceText,
 } from "../manpowerforecasts/manpowerForecasts";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
+import { publishScreenPeriod } from "../../shared/layout/screenPeriodChannel";
 import {
   getCommonManpowerBoard,
   getCommonManpowerBoardExcel,
@@ -120,7 +121,10 @@ export function UI28Page({
 }: { renderActions?: (actions: ReactNode) => ReactNode } = {}) {
   const navigate = useNavigate();
   const openDeveloperAction = useOpenDeveloperAction();
-  const period = useScreenPeriod("UI-28", periodOptions);
+  // [AI에게 묻기] 기간은 아래 한 곳에서만 알린다(달력 탭은 고른 해, 예측 탭은 예측 달). 훅은 알리지 않는다.
+  const period = useScreenPeriod("UI-28", periodOptions, undefined, {
+    publish: false,
+  });
   // 오늘(한국 날짜)은 한 번만 구한다.
   const today = useMemo(() => koreanToday(), []);
   const currentYear = Number(today.slice(0, 4));
@@ -144,6 +148,22 @@ export function UI28Page({
   const [tab, setTab] = useState<"calendar" | "forecast">("calendar");
   const [forecast, setForecast] = useState<SalesForecast | null>(null);
   const [forecastError, setForecastError] = useState("");
+  useEffect(() => {
+    const months = tab === "forecast" ? forecast?.months : undefined;
+    publishScreenPeriod(
+      "UI-28",
+      months?.length
+        ? {
+            startMonth: months[0].month,
+            endMonth: months[months.length - 1].month,
+          }
+        : year == null
+          ? undefined
+          : { startMonth: `${year}-01`, endMonth: `${year}-12` },
+    );
+  }, [tab, forecast, year]);
+  // 화면이 닫히면 알린 기간을 지운다.
+  useEffect(() => () => publishScreenPeriod("UI-28", undefined), []);
   const [forecastRevision, setForecastRevision] = useState(0);
   const forecastRequested = useRef<number | null>(null);
   const alive = useRef(true);

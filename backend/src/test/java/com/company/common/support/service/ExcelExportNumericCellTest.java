@@ -46,4 +46,44 @@ class ExcelExportNumericCellTest {
             assertThat(sheet.getRow(5).getCell(1).getStringCellValue()).isEqualTo("무상지원");
         }
     }
+    @Test
+    void manySheetsGetUniqueNamesWithinThirtyOneCharactersEvenAfterSuffixing() throws Exception {
+        String longName = "가".repeat(40);
+        var sheet = new ExcelExportService.SheetData(longName, "제목", List.of("이름"), List.of(List.of("가")));
+        var bytes = new ExcelExportService().write(List.of(sheet, sheet, sheet,
+            new ExcelExportService.SheetData("a/b:c", "제목", List.of("이름"), List.of()),
+            new ExcelExportService.SheetData("A B C", "제목", List.of("이름"), List.of())),
+            "admin", Instant.parse("2026-11-20T15:00:00Z"));
+        try (var book = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+            assertThat(book.getNumberOfSheets()).isEqualTo(5);
+            var names = new java.util.HashSet<String>();
+            for (int i = 0; i < 5; i++) {
+                String name = book.getSheetName(i);
+                assertThat(name.length()).isLessThanOrEqualTo(31);
+                assertThat(names.add(name.toLowerCase(java.util.Locale.ROOT))).as(name).isTrue();
+            }
+            assertThat(book.getSheetName(0)).isEqualTo("가".repeat(31));
+            assertThat(book.getSheetName(1)).isEqualTo("가".repeat(29) + " 2");
+            assertThat(book.getSheetName(2)).isEqualTo("가".repeat(29) + " 3");
+            assertThat(book.getSheetName(3)).isEqualTo("a b c");
+            assertThat(book.getSheetName(4)).isEqualTo("A B C 2");
+        }
+    }
+    @Test
+    void noSheetsStillWritesOneReadableSheetWithItsHeaderLine() throws Exception {
+        var bytes = new ExcelExportService().write(List.of(), "admin", Instant.parse("2026-11-20T15:00:00Z"));
+        try (var book = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+            assertThat(book.getNumberOfSheets()).isEqualTo(1);
+            assertThat(book.getSheetAt(0).getRow(0).getCell(0).getStringCellValue()).startsWith("자료 없음 · 다운로드: admin");
+        }
+    }
+    @Test
+    void singleSheetExportKeepsItsTitleAsTheSheetName() throws Exception {
+        var bytes = new ExcelExportService().write("철수 리스트", List.of("이름"), List.of(List.of("가")),
+            "admin", Instant.parse("2026-11-20T15:00:00Z"));
+        try (var book = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+            assertThat(book.getNumberOfSheets()).isEqualTo(1);
+            assertThat(book.getSheetName(0)).isEqualTo("철수 리스트");
+        }
+    }
 }

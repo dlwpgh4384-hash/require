@@ -116,6 +116,7 @@ beforeEach(() => {
   warning = true;
   missingBasis = false;
   request = vi.fn(async (url: string, _init?: RequestInit) => {
+    if (url === "/api/common/ai-analysis/questions") return ok({ items: [] });
     if (url.startsWith("/api/common/user-preferences/"))
       return ok(
         {
@@ -222,7 +223,7 @@ it.each(["/screens/UI-21", "/"])(
               {
                 menuId: "M024",
                 upperMenuId: "G007",
-                menuNm: "준비 화면",
+                menuNm: "AI 분석 도우미",
                 scrnId: "UI-26",
                 menuLvl: 2,
                 sortOrd: 2,
@@ -251,10 +252,8 @@ it.each(["/screens/UI-21", "/"])(
         "cash-flow-excel",
       ),
     ).toHaveLength(1);
-    fireEvent.click(screen.getByRole("link", { name: "준비 화면" }));
-    expect(
-      await screen.findByRole("region", { name: "UI-26 본문" }),
-    ).toHaveTextContent("준비 중");
+    fireEvent.click(screen.getByRole("link", { name: "AI 분석 도우미" }));
+    expect(await screen.findByTestId("ai-analysis-page")).toBeVisible();
   },
 );
 it("shows year-only selector and readonly fifteen-by-fifteen table", async () => {

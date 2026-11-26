@@ -5,6 +5,10 @@ import {
   PERIOD_CHANGED_EVENT,
   type PeriodChangedDetail,
 } from "./userPreferences";
+import {
+  publishScreenPeriod,
+  screenPeriodChannel,
+} from "../../shared/layout/screenPeriodChannel";
 
 /**
  * 연도만 고르는 화면(UI-01·05·11·12)의 고른 연도를 TB_SY_USER_PREF(PERIOD)에 저장하고 다시 열면 읽는다
@@ -78,5 +82,21 @@ export function useSavedYear(
     },
     [saver],
   );
+  // AI 답 [○○ 열기]가 넘긴 기간의 해로 바꾸고 저장한다(이미 열린 탭도 바로). 받은 요청은 통로가 한 번 쓰고 비운다.
+  useEffect(
+    () =>
+      screenPeriodChannel(screenId).subscribe((period) => {
+        const next = Number(period.endMonth.slice(0, 4));
+        if (!Number.isInteger(next) || next < min || next > max) return;
+        setYear(next);
+        loaded.current?.(next);
+      }),
+    [screenId, setYear, min, max],
+  );
+  // [AI에게 묻기]가 보낼 화면 기간: 고른 해 1월~12월(인력 운영 보드 달력 탭과 같은 모양). 화면이 닫히면 지운다.
+  useEffect(() => {
+    publishScreenPeriod(screenId, { startMonth: `${year}-01`, endMonth: `${year}-12` });
+  }, [screenId, year]);
+  useEffect(() => () => publishScreenPeriod(screenId, undefined), [screenId]);
   return [year, setYear] as const;
 }

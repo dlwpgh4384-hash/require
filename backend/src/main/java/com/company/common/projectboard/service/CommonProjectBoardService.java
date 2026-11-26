@@ -107,6 +107,12 @@ public class CommonProjectBoardService {
         return compute(filter, true);
     }
 
+    public Result preview(Filter filter, boolean readOnly) {
+        if (!readOnly) return preview(filter);
+        validate(filter);
+        return reading.execute(status -> compute(filter, true));
+    }
+
     private Result compute(Filter filter, boolean batch) {
         LocalDate today = calendar.today();
         String month = today.format(DateTimeFormatter.ofPattern("uuuuMM"));

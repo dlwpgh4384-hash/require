@@ -438,6 +438,13 @@ export function NavigationRoot({
   const go = (id: string, replace = false) =>
     navigate(`/screens/${encodeURIComponent(id)}`, { replace });
 
+  const analysisTabWasOpen = useRef(false);
+  useEffect(() => {
+    const open = tabList.includes("UI-26");
+    if (analysisTabWasOpen.current && !open)
+      window.dispatchEvent(new Event("ai-analysis-tab-closed"));
+    analysisTabWasOpen.current = open;
+  }, [tabList]);
   const closeTab = (id: string) => {
     const index = tabList.indexOf(id);
     const rest = tabList.filter((tab) => tab !== id);

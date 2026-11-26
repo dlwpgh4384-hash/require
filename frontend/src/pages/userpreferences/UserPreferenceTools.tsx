@@ -4,6 +4,11 @@ import { ScreenSettingsDialog } from "./ScreenSettingsDialog";
 import { UserPreferenceDialog } from "./UserPreferenceDialog";
 import type { PreferenceMenu } from "./PersonalScreenPreferences";
 import { ShellIcon } from "../../shared/layout/ShellIcon";
+import { AiAnalysisDrawer } from "../aianalysis/AiAnalysisDrawer";
+import {
+  AiAnalysisWorkspaceProvider,
+  useOptionalAiAnalysis,
+} from "../aianalysis/AiAnalysisWorkspace";
 
 export function MenuSearchDialog({
   menus,
@@ -147,6 +152,7 @@ function SessionTimer({ onExtend }: { onExtend: () => void }) {
 export const CURRENT_USER = { name: "시스템 관리자", role: "관리자" };
 
 export function UserPreferenceTools({
+  screenId = "UI-26",
   menus,
   mobile,
   available,
@@ -155,6 +161,7 @@ export function UserPreferenceTools({
   menuError,
   onDirtyChange,
 }: {
+  screenId?: string;
   menus: PreferenceMenu[];
   mobile: boolean;
   available: (id: string) => boolean;
@@ -164,6 +171,8 @@ export function UserPreferenceTools({
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const analysis = useOptionalAiAnalysis();
   const [notice, setNotice] = useState("");
   const menuAnchor = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -211,10 +220,9 @@ export function UserPreferenceTools({
       <button
         type="button"
         className="hd-ai"
-        data-testid="ai-unavailable"
-        aria-label="AI에게 묻기 (준비 중)"
-        title="AI에게 묻기는 AI 분석 도우미 작업에서 붙입니다."
-        onClick={() => setNotice("AI에게 묻기는 준비 중입니다.")}
+        data-testid="ai-analysis-open"
+        aria-label="AI에게 묻기"
+        onClick={() => setAnalysisOpen(true)}
       >
         <ShellIcon name="spark" />
         {!mobile && <span>AI에게 묻기</span>}
@@ -283,6 +291,20 @@ export function UserPreferenceTools({
           </div>
         )}
       </div>
+      {analysisOpen &&
+        (analysis ? (
+          <AiAnalysisDrawer
+            screenId={screenId}
+            onClose={() => setAnalysisOpen(false)}
+          />
+        ) : (
+          <AiAnalysisWorkspaceProvider>
+            <AiAnalysisDrawer
+              screenId={screenId}
+              onClose={() => setAnalysisOpen(false)}
+            />
+          </AiAnalysisWorkspaceProvider>
+        ))}
       {notice && (
         <Toast
           message={notice}

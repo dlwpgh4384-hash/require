@@ -80,7 +80,7 @@ function respond(developerId = "DEV-selected", available = true) {
       {
         menuId: "M024",
         upperMenuId: "G008",
-        menuNm: "미구현 화면",
+        menuNm: "AI 분석 도우미",
         scrnId: "UI-26",
         menuLvl: 2,
         sortOrd: 1,
@@ -171,6 +171,7 @@ function respond(developerId = "DEV-selected", available = true) {
   const request = vi.fn(async (url: string, init?: RequestInit) => {
     if (url === "/api/common/menus")
       return { ...ok(null), json: async () => menus };
+    if (url === "/api/common/ai-analysis/questions") return ok({ items: [] });
     if (url.startsWith("/api/common/user-preferences/")) {
       const input = init?.body ? JSON.parse(String(init.body)) : null;
       return ok(
@@ -244,7 +245,12 @@ function mount(path: string) {
 }
 function expectSingleShell() {
   expect(screen.getAllByRole("banner")).toHaveLength(1);
-  expect(screen.getAllByRole("complementary")).toHaveLength(1);
+  // 시안 UI-26 질문 기록(aside「질문 기록」)은 화면 안 칸이라 공통 틀의 왼쪽 메뉴 수에서 뺀다.
+  expect(
+    screen.getAllByRole("complementary", {
+      name: (name) => name !== "질문 기록",
+    }),
+  ).toHaveLength(1);
   expect(screen.getAllByRole("main")).toHaveLength(1);
 }
 
@@ -276,12 +282,10 @@ it.each(["/screens/UI-19", "/#UI-19"])(
   },
 );
 
-it("M016 opens UI-19 in the existing preference provider while UI-26 stays a placeholder", async () => {
+it("M016 opens UI-19 from the analysis page in the existing preference provider", async () => {
   const { request, developer } = respond();
   mount("/screens/UI-26");
-  expect(
-    await screen.findByRole("region", { name: "UI-26 본문" }),
-  ).toHaveTextContent("준비 중");
+  expect(await screen.findByTestId("ai-analysis-page")).toBeVisible();
   const preferences = screen.getByTestId("user-preferences");
   expect(
     request.mock.calls.some(([url]) => url.includes("part-settlement")),
@@ -294,9 +298,7 @@ it("M016 opens UI-19 in the existing preference provider while UI-26 stays a pla
   await act(async () => {
     await router!.navigate("/screens/UI-26");
   });
-  expect(screen.getByRole("region", { name: "UI-26 본문" })).toHaveTextContent(
-    "준비 중",
-  );
+  expect(screen.getByTestId("ai-analysis-page")).toBeVisible();
   expect(
     request.mock.calls.some(([url]) =>
       url.startsWith("/api/common/part-settlement-close-checks"),

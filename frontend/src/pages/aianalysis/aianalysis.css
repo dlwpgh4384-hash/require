@@ -1,0 +1,242 @@
+/* 시안 AI(유형 F): .chat · .hist · .conv · .msgs · .q · .a · .one · .scope · .steps · .ask · .ex */
+.ai-chat {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 24px;
+  min-height: 520px;
+  min-width: 0;
+}
+/* 시안 꺾은선 색 --c1(파랑)·--c2(주황)·--c3(초록)·--c4(보라)·--c6(회색). 앱 공통 변수에 없어 다른 화면처럼 --pf-c*로 둔다. */
+.ai-conv {
+  --pf-c1: #1d4ed8;
+  --pf-c2: #f59e0b;
+  --pf-c3: #10b981;
+  --pf-c4: #8b5cf6;
+  --pf-c6: #6b7280;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+@media (prefers-color-scheme: dark) {
+  .ai-conv {
+    --pf-c1: #60a5fa;
+    --pf-c2: #fbbf24;
+    --pf-c3: #34d399;
+    --pf-c4: #a78bfa;
+    --pf-c6: #9ca3af;
+  }
+}
+.ai-hist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+/* 시안 .nq-t */
+.ai-nq-t {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-sub);
+  padding: 8px 12px 4px;
+}
+.ai-hist button {
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 8px 10px;
+  border-radius: 4px;
+  color: var(--text-sub);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+  min-height: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ai-hist button:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+.ai-hist button:disabled {
+  cursor: default;
+}
+.ai-hist .ai-cap {
+  padding: 0 10px;
+}
+.ai-msgs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.ai-q {
+  align-self: flex-end;
+  max-width: 80%;
+  background: var(--primary-bg);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.ai-a {
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ai-one {
+  font-size: 15px;
+  line-height: 22px;
+}
+.ai-a-tt {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: -4px;
+}
+/* 시안 .twrap.free: 높이 제한 없음 */
+.ai-a .ai-twrap {
+  max-height: none;
+  min-height: 0;
+}
+.ai-a .ls-t th.ai-num,
+.ai-a .ls-t td.ai-num {
+  text-align: right;
+}
+.ai-tone-bad {
+  color: var(--ls-bad);
+}
+.ai-tone-warn {
+  color: var(--ls-warn);
+}
+/* 시안 .pname: 이름 밑에 작은 관리번호 */
+.ai-pname {
+  display: flex;
+  flex-direction: column;
+  line-height: 18px;
+}
+.ai-pname small {
+  font-size: 12px;
+  color: var(--text-sub);
+}
+.ai-chart {
+  min-width: 0;
+}
+.ai-chart .profit-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.ai-chart .profit-chart .ax {
+  fill: var(--text-sub);
+  font-size: 12px;
+  font-family: inherit;
+}
+.ai-chart .profit-chart .gl {
+  stroke: var(--divider, var(--border));
+  stroke-width: 1;
+}
+.ai-chart .profit-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-sub);
+}
+.ai-chart .profit-legend i {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+/* 시안 .cap */
+.ai-cap {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.ai-scope {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+  border-top: 1px solid var(--divider);
+  padding-top: 10px;
+}
+.ai-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-sub);
+  font-size: 13px;
+}
+.ai-steps .ai-on {
+  color: var(--primary-text);
+  font-weight: 600;
+}
+.ai-ex {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ai-ex .ls-btn {
+  white-space: normal;
+  text-align: left;
+  min-height: 28px;
+  height: auto;
+}
+.ai-ask {
+  display: flex;
+  gap: 8px;
+}
+.ai-ask .ls-in {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+/* 시안 label style="position:absolute;left:-9999px": 화면에 보이지 않는 이름표 */
+.ai-sr {
+  position: absolute;
+  left: -9999px;
+}
+.ai-field-error {
+  margin: -8px 0 0;
+  font-size: 12px;
+  color: var(--ls-bad);
+}
+@media (max-width: 1279px) {
+  .ai-chat {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+}
+@media (max-width: 767px) {
+  .ai-chat {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ai-hist,
+  .ai-hide-m {
+    display: none;
+  }
+  .ai-q {
+    max-width: 92%;
+  }
+  /* 시안 휴대폰 .btn-sm 36px */
+  .ai-ex .ls-btn-sm {
+    min-height: 36px;
+  }
+}

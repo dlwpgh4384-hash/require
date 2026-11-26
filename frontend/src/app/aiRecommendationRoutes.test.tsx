@@ -111,6 +111,7 @@ function respond(available = true, noTargets = false) {
   const request = vi.fn(async (url: string, init?: RequestInit) => {
     if (url === "/api/common/menus")
       return { ok: true, status: 200, json: async () => menus };
+    if (url === "/api/common/ai-analysis/questions") return ok({ items: [] });
     if (url.startsWith("/api/common/user-preferences/"))
       return ok({
         prefTypeCd: url.split("/").at(-2),
@@ -181,7 +182,7 @@ it.each(["/screens/UI-30", "/#UI-30"])(
 it("M026 opens UI-30 inside the existing preferences provider", async () => {
   respond();
   mount("/screens/UI-26");
-  await screen.findByRole("region", { name: "UI-26 본문" });
+  expect(await screen.findByTestId("ai-analysis-page")).toBeVisible();
   const preferences = screen.getByTestId("user-preferences");
   const group = screen.getByTestId("menu-toggle-g009");
   if (group.getAttribute("aria-expanded") !== "true") fireEvent.click(group);
@@ -200,7 +201,7 @@ it("tab activation retains the recommendation draft without another execution", 
   await act(async () => {
     await router!.navigate("/screens/UI-26");
   });
-  await screen.findByRole("region", { name: "UI-26 본문" });
+  expect(await screen.findByTestId("ai-analysis-page")).toBeVisible();
   await act(async () => {
     await router!.navigate("/screens/UI-30");
   });

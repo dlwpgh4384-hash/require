@@ -1553,7 +1553,10 @@ describe("client and part route composition", () => {
     expect(router?.state.location.pathname).toBe("/screens/UI-15");
     expect(
       request.mock.calls.filter(
-        ([url, init]) => !url.includes("user-preferences") && init?.method,
+        ([url, init]) =>
+          !url.includes("user-preferences") &&
+          url !== "/api/health" && // 로그인(UI-22) 뒤 CSRF 토큰 받기
+          init?.method,
       ),
     ).toHaveLength(0);
   });
@@ -3661,7 +3664,9 @@ describe("application route registration", () => {
           request.mock.calls.filter(
             ([url]) =>
               url !== "/api/common/menus" &&
-              url !== "/api/common/bills/unpaid-count",
+              url !== "/api/common/bills/unpaid-count" &&
+              // 로그인(UI-22) 뒤 첫 저장 전 CSRF 토큰을 받는 요청
+              url !== "/api/health",
           ),
         ).toHaveLength(5),
       );

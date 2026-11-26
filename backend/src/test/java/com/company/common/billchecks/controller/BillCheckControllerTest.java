@@ -122,7 +122,7 @@ class BillCheckControllerTest {
     }
 
     @Test void missingCreatesRecomputedSupply()throws Exception {
-        var result=data(command("missing",input()).andExpect(status().isOk()));
+        var result=data(mvc.perform(post("/api/common/bill-checks/missing").contentType("application/json").content(input().toString())).andExpect(status().isOk()));
         assertThat(result.path("bill").path("supplyAmount").decimalValue()).isEqualByComparingTo("10000");
         assertThat(result.path("bill").path("billId").asText()).isEqualTo("B-202611-003");
         assertThat(result.path("missingTaxInvoiceNumber").asBoolean()).isTrue();
@@ -154,14 +154,15 @@ class BillCheckControllerTest {
     }
     @Test void additionalPreservesOriginalAndCreatesOnlyDifference()throws Exception {
         eligible("additional");var original=invoices.get("original");
-        var result=data(command("additional",input()).andExpect(status().isOk()));
+        var result=data(mvc.perform(post("/api/common/bill-checks/additional").contentType("application/json").content(input().toString())).andExpect(status().isOk()));
         assertThat(result.path("bill").path("supplyAmount").decimalValue()).isEqualByComparingTo("5000");
         assertThat(invoices.get("original")).isSameAs(original);
         verify(mapper,never()).correct(any());
     }
     @Test void correctionAddsTotalDifferenceToMaximumOrderNotWholeReference()throws Exception {
         eligible("correction");var older=invoices.get("older");
-        var result=data(command("correction",input()).andExpect(status().isOk()));
+        var result=data(mvc.perform(post("/api/common/bill-checks/correction").contentType("application/json")
+            .content(input().put("modifiedAt",READ.toString()).toString())).andExpect(status().isOk()));
         assertThat(result.path("bill").path("billId").asText()).isEqualTo("latest");
         assertThat(result.path("bill").path("supplyAmount").decimalValue()).isEqualByComparingTo("7000");
         assertThat(invoices.get("older")).isSameAs(older);

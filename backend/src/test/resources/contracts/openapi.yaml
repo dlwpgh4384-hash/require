@@ -9,6 +9,8 @@ info:
     해결한 사용자 승인으로 취급하지 않는다. 직접 진입 정보 전달 OQ-005,
     health 결과·오류 OQ-006, 페이지·검색 입력과 호출자 오류 OQ-007은 확인 필요다.
     원장 REQ-044의 출처 불일치 UP-001도 보존한다. 완성된 실행 계약이나 구현 성공을 주장하지 않는다.
+security:
+- SessionCookie: []
 paths:
   /api/common/menus:
     get:
@@ -21,7 +23,9 @@ paths:
         요청 검색·페이지 입력과 호출자 정정 가능한 오류는 원문에 정의되지 않았다.
         4xx를 발명하거나 업무 읽기를 인프라 예외로 위장하지 않는다(OQ-007).
         GET은 DDL·seed·화면 상태 저장을 실행하지 않는다.
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [ADMIN, EXEC, FIN, SALES_LDR, PM]
       x-related-requirements:
         - REQ-001
         - REQ-002
@@ -88,6 +92,10 @@ paths:
         OQ-007 확인 필요. 호출자 정정 가능한 입력·인증·업무 오류의 근거가 없으며
         4xx 완비를 주장하지 않는다. 업무 메뉴 조회이므로 인프라 읽기 전용 예외를 선언하지 않는다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -111,7 +119,9 @@ paths:
     post:
       operationId: postCommonMenu
       summary: 대메뉴·서브메뉴 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-221
       - REQ-229
@@ -125,6 +135,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonMenuCreateInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 처리 결과
           content:
@@ -148,7 +162,9 @@ paths:
     get:
       operationId: getCommonUserPreference
       summary: 사용자 공통 설정 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-054
       - REQ-055
@@ -184,6 +200,10 @@ paths:
         result_path:
         - data
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -199,7 +219,9 @@ paths:
     put:
       operationId: putCommonUserPreference
       summary: 사용자 공통 설정 저장
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-054
       - REQ-055
@@ -246,6 +268,10 @@ paths:
       - 'side-effect: 기존 MENU_FOLD 행을 읽은 modDttm으로 변경 저장 -> TB_SY_USER_PREF.MOD_USER_ID=admin·MOD_DTTM 갱신이 DB에 있고
         다음 GET.modDttm과 같다.'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -268,11 +294,13 @@ paths:
     get:
       operationId: getCommonUsers
       summary: 사용자 목록 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-130
       - REQ-121
-      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+      description: UI-23 사용자 업무. 서버 실행자는 세션 사용자이며 본문/헤더 실행자는 무시한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
         않는다.
       parameters:
       - name: page
@@ -316,6 +344,10 @@ paths:
           type: string
         description: 이름 또는 아이디 검색
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -338,7 +370,9 @@ paths:
     put:
       operationId: putCommonUsers
       summary: 사용자 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-131
       - REQ-132
@@ -350,7 +384,7 @@ paths:
       - REQ-157
       - REQ-159
       - REQ-161
-      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+      description: UI-23 사용자 업무. 서버 실행자는 세션 사용자이며 본문/헤더 실행자는 무시한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
         않는다.
       requestBody:
         required: true
@@ -359,6 +393,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonUserCreateInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -382,10 +420,12 @@ paths:
     get:
       operationId: getCommonUser
       summary: 계정 정보 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-137
-      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+      description: UI-23 사용자 업무. 서버 실행자는 세션 사용자이며 본문/헤더 실행자는 무시한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
         않는다.
       parameters:
       - name: userId
@@ -397,6 +437,10 @@ paths:
           minLength: 4
           maxLength: 20
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -419,7 +463,9 @@ paths:
     put:
       operationId: putCommonUser
       summary: 계정 정보·역할 변경
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-126
       - REQ-134
@@ -436,7 +482,7 @@ paths:
       - REQ-161
       - REQ-163
       - REQ-164
-      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+      description: UI-23 사용자 업무. 서버 실행자는 세션 사용자이며 본문/헤더 실행자는 무시한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
         않는다.
       parameters:
       - name: userId
@@ -454,6 +500,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonUserUpdateInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -483,10 +533,12 @@ paths:
     get:
       operationId: getCommonUserAccessLogs
       summary: 사용자 접근 기록 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-138
-      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+      description: UI-23 사용자 업무. 서버 실행자는 세션 사용자이며 본문/헤더 실행자는 무시한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
         않는다.
       parameters:
       - name: userId
@@ -516,6 +568,10 @@ paths:
           default: 20
         description: 화면은 공통 목록 설정을 전달한다. default는 HTTP 요청 생략 시 설계값이며 제품 seed가 아니다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -539,13 +595,15 @@ paths:
     put:
       operationId: putCommonUserPasswordReset
       summary: 임시 비밀번호 초기화
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-139
       - REQ-116
       - REQ-147
       - REQ-126
-      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+      description: UI-23 사용자 업무. 서버 실행자는 세션 사용자이며 본문/헤더 실행자는 무시한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
         않는다.
       parameters:
       - name: userId
@@ -563,6 +621,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonUserVersionInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -592,12 +654,14 @@ paths:
     put:
       operationId: putCommonUserUnlock
       summary: 계정 잠금 해제
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-140
       - REQ-147
       - REQ-126
-      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+      description: UI-23 사용자 업무. 서버 실행자는 세션 사용자이며 본문/헤더 실행자는 무시한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
         않는다.
       parameters:
       - name: userId
@@ -615,6 +679,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonUserVersionInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -644,7 +712,9 @@ paths:
     put:
       operationId: putCommonUserStop
       summary: 선택 계정 사용 중지
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-141
       - REQ-142
@@ -657,7 +727,7 @@ paths:
       - REQ-153
       - REQ-155
       - REQ-126
-      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+      description: UI-23 사용자 업무. 서버 실행자는 세션 사용자이며 본문/헤더 실행자는 무시한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
         않는다.
       requestBody:
         required: true
@@ -666,6 +736,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonUserStopInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -695,13 +769,15 @@ paths:
     put:
       operationId: putCommonUserResume
       summary: 계정 사용 재개
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-148
       - REQ-149
       - REQ-154
       - REQ-126
-      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+      description: UI-23 사용자 업무. 서버 실행자는 세션 사용자이며 본문/헤더 실행자는 무시한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
         않는다.
       parameters:
       - name: userId
@@ -719,6 +795,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonUserVersionInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -748,16 +828,22 @@ paths:
     get:
       operationId: getCommonUserOptions
       summary: 사용자 역할·담당 선택 목록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-133
       - REQ-159
       - REQ-162
       - REQ-166
       - REQ-205
-      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지 않는다.
+      description: UI-23 사용자 업무. 서버 실행자는 세션 사용자이며 본문/헤더 실행자는 무시한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지 않는다.
         UI-24에서 사용 중지한 역할은 사용자 등록 역할 목록에서 제외한다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -781,12 +867,14 @@ paths:
     get:
       operationId: getCommonUserChangeImpact
       summary: 역할·중지 영향 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-150
       - REQ-153
       - REQ-163
-      description: UI-23 사용자 업무. 서버 실행자는 admin으로 고정한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
+      description: UI-23 사용자 업무. 서버 실행자는 세션 사용자이며 본문/헤더 실행자는 무시한다. 물리 필드·코드 매핑은 OQ-DATA-023의 SQL 대조 후 확정하며 DTO는 비밀번호·해시를 공개하지
         않는다.
       parameters:
       - name: userIds
@@ -819,6 +907,10 @@ paths:
             description: DML 원천 코드. 미제공 코드를 하드코딩하지 않는다.
         description: ROLE_CHANGE 대상 역할 집합; 담당 프로젝트 적격성 소멸 판정용
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -864,11 +956,17 @@ paths:
     get:
       operationId: getCommonRoles
       summary: 활성 역할 탭 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-183
       - REQ-184
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -897,12 +995,18 @@ paths:
     post:
       operationId: postCommonRoleCopy
       summary: 기존 역할 복사 생성
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-199
       - REQ-200
       - REQ-201
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -938,7 +1042,9 @@ paths:
     get:
       operationId: getCommonRole
       summary: 역할 범위·메뉴 권한 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-184
       - REQ-185
@@ -953,6 +1059,10 @@ paths:
           minLength: 1
           description: 기존 기본 역할 식별자 또는 서버 자동 R-nnn. 실제 물리 PK/코드 매핑은 SQL 원문 대조.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -981,7 +1091,9 @@ paths:
     put:
       operationId: putCommonRole
       summary: 역할 범위·메뉴 권한 저장
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-185
       - REQ-186
@@ -1007,6 +1119,10 @@ paths:
           minLength: 1
           description: 기존 기본 역할 식별자 또는 서버 자동 R-nnn. 실제 물리 PK/코드 매핑은 SQL 원문 대조.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1048,7 +1164,9 @@ paths:
     get:
       operationId: getCommonRoleChangeImpact
       summary: 담당범위 정리 영향 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-187
       - REQ-186
@@ -1067,6 +1185,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1096,7 +1218,9 @@ paths:
     post:
       operationId: postCommonRoleStop
       summary: 추가 역할 사용 중지
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-202
       - REQ-203
@@ -1111,6 +1235,10 @@ paths:
           minLength: 1
           description: 기존 기본 역할 식별자 또는 서버 자동 R-nnn. 실제 물리 PK/코드 매핑은 SQL 원문 대조.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1141,7 +1269,9 @@ paths:
     get:
       operationId: getCommonMenuSettings
       summary: 메뉴 관리 트리 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-218
       parameters:
@@ -1155,6 +1285,10 @@ paths:
           - 2
         description: 생략하면 전체 관리 트리, 1 또는 2이면 해당 레벨만 반환한다. UI-25는 생략하여 전체를 읽는다. 계층 전체는 페이지 분할하지 않는다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 처리 결과
           content:
@@ -1179,7 +1313,9 @@ paths:
     put:
       operationId: putCommonMenuSettings
       summary: 메뉴 트리 변경 저장
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-219
       - REQ-220
@@ -1197,6 +1333,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonMenuSettingsInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 처리 결과
           content:
@@ -1226,7 +1366,9 @@ paths:
     get:
       operationId: getCommonMenuOptions
       summary: 메뉴 등록 선택 목록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-230
       parameters:
@@ -1240,6 +1382,10 @@ paths:
           - 2
         description: 등록 레벨 1=대메뉴, 2=서브메뉴. 레벨에 필요한 선택지만 반환한다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 처리 결과
           content:
@@ -1265,12 +1411,18 @@ paths:
     get:
       operationId: getCommonCodeGroups
       summary: 공통코드 그룹 목록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-251
       description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
         승인하지 않는다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1293,7 +1445,9 @@ paths:
     post:
       operationId: postCommonCodeGroup
       summary: 업무 코드 그룹 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-267
       - REQ-268
@@ -1306,6 +1460,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonCodeGroupInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1329,7 +1487,9 @@ paths:
     get:
       operationId: getCommonCodes
       summary: 그룹별 공통코드 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-254
       - REQ-269
@@ -1344,6 +1504,10 @@ paths:
           type: string
           pattern: ^[A-Z][A-Z0-9_]{0,29}$
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1366,7 +1530,9 @@ paths:
     post:
       operationId: postCommonCode
       summary: 업무·수당 코드 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-258
       - REQ-259
@@ -1388,6 +1554,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonCodeInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1410,7 +1580,9 @@ paths:
     put:
       operationId: putCommonCodes
       summary: 공통코드 변경 저장
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-255
       - REQ-256
@@ -1436,6 +1608,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonCodesInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1465,7 +1641,9 @@ paths:
     post:
       operationId: postCommonCodeDelete
       summary: 미사용 업무 코드 삭제
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-262
       - REQ-263
@@ -1487,6 +1665,10 @@ paths:
           pattern: ^[A-Z0-9_]{1,20}$
       x-no-request-body-reason: 그룹과 코드 식별자는 path로 전달하고 삭제 실행은 사용 참조를 서버에서 재검증한다. 추가 업무 입력이 없는 명시적 논리 삭제다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1510,7 +1692,9 @@ paths:
     get:
       operationId: getCommonOperatingStandards
       summary: 운영 기준값과 이력 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-272
       - REQ-295
@@ -1518,6 +1702,10 @@ paths:
       description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의 승인하지
         않는다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1540,7 +1728,9 @@ paths:
     put:
       operationId: putCommonOperatingStandards
       summary: 운영 기준값 월 이력 저장
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-273
       - REQ-274
@@ -1558,6 +1748,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonOperatingStandardsInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1587,12 +1781,18 @@ paths:
     get:
       operationId: getCommonCodeMaps
       summary: 엑셀 표기 대응 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-279
       description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
         승인하지 않는다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1615,7 +1815,9 @@ paths:
     post:
       operationId: postCommonCodeMap
       summary: 엑셀 표기 대응 추가
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-280
       - REQ-281
@@ -1628,6 +1830,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonCodeMapInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1651,7 +1857,9 @@ paths:
     post:
       operationId: postCommonCodeMapDelete
       summary: 엑셀 표기 대응 삭제
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-282
       - REQ-283
@@ -1664,6 +1872,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonCodeMapDeleteInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1687,12 +1899,18 @@ paths:
     get:
       operationId: getCommonCodeChangeHistory
       summary: 공통코드 변경 이력
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-286
       description: UI-27·SLICE-008. UI-22 전 로그인 없이 admin. 공개 DTO이며 실제 물리 필드/키/정밀도는 OQ-DATA-027 SQL 대조. 미정 정책을 임의
         승인하지 않는다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1716,7 +1934,9 @@ paths:
     get:
       operationId: getCommonClients
       summary: 거래처 목록 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-309
       - REQ-310
@@ -1744,6 +1964,10 @@ paths:
         schema:
           type: string
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1766,7 +1990,9 @@ paths:
     post:
       operationId: postCommonClient
       summary: 거래처 신규 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-312
       - REQ-313
@@ -1782,6 +2008,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonClientInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1805,7 +2035,9 @@ paths:
     get:
       operationId: getCommonClient
       summary: 거래처 기본 정보 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-330
       - REQ-318
@@ -1817,6 +2049,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1839,7 +2075,9 @@ paths:
     put:
       operationId: putCommonClient
       summary: 거래처 수정 저장
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-320
       - REQ-321
@@ -1860,6 +2098,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonClientUpdate'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1889,7 +2131,9 @@ paths:
     get:
       operationId: getCommonClientAssignments
       summary: 거래처 오늘 투입 내역
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-310
       - REQ-311
@@ -1912,6 +2156,10 @@ paths:
         - data
         - items
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 조회 또는 저장 결과
           content:
@@ -1935,7 +2183,9 @@ paths:
     get:
       operationId: getCommonClientChangeHistory
       summary: 거래처 변경 이력
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-330
       - REQ-316
@@ -1948,6 +2198,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -1971,7 +2225,9 @@ paths:
     get:
       operationId: getCommonClientPaymentAccount
       summary: 거래처 지급 계좌 전체 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-322
       parameters:
@@ -1982,6 +2238,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -2005,7 +2265,9 @@ paths:
     put:
       operationId: putCommonClientUseStatus
       summary: 거래처 사용 상태 변경
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-323
       - REQ-324
@@ -2018,6 +2280,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonClientStateInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -2047,13 +2313,19 @@ paths:
     get:
       operationId: getCommonParts
       summary: 영업 파트 목록 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-331
       - REQ-287
       - REQ-305
       - REQ-336
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -2076,7 +2348,9 @@ paths:
     post:
       operationId: postCommonPart
       summary: 영업 파트 추가
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-333
       - REQ-334
@@ -2091,6 +2365,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonPartInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -2120,12 +2398,18 @@ paths:
     get:
       operationId: getCommonPartOptions
       summary: 파트장과 초기 기준 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-292
       - REQ-334
       - REQ-344
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -2149,7 +2433,9 @@ paths:
     get:
       operationId: getCommonPartStandards
       summary: 파트 기준 이력 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-332
       - REQ-331
@@ -2163,6 +2449,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -2185,7 +2475,9 @@ paths:
     put:
       operationId: putCommonPartStandards
       summary: 파트 월별 기준 변경
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-338
       - REQ-339
@@ -2207,6 +2499,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonPartStandardInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -2236,7 +2532,9 @@ paths:
     put:
       operationId: putCommonPart
       summary: 파트명 수정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-341
       - REQ-334
@@ -2256,6 +2554,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonPartRenameInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -2285,7 +2587,9 @@ paths:
     put:
       operationId: putCommonPartStop
       summary: 영업 파트 중지
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-342
       - REQ-306
@@ -2303,6 +2607,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonPartStopInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -2332,7 +2640,9 @@ paths:
     get:
       operationId: getCommonUploadTemplate
       summary: 공통 업무 엑셀 양식
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1197
       - REQ-326
@@ -2372,6 +2682,10 @@ paths:
         columns: [연월, 매출 목표, 영업이익 목표]
         months: 선택연도 1~12월 12줄; 금액 빈칸0
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 엑셀 파일
           content:
@@ -2411,7 +2725,9 @@ paths:
     post:
       operationId: postCommonUpload
       summary: 공통 업무 엑셀 검사
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1187
       - REQ-1199
@@ -2455,6 +2771,10 @@ paths:
         columns: [연월, 매출 목표, 영업이익 목표]
         months: 선택연도 1~12월 12줄; 금액 빈칸0
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -2531,7 +2851,9 @@ paths:
     get:
       operationId: getCommonUpload
       summary: 엑셀 검사 결과 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1200
       - REQ-1201
@@ -2569,6 +2891,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -2592,7 +2918,9 @@ paths:
     get:
       operationId: getCommonUploadErrors
       summary: 엑셀 행 오류 목록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-329
       - REQ-400
@@ -2625,6 +2953,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 엑셀 파일
           content:
@@ -2642,7 +2974,9 @@ paths:
     post:
       operationId: postCommonUploadApply
       summary: 검사한 업무 엑셀 반영
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1198
       - REQ-1202
@@ -2698,6 +3032,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonUploadApplyInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -2727,7 +3065,9 @@ paths:
     get:
       operationId: getCommonPartChangeHistory
       summary: 파트 기준 변경 기록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-347
       parameters:
@@ -2738,6 +3078,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -2761,7 +3105,9 @@ paths:
     get:
       operationId: getCommonDevelopers
       summary: 개발자 목록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
       x-related-requirements:
       - REQ-366
@@ -2824,6 +3170,10 @@ paths:
         - includeStopped
         ordering: 개발자 목록 이름순; 상태 이력의 입사일 재직 줄은 맨 아래. 나머지는 원천 순서 보존.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 개발자 목록 결과
           content:
@@ -2849,7 +3199,9 @@ paths:
     post:
       operationId: postCommonDeveloper
       summary: 개발자 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
       x-related-requirements:
       - REQ-370
@@ -2877,6 +3229,10 @@ paths:
       - 'business: 이미 등록된 관리번호 제출 -> 400 이미 등록된 관리번호입니다.·기존 개발자 불변'
       - 'side-effect: 스킬/거주지 포함 등록 -> TB_HR_DEV_SKILL 관계와 HOME_AREA_CD/HOME_ADDR를 상세에서 재조회'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 개발자 등록 결과
           content:
@@ -2900,7 +3256,9 @@ paths:
     get:
       operationId: getCommonDeveloper
       summary: 개발자 기본 정보
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
       x-related-requirements:
       - REQ-380
@@ -2922,6 +3280,10 @@ paths:
         filtering: path 식별자만
         ordering: 개발자 목록 이름순; 상태 이력의 입사일 재직 줄은 맨 아래. 나머지는 원천 순서 보존.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 개발자 기본 정보 결과
           content:
@@ -2947,7 +3309,9 @@ paths:
     put:
       operationId: putCommonDeveloper
       summary: 개발자 정보 수정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
       x-related-requirements:
       - REQ-375
@@ -2981,6 +3345,10 @@ paths:
       - 'business: managementNumber 변경 필드를 직접 제출 -> 400 errors.managementNumber·관리번호 불변'
       - 'side-effect: 월단가/급여 변경 -> TB_HR_DEV_PRC 한국 저장월 이력 및 TB_SY_CHG_HIST 각 변경 항목 조회'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 개발자 정보 수정 결과
           content:
@@ -3004,7 +3372,9 @@ paths:
     get:
       operationId: getCommonDeveloperAssignments
       summary: 개발자 투입 이력
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
       x-related-requirements:
       - REQ-380
@@ -3025,6 +3395,10 @@ paths:
         filtering: path 식별자만
         ordering: 개발자 목록 이름순; 상태 이력의 입사일 재직 줄은 맨 아래. 나머지는 원천 순서 보존.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 개발자 투입 이력 결과
           content:
@@ -3048,7 +3422,9 @@ paths:
     get:
       operationId: getCommonDeveloperStatuses
       summary: 개발자 근무 상태 이력
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
       x-related-requirements:
       - REQ-380
@@ -3070,6 +3446,10 @@ paths:
         filtering: path 식별자만
         ordering: 개발자 목록 이름순; 상태 이력의 입사일 재직 줄은 맨 아래. 나머지는 원천 순서 보존.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 개발자 근무 상태 이력 결과
           content:
@@ -3092,7 +3472,9 @@ paths:
     post:
       operationId: postCommonDeveloperStatus
       summary: 근무 상태 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
       x-related-requirements:
       - REQ-382
@@ -3139,6 +3521,10 @@ paths:
       - 'business: 진행 휴직 없음 또는 복귀일이 휴직 종료일 다음 날보다 늦음 -> 400 지정 재직 안내·이력 불변'
       - 'business: 겹친 휴직/종료<시작/퇴사2개/퇴사뒤휴직/휴직당재직2개/복귀일 새휴직 -> 400 정합성 이유·전체 쓰기0'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 근무 상태 등록 결과
           content:
@@ -3162,7 +3548,9 @@ paths:
     get:
       operationId: getCommonDeveloperChangeHistory
       summary: 개발자 변경 이력
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-377
       - REQ-391
@@ -3174,6 +3562,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -3197,7 +3589,9 @@ paths:
     get:
       operationId: getCommonDeveloperAreas
       summary: 거주지 행정구역
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-373
       parameters:
@@ -3208,6 +3602,10 @@ paths:
           type: string
           description: 상위 코드. 생략 시 시·도, 시·도면 시·군·구, 시·군·구면 동
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -3231,7 +3629,9 @@ paths:
     get:
       operationId: getCommonDevelopersExcel
       summary: 개발자 목록 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-356
       - REQ-357
@@ -3275,6 +3675,10 @@ paths:
           type: boolean
           default: false
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -3292,7 +3696,9 @@ paths:
     put:
       operationId: putCommonDeveloperStatusEndDate
       summary: 휴직 종료일 수정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
       x-related-requirements:
       - REQ-383
@@ -3329,6 +3735,10 @@ paths:
       - 'business: 재직으로 닫힌 휴직 수정 -> 400 재직을 먼저 취소하세요·endDate 불변'
       - 'side-effect: 유효 연장 후 -> 같은 TB_HR_DEV_STAT 줄의 종료일 갱신과 WORK_STAT_CD 이력 재판정 결과 조회'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 휴직 종료일 수정 결과
           content:
@@ -3352,7 +3762,9 @@ paths:
     post:
       operationId: postCommonDeveloperReturnCancel
       summary: 재직 등록 취소
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
       x-related-requirements:
       - REQ-385
@@ -3384,6 +3796,10 @@ paths:
       - 'business: 복귀월 마감 후 취소 -> 400 마감 안내·재직과 휴직 종료일 불변'
       - 'side-effect: 퇴사예정이 있는 재직 취소 -> TB_HR_DEV_STAT 복원 종료일은 퇴사 전날 이하·상태 재판정'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 재직 등록 취소 결과
           content:
@@ -3407,7 +3823,9 @@ paths:
     post:
       operationId: postCommonDeveloperRetirementCancel
       summary: 퇴사 등록 취소
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: UI-22 전 무인증·현재 사용자 admin. 역할·민감 정책은 별도 정책 시험으로 보존하며 인증 검사를 앞당기지 않는다.
       x-related-requirements:
       - REQ-390
@@ -3447,6 +3865,10 @@ paths:
       - 'side-effect: 미마감 취소 완료 -> TB_SY_CHG_HIST 수정/퇴사 취소/입력 사유·원휴직 종료일 복원 조회'
       - 'auth: 후속 정책 함수에 지난 퇴사/재무 입력 -> 허용=false·변경0; admin/미마감은 허용=true. HTTP403 활성화는 UI-22 후속'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 퇴사 등록 취소 결과
           content:
@@ -3470,7 +3892,9 @@ paths:
     put:
       operationId: putCommonDeveloperUseStatus
       summary: 개발자 사용 중지·재개
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-404
       - REQ-405
@@ -3483,6 +3907,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonDeveloperUseInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -3506,13 +3934,19 @@ paths:
     get:
       operationId: getCommonProjects
       summary: 프로젝트 목록 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-420
       - REQ-430
       - REQ-432
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 조회 또는 처리 후 재조회 가능한 업무 결과
           content:
@@ -3545,7 +3979,9 @@ paths:
     post:
       operationId: postCommonProject
       summary: 프로젝트 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-433
@@ -3554,6 +3990,10 @@ paths:
       - REQ-437
       - REQ-440
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 조회 또는 처리 후 재조회 가능한 업무 결과
           content:
@@ -3604,7 +4044,9 @@ paths:
     get:
       operationId: getCommonProject
       summary: 프로젝트 상세 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-423
@@ -3613,6 +4055,10 @@ paths:
       - REQ-451
       - REQ-452
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 조회 또는 처리 후 재조회 가능한 업무 결과
           content:
@@ -3650,7 +4096,9 @@ paths:
     put:
       operationId: putCommonProject
       summary: 프로젝트 계약 수정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-431
@@ -3660,6 +4108,10 @@ paths:
       - REQ-480
       - REQ-481
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 조회 또는 처리 후 재조회 가능한 업무 결과
           content:
@@ -3715,12 +4167,18 @@ paths:
     put:
       operationId: putCommonProjectBudget
       summary: 프로젝트 예산 변경
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-438
       - REQ-439
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 조회 또는 처리 후 재조회 가능한 업무 결과
           content:
@@ -3770,11 +4228,17 @@ paths:
     get:
       operationId: getCommonProjectChangeHistory
       summary: 계약 변경 이력 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-422
       - REQ-444
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -3805,10 +4269,16 @@ paths:
     get:
       operationId: getCommonProjectSalesParts
       summary: 영업 파트 이력 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-448
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -3839,12 +4309,18 @@ paths:
     put:
       operationId: putCommonProjectSalesPart
       summary: 프로젝트 영업 파트 변경
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-445
       - REQ-446
       - REQ-447
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -3881,11 +4357,17 @@ paths:
     post:
       operationId: postCommonProjectStart
       summary: 수주예정 프로젝트 진행 전환
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-450
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 조회 또는 처리 후 재조회 가능한 업무 결과
           content:
@@ -3929,7 +4411,9 @@ paths:
     get:
       operationId: getCommonProjectDistribution
       summary: 턴키 배분표 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-457
@@ -3937,6 +4421,10 @@ paths:
       - REQ-462
       - REQ-463
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 조회 또는 처리 후 재조회 가능한 업무 결과
           content:
@@ -3975,10 +4463,16 @@ paths:
     get:
       operationId: getCommonProjectDistributionTemplate
       summary: 턴키 배분표 양식
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-458
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -4003,10 +4497,16 @@ paths:
     get:
       operationId: getCommonProjectManpowerPlan
       summary: 프로젝트 인원 계획 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-464
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -4036,11 +4536,17 @@ paths:
     put:
       operationId: putCommonProjectManpowerPlan
       summary: 프로젝트 인원 계획 저장
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-465
       - REQ-466
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -4077,10 +4583,16 @@ paths:
     get:
       operationId: getCommonProjectDirectExpenses
       summary: 프로젝트 추가 경비 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-467
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -4110,11 +4622,17 @@ paths:
     post:
       operationId: postCommonProjectDirectExpense
       summary: 프로젝트 추가 경비 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-468
       - REQ-469
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -4151,10 +4669,16 @@ paths:
     post:
       operationId: postCommonProjectDirectExpenseDelete
       summary: 프로젝트 추가 경비 삭제
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-470
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -4192,7 +4716,9 @@ paths:
     post:
       operationId: postCommonProjectLose
       summary: 수주예정 프로젝트 실주 처리
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 로그인 전 admin 고정·메뉴 인증검사 없음. 업무 상태/마감/프로젝트 담당 정책은 서버에서 최종 재검증한다.
       x-related-requirements:
       - REQ-472
@@ -4201,6 +4727,10 @@ paths:
       - REQ-476
       - REQ-477
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 조회 또는 처리 후 재조회 가능한 업무 결과
           content:
@@ -4255,10 +4785,16 @@ paths:
     get:
       operationId: getCommonProjectLoseImpact
       summary: 프로젝트 실주 영향 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-474
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -4289,7 +4825,9 @@ paths:
     get:
       operationId: getCommonAssignments
       summary: 투입 배정 목록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-499
       - REQ-504
@@ -4343,6 +4881,10 @@ paths:
         - data
         - items
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 투입 배정 목록 결과
           content:
@@ -4365,7 +4907,9 @@ paths:
     post:
       operationId: postCommonAssignment
       summary: 인력 투입 배정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-508
       - REQ-509
@@ -4385,6 +4929,10 @@ paths:
       - REQ-505
       description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 인력 투입 배정 결과
           content:
@@ -4453,7 +5001,9 @@ paths:
     get:
       operationId: getCommonAssignment
       summary: 투입 배정 상세
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-524
       - REQ-489
@@ -4474,6 +5024,10 @@ paths:
         result_path:
         - data
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 투입 배정 상세 결과
           content:
@@ -4497,7 +5051,9 @@ paths:
     get:
       operationId: getCommonAssignmentCandidates
       summary: 수주 배정 후보
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-501
       description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
@@ -4511,6 +5067,10 @@ paths:
         - data
         - items
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 수주 배정 후보 결과
           content:
@@ -4534,7 +5094,9 @@ paths:
     post:
       operationId: postCommonAssignmentCandidateRemove
       summary: 배정 후보 제외
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-503
       description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
@@ -4546,6 +5108,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 배정 후보 제외 결과
           content:
@@ -4593,7 +5159,9 @@ paths:
     get:
       operationId: getCommonAssignmentContractDevelopers
       summary: 계약상 인력 선택
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-517
       - REQ-518
@@ -4631,6 +5199,10 @@ paths:
         - data
         - items
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 계약상 인력 선택 결과
           content:
@@ -4654,7 +5226,9 @@ paths:
     get:
       operationId: getCommonAssignmentHistory
       summary: 투입 변경 이력
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-539
       - REQ-493
@@ -4684,6 +5258,10 @@ paths:
         - data
         - items
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 투입 변경 이력 결과
           content:
@@ -4707,7 +5285,9 @@ paths:
     post:
       operationId: postCommonAssignmentChange
       summary: 투입 배정 변경 기록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-525
       - REQ-526
@@ -4731,6 +5311,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -4766,7 +5350,9 @@ paths:
     post:
       operationId: postCommonAssignmentHistoryCorrection
       summary: 투입 이력 정정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-537
       - REQ-538
@@ -4785,6 +5371,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -4820,12 +5410,18 @@ paths:
     put:
       operationId: putCommonAssignmentExtensionPossibility
       summary: 선택 배정 연장 가능성 변경
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-547
       - REQ-489
       description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 선택 배정 연장 가능성 변경 결과
           content:
@@ -4874,7 +5470,9 @@ paths:
     post:
       operationId: postCommonAssignmentCancel
       summary: 선택 투입 배정 취소
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-548
       - REQ-549
@@ -4882,6 +5480,10 @@ paths:
       - REQ-489
       description: 개발 단계 무인증·고정 admin. 로그인/메뉴 권한 연결은 마지막 파일(31번) 후속. 역할별 단가 정책은 독립 정책 함수로 보존한다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 선택 투입 배정 취소 결과
           content:
@@ -4932,7 +5534,9 @@ paths:
     get:
       operationId: getCommonAssignmentsExcel
       summary: 투입 배정 목록 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-491
       - REQ-492
@@ -4968,6 +5572,10 @@ paths:
         schema:
           type: string
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -4985,7 +5593,9 @@ paths:
     get:
       operationId: getCommonWithdrawals
       summary: 철수 인력 목록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-562
       - REQ-563
@@ -4995,6 +5605,10 @@ paths:
       description: 개발 단계 인증·메뉴 권한 연결은 후속31번. 한국 달력 Asia/Seoul·기존 동기 MyBatis 사용. 응답 논리 필드의 물리 매핑은 OQ-DATA-005를
         대조한다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 요청한 업무 결과
           content:
@@ -5065,7 +5679,9 @@ paths:
     get:
       operationId: getCommonWithdrawalRecommendations
       summary: 철수 인력 다음 자리 추천
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-568
       - REQ-569
@@ -5076,6 +5692,10 @@ paths:
       description: 개발 단계 인증·메뉴 권한 연결은 후속31번. 한국 달력 Asia/Seoul·기존 동기 MyBatis 사용. 응답 논리 필드의 물리 매핑은 OQ-DATA-005를
         대조한다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 요청한 업무 결과
           content:
@@ -5132,7 +5752,9 @@ paths:
     put:
       operationId: putCommonWithdrawalExtensionPossibility
       summary: 철수 인력 연장 가능성 변경
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-564
       - REQ-565
@@ -5142,6 +5764,10 @@ paths:
       description: 개발 단계 인증·메뉴 권한 연결은 후속31번. 한국 달력 Asia/Seoul·기존 동기 MyBatis 사용. 응답 논리 필드의 물리 매핑은 OQ-DATA-005를
         대조한다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -5184,12 +5810,18 @@ paths:
     get:
       operationId: getCommonWithdrawalTentativeAssignment
       summary: 철수 인력 현재 가배정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-573
       description: 개발 단계 인증·메뉴 권한 연결은 후속31번. 한국 달력 Asia/Seoul·기존 동기 MyBatis 사용. 응답 논리 필드의 물리 매핑은 OQ-DATA-005를
         대조한다. 현재 가배정 없으면 data.assignment=null, 있으면 선택 기회·NEED_SN·시작월을 반환한다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 요청한 업무 결과
           content:
@@ -5224,7 +5856,9 @@ paths:
     put:
       operationId: putCommonWithdrawalTentativeAssignment
       summary: 철수 인력 가배정 저장
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-571
       - REQ-572
@@ -5234,6 +5868,10 @@ paths:
       description: 개발 단계 인증·메뉴 권한 연결은 후속31번. 한국 달력 Asia/Seoul·기존 동기 MyBatis 사용. 응답 논리 필드의 물리 매핑은 OQ-DATA-005를
         대조한다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 요청한 업무 결과
           content:
@@ -5298,7 +5936,9 @@ paths:
     get:
       operationId: getCommonWithdrawalAssignments
       summary: 철수 인력 공유 배정 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-564
       - REQ-573
@@ -5306,6 +5946,10 @@ paths:
         대조한다. TB_PJ_ASGN과 선택적 TB_SL_TENT_ASGN의 동일 인력 결과. UI-28/17의 연장 가능성 및 UI-28/29의 가배정 표시에만 사용하며 기회/보드
         CRUD를 제공하지 않는다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 요청한 업무 결과
           content:
@@ -5353,12 +5997,18 @@ paths:
     get:
       operationId: getCommonWithdrawalsExcel
       summary: 철수 인력 목록 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-575
       description: 개발 단계 인증·메뉴 권한 연결은 후속31번. 한국 달력 Asia/Seoul·기존 동기 MyBatis 사용. 응답 논리 필드의 물리 매핑은 OQ-DATA-005를
         대조한다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           headers:
@@ -5418,7 +6068,9 @@ paths:
         소수 둘째 자리 반올림한다. 차이는 실제-계획이며 정확히0만 맞음이다.
         프로젝트 기간 일부 월의 개월 수 산정은 DB 식-00/식-67을 따른다(OQ-CALC-011).
         현재 로그인/메뉴권한 연결은 하지 않는다. GET은 업무 쓰기/DDL/seed를 실행하지 않는다.
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-578
       - REQ-587
@@ -5476,6 +6128,10 @@ paths:
           enum: [부족, 초과, 맞음]
         description: 파생 차이 상태; 미등록 상태 없음
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 프로젝트·직무별 연간 비교 행과 현재 조회 결과 합계
           content:
@@ -5499,7 +6155,9 @@ paths:
     get:
       operationId: getCommonProjectsExcel
       summary: 프로젝트 목록 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: UI-22 전 무인증·현재 사용자 admin. 화면 목록과 같은 조건(연도·계약유형·상태·영업 파트·프로젝트명 또는 고객사)과 순서(시작일 늦은 순)로 내려받는다.
       parameters:
       - name: year
@@ -5531,6 +6189,10 @@ paths:
           type: string
           description: 프로젝트명 또는 고객사
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 프로젝트 목록 엑셀 결과
           content:
@@ -5548,9 +6210,15 @@ paths:
     get:
       operationId: getCommonProjectBudgetRule
       summary: 예산 기본값 규칙(식-19)
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 예산 기본값 = 계약금액 × budgetFactor(원 단위 버림). budgetFactor는 TB_SY_CALC_RULE 식-19와 이번 달 운영 기준값 TGT_MRGN_RT로 서버가 계산한다. 화면은 등록·수정 폼과 예산 변경 창의 기본값·안내 문구에 쓴다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 예산 기본값 규칙
           content:
@@ -5583,7 +6251,9 @@ paths:
       operationId: getCommonClientsExcel
       summary: 거래처 목록 엑셀 다운로드(SFR-011)
       description: 지금 조건의 전체 결과를 보이는 열·정렬 그대로 xlsx로 내려준다. 파일에 받은 사람·한국 시각(SER-007), 접근 기록 DNLD(SER-006).
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       parameters:
       - name: clientTypeCode
         in: query
@@ -5636,6 +6306,10 @@ paths:
             type: string
         description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 엑셀 파일
           content:
@@ -5654,7 +6328,9 @@ paths:
       operationId: getCommonPartsExcel
       summary: 영업 파트 목록 엑셀 다운로드(SFR-011)
       description: 보이는 열·정렬 그대로 xlsx로 내려준다. 파일에 받은 사람·한국 시각(SER-007), 접근 기록 DNLD(SER-006).
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       parameters:
       - name: sort
         in: query
@@ -5688,6 +6364,10 @@ paths:
             type: string
         description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 엑셀 파일
           content:
@@ -5705,7 +6385,9 @@ paths:
     get:
       operationId: getCommonRoleChangeHistory
       summary: 역할 권한 변경 이력 조회(시안 「변경 이력 (n)」)
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       parameters:
       - name: roleId
         in: path
@@ -5714,6 +6396,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 바뀐 항목마다 1줄, 최근 순
           content:
@@ -5763,7 +6449,9 @@ paths:
       operationId: getCommonUsersExcel
       summary: 사용자 목록 엑셀 다운로드(SFR-011)
       description: 지금 조건의 전체 결과를 보이는 열 그대로 xlsx로 내려준다. 1행 「사용자 · 다운로드 admin · 한국 시각」, 3행부터 머리글. 파일 이름은 「화면이름_기간_다운로드일시.xlsx」. 접근 기록(DNLD)을 남긴다.
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       parameters:
       - name: includeStopped
         in: query
@@ -5820,6 +6508,10 @@ paths:
             type: string
         description: 내려받을 열 키(화면에 보이는 열). 없으면 모든 열.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 엑셀 파일
           content:
@@ -5838,7 +6530,9 @@ paths:
       operationId: getCommonUserChangeHistory
       summary: 사용자 변경 이력 조회(상세 패널 「변경 이력」 탭)
       description: 바뀐 항목마다 1줄(이름·이메일·역할·고른 본사·담당 프로젝트·상태·등록), 최근 순.
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       parameters:
       - name: userId
         in: path
@@ -5847,6 +6541,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 변경 이력 목록
           content:
@@ -5890,7 +6588,9 @@ paths:
     put:
       operationId: putCommonPartResume
       summary: 영업 파트 다시 사용
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-342
       - REQ-306
@@ -5914,6 +6614,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonPartStopInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 조회 또는 저장 결과
           content:
@@ -5944,7 +6648,9 @@ paths:
       operationId: getCommonManpowerComparisonsExcel
       summary: 인원 계획 대비 투입 엑셀 다운로드(SFR-011)
       description: 목록과 같은 조건(year·projectId·differenceStatus)의 전체 결과를 목록 순서(차이 오름차순, 부족 큰 순) 그대로 xlsx로 내려준다. 열은 프로젝트·직무·계획 MM·실제·예정 MM·차이(부족 n.nn·초과 n.nn·맞음). 파일 1행에 받은 사람·한국 시각, 파일 이름 「인원 계획 대비 투입_{year}년_다운로드일시.xlsx」, 접근 기록 DNLD.
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       parameters:
       - name: year
         in: query
@@ -5969,6 +6675,10 @@ paths:
           enum: [부족, 초과, 맞음]
         description: 파생 차이 상태
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 인원 계획 대비 투입 엑셀 파일(0건이면 머리글만)
           headers:
@@ -5995,7 +6705,9 @@ paths:
     get:
       operationId: getCommonProjectBoard
       summary: 프로젝트 현황판 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-619
       - REQ-620
@@ -6033,6 +6745,10 @@ paths:
           minLength: 1
         description: 조건 선택; 생략하면 해당 조건 제한 없음
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6056,7 +6772,9 @@ paths:
     get:
       operationId: getCommonProjectBoardExcel
       summary: 프로젝트 현황판 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-645
       - REQ-646
@@ -6087,6 +6805,10 @@ paths:
           minLength: 1
         description: 조건 선택; 생략하면 해당 조건 제한 없음
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6104,7 +6826,9 @@ paths:
     get:
       operationId: getCommonProjectBoardWeeklyMemos
       summary: 프로젝트 주간 메모 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-631
       - REQ-632
@@ -6117,6 +6841,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6145,7 +6873,9 @@ paths:
     post:
       operationId: postCommonProjectBoardWeeklyMemo
       summary: 주간 메모 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-628
       - REQ-629
@@ -6165,6 +6895,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonProjectBoardMemoInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6194,7 +6928,9 @@ paths:
     put:
       operationId: putCommonProjectBoardWeeklyMemo
       summary: 주간 메모 수정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-631
       - REQ-632
@@ -6220,6 +6956,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonProjectBoardMemoUpdateInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6255,7 +6995,9 @@ paths:
     get:
       operationId: getCommonProjectBoardSteps
       summary: 프로젝트 단계 계획 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-633
       - REQ-635
@@ -6267,6 +7009,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6295,7 +7041,9 @@ paths:
     put:
       operationId: putCommonProjectBoardSteps
       summary: 단계 계획 날짜 저장
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-634
       - REQ-635
@@ -6314,6 +7062,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonProjectBoardStepDatesInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6349,7 +7101,9 @@ paths:
     post:
       operationId: postCommonProjectBoardStepsEnsure
       summary: 누락 단계 기본값 보완
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-636
       - REQ-601
@@ -6362,6 +7116,10 @@ paths:
           minLength: 1
       x-no-request-body-reason: 경로가 지정한 누락 단계 보완 동작이며 날짜·단계명·비중은 서버 계약/DB 원천에서 정한다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6391,7 +7149,9 @@ paths:
     post:
       operationId: postCommonProjectBoardStepComplete
       summary: 프로젝트 단계 완료
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-637
       - REQ-647
@@ -6410,6 +7170,10 @@ paths:
           minLength: 1
       x-no-request-body-reason: 경로가 지정한 단계 완료 동작이며 날짜·단계명·비중은 서버 계약/DB 원천에서 정한다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6439,7 +7203,9 @@ paths:
     get:
       operationId: getCommonProjectBoardIssues
       summary: 프로젝트 이슈 모아 보기
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-643
       - REQ-644
@@ -6480,6 +7246,10 @@ paths:
           type: boolean
         description: true면 상태 상관없이 전부(종료 이슈는 맨 뒤). 프로젝트 상세 [이슈] 탭이 쓴다. statusCode를 주면 statusCode가 우선
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6502,7 +7272,9 @@ paths:
     post:
       operationId: postCommonProjectBoardIssue
       summary: 프로젝트 이슈 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-638
       - REQ-640
@@ -6516,6 +7288,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonProjectBoardIssueInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6546,7 +7322,9 @@ paths:
       operationId: getCommonProjectBoardIssuesExcel
       summary: 이슈 모아 보기 엑셀 다운로드(SFR-011)
       description: 이슈 모아 보기와 같은 조건(statusCode·overdue·importanceCode·projectId·all)의 전체 결과를 목록 순서 그대로 xlsx로 내려준다. 열은 중요도·제목·프로젝트·담당자·기한(지나면 「N일 지남」)·상태·조치 내용·등록일(한국 날짜). 파일 1행에 받은 사람·한국 시각, 파일 이름 「프로젝트 이슈_다운로드일시.xlsx」, 접근 기록 DNLD(화면 UI-31).
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       parameters:
       - name: statusCode
         in: query
@@ -6582,6 +7360,10 @@ paths:
           type: boolean
         description: true면 상태 상관없이 전부
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 이슈 모아 보기 엑셀 파일(0건이면 머리글만)
           headers:
@@ -6608,7 +7390,9 @@ paths:
     put:
       operationId: putCommonProjectBoardIssue
       summary: 프로젝트 이슈 수정·종료
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-639
       - REQ-640
@@ -6629,6 +7413,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonProjectBoardIssueUpdateInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6665,7 +7453,9 @@ paths:
     get:
       operationId: getCommonBills
       summary: 청구 목록과 요약 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-675
       - REQ-676
@@ -6695,6 +7485,10 @@ paths:
         schema:
           type: string
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6717,7 +7511,9 @@ paths:
     post:
       operationId: postCommonBill
       summary: 청구 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-684
       - REQ-685
@@ -6734,6 +7530,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonBillingInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6763,7 +7563,9 @@ paths:
       operationId: getCommonBillsExcel
       summary: 청구 목록 엑셀 다운로드(SFR-011)
       description: 청구 목록과 같은 조건(year·status·billMonth·projectId)의 전체 결과를 목록 순서(청구일 최신순) 그대로 xlsx로 내려준다. 열은 목록 열(청구번호·프로젝트·차수·청구일·공급가·부가세·합계·입금액·미수금·입금 예정일·상태·미수 알림). 파일 1행에 받은 사람·한국 시각, 파일 이름 「청구·입금_{year}년_다운로드일시.xlsx」, 접근 기록 DNLD(화면 UI-13).
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       parameters:
       - name: year
         in: query
@@ -6793,6 +7595,10 @@ paths:
           minLength: 1
         description: 기존 프로젝트 식별자
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 청구 목록 엑셀 파일(0건이면 머리글만)
           headers:
@@ -6819,7 +7625,9 @@ paths:
     get:
       operationId: getCommonBillOptions
       summary: 청구 등록 선택지와 추정값
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-684
       - REQ-685
@@ -6836,6 +7644,10 @@ paths:
         schema:
           type: string
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6859,10 +7671,16 @@ paths:
     get:
       operationId: getCommonBillUnpaidCount
       summary: 메뉴 배지용 미수 청구 건수
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - SFR-001-04
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6880,7 +7698,9 @@ paths:
     get:
       operationId: getCommonBill
       summary: 청구 상세와 입금 내역
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-679
       - REQ-715
@@ -6893,6 +7713,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6921,7 +7745,9 @@ paths:
     put:
       operationId: putCommonBill
       summary: 청구 정보 수정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-680
       - REQ-681
@@ -6942,6 +7768,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonBillingEditInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -6977,7 +7807,9 @@ paths:
     post:
       operationId: postCommonBillCancel
       summary: 청구 취소
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-682
       - REQ-715
@@ -6997,6 +7829,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonBillingCancelInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7032,7 +7868,9 @@ paths:
     post:
       operationId: postCommonReceipt
       summary: 청구별 입금 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-690
       - REQ-691
@@ -7045,6 +7883,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonBillingReceiptInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7068,7 +7910,9 @@ paths:
     post:
       operationId: postCommonReceiptCancel
       summary: 입금 취소
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-707
       - REQ-708
@@ -7088,6 +7932,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonBillingReceiptCancelInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7123,7 +7971,9 @@ paths:
     get:
       operationId: getCommonBillChecks
       summary: 월별 청구 누락 점검
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-693
       - REQ-694
@@ -7137,6 +7987,10 @@ paths:
           pattern: ^[0-9]{6}$
         description: 미지정은 기존 마감 서비스가 반환한 마지막 마감월. 마감없음 초기선택은 OQ-UI-013.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7160,7 +8014,9 @@ paths:
     post:
       operationId: postCommonBillCheckMissing
       summary: 누락 청구 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-695
       - REQ-720
@@ -7173,6 +8029,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonBillingCheckInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7196,7 +8056,9 @@ paths:
     post:
       operationId: postCommonBillCheckAdditional
       summary: 부족 차액 추가 청구
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-697
       - REQ-720
@@ -7209,6 +8071,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonBillingCheckInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7232,7 +8098,9 @@ paths:
     post:
       operationId: postCommonBillCheckCorrection
       summary: 미마감 차이 청구 수정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-696
       - REQ-720
@@ -7244,6 +8112,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonBillingCheckInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7273,13 +8145,19 @@ paths:
     get:
       operationId: getCommonBillDunning
       summary: 미수 알림 대상과 이력
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-699
       - REQ-700
       - REQ-701
       - REQ-704
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7303,7 +8181,9 @@ paths:
     post:
       operationId: postCommonBillDunningResend
       summary: 현재 단계 미수 재알림
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-703
       - REQ-700
@@ -7317,6 +8197,10 @@ paths:
           minLength: 1
       x-no-request-body-reason: billId와 현재일·DB 잔액/이력에서 현재단계와 수신자를 서버가 읽는다. 사용자에게 단계/수신자/토큰 입력을 요구하지 않는다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7346,7 +8230,9 @@ paths:
     post:
       operationId: postCommonBillNextMonth
       summary: 다음 달 청구 즉시 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-710
       - REQ-719
@@ -7363,6 +8249,10 @@ paths:
           minLength: 1
       x-no-request-body-reason: 원 billId에서 프로젝트·세율을 읽고 다음달 월투입·DB식을 사용한다. 창없이 즉시 생성하므로 임의 공급가/날짜를 body로 받지 않는다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7392,7 +8282,9 @@ paths:
     get:
       operationId: getCommonPersonalCostProfits
       summary: 개인 원가·수익 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: UI-03 readonly 집계. 마감월은 TB_CO_MON_COST 저장값, 미마감월은 현재 투입·급여자료와 DB 식으로 계산해 포함한다. 사람당 한 줄·투입별 펼침·요약5칸·직무등급표·합계를
         같은 응답으로 반환한다. 목록의 프로젝트/계약유형/가득률 열은 없고 프로젝트는 펼침에서 읽는다. 현재 개발 admin이며 로그인/메뉴검사는 UI-22 후속. 분모0/정확 금액/필터집계범위는
         OQ-CALC/QUERY-003 국소 검토다.
@@ -7520,6 +8412,10 @@ paths:
             - incomeTax
             - netPay
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7544,7 +8440,9 @@ paths:
     get:
       operationId: getCommonPersonalCostProfitsExcel
       summary: 개인 원가·수익 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 화면과 동일 조건·보기·보이는 열 및 영업이익현황 B.4 순서의 xlsx. 다운로드 때 기존 접근기록 helper로 DNLD를 남긴다. 펼침행 포함·실패기록시점은 OQ-QUERY/DATA-003으로
         남기며 임의 부가열을 만들지 않는다.
       x-related-requirements:
@@ -7659,6 +8557,10 @@ paths:
             - incomeTax
             - netPay
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7678,7 +8580,9 @@ paths:
     get:
       operationId: getCommonProjectCostAnalyses
       summary: 프로젝트 원가 분석 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 프로젝트 원가 분석 조회. 현재 개발 admin·로그인/메뉴검사는 UI-22 후속. 업무 원자료/분석 결과는 저장하지 않는다. 마감월은 저장값, 미마감월은 해당월 유효 이력과
         현재자료. 정확한 물리매핑/식은 OQ-DATA/CALC-004로 국소 대조.
       x-related-requirements:
@@ -7739,6 +8643,10 @@ paths:
         schema:
           type: boolean
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7762,7 +8670,9 @@ paths:
     get:
       operationId: getCommonProjectCostAnalysesExcel
       summary: 프로젝트 원가 분석 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 프로젝트 원가 분석 엑셀. 현재 개발 admin·로그인/메뉴검사는 UI-22 후속. 업무 원자료/분석 결과는 저장하지 않는다. 마감월은 저장값, 미마감월은 해당월 유효 이력과
         현재자료. 정확한 물리매핑/식은 OQ-DATA/CALC-004로 국소 대조.
       x-related-requirements:
@@ -7813,6 +8723,10 @@ paths:
         schema:
           type: boolean
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7830,7 +8744,9 @@ paths:
     get:
       operationId: getCommonProjectCostAnalysisMonthlyCosts
       summary: 프로젝트 월별 원가 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 프로젝트 월별 원가 조회. 현재 개발 admin·로그인/메뉴검사는 UI-22 후속. 업무 원자료/분석 결과는 저장하지 않는다. 마감월은 저장값, 미마감월은 해당월 유효 이력과
         현재자료. 정확한 물리매핑/식은 OQ-DATA/CALC-004로 국소 대조.
       x-related-requirements:
@@ -7859,6 +8775,10 @@ paths:
           minimum: 1
           maximum: 12
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7888,7 +8808,9 @@ paths:
     get:
       operationId: getCommonProjectCostAnalysisWorkforce
       summary: 프로젝트 투입 인력 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 프로젝트 투입 인력 조회. 현재 개발 admin·로그인/메뉴검사는 UI-22 후속. 업무 원자료/분석 결과는 저장하지 않는다. 마감월은 저장값, 미마감월은 해당월 유효 이력과
         현재자료. 정확한 물리매핑/식은 OQ-DATA/CALC-004로 국소 대조.
       x-related-requirements:
@@ -7917,6 +8839,10 @@ paths:
           minimum: 1
           maximum: 12
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -7946,7 +8872,9 @@ paths:
     get:
       operationId: getCommonProjectCostAnalysisSimulation
       summary: 프로젝트 가상 마진 계산
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 프로젝트 가상 마진 계산. 현재 개발 admin·로그인/메뉴검사는 UI-22 후속. 업무 원자료/분석 결과는 저장하지 않는다. 마감월은 저장값, 미마감월은 해당월 유효 이력과
         현재자료. 정확한 물리매핑/식은 OQ-DATA/CALC-004로 국소 대조.
       x-related-requirements:
@@ -8000,6 +8928,10 @@ paths:
         schema:
           type: number
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8030,7 +8962,9 @@ paths:
     get:
       operationId: getCommonProjectCostAnalysisCauses
       summary: 프로젝트 원가 초과 원인
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 프로젝트 원가 초과 원인. 현재 개발 admin·로그인/메뉴검사는 UI-22 후속. 업무 원자료/분석 결과는 저장하지 않는다. 마감월은 저장값, 미마감월은 해당월 유효 이력과
         현재자료. 정확한 물리매핑/식은 OQ-DATA/CALC-004로 국소 대조.
       x-related-requirements:
@@ -8062,6 +8996,10 @@ paths:
           minimum: 1
           maximum: 12
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8091,7 +9029,9 @@ paths:
     get:
       operationId: getCommonPartSettlements
       summary: 영업 파트 탭·요약 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 고정 admin·UI-22 전 로그인/메뉴권한 미연결. 원문23/133행을 보존하며 인증정의·가짜403을 추가하지 않는다. SQL/식 공백은 OQ-DATA/CALC-019의 물리매핑/절대수치에만
         제한한다.
       x-related-requirements:
@@ -8109,6 +9049,10 @@ paths:
           pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
           description: 선택 년월·공통 PeriodSelector
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8132,7 +9076,9 @@ paths:
     get:
       operationId: getCommonPartSettlement
       summary: 이번 달 인력별 이익금 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 고정 admin·UI-22 전 로그인/메뉴권한 미연결. 원문23/133행을 보존하며 인증정의·가짜403을 추가하지 않는다. SQL/식 공백은 OQ-DATA/CALC-019의 물리매핑/절대수치에만
         제한한다.
       x-related-requirements:
@@ -8157,6 +9103,10 @@ paths:
           pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
           description: 선택 년월·공통 PeriodSelector
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8186,7 +9136,9 @@ paths:
     get:
       operationId: getCommonPartSettlementTrends
       summary: 기간 추이 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 고정 admin·UI-22 전 로그인/메뉴권한 미연결. 원문23/133행을 보존하며 인증정의·가짜403을 추가하지 않는다. SQL/식 공백은 OQ-DATA/CALC-019의 물리매핑/절대수치에만
         제한한다.
       x-related-requirements:
@@ -8206,6 +9158,10 @@ paths:
           pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
           description: 선택 년월·공통 PeriodSelector
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8235,7 +9191,9 @@ paths:
     put:
       operationId: putCommonPartSettlementCard
       summary: 법인카드 저장
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 고정 admin·UI-22 전 로그인/메뉴권한 미연결. 원문23/133행을 보존하며 인증정의·가짜403을 추가하지 않는다. SQL/식 공백은 OQ-DATA/CALC-019의 물리매핑/절대수치에만
         제한한다.
       x-related-requirements:
@@ -8262,6 +9220,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonPartSettlementCardInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8297,7 +9259,9 @@ paths:
     put:
       operationId: putCommonPartSettlementConfirm
       summary: 정산 직접 확정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 고정 admin·UI-22 전 로그인/메뉴권한 미연결. 원문23/133행을 보존하며 인증정의·가짜403을 추가하지 않는다. SQL/식 공백은 OQ-DATA/CALC-019의 물리매핑/절대수치에만
         제한한다.
       x-related-requirements:
@@ -8326,6 +9290,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonPartSettlementVersionInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8361,7 +9329,9 @@ paths:
     put:
       operationId: putCommonPartSettlementCancel
       summary: 정산 확정 취소
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 고정 admin·UI-22 전 로그인/메뉴권한 미연결. 원문23/133행을 보존하며 인증정의·가짜403을 추가하지 않는다. SQL/식 공백은 OQ-DATA/CALC-019의 물리매핑/절대수치에만
         제한한다.
       x-related-requirements:
@@ -8393,6 +9363,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonPartSettlementCancelInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8428,7 +9402,9 @@ paths:
     get:
       operationId: getCommonPartSettlementsExcel
       summary: 파트 이익금 엑셀 다운로드
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 고정 admin·UI-22 전 로그인/메뉴권한 미연결. 원문23/133행을 보존하며 인증정의·가짜403을 추가하지 않는다. SQL/식 공백은 OQ-DATA/CALC-019의 물리매핑/절대수치에만
         제한한다.
       x-related-requirements:
@@ -8465,6 +9441,10 @@ paths:
           type: string
           description: 이번 달 표에서 보이는 열 key를 쉼표로 이음(예 developerName,unitPrice). 없으면 모든 열·기간 추이는 쓰지 않음
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8482,7 +9462,9 @@ paths:
     get:
       operationId: getCommonPartSettlementCloseCheck
       summary: 영업 파트 정산 마감 점검
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 고정 admin·UI-22 전 로그인/메뉴권한 미연결. 원문23/133행을 보존하며 인증정의·가짜403을 추가하지 않는다. SQL/식 공백은 OQ-DATA/CALC-019의 물리매핑/절대수치에만
         제한한다.
       x-related-requirements:
@@ -8498,6 +9480,10 @@ paths:
           pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
           description: 선택 년월·공통 PeriodSelector
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8521,7 +9507,9 @@ paths:
     put:
       operationId: putCommonPartSettlementCloseConfirm
       summary: 월 마감 영업 파트 자동 확정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 현재 고정 admin·UI-22 전 로그인/메뉴권한 미연결. 원문23/133행을 보존하며 인증정의·가짜403을 추가하지 않는다. SQL/식 공백은 OQ-DATA/CALC-019의 물리매핑/절대수치에만
         제한한다.
       x-related-requirements:
@@ -8538,6 +9526,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonPartSettlementCloseInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8568,7 +9560,9 @@ paths:
     get:
       operationId: getCommonRateRenegotiations
       summary: 단가 재협상 대상 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 고정 admin 전체 조회. 로그인·메뉴권한·파트장 범위/월원가 숨김은 UI-22 후속이다. 식-00/85/86/90을 DB에서 읽고 BigDecimal로 계산한다.
         절대금액/기준월/평균 상세 OQ-CALC-032·원문 scheme 금지와 표준 충돌 OQ-AUTH-032를 보존한다.
       x-related-requirements:
@@ -8622,6 +9616,10 @@ paths:
           default: 5
         description: 인상률 가정·0 미만은0/50 초과는50으로 보정·저장하지 않음
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8646,7 +9644,9 @@ paths:
     get:
       operationId: getCommonRateRenegotiationsExcel
       summary: 단가 재협상 대상 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 조회와 동일 대상/인상률·화면 columns만 실제 xlsx로 제공한다. 현재 admin 전체 열; 후속 파트장 투영 경계는 보존한다. 업무 상태 변경은 없으며
         기존 접근기록 DNLD만 추가한다.
       x-related-requirements:
@@ -8717,6 +9717,10 @@ paths:
             - annualProfitIncrease
         description: 화면에서 보이는 열 key를 순서대로 반복 전달한다. 보이지 않는 열은 보내지 않는다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8734,7 +9738,9 @@ paths:
     get:
       operationId: getCommonFinanceItems
       summary: 재무 항목 월별 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-929
       - REQ-943
@@ -8760,6 +9766,10 @@ paths:
       description: UI-22 전 무인증 개발 호출. scheme/역할거부 시험은 OQ-AUTH-010의 충돌이며 새401/403으로 위장하지 않는다. 원문 SQL·DB 식의 정확 키/타입과
         시안 문구는 OQ-DATA/CALC/UI-010 대조.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8782,7 +9792,9 @@ paths:
     put:
       operationId: putCommonFinanceItems
       summary: 재무 항목 두 탭 저장
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-945
       - REQ-948
@@ -8827,6 +9839,10 @@ paths:
       description: UI-22 전 무인증 개발 호출. scheme/역할거부 시험은 OQ-AUTH-010의 충돌이며 새401/403으로 위장하지 않는다. 원문 SQL·DB 식의 정확 키/타입과
         시안 문구는 OQ-DATA/CALC/UI-010 대조.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8862,7 +9878,9 @@ paths:
     post:
       operationId: postCommonFinanceTaxYear
       summary: 과세연도 초기 준비
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-977
       parameters:
@@ -8874,6 +9892,10 @@ paths:
       description: UI-22 전 무인증 개발 호출. scheme/역할거부 시험은 OQ-AUTH-010의 충돌이며 새401/403으로 위장하지 않는다. 원문 SQL·DB 식의 정확 키/타입과
         시안 문구는 OQ-DATA/CALC/UI-010 대조.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8904,7 +9926,9 @@ paths:
     post:
       operationId: postCommonFinanceTaxPaymentConfirm
       summary: 법인세 납부 확인
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-980
       - REQ-981
@@ -8920,6 +9944,10 @@ paths:
       description: UI-22 전 무인증 개발 호출. scheme/역할거부 시험은 OQ-AUTH-010의 충돌이며 새401/403으로 위장하지 않는다. 원문 SQL·DB 식의 정확 키/타입과
         시안 문구는 OQ-DATA/CALC/UI-010 대조.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8955,7 +9983,9 @@ paths:
     get:
       operationId: getCommonFinancePreviousItems
       summary: 지난달 누락 항목 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-972
       parameters:
@@ -8976,6 +10006,10 @@ paths:
       description: UI-22 전 무인증 개발 호출. scheme/역할거부 시험은 OQ-AUTH-010의 충돌이며 새401/403으로 위장하지 않는다. 원문 SQL·DB 식의 정확 키/타입과
         시안 문구는 OQ-DATA/CALC/UI-010 대조.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -8999,7 +10033,9 @@ paths:
     get:
       operationId: getCommonProfitStructures
       summary: 전체 수익 구조 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       parameters:
       - name: year
         in: query
@@ -9051,6 +10087,10 @@ paths:
       - REQ-1123
       - REQ-1124
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9075,7 +10115,9 @@ paths:
     get:
       operationId: getCommonProfitStructuresExcel
       summary: 전체 수익 구조 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 숫자로 보기 표(줄 = 항목, 열 = 기간, 잠정 기간은 머리에 「잠정」)와 같은 xlsx. 기존 공통 export helper와 DNLD만 사용.
       parameters:
       - name: year
@@ -9111,6 +10153,10 @@ paths:
       - REQ-1123
       - REQ-1124
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           headers:
@@ -9133,7 +10179,9 @@ paths:
     get:
       operationId: getCommonOperatingProfitStatements
       summary: 영업이익표 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       parameters:
       - name: year
         in: query
@@ -9169,6 +10217,10 @@ paths:
       - REQ-1123
       - REQ-1124
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9192,7 +10244,9 @@ paths:
     get:
       operationId: getCommonOperatingProfitStatementsExcel
       summary: 영업이익표 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       parameters:
       - name: year
         in: query
@@ -9227,6 +10281,10 @@ paths:
       - REQ-1124
       - REQ-1107
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           headers:
@@ -9249,7 +10307,9 @@ paths:
     get:
       operationId: getCommonNetProfitStatements
       summary: 순이익표 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: UI-09 조회. 기존 year(…)·projection 직접 재사용; UI-09 첫 해 열 제외/순이익 확장 옵션만 적용. UI-22 전 인증 검사
         없음; 인증 정의 표준 충돌은 OQ-AUTH-009.
       parameters:
@@ -9287,6 +10347,10 @@ paths:
       - REQ-1160
       - REQ-1161
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9310,7 +10374,9 @@ paths:
     get:
       operationId: getCommonNetProfitStatementsExcel
       summary: 순이익표 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: UI-09 조회와 같은 projection/첫 해 열/머리글·금액단위. columns 입력 없음. 정상 수신에 DNLD/clock_timestamp().
         인증 예외 OQ-AUTH-009.
       parameters:
@@ -9348,6 +10414,10 @@ paths:
       - REQ-1162
       - REQ-1151
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           headers:
@@ -9371,7 +10441,9 @@ paths:
     get:
       operationId: getCommonBusinessPlanComparisons
       summary: 사업계획 대비 실적 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1165
       - REQ-1181
@@ -9402,6 +10474,10 @@ paths:
           pattern: ^[0-9]{4}(0[1-9]|1[0-2])$
         description: 선택연도와 동일 YYYYMM; 지난 해도 1~12월 허용
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9425,7 +10501,9 @@ paths:
     get:
       operationId: getCommonCashFlowStatements
       summary: 자금수지표 연간 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       parameters:
       - name: year
         in: query
@@ -9455,6 +10533,10 @@ paths:
       - REQ-1254
       - REQ-1255
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9478,7 +10560,9 @@ paths:
     get:
       operationId: getCommonCashFlowStatementsExcel
       summary: 자금수지표 엑셀 다운로드
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       parameters:
       - name: year
         in: query
@@ -9500,6 +10584,10 @@ paths:
       - REQ-1235
       - REQ-1257
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9517,7 +10605,9 @@ paths:
     get:
       operationId: getCommonMonthClose
       summary: 월 마감 안내·점검 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1259
       - REQ-1279
@@ -9532,6 +10622,10 @@ paths:
           type: string
           pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9555,7 +10649,9 @@ paths:
     put:
       operationId: putCommonMonthCloseConfirm
       summary: 월 마감 확정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1284
       - REQ-1285
@@ -9575,6 +10671,10 @@ paths:
           type: string
           pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9610,7 +10710,9 @@ paths:
     get:
       operationId: getCommonMonthCloseReopenImpact
       summary: 마감 해제 조정 건수 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1301
       parameters:
@@ -9621,6 +10723,10 @@ paths:
           type: string
           pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9644,7 +10750,9 @@ paths:
     put:
       operationId: putCommonMonthCloseReopen
       summary: 최근 월 마감 해제
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1292
       - REQ-1293
@@ -9663,6 +10771,10 @@ paths:
           type: string
           pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9698,10 +10810,16 @@ paths:
     get:
       operationId: getCommonMonthCloseHistory
       summary: 월 마감 이력 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1297
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9732,10 +10850,16 @@ paths:
     get:
       operationId: getCommonMonthCloseBadge
       summary: 월 마감 메뉴 경고 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1273
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9755,10 +10879,16 @@ paths:
     get:
       operationId: getCommonCandidateSummary
       summary: 외부 후보 요약
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1328
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9782,11 +10912,17 @@ paths:
     get:
       operationId: getCommonCandidateShortages
       summary: 부족 직무별 후보
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1329
       - REQ-1330
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9810,12 +10946,18 @@ paths:
     get:
       operationId: getCommonCandidates
       summary: 외부 후보 목록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1331
       - REQ-1332
       - REQ-1333
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9868,7 +11010,9 @@ paths:
     post:
       operationId: postCommonCandidate
       summary: 외부 후보 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1334
       - REQ-1335
@@ -9879,6 +11023,10 @@ paths:
       - REQ-1340
       - REQ-1341
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -9908,10 +11056,16 @@ paths:
     get:
       operationId: getCommonCandidatesExcel
       summary: 외부 후보 목록 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1332
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           headers:
@@ -9967,7 +11121,9 @@ paths:
     get:
       operationId: getCommonCandidate
       summary: 외부 후보 기본 정보
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1334
       - REQ-1338
@@ -9975,6 +11131,10 @@ paths:
       - REQ-1340
       - REQ-1354
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10010,7 +11170,9 @@ paths:
     put:
       operationId: putCommonCandidate
       summary: 외부 후보 정보 수정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1354
       - REQ-1335
@@ -10022,6 +11184,10 @@ paths:
       - REQ-1320
       - REQ-1321
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10070,12 +11236,18 @@ paths:
     get:
       operationId: getCommonCandidateContacts
       summary: 후보 연락 기록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1351
       - REQ-1341
       - REQ-1355
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10111,7 +11283,9 @@ paths:
     post:
       operationId: postCommonCandidateContact
       summary: 후보 연락 기록 저장
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1349
       - REQ-1360
@@ -10119,6 +11293,10 @@ paths:
       - REQ-1320
       - REQ-1321
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10167,11 +11345,17 @@ paths:
     get:
       operationId: getCommonCandidateMatches
       summary: 후보의 맞는 자리
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1352
       - REQ-1353
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10208,7 +11392,9 @@ paths:
     post:
       operationId: postCommonCandidateResumeExtraction
       summary: 이력서 후보 정보 추출
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1342
       - REQ-1343
@@ -10217,6 +11403,10 @@ paths:
       - REQ-1346
       - REQ-1347
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10253,7 +11443,9 @@ paths:
     get:
       operationId: getCommonSalesPipeline
       summary: 진행 영업 기회 현황
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1389
       - REQ-1390
@@ -10264,6 +11456,10 @@ paths:
         mode: none
         reason: 현재 admin 전체 범위이며 요청에 없는 역할/파트 필터는 추가하지 않는다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10287,7 +11483,9 @@ paths:
     get:
       operationId: getCommonSalesOpportunity
       summary: 영업 기회 상세
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1393
       - REQ-1401
@@ -10300,6 +11498,10 @@ paths:
           type: string
           minLength: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10328,7 +11530,9 @@ paths:
     put:
       operationId: putCommonSalesOpportunity
       summary: 영업 기회 수정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1393
       - REQ-1394
@@ -10352,6 +11556,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonSalesOpportunityUpdateInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10387,7 +11595,9 @@ paths:
     post:
       operationId: postCommonSalesOpportunity
       summary: 영업 기회 등록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1392
       - REQ-1394
@@ -10401,6 +11611,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonSalesOpportunityInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10430,7 +11644,9 @@ paths:
     post:
       operationId: postCommonSalesOpportunityDraftTentativeAssignmentCheck
       summary: 저장 전 줄 가배정 충돌 경고
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1405
       description: 아직 저장하지 않은 새 기회·새 필요 인력 줄에서 고른 사람을 미리 점검한다(SFR-129-08). opportunityId는 고치는 중인 기회이고 새 기회면 넣지 않는다. needSn·modifiedAt은 받지 않는다. 경고의 needSn은 이 줄이면 null, 같은 기회의 다른 줄이면 그 줄 번호다. 점유·수정 시각은 바꾸지 않는다.
@@ -10441,6 +11657,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonSalesDraftTentativeInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 다른 기회 가배정·같은 사람 두 줄·그 달 1.0 MM 이상 확정 투입·투입 배정 후보로 넘긴 사람 경고
           content:
@@ -10470,7 +11690,9 @@ paths:
     post:
       operationId: postCommonSalesPipelineQuote
       summary: 영업 견적 이익 점검
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1395
       - REQ-1396
@@ -10482,6 +11704,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonSalesQuoteInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10505,7 +11731,9 @@ paths:
     put:
       operationId: putCommonSalesOpportunityStage
       summary: 영업 기회 단계 이동
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1403
       - REQ-1404
@@ -10524,6 +11752,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonSalesStageInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10559,7 +11791,9 @@ paths:
     put:
       operationId: putCommonSalesOpportunityApprove
       summary: 견적 승인
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1399
       - REQ-1401
@@ -10578,6 +11812,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonSalesVersionInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10613,7 +11851,9 @@ paths:
     put:
       operationId: putCommonSalesOpportunityReject
       summary: 견적 반려
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1400
       - REQ-1401
@@ -10633,6 +11873,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonSalesRejectInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10668,7 +11912,9 @@ paths:
     post:
       operationId: postCommonSalesOpportunityTentativeAssignmentCheck
       summary: 가배정 충돌 경고
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1405
       parameters:
@@ -10685,6 +11931,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonSalesTentativeInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10720,7 +11970,9 @@ paths:
     put:
       operationId: putCommonSalesOpportunityTentativeAssignment
       summary: 영업 기회 가배정 저장
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1406
       - REQ-1380
@@ -10739,6 +11991,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonSalesTentativeInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10774,7 +12030,9 @@ paths:
     post:
       operationId: postCommonSalesOpportunityWin
       summary: 수주 프로젝트 인계
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1407
       - REQ-1408
@@ -10795,6 +12053,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonSalesWinInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10830,7 +12092,9 @@ paths:
     post:
       operationId: postCommonSalesOpportunityLose
       summary: 실주 처리
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1410
       - REQ-1378
@@ -10849,6 +12113,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonSalesLoseInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10884,7 +12152,9 @@ paths:
     post:
       operationId: postCommonSalesOpportunityStop
       summary: 진행 기회 사용 중지
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1411
       - REQ-1378
@@ -10902,6 +12172,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonSalesVersionInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10937,7 +12211,9 @@ paths:
     post:
       operationId: postCommonSalesOpportunityResume
       summary: 다시 사용
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1413
       - REQ-1378
@@ -10955,6 +12231,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonSalesVersionInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -10990,7 +12270,9 @@ paths:
     get:
       operationId: getCommonSalesPipelineClosed
       summary: 종료 영업 기회 목록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1414
       - REQ-1412
@@ -11014,6 +12296,10 @@ paths:
           type: boolean
           default: false
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -11037,7 +12323,9 @@ paths:
     get:
       operationId: getCommonSalesPipelineForecast
       summary: 매출 인력 예측
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1415
       - REQ-1416
@@ -11057,6 +12345,10 @@ paths:
           pattern: ^\d{4}-\d{2}$
         description: 6개월 예측의 첫 달(yyyy-MM). 이번 달 또는 다음 달만 받는다(그 밖은 400). 생략하면 다음 달(UI-29), 인력 운영 보드(UI-28)는 이번 달. 미충원·턴키 나눗수는 늘 다음 달부터 센다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 매출 인력 예측 결과
           content:
@@ -11084,13 +12376,19 @@ paths:
     get:
       operationId: getCommonSalesPipelineForecastExcel
       summary: 매출 인력 예측 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1417
       - REQ-1373
       - REQ-1374
       - REQ-1375
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           headers:
@@ -11113,7 +12411,9 @@ paths:
     get:
       operationId: getCommonManpowerBoard
       summary: 인력 운영 달력과 요약
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1432
       - REQ-1446
@@ -11127,6 +12427,10 @@ paths:
         mode: query
         reason: 선택연도·직무·등급·직원구분·보기만 허용한다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -11187,7 +12491,9 @@ paths:
     get:
       operationId: getCommonManpowerBoardExcel
       summary: 인력 운영 보드 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1455
       - REQ-1435
@@ -11236,6 +12542,10 @@ paths:
         mode: query
         reason: 달력 조회와 같은 year/jobCode/gradeCode/employeeTypeCode/onlyAvailable
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           headers:
@@ -11259,7 +12569,9 @@ paths:
     get:
       operationId: getCommonManpowerForecasts
       summary: 연도별 인력 수요 예측
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1472
       - REQ-1473
@@ -11289,6 +12601,10 @@ paths:
         mode: query
         reason: year만 입력; 직무/등급/역할 임의필터는 없다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -11312,7 +12628,9 @@ paths:
     get:
       operationId: getCommonManpowerForecastsExcel
       summary: 인력 수요 예측 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1478
       - REQ-1479
@@ -11336,6 +12654,10 @@ paths:
         mode: query
         reason: 조회와 같은 year이며 화면용 임의 열선택은 추가하지 않는다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           headers:
@@ -11359,7 +12681,9 @@ paths:
     get:
       operationId: getCommonDashboard
       summary: 대시보드 전체 현황 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       description: 고정 관리자 전체 모양. 기존 화면 서버 계산을 직접 재사용하는 묶음 조회이며 칸마다 HTTP를 호출하지 않는다. 가동률만 식-37로 새 계산. 읽기 전용·새 표/뷰/배치
         없음.
       x-related-requirements:
@@ -11411,6 +12735,10 @@ paths:
         - yearMonth
         reason: 선택월만 입력하며 역할/파트/직무 임의필터를 새로 만들지 않는다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -11434,7 +12762,9 @@ paths:
     get:
       operationId: getCommonDashboardExcel
       summary: 대시보드 숫자 엑셀
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       parameters:
       - in: query
         name: yearMonth
@@ -11462,6 +12792,10 @@ paths:
         - yearMonth
         reason: 화면 조회와 같은 기준월이며 오늘 기준 영역은 오늘 값을 쓴다.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           headers:
@@ -11489,13 +12823,19 @@ paths:
     get:
       operationId: getCommonAiRecommendationOptions
       summary: AI 인력 추천 조건
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1556
       - REQ-1558
       - REQ-1609
       - REQ-1614
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -11536,7 +12876,9 @@ paths:
     post:
       operationId: postCommonAiRecommendation
       summary: AI 인력 추천 실행
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1557
       - REQ-1559
@@ -11562,6 +12904,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonAiRecommendationInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -11585,7 +12931,9 @@ paths:
     post:
       operationId: postCommonAiRecommendationAssignment
       summary: 추천 인력 배정 선택 기록
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1564
       - REQ-1565
@@ -11605,6 +12953,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonAiRecommendationAssignmentInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -11628,7 +12980,9 @@ paths:
     put:
       operationId: putCommonAiRecommendationTentativeAssignment
       summary: 추천 인력 가배정
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1566
       - REQ-1567
@@ -11652,6 +13006,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonAiRecommendationTentativeInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -11681,7 +13039,9 @@ paths:
     post:
       operationId: postCommonAiRecommendationExclusion
       summary: 추천 후보 제외
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1569
       - REQ-1570
@@ -11701,6 +13061,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonAiRecommendationExclusionInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -11724,7 +13088,9 @@ paths:
     get:
       operationId: getCommonAiAnalysisQuestions
       summary: 본인 질문 기록 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1648
       - REQ-1658
@@ -11734,6 +13100,10 @@ paths:
       x-filtering:
         owner: 서버 CurrentBusinessActor; userId 입력 금지
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -11756,7 +13126,9 @@ paths:
     post:
       operationId: postCommonAiAnalysisQuestion
       summary: 숫자 질문과 예측 답변
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1630
       - REQ-1632
@@ -11795,6 +13167,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CommonAiAnalysisQuestionInput'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -11831,11 +13207,17 @@ paths:
     get:
       operationId: getCommonAiAnalysisProgress
       summary: 질문 처리 단계 조회
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1642
       description: POST와 병행해 같은 요청의 실제 단계만 읽는다. 서버 실행 중 메모리 상태이며 결과/가짜대기 저장 없음. 타인 요청은 비공개(OQ-ACCESS-026).
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -11872,13 +13254,19 @@ paths:
     get:
       operationId: getCommonAiAnalysisQuestionExcel
       summary: 저장 답 표 엑셀 다운로드
-      security: []
+      security:
+      - SessionCookie: []
+      x-roles: [로그인 사용자]
       x-related-requirements:
       - REQ-1652
       - REQ-1645
       - REQ-1648
       description: 본인 저장 ANS_CN의 이미 정책 적용된 표만 공통 엑셀로 변환·DNLD. 업무 재계산 없음.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: 성공
           content:
@@ -11898,8 +13286,1236 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/common/login:
+    post:
+      operationId: postCommonLogin
+      summary: 아이디 비밀번호 로그인
+      x-related-requirements:
+      - REQ-1689
+      - REQ-1690
+      - REQ-1691
+      - REQ-1692
+      - REQ-1693
+      - REQ-1797
+      - REQ-1798
+      - REQ-1799
+      security: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonLoginResult'
+                  required:
+                  - data
+        '400':
+          $ref: '#/components/responses/InvalidInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommonLoginInput'
+      x-business-rules:
+      - 아이디·비밀번호·로그인·비밀번호 찾기와 잠금 안내를 시안 배치로 제공한다.
+      - 빈 비밀번호·틀린 자격·잠김·중지를 원문의 문구로 구별한다.
+      - 실패마다 PWD_ERR_CNT를 증가시키고 LOCK_FAIL_CNT번째 LOCK으로 바꾼다.
+      - 로그인을 끝까지 성공한 뒤 PWD_ERR_CNT·MFA_ERR_CNT·발송 횟수를 0으로 하고 LAST_LOGIN_DTTM을 저장한다.
+      - BCrypt 강도10·8자 이상 영문 숫자 특수문자 조합을 서버에서 검사한다.
+      - 시스템 자체 아이디와 비밀번호로 로그인하여 허용 메뉴를 표시한다.
+      - 실패마다 PWD_ERR_CNT를 올리고 운영기준 도달 LOCK·성공0을 저장한다.
+      - 관리자는 UI-23의 기존 잠금 해제를 사용한다.
+      x-side-effects:
+      - TB_SY_ACCS_LOG LOGIN1행·세션ID 교체
+      x-required-tests:
+      - 'happy: 사용중 일반계정의 올바른 비밀번호로 로그인 -> LAST_LOGIN_DTTM 저장과 PWD_ERR_CNT=0을 사용자
+        재조회로 확인'
+      - 'auth: 없는 아이디 또는 틀린 비밀번호로 로그인 -> 401과 동일한 아이디 또는 비밀번호가 맞지 않습니다. 문구'
+      - 'validation: password 빈문자열 제출 -> 400 errors.field=password와 비밀번호를 입력해 주세요.'
+      - 'business: LOCK_FAIL_CNT번째 실패 제출 -> USER_STAT_CD=LOCK이며 업무API401'
+      - 'side-effect: 비밀번호 성공한 일반계정 로그인 -> TB_SY_ACCS_LOG LOGIN1행·세션ID 교체'
+      x-state-transitions:
+      - condition: 아이디·비밀번호·로그인·비밀번호 찾기와 잠금 안내를 시안 배치로 제공한다.
+        observable_result: 375px·다크 모드 넘침 없음, 시안 계정 목록·아이디 초기값 없음
+      - condition: 빈 비밀번호·틀린 자격·잠김·중지를 원문의 문구로 구별한다.
+        observable_result: 없는 아이디와 틀린 비밀번호는 같은 문구, 빈 비밀번호는 입력 안내
+      - condition: 실패마다 PWD_ERR_CNT를 증가시키고 LOCK_FAIL_CNT번째 LOCK으로 바꾼다.
+        observable_result: 기준 전 실패는 횟수 증가, 기준 도달은 LOCK
+      - condition: 로그인을 끝까지 성공한 뒤 PWD_ERR_CNT·MFA_ERR_CNT·발송 횟수를 0으로 하고 LAST_LOGIN_DTTM을
+          저장한다.
+        observable_result: MFA 대기에는 완료 처리 없음, 완료 후 재조회 횟수0·로그인 시각 존재
+      - condition: BCrypt 강도10·8자 이상 영문 숫자 특수문자 조합을 서버에서 검사한다.
+        observable_result: 7자 거부·8자 조합 허용, 저장 해시는 BCrypt 강도10
+      - condition: 시스템 자체 아이디와 비밀번호로 로그인하여 허용 메뉴를 표시한다.
+        observable_result: 비밀번호 빈값은 지정 안내·성공 뒤 허용 메뉴만 표시
+      - condition: 실패마다 PWD_ERR_CNT를 올리고 운영기준 도달 LOCK·성공0을 저장한다.
+        observable_result: 기준 실패 LOCK·완료 성공0
+      - condition: 관리자는 UI-23의 기존 잠금 해제를 사용한다.
+        observable_result: LOCK 사용자 해제 뒤 기존 사용자 조회 USE·횟수0
+  /api/common/mfa/verify:
+    post:
+      operationId: postCommonMfaVerify
+      summary: 관리자 인증번호 확인
+      x-related-requirements:
+      - REQ-1694
+      - REQ-1695
+      - REQ-1696
+      - REQ-1697
+      - REQ-1805
+      - REQ-1806
+      - REQ-1796
+      security: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonLoginResult'
+                  required:
+                  - data
+        '400':
+          $ref: '#/components/responses/InvalidInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommonMfaVerifyInput'
+      x-business-rules:
+      - 시스템 관리자 역할만 MFA_USE_YN=Y로 자동 적용하고 번호 확인 전 업무 진입을 막는다.
+      - 6자리 번호를 5분 유효 해시로 저장하고 다시 보내면 이전 번호를 무효화한다.
+      - 재발송은 60초 뒤·로그인당5번·계정별 직전60분10번으로 제한한다.
+      - 메일 실패는 원문 안내를 표시하고 관리자 인증을 건너뛰지 않는다.
+      - 여러 기기에서 나중 시작한 관리자 인증이 이전 진행 인증을 대체한다.
+      - 관리자만 가린 이메일로6자리·5분 번호를 발송하고 해시저장·재발송시 대체한다.
+      - 길이·만료·오답 문구를 구별하고5번째오답은 로그인처음으로 돌린다.
+      x-side-effects:
+      - TB_SY_ACCS_LOG LOGIN 기록; 임시계정은 임시 비밀번호 로그인 설명·변경전 업무거부
+      x-required-tests:
+      - 'happy: 최신 관리자 진행인증의 올바른6자리 제출 -> UI-40 또는 첫화면 반환·최종완료일때 LAST_LOGIN_DTTM 갱신'
+      - 'auth: 진행인증 없는 세션으로 번호제출 -> 401·업무세션 생성0'
+      - 'validation: code가5자리 -> 400 errors.field=code·인증번호 6자리를 넣어 주세요.'
+      - 'business: 다른기기 최신인증이 시작된 뒤 이전번호 확인 -> 거부·이전인증으로 업무API200 없음'
+      - 'side-effect: 번호확인 성공 -> TB_SY_ACCS_LOG LOGIN 기록; 임시계정은 임시 비밀번호 로그인 설명·변경전
+        업무거부'
+      x-state-transitions:
+      - condition: 시스템 관리자 역할만 MFA_USE_YN=Y로 자동 적용하고 번호 확인 전 업무 진입을 막는다.
+        observable_result: 관리자 번호 확인 전 업무 불가·비관리자 추가 인증 없음
+      - condition: 6자리 번호를 5분 유효 해시로 저장하고 다시 보내면 이전 번호를 무효화한다.
+        observable_result: 새 번호 발송 후 이전 번호 실패·5분 경과 번호 거부
+      - condition: 재발송은 60초 뒤·로그인당5번·계정별 직전60분10번으로 제한한다.
+        observable_result: 60초 전 재발송 거부·로그인당6번째/시간당11번째 원문 안내
+      - condition: 메일 실패는 원문 안내를 표시하고 관리자 인증을 건너뛰지 않는다.
+        observable_result: 발송 실패 후 업무 세션 없음·다시 보내기만 허용
+      - condition: 여러 기기에서 나중 시작한 관리자 인증이 이전 진행 인증을 대체한다.
+        observable_result: 두기기 인증시 이전 번호 거부·최신 인증만 완료가능
+      - condition: 관리자만 가린 이메일로6자리·5분 번호를 발송하고 해시저장·재발송시 대체한다.
+        observable_result: 해시만DB·5분지난번호거부·이전번호무효
+      - condition: 길이·만료·오답 문구를 구별하고5번째오답은 로그인처음으로 돌린다.
+        observable_result: 6자리미만 안내·5회오답 계정잠금과별도 처음화면
+  /api/common/mfa/resend:
+    post:
+      operationId: postCommonMfaResend
+      summary: 관리자 인증번호 재발송
+      x-related-requirements:
+      - REQ-1694
+      - REQ-1695
+      - REQ-1696
+      - REQ-1697
+      - REQ-1805
+      - REQ-1806
+      - REQ-1796
+      security: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonMfaDeliveryResult'
+                  required:
+                  - data
+        '400':
+          $ref: '#/components/responses/InvalidInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-no-request-body-reason: 서버 세션의 본인 문맥만으로 처리하며 원문은 추가 입력을 요구하지 않는다.
+      x-business-rules:
+      - 시스템 관리자 역할만 MFA_USE_YN=Y로 자동 적용하고 번호 확인 전 업무 진입을 막는다.
+      - 6자리 번호를 5분 유효 해시로 저장하고 다시 보내면 이전 번호를 무효화한다.
+      - 재발송은 60초 뒤·로그인당5번·계정별 직전60분10번으로 제한한다.
+      - 메일 실패는 원문 안내를 표시하고 관리자 인증을 건너뛰지 않는다.
+      - 여러 기기에서 나중 시작한 관리자 인증이 이전 진행 인증을 대체한다.
+      - 관리자만 가린 이메일로6자리·5분 번호를 발송하고 해시저장·재발송시 대체한다.
+      - 길이·만료·오답 문구를 구별하고5번째오답은 로그인처음으로 돌린다.
+      x-side-effects:
+      - 이전번호거부·새번호만확인가능
+      x-required-tests:
+      - 'happy: 진행인증 발송후60초 지난 재발송 -> 파일함 새번호와 TB_SY_USER.MFA_CODE_HASH 대체'
+      - 'auth: 관리자 진행인증 문맥 없이 재발송 -> 401·메일/해시변경0'
+      - 'validation: 최근 발송후60초 전 재요청 -> 400 재발송대기 안내·새해시0'
+      - 'business: 로그인당5회 또는 직전60분10회 초과 -> 400 원문한도문구·추가발송0'
+      - 'side-effect: 재발송 성공후 이전번호로 확인 -> 이전번호거부·새번호만확인가능'
+      x-state-transitions:
+      - condition: 시스템 관리자 역할만 MFA_USE_YN=Y로 자동 적용하고 번호 확인 전 업무 진입을 막는다.
+        observable_result: 관리자 번호 확인 전 업무 불가·비관리자 추가 인증 없음
+      - condition: 6자리 번호를 5분 유효 해시로 저장하고 다시 보내면 이전 번호를 무효화한다.
+        observable_result: 새 번호 발송 후 이전 번호 실패·5분 경과 번호 거부
+      - condition: 재발송은 60초 뒤·로그인당5번·계정별 직전60분10번으로 제한한다.
+        observable_result: 60초 전 재발송 거부·로그인당6번째/시간당11번째 원문 안내
+      - condition: 메일 실패는 원문 안내를 표시하고 관리자 인증을 건너뛰지 않는다.
+        observable_result: 발송 실패 후 업무 세션 없음·다시 보내기만 허용
+      - condition: 여러 기기에서 나중 시작한 관리자 인증이 이전 진행 인증을 대체한다.
+        observable_result: 두기기 인증시 이전 번호 거부·최신 인증만 완료가능
+      - condition: 관리자만 가린 이메일로6자리·5분 번호를 발송하고 해시저장·재발송시 대체한다.
+        observable_result: 해시만DB·5분지난번호거부·이전번호무효
+      - condition: 길이·만료·오답 문구를 구별하고5번째오답은 로그인처음으로 돌린다.
+        observable_result: 6자리미만 안내·5회오답 계정잠금과별도 처음화면
+  /api/common/password-find:
+    post:
+      operationId: postCommonPasswordFind
+      summary: 임시 비밀번호 찾기
+      x-related-requirements:
+      - REQ-1700
+      - REQ-1701
+      - REQ-1702
+      - REQ-1800
+      security: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonPasswordFindResult'
+                  required:
+                  - data
+        '400':
+          $ref: '#/components/responses/InvalidInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommonPasswordFindInput'
+      x-business-rules:
+      - 아이디·등록 이메일이 맞는 사용 중 계정만 발송하고 같은 아이디는10분1번으로 제한한다.
+      - 메일 성공 뒤에만 새 해시·TEMP_PWD_YN=Y·PWD_ERR_CNT=0을 저장하고 전체 세션을 끝낸다.
+      - 계정 유무와 무관하게 입력 정보가 맞으면 이메일로 보냈다는 동일 문구를 반환한다.
+      - 등록 이메일에 임시 비밀번호를 보내고 성공 뒤 TEMP_PWD_YN=Y로 저장한다.
+      x-side-effects:
+      - 기존모든기기API401; 발송실패는 해시·세션불변
+      x-required-tests:
+      - 'happy: 사용중 아이디와 등록이메일 일치 -> 파일함 전달후 TEMP_PWD_YN=Y·PWD_ERR_CNT=0 재조회'
+      - 'auth: 없는아이디 또는 이메일불일치 요청 -> 200 동일안내문구·해당계정 저장0'
+      - 'validation: 이메일형식오류 제출 -> 400 errors.field=email·이메일 형식이 맞지 않습니다.'
+      - 'business: LOCK/STOP 또는 같은아이디10분내 요청 -> 동일안내·임시해시변경/추가메일0'
+      - 'side-effect: 일치사용자 파일함성공 -> 기존모든기기API401; 발송실패는 해시·세션불변'
+      x-state-transitions:
+      - condition: 아이디·등록 이메일이 맞는 사용 중 계정만 발송하고 같은 아이디는10분1번으로 제한한다.
+        observable_result: 일치 사용중만 발송·잠김/중지/10분내 추가 발송0
+      - condition: 메일 성공 뒤에만 새 해시·TEMP_PWD_YN=Y·PWD_ERR_CNT=0을 저장하고 전체 세션을 끝낸다.
+        observable_result: 메일 실패 해시·세션 불변·성공 뒤 전체 세션401
+      - condition: 계정 유무와 무관하게 입력 정보가 맞으면 이메일로 보냈다는 동일 문구를 반환한다.
+        observable_result: 일치/불일치/잠김 요청의 결과 문구 동일
+      - condition: 등록 이메일에 임시 비밀번호를 보내고 성공 뒤 TEMP_PWD_YN=Y로 저장한다.
+        observable_result: 일치 계정 발송성공 후 임시표시Y
+  /api/common/logout:
+    post:
+      operationId: postCommonLogout
+      summary: 현재 기기 로그아웃
+      x-related-requirements:
+      - REQ-1709
+      - REQ-1710
+      - REQ-1724
+      security:
+      - SessionCookie: []
+      responses:
+        '204':
+          description: 처리 성공·본문 없음
+        '400':
+          $ref: '#/components/responses/InvalidInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-roles:
+      - 로그인 사용자(역할 없음 포함)
+      x-no-request-body-reason: 서버 세션의 본인 문맥만으로 처리하며 원문은 추가 입력을 요구하지 않는다.
+      x-business-rules:
+      - 현재 기기 세션만 끝내고 dirty 탭은 원문 문구로 로그아웃 또는 취소를 확인한다.
+      - 모든 API 응답에 Cache-Control:no-store를 붙인다.
+      - 직접·실제 세션 만료·다른 기기 변경/중지 종료를 LOGOUT으로 남긴다.
+      x-side-effects:
+      - TB_SY_ACCS_LOG LOGOUT 직접 로그아웃1행·다른기기는200
+      x-required-tests:
+      - 'happy: 현재기기에서 로그아웃 -> 204·현재세션후속요청401'
+      - 'auth: 세션없는 로그아웃 -> 401·타기기세션불변'
+      - 'validation: CSRF헤더누락 로그아웃 -> 403·현재세션유지'
+      - 'business: dirty로그아웃창 취소 -> 로그아웃요청0·미저장입력유지'
+      - 'side-effect: 직접로그아웃 성공 -> TB_SY_ACCS_LOG LOGOUT 직접 로그아웃1행·다른기기는200'
+      x-state-transitions:
+      - condition: 현재 기기 세션만 끝내고 dirty 탭은 원문 문구로 로그아웃 또는 취소를 확인한다.
+        observable_result: 취소는 입력/세션 유지·확인은 현재 세션만401
+      - condition: 모든 API 응답에 Cache-Control:no-store를 붙인다.
+        observable_result: 로그아웃 뒤 뒤로 가기에서 보호 자료 표시 없음
+      - condition: 직접·실제 세션 만료·다른 기기 변경/중지 종료를 LOGOUT으로 남긴다.
+        observable_result: 브라우저를 닫아도 서버 만료 순간 자동 로그아웃 기록
+  /api/common/session/extend:
+    post:
+      operationId: postCommonSessionExtend
+      summary: 사용자 세션 연장
+      x-related-requirements:
+      - REQ-1706
+      - REQ-1707
+      - REQ-1802
+      - REQ-1803
+      security:
+      - SessionCookie: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSessionRemainingResult'
+                  required:
+                  - data
+        '400':
+          $ref: '#/components/responses/InvalidInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-roles:
+      - 로그인 사용자(역할 없음 포함)
+      x-no-request-body-reason: 서버 세션의 본인 문맥만으로 처리하며 원문은 추가 입력을 요구하지 않는다.
+      x-business-rules:
+      - SESSION_MIN을 읽고 사용자 서버 요청과 연장 요청으로만 미사용 시간을 다시 시작한다.
+      - 마지막 서버 응답 시각부터 남은 시간을 표시하며 만료 전 창과 알림 자동 폴링은 없다.
+      - SESSION_MIN=30 기준 사용자 서버 요청만 만료를 다시 시작하고 연장을 지원한다.
+      - 마지막 서버응답 기준 남은 시간을 표시하고 사전창 없이 만료시 미저장입력을 폐기한다.
+      x-side-effects:
+      - remaining.serverRespondedAt 새시각·마우스만이동한대조군은 연장없음
+      x-required-tests:
+      - 'happy: 유효세션 연장요청 -> 후속remaining이 SESSION_MIN 기준으로 재시작'
+      - 'auth: 만료세션 연장요청 -> 401·세션재생성0'
+      - 'validation: CSRF없는연장 -> 403·연장처리0'
+      - 'business: 사용자STOP 이후 연장요청 -> 세션종료401·연장없음'
+      - 'side-effect: 연장성공 -> remaining.serverRespondedAt 새시각·마우스만이동한대조군은 연장없음'
+      x-state-transitions:
+      - condition: SESSION_MIN을 읽고 사용자 서버 요청과 연장 요청으로만 미사용 시간을 다시 시작한다.
+        observable_result: 클릭/타이핑만으로 만료시각 불변·연장 요청 뒤 SESSION_MIN 재시작
+      - condition: 마지막 서버 응답 시각부터 남은 시간을 표시하며 만료 전 창과 알림 자동 폴링은 없다.
+        observable_result: 로컬 입력만으로 남은 시간 증가 없음·알림 자동 요청0
+      - condition: SESSION_MIN=30 기준 사용자 서버 요청만 만료를 다시 시작하고 연장을 지원한다.
+        observable_result: 요청후30분 재시작·타이핑은연장0
+      - condition: 마지막 서버응답 기준 남은 시간을 표시하고 사전창 없이 만료시 미저장입력을 폐기한다.
+        observable_result: 만료전 안내창0·만료후 초안없음
+  /api/common/session/remaining:
+    get:
+      operationId: getCommonSessionRemaining
+      summary: 세션 남은 시간 조회
+      x-related-requirements:
+      - REQ-1706
+      - REQ-1707
+      - REQ-1802
+      - REQ-1803
+      security:
+      - SessionCookie: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonSessionRemainingResult'
+                  required:
+                  - data
+        '400':
+          $ref: '#/components/responses/InvalidInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-roles:
+      - 로그인 사용자(역할 없음 포함)
+  /api/common/my-password:
+    put:
+      operationId: putCommonMyPassword
+      summary: 내 비밀번호 변경
+      x-related-requirements:
+      - REQ-1698
+      - REQ-1699
+      - REQ-1711
+      - REQ-1720
+      - REQ-1721
+      - REQ-1749
+      - REQ-1750
+      - REQ-1751
+      - REQ-1752
+      - REQ-1804
+      security:
+      - SessionCookie: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonMyPasswordResult'
+                  required:
+                  - data
+        '400':
+          $ref: '#/components/responses/InvalidInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      x-roles:
+      - 로그인 사용자(역할 없음 포함)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutCommonMyPasswordInput'
+      x-business-rules:
+      - TEMP_PWD_YN=Y는 관리자 번호 확인 뒤 변경을 마쳐야 첫 화면으로 이동한다.
+      - 임시값과 같은 새 값·확인값 불일치를 원문 문구로 거부하며 임시값 기한은 두지 않는다.
+      - 동시 기기 로그인은 허용하되 비밀번호 변경은 다른 세션, 초기화·찾기·중지·잠김은 모든 세션을 종료한다.
+      - 변경 창에서 마지막 변경 날짜와 PWD_CHG_DAY 기준 권고를 표시한다.
+      - 현재와 다른 새 비밀번호를 저장하고 PWD_CHG_DTTM을 갱신한다.
+      - UI-23·UI-24·내 비밀번호 변경은 저장 시각 불일치409·입력을 유지한다.
+      - 서로의 관리자 제거·중지는 DB 잠금 안에서 관리자 수를 센 뒤 저장한다.
+      - 권한/범위 변경 다음 요청403이면 메뉴를 다시 읽고 사라진 메뉴 탭을 닫는다.
+      - 같은 계정 찾기와 변경이 동시에 와도 한 번만 처리한다.
+      - 8자 이상 영문 숫자 특수문자·단방향저장·90일 변경권고를 적용한다.
+      x-side-effects:
+      - 다른기기401·현재기기유지·TEMP_PWD_YN 해소뒤 첫화면진입
+      x-required-tests:
+      - 'happy: 유효한다른8자조합과최신modifiedAt 제출 -> PWD_CHG_DTTM 갱신·재로그인새값성공'
+      - 'auth: 만료세션에서변경 -> 401·해시불변'
+      - 'validation: 7자 newPassword -> 400 errors.field=newPassword·해시불변'
+      - 'business: 현재와같거나stale modifiedAt -> 같은값400 또는 stale409·해시불변·입력유지'
+      - 'side-effect: 변경성공 -> 다른기기401·현재기기유지·TEMP_PWD_YN 해소뒤 첫화면진입'
+      x-state-transitions:
+      - condition: TEMP_PWD_YN=Y는 관리자 번호 확인 뒤 변경을 마쳐야 첫 화면으로 이동한다.
+        observable_result: 변경 전 다른 API 차단·변경과 로그아웃만 허용
+      - condition: 임시값과 같은 새 값·확인값 불일치를 원문 문구로 거부하며 임시값 기한은 두지 않는다.
+        observable_result: 같은 값·불일치는 저장0, 오래된 임시값도 변경 흐름 진입
+      - condition: 동시 기기 로그인은 허용하되 비밀번호 변경은 다른 세션, 초기화·찾기·중지·잠김은 모든 세션을 종료한다.
+        observable_result: 일반 변경의 현재 세션 유지·중지 후 모든 기기401
+      - condition: 변경 창에서 마지막 변경 날짜와 PWD_CHG_DAY 기준 권고를 표시한다.
+        observable_result: 90일 경과 안내는 변경 창에만 존재
+      - condition: 현재와 다른 새 비밀번호를 저장하고 PWD_CHG_DTTM을 갱신한다.
+        observable_result: 같은 값 거부·다른 유효 값 저장 후 변경일 재조회
+      - condition: UI-23·UI-24·내 비밀번호 변경은 저장 시각 불일치409·입력을 유지한다.
+        observable_result: stale409 뒤 저장값/이력 불변·화면 입력 유지
+      - condition: 서로의 관리자 제거·중지는 DB 잠금 안에서 관리자 수를 센 뒤 저장한다.
+        observable_result: 동시 요청에도 사용중 관리자 최소1명
+      - condition: 권한/범위 변경 다음 요청403이면 메뉴를 다시 읽고 사라진 메뉴 탭을 닫는다.
+        observable_result: 회수 직후 다음 요청403·해당 탭 제거·다른 탭 유지
+      - condition: 같은 계정 찾기와 변경이 동시에 와도 한 번만 처리한다.
+        observable_result: 동시 발급/변경 성공 저장1회·이전 요청이 새 해시 덮어쓰기 없음
+      - condition: 8자 이상 영문 숫자 특수문자·단방향저장·90일 변경권고를 적용한다.
+        observable_result: 7자거부·8자조합허용·90일권고표시
+  /api/common/my-info:
+    get:
+      operationId: getCommonMyInfo
+      summary: 내 정보 조회
+      x-related-requirements:
+      - REQ-1718
+      - REQ-1719
+      security:
+      - SessionCookie: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonMyInfoResult'
+                  required:
+                  - data
+        '400':
+          $ref: '#/components/responses/InvalidInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-roles:
+      - ADMIN
+      - EXEC
+      - FIN
+      - SALES_LDR
+      - PM
+  /api/common/notifications:
+    get:
+      operationId: getCommonNotifications
+      summary: 본인 알림 목록
+      x-related-requirements:
+      - REQ-1764
+      - REQ-1765
+      - REQ-1767
+      security:
+      - SessionCookie: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonNotificationListResult'
+                  required:
+                  - data
+        '400':
+          $ref: '#/components/responses/InvalidInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-roles:
+      - 로그인 사용자(역할 없음 포함)
+      x-pagination-contract:
+        mode: unpaged
+        filter: 세션 본인·30일보관·최신순; 페이지/검색 입력은 추가하지 않는다.
+  /api/common/notifications/{notificationId}/read:
+    put:
+      operationId: putCommonNotificationRead
+      summary: 본인 알림 읽음
+      x-related-requirements:
+      - REQ-1766
+      security:
+      - SessionCookie: []
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/CommonNotificationReadResult'
+                  required:
+                  - data
+        '400':
+          $ref: '#/components/responses/InvalidInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-roles:
+      - 로그인 사용자(역할 없음 포함)
+      x-no-request-body-reason: 서버 세션의 본인 문맥과 경로 notificationId만으로 처리하며 원문은 추가 입력을
+        요구하지 않는다.
+      parameters:
+      - name: notificationId
+        in: path
+        required: true
+        schema:
+          type: integer
+      x-business-rules:
+      - 줄 선택은 읽음 처리 후 대상 화면만 열고 권한·범위·대상소실·PC전용을 각 문구로 처리한다.
+      x-side-effects:
+      - 미읽음수감소·자동상세열기0
+      x-required-tests:
+      - 'happy: 본인미읽음알림 읽음 -> GET목록에서 해당READ_YN=Y·READ_DTTM존재'
+      - 'auth: 타인알림ID 읽음 -> 403·타인READ_YN불변'
+      - 'validation: notificationId가정수아님 -> 400 경로필드오류·쓰기0'
+      - 'business: 대상조회권한회수후줄클릭 -> 읽음처리후 권한안내·화면이동0·원알림글가림'
+      - 'side-effect: 본인읽음성공 -> 미읽음수감소·자동상세열기0'
+      x-state-transitions:
+      - condition: 줄 선택은 읽음 처리 후 대상 화면만 열고 권한·범위·대상소실·PC전용을 각 문구로 처리한다.
+        observable_result: 권한없음 이동0·범위밖 화면만·상세 자동열림0
+  /api/common/notifications/read-all:
+    put:
+      operationId: putCommonNotificationsReadAll
+      summary: 본인 알림 모두 읽음
+      x-related-requirements:
+      - REQ-1764
+      - REQ-1765
+      security:
+      - SessionCookie: []
+      responses:
+        '204':
+          description: 처리 성공·본문 없음
+        '400':
+          $ref: '#/components/responses/InvalidInput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-roles:
+      - 로그인 사용자(역할 없음 포함)
+      x-no-request-body-reason: 서버 세션의 본인 문맥만으로 처리하며 원문은 추가 입력을 요구하지 않는다.
+      x-business-rules:
+      - 본인 최신순·미읽음·99+·시각문구·30일 안내를 벨/목록으로 제공한다.
+      - 모두 읽음은 본인 미읽음 상태만 바꾸고 화면을 이동하지 않는다.
+      x-side-effects:
+      - 본인READ_DTTM설정·현재화면주소불변
+      x-required-tests:
+      - 'happy: 본인미읽음2행 모두읽음 -> GET목록 두READ_YN=Y·unreadCount=0'
+      - 'auth: 세션없는모두읽음 -> 401·전체알림불변'
+      - 'validation: CSRF빠진모두읽음 -> 403·본인READ_YN불변'
+      - 'business: 다른사용자미읽음이있는상태 모두읽음 -> 타인READ_YN=N 유지'
+      - 'side-effect: 모두읽음성공 -> 본인READ_DTTM설정·현재화면주소불변'
+      x-state-transitions:
+      - condition: 본인 최신순·미읽음·99+·시각문구·30일 안내를 벨/목록으로 제공한다.
+        observable_result: 타인 알림0·미읽음100이면99+·최신순
+      - condition: 모두 읽음은 본인 미읽음 상태만 바꾸고 화면을 이동하지 않는다.
+        observable_result: READ_YN 재조회Y·현재 화면 유지
+x-uncovered-requirements:
+- canonical_id: REQ-1681
+  status: non-functional
+  evidence: '단일 개발 묶음과 순차 관문: 앞 단계 시험 실패 시 다음 단계 진입 없음'
+- canonical_id: REQ-1682
+  status: data-constraint
+  evidence: '기존 저장 구조와 기준값 재사용: DDL 대조에서 새 표·칸·코드·식 0개'
+- canonical_id: REQ-1683
+  status: non-functional
+  evidence: 'OpenAPI 크기와 보호 파일: 보호된 네 YAML은 변경 전후 바이트 동일'
+- canonical_id: REQ-1684
+  status: covered
+  evidence: 'T004: AI 단일 정책 경계는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 추천 응답 원가·단가 속성 부재, 외부
+    AI 호출 0회'
+- canonical_id: REQ-1685
+  status: non-functional
+  evidence: '매퍼 탐색 설정: 실제 앱 기동에서 매퍼 빈 누락 없음'
+- canonical_id: REQ-1686
+  status: non-functional
+  evidence: '기존 앱 설정 보존: 설정 diff에 세 항목의 무단 변경 없음'
+- canonical_id: REQ-1687
+  status: non-functional
+  evidence: '검수 도구 인증 활성화: 두 설정 true, 실제 비밀번호 값 유입 0개'
+- canonical_id: REQ-1688
+  status: covered
+  evidence: 'T008: 전역 세션 인증 계약는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 보호 API 익명401, 공개 로그인
+    접근 허용'
+- canonical_id: REQ-1703
+  status: covered
+  evidence: 'T023: 권한과 기기별 첫 화면는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 대시보드 없는 사용자는
+    첫 가시 메뉴·휴대폰 가시0개는 전용 안내'
+- canonical_id: REQ-1704
+  status: covered
+  evidence: 'T024: 무역할 사용자 진입는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 로그인 성공 후 빈 본문
+    대신 안내와 로그아웃만 존재'
+- canonical_id: REQ-1705
+  status: non-functional
+  evidence: '서버 세션 쿠키: 완료 전후 ID 다름·기본 HTTP·전환 설정 뒤 Secure'
+- canonical_id: REQ-1708
+  status: covered
+  evidence: 'T028: 만료 처리와 업로드 되돌림는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 만료 후401·업로드
+    중 만료에 부분 반영0'
+- canonical_id: REQ-1712
+  status: covered
+  evidence: 'T032: 요청별 권한 재확인는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 중지/잠김 다음 요청 세션종료·권한 회수
+    다음 요청403'
+- canonical_id: REQ-1713
+  status: covered
+  evidence: 'T033: 서버 실행자 신뢰 경계는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 위조 실행자 요청 뒤
+    기록은 세션 사용자'
+- canonical_id: REQ-1714
+  status: covered
+  evidence: 'T034: 공개 API 한정는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 익명 엑셀/업로드/AI401·health
+    공개 유지'
+- canonical_id: REQ-1715
+  status: covered
+  evidence: 'T035: CSRF 검사는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 토큰 누락 변경403·정상 토큰
+    변경 허용'
+- canonical_id: REQ-1716
+  status: covered
+  evidence: 'T036: 반복 실패 지연는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 임계값·관찰 기간·지연량 OQ-SEC-001
+    확정 뒤 가상시계로 지연 확인'
+- canonical_id: REQ-1717
+  status: non-functional
+  evidence: '단일 fetch 경계: 동일 오류 Toast1회·화면별 중복 래퍼0'
+- canonical_id: REQ-1722
+  status: covered
+  evidence: 'T042: 로그인 접근 기록는 공통 접근기록 helper의 해당 사건 삽입과 getCommonUserAccessLogs 조회
+    시험으로 검증한다; 별도 사건 생성 API를 추가하지 않는다.'
+- canonical_id: REQ-1723
+  status: covered
+  evidence: 'T043: 로그인 실패 접근 기록는 공통 접근기록 helper의 해당 사건 삽입과 getCommonUserAccessLogs
+    조회 시험으로 검증한다; 별도 사건 생성 API를 추가하지 않는다.'
+- canonical_id: REQ-1725
+  status: covered
+  evidence: 'T045: 업무 보안 사건 기록는 공통 접근기록 helper의 해당 사건 삽입과 getCommonUserAccessLogs
+    조회 시험으로 검증한다; 별도 사건 생성 API를 추가하지 않는다.'
+- canonical_id: REQ-1726
+  status: covered
+  evidence: 'T046: 공통 기록 실행자는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 위조 헤더 사용자ID 기록
+    안 됨·공통 helper 호출 확인'
+- canonical_id: REQ-1727
+  status: non-functional
+  evidence: '비밀 기록 금지: 실제 비밀에 대한 로그/오류/메일메타 검색0; 승인 .eml 시험 전달은 별도 보안 경계'
+- canonical_id: REQ-1728
+  status: covered
+  evidence: 'T048: 관리자 기록 조회 제한는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 관리자 일시·작업·대상
+    조회200·비관리자403'
+- canonical_id: REQ-1729
+  status: covered
+  evidence: 'T049: 세션 실행자 교체는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 사용자 작업은 실제 ID·배치
+    기록은 SYSTEM'
+- canonical_id: REQ-1730
+  status: covered
+  evidence: 'T050: 고정 admin 제거는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 본 코드 admin 문자열0·V3/V4
+    초기 SQL 제외'
+- canonical_id: REQ-1731
+  status: covered
+  evidence: 'T051: 클라이언트 실행자 연결는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 계정별 다른 헤더와
+    신규 이슈 담당자'
+- canonical_id: REQ-1732
+  status: covered
+  evidence: 'T052: 업무 실행자 전파는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; TB_SY_USER_PREF는
+    사용자별 분리·이슈 담당자는 타인 수정에도 원등록자'
+- canonical_id: REQ-1733
+  status: covered
+  evidence: 'T053: 등록과 초기화 메일는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 기존 계정 초기화 재발송
+    성공 뒤 새 임시 해시'
+- canonical_id: REQ-1734
+  status: data-constraint
+  evidence: '과거 admin 자료 보존: 변경 전후 과거 실행자 문자열 동일'
+- canonical_id: REQ-1735
+  status: covered
+  evidence: 'T055: 메뉴 동작 중앙 검사는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 컨트롤러 경로 미분류0·조회N인 수정403'
+- canonical_id: REQ-1736
+  status: covered
+  evidence: 'T056: 권한 오류 봉투는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 권한 오류와 범위 오류 문구 구별·내부 예외정보0'
+- canonical_id: REQ-1737
+  status: covered
+  evidence: 'T057: 공유 업로드 엑셀 상세 정책는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; B7은 M002 업로드 없으면403·원메뉴
+    다운로드 없는 엑셀403'
+- canonical_id: REQ-1738
+  status: covered
+  evidence: 'T058: 가시 메뉴 계층는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 가시 자식0인 그룹 부재·G 권한 유무로
+    잎 권한 변화 없음'
+- canonical_id: REQ-1739
+  status: covered
+  evidence: 'T059: 대메뉴 권한행 생성 중단는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 대메뉴 등록 후 ROLE_MENU_AUTH
+    추가0·기존 잎 메뉴 계약 유지'
+- canonical_id: REQ-1740
+  status: covered
+  evidence: 'T060: 권한별 화면 동작는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 수정N 저장/취소 부재·등록Y로
+    기존자료 수정 불가'
+- canonical_id: REQ-1741
+  status: covered
+  evidence: 'T061: 탐색 권한 일관성는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 저장 즐겨찾기는 보존·회수
+    메뉴 표시와 이동 없음'
+- canonical_id: REQ-1742
+  status: covered
+  evidence: 'T062: 직접 주소 제한는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 주소 직접 입력에도 보호 본문
+    노출0'
+- canonical_id: REQ-1743
+  status: covered
+  evidence: 'T063: 관리자 권한표 적용는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 관리자 조회N도403·마지막 관리자 제거
+    저장 거부'
+- canonical_id: REQ-1744
+  status: covered
+  evidence: 'T064: 기본 권한 두 행 보정는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 재실행 뒤 두 행만
+    지정값·나머지 DML 권한 보존'
+- canonical_id: REQ-1745
+  status: non-functional
+  evidence: '시험용 역할 분기 제거: developmentRoles/고정 canManage 대체·서버 허용 변경 즉시 반영'
+- canonical_id: REQ-1746
+  status: covered
+  evidence: 'T066: 명세 역할 예외 한정는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 인원계획 담당PM 허용·다른PM 거부,
+    분석은 메뉴권한으로 판정'
+- canonical_id: REQ-1747
+  status: covered
+  evidence: 'T067: 공유 선택 API 범위 조회는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 원화면 메뉴 없어도 범위내 선택200·민감
+    속성0'
+- canonical_id: REQ-1748
+  status: covered
+  evidence: 'T068: 선택과 업무 실행 분리는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 고르기200인 계정도 원메뉴 쓰기권한
+    없으면403'
+- canonical_id: REQ-1753
+  status: covered
+  evidence: 'T073: 공통 사용자 범위 계산는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 파트없음0건·전체 역할 추가 시 전체·교체
+    적용월부터 새 파트장 과거까지 조회'
+- canonical_id: REQ-1754
+  status: covered
+  evidence: 'T074: 전 채널 범위 검사는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 범위밖 상세403·합계/엑셀/AI에 타범위
+    자료0'
+- canonical_id: REQ-1755
+  status: covered
+  evidence: 'T075: 화면별 범위 예외는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; PM 영업기회0·인력수요예측 회사전체·외부후보
+    범위필터 추가 없음'
+- canonical_id: REQ-1756
+  status: covered
+  evidence: 'T076: 범위별 대시보드 모양는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 파트장 세 줄 부재·PM은
+    명시 네 영역만·수급 회사전체 문구'
+- canonical_id: REQ-1757
+  status: covered
+  evidence: 'T077: 배지와 파트 합계는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 타파트 미수는 배지 제외·마감 표시는 전체
+    유지'
+- canonical_id: REQ-1758
+  status: covered
+  evidence: 'T078: 역할 민감 체크 합집합는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 기본 관리자/경영진/재무Y·파트장/PM
+    N·파트장 자기파트도 민감 제외'
+- canonical_id: REQ-1759
+  status: covered
+  evidence: 'T079: 민감 속성 완전 제거는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 민감 속성은 null이 아닌 부재·응답
+    schema required에서도 제외'
+- canonical_id: REQ-1760
+  status: covered
+  evidence: 'T080: 계좌 마스킹는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 민감N 계좌없음·체크Y 기본 끝4자리·보기 뒤
+    ACCT_VIEW'
+- canonical_id: REQ-1761
+  status: covered
+  evidence: 'T081: AI 민감 질문 제한는 기존 업무 요청의 중앙 정책/투영/트랜잭션 조건이다; 급여질문 NO_ANS·안전부분 질문
+    OK·추천 원가필드0'
+- canonical_id: REQ-1762
+  status: covered
+  evidence: 'T082: 단가 직접 입력 권한는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 체크Y 수정N 거부·체크Y
+    수정Y 허용'
+- canonical_id: REQ-1763
+  status: covered
+  evidence: 'T083: 단가 비열람 배정 기본값는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 기본단가0 배정0·무상지원은0저장
+    검사없음·턴키 기존대로'
+- canonical_id: REQ-1768
+  status: covered
+  evidence: 'T088: 수신 대상과 민감 글 제한는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 중지/권한없음/범위밖
+    수신0·글 민감숫자0'
+- canonical_id: REQ-1769
+  status: covered
+  evidence: 'T089: 업무 알림 생성는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 철수중복0·미수만메일·AI_DONE생성0'
+- canonical_id: REQ-1770
+  status: covered
+  evidence: 'T090: 자금 부족 수신 권한는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 역할명과 무관 UI-21조회Y
+    수신·동일달 당일2회 생성0'
+- canonical_id: REQ-1771
+  status: covered
+  evidence: 'T091: 업로드 완료 개인 알림는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 다른 사용자 수신0·업로드자에게
+    경고건수 일치'
+- canonical_id: REQ-1772
+  status: covered
+  evidence: 'T092: 02시 순차 업무 갱신는 02시 조정자의 서버 내부 단계이며 배치 실행 API를 공개하지 않는다; 월1일만MM단가
+    수행·종료일지난 진행은 종료 저장'
+- canonical_id: REQ-1773
+  status: covered
+  evidence: 'T093: 보존기간 정리는 02시 조정자의 서버 내부 단계이며 배치 실행 API를 공개하지 않는다; 경계전 자료 보존·경계지난
+    대상만 삭제·영구대상 유지'
+- canonical_id: REQ-1774
+  status: covered
+  evidence: 'T094: 단계별 독립 저장는 02시 조정자의 서버 내부 단계이며 배치 실행 API를 공개하지 않는다; 2단계실패에도3단계수행·실패단계부분쓰기0·09시유지'
+- canonical_id: REQ-1775
+  status: non-functional
+  evidence: 'SMTP 설정 우선순위: 로컬파일 git제외·example 값빈칸·DB기본값유지'
+- canonical_id: REQ-1776
+  status: covered
+  evidence: 'T096: 메일 단일 발송과 파일함는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; SMTP 비밀번호없음
+    실제전송0·.eml존재를 발송성공으로 판정'
+- canonical_id: REQ-1777
+  status: non-functional
+  evidence: '메일 종류 한정: 철수/자금/업로드 시스템알림에서 메일0'
+- canonical_id: REQ-1778
+  status: non-functional
+  evidence: '실패 메타 기록과 초기 인계: 본문/번호/비밀번호 로그0·이메일미교체 관리자 인증 불가 안내'
+- canonical_id: REQ-1779
+  status: non-functional
+  evidence: 'Spring Security 의존 추가: 의존성 및 보안필터 실제기동 확인'
+- canonical_id: REQ-1780
+  status: non-functional
+  evidence: '개발 계좌키 경고: 경고문1회·키값로그0'
+- canonical_id: REQ-1781
+  status: non-functional
+  evidence: 'HTTP와 내부망 설정: 내부망설정활성시 타기기 로그인파일 접근·기본Secure꺼짐'
+- canonical_id: REQ-1782
+  status: non-functional
+  evidence: '응답 보안 헤더: 실제HTTP응답에 세 보안헤더 존재'
+- canonical_id: REQ-1783
+  status: non-functional
+  evidence: '운영 인계 README: README에 명시 절차 존재·복구화면/우회경로0'
+- canonical_id: REQ-1784
+  status: non-functional
+  evidence: '시험 계정 격리: 운영seed 시험계정0·5역할 로그인fixture 존재'
+- canonical_id: REQ-1785
+  status: non-functional
+  evidence: '시험 시계 경계: 제품에서 날짜이동불가·시험 각 경계의 전후 결과 구별'
+- canonical_id: REQ-1786
+  status: non-functional
+  evidence: '기존 시험 인증 전환: 기존시험삭제0·UI-22 메뉴등록금지시험 유지'
+- canonical_id: REQ-1787
+  status: non-functional
+  evidence: '전역 보안 자동 시험: 빈DB500 0·숨긴필드0·확정3곳·배치8단계검증'
+- canonical_id: REQ-1788
+  status: non-functional
+  evidence: '도구 재무 스모크: MFA없는 재무 로그인과 허용메뉴 렌더'
+- canonical_id: REQ-1789
+  status: non-functional
+  evidence: '5역할 수동 확인: 관리자 번호는 .eml로 확인·로그아웃후 자료없음'
+- canonical_id: REQ-1790
+  status: non-functional
+  evidence: '기동 누출 시각 크기 검증: openapi<=1000000·보호4파일 동일·자료임시파일 정리 확인'
+- canonical_id: REQ-1791
+  status: non-functional
+  evidence: '최종 전체 시험과 diff 점검: 두 전체시험결과와 공백검사 종료0; 현 문서작업에서는 미실행'
+- canonical_id: REQ-1792
+  status: out-of-scope
+  evidence: '운영과 후속 기능 제외: 각 제외기능 신규경로/화면/배치 없음; 전환설정과 안내는 포함'
+- canonical_id: REQ-1793
+  status: covered
+  evidence: 'T113: 메일 실패 등록 전량 취소는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 실제발송실패 계정0/이력0·파일함성공
+    등록가능'
+- canonical_id: REQ-1794
+  status: non-functional
+  evidence: '제안 보안 정책 필수 확정: CSRF/지연 시험이 선택시험이 아닌 필수 관문'
+- canonical_id: REQ-1795
+  status: covered
+  evidence: 'T115: 실제 민감 제공 전체 기록는 공통 접근기록 helper의 해당 사건 삽입과 getCommonUserAccessLogs
+    조회 시험으로 검증한다; 별도 사건 생성 API를 추가하지 않는다.'
+- canonical_id: REQ-1801
+  status: covered
+  evidence: 'T121: 최초 변경과 중지 거부는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 임시계정 변경전 업무불가·STOP로그인거부'
+- canonical_id: REQ-1807
+  status: covered
+  evidence: 'T127: 사용자 복수 역할 연결는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 두역할 각각허용메뉴의
+    합집합 표시'
+- canonical_id: REQ-1808
+  status: covered
+  evidence: 'T128: 메뉴 일곱 동작 검사는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 미등록메뉴403·수정N은입력잠금/저장취소없음'
+- canonical_id: REQ-1809
+  status: covered
+  evidence: 'T129: 권한별 최초 화면과 직접주소는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 대시보드조회N이면첫가시메뉴·가시0개는안내'
+- canonical_id: REQ-1810
+  status: covered
+  evidence: 'T130: 다섯 기본 역할는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 기본5역할존재·PM M011
+    일곱N'
+- canonical_id: REQ-1811
+  status: covered
+  evidence: 'T131: 확정 동작 세 곳 한정는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; CNFM_N은세영역거부·청구확정경로0'
+- canonical_id: REQ-1812
+  status: covered
+  evidence: 'T132: 마지막 관리자 보호는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 마지막관리자 제거/중지
+    둘다거부·관리자최소1'
+- canonical_id: REQ-1813
+  status: covered
+  evidence: 'T133: 주요 작업 접근기록는 공통 접근기록 helper의 해당 사건 삽입과 getCommonUserAccessLogs 조회
+    시험으로 검증한다; 별도 사건 생성 API를 추가하지 않는다.'
+- canonical_id: REQ-1814
+  status: covered
+  evidence: 'T134: 접근기록 탭 조회는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 탭에일시·작업·대상표시'
+- canonical_id: REQ-1815
+  status: covered
+  evidence: 'T135: 접근기록 관리자 제한는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 관리자200·다른역할403'
+- canonical_id: REQ-1816
+  status: covered
+  evidence: 'T136: 접근기록 3년 정리는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 3년전후fixture에서지난것만삭제'
+- canonical_id: REQ-1817
+  status: covered
+  evidence: 'T137: AI 전송 최소화는 해당 기존 화면/서비스의 변화이며 별도 API 증설 대상이 아니다; 외부경계 이름0·민감N급여0'
+- canonical_id: REQ-1818
+  status: covered
+  evidence: 'T138: AI 질문 데이터범위 이력는 공통 접근기록 helper의 해당 사건 삽입과 getCommonUserAccessLogs
+    조회 시험으로 검증한다; 별도 사건 생성 API를 추가하지 않는다.'
+- canonical_id: REQ-1819
+  status: non-functional
+  evidence: 'BCrypt 보안 기준: 해시강도10·7자거부·90일권고·기본기준5회LOCK'
+- canonical_id: REQ-1820
+  status: non-functional
+  evidence: '세션 보안 기준: 30분만료401·연장후새잔여'
+- canonical_id: REQ-1821
+  status: non-functional
+  evidence: '관리자 이메일 보안 인증: 관리자업무진입전번호확인필수'
+- canonical_id: REQ-1822
+  status: non-functional
+  evidence: '전 API 서버 보안 검사: 직접HTTP도권한403·범위403·민감속성부재'
+- canonical_id: REQ-1823
+  status: non-functional
+  evidence: '접근기록 보안 보존: 비관리자403·3년정리·주요유형기록'
+- canonical_id: REQ-1824
+  status: non-functional
+  evidence: 'AI 외부 전송 보안: 현재외부연결0·향후D-30결정전범위확대없음'
+
 components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: JSESSIONID
+      description: 서버 세션; HttpOnly·SameSite=Lax·완료시 ID교체. 기본HTTP·Secure전환설정
+  responses:
+    Unauthorized:
+      description: 다시 로그인해 주세요.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Forbidden:
+      description: 권한이 없습니다. 또는 이 건은 지금 볼 수 있는 범위 밖입니다.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    InvalidInput:
+      description: 입력 항목 또는 현재 업무 조건 오류
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Conflict:
+      description: 다른 사람이 먼저 고쳤습니다
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
   schemas:
+    CommonInitialRoleCode:
+      type: string
+      description: TB_SY_ROLE 초기 데이터의 기본 역할 코드. 사용자 정의 역할 코드는 별도로 관리한다.
+      enum: [ADMIN, EXEC, FIN, SALES_LDR, PM]
+    CommonLoginResult:
+      type: object
+      properties:
+        nextScreenId:
+          type: string
+          description: UI-39 인증·UI-40 강제변경 또는 서버가 고른 가시 첫 화면. 메뉴0개는 공통 안내 영역.
+      required:
+      - nextScreenId
+    CommonMfaDeliveryResult:
+      type: object
+      properties:
+        maskedEmail:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        resendAvailableAt:
+          type: string
+          format: date-time
+      required:
+      - maskedEmail
+      - expiresAt
+      - resendAvailableAt
+    CommonPasswordFindResult:
+      type: object
+      properties:
+        message:
+          type: string
+          enum:
+          - 입력한 정보가 맞으면 이메일로 임시 비밀번호를 보냈습니다.
+      required:
+      - message
+    CommonSessionRemainingResult:
+      type: object
+      properties:
+        remainingSeconds:
+          type: integer
+          minimum: 0
+        sessionMinutes:
+          type: integer
+          description: SESSION_MIN 실제값
+        serverRespondedAt:
+          type: string
+          format: date-time
+      required:
+      - remainingSeconds
+      - sessionMinutes
+      - serverRespondedAt
+    CommonMyPasswordResult:
+      type: object
+      properties:
+        passwordChangedAt:
+          type: string
+          format: date-time
+        modifiedAt:
+          type: string
+          format: date-time
+      required:
+      - passwordChangedAt
+      - modifiedAt
+    CommonMyInfoResult:
+      type: object
+      properties:
+        userId:
+          type: string
+        name:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        parts:
+          type: array
+          items:
+            type: string
+      required:
+      - userId
+      - name
+      - roles
+      - parts
+    CommonNotificationItem:
+      type: object
+      properties:
+        notificationId:
+          type: integer
+        content:
+          type: string
+          description: NOTI_CN·현재 범위밖은 볼 수 없는 알림입니다
+        screenId:
+          type: string
+          nullable: true
+        targetKey:
+          type: string
+          nullable: true
+        readYn:
+          type: string
+          enum:
+          - Y
+          - N
+        notifiedAt:
+          type: string
+          format: date-time
+      required:
+      - notificationId
+      - content
+      - readYn
+      - notifiedAt
+    CommonNotificationListResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonNotificationItem'
+        unreadCount:
+          type: integer
+          minimum: 0
+      required:
+      - items
+      - unreadCount
+    CommonNotificationReadResult:
+      type: object
+      properties:
+        notificationId:
+          type: integer
+        readYn:
+          type: string
+          enum:
+          - Y
+        readAt:
+          type: string
+          format: date-time
+      required:
+      - notificationId
+      - readYn
+      - readAt
+    PostCommonLoginInput:
+      type: object
+      properties:
+        userId:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
+      required:
+      - userId
+      - password
+    PostCommonMfaVerifyInput:
+      type: object
+      properties:
+        code:
+          type: string
+          pattern: ^[0-9]{6}$
+      required:
+      - code
+    PostCommonPasswordFindInput:
+      type: object
+      properties:
+        userId:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+      required:
+      - userId
+      - email
+    PutCommonMyPasswordInput:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+          minLength: 1
+        newPassword:
+          type: string
+          minLength: 8
+          pattern: ^(?=.*[A-Za-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$
+        modifiedAt:
+          type: string
+          format: date-time
+      required:
+      - currentPassword
+      - newPassword
+      - modifiedAt
     CommonDashboardSummary:
       type: object
       required:
@@ -12171,7 +14787,6 @@ components:
       required:
       - month
       - revenue
-      - cost
       - targetRevenue
       properties:
         month:
@@ -14377,7 +16992,6 @@ components:
       - daysUntilRenewal
       - monthlyMm
       - currentUnitPrice
-      - monthlyCost
       - profitRate
       - targetUnitPrice
       - requiredIncreaseRate
@@ -14466,7 +17080,6 @@ components:
       type: object
       required:
       - renewalDate
-      - monthlyCost
       - profitRate
       - targetUnitPrice
       - requiredIncreaseRate
@@ -14809,7 +17422,6 @@ components:
       required:
       - yearMonth
       - mm
-      - cost
       - revenue
       - distributionRevenue
       - marginRate
@@ -16937,7 +19549,6 @@ components:
       - joinDate
       - operatingRate
       - mm
-      - unitPrice
       - allowance
       - companyInsurance
       - retirementReserve
@@ -17051,7 +19662,6 @@ components:
       - contractTypeCode
       - free
       - mm
-      - unitPrice
       - allocatedCost
       - operatingProfit
       properties:
@@ -17144,7 +19754,6 @@ components:
       type: object
       required:
       - mm
-      - unitPrice
       - allowance
       - companyInsurance
       - retirementReserve
@@ -17322,8 +19931,6 @@ components:
       - employeeTypeCode
       - projectNames
       - monthlyMm
-      - unitPrice
-      - salary
       - salesExpense
       - retirementAmount
       - totalCost
@@ -17450,7 +20057,6 @@ components:
       required:
       - yearMonth
       - monthlyMm
-      - unitPrice
       - totalCost
       - profit
       - profitShare
@@ -19415,7 +22021,6 @@ components:
       type: object
       required:
       - bankCode
-      - accountNumber
       - accountHolder
       properties:
         bankCode:
@@ -22380,7 +24985,6 @@ components:
       - customerIndustry
       - grade
       - performance
-      - cost
       - availability
       - workplace
     CommonAiRecommendationCard:

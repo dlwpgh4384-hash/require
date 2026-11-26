@@ -11,6 +11,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import static org.assertj.core.api.Assertions.*;
 
+// 로그인(UI-22) 작업 뒤: 손 설명서는 그대로, 로그인 정의(security·x-roles·401·403)는 openapi.yaml에만 있어 그 차이는 빼고 비교한다.
 class CashFlowStatementBoundaryTest {
     private JsonNode yaml(String name) {
         var factory = new YamlMapFactoryBean();
@@ -22,8 +23,7 @@ class CashFlowStatementBoundaryTest {
 
     @Test void cashContractHasOnlyTheTwoApprovedAnonymousGetOperations() {
         var contract = yaml("contracts/openapi.yaml");
-        assertThat(contract.has("security")).isFalse();
-        assertThat(contract.path("components").has("securitySchemes")).isFalse();
+        com.company.common.support.test.LoginEraContract.assertSessionLogin(contract);
         assertThat(contract.findValues("bearerAuth")).isEmpty();
         var paths = contract.path("paths");
         for (String suffix : List.of("", "/excel")) {
@@ -33,11 +33,9 @@ class CashFlowStatementBoundaryTest {
             var operation = path.path("get");
             assertThat(operation.path("operationId").asText()).isEqualTo(suffix.isEmpty()
                 ? "getCommonCashFlowStatements" : "getCommonCashFlowStatementsExcel");
-            assertThat(operation.path("security").isArray()).isTrue();
-            assertThat(operation.path("security").isEmpty()).isTrue();
-            assertThat(operation.has("x-roles")).isFalse();
-            assertThat(operation.path("responses").has("401")).isFalse();
-            assertThat(operation.path("responses").has("403")).isFalse();
+            com.company.common.support.test.LoginEraContract.assertLoggedIn(operation, "operation");
+            assertThat(operation.path("responses").has("401")).isTrue();
+            assertThat(operation.path("responses").has("403")).isTrue();
             var names = new java.util.ArrayList<String>();
             operation.path("parameters").forEach(parameter -> names.add(parameter.path("name").asText()));
             assertThat(names).containsExactlyElementsOf(suffix.isEmpty()
@@ -52,7 +50,7 @@ class CashFlowStatementBoundaryTest {
         manual.path("paths").fields().forEachRemaining(path ->
             path.getValue().fields().forEachRemaining(method ->
                 assertThat(effective.path("paths").path(path.getKey()).path(method.getKey()))
-                    .as(path.getKey() + " " + method.getKey()).isEqualTo(method.getValue())));
+                    .as(path.getKey() + " " + method.getKey()).satisfies(actual -> assertThat(com.company.common.support.test.LoginEraContract.withoutLogin((com.fasterxml.jackson.databind.JsonNode) actual)).isEqualTo(com.company.common.support.test.LoginEraContract.withoutLogin(method.getValue())))));
         manual.path("components").path("schemas").fields().forEachRemaining(schema ->
             assertThat(effective.path("components").path("schemas").path(schema.getKey()))
                 .as(schema.getKey()).isEqualTo(schema.getValue()));

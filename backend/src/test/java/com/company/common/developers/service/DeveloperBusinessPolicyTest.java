@@ -31,15 +31,19 @@ class DeveloperBusinessPolicyTest {
             UserScopePolicy.union(List.of(new Grant("PART", Set.of("owned-part"), Set.of()))));
     }
 
-    @Test void currentAnonymousActorHasAllDeveloperCapabilities() {
-        var current = new CurrentBusinessActor();
-        var actor = new Actor(current.roles(), all("ADMIN").scope());
-        assertThat(current.userId()).isEqualTo("admin");
-        assertThat(DeveloperBusinessPolicy.canReadDeveloper(actor, "first-part")).isTrue();
-        assertThat(DeveloperBusinessPolicy.canReadDeveloper(actor, "other-part")).isTrue();
-        assertThat(DeveloperBusinessPolicy.canReadMonthlyRate(actor, "other-part")).isTrue();
-        assertThat(DeveloperBusinessPolicy.canReadMonthlyPay(actor, "other-part")).isTrue();
-        assertThat(DeveloperBusinessPolicy.canUploadPayroll(actor.roles())).isTrue();
+    @Test void currentAnonymousActorHasAllDeveloperCapabilities() throws Exception {
+        // 로그인(UI-22) 뒤 현재 사용자는 로그인 정보에서만 온다: 로그인 전 개발 사용자(admin)로 로그인한 상태로 본다.
+        try (var login = com.company.common.support.test.AuthenticatedMockMvcCustomizerFactory.loginDevelopmentAdmin()) {
+            var current = new CurrentBusinessActor();
+            var actor = new Actor(current.roles(), all("ADMIN").scope());
+            assertThat(current.userId()).isEqualTo("admin");
+            assertThat(DeveloperBusinessPolicy.canReadDeveloper(actor, "first-part")).isTrue();
+            assertThat(DeveloperBusinessPolicy.canReadDeveloper(actor, "other-part")).isTrue();
+            assertThat(DeveloperBusinessPolicy.canReadMonthlyRate(actor, "other-part")).isTrue();
+            assertThat(DeveloperBusinessPolicy.canReadMonthlyPay(actor, "other-part")).isTrue();
+            assertThat(DeveloperBusinessPolicy.canUploadPayroll(actor.roles())).isTrue();
+
+        }
     }
 
     @Test void leaderOnlyReadsOwnPartDevelopers() {

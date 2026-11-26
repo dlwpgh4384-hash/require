@@ -13,7 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping(value="/api/common/bills",produces="application/json")
+@RequestMapping(produces="application/json")
 public class CommonBillController {
     private final CommonBillService service;
     private final BillDunningService dunning;
@@ -21,14 +21,14 @@ public class CommonBillController {
         this.service=service;
         this.dunning=dunning;
     }
-    @GetMapping
+    @GetMapping("/api/common/bills")
     public Response<BillList> getCommonBills(@ModelAttribute Filter filter) {
         return Response.of(service.getCommonBills(filter));
     }
     private static final String XLSX="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     /** SFR-011 엑셀 다운로드: 목록과 같은 조건의 전체 결과. 오류는 목록과 같은 JSON(400). */
-    @GetMapping(value="/excel",produces={XLSX,"application/json"})
+    @GetMapping(value="/api/common/bills/excel",produces={XLSX,"application/json"})
     public ResponseEntity<byte[]> getCommonBillsExcel(@ModelAttribute Filter filter) {
         var file=service.getCommonBillsExcel(filter);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(XLSX))
@@ -37,31 +37,31 @@ public class CommonBillController {
             .header("X-Total-Count",Integer.toString(file.count())).body(file.bytes());
     }
     /** 메뉴 옆 미수 건수 배지(SFR-001-04). */
-    @GetMapping("/unpaid-count")
+    @GetMapping("/api/common/bills/unpaid-count")
     public Response<UnpaidCount> getCommonBillUnpaidCount() {
         return Response.of(service.getCommonBillUnpaidCount());
     }
-    @GetMapping("/{billId}")
+    @GetMapping("/api/common/bills/{billId}")
     public Response<Detail> getCommonBill(@PathVariable String billId) {
         return Response.of(service.getCommonBill(billId));
     }
-    @PostMapping
+    @PostMapping("/api/common/bills")
     public SaveResponse postCommonBill(@RequestBody JsonNode body) {
         return service.postCommonBill(body);
     }
-    @PutMapping("/{billId}")
+    @PutMapping("/api/common/bills/{billId}")
     public Response<Detail> putCommonBill(@PathVariable String billId, @RequestBody JsonNode body) {
         return Response.of(service.putCommonBill(billId,body));
     }
-    @PostMapping("/{billId}/cancel")
+    @PostMapping("/api/common/bills/{billId}/cancel")
     public Response<Detail> postCommonBillCancel(@PathVariable String billId, @RequestBody JsonNode body) {
         return Response.of(service.postCommonBillCancel(billId,body));
     }
-    @PostMapping("/{billId}/next-month")
+    @PostMapping("/api/common/bills/{billId}/next-month")
     public Response<Detail> postCommonBillNextMonth(@PathVariable String billId) {
         return Response.of(service.postCommonBillNextMonth(billId));
     }
-    @PostMapping("/{billId}/dunning-resend")
+    @PostMapping("/api/common/bills/{billId}/dunning-resend")
     public Response<SendResult> postCommonBillDunningResend(@PathVariable String billId) {
         return Response.of(dunning.postCommonBillDunningResend(billId));
     }

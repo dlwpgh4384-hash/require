@@ -87,7 +87,7 @@ class CashFlowStatementControllerTest {
     }
     @Test void anonymousReportReturnsTwelveMonthsAndFifteenRawColumns() throws Exception {
         when(source.receipts()).thenReturn(List.of(contribution("202601", "RECEIPT", "100")));
-        mvc.perform(get(PATH).param("year", "2026")).andExpect(status().isOk())
+        mvc.perform(get("/api/common/cash-flow-statements").param("year", "2026")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.months.length()").value(12))
             .andExpect(jsonPath("$.data.numericTable.columns.length()").value(15))
             .andExpect(jsonPath("$.data.numericTable.rows.length()").value(15))
@@ -352,7 +352,7 @@ class CashFlowStatementControllerTest {
     @Test void anonymousWorkbookIsActualXlsxWithSameRawRowsColumnsAndValues() throws Exception {
         when(source.receipts()).thenReturn(List.of(contribution("202601", "RECEIPT", "123")));
         var report = reports.getCommonCashFlowStatements(new Filter(2026)).data();
-        byte[] bytes = mvc.perform(get(PATH + "/excel").param("year", "2026").param("amountUnit", "원"))
+        byte[] bytes = mvc.perform(get("/api/common/cash-flow-statements/excel").param("year", "2026").param("amountUnit", "원"))
             .andExpect(status().isOk()).andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .andExpect(header().exists("Content-Disposition")).andReturn().getResponse().getContentAsByteArray();
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {

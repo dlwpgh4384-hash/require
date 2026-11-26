@@ -9,7 +9,7 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping(value="/api/common/part-settlements",produces="application/json")
+@RequestMapping(produces="application/json")
 public class CommonPartSettlementController {
     private final CommonPartSettlementService service;
     private final PartSettlementAutoConfirmService close;
@@ -17,34 +17,34 @@ public class CommonPartSettlementController {
     public CommonPartSettlementController(CommonPartSettlementService service,PartSettlementAutoConfirmService close,PartSettlementExcelService excel) {
         this.service=service;this.close=close;this.excel=excel;
     }
-    @GetMapping
+    @GetMapping("/api/common/part-settlements")
     public Response<Tabs> getCommonPartSettlements(@RequestParam String yearMonth) { return service.getCommonPartSettlements(yearMonth); }
-    @GetMapping("/{partId}/{yearMonth}")
+    @GetMapping("/api/common/part-settlements/{partId}/{yearMonth}")
     public Response<Settlement> getCommonPartSettlement(@PathVariable String partId,@PathVariable String yearMonth) {
         return service.detailResponse(partId,yearMonth);
     }
-    @GetMapping("/{partId}/{yearMonth}/trends")
+    @GetMapping("/api/common/part-settlements/{partId}/{yearMonth}/trends")
     public Response<Trends> getCommonPartSettlementTrends(@PathVariable String partId,@PathVariable String yearMonth) {
         return Response.of(service.getCommonPartSettlementTrends(partId,yearMonth));
     }
-    @PutMapping("/{partId}/{yearMonth}/card")
+    @PutMapping("/api/common/part-settlements/{partId}/{yearMonth}/card")
     public Response<Settlement> putCommonPartSettlementCard(@PathVariable String partId,@PathVariable String yearMonth,@RequestBody JsonNode body) {
         return Response.of(service.putCommonPartSettlementCard(partId,yearMonth,PartSettlementInput.card(body)));
     }
-    @PutMapping("/{partId}/{yearMonth}/confirm")
+    @PutMapping("/api/common/part-settlements/{partId}/{yearMonth}/confirm")
     public Response<Settlement> putCommonPartSettlementConfirm(@PathVariable String partId,@PathVariable String yearMonth,@RequestBody JsonNode body) {
         PartSettlementInput.fields(body,"modifiedAt");
         return Response.of(service.putCommonPartSettlementConfirm(partId,yearMonth,PartSettlementInput.version(body)));
     }
-    @PutMapping("/{partId}/{yearMonth}/cancel")
+    @PutMapping("/api/common/part-settlements/{partId}/{yearMonth}/cancel")
     public Response<Settlement> putCommonPartSettlementCancel(@PathVariable String partId,@PathVariable String yearMonth,@RequestBody JsonNode body) {
         return Response.of(service.putCommonPartSettlementCancel(partId,yearMonth,PartSettlementInput.cancel(body)));
     }
-    @PutMapping("/close-confirm")
+    @PutMapping("/api/common/part-settlements/close-confirm")
     public Response<CloseResult> putCommonPartSettlementCloseConfirm(@RequestBody JsonNode body) {
         return Response.of(close.putCommonPartSettlementCloseConfirm(PartSettlementInput.close(body)));
     }
-    @GetMapping(value="/excel",produces={"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/json"})
+    @GetMapping(value="/api/common/part-settlements/excel",produces={"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/json"})
     public ResponseEntity<byte[]> getCommonPartSettlementsExcel(@RequestParam String partId,@RequestParam String yearMonth,@RequestParam String view,
         @RequestParam(required=false) String columns) {
         var file=excel.getCommonPartSettlementsExcel(partId,yearMonth,view,columns);

@@ -19,7 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping(value = "/api/common/candidates", produces = "application/json")
+@RequestMapping(produces = "application/json")
 public class CommonCandidateController {
     private static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private static final String TITLE = "외부 인력 후보";
@@ -34,7 +34,7 @@ public class CommonCandidateController {
     }
 
     /** 목록 엑셀(SFR-011): 지금 조건의 전체 결과, 열은 화면 목록 순서(시안 UI-33). */
-    @GetMapping(value = "/excel", produces = {XLSX, "application/json"})
+    @GetMapping(value = "/api/common/candidates/excel", produces = {XLSX, "application/json"})
     public ResponseEntity<byte[]> getCommonCandidatesExcel(@ModelAttribute Filter filter) {
         var items = service.getCommonCandidates(filter).items();
         var rows = items.stream().map(r -> List.of(text(r.name()),
@@ -54,32 +54,32 @@ public class CommonCandidateController {
     private static String text(Object value) { return value == null ? "" : Objects.toString(value); }
     private static String amount(BigDecimal value) { return value == null ? "" : value.stripTrailingZeros().toPlainString(); }
 
-    @GetMapping
+    @GetMapping("/api/common/candidates")
     public Response<Items<Candidate>> getCommonCandidates(@ModelAttribute Filter filter) {
         return Response.of(service.getCommonCandidates(filter));
     }
-    @GetMapping("/{candidateId}")
+    @GetMapping("/api/common/candidates/{candidateId}")
     public Response<Candidate> getCommonCandidate(@PathVariable String candidateId) {
         return Response.of(service.getCommonCandidate(candidateId));
     }
-    @GetMapping("/{candidateId}/contacts")
+    @GetMapping("/api/common/candidates/{candidateId}/contacts")
     public Response<Items<Contact>> getCommonCandidateContacts(@PathVariable String candidateId) {
         return Response.of(service.getCommonCandidateContacts(candidateId));
     }
-    @GetMapping("/{candidateId}/matches")
+    @GetMapping("/api/common/candidates/{candidateId}/matches")
     public Response<Items<Match>> getCommonCandidateMatches(@PathVariable String candidateId) {
         return Response.of(service.getCommonCandidateMatches(candidateId));
     }
-    @PostMapping(consumes = "application/json")
+    @PostMapping(value = "/api/common/candidates", consumes = "application/json")
     public Response<Candidate> postCommonCandidate(@RequestBody JsonNode body) {
         return Response.of(service.postCommonCandidate(CandidateRules.input(body, false)));
     }
-    @PutMapping(value = "/{candidateId}", consumes = "application/json")
+    @PutMapping(value = "/api/common/candidates/{candidateId}", consumes = "application/json")
     public Response<Candidate> putCommonCandidate(@PathVariable String candidateId, @RequestBody JsonNode body) {
         var input = CandidateRules.input(body, true);
         return Response.of(service.putCommonCandidate(candidateId, input, ClientRules.token(body)));
     }
-    @PostMapping(value = "/{candidateId}/contacts", consumes = "application/json")
+    @PostMapping(value = "/api/common/candidates/{candidateId}/contacts", consumes = "application/json")
     public Response<Candidate> postCommonCandidateContact(@PathVariable String candidateId, @RequestBody JsonNode body) {
         return Response.of(service.postCommonCandidateContact(candidateId, CandidateRules.contact(body)));
     }

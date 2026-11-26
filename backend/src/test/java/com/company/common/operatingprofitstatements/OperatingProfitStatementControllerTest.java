@@ -75,7 +75,7 @@ class OperatingProfitStatementControllerTest {
     }
     @Test void publicReportUsesSharedFixedAndLiveMonthValuesForAllFourCards() throws Exception {
         var live=monthly.year(2026,2,"202601").get("202602").values().operatingProfit();
-        mvc.perform(query("","202602")).andExpect(status().isOk())
+        mvc.perform(get("/api/common/operating-profit-statements").param("year","2026").param("baseMonth","202602")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.summary.cumulativeRevenue.amount").value(1000000))
             .andExpect(jsonPath("$.data.summary.cumulativeGrossProfit.amount").value(600000))
             .andExpect(jsonPath("$.data.summary.cumulativeOperatingProfit.amount").value(n("400000").add(live).intValueExact()))
@@ -134,7 +134,7 @@ class OperatingProfitStatementControllerTest {
         verifyNoInteractions(audit);
     }
     @Test void publicExcelSharesAllHeadersRowsFutureNullsAndMixedCellFormats() throws Exception {
-        var bytes=mvc.perform(query("/excel","202602")).andExpect(status().isOk())
+        var bytes=mvc.perform(get("/api/common/operating-profit-statements/excel").param("year","2026").param("baseMonth","202602").param("amountUnit","원")).andExpect(status().isOk())
             .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .andExpect(header().string("Content-Disposition",org.hamcrest.Matchers.containsString("attachment")))
             .andReturn().getResponse().getContentAsByteArray();

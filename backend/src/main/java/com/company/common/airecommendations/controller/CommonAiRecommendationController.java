@@ -11,7 +11,7 @@ import java.util.Set;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping(value = "/api/common/ai-recommendations", produces = "application/json")
+@RequestMapping(produces = "application/json")
 public class CommonAiRecommendationController {
     private final CommonAiRecommendationService recommendations;
     private final AiRecommendationActionService actions;
@@ -22,22 +22,22 @@ public class CommonAiRecommendationController {
         this.actions = actions;
         this.json = json;
     }
-    @PostMapping
+    @PostMapping("/api/common/ai-recommendations")
     public Response<Result> postCommonAiRecommendation(@RequestBody JsonNode input) {
         return Response.of(recommendations.postCommonAiRecommendation(input(input, Input.class,
             Set.of("requestId", "targetType", "targetId", "jobCode", "startMonth", "gradeCode", "needSn"))));
     }
-    @PostMapping("/{recommendationId}/assignment")
+    @PostMapping("/api/common/ai-recommendations/{recommendationId}/assignment")
     public Response<AssignmentResult> postCommonAiRecommendationAssignment(@PathVariable String recommendationId,
         @RequestBody JsonNode input) {
         return Response.of(actions.assignment(recommendationId, input(input, AssignmentInput.class, Set.of("developerId", "assignmentId"))));
     }
-    @PostMapping("/{recommendationId}/exclusions")
+    @PostMapping("/api/common/ai-recommendations/{recommendationId}/exclusions")
     public Response<ExclusionResult> postCommonAiRecommendationExclusion(@PathVariable String recommendationId,
         @RequestBody JsonNode input) {
         return Response.of(actions.exclusion(recommendationId, input(input, ExclusionInput.class, Set.of("developerId", "reasonCode"))));
     }
-    @PutMapping("/{recommendationId}/tentative-assignment")
+    @PutMapping("/api/common/ai-recommendations/{recommendationId}/tentative-assignment")
     public Response<TentativeResult> putCommonAiRecommendationTentativeAssignment(@PathVariable String recommendationId,
         @RequestBody JsonNode input) {
         return Response.of(actions.tentative(recommendationId, input(input, TentativeInput.class, Set.of("developerId", "needSn"))));

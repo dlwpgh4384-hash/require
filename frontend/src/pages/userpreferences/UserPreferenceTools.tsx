@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { Toast } from "../../shared/feedback/Dialog";
 import { ScreenSettingsDialog } from "./ScreenSettingsDialog";
 import { UserPreferenceDialog } from "./UserPreferenceDialog";
 import type { PreferenceMenu } from "./PersonalScreenPreferences";
 import { ShellIcon } from "../../shared/layout/ShellIcon";
 import { AiAnalysisDrawer } from "../aianalysis/AiAnalysisDrawer";
+import { useOptionalAccountSession } from "../commonops/AccountSessionBoundary";
 import {
   AiAnalysisWorkspaceProvider,
   useOptionalAiAnalysis,
@@ -108,49 +108,6 @@ export function ShortcutHelpDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-/**
- * 시안 「자동 로그아웃까지 mm:ss [연장]」. 운영 기준 SESSION_MIN(30분, 공통-07).
- * 지금은 보이는 것만 만든다: 화면을 누르면 30분으로 돌아가고 0이 되어도 로그아웃하지 않는다.
- * 실제 로그아웃과 운영 기준 표(TB_SY_OPER_STD)에서 분을 읽는 일은 마지막 로그인(UI-22) 작업에서 붙인다.
- */
-const SESSION_MINUTES = 30;
-let sessionEnd = Date.now() + SESSION_MINUTES * 60_000;
-if (typeof document !== "undefined")
-  document.addEventListener("click", () => {
-    sessionEnd = Date.now() + SESSION_MINUTES * 60_000;
-  });
-export function sessionLeft(now = Date.now()) {
-  const seconds = Math.max(0, Math.round((sessionEnd - now) / 1000));
-  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-}
-function SessionTimer({ onExtend }: { onExtend: () => void }) {
-  const [left, setLeft] = useState(() => sessionLeft());
-  useEffect(() => {
-    const timer = window.setInterval(() => setLeft(sessionLeft()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-  return (
-    <div className="hd-sess" data-testid="session-left">
-      자동 로그아웃까지 <b>{left}</b>
-      <button
-        type="button"
-        className="hd-sess-ext"
-        data-testid="session-extend"
-        onClick={() => {
-          sessionEnd = Date.now() + SESSION_MINUTES * 60_000;
-          setLeft(sessionLeft());
-          onExtend();
-        }}
-      >
-        연장
-      </button>
-    </div>
-  );
-}
-
-/** 로그인(UI-22) 전까지 서버 사용자는 admin으로 고정한다. 헤더 이름 자리에 그대로 보인다. */
-export const CURRENT_USER = { name: "시스템 관리자", role: "관리자" };
-
 export function UserPreferenceTools({
   screenId = "UI-26",
   menus,
@@ -170,15 +127,17 @@ export function UserPreferenceTools({
   menuError?: string;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
+  const account = useOptionalAccountSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const analysis = useOptionalAiAnalysis();
-  const [notice, setNotice] = useState("");
+
   const menuAnchor = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!menuOpen) return;
     const close = (event: MouseEvent) => {
-      if (!menuAnchor.current?.contains(event.target as Node)) setMenuOpen(false);
+      if (!menuAnchor.current?.contains(event.target as Node))
+        setMenuOpen(false);
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setMenuOpen(false);
@@ -227,16 +186,7 @@ export function UserPreferenceTools({
         <ShellIcon name="spark" />
         {!mobile && <span>AI에게 묻기</span>}
       </button>
-      <button
-        type="button"
-        className="hd-ibtn"
-        data-testid="notification-unavailable"
-        aria-label="알림 (준비 중)"
-        title="알림은 마지막 로그인 작업에서 붙입니다."
-        onClick={() => setNotice("알림은 준비 중입니다.")}
-      >
-        <ShellIcon name="bell" />
-      </button>
+
       <div className="hd-anchor" ref={menuAnchor}>
         <button
           type="button"
@@ -249,7 +199,16 @@ export function UserPreferenceTools({
           <ShellIcon name="user" />
           {!mobile && (
             <span>
-              {CURRENT_USER.name} <span className="hd-sub">({CURRENT_USER.role})</span>
+              {account?.info?.name ?? "사용자 메뉴"}
+              {account?.info && (
+                <span className="hd-sub">
+                  ({account.info.roles[0] ?? "역할 없음"}
+                  {account.info.roles.length > 1
+                    ? ` 외 ${account.info.roles.length - 1}`
+                    : ""}
+                  )
+                </span>
+              )}
             </span>
           )}
           <ShellIcon name="chevronDown" />
@@ -261,15 +220,12 @@ export function UserPreferenceTools({
             role="menu"
           >
             <div className="hd-pop-h">
-              {CURRENT_USER.name} <span className="hd-sub">{CURRENT_USER.role}</span>
+              {account?.info?.name ?? "사용자 메뉴"}
             </div>
             {(
               [
-                ["profile-unavailable", "내 정보", null],
-                ["password-unavailable", "비밀번호 변경", null],
                 ["screen-settings-open", "화면 설정", "settings"],
                 ["shortcut-help-open", "단축키 보기", "shortcuts"],
-                ["logout-unavailable", "로그아웃", null],
               ] as const
             ).map(([testId, label, target]) => (
               <button
@@ -280,14 +236,12 @@ export function UserPreferenceTools({
                 data-testid={testId}
                 onClick={() => {
                   setMenuOpen(false);
-                  if (target) setDialog(target);
-                  else setNotice(`${label}은(는) 준비 중입니다. 마지막 로그인 작업에서 붙입니다.`);
+                  setDialog(target);
                 }}
               >
                 {label}
               </button>
             ))}
-            <SessionTimer onExtend={() => setNotice("자동 로그아웃 시간을 30분으로 다시 늘렸습니다.")} />
           </div>
         )}
       </div>
@@ -305,13 +259,7 @@ export function UserPreferenceTools({
             />
           </AiAnalysisWorkspaceProvider>
         ))}
-      {notice && (
-        <Toast
-          message={notice}
-          onDismiss={() => setNotice("")}
-          testId="header-notice"
-        />
-      )}
+
       {dialog === "settings" && (
         <ScreenSettingsDialog
           onClose={() => setDialog(null)}
@@ -356,7 +304,8 @@ export function usePreferenceBusinessShortcuts(
     const keydown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
       if (handlers.scope?.current?.closest("[hidden]")) return;
-      const save = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s";
+      const save =
+        (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s";
       // 숨은 화면 탭 안에 열려 있는 대화상자(상세 패널)는 세지 않는다(보이는 탭 Ctrl+S가 막히지 않게).
       const dialogs = Array.from(
         document.querySelectorAll('[role="dialog"], [role="alertdialog"]'),
@@ -390,16 +339,18 @@ export function usePreferenceBusinessShortcuts(
           "button,a[href],summary,[role='button'],[role='tab'],[role='checkbox'],[role='menuitem'],[role='link']",
         );
       if (editing && !save) return;
-      const handler =
-        save
-          ? handlers.onSave
-          : event.ctrlKey && event.key === "ArrowLeft"
-            ? handlers.onPreviousPage
-            : event.ctrlKey && event.key === "ArrowRight"
-              ? handlers.onNextPage
-              : !event.ctrlKey && !event.metaKey && event.key === "Enter" && !control
-                ? handlers.onSearch
-                : undefined;
+      const handler = save
+        ? handlers.onSave
+        : event.ctrlKey && event.key === "ArrowLeft"
+          ? handlers.onPreviousPage
+          : event.ctrlKey && event.key === "ArrowRight"
+            ? handlers.onNextPage
+            : !event.ctrlKey &&
+                !event.metaKey &&
+                event.key === "Enter" &&
+                !control
+              ? handlers.onSearch
+              : undefined;
       if (handler) {
         event.preventDefault();
         handler();

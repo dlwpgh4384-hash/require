@@ -42,6 +42,14 @@ class CommonBillControllerTest {
     final LocalDate today=LocalDate.of(2026,11,15);
     static final Instant MOD=Instant.parse("2026-11-01T00:00:00Z"),MOD2=Instant.parse("2026-11-15T00:00:01Z");
     Map<String,Invoice> rows;
+    @Test void unpaidBadgeReadsDatabaseCountAndDurableResponseShape() throws Exception {
+        when(mapper.unpaidCount()).thenReturn(7);
+        mvc.perform(get("/api/common/bills/unpaid-count"))
+            .andExpect(status().isOk()).andExpect(com.company.common.support.controller.OpenApiResponseContract
+                .response("GET", "/api/common/bills/unpaid-count"));
+        verify(mapper).unpaidCount();
+        verify(mapper,never()).insert(any());
+    }
     @BeforeEach void setup() {
         rows=new LinkedHashMap<>(); rows.put("B-202611-001",invoice(false,false,0,"MO",true,"202611"));
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());

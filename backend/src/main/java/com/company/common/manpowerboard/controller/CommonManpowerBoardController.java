@@ -8,7 +8,7 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/manpower-board")
+
 public class CommonManpowerBoardController {
     private static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private final CommonManpowerBoardService service;
@@ -17,7 +17,7 @@ public class CommonManpowerBoardController {
         this.service = service;
     }
 
-    @GetMapping(produces = "application/json")
+    @GetMapping(value = "/api/common/manpower-board", produces = "application/json")
     public Response<Result> getCommonManpowerBoard(
         @RequestParam Integer year,
         @RequestParam(required = false) String jobCode,
@@ -28,7 +28,7 @@ public class CommonManpowerBoardController {
             new Filter(year, jobCode, gradeCode, employeeTypeCode, onlyAvailable)));
     }
 
-    @GetMapping(value = "/excel", produces = {XLSX, "application/json"})
+    @GetMapping(value = "/api/common/manpower-board/excel", produces = {XLSX, "application/json"})
     public ResponseEntity<byte[]> getCommonManpowerBoardExcel(
         @RequestParam Integer year,
         @RequestParam(required = false) String jobCode,

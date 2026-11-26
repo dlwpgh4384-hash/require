@@ -22,6 +22,9 @@ services:
       DB_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:-navigation}
       DB_USER: ${DB_USER:-navigation}
       DB_PASSWORD: ${DB_PASSWORD:-dev-only-password}
+      AIOPS_SMOKE_LOGIN_ID: ${AIOPS_SMOKE_LOGIN_ID}
+      AIOPS_SMOKE_LOGIN_PASSWORD: ${AIOPS_SMOKE_LOGIN_PASSWORD}
+      AIOPS_SMOKE_ROLE_CODES: ${AIOPS_SMOKE_ROLE_CODES}
     ports:
       - "8080:8080"
     depends_on:

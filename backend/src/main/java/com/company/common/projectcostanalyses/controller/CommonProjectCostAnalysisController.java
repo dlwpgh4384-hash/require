@@ -11,7 +11,7 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping(value = "/api/common/project-cost-analyses", produces = "application/json")
+@RequestMapping(produces = "application/json")
 public class CommonProjectCostAnalysisController {
     private static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private final CommonProjectCostAnalysisService service;
@@ -20,11 +20,11 @@ public class CommonProjectCostAnalysisController {
         this.service = service;
         this.excel = excel;
     }
-    @GetMapping
+    @GetMapping("/api/common/project-cost-analyses")
     public Response<CommonProjectCostAnalysisResult> getCommonProjectCostAnalyses(@ModelAttribute Filter filter) {
         return Response.of(service.getCommonProjectCostAnalyses(filter));
     }
-    @GetMapping(value = "/excel", produces = {XLSX, "application/json"})
+    @GetMapping(value = "/api/common/project-cost-analyses/excel", produces = {XLSX, "application/json"})
     public ResponseEntity<byte[]> getCommonProjectCostAnalysesExcel(@ModelAttribute Filter filter) {
         var file = excel.getCommonProjectCostAnalysesExcel(filter);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(XLSX))
@@ -32,22 +32,22 @@ public class CommonProjectCostAnalysisController {
                 .filename(file.fileName(), StandardCharsets.UTF_8).build().toString())
             .header("X-Total-Count", Integer.toString(file.count())).body(file.bytes());
     }
-    @GetMapping("/{projectId}/monthly-costs")
+    @GetMapping("/api/common/project-cost-analyses/{projectId}/monthly-costs")
     public Response<CommonProjectCostAnalysisMonthlyCosts> getCommonProjectCostAnalysisMonthlyCosts(
         @PathVariable String projectId, @ModelAttribute Period period) {
         return Response.of(service.getCommonProjectCostAnalysisMonthlyCosts(projectId, period));
     }
-    @GetMapping("/{projectId}/workforce")
+    @GetMapping("/api/common/project-cost-analyses/{projectId}/workforce")
     public Response<CommonProjectCostAnalysisWorkforce> getCommonProjectCostAnalysisWorkforce(
         @PathVariable String projectId, @ModelAttribute Period period) {
         return Response.of(service.getCommonProjectCostAnalysisWorkforce(projectId, period));
     }
-    @GetMapping("/{projectId}/simulation")
+    @GetMapping("/api/common/project-cost-analyses/{projectId}/simulation")
     public Response<CommonProjectCostAnalysisSimulation> getCommonProjectCostAnalysisSimulation(
         @PathVariable String projectId, @ModelAttribute SimulationInput input) {
         return Response.of(service.getCommonProjectCostAnalysisSimulation(projectId, input));
     }
-    @GetMapping("/{projectId}/causes")
+    @GetMapping("/api/common/project-cost-analyses/{projectId}/causes")
     public Response<CommonProjectCostAnalysisCauses> getCommonProjectCostAnalysisCauses(
         @PathVariable String projectId, @ModelAttribute Period period) {
         return Response.of(service.getCommonProjectCostAnalysisCauses(projectId, period));

@@ -12,7 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping(value = "/api/common/dashboard", produces = "application/json")
+@RequestMapping(produces = "application/json")
 public class CommonDashboardController {
     private static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private final CommonDashboardService dashboard;
@@ -20,12 +20,12 @@ public class CommonDashboardController {
     public CommonDashboardController(CommonDashboardService dashboard, DashboardExcelService excel) {
         this.dashboard = dashboard; this.excel = excel;
     }
-    @GetMapping
+    @GetMapping("/api/common/dashboard")
     public Response<Result> getCommonDashboard(@RequestParam(required = false) String yearMonth) {
         CommonDashboardService.month(yearMonth);
         return dashboard.getCommonDashboard(yearMonth);
     }
-    @GetMapping(value = "/excel", produces = {XLSX, "application/json"})
+    @GetMapping(value = "/api/common/dashboard/excel", produces = {XLSX, "application/json"})
     public ResponseEntity<byte[]> getCommonDashboardExcel(@RequestParam(required = false) String yearMonth) {
         CommonDashboardService.month(yearMonth);
         var file = excel.getCommonDashboardExcel(yearMonth);

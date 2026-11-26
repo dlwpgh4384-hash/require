@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.notifications.mapper.NotificationMapper">
+  <resultMap id="notification" type="com.company.common.notifications.mapper.NotificationRows$Notification" autoMapping="false">
+    <id column="noti_id" property="notificationId" javaType="_long"/>
+    <result column="rcvr_user_id" property="recipient" javaType="string"/>
+    <result column="noti_type_cd" property="type" javaType="string"/>
+    <result column="noti_cn" property="content" javaType="string"/>
+    <result column="link_scrn_id" property="screenId" javaType="string"/>
+    <result column="link_key" property="targetKey" javaType="string"/>
+    <result column="read_yn" property="readYn" javaType="string"/>
+    <result column="noti_dttm" property="notifiedAt" javaType="java.time.Instant"/>
+    <result column="read_dttm" property="readAt" javaType="java.time.Instant"/>
+  </resultMap>
+  <resultMap id="access" type="com.company.common.notifications.mapper.NotificationRows$Access" autoMapping="false">
+    <result column="read_allowed" property="readAllowed" javaType="_boolean"/>
+    <result column="in_scope" property="inScope" javaType="_boolean"/>
+    <result column="target_exists" property="targetExists" javaType="_boolean"/>
+    <result column="pc_only" property="pcOnly" javaType="_boolean"/>
+  </resultMap>
+  <sql id="columns">
+    n.noti_id, n.rcvr_user_id, n.noti_type_cd, n.noti_cn, n.link_scrn_id,
+    n.link_key, n.read_yn, n.noti_dttm, n.read_dttm
+  </sql>
+  <select id="activeAccount" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_SY_USER u
+      WHERE u.user_id=#{actor} AND u.user_stat_cd='USE' AND u.temp_pwd_yn='N')
+  </select>
+  <select id="eligibleAccount" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_SY_USER u WHERE u.user_id=#{actor} AND u.user_stat_cd='USE')
+  </select>
+  <select id="withdrawalDue" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_PJ_ASGN a WHERE a.asgn_id=#{id}
+      AND a.input_end_dt=(clock_timestamp() AT TIME ZONE 'Asia/Seoul')::date
+        + (SELECT s.std_val::integer FROM TB_SY_OPER_STD s WHERE s.std_cd='WTHDR_NOTI_D'
+          AND s.aply_bgn_ym &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')
+          ORDER BY s.aply_bgn_ym DESC LIMIT 1))
+  </select>
+  <select id="uploadWarnings" resultType="java.lang.Integer">
+    SELECT u.warn_cnt::integer FROM TB_SY_UPLD u
+    WHERE u.upld_id::text=#{id} AND u.reg_user_id=#{actor} AND u.aply_dttm IS NOT NULL
+  </select>
+  <select id="selectNotifications" resultMap="notification">
+    SELECT <include refid="columns"/> FROM TB_SY_NOTI n
+    WHERE n.rcvr_user_id=#{actor} AND n.noti_dttm &gt;= #{cutoff}
+    ORDER BY n.noti_dttm DESC, n.noti_id DESC
+  </select>
+  <select id="lockNotification" resultMap="notification">
+    SELECT <include refid="columns"/> FROM TB_SY_NOTI n
+    WHERE n.noti_id=#{notificationId} AND n.noti_dttm &gt;= #{cutoff} FOR UPDATE
+  </select>
+  <select id="selectNotification" resultMap="notification">
+    SELECT <include refid="columns"/> FROM TB_SY_NOTI n
+    WHERE n.noti_id=#{notificationId} AND n.rcvr_user_id=#{actor}
+  </select>
+  <update id="read">
+    UPDATE TB_SY_NOTI n SET read_yn='Y', read_dttm=clock_timestamp(),
+      mod_user_id=#{actor}, mod_dttm=clock_timestamp()
+    WHERE n.noti_id=#{notificationId} AND n.rcvr_user_id=#{actor}
+      AND n.read_yn='N' AND n.noti_dttm &gt;= #{cutoff}
+  </update>
+  <update id="readAll">
+    UPDATE TB_SY_NOTI n SET read_yn='Y', read_dttm=clock_timestamp(),
+      mod_user_id=#{actor}, mod_dttm=clock_timestamp()
+    WHERE n.rcvr_user_id=#{actor} AND n.read_yn='N' AND n.noti_dttm &gt;= #{cutoff}
+  </update>
+  <delete id="deleteExpired">
+    DELETE FROM TB_SY_NOTI WHERE noti_dttm &lt; #{cutoff}
+  </delete>
+  <select id="selectAccess" resultMap="access">
+    WITH roles AS (
+      SELECT r.role_id, r.data_scope_cd FROM TB_SY_ROLE r
+      JOIN TB_SY_USER_ROLE ur ON ur.role_id=r.role_id
+      WHERE ur.user_id=#{actor} AND r.use_yn='Y'
+    ), parts AS (
+      SELECT s.part_id FROM TB_BS_PART_STD s
+      WHERE s.part_ldr_user_id=#{actor}
+        AND s.aply_bgn_ym &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')
+        AND (s.aply_end_ym IS NULL OR s.aply_end_ym &gt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM'))
+      UNION
+      SELECT s.part_id FROM TB_SY_USER_SCOPE s JOIN TB_BS_PART p ON p.part_id=s.part_id
+      WHERE s.user_id=#{actor} AND s.scope_type_cd='PART' AND p.hq_yn='Y' AND p.use_yn='Y'
+    ), targets AS (
+      SELECT b.proj_id, NULL::varchar AS part_id
+      FROM TB_BL_BILL b WHERE #{notification.type}='DUN' AND b.bill_id=#{notification.targetKey}
+      UNION ALL
+      SELECT a.proj_id, d.part_id FROM TB_PJ_ASGN a JOIN TB_HR_DEV d ON d.dev_id=a.dev_id
+      WHERE #{notification.type}='WTHDR' AND a.asgn_id=#{notification.targetKey}
+      UNION ALL
+      SELECT o.proj_id, o.part_id FROM TB_SL_OPP o
+      WHERE #{notification.type}='QUOTE_REJ' AND o.opp_id=#{notification.targetKey}
+    ), target_parts AS (
+      SELECT t.part_id FROM targets t WHERE t.part_id IS NOT NULL
+      UNION
+      SELECT pp.part_id FROM targets t JOIN TB_PJ_PROJ_PART pp ON pp.proj_id=t.proj_id
+      WHERE pp.aply_bgn_ym=(SELECT max(p2.aply_bgn_ym) FROM TB_PJ_PROJ_PART p2
+        WHERE p2.proj_id=pp.proj_id
+          AND p2.aply_bgn_ym &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM'))
+    )
+    SELECT EXISTS (SELECT 1 FROM TB_SY_MENU m JOIN TB_SY_ROLE_MENU_AUTH a ON a.menu_id=m.menu_id
+        JOIN roles r ON r.role_id=a.role_id
+        WHERE m.scrn_id=#{notification.screenId} AND m.use_yn='Y' AND a.inq_yn='Y') AS read_allowed,
+      (#{notification.type}='CASH_SHORT'
+        OR (#{notification.type}='UPLD_DONE' AND EXISTS (SELECT 1 FROM TB_SY_UPLD u
+          WHERE u.upld_id::text=#{notification.targetKey} AND u.reg_user_id=#{actor}))
+        OR EXISTS (SELECT 1 FROM roles r WHERE r.data_scope_cd='ALL')
+        OR (EXISTS (SELECT 1 FROM roles r WHERE r.data_scope_cd='PART')
+          AND EXISTS (SELECT 1 FROM parts p JOIN target_parts t ON t.part_id=p.part_id))
+        OR (EXISTS (SELECT 1 FROM roles r WHERE r.data_scope_cd='PROJ')
+          AND EXISTS (SELECT 1 FROM TB_SY_USER_SCOPE s JOIN targets t ON t.proj_id=s.proj_id
+            WHERE s.user_id=#{actor} AND s.scope_type_cd='PROJ'))) AS in_scope,
+      (EXISTS (SELECT 1 FROM targets)
+        OR (#{notification.type}='CASH_SHORT' AND #{notification.targetKey} ~ '^[0-9]{6}$')
+        OR (#{notification.type}='UPLD_DONE' AND EXISTS (SELECT 1 FROM TB_SY_UPLD u
+          WHERE u.upld_id::text=#{notification.targetKey} AND u.reg_user_id=#{actor}))) AS target_exists,
+      EXISTS (SELECT 1 FROM TB_SY_MENU m WHERE m.scrn_id=#{notification.screenId}
+        AND m.use_yn='Y' AND m.pc_only_yn='Y') AS pc_only
+  </select>
+  <select id="lockDelivery" resultType="string">
+    SELECT pg_advisory_xact_lock(hashtextextended(#{identity},0))::text
+  </select>
+  <select id="deliveredToday" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_SY_NOTI n
+      WHERE n.rcvr_user_id=#{recipient} AND n.noti_type_cd=#{type} AND n.link_key=#{targetKey}
+        AND (n.noti_dttm AT TIME ZONE 'Asia/Seoul')::date=(#{occurredAt} AT TIME ZONE 'Asia/Seoul')::date)
+  </select>
+  <insert id="insert">
+    INSERT INTO TB_SY_NOTI (rcvr_user_id,noti_type_cd,noti_cn,link_scrn_id,link_key,
+      send_mthd_cd,noti_dttm,reg_user_id)
+    VALUES (#{recipient},#{type},#{content},#{screenId},#{targetKey},'SYS',#{occurredAt},'SYSTEM')
+  </insert>
+</mapper>

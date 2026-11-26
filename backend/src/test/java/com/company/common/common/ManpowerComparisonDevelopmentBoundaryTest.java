@@ -59,7 +59,7 @@ class ManpowerComparisonDevelopmentBoundaryTest {
             .andExpect(jsonPath("$.data.totals.actualMm").value(0))
             .andExpect(jsonPath("$.data.totals.differenceMm").value(0))
             .andReturn();
-        assertThat(response.getRequest().getSession(false)).isNull();
+        // 로그인(UI-22) 뒤에는 로그인 세션으로 부른다(세션 없음 확인은 로그인 전 기준이라 뺌).
         verify(comparisons).getCommonManpowerComparisons(filter);
         verifyNoMoreInteractions(comparisons);
         verifyNoInteractions(mapper);

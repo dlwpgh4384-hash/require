@@ -11,7 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping(value="/api/common/receipts", produces="application/json")
+@RequestMapping(produces="application/json")
 public class ReceiptController {
     private final ReceiptService service;
     private final ObjectMapper json;
@@ -22,12 +22,12 @@ public class ReceiptController {
             DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     }
 
-    @PostMapping
+    @PostMapping("/api/common/receipts")
     public Response<Result> postCommonReceipt(@RequestBody String body) {
         return Response.of(service.postCommonReceipt(parse(body)));
     }
 
-    @PostMapping("/{receiptId}/cancel")
+    @PostMapping("/api/common/receipts/{receiptId}/cancel")
     public Response<Result> postCommonReceiptCancel(@PathVariable String receiptId, @RequestBody String body) {
         return Response.of(service.postCommonReceiptCancel(receiptId,parse(body)));
     }

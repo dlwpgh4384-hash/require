@@ -14,7 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping(value = "/api/common/sales-pipeline", produces = "application/json")
+@RequestMapping(produces = "application/json")
 public class CommonSalesPipelineController {
     private static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private final CommonSalesPipelineService service;
@@ -28,21 +28,21 @@ public class CommonSalesPipelineController {
         this.excel = excel;
     }
 
-    @GetMapping
+    @GetMapping("/api/common/sales-pipeline")
     public Response<Pipeline> getCommonSalesPipeline() {
         return Response.of(service.getCommonSalesPipeline());
     }
-    @GetMapping("/closed")
+    @GetMapping("/api/common/sales-pipeline/closed")
     public Response<Items<Closed>> getCommonSalesPipelineClosed(
         @RequestParam(required = false) String result,
         @RequestParam(defaultValue = "false") boolean includeStopped) {
         return Response.of(service.getCommonSalesPipelineClosed(result, includeStopped));
     }
-    @GetMapping("/forecast")
+    @GetMapping("/api/common/sales-pipeline/forecast")
     public Response<Forecast> getCommonSalesPipelineForecast(@RequestParam(required = false) String startMonth) {
         return Response.of(forecast.getCommonSalesPipelineForecast(startMonth));
     }
-    @GetMapping(value = "/forecast/excel", produces = {XLSX, "application/json"})
+    @GetMapping(value = "/api/common/sales-pipeline/forecast/excel", produces = {XLSX, "application/json"})
     public ResponseEntity<byte[]> getCommonSalesPipelineForecastExcel() {
         var workbook = excel.getCommonSalesPipelineForecastExcel();
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(XLSX))
@@ -50,7 +50,7 @@ public class CommonSalesPipelineController {
                 .filename(workbook.fileName(), StandardCharsets.UTF_8).build().toString())
             .header("X-Total-Count", Integer.toString(workbook.count())).body(workbook.bytes());
     }
-    @PostMapping(value = "/quote", consumes = "application/json")
+    @PostMapping(value = "/api/common/sales-pipeline/quote", consumes = "application/json")
     public Response<Quote> postCommonSalesPipelineQuote(@RequestBody JsonNode body) {
         return Response.of(service.postCommonSalesPipelineQuote(body));
     }

@@ -24,6 +24,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
@@ -36,6 +37,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(CommonPartController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @ContextConfiguration(classes = {CommonPartController.class, CommonPartService.class,
     CurrentBusinessActor.class, CodeExceptionHandler.class, ApiExceptionHandler.class,
     com.company.common.support.service.ExcelExportService.class})
@@ -277,7 +279,7 @@ class CommonPartControllerTest {
         rename("새 이름").andExpect(status().isConflict()); noWrites();
     }
     @Test
-    @org.junit.jupiter.api.DisplayName("시안 UI-15 [다시 사용]: 중지된 파트 useYn N→Y, 사용 여부 이력, 기준 기간 보존")
+    @org.junit.jupiter.api.DisplayName("side-effect: TB_BS_PART useYn N→Y·TB_SY_CHG_HIST 사용 여부 한 줄·기준 관계 보존")
     void resumeStoppedPartTurnsItBackOnAndWritesHistory() throws Exception {
         data.masters.get("part-a").useYn = "N";
         mvc.perform(put("/api/common/parts/part-a/resume").contentType("application/json").content("{\"modifiedAt\":null}"))
@@ -285,8 +287,18 @@ class CommonPartControllerTest {
             .andExpect(response("PUT", "/api/common/parts/{partId}/resume"))
             .andExpect(jsonPath("$.data.useYn").value("Y"));
         verify(mapper).resume("part-a");
-        assertThat(data.histories).anySatisfy(h -> assertThat(h.toString()).contains("사용 여부"));
+        assertThat(data.masters.get("part-a").useYn).isEqualTo("Y");
+        assertThat(data.histories).singleElement().satisfies(h -> {
+            assertThat(h.table()).isEqualTo("TB_BS_PART");
+            assertThat(h.key()).isEqualTo("part-a");
+            assertThat(h.item()).isEqualTo("사용 여부");
+            assertThat(h.before()).isEqualTo("N");
+            assertThat(h.after()).isEqualTo("Y");
+        });
         assertThat(data.rows.get("part-a:202601").distributionRate).isEqualByComparingTo("40");
+        assertThat(data.rows.get("part-a:202601").leaderUserId).isEqualTo("leader-a");
+        verify(mapper, never()).updatePeriod(any());
+        verify(management, never()).insertScope(anyString(), anyString(), anyString());
     }
     @Test void resumeOfPartInUseWritesNothing() throws Exception {
         mvc.perform(put("/api/common/parts/part-a/resume").contentType("application/json").content("{\"modifiedAt\":null}"))

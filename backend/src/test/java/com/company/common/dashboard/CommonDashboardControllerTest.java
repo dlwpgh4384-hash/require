@@ -36,6 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ContextConfiguration(classes = {CommonDashboardController.class, CommonDashboardService.class,
     DashboardExcelService.class, ExcelExportService.class, CurrentBusinessActor.class,
     CodeExceptionHandler.class, ApiExceptionHandler.class})
+// 로그인(UI-22) 작업 뒤: 손 설명서는 그대로, 로그인 정의(security·x-roles·401·403)는 openapi.yaml에만 있어 그 차이는 빼고 비교한다.
 class CommonDashboardControllerTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
@@ -174,7 +175,7 @@ class CommonDashboardControllerTest {
         for (String path : List.of("/api/common/dashboard", "/api/common/dashboard/excel")) {
             var operation = (Map<?, ?>) ((Map<?, ?>) paths.get(path)).get("get");
             assertThat(operation.get("operationId")).isNotNull();
-            assertThat(operation.get("security")).isIn(null, List.of());
+            assertThat(String.valueOf(operation.get("security"))).isEqualTo("[{SessionCookie=[]}]");
         }
     }
 }

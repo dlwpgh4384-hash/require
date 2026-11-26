@@ -13,7 +13,33 @@
       ]
     }
   },
-  "auth": { "required": false },
+  "auth": {
+    "required": true,
+    "credential_ref": "smoke-primary",
+    "test_role": "FIN",
+    "login": {
+      "operation_id": "postCommonLogin",
+      "method": "POST",
+      "path": "/api/common/login",
+      "body_fields": { "login_id": "userId", "password": "password" },
+      "session": "cookie",
+      "bearer_json_path": null,
+      "expect": [{ "path": "success", "op": "equals", "value": true }]
+    },
+    "seed": {
+      "initializer_path": "backend/src/main/java/com/company/common/commonops/service/AccountSmokeAccounts.java"
+    }
+  },
+  "identity": {
+    "operation_id": "getCommonMyInfo",
+    "method": "GET",
+    "path": "/api/common/my-info",
+    "expect": [
+      { "path": "success", "op": "equals", "value": true },
+      { "path": "data.roles", "op": "type", "value": "array_of_string" },
+      { "path": "data.roles", "op": "contains", "value": "$test_role" }
+    ]
+  },
   "first_menu": {
     "route": "/",
     "operation_id": "getCommonMenus",

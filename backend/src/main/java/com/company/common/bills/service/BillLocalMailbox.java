@@ -13,6 +13,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 /**
@@ -29,11 +31,37 @@ public class BillLocalMailbox {
     }
     private final ObjectProvider<JavaMailSender> senders;
     private final String from;
+    private boolean smtpRequired;
 
-    @Autowired
-    public BillLocalMailbox(ObjectProvider<JavaMailSender> senders, @Value("${billing.mail.from:}") String from) {
+    public BillLocalMailbox(ObjectProvider<JavaMailSender> senders, String from) {
         this.senders=senders;
         this.from=from==null?"":from.strip();
+    }
+
+    @Autowired
+    public BillLocalMailbox(ObjectProvider<JavaMailSender> senders,
+        @Value("${billing.mail.from:}") String from, Environment environment) {
+        String password=environment.getProperty("SMTP_PASSWORD",
+            environment.getProperty("spring.mail.password", ""));
+        if (password.isBlank()) {
+            this.senders=null;
+            this.from=from==null?"":from.strip();
+            return;
+        }
+        var sender=new JavaMailSenderImpl();
+        sender.setHost(environment.getProperty("SMTP_HOST", environment.getProperty("spring.mail.host", "smtp-relay.brevo.com")));
+        sender.setPort(Integer.parseInt(environment.getProperty("SMTP_PORT", environment.getProperty("spring.mail.port", "587"))));
+        sender.setUsername(environment.getProperty("SMTP_USERNAME", environment.getProperty("spring.mail.username", "")));
+        sender.setPassword(password);
+        this.smtpRequired=true;
+        sender.getJavaMailProperties().setProperty("mail.smtp.auth", "true");
+        sender.getJavaMailProperties().setProperty("mail.smtp.starttls.enable", "true");
+        sender.getJavaMailProperties().setProperty("mail.smtp.connectiontimeout", "10000");
+        sender.getJavaMailProperties().setProperty("mail.smtp.timeout", "10000");
+        sender.getJavaMailProperties().setProperty("mail.smtp.writetimeout", "10000");
+        this.senders=new org.springframework.beans.factory.support.StaticListableBeanFactory(
+            java.util.Map.of("billingMailTransport", sender)).getBeanProvider(JavaMailSender.class);
+        this.from=from==null || from.isBlank()?sender.getUsername():from.strip();
     }
 
     /** 메일을 받을 수 있는 주소인지(비었거나 형식이 틀리면 메일만 빼고 시스템 알림은 보낸다). */
@@ -52,6 +80,8 @@ public class BillLocalMailbox {
         }
         String[] to=recipients.stream().map(Recipient::email).toArray(String[]::new);
         JavaMailSender sender=senders==null?null:senders.getIfAvailable();
+        if (smtpRequired && (sender==null || from==null || from.isEmpty()))
+            throw CodeFailure.invalid("delivery","메일을 보내지 못했습니다. 다시 시도해 주세요.");
         if (sender!=null && !from.isEmpty()) {
             var message=new SimpleMailMessage();
             message.setFrom(from);

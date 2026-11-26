@@ -8,12 +8,12 @@ import org.springframework.beans.factory.config.YamlMapFactoryBean;
 import org.springframework.core.io.ClassPathResource;
 import static org.assertj.core.api.Assertions.*;
 
+// 로그인(UI-22) 작업 뒤: 손 설명서는 그대로, 로그인 정의(security·x-roles·401·403)는 openapi.yaml에만 있어 그 차이는 빼고 비교한다.
 class FinanceSourcePreservationTest {
     @Test
     void financeOperationsRemainPublicDevelopmentOperations() {
         var contract = yaml("contracts/openapi.yaml");
-        assertThat(contract.has("security")).isFalse();
-        assertThat(contract.path("components").has("securitySchemes")).isFalse();
+        com.company.common.support.test.LoginEraContract.assertSessionLogin(contract);
         assertThat(contract.findValues("bearerAuth")).isEmpty();
         var paths = contract.path("paths");
         for (String path : List.of(
@@ -36,7 +36,7 @@ class FinanceSourcePreservationTest {
         assertThat(manual.size()).isPositive();
         manual.fields().forEachRemaining(path -> path.getValue().fields().forEachRemaining(method ->
             assertThat(effective.path(path.getKey()).path(method.getKey()))
-                .as(path.getKey() + " " + method.getKey()).isEqualTo(method.getValue())));
+                .as(path.getKey() + " " + method.getKey()).satisfies(actual -> assertThat(com.company.common.support.test.LoginEraContract.withoutLogin((com.fasterxml.jackson.databind.JsonNode) actual)).isEqualTo(com.company.common.support.test.LoginEraContract.withoutLogin(method.getValue())))));
         for (String path : List.of("/api/common/developers", "/api/common/projects", "/api/common/assignments")) {
             assertThat(effective.path(path).has("get")).as(path).isTrue();
         }
@@ -55,9 +55,7 @@ class FinanceSourcePreservationTest {
 
     private void assertPublic(JsonNode operation, String path) {
         assertThat(operation.isObject()).as(path).isTrue();
-        assertThat(operation.path("security").isArray()).as(path).isTrue();
-        assertThat(operation.path("security").isEmpty()).as(path).isTrue();
-        assertThat(operation.has("x-roles")).as(path).isFalse();
+        com.company.common.support.test.LoginEraContract.assertLoggedIn(operation, path);
     }
 
     private JsonNode yaml(String name) {

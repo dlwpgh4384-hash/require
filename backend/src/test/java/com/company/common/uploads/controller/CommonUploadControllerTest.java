@@ -112,10 +112,17 @@ class CommonUploadControllerTest {
     }
     private byte[] workbook(List<List<String>> rows) { return workbooks.tabularFile(ClientUploadRules.HEADERS,rows,null); }
     private org.springframework.test.web.servlet.request.RequestPostProcessor clientFile(byte[] bytes) {
-        return request -> multipart(request.getRequestURI())
-            .file(new MockMultipartFile("file","clients.xlsx",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",bytes))
-            .param("formTypeCode","B7").buildRequest(request.getServletContext());
+        return request -> {
+            var built = multipart(request.getRequestURI())
+                .file(new MockMultipartFile("file","clients.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",bytes))
+                .param("formTypeCode","B7").buildRequest(request.getServletContext());
+            // 새로 만든 요청에도 로그인 세션·CSRF 머리글을 옮긴다(로그인 작업 뒤 /api/** 는 로그인 필요).
+            built.setSession(request.getSession());
+            for (String name : java.util.Collections.list(request.getHeaderNames()))
+                for (String value : java.util.Collections.list(request.getHeaders(name))) built.addHeader(name, value);
+            return built;
+        };
     }
     private org.springframework.test.web.servlet.ResultActions check(byte[] bytes) throws Exception {
         return mvc.perform(multipart("/api/common/uploads").file(new MockMultipartFile("file","clients.xlsx",

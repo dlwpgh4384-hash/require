@@ -65,7 +65,7 @@ class BusinessPlanComparisonControllerTest {
     }
     @Test void publicHappyPathHasTwelveMonthsAndSameRevenueAndProfitAsUi08Source() throws Exception {
         var sourceMonth = monthly.year(2026, 11, "202601").get("202611").values();
-        mvc.perform(get(PATH).param("year", "2026").param("baseMonth", "202611"))
+        mvc.perform(get("/api/common/business-plan-comparisons").param("year", "2026").param("baseMonth", "202611"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.months.length()").value(12))
             .andExpect(jsonPath("$.data.months[10].revenueActual").value(sourceMonth.revenue().intValueExact()))

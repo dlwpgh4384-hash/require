@@ -17,7 +17,10 @@ import {
 } from "../shared/layout/ScreenTabs";
 import { ConfirmDialog } from "../shared/feedback/Dialog";
 import { feedbackMessages } from "../shared/feedback/messages";
-import { MENU_REFRESH_EVENT } from "./menuRefresh";
+import {
+  ACCOUNT_SCREENS_CHANGED_EVENT,
+  MENU_REFRESH_EVENT,
+} from "./menuRefresh";
 import { MenuBadge, MenuBadgeContext, useMenuBadgeCounts } from "./menuBadges";
 
 export interface ShellMenuItem {
@@ -209,9 +212,28 @@ export function NavigationRoot({
   const [current, setCurrent] = useState<string | null>(null);
   const [dirty, setDirtyState] = useState<Set<string>>(() => new Set());
   const [pending, setPending] = useState<Pending>(null);
+  const [allowedScreens, setAllowedScreens] = useState<Set<string> | null>(
+    null,
+  );
   const seen = useRef<Record<string, number>>({});
   const tick = useRef(0);
   const autoOpened = useRef(false);
+  useEffect(() => {
+    const reconcile = (event: Event) => {
+      const allowed = new Set((event as CustomEvent<string[]>).detail);
+      setAllowedScreens(allowed);
+      setTabList((list) => list.filter((id) => allowed.has(id)));
+      setDirtyState((ids) => new Set([...ids].filter((id) => allowed.has(id))));
+      setCurrent((id) => (id && allowed.has(id) ? id : null));
+      setPending(null);
+      Object.keys(seen.current).forEach((id) => {
+        if (!allowed.has(id)) delete seen.current[id];
+      });
+    };
+    window.addEventListener(ACCOUNT_SCREENS_CHANGED_EVENT, reconcile);
+    return () =>
+      window.removeEventListener(ACCOUNT_SCREENS_CHANGED_EVENT, reconcile);
+  }, []);
   useEffect(() => {
     const refresh = () => setAttempt((value) => value + 1);
     window.addEventListener(MENU_REFRESH_EVENT, refresh);
@@ -244,7 +266,13 @@ export function NavigationRoot({
     return () => controller.abort();
   }, [attempt]);
 
-  const raw = state.status === "ready" ? state.response.data : [];
+  const raw =
+    state.status === "ready"
+      ? state.response.data.filter(
+          (item) =>
+            !item.scrnId || !allowedScreens || allowedScreens.has(item.scrnId),
+        )
+      : [];
   const visible = new Set<string>();
   const visiting = new Set<string>();
   function include(item: ShellMenuItem): boolean {
@@ -291,7 +319,9 @@ export function NavigationRoot({
     screenId = null;
   }
   const accessOf = (id: string | null) =>
-    state.status === "ready" && id !== null
+    state.status === "ready" &&
+    id !== null &&
+    (!allowedScreens || allowedScreens.has(id))
       ? state.response.meta.screenAccess.find((item) => item.scrnId === id)
       : undefined;
   const openable = (id: string | null) => {

@@ -140,9 +140,9 @@ class UploadApplyIntegrationTest {
         var mapped=new ArrayList<>(row("123-45-67890")); mapped.set(0,"검사용 고객");
         db.update("INSERT INTO TB_SY_CODE_MAP(src_text,code_grp_id,code,reg_user_id) VALUES('검사용 고객','CLNT_TYPE','CUST','admin')");
         byte[] bytes=workbooks.tabularFile(ClientUploadRules.HEADERS,List.of(mapped),null);
-        var result=mvc.perform(post("/api/common/uploads").with(request -> multipart(request.getRequestURI())
+        var result=mvc.perform(post("/api/common/uploads").with(request -> com.company.common.support.test.AuthenticatedMockMvcCustomizerFactory.keepLogin(multipart(request.getRequestURI())
                 .file(new MockMultipartFile("file","clients.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",bytes))
-                .param("formTypeCode","B7").buildRequest(request.getServletContext())))
+                .param("formTypeCode","B7").buildRequest(request.getServletContext()), request)))
             .andExpect(status().isOk()).andExpect(response("POST","/api/common/uploads"))
             .andExpect(jsonPath("$.data.warningCount").value(1))
             .andExpect(jsonPath("$.data.errorCount").value(0)).andReturn();

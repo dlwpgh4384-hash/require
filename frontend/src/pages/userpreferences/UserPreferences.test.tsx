@@ -524,7 +524,7 @@ describe("personal lists and tools", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(caller).toHaveFocus();
   });
-  it("mobile search and AI dialog are usable while later tools only say 준비 중", async () => {
+  it("mobile search and AI dialog remain usable without duplicate account placeholders", async () => {
     wrap(
       <UserPreferenceTools
         menus={menus}
@@ -556,11 +556,10 @@ describe("personal lists and tools", () => {
       "password-unavailable",
       "logout-unavailable",
     ]) {
-      if (!screen.queryByTestId(id))
-        fireEvent.click(screen.getByTestId("user-menu-open"));
-      fireEvent.click(screen.getByTestId(id));
-      expect(screen.getByTestId("header-notice")).toHaveTextContent("준비 중");
+      expect(screen.queryByTestId(id)).not.toBeInTheDocument();
     }
+    expect(screen.getByTestId("screen-settings-open")).toBeVisible();
+    expect(screen.getByTestId("shortcut-help-open")).toBeVisible();
     expect(puts()).toHaveLength(0);
   });
   it("business shortcuts only call registered handlers", () => {
@@ -623,8 +622,8 @@ describe("personal lists and tools", () => {
   });
 });
 
-describe("시안 맞춤: 자동 로그아웃 시간·[연장]", () => {
-  it("사용자 메뉴 맨 아래에 남은 시간과 [연장]이 있고, 연장하면 30분으로 돌아간다", () => {
+describe("account controls belong to the authenticated shell", () => {
+  it("preference tools do not create a second local session timer", () => {
     vi.useRealTimers();
     wrap(
       <UserPreferenceTools
@@ -635,13 +634,8 @@ describe("시안 맞춤: 자동 로그아웃 시간·[연장]", () => {
       />,
     );
     fireEvent.click(screen.getByTestId("user-menu-open"));
-    expect(screen.getByTestId("session-left")).toHaveTextContent(
-      /자동 로그아웃까지 (29:5\d|30:00)/,
-    );
-    fireEvent.click(screen.getByTestId("session-extend"));
-    expect(screen.getByTestId("session-left")).toHaveTextContent("30:00");
-    expect(screen.getByTestId("header-notice")).toHaveTextContent(
-      "자동 로그아웃 시간을 30분으로 다시 늘렸습니다.",
-    );
+    expect(screen.queryByTestId("session-left")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("session-extend")).not.toBeInTheDocument();
+    expect(screen.queryByText("시스템 관리자")).not.toBeInTheDocument();
   });
 });

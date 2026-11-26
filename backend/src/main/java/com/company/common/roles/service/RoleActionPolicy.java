@@ -18,6 +18,6 @@ public final class RoleActionPolicy {
             case DOWNLOAD -> permission.downloadYn();
             case MONTH_CLOSE, PART_SETTLEMENT_CONFIRM, PART_SETTLEMENT_CANCEL, QUOTE_APPROVE, QUOTE_REJECT -> permission.cnfmYn();
         };
-        return "Y".equals(flag);
+        return "Y".equals(permission.readYn()) && "Y".equals(flag);
     }
 }

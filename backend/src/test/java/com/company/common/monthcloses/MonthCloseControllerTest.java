@@ -96,10 +96,12 @@ class MonthCloseControllerTest {
         return json.writeValueAsString(json.createObjectNode().put("modifiedAt", TOKEN.toString()).put("reason", reason));
     }
     @Test void getAndRecheckExposeSixChecksAndOnlyRecordCheckResults() throws Exception {
-        for (int i = 0; i < 2; i++) mvc.perform(get(ROOT + "2026-01")).andExpect(status().isOk())
+        mvc.perform(get("/api/common/month-closes/2026-01")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.totalCount").value(6)).andExpect(jsonPath("$.data.checks.length()").value(6))
             .andExpect(jsonPath("$.data.attentionCount").value(1)).andExpect(jsonPath("$.data.modifiedAt").isEmpty())
             .andExpect(jsonPath("$.data.reopenable").value(false));
+        mvc.perform(get("/api/common/month-closes/2026-01")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.totalCount").value(6));
         verify(recorder, times(2)).record("202601", List.of(), "admin");
         verifyNoInteractions(snapshots, settlements, management);
         verify(mapper, never()).saveClose(any()); verify(mapper, never()).insertHistory(any());
@@ -126,12 +128,12 @@ class MonthCloseControllerTest {
     }
     @Test void impactReadsOnlySelectedAndFollowingMonth() throws Exception {
         when(mapper.adjustmentCount("202612", "202701")).thenReturn(3);
-        mvc.perform(get(ROOT + "2026-12/reopen-impact")).andExpect(status().isOk())
+        mvc.perform(get("/api/common/month-closes/2026-12/reopen-impact")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.yearMonth").value("2026-12")).andExpect(jsonPath("$.data.previousAdjustmentCount").value(3));
         verify(mapper).adjustmentCount("202612", "202701"); verifyNoMoreInteractions(mapper);
     }
     @Test void publicConfirmAllowsWarningsAndUsesServerActorAndPreSettlementNames() throws Exception {
-        mvc.perform(put(ROOT + "2026-01/confirm").contentType("application/json").content(version()))
+        mvc.perform(put("/api/common/month-closes/2026-01/confirm").contentType("application/json").content(version()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.isClosed").value(true))
             .andExpect(jsonPath("$.data.closedBy").value("관리자")).andExpect(jsonPath("$.data.modifiedAt").value(TOKEN.toString()));
         var order = inOrder(management, mapper, checks, snapshots, settlements);
@@ -175,7 +177,7 @@ class MonthCloseControllerTest {
     }
     @Test void publicLatestMonthReopenKeepsPartSettlementConfirmed() throws Exception {
         closed();
-        mvc.perform(put(ROOT + "2026-01/reopen").contentType("application/json").content(reopenBody(" 정정 사유 ")))
+        mvc.perform(put("/api/common/month-closes/2026-01/reopen").contentType("application/json").content(reopenBody(" 정정 사유 ")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.isClosed").value(false));
         verify(snapshots).unfix("202601", "admin"); verifyNoInteractions(settlements);
         verify(mapper).saveClose(new Mutation("202601", "WORK", "admin", TOKEN));

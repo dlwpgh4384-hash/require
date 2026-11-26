@@ -1,0 +1,65 @@
+.mfa-page {
+  box-sizing: border-box;
+  min-height: 100%;
+  height: 100%;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: var(--bg);
+  color: var(--text);
+}
+.mfa-card {
+  box-sizing: border-box;
+  width: min(100%, 420px);
+  padding: 28px;
+  background: var(--panel, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.mfa-card h1 {
+  font-size: 22px;
+  margin: 0 0 24px;
+}
+.mfa-card p {
+  color: var(--text-sub);
+}
+.mfa-card form {
+  display: grid;
+  gap: 12px;
+}
+.mfa-card input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel, var(--surface));
+  color: var(--text);
+  border-radius: 4px;
+  letter-spacing: 0.2em;
+}
+.mfa-card button {
+  min-height: 44px;
+  white-space: normal;
+}
+.mfa-card button[type="submit"] {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+.mfa-card button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.mfa-card #mfa-code-error {
+  margin: 0;
+  color: var(--danger, #b91c1c);
+}
+@media (max-width: 420px) {
+  .mfa-card {
+    padding: 20px;
+  }
+}

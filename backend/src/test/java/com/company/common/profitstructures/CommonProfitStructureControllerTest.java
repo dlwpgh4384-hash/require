@@ -139,7 +139,7 @@ class CommonProfitStructureControllerTest {
             .andExpect(jsonPath("$.data.referenceRevenueVisible").value(false)).andExpect(jsonPath("$.data.numericRows[0].composition").isEmpty());
     }
     @Test void exportIsPublicAndWritesTheNumericTableItemsByPeriods() throws Exception {
-        var bytes=mvc.perform(query("/excel","quarter","202602"))
+        var bytes=mvc.perform(get("/api/common/profit-structures/excel").param("year","2026").param("periodUnit","quarter").param("baseMonth","202602"))
             .andExpect(status().isOk()).andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .andExpect(header().string("Content-Disposition",org.hamcrest.Matchers.containsString("attachment"))).andReturn().getResponse().getContentAsByteArray();
         try(var book=new XSSFWorkbook(new ByteArrayInputStream(bytes))) {

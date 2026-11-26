@@ -4,6 +4,8 @@ server:
     include-message: never
     include-stacktrace: never
 spring:
+  config:
+    import: optional:file:./config/application-local.yml
   application:
     name: navigation-shell
   servlet:

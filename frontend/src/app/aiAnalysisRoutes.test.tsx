@@ -89,7 +89,14 @@ function respond() {
     questionId: "101",
     answerStatus: "OK",
     conclusion: "원천 조회 결과",
-    table: { columns: [{ key: "revenue", label: "매출" }], rows: [[123456]] },
+    tables: [
+      {
+        columns: [
+          { key: "revenue", label: "매출", align: "right", format: "money" },
+        ],
+        rows: [[123456000]],
+      },
+    ],
     assumptions: [],
     usedData: "원래 화면의 마감 자료",
     baseMonth: "2026-11",
@@ -174,7 +181,7 @@ it.each(["/screens/UI-26", "/#UI-26"])(
       "UI-26",
     );
     await ask();
-    expect(screen.getByText("123,456원")).toBeVisible();
+    expect(screen.getByText("123,456,000")).toBeVisible();
     expect(runs).toHaveBeenCalledWith(
       expect.objectContaining({
         requestId: expect.any(String),
@@ -210,7 +217,7 @@ it("M025 opens UI-26 through the existing AI menu without replacing preferences"
   expectSharedRoute();
 });
 
-it("UI-38 shares the routed conversation across close and reopen without a new route or POST", async () => {
+it("the header drawer shares the routed conversation across close and reopen without a new route or POST", async () => {
   const { runs } = respond();
   mount("/screens/UI-26");
   await screen.findByTestId("ai-analysis-page");
@@ -218,11 +225,8 @@ it("UI-38 shares the routed conversation across close and reopen without a new r
   fireEvent.click(screen.getByTestId("ai-analysis-open"));
   const dialog = within(screen.getByTestId("ai-analysis-dialog"));
   expect(dialog.getByText("원천 조회 결과")).toBeVisible();
-  expect(dialog.getByTestId("analysis-modal-content")).toHaveAttribute(
-    "data-screen-id",
-    "UI-38",
-  );
-  fireEvent.click(dialog.getByTestId("analysis-cancel"));
+  expect(document.querySelector('[data-screen-id="UI-38"]')).toBeNull();
+  fireEvent.click(screen.getByTestId("detail-panel-scrim"));
   expect(screen.queryByTestId("ai-analysis-dialog")).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId("ai-analysis-open"));
   expect(
@@ -258,7 +262,7 @@ it("header sends the active source period and answer navigation closes the modal
   const unsubscribe = screenPeriodChannel("ADDED").subscribe(receive);
   try {
     fireEvent.click(dialog.getByRole("button", { name: "원래 화면 열기" }));
-    expect(receive).toHaveBeenCalledWith(answer.actions[0].period);
+    expect(receive).toHaveBeenCalledWith(answer.actions![0].period);
   } finally {
     unsubscribe();
   }

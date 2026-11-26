@@ -58,33 +58,22 @@ const one = (value: number | null | undefined) =>
   value == null ? "–" : (Math.round(value * 10 + 1e-9) / 10).toFixed(1); // 서버·엑셀(HALF_UP)과 같게
 // 시안 ic('info'): 안내 띠 아이콘
 const infoIcon = (
-  <svg
-    width={16}
-    height={16}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
+  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16v-4M12 8h.01" />
   </svg>
 );
 /** 시안 lg: 칸 견본과 이름. */
-const legends: { cls: string; text?: string; label: string; part?: boolean }[] =
-  [
-    { cls: "c-on", label: "투입 중" },
-    { cls: "c-on c-part", label: "일부 투입(1.0 미만)", part: true },
-    { cls: "c-on", text: "2건", label: "동시 투입" },
-    { cls: "c-end", label: "철수 예정" },
-    { cls: "c-idle", label: "비어 있음" },
-    { cls: "c-tent", label: "가배정" },
-    { cls: "c-leave", label: "휴직" },
-    { cls: "c-ret", label: "퇴사" },
-    { cls: "c-pre", text: "⚠", label: "미계약 선투입" },
-  ];
+const legends: { cls: string; text?: string; label: string; part?: boolean }[] = [
+  { cls: "c-on", label: "투입 중" },
+  { cls: "c-on c-part", label: "일부 투입(1.0 미만)", part: true },
+  { cls: "c-on", text: "2건", label: "동시 투입" },
+  { cls: "c-end", label: "철수 예정" },
+  { cls: "c-idle", label: "비어 있음" },
+  { cls: "c-tent", label: "가배정" },
+  { cls: "c-leave", label: "휴직" },
+  { cls: "c-ret", label: "퇴사" },
+  { cls: "c-pre", text: "⚠", label: "미계약 선투입" },
+];
 /** 시안 cellHtml: 일부 투입(1.0 미만)은 투입·철수 예정·미계약 선투입 칸에만. */
 const isPart = (cell: ManpowerBoardCell) =>
   ["on", "end", "pre"].includes(cell.statusCode) && cell.totalMm < 1;
@@ -132,13 +121,17 @@ export function UI28Page({
 }: { renderActions?: (actions: ReactNode) => ReactNode } = {}) {
   const navigate = useNavigate();
   const openDeveloperAction = useOpenDeveloperAction();
-  const period = useScreenPeriod("UI-28", periodOptions);
+  // [AI에게 묻기] 기간은 아래 한 곳에서만 알린다(달력 탭은 고른 해, 예측 탭은 예측 달). 훅은 알리지 않는다.
+  const period = useScreenPeriod("UI-28", periodOptions, undefined, {
+    publish: false,
+  });
   // 오늘(한국 날짜)은 한 번만 구한다.
   const today = useMemo(() => koreanToday(), []);
   const currentYear = Number(today.slice(0, 4));
   const thisMonth = today.slice(0, 7);
   // 기간을 읽은 뒤에만 조회한다(처음 요청 한 번).
-  const year = period.state.status === "ready" ? period.state.value.year : null;
+  const year =
+    period.state.status === "ready" ? period.state.value.year : null;
   const [draft, setDraft] = useState<BoardConditions>({});
   const [applied, setApplied] = useState<BoardConditions>({});
   const [revision, setRevision] = useState(0);
@@ -169,6 +162,8 @@ export function UI28Page({
           : { startMonth: `${year}-01`, endMonth: `${year}-12` },
     );
   }, [tab, forecast, year]);
+  // 화면이 닫히면 알린 기간을 지운다.
+  useEffect(() => () => publishScreenPeriod("UI-28", undefined), []);
   const [forecastRevision, setForecastRevision] = useState(0);
   const forecastRequested = useRef<number | null>(null);
   const alive = useRef(true);
@@ -287,17 +282,7 @@ export function UI28Page({
       disabled={!data || downloading}
       onClick={() => void download()}
     >
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
       </svg>{" "}
       {downloading ? "만드는 중…" : "엑셀 다운로드"}
@@ -570,16 +555,13 @@ export function UI28Page({
                       data-testid={`manpower-board-person-${person.developerId}`}
                       onClick={() => setDetail(person.developerId)}
                       onKeyDown={(event) => {
-                        if (event.key === "Enter")
-                          setDetail(person.developerId);
+                        if (event.key === "Enter") setDetail(person.developerId);
                       }}
                     >
                       <td className="ls-sc">
                         <span className="board-pname">
                           {person.name}
-                          <small>
-                            {person.managementNumber || person.developerId}
-                          </small>
+                          <small>{person.managementNumber || person.developerId}</small>
                         </span>
                       </td>
                       <td>{person.jobName}</td>

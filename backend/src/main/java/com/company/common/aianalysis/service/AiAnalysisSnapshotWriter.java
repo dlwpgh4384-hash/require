@@ -26,6 +26,7 @@ public class AiAnalysisSnapshotWriter {
         } catch (JsonProcessingException invalid) { throw new IllegalStateException("Question serialization failed", invalid); }
     }
     static String truncate(String value, int limit) {
+        if (value == null) return null;
         return value.codePointCount(0, value.length()) <= limit ? value : value.substring(0, value.offsetByCodePoints(0, limit));
     }
 }

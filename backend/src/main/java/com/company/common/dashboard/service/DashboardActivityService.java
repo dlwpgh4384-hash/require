@@ -148,7 +148,7 @@ public class DashboardActivityService {
     }
 
     /** 시안 kor(): 1억 이상은 「n.n억 원」, 아니면 「n만 원」(반올림 HALF_UP), 음수는 「−」. */
-    static String kor(BigDecimal value) {
+    public static String kor(BigDecimal value) {
         if (value == null) return "–";
         var abs = value.abs();
         String sign = value.signum() < 0 ? "−" : "";
@@ -159,7 +159,7 @@ public class DashboardActivityService {
     }
 
     /** 시안 pct(): 소수 한 자리 %, 없으면 「–」. */
-    static String pct(BigDecimal value) {
+    public static String pct(BigDecimal value) {
         if (value == null) return "–";
         return (value.signum() < 0 ? "−" : "") + value.abs().setScale(1, RoundingMode.HALF_UP).toPlainString() + "%";
     }

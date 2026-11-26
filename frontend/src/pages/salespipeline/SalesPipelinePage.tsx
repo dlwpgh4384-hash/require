@@ -213,6 +213,8 @@ export function SalesPipelinePage({
         : undefined,
     );
   }, [tab, forecast]);
+  // 화면이 닫히면 알린 기간을 지운다.
+  useEffect(() => () => publishScreenPeriod("UI-29", undefined), []);
   const [options, setOptions] = useState<SalesOpportunityOptions | null>(null);
   const [optionError, setOptionError] = useState("");
   const [resultDraft, setResultDraft] = useState("");

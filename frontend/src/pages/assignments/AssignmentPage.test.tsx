@@ -39,6 +39,10 @@ let request: ReturnType<typeof vi.fn>,
 let project: Project;
 /** 개발자 목록에 더 넣을 사람(목록 응답은 directClassCode만 준다). */
 let extraDevelopers: Record<string, unknown>[] = [];
+/** 프로젝트 영업 파트 이력(/sales-parts). */
+let salesParts: unknown[] = [];
+/** true면 파트 이력 요청이 실패(500)한다. */
+let salesPartsFail = false;
 const ok = (data: unknown) => ({
   ok: true,
   status: 200,
@@ -56,6 +60,8 @@ const codes: Record<string, unknown[]> = {
 };
 beforeEach(() => {
   extraDevelopers = [];
+  salesParts = [];
+  salesPartsFail = false;
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-11-15T00:00:00Z"));
   failure = false;
@@ -154,7 +160,11 @@ beforeEach(() => {
     if (path.startsWith("/api/common/projects/")) {
       if (path.endsWith("/distribution")) return ok({ project, items: [], uploads: [], mismatches: [], totalAmountWarning: false });
       if (path.endsWith("/manpower-plan")) return ok({ items: [], canSave: false });
-      if (["/direct-expenses", "/sales-parts", "/change-history"].some((s) => path.endsWith(s))) return ok({ items: [] });
+      if (path.endsWith("/sales-parts"))
+        return salesPartsFail
+          ? { ok: false, status: 500, json: async () => ({ success: false, message: "파트 이력 조회 실패", errors: [] }) }
+          : ok({ items: salesParts });
+      if (["/direct-expenses", "/change-history"].some((s) => path.endsWith(s))) return ok({ items: [] });
       return ok(project);
     }
     // 실제 개발자 목록 API처럼 파트 이름(salesPartName)은 빼고 준다: 경고 글의 파트 이름은 상세에서 읽는다.
@@ -726,6 +736,64 @@ it("shows all mockup warnings together in one band", async () => {
   fireEvent.change(screen.getByTestId("assignment-start-date"), { target: { value: "2026-09-01" } });
   expect(screen.getByTestId("assignment-start-date")).toHaveValue("2026-09-01");
   expect(screen.getByTestId("assignment-form-warnings")).toHaveTextContent("마감한 달(2026-09)에 걸칩니다. 마감한 달 금액은 그대로 두고 차액은 이번 달 전월 조정으로 넣습니다.");
+});
+
+const partCalls = () => request.mock.calls.filter((c) => String(c[0]).endsWith("/sales-parts")).length;
+const laterStart = { projectId: "P-0001", developerId: "", jobCode: "BE", startDate: "2027-02-01", endDate: "2027-06-30" };
+it("a project that starts later warns before save with the part effective at the start month", async () => {
+  // 수주로 만든 아직 시작 전 프로젝트: 목록(이번 달 기준) 파트는 비고, 파트 이력은 시작 월부터 있다.
+  project.startDate = "2027-02-01";
+  project.endDate = "2027-06-30";
+  project.salesPartId = null;
+  project.salesPartName = null;
+  salesParts = [
+    { salesPartId: "part3", salesPartName: "3파트", effectiveMonth: "2027-04", reason: null, changedBy: "admin", scheduled: true },
+    { salesPartId: "part2", salesPartName: "2파트", effectiveMonth: "2027-02", reason: null, changedBy: "admin", scheduled: true },
+  ];
+  form({ initialValues: laterStart });
+  await pick();
+  await waitFor(() =>
+    expect(screen.getByTestId("assignment-form-warnings")).toHaveTextContent(
+      "영업 파트가 다릅니다: 김개발님은 영업파트 소속, 프로젝트는 2파트입니다. 매출은 2파트로, 이 사람 이익금은 영업파트로 잡힙니다.",
+    ),
+  );
+  expect(writes()).toHaveLength(0);
+  // 투입일 달이 바뀌면 그 달 파트로 다시 본다(새로 읽지 않음).
+  fireEvent.change(screen.getByTestId("assignment-start-date"), { target: { value: "2027-05-01" } });
+  expect(screen.getByTestId("assignment-form-warnings")).toHaveTextContent("프로젝트는 3파트입니다.");
+  expect(partCalls()).toBe(1);
+  cleanup();
+  // 같은 파트면 경고가 없다.
+  salesParts = [{ salesPartId: "part", salesPartName: "영업파트", effectiveMonth: "2027-02", reason: null, changedBy: "admin", scheduled: true }];
+  form({ initialValues: laterStart });
+  await pick();
+  await waitFor(() => expect(partCalls()).toBe(2));
+  await act(async () => {});
+  expect(screen.getByTestId("assignment-form")).not.toHaveTextContent("영업 파트가 다릅니다");
+});
+
+it.each([
+  ["the part history is empty", false],
+  ["the part history request fails", true],
+])("falls back to the list part and still warns when %s", async (_case, fails) => {
+  project.salesPartId = "part2";
+  project.salesPartName = "2파트";
+  salesParts = [];
+  salesPartsFail = fails;
+  form({ initialValues: laterStart });
+  await pick();
+  await waitFor(() => expect(partCalls()).toBe(1));
+  await waitFor(() =>
+    expect(screen.getByTestId("assignment-form-warnings")).toHaveTextContent(
+      "영업 파트가 다릅니다: 김개발님은 영업파트 소속, 프로젝트는 2파트입니다.",
+    ),
+  );
+  expect(writes()).toHaveLength(0);
+});
+it("a running project in this month uses the list part without reading the part history", async () => {
+  form();
+  await pick();
+  expect(partCalls()).toBe(0);
 });
 
 it("after save the page closes the form, highlights the row and toasts without opening detail", async () => {

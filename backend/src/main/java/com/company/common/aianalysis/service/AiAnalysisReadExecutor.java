@@ -21,9 +21,18 @@ public class AiAnalysisReadExecutor {
         read.setReadOnly(true);
         read.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         read.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        var catalog = AiAnalysisCatalog.FUNCTIONS.stream().map(AiAnalysisCatalog.Entry::id).toList();
         var names = new java.util.HashSet<String>();
-        for (var function : functions) for (var name : function.functions())
+        for (var function : functions) for (var name : function.functions()) {
             if (!names.add(name)) throw new IllegalStateException("Duplicate analysis function " + name);
+            if (!catalog.contains(name)) throw new IllegalStateException("Analysis function is not in the catalog " + name);
+        }
+    }
+    /** 등록된 조회 함수 이름(시험이 명세 목록과 같은지 본다). */
+    public java.util.Set<String> registered() {
+        var names = new java.util.TreeSet<String>();
+        functions.forEach(f -> names.addAll(f.functions()));
+        return names;
     }
     public AiAnalysisFunction.Result read(AiAnalysisInterpreter.Query query, AiAnalysisProgress.Execution execution) {
         return read.execute(status -> {

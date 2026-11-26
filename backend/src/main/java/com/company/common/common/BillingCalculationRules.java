@@ -119,14 +119,6 @@ public class BillingCalculationRules {
         return elapsed >= first ? 1 : null;
     }
 
-    public LocalDate nextDunningDate(boolean cancelled, BigDecimal unpaidAmount,
-        LocalDate payDueDate, LocalDate today) {
-        Integer step = dunningStep(cancelled, unpaidAmount, payDueDate, today);
-        if (cancelled || unpaidAmount.signum() <= 0 || Integer.valueOf(3).equals(step)) return null;
-        int next = step == null ? 1 : step + 1;
-        return payDueDate.plusDays(days("DUN_D" + next, YearMonth.from(today)));
-    }
-
     private void definition(String calcId) {
         metadata.definition("식-00");
         metadata.definition(calcId);

@@ -4,7 +4,7 @@ import { ScreenSettingsDialog } from "./ScreenSettingsDialog";
 import { UserPreferenceDialog } from "./UserPreferenceDialog";
 import type { PreferenceMenu } from "./PersonalScreenPreferences";
 import { ShellIcon } from "../../shared/layout/ShellIcon";
-import { AiAnalysisDialog } from "../aianalysis/AiAnalysisDialog";
+import { AiAnalysisDrawer } from "../aianalysis/AiAnalysisDrawer";
 import {
   AiAnalysisWorkspaceProvider,
   useOptionalAiAnalysis,
@@ -178,8 +178,7 @@ export function UserPreferenceTools({
   useEffect(() => {
     if (!menuOpen) return;
     const close = (event: MouseEvent) => {
-      if (!menuAnchor.current?.contains(event.target as Node))
-        setMenuOpen(false);
+      if (!menuAnchor.current?.contains(event.target as Node)) setMenuOpen(false);
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setMenuOpen(false);
@@ -250,8 +249,7 @@ export function UserPreferenceTools({
           <ShellIcon name="user" />
           {!mobile && (
             <span>
-              {CURRENT_USER.name}{" "}
-              <span className="hd-sub">({CURRENT_USER.role})</span>
+              {CURRENT_USER.name} <span className="hd-sub">({CURRENT_USER.role})</span>
             </span>
           )}
           <ShellIcon name="chevronDown" />
@@ -263,8 +261,7 @@ export function UserPreferenceTools({
             role="menu"
           >
             <div className="hd-pop-h">
-              {CURRENT_USER.name}{" "}
-              <span className="hd-sub">{CURRENT_USER.role}</span>
+              {CURRENT_USER.name} <span className="hd-sub">{CURRENT_USER.role}</span>
             </div>
             {(
               [
@@ -284,32 +281,25 @@ export function UserPreferenceTools({
                 onClick={() => {
                   setMenuOpen(false);
                   if (target) setDialog(target);
-                  else
-                    setNotice(
-                      `${label}은(는) 준비 중입니다. 마지막 로그인 작업에서 붙입니다.`,
-                    );
+                  else setNotice(`${label}은(는) 준비 중입니다. 마지막 로그인 작업에서 붙입니다.`);
                 }}
               >
                 {label}
               </button>
             ))}
-            <SessionTimer
-              onExtend={() =>
-                setNotice("자동 로그아웃 시간을 30분으로 다시 늘렸습니다.")
-              }
-            />
+            <SessionTimer onExtend={() => setNotice("자동 로그아웃 시간을 30분으로 다시 늘렸습니다.")} />
           </div>
         )}
       </div>
       {analysisOpen &&
         (analysis ? (
-          <AiAnalysisDialog
+          <AiAnalysisDrawer
             screenId={screenId}
             onClose={() => setAnalysisOpen(false)}
           />
         ) : (
           <AiAnalysisWorkspaceProvider>
-            <AiAnalysisDialog
+            <AiAnalysisDrawer
               screenId={screenId}
               onClose={() => setAnalysisOpen(false)}
             />
@@ -366,8 +356,7 @@ export function usePreferenceBusinessShortcuts(
     const keydown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
       if (handlers.scope?.current?.closest("[hidden]")) return;
-      const save =
-        (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s";
+      const save = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s";
       // 숨은 화면 탭 안에 열려 있는 대화상자(상세 패널)는 세지 않는다(보이는 탭 Ctrl+S가 막히지 않게).
       const dialogs = Array.from(
         document.querySelectorAll('[role="dialog"], [role="alertdialog"]'),
@@ -401,18 +390,16 @@ export function usePreferenceBusinessShortcuts(
           "button,a[href],summary,[role='button'],[role='tab'],[role='checkbox'],[role='menuitem'],[role='link']",
         );
       if (editing && !save) return;
-      const handler = save
-        ? handlers.onSave
-        : event.ctrlKey && event.key === "ArrowLeft"
-          ? handlers.onPreviousPage
-          : event.ctrlKey && event.key === "ArrowRight"
-            ? handlers.onNextPage
-            : !event.ctrlKey &&
-                !event.metaKey &&
-                event.key === "Enter" &&
-                !control
-              ? handlers.onSearch
-              : undefined;
+      const handler =
+        save
+          ? handlers.onSave
+          : event.ctrlKey && event.key === "ArrowLeft"
+            ? handlers.onPreviousPage
+            : event.ctrlKey && event.key === "ArrowRight"
+              ? handlers.onNextPage
+              : !event.ctrlKey && !event.metaKey && event.key === "Enter" && !control
+                ? handlers.onSearch
+                : undefined;
       if (handler) {
         event.preventDefault();
         handler();

@@ -10,7 +10,7 @@ class AiAnalysisProgressTest {
     @Test void concurrentDuplicateSharesOnlyInFlightExecutionAndReplayGetsNewExecution() {
         var progress = new AiAnalysisProgress(); var first = progress.claim("admin", "request-1"); var duplicate = progress.claim("admin", "request-1");
         assertThat(first.owner()).isTrue(); assertThat(duplicate.owner()).isFalse(); assertThat(duplicate.execution()).isSameAs(first.execution());
-        var answer = new Answer("1", "NO_ANS", "답변 불가", null, List.of(), "", "2026-11", false, List.of(), List.of());
+        var answer = new Answer("1", "NO_ANS", "답변 불가", false, false, null, List.of(), null, List.of(), "", "2026-11", List.of(), false, List.of());
         first.execution().answer.complete(answer); progress.finish("admin", "request-1", first.execution());
         assertThat(duplicate.execution().answer.join()).isSameAs(answer); assertThat(progress.read("admin", "request-1").completed()).isTrue();
         var replay = progress.claim("admin", "request-1"); assertThat(replay.owner()).isTrue(); assertThat(replay.execution()).isNotSameAs(first.execution());

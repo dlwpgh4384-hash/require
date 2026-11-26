@@ -37,7 +37,11 @@ class AiAnalysisMappingTest {
             assertThat(sql).contains("q.USER_ID = ?"); assertThat(sql).doesNotContain("REQUEST_ID");
         }
         var sql = cfg.getMappedStatement(prefix() + "history").getBoundSql(Map.of("actor", "admin")).getSql();
-        assertThat(sql).contains("ORDER BY q.QSTN_DTTM DESC, q.QNA_ID DESC");
+        assertThat(sql).contains("DISTINCT ON (q.QSTN_CN)").contains("ORDER BY h.QSTN_DTTM DESC, h.QNA_ID DESC").contains("LIMIT 20");
+        var download = cfg.getMappedStatement(prefix() + "download").getBoundSql(Map.of("actor", "admin", "count", 3));
+        assertThat(download.getSql()).contains("'AI 분석 도우미 답 '").contains("'건'");
+        assertThat(download.getParameterMappings()).extracting(org.apache.ibatis.mapping.ParameterMapping::getProperty)
+            .containsExactly("actor", "count", "actor");
     }
     String prefix() { return AiAnalysisMapper.class.getName() + "."; }
     Configuration configuration() throws Exception {

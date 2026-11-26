@@ -62,6 +62,9 @@ export function axisScale(values: number[], headroom = 1.05) {
 /** 백만 원 단위 눈금 글자(시안 Math.round(v/1e6).toLocaleString). */
 const million = (value: number) =>
   (Math.round(value / 1e6) + 0).toLocaleString("ko-KR"); // + 0: 「-0」을 「0」으로
+/** 비율(%) 눈금 글자: 소수 한 자리까지(「12.5%」, 「-0」은 「0」). */
+export const percentTick = (value: number) =>
+  `${(Math.round(value * 10) / 10 + 0).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}%`;
 const numbers = (values: Amount[]) =>
   values.filter(
     (value): value is number => value != null && Number.isFinite(value),
@@ -135,12 +138,15 @@ export function LineChart({
   height = 220,
   guide,
   testId,
+  tickFormat,
 }: {
   series: ChartSeries[];
   labels: string[];
   height?: number;
   guide?: { name: string; values: Amount[] } | null;
   testId?: string;
+  /** 눈금 글자 모양. 없으면 백만 원(다른 화면 그대로). 비율 계열은 percentTick. */
+  tickFormat?: (value: number) => string;
 }) {
   const H = height;
   const values = series.flatMap((item) => numbers(item.values));
@@ -163,7 +169,7 @@ export function LineChart({
         aria-label={`${series.map((item) => item.name).join(", ")} 추이`}
         data-testid={testId}
       >
-        <Grid ticks={ticks} y={y} />
+        <Grid ticks={ticks} y={y} format={tickFormat} />
         {labels.map((label, index) => (
           <text
             key={`${label}-${index}`}

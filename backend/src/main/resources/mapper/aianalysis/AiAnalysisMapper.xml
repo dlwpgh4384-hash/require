@@ -14,15 +14,20 @@
     INSERT INTO TB_SY_AI_QNA
       (QNA_ID, USER_ID, QSTN_CN, ANS_CN, USE_DATA_DESC, BASE_YM, PRVS_YN, ANS_STAT_CD,
        QSTN_DTTM, REG_USER_ID, REG_DTTM)
-    VALUES (CAST(#{id} AS NUMERIC), #{actor}, #{question}, #{answer}, #{description}, #{baseMonth},
+    VALUES (CAST(#{id} AS NUMERIC), #{actor}, #{question}, #{answer}, #{description,jdbcType=VARCHAR}, #{baseMonth},
       #{provisional}, #{status}, clock_timestamp(), #{actor}, clock_timestamp())
   </insert>
   <select id="history" resultMap="history">
-    SELECT q.QNA_ID::TEXT AS "questionId", q.QSTN_CN AS "question",
-      q.QSTN_DTTM AS "askedAt", q.ANS_STAT_CD AS "answerStatus"
-    FROM TB_SY_AI_QNA q
-    WHERE q.USER_ID = #{actor}
-    ORDER BY q.QSTN_DTTM DESC, q.QNA_ID DESC
+    SELECT h.QNA_ID::TEXT AS "questionId", h.QSTN_CN AS "question",
+      h.QSTN_DTTM AS "askedAt", h.ANS_STAT_CD AS "answerStatus"
+    FROM (
+      SELECT DISTINCT ON (q.QSTN_CN) q.QNA_ID, q.QSTN_CN, q.QSTN_DTTM, q.ANS_STAT_CD
+      FROM TB_SY_AI_QNA q
+      WHERE q.USER_ID = #{actor}
+      ORDER BY q.QSTN_CN, q.QSTN_DTTM DESC, q.QNA_ID DESC
+    ) h
+    ORDER BY h.QSTN_DTTM DESC, h.QNA_ID DESC
+    LIMIT 20
   </select>
   <select id="saved" resultType="string">
     SELECT q.ANS_CN FROM TB_SY_AI_QNA q
@@ -32,7 +37,7 @@
     INSERT INTO TB_SY_ACCS_LOG
       (LOG_ID, USER_ID, ACT_TYPE_CD, SCRN_ID, TRGT_DESC, ACT_DTTM, REG_USER_ID, REG_DTTM)
     VALUES (nextval('SQ_TB_SY_ACCS_LOG'), #{actor}, 'DNLD', 'UI-26',
-      'AI 분석 답 ' || #{id}, clock_timestamp(), #{actor}, clock_timestamp())
+      'AI 분석 도우미 답 ' || CAST(#{count} AS TEXT) || '건', clock_timestamp(), #{actor}, clock_timestamp())
   </insert>
   <resultMap id="identity" type="com.company.common.aianalysis.mapper.AiAnalysisRows$Identity" autoMapping="false">
     <constructor><arg column="name" javaType="string"/><arg column="replacement" javaType="string"/></constructor>

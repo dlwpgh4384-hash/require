@@ -26,12 +26,28 @@ public class ExcelExportService {
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final DateTimeFormatter FILE = DateTimeFormatter.ofPattern("yyyyMMdd_HHmm");
 
+    /** 시트 하나: name은 시트 이름(엑셀 규칙에 맞게 고쳐 씀), title은 1행 제목. */
+    public record SheetData(String name, String title, List<String> headers, List<List<String>> rows) {}
+
     public byte[] write(String title, List<String> headers, List<List<String>> rows, String downloadedBy,
         Instant atUtc) {
+        return write(List.of(new SheetData(title, title, headers, rows)), downloadedBy, atUtc);
+    }
+
+    /** 표가 여러 개인 답(예: AI 분석 도우미)은 표마다 시트 하나. 각 시트 모양은 한 시트 파일과 같다. */
+    public byte[] write(List<SheetData> sheets, String downloadedBy, Instant atUtc) {
         try (var workbook = new SXSSFWorkbook(200); var out = new ByteArrayOutputStream()) {
             // ZIP64가 필요 없는 파일은 JDK ZipInputStream으로도 읽을 수 있게 쓴다.
             workbook.setZip64Mode(Zip64Mode.AsNeeded);
-            Sheet sheet = workbook.createSheet(title);
+            var names = new java.util.HashSet<String>();
+            // 표가 하나도 없으면 깨진 파일 대신 제목 줄만 있는 빈 시트 하나를 쓴다.
+            var list = sheets == null || sheets.isEmpty()
+                ? List.of(new SheetData(EMPTY_SHEET, EMPTY_SHEET, List.of(), List.of())) : sheets;
+            for (var data : list) {
+            String title = data.title() == null ? "" : data.title();
+            List<String> headers = data.headers() == null ? List.of() : data.headers();
+            List<List<String>> rows = data.rows() == null ? List.of() : data.rows();
+            Sheet sheet = workbook.createSheet(sheetName(data.name(), names));
             Font bold = workbook.createFont();
             bold.setBold(true);
             CellStyle head = workbook.createCellStyle();
@@ -67,12 +83,32 @@ public class ExcelExportService {
                 }
             }
             for (int i = 0; i < headers.size(); i++) sheet.setColumnWidth(i, 18 * 256);
+            }
             workbook.write(out);
             workbook.dispose();
             return out.toByteArray();
         } catch (IOException failure) {
             throw new UncheckedIOException(failure);
         }
+    }
+
+    static final String EMPTY_SHEET = "자료 없음";
+    /**
+     * 엑셀 시트 이름 규칙: 금지 글자(\ / ? * [ ] :)는 빈칸, 31자 이하, 같은 파일 안에서 대소문자 없이 겹치지 않게.
+     * 겹치면 「 2」「 3」…을 붙이되 붙인 뒤에도 31자를 넘지 않게 앞부분을 줄인다.
+     */
+    static String sheetName(String requested, java.util.Set<String> used) {
+        String name = requested == null ? "" : requested.replaceAll("[\\\\/?*\\[\\]:]", " ").strip();
+        // 작은따옴표는 시트 이름 앞뒤에 올 수 없다.
+        name = name.replaceAll("^'+|'+$", "").strip();
+        if (name.isEmpty()) name = "Sheet";
+        if (name.length() > 31) name = name.substring(0, 31);
+        String unique = name;
+        for (int n = 2; !used.add(unique.toLowerCase(java.util.Locale.ROOT)); n++) {
+            String suffix = " " + n;
+            unique = name.substring(0, Math.min(name.length(), 31 - suffix.length())).stripTrailing() + suffix;
+        }
+        return unique;
     }
 
     /** 숫자 모양(1234, -1,234, 0.52). 앞자리 0(전화·계좌 등)은 글자로 둔다. */

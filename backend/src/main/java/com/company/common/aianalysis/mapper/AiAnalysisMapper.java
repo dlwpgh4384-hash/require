@@ -12,6 +12,6 @@ public interface AiAnalysisMapper {
     int insert(Write row);
     List<HistoryItem> history(@Param("actor") String actor);
     String saved(@Param("actor") String actor, @Param("id") String id);
-    int download(@Param("actor") String actor, @Param("id") String id);
+    int download(@Param("actor") String actor, @Param("count") int count);
     List<Identity> identities();
 }

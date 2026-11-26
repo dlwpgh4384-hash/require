@@ -1188,7 +1188,12 @@ describe("common placeholder screen contract", () => {
       const first = mount(`/screens/${id}`);
       await expectScreenContent(id);
       expect(screen.getAllByRole("banner")).toHaveLength(1);
-      expect(screen.getAllByRole("complementary")).toHaveLength(1);
+      // 시안 UI-26 질문 기록(aside「질문 기록」)은 화면 안 칸이라 공통 틀의 왼쪽 메뉴 수에서 뺀다.
+      expect(
+        screen.getAllByRole("complementary", {
+          name: (name) => name !== "질문 기록",
+        }),
+      ).toHaveLength(1);
       expect(screen.getAllByRole("main")).toHaveLength(1);
       // 입력 칸이 없는 화면(화면 목록 hasInputs=false, 「준비 중」 화면 포함)은 글 입력 칸·조회/저장 등 단추가 없다.
       if (!findScreen(id)?.hasInputs) {

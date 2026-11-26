@@ -21,10 +21,12 @@ import {
   ProjectRequestError,
   getCommonProject,
   getCommonProjectDistribution,
+  getCommonProjectSalesParts,
   projectFailure,
   typeLabel,
   won,
   type Project,
+  type ProjectPart,
 } from "../projects/projects";
 import {
   KIND_CODES,
@@ -305,6 +307,48 @@ export function AssignmentForm({
       active = false;
     };
   }, [v.projectId]);
+  // 영업 파트 경고는 서버와 같이 투입일이 든 달의 프로젝트 파트로 본다(없으면 가장 이른 파트 이력).
+  // 목록의 파트는 이번 달 기준이라, 비었거나 투입일이 다른 달일 때만 파트 이력을 읽는다.
+  const startMonth = v.startDate.slice(0, 7);
+  const needParts =
+    !!project &&
+    project.contractTypeCode !== "IN" &&
+    !!startMonth &&
+    (!project.salesPartId || startMonth !== koreanToday().slice(0, 7));
+  const [partHistory, setPartHistory] = useState<{
+    projectId: string;
+    items: ProjectPart[];
+  } | null>(null);
+  useEffect(() => {
+    if (!needParts || partHistory?.projectId === v.projectId) return;
+    let active = true;
+    const id = v.projectId;
+    getCommonProjectSalesParts(id)
+      .then((r) => active && setPartHistory({ projectId: id, items: r.items ?? [] }))
+      // 읽지 못해도 「읽음(빈 이력)」으로 두어 아래에서 목록의 파트로 돌아간다(경고를 조용히 빼지 않음).
+      .catch(() => active && setPartHistory({ projectId: id, items: [] }));
+    return () => {
+      active = false;
+    };
+  }, [needParts, v.projectId, partHistory]);
+  const projectPart = ((): { id: string; name: string | null } | null => {
+    if (!project) return null;
+    const listed = project.salesPartId
+      ? { id: project.salesPartId, name: project.salesPartName }
+      : null;
+    if (!needParts) return listed;
+    // 이력을 읽기 전에는 경고를 띄우지 않는다(틀린 경고가 잠깐 보이지 않게).
+    if (partHistory?.projectId !== project.projectId) return null;
+    // 서버 규칙과 같게: 투입일이 든 달의 파트, 없으면 가장 이른 파트 이력.
+    const rows = [...partHistory.items].sort((a, b) =>
+      a.effectiveMonth.localeCompare(b.effectiveMonth),
+    );
+    const row =
+      rows.filter((r) => r.effectiveMonth.slice(0, 7) <= startMonth).at(-1) ??
+      rows[0];
+    // 이력이 비었거나 읽지 못했으면 목록의 프로젝트 파트로 본다.
+    return row ? { id: row.salesPartId, name: row.salesPartName } : listed;
+  })();
   const origPerson = people.find((p) => p.developerId === v.orig);
   const distWarn =
     project?.contractTypeCode === "TK" &&
@@ -388,14 +432,14 @@ export function AssignmentForm({
     if (
       project &&
       project.contractTypeCode !== "IN" &&
-      project.salesPartId &&
+      projectPart &&
       dv.salesPartId &&
-      dv.salesPartId !== project.salesPartId
+      dv.salesPartId !== projectPart.id
     ) {
       const label = (id: string, name?: string | null) =>
         id === HQ_PART ? "본사" : (name ?? id);
       const mine = label(dv.salesPartId, dv.salesPartName ?? pool?.salesPartName);
-      const theirs = label(project.salesPartId, project.salesPartName);
+      const theirs = label(projectPart.id, projectPart.name);
       warnings.push(
         `영업 파트가 다릅니다: ${dv.name}님은 ${mine} 소속, 프로젝트는 ${theirs}입니다. 매출은 ${theirs}로, 이 사람 이익금은 ${dv.salesPartId === HQ_PART ? "본사(파트 정산 제외)" : mine}로 잡힙니다. 파트를 잘못 골랐다면 개발자 풀에서 고쳐 주세요. 저장은 됩니다.`,
       );

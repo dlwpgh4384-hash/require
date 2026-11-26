@@ -245,7 +245,12 @@ function mount(path: string) {
 }
 function expectSingleShell() {
   expect(screen.getAllByRole("banner")).toHaveLength(1);
-  expect(screen.getAllByRole("complementary")).toHaveLength(1);
+  // 시안 UI-26 질문 기록(aside「질문 기록」)은 화면 안 칸이라 공통 틀의 왼쪽 메뉴 수에서 뺀다.
+  expect(
+    screen.getAllByRole("complementary", {
+      name: (name) => name !== "질문 기록",
+    }),
+  ).toHaveLength(1);
   expect(screen.getAllByRole("main")).toHaveLength(1);
 }
 

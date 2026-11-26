@@ -59,7 +59,7 @@ public class CommonManpowerForecastService {
         var months = core.stream().map(m -> {
             var supply = mm(m.supply());
             var demand = mm(m.demand());
-            return new Month(m.month(), supply, demand, mm(m.unfilledDemand()), one(supply).subtract(one(demand)));
+            return new Month(m.month(), supply, demand, mm(m.unfilledDemand()), monthDifference(m.supply(), m.demand()));
         }).toList();
         JobShortage shortage = null;
         BigDecimal minimum = new BigDecimal("-0.05");
@@ -70,7 +70,7 @@ public class CommonManpowerForecastService {
                 for (var month : core) {
                     for (var value : month.jobs()) {
                         if (!value.jobCode().equals(job.jobCode())) continue;
-                        var difference = one(value.supply()).subtract(one(value.demand()));
+                        var difference = jobDifference(value.supply(), value.demand());
                         if (difference.compareTo(minimum) < 0) {
                             minimum = difference;
                             shortage = new JobShortage(value.jobName(), difference.abs());
@@ -85,6 +85,15 @@ public class CommonManpowerForecastService {
         var thresholds = new Thresholds(standards.effectiveStandard("SHORT_PERSON", base).value(),
             standards.effectiveStandard("SURPLUS_PERSON", base).value());
         return new Result(months, summary, thresholds);
+    }
+
+    /** 달 합계 「차이」(SFR-117-06): 두 자리로 반올림한 가용·필요를 다시 한 자리로 반올림해 뺀다. AI 분석 도우미도 같이 쓴다. */
+    public static BigDecimal monthDifference(BigDecimal supply, BigDecimal demand) {
+        return one(mm(supply)).subtract(one(mm(demand)));
+    }
+    /** 직무별 「차이」: 한 자리로 반올림한 가용 − 필요(시안 worst와 같음). */
+    public static BigDecimal jobDifference(BigDecimal supply, BigDecimal demand) {
+        return one(supply).subtract(one(demand));
     }
 
     private static BigDecimal mm(BigDecimal value) { return value.setScale(2, RoundingMode.HALF_UP); }

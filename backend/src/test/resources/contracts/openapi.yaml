@@ -25136,9 +25136,29 @@ components:
           type: string
         label:
           type: string
+        align:
+          type: string
+          enum:
+          - left
+          - right
+        format:
+          type: string
+          enum:
+          - text
+          - money
+          - rate
+          - mm
+          - count
+          - month
+          - date
+        sensitive:
+          type: boolean
+          description: 민감 칸(권한 없으면 빠짐)
       required:
       - key
       - label
+      - align
+      - format
     CommonAiAnalysisCell:
       oneOf:
       - type: number
@@ -25147,6 +25167,8 @@ components:
     CommonAiAnalysisTable:
       type: object
       properties:
+        title:
+          type: string
         columns:
           type: array
           items:
@@ -25157,9 +25179,62 @@ components:
             type: array
             items:
               $ref: '#/components/schemas/CommonAiAnalysisCell'
+        tones:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+              nullable: true
+              enum:
+              - bad
+              - warn
+        totalRow:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAiAnalysisCell'
+        hidden:
+          type: boolean
+          description: true면 화면에 그리지 않고 엑셀에만 씀
       required:
       - columns
       - rows
+    CommonAiAnalysisChart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+          - line
+        labels:
+          type: array
+          items:
+            type: string
+        series:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              values:
+                type: array
+                items:
+                  type: number
+                  nullable: true
+            required:
+            - name
+            - values
+        format:
+          type: string
+          description: 값 모양(없으면 money)
+          enum:
+          - money
+          - rate
+      required:
+      - type
+      - labels
+      - series
     CommonAiAnalysisAction:
       type: object
       properties:
@@ -25186,36 +25261,56 @@ components:
           - ERR
         conclusion:
           type: string
-        table:
-          $ref: '#/components/schemas/CommonAiAnalysisTable'
+          description: '**굵게** 표시 포함'
+        forecast:
+          type: boolean
+        provisional:
+          type: boolean
+        provisionalMonth:
+          type: string
+          nullable: true
+          description: 가장 늦은 잠정 달
+        tables:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonAiAnalysisTable'
+        chart:
+          $ref: '#/components/schemas/CommonAiAnalysisChart'
         assumptions:
           type: array
           items:
             type: string
         usedData:
           type: string
-          description: 대상·기간·기준월 작업중 여부; 저장 설명500자
+          description: 대상·기간; 저장 설명500자. NO_ANS·ERR는 둘째 줄이 있을 때만
         baseMonth:
           type: string
-        provisional:
-          type: boolean
         actions:
           type: array
           items:
             $ref: '#/components/schemas/CommonAiAnalysisAction'
+        excel:
+          type: boolean
         suggestedQuestions:
           type: array
+          items:
+            type: string
+        suggestionLabels:
+          type: array
+          description: 추천 질문 단추 글(suggestedQuestions와 같은 순서)
           items:
             type: string
       required:
       - questionId
       - answerStatus
       - conclusion
-      - assumptions
-      - usedData
-      - baseMonth
+      - forecast
       - provisional
+      - tables
+      - assumptions
+      - baseMonth
       - actions
+      - excel
       - suggestedQuestions
     CommonAiAnalysisHistoryItem:
       type: object

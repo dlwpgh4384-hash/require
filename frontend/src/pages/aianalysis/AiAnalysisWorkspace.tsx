@@ -17,6 +17,8 @@ interface Turn {
   answer?: api.AnalysisAnswer;
   error?: string;
 }
+/** ok=답 받음, error=처리 실패(답 자리에 안내), invalid=질문 글 오류(입력 그대로 둠), ignored=빈 질문·처리 중. */
+export type SendResult = "ok" | "error" | "invalid" | "ignored";
 interface Workspace {
   turns: Turn[];
   history: api.AnalysisHistoryItem[];
@@ -29,8 +31,9 @@ interface Workspace {
     question: string,
     screenId: string,
     period?: api.AnalysisPeriod,
-  ) => Promise<boolean>;
+  ) => Promise<SendResult>;
   reloadHistory: () => Promise<void>;
+  ensureHistory: () => void;
   clear: () => void;
 }
 const Context = createContext<Workspace | null>(null);
@@ -52,14 +55,23 @@ export function AiAnalysisWorkspaceProvider({
     setHistoryLoading(true);
     setHistoryError("");
     try {
-      setHistory((await api.getCommonAiAnalysisQuestions()).items);
+      setHistory(
+        (await api.getCommonAiAnalysisQuestions()).items.slice(
+          0,
+          api.ANALYSIS_HISTORY_LIMIT,
+        ),
+      );
     } catch {
       setHistoryError("질문 기록을 불러오지 못했습니다.");
     } finally {
       setHistoryLoading(false);
     }
   }, []);
-  useEffect(() => {
+  // 질문 기록은 UI-26 화면이나 [AI에게 묻기] 창이 처음 열릴 때 한 번 읽는다(다른 화면만 열면 요청 없음).
+  const historyRequested = useRef(false);
+  const ensureHistory = useCallback(() => {
+    if (historyRequested.current) return;
+    historyRequested.current = true;
     void reloadHistory();
   }, [reloadHistory]);
   const clear = useCallback(() => {
@@ -79,11 +91,13 @@ export function AiAnalysisWorkspaceProvider({
   );
   const send = useCallback(
     async (question: string, screenId: string, period?: api.AnalysisPeriod) => {
-      if (active.current) return false;
+      if (active.current) return "ignored";
       const trimmed = question.trim();
-      if (!trimmed || [...trimmed].length > 1000) {
+      // 시안 ask(): 빈 질문은 아무 말 없이 무시한다.
+      if (!trimmed) return "ignored";
+      if ([...trimmed].length > 1000) {
         setFieldError("질문은 1~1000자로 입력해 주세요.");
-        return false;
+        return "invalid";
       }
       const id = newAiRequestId();
       const epoch = generation.current;
@@ -122,7 +136,7 @@ export function AiAnalysisWorkspaceProvider({
             ),
           );
         await reloadHistory();
-        return true;
+        return "ok";
       } catch (error) {
         if (generation.current === epoch) {
           if (
@@ -131,6 +145,7 @@ export function AiAnalysisWorkspaceProvider({
           ) {
             setFieldError(error.message);
             setTurns((previous) => previous.filter((turn) => turn.id !== id));
+            return "invalid";
           } else
             setTurns((previous) =>
               previous.map((turn) =>
@@ -143,7 +158,7 @@ export function AiAnalysisWorkspaceProvider({
               ),
             );
         }
-        return false;
+        return "error";
       } finally {
         window.clearInterval(timer);
         active.current = null;
@@ -165,6 +180,7 @@ export function AiAnalysisWorkspaceProvider({
         fieldError,
         send,
         reloadHistory,
+        ensureHistory,
         clear,
       }}
     >

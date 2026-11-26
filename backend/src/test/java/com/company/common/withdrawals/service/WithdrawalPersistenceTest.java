@@ -172,6 +172,31 @@ class WithdrawalPersistenceTest {
         assertThat(list.path("banner").path("soonCount").asInt()).isEqualTo(2);
         assertThat(list.path("banner").path("unassignedCount").asInt()).isZero();
     }
+    /** AI 분석 도우미 F-10 「다음 배정 없음」은 같은 자료에서 철수 리스트 안내 띠 숫자와 같다. */
+    @Test void aiAnalysisWithoutNextAssignmentCountEqualsTheBannerCount(@Autowired CommonWithdrawalService withdrawals,
+        @Autowired BusinessCalendar calendar)throws Exception {
+        var codes=org.mockito.Mockito.mock(com.company.common.airecommendations.service.AiRecommendationCodes.class);
+        org.mockito.Mockito.when(codes.selectable(org.mockito.ArgumentMatchers.anyString())).thenReturn(List.of());
+        var menus=org.mockito.Mockito.mock(com.company.common.menus.mapper.MenuMapper.class);
+        org.mockito.Mockito.when(menus.selectCandidates()).thenReturn(List.of());
+        var tables=new com.company.common.aianalysis.service.AiAnalysisTables(new ObjectMapper().findAndRegisterModules(),
+            new com.company.common.aianalysis.service.AiAnalysisScreens(new com.company.common.menus.service.DevelopedScreenRegistry(),menus));
+        var ai=new com.company.common.aianalysis.service.AiAnalysisWorkforceFunctions(
+            org.mockito.Mockito.mock(com.company.common.salespipeline.service.SalesPipelineForecastService.class),
+            org.mockito.Mockito.mock(com.company.common.manpowerboard.service.CommonManpowerBoardService.class),
+            org.mockito.Mockito.mock(com.company.common.dashboard.service.DashboardUtilizationService.class),
+            withdrawals,codes,org.mockito.Mockito.mock(CalculationRuleService.class),calendar,tables);
+        var query=new com.company.common.aianalysis.service.AiAnalysisInterpreter.Query("다음 배정 없는 철수 예정자는?","F-10",
+            new com.company.common.aianalysis.dto.AiAnalysisContracts.Period("2026-11","2027-02"),false,false);
+        for(int round=0;round<2;round++){
+            if(round==1)save("A-WITHDRAWAL-A",1);
+            int banner=getData("/api/common/withdrawals?year=2026").path("banner").path("unassignedCount").asInt();
+            var answer=ai.read(query);
+            assertThat(answer.tables().get(0).rows()).as("round "+round).hasSize(banner);
+            assertThat(answer.conclusion()).contains("**"+banner+"명**");
+            assertThat(banner).isEqualTo(round==0?2:1);
+        }
+    }
     @Test void listUsesSetQueriesForReservationsHistoryAndSeatNames()throws Exception {
         save("A-WITHDRAWAL-A",1);
         db.update("INSERT INTO TB_PJ_ASGN_HIST(ASGN_ID,HIST_SN,ASGN_CHG_TYPE_CD,APLY_DT,BFR_VAL,AFT_VAL,RTRO_YN,CLOSE_CROSS_YN,CRCT_YN,REG_USER_ID) VALUES('A-WITHDRAWAL-B',1,'EARLY','2026-10-01','2026-12-31','2026-11-30','N','N','N','admin')");

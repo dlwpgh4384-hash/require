@@ -460,7 +460,8 @@ public class CommonProjectCostAnalysisService {
             historicAmount(p, changes, "TEAM", cutoff, p.team()), historicAmount(p, changes, "PEXP", cutoff, p.expense()),
             p.plannedMm(), p.modifiedDate());
     }
-    private static boolean closed(String ym, UserPreferencePeriodBasis.Basis basis) {
+    /** 마감한 달: CASH_BASE_YM 전 달(이관 자료) 또는 마감한 달. AI 분석 도우미 F-03 잠정도 이 규칙을 쓴다. */
+    public static boolean closed(String ym, UserPreferencePeriodBasis.Basis basis) {
         return ym.compareTo(basis.cashBaseYm()) < 0 || basis.closedMonths().contains(ym);
     }
     /** 형식만 본다(DB를 읽기 전). */

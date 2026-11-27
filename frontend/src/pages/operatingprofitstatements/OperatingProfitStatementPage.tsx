@@ -13,6 +13,8 @@ import { Toast } from "../../shared/feedback/Dialog";
 import { PeriodSelector } from "../../shared/period/PeriodSelector";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
 import { UploadActions } from "../uploads/UploadActions";
+import { useOptionalAccountSession } from "../commonops/AccountSessionBoundary";
+import { usePermission } from "../../shared/permission/permission";
 import { ProjectRequestError } from "../projects/projects";
 import { percentage } from "../profitstructures/profitStructureFormulas";
 import {
@@ -91,6 +93,12 @@ const infoIcon = (
 );
 export function OperatingProfitStatementPage() {
   const period = useScreenPeriod("UI-08", options);
+  // 로그인(UI-22) ⑦-10: 전년 손익 양식·업로드는 시스템 관리자 + M020 업로드 권한만(서버 AccountApiPolicy B11과 같다).
+  // 단추 글자가 공통 권한 틀 글자 규칙에 다 걸리지 않아 여기서 직접 가린다. 로그인 틀 밖(화면 단위 시험)은 보인다.
+  const account = useOptionalAccountSession();
+  const canUploadPrior = usePermission("UI-08").can("UPLOAD");
+  const priorUpload =
+    !account || (canUploadPrior && (account.info?.roles ?? []).includes("ADMIN"));
   const host = useOperatingProfitStatementTitleHost();
   const [unit, setUnit] = useState<MoneyUnit>(DEFAULT_MONEY_UNIT);
   const [data, setData] = useState<OperatingResult | null>(null);
@@ -181,6 +189,7 @@ export function OperatingProfitStatementPage() {
   };
   const actions = (
     <div className="operating-title-buttons">
+      {priorUpload && (
       <UploadActions
         formTypeCode="B11"
         targetName="전년 손익"
@@ -206,6 +215,7 @@ export function OperatingProfitStatementPage() {
           setNotice({ message: "전년 손익을 반영했습니다.", kind: "ok" });
         }}
       />
+      )}
       <button
         type="button"
         className="upload-title-button"

@@ -8,6 +8,7 @@ import org.springframework.beans.factory.config.YamlMapFactoryBean;
 import org.springframework.core.io.ClassPathResource;
 import static org.assertj.core.api.Assertions.*;
 
+// 로그인(UI-22) 작업 뒤: 손 설명서는 그대로, 로그인 정의(security·x-roles·401·403)는 openapi.yaml에만 있어 그 차이는 빼고 비교한다.
 class ManpowerForecastContractTest {
     JsonNode contract() {
         var yaml = new YamlMapFactoryBean();
@@ -20,8 +21,7 @@ class ManpowerForecastContractTest {
             var operation = paths.path("/api/common/manpower-forecasts" + suffix).path("get");
             assertThat(operation.path("operationId").asText()).isEqualTo(suffix.isEmpty()
                 ? "getCommonManpowerForecasts" : "getCommonManpowerForecastsExcel");
-            assertThat(operation.path("security").isArray()).isTrue();
-            assertThat(operation.path("security").size()).isZero();
+            com.company.common.support.test.LoginEraContract.assertLoggedIn(operation, suffix);
             var year = operation.path("parameters").findValues("name");
             assertThat(year).extracting(JsonNode::asText).contains("year");
             var parameters = operation.path("parameters");

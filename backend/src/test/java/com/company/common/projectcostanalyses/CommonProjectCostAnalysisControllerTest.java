@@ -46,6 +46,37 @@ class CommonProjectCostAnalysisControllerTest {
     @MockBean UserPreferencePeriodSourceMapper periods;
     @MockBean PlatformTransactionManager transactions;
     static final String PATH = "/api/common/project-cost-analyses";
+    @Test void monthlyCostsExposeDurableResponseContract() throws Exception {
+        mvc.perform(get("/api/common/project-cost-analyses/P/monthly-costs").param("year","2026").param("baseMonth","1"))
+            .andExpect(status().isOk()).andExpect(com.company.common.support.controller.OpenApiResponseContract
+                .response("GET", "/api/common/project-cost-analyses/{projectId}/monthly-costs"));
+        verify(mapper,never()).insertAccess(anyString(),anyString());
+    }
+    @Test void workforceExposesDurableResponseContract() throws Exception {
+        mvc.perform(get("/api/common/project-cost-analyses/P/workforce").param("year","2026").param("baseMonth","1"))
+            .andExpect(status().isOk()).andExpect(com.company.common.support.controller.OpenApiResponseContract
+                .response("GET", "/api/common/project-cost-analyses/{projectId}/workforce"));
+        verify(mapper,never()).insertAccess(anyString(),anyString());
+    }
+    @Test void causesExposeDurableResponseContract() throws Exception {
+        mvc.perform(get("/api/common/project-cost-analyses/P/causes").param("year","2026").param("baseMonth","1"))
+            .andExpect(status().isOk()).andExpect(com.company.common.support.controller.OpenApiResponseContract
+                .response("GET", "/api/common/project-cost-analyses/{projectId}/causes"));
+        verify(mapper,never()).insertAccess(anyString(),anyString());
+    }
+    @Test void simulationExposesDurableResponseContractWithoutWrites() throws Exception {
+        mvc.perform(get("/api/common/project-cost-analyses/P/simulation").param("year","2026").param("baseMonth","1")
+                .param("headcountChange","1").param("monthlyCostPerPerson","100").param("months","1").param("monthlyPricePerPerson","200"))
+            .andExpect(status().isOk()).andExpect(com.company.common.support.controller.OpenApiResponseContract
+                .response("GET", "/api/common/project-cost-analyses/{projectId}/simulation"));
+        verify(mapper,never()).insertAccess(anyString(),anyString());
+    }
+    @Test void excelRejectsInvalidMonthWithoutDownloadAudit() throws Exception {
+        mvc.perform(get("/api/common/project-cost-analyses/excel").param("year","2026").param("baseMonth","13"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("baseMonth"));
+        verify(mapper,never()).selectSnapshots(any());
+        verify(mapper,never()).insertAccess(anyString(),anyString());
+    }
     @BeforeEach void setup() throws Exception {
         ProjectCostAnalysisTestSources.definitions(definitions);
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
@@ -450,11 +481,5 @@ class CommonProjectCostAnalysisControllerTest {
         var with=json.readTree(mvc.perform(request("")).andReturn().getResponse().getContentAsString()).at("/data/items/0/expectedFinalMarginRate");
         assertThat(with).isEqualTo(without);
         assertThat(with.isNumber()).isTrue();
-    }
-    @Test void independentRolePolicyPermitsUnionOfFinanceExecutiveAdminButNotPmOrSalesLeader() {
-        for (String role : List.of("FIN","EXEC","ADMIN"))
-            assertThat(ProjectCostAnalysisPolicy.canView(List.of(new Role(role,role,"ALL","Y","Y",true)))).isTrue();
-        for (String role : List.of("PM","SALES_LDR"))
-            assertThat(ProjectCostAnalysisPolicy.canView(List.of(new Role(role,role,"ALL","Y","Y",true)))).isFalse();
     }
 }

@@ -98,7 +98,7 @@ class UserProjectionTest {
         parameters.put("id", "test"); parameters.put("token", null); parameters.put("state", "USE"); parameters.put("unlock", true); parameters.put("hash", "redacted");
         for (String method : List.of("touch", "resetPassword", "changeState")) {
             String update = config.getMappedStatement(UserMapper.class.getName() + "." + method).getBoundSql(parameters).getSql();
-            assertThat(update).contains("IS NOT DISTINCT FROM", "1 microsecond", "mod_user_id='admin'");
+            assertThat(update).contains("IS NOT DISTINCT FROM", "1 microsecond", "mod_user_id=?");
         }
     }
 }

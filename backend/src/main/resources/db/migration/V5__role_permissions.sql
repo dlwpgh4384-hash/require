@@ -33,7 +33,7 @@ BEGIN
     LOCK TABLE TB_SY_ROLE_MENU_AUTH IN EXCLUSIVE MODE;
     IF NOT EXISTS (SELECT 1 FROM TB_SY_ROLE_MENU_AUTH) THEN
         -- Original DML permissions expressed as role defaults and its blocked-menu rows.
-        -- EXEC/M011 CNFM=N is the approved read/download-only initial-value correction.
+        -- 경영진·영업 파이프라인(M011) 확정은 Y(DML·시안과 같게), PM은 M011 7개 모두 N(사용자 결정 2026-11-26).
         INSERT INTO TB_SY_ROLE_MENU_AUTH (
             ROLE_ID, MENU_ID, INQ_YN, REG_YN, UPD_YN, DEL_YN, UPLD_YN, DNLD_YN, CNFM_YN, REG_USER_ID
         )
@@ -44,7 +44,7 @@ BEGIN
             CASE WHEN NOT b.blocked AND r.ROLE_ID IN ('ADMIN','FIN') THEN 'Y' ELSE 'N' END,
             CASE WHEN NOT b.blocked AND r.ROLE_ID IN ('ADMIN','FIN') THEN 'Y' ELSE 'N' END,
             CASE WHEN NOT b.blocked AND r.ROLE_ID!='PM' THEN 'Y' ELSE 'N' END,
-            CASE WHEN NOT b.blocked AND r.ROLE_ID IN ('ADMIN','FIN') THEN 'Y' ELSE 'N' END,
+            CASE WHEN NOT b.blocked AND (r.ROLE_ID IN ('ADMIN','FIN') OR (r.ROLE_ID='EXEC' AND m.MENU_ID='M011')) THEN 'Y' ELSE 'N' END,
             'SYSTEM'
         FROM TB_SY_ROLE r
         CROSS JOIN TB_SY_MENU m
@@ -52,7 +52,7 @@ BEGIN
             (r.ROLE_ID='EXEC' AND m.MENU_ID IN ('M027','M028','M029','M030'))
             OR (r.ROLE_ID='SALES_LDR' AND m.MENU_ID IN (
                 'M014','M015','M018','M019','M020','M021','M022','M023','M024','M027','M028','M029','M030'))
-            OR (r.ROLE_ID='PM' AND m.MENU_ID IN (
+            OR (r.ROLE_ID='PM' AND m.MENU_ID IN ('M011',
                 'M014','M015','M016','M017','M018','M019','M020','M021','M022','M023','M024','M027','M028','M029','M030'))
         ) AS blocked) b
         WHERE r.ROLE_ID IN ('ADMIN','EXEC','FIN','SALES_LDR','PM')
@@ -60,6 +60,13 @@ BEGIN
                 'M001','M002','M003','M004','M005','M006','M007','M008','M009','M010',
                 'M011','M012','M013','M014','M015','M016','M017','M018','M019','M020',
                 'M021','M022','M023','M024','M025','M026','M027','M028','M029','M030');
+    ELSE
+        -- 이미 만든 DB: 준비 명령이 이 두 줄만 고친다. 관리자가 권한 화면에서 고친 줄(MOD_USER_ID 있음)은 그대로 둔다.
+        UPDATE TB_SY_ROLE_MENU_AUTH SET CNFM_YN='Y'
+        WHERE ROLE_ID='EXEC' AND MENU_ID='M011' AND CNFM_YN='N' AND INQ_YN='Y' AND MOD_USER_ID IS NULL;
+        UPDATE TB_SY_ROLE_MENU_AUTH SET INQ_YN='N',REG_YN='N',UPD_YN='N',DEL_YN='N',UPLD_YN='N',DNLD_YN='N',CNFM_YN='N'
+        WHERE ROLE_ID='PM' AND MENU_ID='M011' AND MOD_USER_ID IS NULL
+          AND 'Y' IN (INQ_YN,REG_YN,UPD_YN,DEL_YN,UPLD_YN,DNLD_YN,CNFM_YN);
     END IF;
 END;
 $permissions$;

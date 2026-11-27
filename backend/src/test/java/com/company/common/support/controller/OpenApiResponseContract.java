@@ -37,8 +37,20 @@ public final class OpenApiResponseContract {
         assertThat(operation.isObject()).as("OpenAPI operation %s %s", method, path).isTrue();
         return result -> {
             var response = result.getResponse();
-            JsonNode schema = operation.path("responses").path(Integer.toString(response.getStatus()))
-                .path("content").path("application/json").path("schema");
+            JsonNode declared = operation.path("responses").path(Integer.toString(response.getStatus()));
+            assertThat(declared.isObject()).as("declared response %s %s: %s", method, path, response.getStatus()).isTrue();
+            if (declared.has("$ref")) {
+                String reference = declared.path("$ref").asText();
+                assertThat(reference).startsWith("#/");
+                declared = contract.at(reference.substring(1));
+                assertThat(declared.isObject()).as("resolved response %s", reference).isTrue();
+            }
+            if (response.getStatus() == 204) {
+                assertThat(declared.has("content")).as("204 response has no content contract").isFalse();
+                assertThat(response.getContentAsByteArray()).isEmpty();
+                return;
+            }
+            JsonNode schema = declared.path("content").path("application/json").path("schema");
             assertThat(schema.isObject()).as("declared JSON response %s %s: %s", method, path, response.getStatus()).isTrue();
             JsonNode body = JSON.readTree(response.getContentAsByteArray());
             assertThat(body).as("JSON response body").isNotNull();

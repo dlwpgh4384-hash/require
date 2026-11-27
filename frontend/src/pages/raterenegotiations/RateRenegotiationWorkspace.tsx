@@ -37,6 +37,7 @@ import {
   rateRenegotiationFormulaFoot,
   rateRenegotiationFormulas,
 } from "./rateRenegotiationFormulas";
+import { useSensitiveView } from "../../shared/permission";
 import "./rateRenegotiations.css";
 
 /** 시안 ic('warn',18): 다른 화면 경고 띠와 같은 아이콘 */
@@ -46,6 +47,12 @@ const warnIcon = (
   </svg>
 );
 
+// 민감 칸을 볼 수 없으면 서버가 현재 단가·월 원가·목표 단가를 보내지 않는다 → 그 열을 숨긴다.
+const SENSITIVE_RATE_KEYS = new Set<string>([
+  "currentUnitPrice",
+  "monthlyCost",
+  "targetUnitPrice",
+]);
 const moneyKeys = new Set<string>([
   "currentUnitPrice",
   "monthlyCost",
@@ -71,6 +78,8 @@ const message = (reason: unknown) =>
 
 // UI-32 / M017 / G006: no period selector, business save or negotiation state.
 export function RateRenegotiationWorkspace() {
+  // 민감 칸을 볼 수 없으면 서버가 월 원가를 보내지 않는다 → 열을 숨긴다.
+  const sensitive = useSensitiveView();
   const [draft, setDraft] = useState(rateRenegotiationDefaults);
   const [applied, setApplied] = useState(rateRenegotiationDefaults);
   const [data, setData] = useState<RateRenegotiationResult | null>(null);
@@ -265,7 +274,9 @@ export function RateRenegotiationWorkspace() {
     return row[key];
   };
   const columns: ListColumn<RateRenegotiationRow>[] =
-    rateRenegotiationColumns.map(([key, label]) => ({
+    rateRenegotiationColumns
+      .filter(([key]) => sensitive || !SENSITIVE_RATE_KEYS.has(key))
+      .map(([key, label]) => ({
       key,
       label:
         key === "annualProfitIncrease"
@@ -544,7 +555,10 @@ export function RateRenegotiationWorkspace() {
             </div>
             <div className="ls-r2">
               <span>
-                단가 {formatKoreanMoney(row.currentUnitPrice)} · 이익률{" "}
+                {sensitive && row.currentUnitPrice != null
+                  ? `단가 ${formatKoreanMoney(row.currentUnitPrice)} · `
+                  : ""}
+                이익률{" "}
                 {percent(row.profitRate)}
               </span>
               <b>+{formatKoreanMoney(row.annualProfitIncrease)}/년</b>

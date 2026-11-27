@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { DeveloperPage } from "./DeveloperPage";
@@ -607,7 +608,50 @@ it("hides status actions from people who cannot manage statuses", async () => {
   expect(screen.queryByTestId("developer-status-add")).not.toBeInTheDocument();
   expect(screen.queryByTestId("developer-end-1")).not.toBeInTheDocument();
 });
-it("tells the list page the mockup message after saving an end date", async () => {
+it.each([
+  ["휴직", ["퇴사", "재직"]],
+  ["대기", ["휴직", "퇴사"]],
+  ["투입중", ["휴직", "퇴사"]],
+])(
+  "55번 5-1: 지금 상태가 %s이면 같은 상태는 고를 수 없다",
+  async (current, choices) => {
+    row.workStatusName = current;
+    renderDetail();
+    await openStatusTab();
+    fireEvent.click(screen.getByTestId("developer-status-add"));
+    const select = within(
+      screen.getByTestId("developer-status-dialog"),
+    ).getByTestId("developer-status-name");
+    expect(
+      Array.from(select.querySelectorAll("option")).map((o) => o.textContent),
+    ).toEqual(choices);
+    expect(select).toHaveValue(choices[0]);
+  },
+);
+it("55번 5-3: 고르기 목록(공통코드·거래처·파트)은 처음 한 번만 읽고 검색 때는 목록만 다시 읽는다", async () => {
+  render(<DeveloperPage />);
+  await screen.findByText("김개발");
+  const optionReads = () =>
+    request.mock.calls.filter(
+      ([path]) =>
+        String(path).includes("/code-groups/") ||
+        String(path).startsWith("/api/common/clients?") ||
+        String(path).startsWith("/api/common/parts"),
+    ).length;
+  const listReads = () =>
+    request.mock.calls.filter(([path]) =>
+      String(path).startsWith("/api/common/developers?"),
+    ).length;
+  await waitFor(() => expect(optionReads()).toBe(9));
+  expect(listReads()).toBe(1);
+  fireEvent.change(screen.getByTestId("developer-search"), {
+    target: { value: "K-0001" },
+  });
+  fireEvent.click(screen.getByTestId("list-search"));
+  await waitFor(() => expect(listReads()).toBe(2));
+  await screen.findByText("김개발");
+  expect(optionReads()).toBe(9);
+});it("tells the list page the mockup message after saving an end date", async () => {
   const onChanged = vi.fn();
   renderDetail(onChanged);
   await openStatusTab();

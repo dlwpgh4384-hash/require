@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Badge,
   Banner,
@@ -8,7 +8,6 @@ import {
 } from "../../shared/list";
 import { YearBar } from "../../shared/period/YearBar";
 import { isAllowed, yearRange } from "../../shared/period/periodRules";
-import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { koreanToday } from "../../shared/time";
 import { projectFailure, ProjectRequestError } from "../projects/projects";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
@@ -16,7 +15,6 @@ import { ManpowerForecastBars } from "./ManpowerForecastBars";
 import { ManpowerForecastTable } from "./ManpowerForecastTable";
 import {
   getCommonManpowerForecasts,
-  getCommonManpowerForecastsExcel,
   type ManpowerForecastResult,
 } from "./manpowerForecasts";
 import "../profitstructures/profitStructures.css";
@@ -60,18 +58,6 @@ export function UI17Page({
     [],
   );
   const [revision, setRevision] = useState(0);
-  const [downloading, setDownloading] = useState(false);
-  const [notice, setNotice] = useState<{
-    message: string;
-    kind: ToastKind;
-  } | null>(null);
-  const alive = useRef(true);
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
   useEffect(() => {
     if (year === null) return;
     const controller = new AbortController();
@@ -89,39 +75,8 @@ export function UI17Page({
       });
     return () => controller.abort();
   }, [year, revision]);
-  const download = async () => {
-    if (!data || year === null || downloading) return;
-    setDownloading(true);
-    try {
-      const count = await getCommonManpowerForecastsExcel(year);
-      if (alive.current)
-        setNotice({
-          kind: "ok",
-          message: `엑셀 파일을 만들었습니다 (조회 결과 ${count}건)`,
-        });
-    } catch (reason) {
-      if (alive.current) {
-        setNotice({ kind: "warn", message: projectFailure(reason) });
-        if (reason instanceof ProjectRequestError) setFields(reason.errors);
-      }
-    } finally {
-      if (alive.current) setDownloading(false);
-    }
-  };
-  const actions = (
-    <button
-      type="button"
-      className="ls-btn"
-      data-testid="manpower-forecast-excel"
-      disabled={!data || downloading}
-      onClick={() => void download()}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
-      </svg>{" "}
-      {downloading ? "만드는 중…" : "엑셀 다운로드"}
-    </button>
-  );
+  // [엑셀 다운로드]는 사용자 결정으로 뺐다(55번 6). 제목 줄 단추 자리는 비워 둔다.
+  const actions = null;
   const choose = (next: number) => {
     if (
       period.state.status === "ready" &&
@@ -137,11 +92,7 @@ export function UI17Page({
       data-testid="manpower-forecast-page"
       data-screen-id="SCR-UI-17"
     >
-      {renderActions ? (
-        renderActions(actions)
-      ) : (
-        <div className="project-title-actions">{actions}</div>
-      )}
+      {renderActions?.(actions)}
       {period.state.status === "ready" && (
         <YearBar
           year={period.state.value.year}
@@ -236,13 +187,6 @@ export function UI17Page({
             달까지 나눈 값). 달별 미충원: {unfilledNote(data.months)}명.
           </p>
         </>
-      )}
-      {notice && (
-        <Toast
-          kind={notice.kind}
-          message={notice.message}
-          onDismiss={() => setNotice(null)}
-        />
       )}
     </div>
   );

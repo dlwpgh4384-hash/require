@@ -18,10 +18,12 @@ export interface RateRenegotiationRow {
   renewalDate: string;
   daysUntilRenewal: number;
   monthlyMm: number;
-  currentUnitPrice: number;
-  monthlyCost: number;
+  /** 민감 칸을 볼 수 없는 사람에게는 서버가 보내지 않는다(목표 단가도 같음). */
+  currentUnitPrice?: number | null;
+  /** 민감 칸을 볼 수 없는 사람에게는 서버가 보내지 않는다. */
+  monthlyCost?: number | null;
   profitRate: number;
-  targetUnitPrice: number;
+  targetUnitPrice?: number | null;
   requiredIncreaseRate: number;
   annualProfitIncrease: number;
   /** 프로젝트 이름을 누르면 여는 프로젝트 상세용 */

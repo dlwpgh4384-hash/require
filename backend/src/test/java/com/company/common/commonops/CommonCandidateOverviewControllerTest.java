@@ -47,6 +47,12 @@ class CommonCandidateOverviewControllerTest {
     @MockBean CandidateDefinitions definitions;
     @MockBean BusinessCalendar calendar;
     @MockBean PlatformTransactionManager transactions;
+    @Test void extractionRequiresMultipartAndDoesNotReadBusinessSourcesForJson() throws Exception {
+        mvc.perform(post("/api/common/candidate-resume-extractions").contentType("application/json").content("{}"))
+            // 앱 공통 오류 처리(ApiExceptionHandler)는 형식 오류를 400 「입력 형식을 확인해 주세요.」로 돌려준다.
+            .andExpect(status().isBadRequest());
+        verifyNoInteractions(mapper,forecast,definitions,calculations);
+    }
 
     @BeforeEach void setup() {
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());

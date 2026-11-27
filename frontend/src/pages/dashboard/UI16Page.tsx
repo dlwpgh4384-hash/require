@@ -34,12 +34,12 @@ import {
 } from "../projectcostanalyses/projectCostAnalyses";
 import {
   getCommonDashboard,
-  getCommonDashboardExcel,
   type Amount,
   type DashboardResult,
 } from "./dashboard";
 import "../profitstructures/profitStructures.css";
 import "./dashboard.css";
+import { useCanViewScreen } from "../../shared/permission";
 
 const options = { kind: "yearMonth" as const };
 const ok = (value: Amount | undefined): value is number =>
@@ -71,9 +71,8 @@ function Icon({ path, size }: { path: string; size: number }) {
     </svg>
   );
 }
-/** 시안 ic('warn') · ic('down'). */
+/** 시안 ic('warn'). */
 const WARN = "M12 3l10 18H2zM12 10v5M12 18h.01";
-const DOWN = "M12 3v12M7 10l5 5 5-5M5 21h14";
 
 /** 시안 delta(): 「▲ 3.2% 전월 대비」(좋으면 초록, 나쁘면 빨강). 비교 값이 없으면 null. */
 function Delta({ value }: { value: Amount | undefined }) {
@@ -87,7 +86,9 @@ function Delta({ value }: { value: Amount | undefined }) {
     </>
   );
 }
-function DetailButton({ onClick }: { onClick: () => void }) {
+function DetailButton({ onClick }: { onClick?: () => void }) {
+  // 볼 권한이 없는 화면으로 가는 [자세히]는 그리지 않는다(⑦-5).
+  if (!onClick) return null;
   return (
     <button type="button" className="ls-btn ls-btn-sm ls-btn-t" onClick={onClick}>
       자세히
@@ -105,7 +106,6 @@ export function UI16Page({
   const [error, setError] = useState("");
   const [fieldError, setFieldError] = useState("");
   const [retry, setRetry] = useState(0);
-  const [downloading, setDownloading] = useState(false);
   const [toast, setToast] = useState<{
     kind: "success" | "error";
     message: string;
@@ -196,34 +196,8 @@ export function UI16Page({
       if (!controller.signal.aborted) setDetailBusy(false);
     }
   }
-  async function download() {
-    if (!data || busy || downloading) return;
-    const targetMonth = data.selectedMonth;
-    setDownloading(true);
-    try {
-      const count = await getCommonDashboardExcel(targetMonth);
-      setToast({
-        kind: "success",
-        message: `엑셀 파일을 만들었습니다 (조회 결과 ${count}건)`,
-      });
-    } catch (failure) {
-      setToast({ kind: "error", message: projectFailure(failure) });
-    } finally {
-      setDownloading(false);
-    }
-  }
-  const actions = (
-    <button
-      type="button"
-      className="ls-btn"
-      data-testid="dashboard-excel"
-      disabled={busy || !data || downloading}
-      onClick={() => void download()}
-    >
-      <Icon path={DOWN} size={16} />{" "}
-      {downloading ? "만드는 중…" : "엑셀 다운로드"}
-    </button>
-  );
+  // [엑셀 다운로드]는 사용자 결정으로 뺐다(55번 3-5). 제목 줄 단추 자리는 비워 둔다.
+  const actions = null;
   return (
     <div
       role="region"
@@ -231,11 +205,7 @@ export function UI16Page({
       className="screen-body profit-structures-page dashboard-page"
       data-testid="dashboard-page"
     >
-      {renderActions ? (
-        renderActions(actions)
-      ) : (
-        <div className="dashboard-actions">{actions}</div>
-      )}
+      {renderActions?.(actions)}
       {basis && value && (
         <PeriodSelector
           kind="yearMonth"
@@ -323,8 +293,14 @@ function DashboardBody({
   openProject: (projectId: string) => void;
 }) {
   const s = data.summary;
+  // 요약 칸·[자세히]·확인할 일은 볼 권한이 있는 화면으로만 옮겨 간다(시안 TO·canSee, ⑦-5).
+  const canView = useCanViewScreen();
+  const to = (screen: string) => (canView(screen) ? () => go(screen) : undefined);
   // 가동률 목표(시안 「목표 90% 대비」). 서버 값이 없으면 시안 기본 90%.
-  const target = ok(s.utilizationTargetRate) ? s.utilizationTargetRate : 90;
+  const target = s && ok(s.utilizationTargetRate) ? s.utilizationTargetRate : 90;
+  // 명세 ⑧-4·시안 dashMode: 파트장·PM 모양은 서버가 요약·마감·파이프라인·자금 등을 비워 보낸다 → 그 칸을 숨긴다.
+  const mode = data.dashMode ?? "all";
+  const full = mode === "all";
   const selected = data.selectedMonth;
   const selectedNo = monthNumber(selected);
   const year = selected.slice(0, 4);
@@ -333,9 +309,10 @@ function DashboardBody({
   // 서버가 시안 규칙(0건 숨김, 철수 줄은 늘 보임)으로 정한 visible 줄만 그린다. 급함 = 빨강(bad) 줄 수.
   const todos = data.todos.filter((t) => t.visible);
   const urgent = todos.filter((t) => t.tone === "bad").length;
-  const remaining = data.closing.remainingItems;
-  const done = data.closing.completedCount;
-  const total = data.closing.totalCount;
+  const closing = data.closing;
+  const remaining = closing?.remainingItems ?? [];
+  const done = closing?.completedCount ?? 0;
+  const total = closing?.totalCount ?? 0;
   const alerts = data.projectAlerts;
   // 매출·원가 추이: 1~12월, 매출·원가는 고른 달까지, 목표 매출은 12달 모두(시안).
   const months = Array.from(
@@ -364,6 +341,16 @@ function DashboardBody({
           <span className="ls-cap">· {data.mixedBasisNotice}</span>
         )}
       </div>
+      {!full && (
+        <SharedBanner kind="info">
+          <span data-testid="dashboard-mode-notice">
+            {mode === "part"
+              ? "담당 파트 기준으로 봅니다(데이터 범위: 담당 파트). 요약·추이·파트별·파이프라인·마감 진행·자금은 보이지 않습니다."
+              : "맡은 프로젝트 기준으로 봅니다(데이터 범위: 담당 프로젝트). 요약·추이·파트별·파이프라인·자금은 보이지 않습니다."}
+          </span>
+        </SharedBanner>
+      )}
+      {s && (
       <div className="dashboard-kpis">
         <KpiCards aria-label="대시보드 요약">
           <KpiCard
@@ -377,7 +364,7 @@ function DashboardBody({
               </>
             }
             testId="dashboard-revenue"
-            onClick={() => go("UI-08")}
+            onClick={to("UI-08")}
           />
           <KpiCard
             label={`${ML} 영업이익`}
@@ -390,14 +377,14 @@ function DashboardBody({
               </>
             }
             testId="dashboard-profit"
-            onClick={() => go("UI-08")}
+            onClick={to("UI-08")}
           />
           <KpiCard
             label="누계 영업이익"
             value={formatKoreanMoney(s.cumulativeOperatingProfit)}
             description={`1~${selectedNo}월 · 목표 달성 ${pct(s.cumulativeAchievementRate)}`}
             testId="dashboard-cumulative"
-            onClick={() => go("UI-18")}
+            onClick={to("UI-18")}
           />
           <KpiCard
             label="가동률"
@@ -406,7 +393,7 @@ function DashboardBody({
               ok(s.utilizationRate) ? pp(s.utilizationRate - target) : "–"
             } · 대기 ${ok(s.idlePeople) ? Math.round(s.idlePeople) : "–"}명`}
             testId="dashboard-utilization"
-            onClick={() => go("UI-28")}
+            onClick={to("UI-28")}
           />
           <KpiCard
             label={cur ? "미수금" : "미수금 (오늘)"}
@@ -421,10 +408,11 @@ function DashboardBody({
               )
             }
             testId="dashboard-unpaid"
-            onClick={() => go("UI-13")}
+            onClick={to("UI-13")}
           />
         </KpiCards>
       </div>
+      )}
       <div className="dashboard-dgrid">
         <section className="profit-card dashboard-todos" data-testid="dashboard-todos">
           <div className="profit-card-h">
@@ -444,8 +432,8 @@ function DashboardBody({
                 className="dashboard-witem"
                 data-testid={`dashboard-todo-${i}`}
                 key={t.key}
-                disabled={!screen}
-                onClick={() => screen && go(screen)}
+                disabled={!screen || !canView(screen)}
+                onClick={() => screen && canView(screen) && go(screen)}
               >
                 <span className={`dashboard-${t.tone}`} aria-hidden="true">
                   <Icon path={WARN} size={16} />
@@ -454,7 +442,7 @@ function DashboardBody({
                   <strong>{t.title}</strong>
                   <span className="ls-cap">{t.description}</span>
                 </span>
-                {name && (
+                {name && canView(screen) && (
                   <span className="ls-cap dashboard-wgo">
                     {name} <ShellIcon name="chevronRight" size={14} />
                   </span>
@@ -464,63 +452,66 @@ function DashboardBody({
           })}
         </section>
         <div className="dashboard-side">
-          <section className="profit-card dashboard-close" data-testid="dashboard-close">
-            <div className="profit-card-h">
-              <h2>{selectedNo}월 마감 진행</h2>
-              <button
-                type="button"
-                className="ls-btn ls-btn-sm"
-                data-testid="dashboard-close-go"
-                onClick={() => go("UI-14")}
-              >
-                월 마감
-              </button>
-            </div>
-            <div className="dashboard-bar">
-              <div
-                className="dashboard-track"
-                role="progressbar"
-                aria-label="마감 진행"
-                aria-valuemin={0}
-                aria-valuemax={total}
-                aria-valuenow={done}
-              >
-                <div
-                  className="dashboard-fill"
-                  style={{ width: `${total ? (done / total) * 100 : 0}%` }}
-                />
-              </div>
-              <span className="profit-tnum" data-testid="dashboard-close-count">
-                {done}/{total}
-              </span>
-            </div>
-            {remaining.length ? (
-              remaining.map((item, i) => (
-                <div
-                  className="dashboard-close-item"
-                  key={`${item.name}-${i}`}
-                  data-testid={`dashboard-close-${i}`}
+          {/* 월 마감 진행은 월 마감 조회 권한이 있을 때만(시안 canSee('UI-14')). */}
+          {canView("UI-14") && closing && (
+            <section className="profit-card dashboard-close" data-testid="dashboard-close">
+              <div className="profit-card-h">
+                <h2>{selectedNo}월 마감 진행</h2>
+                <button
+                  type="button"
+                  className="ls-btn ls-btn-sm"
+                  data-testid="dashboard-close-go"
+                  onClick={() => go("UI-14")}
                 >
-                  <span className="dashboard-warn">●</span>
-                  <span>
-                    <strong>{item.name}</strong>{" "}
-                    {item.description && (
-                      <span className="ls-cap">{item.description}</span>
-                    )}
-                  </span>
+                  월 마감
+                </button>
+              </div>
+              <div className="dashboard-bar">
+                <div
+                  className="dashboard-track"
+                  role="progressbar"
+                  aria-label="마감 진행"
+                  aria-valuemin={0}
+                  aria-valuemax={total}
+                  aria-valuenow={done}
+                >
+                  <div
+                    className="dashboard-fill"
+                    style={{ width: `${total ? (done / total) * 100 : 0}%` }}
+                  />
                 </div>
-              ))
-            ) : (
-              <p className="dashboard-sub">남은 점검이 없습니다.</p>
-            )}
-          </section>
+                <span className="profit-tnum" data-testid="dashboard-close-count">
+                  {done}/{total}
+                </span>
+              </div>
+              {remaining.length ? (
+                remaining.map((item, i) => (
+                  <div
+                    className="dashboard-close-item"
+                    key={`${item.name}-${i}`}
+                    data-testid={`dashboard-close-${i}`}
+                  >
+                    <span className="dashboard-warn">●</span>
+                    <span>
+                      <strong>{item.name}</strong>{" "}
+                      {item.description && (
+                        <span className="ls-cap">{item.description}</span>
+                      )}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="dashboard-sub">남은 점검이 없습니다.</p>
+              )}
+            </section>
+          )}
           <section className="profit-card dashboard-alerts" data-testid="dashboard-alerts">
             <div className="profit-card-h">
               <h2>
                 프로젝트 경보{" "}
                 <span className="ls-cap dashboard-count">{alerts.length}건</span>
               </h2>
-              <DetailButton onClick={() => go("UI-04")} />
+              <DetailButton onClick={to("UI-04")} />
             </div>
             {detailBusy && <p className="dashboard-sub">원가 상세를 불러오는 중입니다.</p>}
             {alerts.length ? (
@@ -531,7 +522,8 @@ function DashboardBody({
                     className="dashboard-witem dashboard-alert"
                     key={a.projectId}
                     data-testid={`dashboard-alert-${a.projectId}`}
-                    onClick={() => openProject(a.projectId)}
+                    disabled={!canView("UI-04")}
+                    onClick={() => canView("UI-04") && openProject(a.projectId)}
                   >
                     <span className="dashboard-wt">
                       <strong>{a.projectName}</strong>
@@ -564,7 +556,8 @@ function DashboardBody({
           </section>
         </div>
       </div>
-      <div className="dashboard-g2">
+      <div className={data.trend.length ? "dashboard-g2" : "dashboard-single"}>
+        {data.trend.length > 0 && (
         <section className="profit-card" data-testid="dashboard-trend">
           <div className="profit-card-h">
             <h2>매출·원가 추이</h2>
@@ -627,10 +620,12 @@ function DashboardBody({
             </div>
           </details>
         </section>
+        )}
         <section className="profit-card" data-testid="dashboard-supply">
           <div className="profit-card-h">
             <h2>
-              앞으로 6개월 인력 수급 <Badge kind="info">예측</Badge>
+              앞으로 6개월 인력 수급{full ? "" : " (회사 전체)"}{" "}
+              <Badge kind="info">예측</Badge>
             </h2>
             <span className="ls-cap">단위: 명(MM)</span>
           </div>
@@ -696,11 +691,13 @@ function DashboardBody({
           </p>
         </section>
       </div>
+      {(parts.length > 0 || pipeline || data.cash.length > 0) && (
       <div className="dashboard-grid3">
+        {parts.length > 0 && (
         <section className="profit-card" data-testid="dashboard-parts">
           <div className="profit-card-h">
             <h2>영업 파트별 {ML}</h2>
-            <DetailButton onClick={() => go("UI-07")} />
+            <DetailButton onClick={to("UI-07")} />
           </div>
           <MixRows
             rows={parts.map((p) => ({
@@ -712,10 +709,12 @@ function DashboardBody({
             testId="dashboard-part-rows"
           />
         </section>
+        )}
+        {pipeline && (
         <section className="profit-card" data-testid="dashboard-pipeline">
           <div className="profit-card-h">
             <h2>영업 파이프라인</h2>
-            <DetailButton onClick={() => go("UI-29")} />
+            <DetailButton onClick={to("UI-29")} />
           </div>
           <div className="dashboard-kv2">
             <div>
@@ -750,10 +749,12 @@ function DashboardBody({
             </div>
           ))}
         </section>
+        )}
+        {data.cash.length > 0 && (
         <section className="profit-card" data-testid="dashboard-cash">
           <div className="profit-card-h">
             <h2>자금 (앞으로 3개월)</h2>
-            <DetailButton onClick={() => go("UI-21")} />
+            <DetailButton onClick={to("UI-21")} />
           </div>
           {data.cash.map((c) => (
             <div
@@ -780,7 +781,9 @@ function DashboardBody({
             적을 것으로 예상되는 달.
           </p>
         </section>
+        )}
       </div>
+      )}
     </>
   );
 }

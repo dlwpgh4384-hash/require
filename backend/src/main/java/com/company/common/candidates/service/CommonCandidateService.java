@@ -1,5 +1,7 @@
 package com.company.common.candidates.service;
 
+import com.company.common.support.service.CurrentBusinessActor;
+
 import com.company.common.candidates.dto.CandidateContracts.*;
 import com.company.common.candidates.mapper.CandidateMapper;
 import com.company.common.candidates.mapper.CandidateRows.*;
@@ -56,7 +58,10 @@ public class CommonCandidateService {
         if (in.homeAreaCode() != null && area == null && !sameArea) throw CandidateRules.invalid("homeAreaCode");
         String address = area != null ? area.address() : sameArea ? old.homeAddress() : null;
         if (address != null && address.codePointCount(0, address.length()) > 50) throw CandidateRules.invalid("homeAddress");
-        return new Input(in.name(), in.desiredMonthlyRate(), in.employeeTypeCode(), in.companyId(),
+        // 민감 체크가 없으면 희망 단가는 받지 않고 저장된 값을 그대로 둔다(명세 ⑨-2).
+        var rate = old != null && !com.company.common.support.auth.RequestAccess.sensitiveVisible()
+            ? old.desiredMonthlyRate() : in.desiredMonthlyRate();
+        return new Input(in.name(), rate, in.employeeTypeCode(), in.companyId(),
             in.phone(), in.email(), in.privacyAgreement(), in.primaryJobCode(), in.secondaryJobCode(),
             in.skills(), in.gradeCode(), in.availableDate(), in.homeAreaCode(), address, in.sourceCode(), in.memo());
     }
@@ -132,7 +137,7 @@ public class CommonCandidateService {
         var old = require(id, true);
         if (!Objects.equals(old.modifiedAt(), in.modifiedAt())) throw CodeFailure.conflict();
         selectable("CNTC_STAT", in.contactStatusCode(), "contactStatusCode");
-        var write = new ContactWrite(id, in.contactStatusCode(), in.memo(), calendar.today(), "admin");
+        var write = new ContactWrite(id, in.contactStatusCode(), in.memo(), calendar.today(), CurrentBusinessActor.id());
         mapper.insertContact(write);
         mapper.updateContact(write);
         return detail(require(id, false));

@@ -13,12 +13,6 @@ import static com.company.common.profitstructures.service.ProfitStructureRules.*
 import static org.assertj.core.api.Assertions.*;
 
 class ProfitStructureRulesTest {
-    @Test void futurePolicyProjectsFinanceExecutiveAdministratorAndUnionWithoutAnHttpGuard() {
-        for(var role:List.of("FIN","EXEC","ADMIN")) assertThat(projectedRoleAllows(Set.of(role))).isTrue();
-        assertThat(projectedRoleAllows(Set.of("PM","FIN"))).isTrue();
-        assertThat(projectedRoleAllows(Set.of("PM","SALES_LDR"))).isFalse();
-        assertThat(projectedRoleAllows(Set.of())).isFalse();
-    }
     Month month(Snapshot row) { return new Month(row,List.of(),row.revenue(),true,"Y".equals(row.migrated()),!"Y".equals(row.fixed())); }
     @Test void quarterUsesEqualPartialWindowsAndPriorYearRollover() {
         var current=ProfitStructurePeriod.of(new Filter(2026,"quarter","202605"));

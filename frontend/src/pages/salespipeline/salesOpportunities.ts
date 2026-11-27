@@ -195,11 +195,18 @@ export function salesOpportunityAction<T = SalesOpportunity>(
   );
 }
 export const SALES_QUOTE_URL = "/api/common/sales-pipeline/quote";
+/**
+ * 견적 계산. 상세 응답의 읽기 전용 줄(tentativeAssignments)은 빼고 보낸다.
+ * 서버는 모르는 칸을 받지 않아(400 「1번째 줄의 입력 값을 확인해 주세요.」) 기회 상세 「견적 점검」 탭이
+ * 그 한 줄만 보이고 비어 있었다(55번 1-2).
+ */
 export const quoteCommonSalesOpportunity = (needs: SalesNeed[]) =>
   developerRequest<SalesQuote>(SALES_QUOTE_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ needs }),
+    body: JSON.stringify({
+      needs: needs.map(({ tentativeAssignments: _lines, ...need }) => need),
+    }),
   });
 
 /** 단계별 기본 확률(운영 기준값 STEP_PRBL_n의 이번 달 값). 파이프라인 조회의 stages[].defaultProbability에서 읽는다. */

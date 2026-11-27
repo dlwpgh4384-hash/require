@@ -28,7 +28,7 @@ import {
   KIND_CODES,
   KIND_LABEL,
   addDays,
-  assignmentPriceEditable,
+  useAssignmentPriceEditable,
   getCommonAssignment,
   getCommonAssignmentHistory,
   isAssignmentConflict,
@@ -126,20 +126,22 @@ export function AssignmentDetail({
   id,
   initialTab,
   readOnly,
-  roles,
+  canRate: canRateOverride,
   onClose,
   onChanged,
 }: {
   id: string;
   initialTab?: string;
   readOnly: boolean;
-  roles: readonly string[];
+  /** 청구 단가 직접 입력. 안 주면 민감 체크 + 투입 배정 수정 권한(⑨-5). */
+  canRate?: boolean;
   onClose: () => void;
   /** 저장 뒤 목록을 다시 읽고 안내(message)를 띄운다. */
   onChanged: (message?: string, kind?: ToastKind) => void;
 }) {
   const navigate = useNavigate();
-  const canRate = assignmentPriceEditable(roles);
+  const priceEditable = useAssignmentPriceEditable();
+  const canRate = canRateOverride ?? priceEditable;
   const [row, setRow] = useState<Assignment | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [retirementDate, setRetirementDate] = useState<string | null>(null);

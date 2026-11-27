@@ -72,6 +72,10 @@ public class CommonClientController {
         var keys = columns == null || columns.isEmpty() ? List.copyOf(EXCEL_COLUMNS.keySet()) : columns;
         for (String key : keys) if (!EXCEL_COLUMNS.containsKey(key))
             throw CodeFailure.invalid("columns", "내려받을 열을 확인해 주세요.");
+        // 민감 체크가 없으면 지급 계좌 열을 엑셀에서도 뺀다(명세 ⑨-2).
+        if (!com.company.common.support.auth.RequestAccess.sensitiveVisible())
+            keys = keys.stream().filter(key -> !key.equals("account")).toList();
+        if ("account".equals(sort) && !keys.contains("account")) sort = null;
         if (sort != null && !EXCEL_COLUMNS.containsKey(sort)) throw CodeFailure.invalid("sort", "정렬 열을 확인해 주세요.");
         var names = new HashMap<String, String>();
         for (String group : List.of("CLNT_TYPE", "INDUTY"))

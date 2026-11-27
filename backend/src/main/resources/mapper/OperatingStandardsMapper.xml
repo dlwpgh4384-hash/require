@@ -32,14 +32,16 @@
     LOCK TABLE TB_SY_OPER_STD, TB_CL_CLOSE IN SHARE ROW EXCLUSIVE MODE
   </update>
   <insert id="insertStandard">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_OPER_STD
       (std_cd, aply_bgn_ym, std_nm, std_val, unit_nm, std_desc, reg_user_id, reg_dttm)
     VALUES (#{standardCode}, #{month}, #{standardName}, #{value}, #{unit},
-      #{description,jdbcType=VARCHAR}, 'admin', clock_timestamp())
+      #{description,jdbcType=VARCHAR}, #{actorId}, clock_timestamp())
   </insert>
   <update id="updateStandard">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     UPDATE TB_SY_OPER_STD
-    SET std_val=#{value}, mod_user_id='admin',
+    SET std_val=#{value}, mod_user_id=#{actorId},
       mod_dttm=GREATEST(clock_timestamp(), COALESCE(mod_dttm, reg_dttm) + INTERVAL '1 microsecond')
     WHERE std_cd=#{standardCode} AND aply_bgn_ym=#{month}
   </update>

@@ -39,7 +39,7 @@ export function PersonalCostProfitContributions({
         <table className="ls-t">
           <thead>
             <tr>
-              <th>직무</th>
+              <th className="ls-sc">직무</th>
               {grades.map((grade) => (
                 <th key={grade} className="ls-right">
                   {grade}
@@ -58,7 +58,8 @@ export function PersonalCostProfitContributions({
               );
               return (
                 <tr key={code} data-testid={`personal-contribution-${code}`}>
-                  <th scope="row">{name}</th>
+                  {/* 시안 td.sc: 몸통 칸이라 머리 칸(th) 모양·고정이 아니라 아래·오른쪽 선이 있는 첫 칸(55번 5-1 표 테두리). */}
+                  <td className="ls-sc">{name}</td>
                   {grades.map((grade) => {
                     const found = rows.find((row) => row.gradeName === grade);
                     return (

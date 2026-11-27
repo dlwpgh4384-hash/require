@@ -1,3 +1,4 @@
+import { useCanViewScreen } from "../../shared/permission";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useInRouterContext, useNavigate } from "react-router-dom";
@@ -67,6 +68,7 @@ export function NetProfitStatementPage() {
   const period = useScreenPeriod("UI-09", options);
   const host = useNetProfitStatementTitleHost();
   const openScreen = useOpenScreen();
+  const canView = useCanViewScreen();
   const [unit, setUnit] = useState<MoneyUnit>(DEFAULT_MONEY_UNIT);
   const [data, setData] = useState<NetProfitStatementResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -312,6 +314,7 @@ export function NetProfitStatementPage() {
         <p className="ls-note" data-testid="net-profit-tax-note">
           법인세는 연간 예상액을 달마다 나눈 금액(월할)입니다. 실제로 낸
           법인세는{" "}
+          {canView("UI-21") ? (
           <a
             href="/screens/UI-21"
             className="net-profit-link"
@@ -323,6 +326,9 @@ export function NetProfitStatementPage() {
           >
             자금수지표
           </a>
+          ) : (
+            "자금수지표"
+          )}
           에만 잡힙니다. 내부(자체 개발) 비용은 판관비(연구개발비)로
           처리합니다.
         </p>

@@ -16,6 +16,7 @@ import {
 } from "../userpreferences";
 import { PlaceholderScreen } from "./PlaceholderScreen";
 import { findScreen } from "./screenRegistry";
+import { ScreenPermissionGate } from "../../shared/permission";
 import { ProjectWorkspaceProvider } from "../projects/ProjectWorkspace";
 import { AssignmentWorkspaceProvider } from "../assignments/AssignmentWorkspace";
 import { WithdrawalWorkspaceProvider } from "../withdrawals/WithdrawalWorkspace";
@@ -39,13 +40,29 @@ import { SalesPipelineWorkspaceProvider } from "../salespipeline/SalesPipelineWo
 import { ManpowerBoardWorkspaceProvider } from "../manpowerboard/ManpowerBoardWorkspace";
 
 // 만든 화면은 화면 목록(screenRegistry) 한 곳에서 고른다. 없으면 「준비 중」.
+// 화면마다 메뉴 × 동작 권한을 건다(권한 없는 단추 숨김·수정 권한 없으면 입력 잠금, ⑦-5).
+// AI 화면은 입력 칸이 질문·조건뿐이라 잠그지 않는다(단추 규칙만).
+const QUESTION_SCREENS = new Set(["UI-26", "UI-30"]);
 const renderScreen = (scrnId: string) => {
   const entry = findScreen(scrnId);
-  return entry ? <entry.Page /> : <PlaceholderScreen scrnId={scrnId} />;
+  return entry ? (
+    <ScreenPermissionGate
+      screenId={scrnId}
+      lockInputs={!QUESTION_SCREENS.has(scrnId)}
+    >
+      <entry.Page />
+    </ScreenPermissionGate>
+  ) : (
+    <PlaceholderScreen scrnId={scrnId} />
+  );
 };
 const screenActions = (scrnId: string | null | undefined) => {
   const entry = findScreen(scrnId);
-  return entry?.TitleActions ? <entry.TitleActions /> : undefined;
+  return scrnId && entry?.TitleActions ? (
+    <ScreenPermissionGate screenId={scrnId} notice={false}>
+      <entry.TitleActions />
+    </ScreenPermissionGate>
+  ) : undefined;
 };
 
 /** 공통 화면 틀(00) + 공통 기능(00-1): 탭, 즐겨찾기·최근, 도구줄, 메뉴 접기 저장. */
@@ -88,6 +105,7 @@ function PreferenceNavigation() {
               mobile={context.mobile}
               collapsed={false}
               onNavigate={context.open}
+              current={context.screenId}
             />
           ),
           actions: (
@@ -97,6 +115,7 @@ function PreferenceNavigation() {
               mobile={context.mobile}
               available={context.available}
               onNavigate={context.open}
+              dirty={context.dirty}
               menuLoading={!context.ready && !context.failed}
               menuError={
                 context.failed ? "메뉴를 불러오지 못했습니다." : undefined

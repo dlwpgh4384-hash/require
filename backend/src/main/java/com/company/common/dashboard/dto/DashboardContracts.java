@@ -45,12 +45,13 @@ public final class DashboardContracts {
      * asOfText: "오늘 yyyy-MM-dd · n월까지 마감". provisionalNotice: shown after the 잠정 badge when the selected
      * month is not closed. mixedBasisNotice: only for a past month. projectAlertMonth: the yyyy-MM month the
      * project alerts were read for (the project detail opens that same month).
+     * dashMode: all / part / pm (명세 ⑧-4). part·pm에서 숨긴 칸은 null(summary·closing·pipeline·minimumCash) 또는 빈 목록.
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Result(String selectedMonth, LocalDate today, String closingState, String lastClosedMonth,
         boolean provisional, String asOfText, String provisionalNotice, String mixedBasisNotice, Summary summary,
         List<Todo> todos, Closing closing, List<ProjectAlert> projectAlerts, String projectAlertMonth, List<TrendMonth> trend,
         List<ManpowerMonth> manpower, List<SalesPart> salesParts, Pipeline pipeline, List<CashMonth> cash,
-        BigDecimal minimumCash) {}
+        BigDecimal minimumCash, String dashMode) {}
     public record ExcelFile(byte[] bytes, String fileName, int count) {}
 }

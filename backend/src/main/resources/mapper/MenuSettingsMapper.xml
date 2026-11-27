@@ -22,9 +22,10 @@
     SELECT max(COALESCE(mod_dttm, reg_dttm)) FROM TB_SY_MENU
   </select>
   <update id="updateSetting">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     UPDATE TB_SY_MENU SET menu_nm=#{menuNm}, upper_menu_id=#{upperMenuId,jdbcType=VARCHAR},
       sort_ord=#{sortOrd}, use_yn=#{useYn}, pc_only_yn=#{pcOnlyYn},
-      mod_user_id='admin', mod_dttm=clock_timestamp()
+      mod_user_id=#{actorId}, mod_dttm=clock_timestamp()
     WHERE menu_id=#{menuId}
   </update>
 </mapper>

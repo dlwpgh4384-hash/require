@@ -76,9 +76,27 @@
   z-index: 50;
 }
 .preference-user-menu .hd-pop-h {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--divider);
   font-weight: 600;
+  overflow-wrap: anywhere;
+}
+/* 시안 .cap: 팝업 머리의 역할(작은 회색 글) */
+.preference-user-menu .hd-cap {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  color: var(--text-sub);
+}
+.preference-user-menu .hd-pop-i {
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  height: auto;
 }
 .preference-user-menu .hd-pop-i {
   width: 100%;
@@ -157,6 +175,16 @@
     min-width: 36px;
     padding: 0 6px;
   }
+  /* 시안 휴대폰: 사용자 단추는 아이콘만(▾ 숨김) */
+  .preference-tools .hd-umenu {
+    padding: 0 4px;
+  }
+  .preference-tools .hd-umenu-chev {
+    display: none;
+  }
+  .preference-user-menu {
+    max-width: calc(100vw - 32px);
+  }
 }
 
 /* 사용자 메뉴 맨 아래: 자동 로그아웃까지 mm:ss [연장] */
@@ -179,9 +207,116 @@
   padding: 0 10px;
   font-size: 13px;
 }
+/* 시안 .ni.on: 즐겨찾기·최근 본 화면에서도 지금 보는 화면 줄을 칠한다(55번 2-1). */
+.preference-personal-lists button {
+  border-left: 3px solid transparent;
+}
+.preference-personal-lists button.is-current,
+.preference-personal-lists button.is-current:hover {
+  color: var(--primary-text);
+  background: var(--primary-bg);
+  border-left-color: var(--primary-text);
+  font-weight: 600;
+}
 /* 왼쪽 즐겨찾기·최근 본 화면 제목 아이콘(시안) */
 .preference-personal-lists h2 {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+/* 시안 keys 창(.modal 400px): 머리 .mh(16·16·8·24), 본문 .mb(4·24·16, 회색 글자), 표 .twrap.free·table.t, 단추 줄 .mf(12·24·20). */
+.app-dialog[data-testid="shortcut-help-dialog"] {
+  width: min(400px, 100%);
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-dialog[data-testid="shortcut-help-dialog"] > .app-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 16px 16px 8px 24px;
+}
+.app-dialog[data-testid="shortcut-help-dialog"] .app-dialog-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+.app-dialog[data-testid="shortcut-help-dialog"] .app-dialog-close {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-sub);
+}
+.app-dialog[data-testid="shortcut-help-dialog"] .app-dialog-close:hover {
+  background: var(--hover);
+}
+.shortcut-help-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 4px 24px 16px;
+  overflow: auto;
+  color: var(--text-sub);
+}
+.shortcut-help-wrap {
+  overflow: auto;
+  max-width: 100%;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.shortcut-help-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.shortcut-help-table td {
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--divider);
+  white-space: nowrap;
+  background: var(--surface);
+}
+.shortcut-help-table tbody tr:hover td {
+  background: var(--hover);
+}
+.shortcut-help-table strong {
+  font-weight: 700;
+  color: inherit;
+}
+.shortcut-help-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 12px 24px 20px;
+}
+.shortcut-help-actions .primary-button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  font-weight: 500;
+}
+/* 시안 휴대폰(767px 이하): .btn 44px. 표는 창 안에서만 옆으로 밀린다(.twrap overflow). */
+@media (max-width: 767px) {
+  .shortcut-help-actions .primary-button {
+    height: 44px;
+    min-height: 44px;
+  }
 }

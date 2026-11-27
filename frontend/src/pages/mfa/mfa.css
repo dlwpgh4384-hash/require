@@ -1,0 +1,28 @@
+/* 인증번호 확인(시안 renderMfa): 로그인 카드(accountAccess.css)를 그대로 쓰고 칸 줄만 더한다. */
+.mfa-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.account-field .mfa-code-row input {
+  width: 160px;
+  max-width: 100%;
+  letter-spacing: 4px;
+}
+.mfa-left {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+.mfa-message {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.mfa-small {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+}

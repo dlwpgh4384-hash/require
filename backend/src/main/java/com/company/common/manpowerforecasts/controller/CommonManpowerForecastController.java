@@ -12,7 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping(value = "/api/common/manpower-forecasts", produces = "application/json")
+@RequestMapping(produces = "application/json")
 public class CommonManpowerForecastController {
     private static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private final CommonManpowerForecastService service;
@@ -23,12 +23,12 @@ public class CommonManpowerForecastController {
         this.excel = excel;
     }
 
-    @GetMapping
+    @GetMapping("/api/common/manpower-forecasts")
     public Response<Result> getCommonManpowerForecasts(@RequestParam Integer year) {
         return Response.of(service.getCommonManpowerForecasts(year));
     }
 
-    @GetMapping(value = "/excel", produces = {XLSX, "application/json"})
+    @GetMapping(value = "/api/common/manpower-forecasts/excel", produces = {XLSX, "application/json"})
     public ResponseEntity<byte[]> getCommonManpowerForecastsExcel(@RequestParam Integer year) {
         var workbook = excel.getCommonManpowerForecastsExcel(year);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(XLSX))

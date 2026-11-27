@@ -13,6 +13,7 @@ export function Dialog({
   testId = "app-dialog",
   role = "dialog",
   closable = false,
+  screenId,
 }: {
   title: string;
   children: ReactNode;
@@ -21,6 +22,8 @@ export function Dialog({
   role?: "dialog" | "alertdialog";
   /** 시안 모달 머리의 [×] 닫기 단추를 보인다. */
   closable?: boolean;
+  /** 창이 맡은 화면 ID(data-screen-id, 예: 내 정보 UI-41). */
+  screenId?: string;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
@@ -82,6 +85,7 @@ export function Dialog({
         aria-label={title}
         tabIndex={-1}
         data-testid={testId}
+        data-screen-id={screenId}
         className="app-dialog"
       >
         {closable ? (

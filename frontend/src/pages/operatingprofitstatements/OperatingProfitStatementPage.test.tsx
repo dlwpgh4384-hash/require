@@ -17,6 +17,7 @@ import {
   OperatingProfitStatementWorkspaceProvider,
 } from "./OperatingProfitStatementWorkspace";
 import type { OperatingResult } from "./operatingProfitStatements";
+import { testAccount, WithTestAccount } from "../../test/testAccounts";
 
 const ok = (data: unknown, meta: unknown = {}) => ({
   ok: true,
@@ -457,3 +458,32 @@ it("aborts stale period requests so their late response cannot overwrite selecte
     "202512",
   );
 });
+
+it.each([
+  ["ADMIN", true],
+  ["FIN", false],
+  ["EXEC", false],
+] as const)(
+  "prior-year template and upload buttons follow admin role plus M020 upload (⑦-10): %s",
+  async (role, shown) => {
+    render(
+      <WithTestAccount account={testAccount([role])}>
+        <MemoryRouter initialEntries={["/screens/UI-08"]}>
+          <OperatingProfitStatementWorkspaceProvider>
+            <OperatingProfitStatementTitleActions />
+            <OperatingProfitStatementPage />
+          </OperatingProfitStatementWorkspaceProvider>
+        </MemoryRouter>
+      </WithTestAccount>,
+    );
+    await ready();
+    const title = within(screen.getByTestId("operating-title-actions"));
+    for (const name of ["전년 손익 양식", "전년 손익 업로드"]) {
+      if (shown) expect(title.getByRole("button", { name })).toBeEnabled();
+      else expect(title.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    expect(
+      title.getByRole("button", { name: /엑셀 다운로드/ }),
+    ).toBeInTheDocument();
+  },
+);

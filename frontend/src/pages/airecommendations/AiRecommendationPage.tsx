@@ -5,7 +5,6 @@ import { koreanToday } from "../../shared/time";
 import { AssignmentForm } from "../assignments/AssignmentForm";
 import {
   AssignmentRequestError,
-  assignmentDevelopmentRoles,
   type Assignment,
 } from "../assignments/assignments";
 import { getCommonProject, type Project } from "../projects/projects";
@@ -1074,7 +1073,6 @@ export function AiRecommendationPage() {
       {assign && (
         <AssignmentForm
           projects={[assign.project]}
-          roles={assignmentDevelopmentRoles}
           subtitle="AI 인력 추천에서 채움"
           screenId="UI-30"
           extraWarning={

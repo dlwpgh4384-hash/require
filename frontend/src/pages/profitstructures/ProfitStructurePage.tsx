@@ -1,3 +1,4 @@
+import { useCanViewScreen } from "../../shared/permission";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useInRouterContext, useNavigate } from "react-router-dom";
@@ -100,6 +101,9 @@ function ScreenLink({
   children: ReactNode;
   open: (id: string) => void;
 }) {
+  // 볼 권한이 없는 화면이면 링크 없이 글자만(⑦-5).
+  const canView = useCanViewScreen();
+  if (!canView(id)) return <>{children}</>;
   return (
     <a
       href={`/screens/${id}`}

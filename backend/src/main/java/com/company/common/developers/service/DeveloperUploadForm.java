@@ -117,6 +117,12 @@ public class DeveloperUploadForm implements UploadForm {
         return new Inspection(List.copyOf(records), List.copyOf(issues), success, warnings, errors, rows.size(), assigned);
     }
 
+    /** 데이터 범위: 새 개발자 줄은 그 영업 파트(영업 파트 칸)로 본다. 개발자 풀처럼 「담당 파트」 역할만 거른다(⑧-3). */
+    @Override public List<ScopeTarget> scopeTargets(Inspection inspection) {
+        return inspection.records().stream().map(Row.class::cast)
+            .map(r -> new ScopeTarget(r.rowNumber(), 9, "DEV_PART", r.input().salesPartId())).toList();
+    }
+
     @Override public Map<Integer, String> apply(Inspection inspection, YearMonth month, long uploadId) {
         var result = new LinkedHashMap<Integer, String>();
         for (var record : inspection.records()) {

@@ -1,0 +1,185 @@
+/* 시안 notifPop/.pop: 종 바로 아래 오른쪽 맞춤 340px 팝업 */
+.hd-pop {
+  position: absolute;
+  right: 0;
+  top: 44px;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  max-height: min(520px, calc(100dvh - 72px));
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  z-index: 50;
+  text-align: left;
+}
+.notifications-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hd-pop .hd-pop-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--divider);
+  font-weight: 600;
+}
+/* 시안 .btn-t: 글자 단추 */
+.notifications-read-all {
+  min-height: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--primary-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+.notifications-read-all:hover {
+  background: var(--hover);
+}
+.notifications-read-all:disabled {
+  background: none;
+}
+.notifications-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.notification-row {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  border: 0;
+  border-bottom: 1px solid var(--divider);
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+}
+.notification-row:hover {
+  background: var(--hover);
+}
+.notification-row.notification-unread {
+  background: var(--primary-bg);
+}
+.notification-row:disabled {
+  color: var(--text);
+}
+.notification-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.notification-text {
+  display: block;
+}
+.notification-time,
+.notifications-retention,
+.notifications-note {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-sub);
+}
+.notification-icon-warn,
+.notification-icon-read {
+  flex: none;
+  display: inline-flex;
+  padding-top: 2px;
+}
+.notification-icon-warn {
+  color: #b45309;
+}
+.notification-icon-read {
+  color: var(--text-sub);
+}
+.notifications-retention,
+.notifications-note {
+  margin: 0;
+  padding: 8px 14px;
+}
+.notifications-error p {
+  margin: 0 0 8px;
+}
+.notifications-error button {
+  height: 28px;
+  min-height: 28px;
+  font-size: 13px;
+}
+.notifications-content .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+/* 종 단추와 빨간 점(시안 .dot) */
+.notification-bell {
+  position: relative;
+}
+.notification-bell .hd-ibtn {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-sub);
+}
+.notification-bell .hd-ibtn:hover {
+  background: var(--hover);
+}
+.hd-dot {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+@media (prefers-color-scheme: dark) {
+  .notification-icon-warn {
+    color: #fbbf24;
+  }
+  .hd-pop {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+@media (max-width: 767px) {
+  /* 휴대폰: 화면 양옆 16px 안에 둔다(넘치지 않게). */
+  .hd-pop.notifications-pop {
+    position: fixed;
+    top: calc(56px + env(safe-area-inset-top, 0px));
+    right: 16px;
+    left: 16px;
+    width: auto;
+    max-width: none;
+  }
+}

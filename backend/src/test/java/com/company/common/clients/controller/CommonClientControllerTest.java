@@ -206,6 +206,38 @@ class CommonClientControllerTest {
         mvc.perform(get("/api/common/clients/" + id)).andExpect(jsonPath("$.data.modifiedAt").value(rows.get(id).modifiedAt.toString()));
         assertThat(histories.subList(1, histories.size())).containsExactly(new History("TB_BS_CLNT", id, "UPD", "담당자", null, "새 담당자"));
     }
+    static org.springframework.test.web.servlet.request.RequestPostProcessor nonSensitive() {
+        return request -> {
+            new com.company.common.support.auth.RequestAccess("viewer", Set.of("PM"),
+                new com.company.common.users.service.UserScopePolicy.Scope(true, Set.of(), Set.of()), false,
+                Set.of(), Set.of(), "127.0.0.1", false, Set.of()).store(request);
+            return request;
+        };
+    }
+    @ParameterizedTest @ValueSource(strings = {"missing", "other"})
+    @DisplayName("민감 체크 없는 사용자의 매입처 수정: 계좌번호·예금주는 보내지 않거나 달라도 저장된 값을 그대로 둔다")
+    void nonSensitiveVendorUpdateKeepsStoredAccount(String shape) throws Exception {
+        String id = create("VNDR"); var body = update("VNDR").put("contactName", "새 담당자");
+        if ("missing".equals(shape)) { body.remove("accountNumber"); body.remove("accountHolder"); }
+        else body.put("accountNumber", "99999999").put("accountHolder", "다른 사람");
+        mvc.perform(put("/api/common/clients/{clientId}", id).with(nonSensitive()).contentType("application/json").content(body.toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.client.contactName").value("새 담당자"))
+            .andExpect(jsonPath("$.data.client.paymentAccountSummary").doesNotExist());
+        assertThat(rows.get(id).encryptedAccount).isEqualTo("encrypted:12345678");
+        assertThat(rows.get(id).accountHolder).isEqualTo("예금주");
+        assertThat(histories).noneMatch(h -> h.item().equals("계좌번호") || h.item().equals("예금주"));
+    }
+    @Test void nonSensitiveCannotLeaveNewVendorWithoutAccount() throws Exception {
+        String id = create("CUST"); var body = update("VNDR"); body.remove("accountNumber");
+        mvc.perform(put("/api/common/clients/{clientId}", id).with(nonSensitive()).contentType("application/json").content(body.toString()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("accountNumber"));
+        assertThat(rows.get(id).encryptedAccount).isNull();
+    }
+    @Test void sensitiveVendorUpdateStillRequiresAccount() throws Exception {
+        String id = create("VNDR"); var body = update("VNDR"); body.remove("accountNumber");
+        putClient(id, body).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("accountNumber"));
+        assertThat(rows.get(id).encryptedAccount).isEqualTo("encrypted:12345678");
+    }
     @Test void immutableNumberRejectsBeforeAnyWrite() throws Exception {
         String id = create("CUST"); putClient(id, update("CUST").put("businessNumber", "987-65-43210")).andExpect(status().isBadRequest());
         assertThat(rows.get(id).businessNumber).isEqualTo("123-45-67890"); assertThat(histories).hasSize(1);

@@ -36,6 +36,7 @@
     <if test="projectId != null and projectId != ''">AND a.PROJ_ID=#{projectId}</if>
     <if test="jobCode != null and jobCode != ''">AND a.JOB_CD=#{jobCode}</if>
     <if test="keyword != null and keyword != ''">AND strpos(lower(d.DEV_NM||' '||d.MNG_NO),#{keyword})&gt;0</if>
+    <include refid="dataScope"><property name="proj" value="a.PROJ_ID"/></include>
     ORDER BY a.INPUT_BGN_DT ASC,a.ASGN_ID ASC</select>
   <select id="projectRows" resultMap="row">SELECT <include refid="columns"/> <include refid="joins"/> WHERE a.PROJ_ID=#{projectId} AND a.ASGN_STAT_CD&lt;&gt;'CNCL' ORDER BY a.INPUT_BGN_DT ASC,a.ASGN_ID ASC</select>
   <select id="row" resultMap="row">SELECT <include refid="columns"/> <include refid="joins"/> WHERE a.ASGN_ID=#{id}</select>
@@ -124,5 +125,20 @@
   <insert id="saveMonth">INSERT INTO TB_PJ_ASGN_MON (ASGN_ID,INPUT_YM,DEV_ID,PROJ_ID,INPUT_DAY_CNT,MON_MM,APLY_UPRC,SALES_AMT,FIX_YN,REG_USER_ID,REG_DTTM)
     VALUES(#{assignmentId},#{month},#{developerId},#{projectId},#{days},#{mm},#{price},#{sales},'N',#{actor},clock_timestamp()) ON CONFLICT (ASGN_ID,INPUT_YM) DO NOTHING</insert>
   <select id="latestPrice" resultType="java.math.BigDecimal">SELECT APLY_UPRC FROM TB_PJ_ASGN_MON WHERE ASGN_ID=#{id} ORDER BY INPUT_YM DESC LIMIT 1</select>
-  <insert id="insertAccess">INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM) VALUES (#{userId},'DNLD','UI-12',#{target},clock_timestamp(),#{userId},clock_timestamp())</insert>
+  <insert id="insertAccess"><bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM,CLIENT_IP) VALUES (#{userId},'DNLD','UI-12',#{target},clock_timestamp(),#{userId},clock_timestamp(),#{accessIp,jdbcType=VARCHAR})</insert>
+  <!-- 데이터 범위(명세 ⑧): 전체가 아니면 「내 프로젝트」이거나 현재 영업 파트가 「내 파트」인 프로젝트만. ${proj}: 프로젝트 ID 칸 -->
+  <sql id="dataScope">
+    <bind name="scopeAll" value="@com.company.common.support.auth.RequestAccess@scopeAll()"/>
+    <bind name="scopeParts" value="@com.company.common.support.auth.RequestAccess@scopeParts()"/>
+    <bind name="scopeProjects" value="@com.company.common.support.auth.RequestAccess@scopeProjects()"/>
+    <if test="!scopeAll">
+      AND (FALSE
+      <if test="!scopeProjects.isEmpty()">OR ${proj} IN <foreach collection="scopeProjects" item="scopeProject" open="(" separator="," close=")">#{scopeProject}</foreach></if>
+      <if test="!scopeParts.isEmpty()">OR EXISTS (SELECT 1 FROM TB_PJ_PROJ_PART scope_part WHERE scope_part.PROJ_ID=${proj}
+        AND scope_part.APLY_BGN_YM=COALESCE((SELECT max(scope_x.APLY_BGN_YM) FROM TB_PJ_PROJ_PART scope_x WHERE scope_x.PROJ_ID=${proj}
+            AND scope_x.APLY_BGN_YM &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')),
+          (SELECT min(scope_x.APLY_BGN_YM) FROM TB_PJ_PROJ_PART scope_x WHERE scope_x.PROJ_ID=${proj}))
+        AND scope_part.PART_ID IN <foreach collection="scopeParts" item="scopePart" open="(" separator="," close=")">#{scopePart}</foreach>)</if>)
+    </if>
+  </sql>
 </mapper>

@@ -28,3 +28,7 @@ playwright-report/
 .classpath
 .settings/
 backend/bin/
+
+# 메일 아이디·비밀번호가 든 내 PC 설정(⑫-1). 빈 칸 예시는 config/application-local.example.yml
+config/application-local.yml
+backend/config/application-local.yml

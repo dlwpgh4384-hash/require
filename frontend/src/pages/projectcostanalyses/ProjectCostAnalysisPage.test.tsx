@@ -437,7 +437,7 @@ it("internal rows show cost with 연구개발비 and dashes; monthly rows show �
   show();
   await ready();
   const internal = screen.getByTestId("list-row-I");
-  expect(within(internal).getByTestId("list-cell-I-totalCost")).toHaveTextContent("30,000 연구개발비");
+  expect(within(internal).getByTestId("list-cell-I-totalCost")).toHaveTextContent("30,000,000 연구개발비");
   expect(within(internal).getByTestId("list-cell-I-contractAmount")).toHaveTextContent("–");
   expect(within(internal).getByTestId("list-cell-I-plannedMm")).toHaveTextContent("–");
   const monthly = screen.getByTestId("list-row-M");
@@ -445,14 +445,14 @@ it("internal rows show cost with 연구개발비 and dashes; monthly rows show �
     "13.5% 월간",
   );
   expect(within(monthly).getByText("−6.5%p")).toHaveClass("ls-neg");
-  expect(within(monthly).getByTestId("list-cell-M-freeSupportMm")).toHaveTextContent("18.00 · 49,867");
+  expect(within(monthly).getByTestId("list-cell-M-freeSupportMm")).toHaveTextContent("18.00 · 49,866,750");
   expect(within(monthly).getByText("저마진")).toHaveClass("ls-b-warn");
   expect(within(monthly).getByTestId("list-cell-M-alerts")).toHaveTextContent(
     "주원인: 원가가 단가의 80%를 넘는 인력 (1,114만 원)",
   );
   expect(screen.getByTestId("list-footer-projectName")).toHaveTextContent("합계(내부 제외)");
-  // 내부 제외: 원가 400,000 + 400,000(천 원)
-  expect(screen.getByTestId("list-footer-totalCost")).toHaveTextContent("800,000");
+  // 내부 제외: 원가 400,000,000 + 400,000,000(원)
+  expect(screen.getByTestId("list-footer-totalCost")).toHaveTextContent("800,000,000");
   expect(screen.getByTestId("list-footer-cumulativeMarginRate")).toHaveTextContent("33.3%");
 });
 it("formula box shows the mockup 11 rows and the target margin from the response", async () => {

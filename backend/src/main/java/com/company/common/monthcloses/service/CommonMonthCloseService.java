@@ -68,7 +68,8 @@ public class CommonMonthCloseService {
         if (implied)
             return new View(new MonthClose(month.toString(), true, false, modifiedAt, closedAt, closedBy,
                 0, 0, List.of()), List.of(), false);
-        boolean reopenable = stored && Objects.equals(db, mapper.latestClosedMonth());
+        // 마감 해제는 시스템 관리자만(명세 ⑦-10): 관리자가 아니면 해제할 수 있는 달이 없다.
+        boolean reopenable = stored && MonthCloseRules.canReopen(actor.roles()) && Objects.equals(db, mapper.latestClosedMonth());
         var result = checks.calculate(month);
         boolean recordable = !closed && base != null && !month.isAfter(period.currentMonth());
         return new View(new MonthClose(month.toString(), closed, reopenable, modifiedAt, closedAt, closedBy,
@@ -102,7 +103,7 @@ public class CommonMonthCloseService {
         var month = MonthCloseRules.month(yearMonth);
         // Role first: a non-administrator never takes the month locks or learns the current version.
         if (!MonthCloseRules.canReopen(actor.roles()))
-            throw CodeFailure.invalid("reason", "시스템 관리자만 마감을 해제할 수 있습니다.");
+            throw new CodeFailure(403, "reason", "시스템 관리자만 마감을 해제할 수 있습니다.");
         MonthCloseRules.reason(input.reason());
         period.lock();
         var old = current(month, input.modifiedAt());

@@ -1,0 +1,2 @@
+org.springframework.test.context.ContextCustomizerFactory=com.company.common.support.test.AuthenticatedMockMvcCustomizerFactory
+org.springframework.test.context.TestExecutionListener=com.company.common.support.test.AuthenticatedMockMvcCustomizerFactory$Listener

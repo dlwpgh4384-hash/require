@@ -17,6 +17,19 @@ public interface UploadForm {
         return this;
     }
     default Integer distributionMismatchCount() { return null; }
+    /**
+     * 데이터 범위(명세 ⑧-2): 오류 없는 줄이 쓰는 대상. kind는 PROJ·PART·DEV_PART, column은 오류를 붙일 칸 번호.
+     * 범위가 「전체」가 아니면 공통 서비스가 범위 밖 줄을 줄 오류로 바꾼다. 대상이 없는 양식(거래처·재무 항목·사업계획·전년 손익)은 빈 목록.
+     * 급여(B.1)는 줄을 거르지 않고 {@link #allScopeSensitiveOnly()}로 올리는 사람을 막는다.
+     */
+    record ScopeTarget(int row, int column, String kind, String id) {}
+    default List<ScopeTarget> scopeTargets(Inspection inspection) { return List.of(); }
+    /**
+     * 범위 「전체」이면서 민감 체크가 있는 사람만 검사·반영할 수 있는 양식(B.1 급여, 2026-11-27 사용자 결정):
+     * 반영이 그 달 급여 전체를 바꾸므로 범위가 좁은 사람이 올리면 다른 파트 급여가 지워지고, 급여는 민감 항목이다.
+     * 양식 내려받기는 자료가 없어 막지 않는다.
+     */
+    default boolean allScopeSensitiveOnly() { return false; }
     String formTypeCode();
     /** 결과 창 제목 「엑셀 업로드 결과 · {대상}」과 업로드 기록의 화면 번호. */
     String targetName();

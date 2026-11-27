@@ -72,21 +72,24 @@
     SELECT COALESCE(MAX(r.sort_ord),0)+1 FROM TB_SY_ROLE r
   </select>
   <insert id="insertRole">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_ROLE (role_id,role_nm,data_scope_cd,snstv_view_yn,sys_role_yn,sort_ord,
       use_yn,reg_user_id,reg_dttm)
     VALUES (#{id},#{input.roleName},#{input.dataScopeCd},#{source.snstvViewYn},'N',#{sort},
-      'Y','admin',clock_timestamp())
+      'Y',#{actorId},clock_timestamp())
   </insert>
   <insert id="copyMenus">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_ROLE_MENU_AUTH (role_id,menu_id,inq_yn,reg_yn,upd_yn,del_yn,upld_yn,
       dnld_yn,cnfm_yn,reg_user_id,reg_dttm)
     SELECT #{id},a.menu_id,a.inq_yn,a.reg_yn,a.upd_yn,a.del_yn,a.upld_yn,a.dnld_yn,a.cnfm_yn,
-      'admin',clock_timestamp() FROM TB_SY_ROLE_MENU_AUTH a WHERE a.role_id=#{sourceId}
+      #{actorId},clock_timestamp() FROM TB_SY_ROLE_MENU_AUTH a WHERE a.role_id=#{sourceId}
   </insert>
   <insert id="insertBlankMenus">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_ROLE_MENU_AUTH (role_id,menu_id,inq_yn,reg_yn,upd_yn,del_yn,upld_yn,
       dnld_yn,cnfm_yn,reg_user_id,reg_dttm)
-    SELECT #{id},m.menu_id,'N','N','N','N','N','N','N','admin',clock_timestamp()
+    SELECT #{id},m.menu_id,'N','N','N','N','N','N','N',#{actorId},clock_timestamp()
     FROM TB_SY_MENU m
     WHERE m.scrn_id IS NOT NULL AND m.use_yn='Y'
       AND NOT EXISTS (SELECT 1 FROM TB_SY_MENU child WHERE child.upper_menu_id=m.menu_id)
@@ -109,20 +112,23 @@
     ORDER BY h.reg_dttm DESC, h.hist_id DESC
   </select>
   <update id="updateRole">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     UPDATE TB_SY_ROLE SET data_scope_cd=#{input.dataScopeCd},snstv_view_yn=#{input.snstvViewYn},
-      mod_user_id='admin',mod_dttm=clock_timestamp() WHERE role_id=#{id}
+      mod_user_id=#{actorId},mod_dttm=clock_timestamp() WHERE role_id=#{id}
   </update>
   <update id="updateMenu">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     UPDATE TB_SY_ROLE_MENU_AUTH SET inq_yn=#{input.readYn},reg_yn=#{input.createYn},
       upd_yn=#{input.updateYn},del_yn=#{input.deleteYn},upld_yn=#{input.uploadYn},
-      dnld_yn=#{input.downloadYn},cnfm_yn=#{input.cnfmYn},mod_user_id='admin',mod_dttm=clock_timestamp()
+      dnld_yn=#{input.downloadYn},cnfm_yn=#{input.cnfmYn},mod_user_id=#{actorId},mod_dttm=clock_timestamp()
     WHERE role_id=#{id} AND menu_id=#{input.menuId}
   </update>
   <select id="countAssignments" resultType="long">
     SELECT COUNT(DISTINCT ur.user_id) FROM TB_SY_USER_ROLE ur WHERE ur.role_id=#{id}
   </select>
   <update id="stopRole">
-    UPDATE TB_SY_ROLE SET use_yn='N',mod_user_id='admin',mod_dttm=clock_timestamp() WHERE role_id=#{id}
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
+    UPDATE TB_SY_ROLE SET use_yn='N',mod_user_id=#{actorId},mod_dttm=clock_timestamp() WHERE role_id=#{id}
   </update>
   <select id="selectRemovableScopes" resultMap="scope">
     SELECT s.user_id,s.scope_sn,s.scope_type_cd,s.part_id,s.proj_id FROM TB_SY_USER_SCOPE s
@@ -151,12 +157,15 @@
     DELETE FROM TB_SY_USER_SCOPE WHERE user_id=#{userId} AND scope_sn=#{scopeSn}
   </delete>
   <insert id="insertHistory">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_CHG_HIST (trgt_tbl_nm,trgt_key,chg_type_cd,chg_item_nm,bfr_val,aft_val,reg_user_id,reg_dttm)
     VALUES (#{table},#{key},#{type},#{item},#{before,jdbcType=VARCHAR},#{after,jdbcType=VARCHAR},
-      'admin',clock_timestamp())
+      #{actorId},clock_timestamp())
   </insert>
   <insert id="insertRoleAccess">
-    INSERT INTO TB_SY_ACCS_LOG (user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm)
-    VALUES ('admin','AUTH_CHG','UI-24',#{id},clock_timestamp(),'admin',clock_timestamp())
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
+    INSERT INTO TB_SY_ACCS_LOG (user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm,client_ip)
+    VALUES (#{actorId},'AUTH_CHG','UI-24',#{id},clock_timestamp(),#{actorId},clock_timestamp(),#{accessIp,jdbcType=VARCHAR})
   </insert>
 </mapper>

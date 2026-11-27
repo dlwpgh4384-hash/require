@@ -94,7 +94,7 @@
       o.APRV_STAT_CD AS "approvalStatusCode",COALESCE(o.MOD_DTTM,o.REG_DTTM) AS "modifiedAt",
       COALESCE((SELECT SUM(n.NEED_CNT*n.MON_MM) FROM TB_SL_OPP_NEED n WHERE n.OPP_ID=o.OPP_ID),0) AS "manpower"
     FROM TB_SL_OPP o JOIN TB_BS_CLNT c ON c.CLNT_ID=o.CUST_CLNT_ID
-    WHERE o.OPP_STAT_CD='ING'
+    WHERE o.OPP_STAT_CD='ING' <include refid="partScope"><property name="part" value="o.PART_ID"/></include>
     ORDER BY COALESCE(o.MOD_DTTM,o.REG_DTTM) DESC,o.OPP_ID
   </select>
   <!-- 카드의 필요 직무 칩(시안 「백엔드 개발 2」): 직무마다 한 줄, 인원 합, 첫 필요 인력 줄 순서. -->
@@ -120,12 +120,13 @@
     LEFT JOIN TB_SY_CODE r ON r.CODE_GRP_ID='LOSE_RSN' AND r.CODE=o.LOSE_RSN_CD
     WHERE o.OPP_STAT_CD IN ('WIN','LOSE'<if test="includeStopped">,'STOP'</if>)
       <if test="result != null">AND o.OPP_STAT_CD=#{result}</if>
+      <include refid="partScope"><property name="part" value="o.PART_ID"/></include>
     ORDER BY o.RSLT_DT DESC,o.OPP_ID
   </select>
   <!-- 종료 탭 건수(시안 「종료 · 수주·실주 (n)」): closed 목록(결과 전체, 사용 중지 빼고)과 같은 조건. -->
   <select id="closedCount" resultType="int">
     SELECT COUNT(*)::int FROM TB_SL_OPP o JOIN TB_BS_CLNT c ON c.CLNT_ID=o.CUST_CLNT_ID
-    WHERE o.OPP_STAT_CD IN ('WIN','LOSE')
+    WHERE o.OPP_STAT_CD IN ('WIN','LOSE') <include refid="partScope"><property name="part" value="o.PART_ID"/></include>
   </select>
   <!-- 예측 달 목록(ym = YYYYMM, 첫날·말일). 아래 묶음 조회가 같이 쓴다. -->
   <sql id="months">
@@ -231,7 +232,17 @@
     WHERE c.CNTC_STAT_CD NOT IN ('HOLD','CTRT') GROUP BY c.JOB_CD ORDER BY c.JOB_CD
   </select>
   <insert id="insertAccess">
-    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
-    VALUES(#{userId},'DNLD','UI-29',concat('매출·인력 예측 ',#{count},'건'),clock_timestamp(),#{userId},clock_timestamp())
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
+    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM,CLIENT_IP)
+    VALUES(#{userId},'DNLD','UI-29',concat('매출·인력 예측 ',#{count},'건'),clock_timestamp(),#{userId},clock_timestamp(),#{accessIp,jdbcType=VARCHAR})
   </insert>
+  <!-- 데이터 범위(명세 ⑧): 전체가 아니면 「내 파트」만. ${part}: 파트 ID 칸 -->
+  <sql id="partScope">
+    <bind name="scopeAll" value="@com.company.common.support.auth.RequestAccess@scopeAll()"/>
+    <bind name="scopeParts" value="@com.company.common.support.auth.RequestAccess@scopeParts()"/>
+    <if test="!scopeAll">
+      AND <choose><when test="scopeParts.isEmpty()">FALSE</when>
+      <otherwise>${part} IN <foreach collection="scopeParts" item="scopePart" open="(" separator="," close=")">#{scopePart}</foreach></otherwise></choose>
+    </if>
+  </sql>
 </mapper>

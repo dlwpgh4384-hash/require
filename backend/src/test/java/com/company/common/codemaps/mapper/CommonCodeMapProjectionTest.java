@@ -47,7 +47,7 @@ class CommonCodeMapProjectionTest {
         var insert = config.getMappedStatement(CommonCodeMapMapper.class.getName() + ".insertMap");
         assertThat(insert.getKeyProperties()).containsExactly("mapId");
         assertThat(insert.getKeyColumns()).containsExactly("map_id");
-        assertThat(insert.getBoundSql(new CodeMapRow()).getSql()).contains("'admin'", "clock_timestamp()");
+        assertThat(insert.getBoundSql(new CodeMapRow()).getSql()).contains("clock_timestamp()").doesNotContain("'admin'");
         var delete = config.getMappedStatement(CommonCodeMapMapper.class.getName() + ".deleteMap");
         assertThat(delete.getBoundSql(java.util.Map.of("mapId", 9L)).getSql())
             .contains("DELETE FROM TB_SY_CODE_MAP").doesNotContain("DEL_YN");

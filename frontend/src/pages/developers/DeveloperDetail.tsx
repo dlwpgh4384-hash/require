@@ -22,6 +22,9 @@ import {
   type DeveloperChange,
 } from "./developers";
 import { historyValue } from "../../shared/historyValue";
+import { useSensitiveView } from "../../shared/permission";
+// 개발자 풀 밖(개인 원가·수익표 등)에서 열어도 상세·근무 상태 창 모양이 같게 한다.
+import "./developers.css";
 
 type Action = {
   kind: "register" | "end" | "return" | "retire";
@@ -70,6 +73,7 @@ export function DeveloperDetail({
   onChanged,
   readOnly = false,
 }: DeveloperDetailProps) {
+  const sensitive = useSensitiveView();
   const [developer, setDeveloper] = useState<Developer | null>(null);
   const [assignments, setAssignments] = useState<DeveloperAssignment[]>([]);
   const [statuses, setStatuses] = useState<DeveloperStatus[]>([]);
@@ -301,23 +305,30 @@ export function DeveloperDetail({
                         )}
                       </>,
                     ],
-                    [
-                      "월 단가",
-                      <span className="developer-num">
-                        {d.monthlyRate == null
-                          ? "–"
-                          : `${won(d.monthlyRate)} 원`}
-                      </span>,
-                    ],
-                    [
-                      "월 급여·지급액",
-                      <span className="developer-num">
-                        {d.monthlyPay == null ? "–" : `${won(d.monthlyPay)} 원`}{" "}
-                        <span className="ls-cap">
-                          (민감 항목: 관리자·경영진·재무만 보임)
-                        </span>
-                      </span>,
-                    ],
+                    // 민감 칸을 볼 수 없으면 서버가 단가·급여를 보내지 않는다 → 줄을 숨긴다.
+                    ...(sensitive
+                      ? ([
+                          [
+                            "월 단가",
+                            <span className="developer-num">
+                              {d.monthlyRate == null
+                                ? "–"
+                                : `${won(d.monthlyRate)} 원`}
+                            </span>,
+                          ],
+                          [
+                            "월 급여·지급액",
+                            <span className="developer-num">
+                              {d.monthlyPay == null
+                                ? "–"
+                                : `${won(d.monthlyPay)} 원`}{" "}
+                              <span className="ls-cap">
+                                (민감 항목: 관리자·경영진·재무만 보임)
+                              </span>
+                            </span>,
+                          ],
+                        ] as [string, ReactNode][])
+                      : []),
                     ["직위", d.positionName || "–"],
                     ["보조 직무", d.secondaryJobName || "–"],
                     ["직접/간접", directLabel(d.directClassName)],
@@ -473,6 +484,7 @@ export function DeveloperDetail({
           action={action}
           developerId={developerId}
           developerName={d?.name || ""}
+          currentStatusName={d?.workStatusName || ""}
           statuses={statuses}
           assignments={assignments}
           onClose={() => setAction(null)}
@@ -487,11 +499,20 @@ export function DeveloperDetail({
   );
 }
 
+/** 근무 상태 등록 창의 상태 목록(시안 순서 휴직·퇴사·재직에서 지금 상태와 같은 것을 뺀다). */
+function statusChoices(currentStatusName: string) {
+  const onLeave = currentStatusName === "휴직";
+  return ["휴직", "퇴사", "재직"].filter((name) =>
+    onLeave ? name !== "휴직" : name !== "재직",
+  );
+}
+
 /** 시안 근무 상태 등록·휴직 종료일 수정·재직 취소·퇴사 취소 창. */
 function DeveloperStatusDialog({
   action,
   developerId,
   developerName,
+  currentStatusName,
   statuses,
   assignments,
   onClose,
@@ -500,13 +521,17 @@ function DeveloperStatusDialog({
   action: Action;
   developerId: string;
   developerName: string;
+  /** 지금 근무 상태(투입중·철수예정·대기·휴직). 같은 상태는 고를 수 없다. */
+  currentStatusName: string;
   statuses: DeveloperStatus[];
   assignments: DeveloperAssignment[];
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
   const today = koreanToday();
-  const [statusName, setStatusName] = useState("휴직");
+  // 55번 5-1(사용자 결정): 지금 상태와 같은 상태는 목록에서 뺀다. 휴직 중이면 「휴직」, 아니면(재직 중) 「재직」이 없다.
+  const choices = statusChoices(currentStatusName);
+  const [statusName, setStatusName] = useState(choices[0]);
   const [date, setDate] = useState(today);
   // 시안: 종료일 수정 창은 지금 종료일(없으면 오늘)로 시작
   const [endDate, setEndDate] = useState(
@@ -661,9 +686,9 @@ function DeveloperStatusDialog({
                     setError(null);
                   }}
                 >
-                  <option>휴직</option>
-                  <option>퇴사</option>
-                  <option>재직</option>
+                  {choices.map((name) => (
+                    <option key={name}>{name}</option>
+                  ))}
                 </select>
                 <span className="developer-help">
                   투입중·철수예정·대기는 자동으로 정해집니다. 재직은 휴직에서

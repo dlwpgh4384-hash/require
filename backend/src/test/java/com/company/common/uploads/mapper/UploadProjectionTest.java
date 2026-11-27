@@ -41,7 +41,9 @@ class UploadProjectionTest {
         var bound=config.getMappedStatement(UploadMapper.class.getName()+".insertUpload")
             .getBoundSql(new UploadContracts.Check(81,"B7","UI-15",null,"clients.xlsx",1234,inspection));
         var meta=config.newMetaObject(bound.getParameterObject());
-        bound.getParameterMappings().forEach(parameter -> assertThat(meta.hasGetter(parameter.getProperty())).isTrue());
+        // actorId는 로그인 사용자를 매퍼 bind로 넣는 값이라 입력 객체에 없다.
+        bound.getParameterMappings().stream().filter(parameter -> !bound.hasAdditionalParameter(parameter.getProperty()))
+            .forEach(parameter -> assertThat(meta.hasGetter(parameter.getProperty())).isTrue());
     }
     private void map(Configuration config,String operation,Object row,Map<String,Object> labels) {
         var statement=config.getMappedStatement(UploadMapper.class.getName()+"."+operation);

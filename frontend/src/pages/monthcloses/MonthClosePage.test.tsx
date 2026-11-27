@@ -12,12 +12,12 @@ import "@testing-library/jest-dom/vitest";
 import { useEffect } from "react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { MonthClosePage } from "./MonthClosePage";
+import { testAccount, WithTestAccount, type TestAccount } from "../../test/testAccounts";
 import {
   MonthCloseTitleActions,
   MonthCloseWorkspaceProvider,
 } from "./MonthCloseWorkspace";
 import {
-  canReopenMonthClose,
   type MonthClose,
   type MonthCloseHistoryItem,
 } from "./monthCloses";
@@ -76,13 +76,14 @@ function Location() {
   }, [location]);
   return <p data-testid="test-location">{location.pathname}</p>;
 }
-function mount(roles?: readonly string[]) {
-  render(
+function mount(account?: TestAccount) {
+  const page = (
     <MemoryRouter initialEntries={["/screens/UI-14"]}>
-      <MonthClosePage roles={roles} />
+      <MonthClosePage />
       <Location />
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+  render(account ? <WithTestAccount account={account}>{page}</WithTestAccount> : page);
 }
 async function ready() {
   expect(await screen.findByTestId("month-close-check-5")).toBeInTheDocument();
@@ -454,12 +455,11 @@ it("cancelling confirmation makes no write", async () => {
   ).not.toBeInTheDocument();
   expect(writes()).toHaveLength(0);
 });
-it("closed state exposes only reopen, and non-admin policy hides it", async () => {
+it("closed state exposes only reopen, and an account without the 확정 permission does not see it", async () => {
   closeRow();
-  mount(["FIN"]);
+  // 경영진: 월 마감 조회·다운로드만(확정 N). 역할 이름이 아니라 서버 권한표로 숨긴다(⑦-9).
+  mount(testAccount(["EXEC"]));
   await ready();
-  expect(canReopenMonthClose(["ADMIN"])).toBe(true);
-  expect(canReopenMonthClose(["FIN"])).toBe(false);
   expect(screen.getByTestId("banner-lock")).toHaveTextContent(
     "마감 해제는 시스템 관리자만 할 수 있습니다.",
   );

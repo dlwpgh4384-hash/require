@@ -42,7 +42,13 @@ export function CandidateForm({
 }) {
   const defaults = useRef(candidateDefaults(options));
   const [draft, setDraft] = useState<CandidateInput>(() =>
-    candidate ? { ...candidate } : { ...defaults.current },
+    candidate
+      ? {
+          ...candidate,
+          // 서버가 희망 단가를 보내지 않은 경우(민감 칸 없음) 빈 칸으로 둔다(NaN = 빈 칸).
+          desiredMonthlyRate: candidate.desiredMonthlyRate ?? Number.NaN,
+        }
+      : { ...defaults.current },
   );
   const [skillText, setSkillText] = useState(draft.skills.join(", "));
   const original = useRef(JSON.stringify(draft));

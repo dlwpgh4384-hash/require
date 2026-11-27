@@ -4,6 +4,8 @@ server:
     include-message: never
     include-stacktrace: never
 spring:
+  config:
+    import: optional:file:./config/application-local.yml
   application:
     name: navigation-shell
   servlet:
@@ -34,9 +36,16 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: false
     auto-mapping-unknown-column-behavior: FAILING
-# UI-13 미수 알림 메일. SMTP는 운영자가 환경 변수로만 넣는다(값은 여기에 두지 않는다):
-#   SPRING_MAIL_HOST, SPRING_MAIL_PORT, SPRING_MAIL_USERNAME, SPRING_MAIL_PASSWORD, BILLING_MAIL_FROM(보내는 주소)
-# SPRING_MAIL_HOST와 BILLING_MAIL_FROM이 모두 있어야 실제 메일을 보내고, 없으면 앱 임시 폴더 billing-mail에 .eml로 쓴다.
+# 공통 메일(미수 알림·임시 비밀번호·인증번호). 앱은 smtp.* 한 곳에서만 읽는다.
+# 읽는 순서: 환경 변수 SMTP_HOST·SMTP_PORT·SMTP_USERNAME·SMTP_PASSWORD > 앱이 도는 곳 옆 config/application-local.yml
+#   (git에 안 올림, 예전 키 spring.mail.host·port·username·password도 읽음) > 아래 기본값(주소·포트만).
+# 아이디·비밀번호는 여기에 두지 않는다. 비밀번호가 없으면 보내지 않고 앱 임시 폴더 billing-mail에 .eml로 쓴다(개발·시험용).
+# 보내는 주소는 BILLING_MAIL_FROM 또는 billing.mail.from(없으면 SMTP 아이디).
+smtp:
+  host: ${SMTP_HOST:${spring.mail.host:smtp-relay.brevo.com}}
+  port: ${SMTP_PORT:${spring.mail.port:587}}
+  username: ${SMTP_USERNAME:${spring.mail.username:}}
+  password: ${SMTP_PASSWORD:${spring.mail.password:}}
 billing:
   mail:
     from: ${BILLING_MAIL_FROM:}

@@ -140,13 +140,15 @@
     ORDER BY h.reg_dttm DESC, h.hist_id DESC
   </select>
   <sql id="nextVersion">
-    mod_user_id='admin', mod_dttm=GREATEST(clock_timestamp(), mod_dttm + INTERVAL '1 microsecond')
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
+    mod_user_id=#{actorId}, mod_dttm=GREATEST(clock_timestamp(), mod_dttm + INTERVAL '1 microsecond')
   </sql>
   <insert id="insertUser">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_USER (user_id,user_nm,email_addr,pwd_hash,temp_pwd_yn,pwd_err_cnt,user_stat_cd,
       mfa_use_yn,mfa_err_cnt,reg_user_id,reg_dttm,mod_user_id,mod_dttm)
-    VALUES (#{input.userId},#{input.name},#{input.email},#{hash},'Y',0,'USE','N',0,'admin',
-      clock_timestamp(),'admin',clock_timestamp())
+    VALUES (#{input.userId},#{input.name},#{input.email},#{hash},'Y',0,'USE','N',0,#{actorId},
+      clock_timestamp(),#{actorId},clock_timestamp())
   </insert>
   <update id="updateProfile">
     UPDATE TB_SY_USER SET user_nm=#{name}, email_addr=#{email} WHERE user_id=#{id}
@@ -167,8 +169,9 @@
   </update>
   <delete id="deleteRoles">DELETE FROM TB_SY_USER_ROLE WHERE user_id=#{id}</delete>
   <insert id="insertRole">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_USER_ROLE (user_id,role_id,reg_user_id,reg_dttm)
-    VALUES (#{id},#{role},'admin',clock_timestamp())
+    VALUES (#{id},#{role},#{actorId},clock_timestamp())
   </insert>
   <delete id="deleteProject">
     DELETE FROM TB_SY_USER_SCOPE WHERE user_id=#{id} AND scope_type_cd='PROJ' AND proj_id=#{project}
@@ -178,18 +181,22 @@
     WHERE s.user_id=#{id} AND s.scope_type_cd='PART' AND s.part_id=p.part_id AND p.hq_yn='Y'
   </delete>
   <insert id="insertScope">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_USER_SCOPE (user_id,scope_sn,scope_type_cd,part_id,proj_id,reg_user_id,reg_dttm)
     SELECT #{id}, COALESCE(MAX(s.scope_sn),0)+1, #{type},
       <choose><when test="type == 'PART'">#{value},NULL</when><otherwise>NULL,#{value}</otherwise></choose>,
-      'admin',clock_timestamp() FROM TB_SY_USER_SCOPE s WHERE s.user_id=#{id}
+      #{actorId},clock_timestamp() FROM TB_SY_USER_SCOPE s WHERE s.user_id=#{id}
   </insert>
   <insert id="insertAccess">
-    INSERT INTO TB_SY_ACCS_LOG (user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm)
-    VALUES (#{id},#{action},'UI-23',#{target},clock_timestamp(),'admin',clock_timestamp())
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
+    INSERT INTO TB_SY_ACCS_LOG (user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm,client_ip)
+    VALUES (#{id},#{action},'UI-23',#{target},clock_timestamp(),#{actorId},clock_timestamp(),#{accessIp,jdbcType=VARCHAR})
   </insert>
   <insert id="insertHistory">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_CHG_HIST (trgt_tbl_nm,trgt_key,chg_type_cd,chg_item_nm,bfr_val,aft_val,reg_user_id,reg_dttm)
     VALUES (#{table},#{key},#{type},#{item},#{before,jdbcType=VARCHAR},#{after,jdbcType=VARCHAR},
-      'admin',clock_timestamp())
+      #{actorId},clock_timestamp())
   </insert>
 </mapper>

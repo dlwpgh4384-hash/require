@@ -3,3 +3,12 @@ export const MENU_REFRESH_EVENT = "navigation-menus-refresh";
 export function requestMenuRefresh() {
   window.dispatchEvent(new Event(MENU_REFRESH_EVENT));
 }
+
+export const ACCOUNT_SCREENS_CHANGED_EVENT =
+  "navigation-account-screens-changed";
+export function reconcileAccountScreens(screenIds: string[]) {
+  window.dispatchEvent(
+    new CustomEvent(ACCOUNT_SCREENS_CHANGED_EVENT, { detail: screenIds }),
+  );
+  requestMenuRefresh();
+}

@@ -46,6 +46,13 @@ public class CommonPersonalCostProfitService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Result getCommonPersonalCostProfits(Filter filter) { return calculate(filter).result(); }
 
+    /** 민감 체크가 켜진 사용자가 화면을 보면 접근 기록 SNSTV_VIEW 한 줄(명세 ⑤-4). */
+    @Transactional
+    public void recordSensitiveView(Filter filter) {
+        if (!actor.sensitive()) return;
+        mapper.insertSensitiveView(actor.userId(), "개인 원가·수익표 조회 " + (filter == null || filter.year() == null ? "" : filter.year() + "년"));
+    }
+
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Calculation calculate(Filter filter) {
         return calculate(filter, 1);

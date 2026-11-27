@@ -81,7 +81,11 @@ public class CommonDeveloperService {
     public Developer getCommonDeveloper(String id) { lock(); Developer row=require(id); refresh(row,false); return detail(row); }
     public Items<ListRow> getCommonDevelopers(Filter requested) {
         Filter f=DeveloperRules.filter(requested); lock(); var items=new ArrayList<ListRow>();
+        // 「담당 파트」 역할(전체 없음)은 자기 파트 인력만(명세 ⑧-3, 시안 devInScope). PM은 거르지 않는다.
+        boolean partOnly=com.company.common.support.auth.RequestAccess.developerPartOnly();
+        var parts=com.company.common.support.auth.RequestAccess.scopeParts();
         for (Developer row : mapper.selectDevelopers(f,month())) {
+            if (partOnly && (row.salesPartId==null || !parts.contains(row.salesPartId))) continue;
             refresh(row,false);
             if (f.workStatusName()!=null && !f.workStatusName().equals(row.workStatusName)) continue;
             if (!f.includeStopped() && !"퇴사".equals(f.workStatusName()) && (!"Y".equals(row.useYn) || "퇴사".equals(row.workStatusName))) continue;
@@ -132,8 +136,12 @@ public class CommonDeveloperService {
         if (mapper.hasAssignmentHistory()) for (Assignment a:assignments) a.mm=mapper.selectAssignmentMm(a.assignmentId,calendar.today());
         return new Items<>(assignments);
     }
+    /** 월 단가·월 급여 변경 줄은 민감 체크가 없으면 뺀다(변경 이력 글에서도 빼기, 명세 ⑨-2). */
+    static final Set<String> SENSITIVE_HISTORY = Set.of("월 단가", "월 급여·지급액");
     public Items<DeveloperRows.Change> getCommonDeveloperChangeHistory(String id) {
-        lock(); require(id); return new Items<>(mapper.selectChanges(id));
+        lock(); require(id); var rows=mapper.selectChanges(id);
+        if (!actor.sensitive()) rows=rows.stream().filter(row -> !SENSITIVE_HISTORY.contains(row.fieldName)).toList();
+        return new Items<>(rows);
     }
     public Items<Area> getCommonDeveloperAreas(String parent) {
         if (parent!=null && (!parent.matches("[0-9]{1,10}") || mapper.selectAddress(parent)==null)) throw DeveloperRules.invalid("parentAreaCode");
@@ -163,8 +171,12 @@ public class CommonDeveloperService {
         boolean unchanged=previous!=null && in.homeAreaCode()!=null && in.homeAreaCode().equals(previous.homeAreaCode);
         if (in.homeAreaCode()!=null && address==null && !unchanged) throw DeveloperRules.invalid("homeAreaCode");
         String homeAddress=address!=null?address.address:unchanged?previous.homeAddress:null;
+        // 민감 체크가 없으면 월 단가·월 급여 칸을 받지 않고 저장된 값을 그대로 둔다(화면에 칸이 없음, 명세 ⑨-2).
+        boolean sensitive=actor.sensitive();
+        BigDecimal rate=sensitive?in.monthlyRate():previous==null?null:previous.monthlyRate;
+        BigDecimal pay=sensitive?in.monthlyPay():previous==null?null:previous.monthlyPay;
         return new Input(number,in.name(),in.employeeTypeCode(),in.organizationId(),in.gradeCode(),in.primaryJobCode(),
-            in.secondaryJobCode(),position,in.directClassCode(),in.salesPartId(),in.hireDate(),in.monthlyRate(),in.monthlyPay(),
+            in.secondaryJobCode(),position,in.directClassCode(),in.salesPartId(),in.hireDate(),rate,pay,
             in.skillCodes(),in.homeAreaCode(),homeAddress);
     }
     public Developer postCommonDeveloper(Input request) {
@@ -257,10 +269,15 @@ public class CommonDeveloperService {
         return new StatusList(rows,DeveloperBusinessPolicy.canManageStatuses(roles),roles.contains("ADMIN"));
     }
     private boolean closed(LocalDate date) { return mapper.closedMonth(calendar.toDatabaseMonth(YearMonth.from(date))); }
+    /** SFR-102-09: 근무 상태 등록·종료일 수정·재직 취소·퇴사 취소는 관리자·재무만(메뉴 등록·수정 권한만으로는 안 됨). */
+    private void requireStatusManager() {
+        if (!DeveloperBusinessPolicy.canManageStatuses(actor.roles())) throw new CodeFailure(403,"permission","권한이 없습니다.");
+    }
     public StatusList postCommonDeveloperStatus(String id,StatusInput input) {
+        requireStatusManager();
         lock(); Developer d=require(id); var original=mapper.selectStatuses(id);
         LocalDate retire=DeveloperStatusRules.retirement(original);
-        if (DeveloperBusinessPolicy.retired(retire,calendar.today())) throw CodeFailure.invalid("date","퇴사한 개발자는 상태를 등록할 수 없습니다.");
+        if (!DeveloperBusinessPolicy.canRegisterStatus(actor.roles(),retire,calendar.today())) throw CodeFailure.invalid("date","퇴사한 개발자는 상태를 등록할 수 없습니다.");
         if ("퇴사".equals(input.statusName()) && retire==null) {
             if (closed(input.date())) {
                 // 시안: 「마감한 달(마지막 마감 달 이전)로는…」
@@ -287,6 +304,7 @@ public class CommonDeveloperService {
                 || !Objects.equals(old.originalEndDate,s.originalEndDate)))) mapper.updateStatus(s);
     }
     public StatusList putCommonDeveloperStatusEndDate(String id,String statusId,LocalDate endDate) {
+        requireStatusManager();
         lock(); Developer d=require(id); var before=mapper.selectStatuses(id); var next=DeveloperStatusRules.copy(before);
         State leave=DeveloperStatusRules.target(next,statusId);
         if (!"LEAVE".equals(leave.code)) throw DeveloperRules.invalid("statusId");
@@ -301,8 +319,9 @@ public class CommonDeveloperService {
         mapper.insertHistory(new Audit(id,"UPD","휴직 종료일",text(DeveloperStatusRules.target(before,statusId).endDate),text(endDate),null,actor.userId()));
         refresh(d,false); return statuses(d);
     }
-    public StatusList postCommonDeveloperReturnCancel(String id,String statusId) { return cancel(id,statusId,null,false); }
+    public StatusList postCommonDeveloperReturnCancel(String id,String statusId) { requireStatusManager(); return cancel(id,statusId,null,false); }
     public StatusList postCommonDeveloperRetirementCancel(String id,String statusId,String reason) {
+        requireStatusManager();
         if(reason==null || reason.isBlank()) throw DeveloperRules.invalid("reason");
         return cancel(id,statusId,reason,true);
     }
@@ -310,8 +329,9 @@ public class CommonDeveloperService {
         lock(); Developer d=require(id); var before=mapper.selectStatuses(id); var next=DeveloperStatusRules.copy(before);
         State target=DeveloperStatusRules.target(next,statusId);
         if (!(retirement?"RETIRE":"WORK").equals(target.code)) throw DeveloperRules.invalid("statusId");
-        if (retirement && target.startDate.isBefore(calendar.today()) && !actor.roles().contains("ADMIN"))
-            throw CodeFailure.invalid("statusId","퇴사일이 지난 퇴사는 시스템 관리자만 취소할 수 있습니다.");
+        // 마감 여부는 아래에서 따로 알린다(문구가 달라서 closedMonth=false로 역할만 본다).
+        if (retirement && !DeveloperBusinessPolicy.canCancelRetirement(actor.roles(),target.startDate,calendar.today(),false))
+            throw new CodeFailure(403,"permission","퇴사일이 지난 퇴사는 시스템 관리자만 취소할 수 있습니다.");
         if (closed(target.startDate)) throw CodeFailure.invalid("statusId",retirement?
             "퇴사한 달("+YearMonth.from(target.startDate)+")이 마감되어 취소할 수 없습니다. 다시 쓰려면 새로 등록하세요.":"복귀한 달이 마감되어 취소할 수 없습니다.");
         DeveloperStatusRules.cancel(next,target);

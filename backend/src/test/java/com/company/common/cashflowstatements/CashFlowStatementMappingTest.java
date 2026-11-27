@@ -37,7 +37,7 @@ class CashFlowStatementMappingTest {
     @Test void auditUsesUi21AndOnlyNamedBoundValues() throws Exception {
         var sql = configuration().getMappedStatement(NS + "insertAccess").getBoundSql(Map.of("userId", "admin", "target", "자금수지표"));
         assertThat(sql.getSql()).contains("'UI-21'", "'DNLD'", "clock_timestamp()").doesNotContain("UI-09");
-        assertThat(sql.getParameterMappings()).extracting(p -> p.getProperty()).containsExactly("userId", "target", "userId");
+        assertThat(sql.getParameterMappings()).extracting(p -> p.getProperty()).containsExactly("userId", "target", "userId", "accessIp");
     }
     private Configuration configuration() throws Exception {
         var config = new Configuration();

@@ -4,6 +4,9 @@ import { downloadFile } from "../../shared/list/download";
 export type Amount = number | null;
 export type DashboardTone = "bad" | "warn";
 export interface DashboardResult {
+  /** 대시보드 모양(명세 ⑧-4): 전체 / 파트장(담당 파트) / PM(담당 프로젝트). 옛 응답에는 없다(전체로 본다).
+   *  part·pm이면 summary·closing·pipeline·minimumCash는 null, cash·trend·salesParts는 빈 배열. */
+  dashMode?: "all" | "part" | "pm";
   selectedMonth: string;
   today: string;
   closingState: "작업중" | "마감";
@@ -31,7 +34,7 @@ export interface DashboardResult {
     unpaidCount: number;
     overdueCount: number;
     overdueAmount: Amount;
-  };
+  } | null;
   /** 시안 확인할 일. 제목에 건수가 이미 들어 있다. visible=true 줄만 그린다. */
   todos: {
     key: string;
@@ -57,7 +60,7 @@ export interface DashboardResult {
       description: string | null;
       targetScreenId: string | null;
     }[];
-  };
+  } | null;
   projectAlerts: {
     projectId: string;
     projectName: string;
@@ -104,7 +107,7 @@ export interface DashboardResult {
       stageName: string | null;
       probability: Amount;
     }[];
-  };
+  } | null;
   cash: {
     month: string;
     monthEndBalance: Amount;

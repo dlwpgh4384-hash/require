@@ -80,7 +80,10 @@ public class CommonProjectCostAnalysisService {
     /**
      * 프로젝트별 예산 소진율(식-19, 목록 「예산 소진율」과 같은 값). 프로젝트 현황판의 원가 사용률(식-75 「예산 소진율과
      * 같은 값」)이 같은 계산을 쓰게 한다(2026-11-24 사용자 결정). 값이 없는 프로젝트는 빠진다.
+     * 고를 수 없는 달이면 CodeFailure를 던지지만 읽기만 하므로 부르는 쪽(현황판) 읽기 묶음을 rollback-only로 만들지 않는다
+     * (그러면 현황판이 커밋 때 UnexpectedRollbackException으로 500이 된다).
      */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, noRollbackFor = CodeFailure.class)
     public java.util.Map<String, BigDecimal> budgetUsageRates(int year, int baseMonth) {
         var rates = new java.util.HashMap<String, BigDecimal>();
         for (var analysis : population(new Period(year, baseMonth)).projects())

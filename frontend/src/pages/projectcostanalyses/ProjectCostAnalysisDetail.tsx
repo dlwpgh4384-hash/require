@@ -7,6 +7,7 @@ import { ProjectRequestError, typeLabel } from "../projects/projects";
 import { ProjectDetail } from "../projects/ProjectDetail";
 import { useOpenProjectEdit } from "../projects/projectEdit";
 import { formatKoreanMoney, formatMoney } from "../../shared/list/moneyUnit";
+import { useCanViewScreen, useSensitiveView } from "../../shared/permission";
 import {
   formatMm,
   formatPercent,
@@ -100,6 +101,8 @@ export function ProjectCostAnalysisDetail({
   monthlyMarginNotice: string | null;
   onClose: () => void;
 }) {
+  // 투입 인력의 배분 원가는 민감 칸을 볼 수 있을 때만(아니면 서버가 보내지 않는다).
+  const sensitive = useSensitiveView();
   const key = `${row.projectId}:${period.year}:${period.baseMonth}`;
   const internal = row.contractTypeCode === "IN";
   const turnkey = row.contractTypeCode === "TK";
@@ -186,6 +189,8 @@ export function ProjectCostAnalysisDetail({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, key, input.headcountChange, input.monthlyCostPerPerson, input.months, input.monthlyPricePerPerson, workforce.data]);
+  // 원가 초과 원인 단추는 옮겨 갈 화면 조회 권한이 있을 때만(⑦-5).
+  const canView = useCanViewScreen();
   function go(target: string, context: string | null) {
     if ((target !== "UI-11" && target !== "UI-32") || !context) {
       setMessage("이동할 화면을 확인할 수 없습니다.");
@@ -304,7 +309,7 @@ export function ProjectCostAnalysisDetail({
                   <th>이름</th>
                   <th>직무</th>
                   <th className="ls-right">MM</th>
-                  <th className="ls-right">배분 원가</th>
+                  {sensitive && <th className="ls-right">배분 원가</th>}
                   <th className="ls-right">매출</th>
                   <th>구분</th>
                 </tr>
@@ -318,7 +323,9 @@ export function ProjectCostAnalysisDetail({
                     <td>{item.developerName}</td>
                     <td>{item.jobName}</td>
                     <td className="ls-right">{formatMm(item.monthlyMm)}</td>
-                    <td className="ls-right">{won(item.allocatedCost)}</td>
+                    {sensitive && (
+                      <td className="ls-right">{won(item.allocatedCost)}</td>
+                    )}
                     <td className="ls-right">{internal || item.revenue == null ? "–" : won(item.revenue)}</td>
                     <td>
                       <Badge kind={item.inputTypeCode === "FREE" ? "warn" : "neutral"}>
@@ -510,7 +517,7 @@ export function ProjectCostAnalysisDetail({
                   <span>
                     고칠 사람: <strong>{item.owner}</strong> — {item.task}
                   </span>
-                  {item.targetScreenId && item.targetLabel && (
+                  {item.targetScreenId && item.targetLabel && canView(item.targetScreenId) && (
                     <button
                       type="button"
                       className="ls-btn ls-btn-sm"

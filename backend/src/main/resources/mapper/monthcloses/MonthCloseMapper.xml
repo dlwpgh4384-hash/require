@@ -61,8 +61,9 @@
     FROM TB_CL_CLOSE_HIST WHERE CLOSE_YM = #{month}
   </insert>
   <insert id="insertAccess">
-    INSERT INTO TB_SY_ACCS_LOG(USER_ID, ACT_TYPE_CD, SCRN_ID, TRGT_DESC, ACT_DTTM, REG_USER_ID, REG_DTTM)
-    VALUES(#{actor}, #{action}, 'UI-14', #{month}, clock_timestamp(), #{actor}, clock_timestamp())
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
+    INSERT INTO TB_SY_ACCS_LOG(USER_ID, ACT_TYPE_CD, SCRN_ID, TRGT_DESC, ACT_DTTM, REG_USER_ID, REG_DTTM,CLIENT_IP)
+    VALUES(#{actor}, #{action}, 'UI-14', #{month}, clock_timestamp(), #{actor}, clock_timestamp(),#{accessIp,jdbcType=VARCHAR})
   </insert>
   <insert id="insertWorkMonth">
     INSERT INTO TB_CL_CLOSE(CLOSE_YM, CLOSE_STAT_CD, REG_USER_ID, REG_DTTM)

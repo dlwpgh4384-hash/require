@@ -70,14 +70,14 @@ class CommonPartSettlementControllerTest {
             .andExpect(jsonPath("$.data.notice").value("맡은 영업 파트가 없습니다. 본사(직접 영업)는 파트 이익금 정산 대상이 아닙니다."));
     }
     @Test void publicMonthlyDetailUsesPersonSalaryOnce() throws Exception {
-        mvc.perform(get(A)).andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].salary").value(4000000))
+        mvc.perform(get("/api/common/part-settlements/A/2026-01")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].salary").value(4000000))
             .andExpect(jsonPath("$.data.items[0].retirementAmount").value(333333)).andExpect(jsonPath("$.data.items[0].profitShare").value(466666))
             .andExpect(jsonPath("$.data.modifiedAt").value(org.hamcrest.Matchers.nullValue()));
         assertThat(data.headers).isEmpty();
     }
     @Test void publicTrendsContainJanuaryThroughSelectionAndCardOnce() throws Exception {
         data.header("WORK");
-        mvc.perform(get(ROOT+"/A/2026-02/trends")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].months.length()").value(2))
+        mvc.perform(get("/api/common/part-settlements/A/2026-02/trends")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].months.length()").value(2))
             .andExpect(jsonPath("$.data.monthlyTotals[0].partProfitAmount").value(466566));
     }
     @ParameterizedTest @ValueSource(strings={"","/excel","/A/2026-13","/A/2026-13/trends"})
@@ -87,7 +87,7 @@ class CommonPartSettlementControllerTest {
         assertThat(data.headers).isEmpty();assertThat(data.audits).isEmpty();
     }
     @Test void publicCardCreateThenReadBackAndStaleConflict() throws Exception {
-        mvc.perform(put(A+"/card").contentType("application/json").content("{\"corpCardAmount\":50000,\"modifiedAt\":null}"))
+        mvc.perform(put("/api/common/part-settlements/A/2026-01/card").contentType("application/json").content("{\"corpCardAmount\":50000,\"modifiedAt\":null}"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.corpCardAmount").value(50000))
             .andExpect(jsonPath("$.data.summary.partProfitAmount").value(416666));
         var h=data.headers.get(new Key("A","202601"));
@@ -113,7 +113,7 @@ class CommonPartSettlementControllerTest {
         assertThat(data.headers).isEmpty();
     }
     @Test void publicDirectConfirmSnapshotsAndRepeatedConfirmPreservesTimestamp() throws Exception {
-        mvc.perform(put(A+"/confirm").contentType("application/json").content("{\"modifiedAt\":null}"))
+        mvc.perform(put("/api/common/part-settlements/A/2026-01/confirm").contentType("application/json").content("{\"modifiedAt\":null}"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.confirmedBy").value("admin")).andExpect(jsonPath("$.data.confirmed").value(true));
         var h=data.headers.get(new Key("A","202601"));var at=h.modifiedAt;
         data.inputs.get(0).projectName="바뀐 프로젝트";data.inputs.get(0).employeeTypeCode="VN";
@@ -140,7 +140,7 @@ class CommonPartSettlementControllerTest {
     @Test void cancellationPersistsTypedReasonAndRetainsSnapshotButReadsLive() throws Exception {
         mvc.perform(put(A+"/confirm").contentType("application/json").content("{\"modifiedAt\":null}")).andExpect(status().isOk());
         var h=data.headers.get(new Key("A","202601"));data.inputs.get(0).projectName="현재 프로젝트";
-        mvc.perform(put(A+"/cancel").contentType("application/json").content(body(new CancelInput("  정정 필요  ",h.modifiedAt))))
+        mvc.perform(put("/api/common/part-settlements/A/2026-01/cancel").contentType("application/json").content(body(new CancelInput("  정정 필요  ",h.modifiedAt))))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.confirmed").value(false)).andExpect(jsonPath("$.data.items[0].projectNames[0]").value("현재 프로젝트"));
         assertThat(h.cancelReason).isEqualTo("  정정 필요  ");assertThat(data.details.get(new Key("A","202601"))).hasSize(1);
         assertThat(data.audits.get(data.audits.size()-1)).extracting(Audit::before,Audit::after,Audit::reason,Audit::actor)

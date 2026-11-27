@@ -44,7 +44,8 @@ class RoleConsumerPolicyTest {
             RoleActionPolicy.Action.MONTH_CLOSE,RoleActionPolicy.Action.PART_SETTLEMENT_CONFIRM,
             RoleActionPolicy.Action.PART_SETTLEMENT_CANCEL)) {
             assertThat(RoleActionPolicy.allows(editOnly,action)).isFalse();
-            var confirmOnly=new RoleContracts.MenuInput("M011","N","N","N","N","N","N","Y");
+            // 로그인(UI-22) 뒤 모든 동작은 조회(Y)가 있어야 한다.
+            var confirmOnly=new RoleContracts.MenuInput("M011","Y","N","N","N","N","N","Y");
             assertThat(RoleActionPolicy.allows(confirmOnly,action)).isTrue();
         }
     }

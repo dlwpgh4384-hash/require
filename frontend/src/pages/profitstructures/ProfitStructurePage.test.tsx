@@ -282,7 +282,7 @@ it("compares 연 누계 only with the same period last year", async () => {
   for (const id of ["profit-kpi-revenue", "profit-kpi-gross", "profit-kpi-operating", "profit-kpi-idle"])
     expect(screen.getByTestId(id)).not.toHaveTextContent(/전월 대비|전 분기/);
   expect(screen.getByTestId("profit-kpi-revenue")).toHaveTextContent("전년 같은 기간 대비 ▼ 8.3%");
-  expect(screen.getByTestId("profit-numeric-panel")).toHaveTextContent("월별 누계 · 단위 천 원");
+  expect(screen.getByTestId("profit-numeric-panel")).toHaveTextContent("월별 누계 · 단위 원");
 });
 
 it("shows the provisional banner and 잠정 badges only when the ending month is open", async () => {
@@ -344,7 +344,7 @@ it("uses a bar chart and the partial-quarter note for 분기", async () => {
   );
   expect(screen.getByTestId("profit-trend-chart")).toHaveAttribute("aria-label", "매출, 매출원가 비교");
   expect(screen.getByTestId("profit-kpi-revenue")).toHaveTextContent("▲ 10.0% 전 분기 같은 기간 대비");
-  expect(screen.getByTestId("profit-numeric-panel")).toHaveTextContent("분기별 · 단위 천 원");
+  expect(screen.getByTestId("profit-numeric-panel")).toHaveTextContent("분기별 · 단위 원");
 });
 
 it("renders the 숫자로 보기 table with items as rows and periods as columns", async () => {

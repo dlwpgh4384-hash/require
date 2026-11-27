@@ -1,3 +1,4 @@
+import { usePermission, useSensitiveView } from "../../shared/permission";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import {
@@ -52,16 +53,12 @@ const sortValue = (row: Candidate, key: string): string | number => {
 /** 인력 계획 › 외부 인력 후보(UI-33). 시안 SCR['UI-33']. */
 export function CandidatePage({
   renderActions,
-  futureRoles,
   testId = "candidate-page",
 }: {
   renderActions?: (actions: ReactNode) => ReactNode;
-  futureRoles?: string[];
   testId?: string;
 }) {
-  const policy = futureRoles
-    ? candidatePolicy(futureRoles)
-    : { canManage: true, showAmounts: true };
+  const policy = candidatePolicy(usePermission("UI-33"), useSensitiveView());
   const root = useRef<HTMLDivElement>(null);
   const [options, setOptions] = useState<CandidateOptions | null>(null);
   const [optionsError, setOptionsError] = useState("");

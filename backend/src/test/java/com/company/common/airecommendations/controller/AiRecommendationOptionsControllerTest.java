@@ -55,7 +55,7 @@ class AiRecommendationOptionsControllerTest {
     }
 
     @Test void publicReadPreservesOrderingMonthsStableNeedNumbersAndCodeLabels() throws Exception {
-        mvc.perform(get(PATH)).andExpect(status().isOk()).andExpect(response("GET", PATH))
+        mvc.perform(get("/api/common/ai-recommendation-options")).andExpect(status().isOk()).andExpect(response("GET", PATH))
             .andExpect(jsonPath("$.success").value(true)).andExpect(jsonPath("$.meta").isMap())
             .andExpect(jsonPath("$.data.targets[0].targetName").value("가 프로젝트"))
             .andExpect(jsonPath("$.data.targets[0].startMonth").value("2026-11"))

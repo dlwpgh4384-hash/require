@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.common.commonops.mapper.AccountAccessMapper">
+  <resultMap id="account" type="com.company.common.commonops.mapper.AccountAccessMapper$Account" autoMapping="false">
+    <id column="user_id" property="userId"/>
+    <result column="user_nm" property="name"/>
+    <result column="email_addr" property="email"/>
+    <result column="pwd_hash" property="hash"/>
+    <result column="user_stat_cd" property="status"/>
+    <result column="temp_pwd_yn" property="temporary"/>
+    <result column="modified_at" property="modifiedAt" javaType="java.time.Instant"/>
+    <result column="pwd_chg_dttm" property="passwordChangedAt" javaType="java.time.Instant"/>
+    <result column="last_login_dttm" property="lastLoginAt" javaType="java.time.Instant"/>
+    <result column="pwd_err_cnt" property="failures"/>
+  </resultMap>
+  <sql id="columns">u.user_id,u.user_nm,u.email_addr,u.pwd_hash,u.user_stat_cd,u.temp_pwd_yn,
+    COALESCE(u.mod_dttm,u.reg_dttm) AS modified_at,u.pwd_chg_dttm,u.last_login_dttm,u.pwd_err_cnt</sql>
+  <select id="account" resultMap="account">
+    SELECT <include refid="columns"/> FROM TB_SY_USER u WHERE u.user_id=#{id}
+  </select>
+  <select id="lockAccount" resultMap="account">
+    SELECT <include refid="columns"/> FROM TB_SY_USER u WHERE u.user_id=#{id} FOR UPDATE OF u
+  </select>
+  <select id="standard" resultType="java.lang.Integer">
+    SELECT s.std_val::integer FROM TB_SY_OPER_STD s WHERE s.std_cd=#{code}
+      AND s.aply_bgn_ym &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')
+    ORDER BY s.aply_bgn_ym DESC LIMIT 1
+  </select>
+  <select id="roles" resultType="string">
+    SELECT r.role_id FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.role_id=ur.role_id
+    WHERE ur.user_id=#{id} AND r.use_yn='Y' ORDER BY r.sort_ord,r.role_id
+  </select>
+  <select id="roleNames" resultType="string">
+    SELECT r.role_nm FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.role_id=ur.role_id
+    WHERE ur.user_id=#{id} AND r.use_yn='Y' ORDER BY r.sort_ord,r.role_id
+  </select>
+  <resultMap id="permission" type="com.company.common.commonops.mapper.AccountAccessMapper$Permission" autoMapping="false">
+    <id column="menu_id" property="menuId"/>
+    <result column="scrn_id" property="screenId"/>
+    <result column="pc_only_yn" property="pcOnlyYn"/>
+    <result column="inq_yn" property="readYn"/>
+    <result column="reg_yn" property="createYn"/>
+    <result column="upd_yn" property="updateYn"/>
+    <result column="del_yn" property="deleteYn"/>
+    <result column="upld_yn" property="uploadYn"/>
+    <result column="dnld_yn" property="downloadYn"/>
+    <result column="cnfm_yn" property="cnfmYn"/>
+  </resultMap>
+  <select id="permissions" resultMap="permission">
+    SELECT m.menu_id,m.scrn_id,m.pc_only_yn,max(a.inq_yn) AS inq_yn,
+      max(a.reg_yn) AS reg_yn,max(a.upd_yn) AS upd_yn,max(a.del_yn) AS del_yn,
+      max(a.upld_yn) AS upld_yn,max(a.dnld_yn) AS dnld_yn,max(a.cnfm_yn) AS cnfm_yn
+    FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.role_id=ur.role_id AND r.use_yn='Y'
+    JOIN TB_SY_ROLE_MENU_AUTH a ON a.role_id=r.role_id
+    JOIN TB_SY_MENU m ON m.menu_id=a.menu_id AND m.use_yn='Y'
+    LEFT JOIN TB_SY_MENU g ON g.menu_id=m.upper_menu_id
+    WHERE ur.user_id=#{id} AND m.scrn_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM TB_SY_MENU c WHERE c.upper_menu_id=m.menu_id)
+    GROUP BY m.menu_id,m.scrn_id,m.pc_only_yn,g.sort_ord,g.menu_id,m.sort_ord
+    ORDER BY g.sort_ord NULLS FIRST,g.menu_id,m.sort_ord,m.menu_id
+  </select>
+  <select id="scopeCodes" resultType="string">
+    SELECT r.data_scope_cd FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.role_id=ur.role_id
+    WHERE ur.user_id=#{id} AND r.use_yn='Y' ORDER BY r.sort_ord,r.role_id
+  </select>
+  <select id="scopeParts" resultType="string">
+    SELECT s.part_id FROM TB_BS_PART_STD s WHERE s.part_ldr_user_id=#{id}
+      AND s.aply_bgn_ym &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')
+      AND (s.aply_end_ym IS NULL OR s.aply_end_ym &gt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM'))
+    UNION
+    SELECT p.part_id FROM TB_BS_PART p JOIN TB_SY_USER_SCOPE s ON s.part_id=p.part_id
+      WHERE s.user_id=#{id} AND s.scope_type_cd='PART' AND p.hq_yn='Y'
+  </select>
+  <select id="scopeProjects" resultType="string">
+    SELECT s.proj_id FROM TB_SY_USER_SCOPE s WHERE s.user_id=#{id} AND s.scope_type_cd='PROJ'
+  </select>
+  <select id="sensitive" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.role_id=ur.role_id
+      WHERE ur.user_id=#{id} AND r.use_yn='Y' AND r.snstv_view_yn='Y')
+  </select>
+  <select id="projectOf" resultType="string">
+    <choose>
+      <when test="kind == 'BILL'">SELECT proj_id FROM TB_BL_BILL WHERE bill_id=#{id}</when>
+      <when test="kind == 'RCPT'">SELECT b.proj_id FROM TB_BL_RCPT r JOIN TB_BL_BILL b ON b.bill_id=r.bill_id WHERE CAST(r.rcpt_id AS TEXT)=#{id}</when>
+      <when test="kind == 'ASGN'">SELECT proj_id FROM TB_PJ_ASGN WHERE asgn_id=#{id}</when>
+      <when test="kind == 'RCMD'">SELECT proj_id FROM TB_SL_RCMD_LOG WHERE CAST(rcmd_id AS TEXT)=#{id} ORDER BY rank_ord LIMIT 1</when>
+      <when test="kind == 'ISSUE'">SELECT proj_id FROM TB_PJ_ISSUE WHERE CAST(issue_id AS TEXT)=#{id}</when>
+      <otherwise>SELECT proj_id FROM TB_PJ_PROJ WHERE proj_id=#{id}</otherwise>
+    </choose>
+  </select>
+  <select id="opportunityPart" resultType="string">SELECT part_id FROM TB_SL_OPP WHERE opp_id=#{id}</select>
+  <select id="recommendationOpportunity" resultType="string">SELECT opp_id FROM TB_SL_RCMD_LOG WHERE CAST(rcmd_id AS TEXT)=#{id} ORDER BY rank_ord LIMIT 1</select>
+  <select id="developerPart" resultType="string">SELECT COALESCE(part_id,'') FROM TB_HR_DEV WHERE dev_id=#{id}</select>
+  <select id="projectInParts" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_PJ_PROJ_PART h WHERE h.proj_id=#{projectId}
+      AND h.aply_bgn_ym=COALESCE((SELECT max(x.aply_bgn_ym) FROM TB_PJ_PROJ_PART x WHERE x.proj_id=#{projectId}
+          AND x.aply_bgn_ym &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')),
+        (SELECT min(x.aply_bgn_ym) FROM TB_PJ_PROJ_PART x WHERE x.proj_id=#{projectId}))
+      AND h.part_id IN <foreach collection="parts" item="part" open="(" separator="," close=")">#{part}</foreach>)
+  </select>
+  <select id="uploadForm" resultType="string">
+    SELECT form_type_cd FROM TB_SY_UPLD WHERE upld_id=#{uploadId} AND reg_user_id=#{userId}
+  </select>
+  <select id="activeRoleCount" resultType="int">
+    SELECT count(*) FROM TB_SY_ROLE WHERE use_yn='Y' AND role_id IN
+    <foreach collection="roles" item="role" open="(" separator="," close=")">#{role}</foreach>
+  </select>
+  <!-- 시험 계정은 새로 넣기만 한다. 이미 있는 계정의 비밀번호·잠금·역할은 절대 바꾸지 않는다(보안 검토). -->
+  <insert id="insertSmoke">
+    INSERT INTO TB_SY_USER(user_id,user_nm,email_addr,pwd_hash,temp_pwd_yn,pwd_err_cnt,mfa_err_cnt,user_stat_cd,pwd_chg_dttm,reg_user_id)
+    VALUES (#{id},#{id},concat(#{id},'@example.invalid'),#{hash},'N',0,0,'USE',clock_timestamp(),'SYSTEM')
+    ON CONFLICT(user_id) DO NOTHING
+  </insert>
+  <insert id="assignSmokeRoles">
+    INSERT INTO TB_SY_USER_ROLE(user_id,role_id,reg_user_id) VALUES
+    <foreach collection="roles" item="role" separator=",">(#{id},#{role},'SYSTEM')</foreach>
+  </insert>
+  <update id="failed">
+    UPDATE TB_SY_USER SET pwd_err_cnt=LEAST(pwd_err_cnt+1,99),
+      user_stat_cd=CASE WHEN pwd_err_cnt+1 &gt;= #{threshold} THEN 'LOCK' ELSE user_stat_cd END
+    WHERE user_id=#{id}
+  </update>
+  <update id="complete">
+    <!-- 로그인에 성공하면 그 사람의 화면 기간 기억(PERIOD)을 지워 모든 화면이 처음 기간으로 연다(2차 SFR-005-05·06). -->
+    WITH cleared_period AS (DELETE FROM TB_SY_USER_PREF WHERE user_id=#{id} AND pref_type_cd='PERIOD')
+    UPDATE TB_SY_USER SET pwd_err_cnt=0,mfa_err_cnt=0,last_login_dttm=#{now},
+      mfa_code_hash=NULL,mfa_expr_dttm=NULL WHERE user_id=#{id}
+  </update>
+  <update id="password">
+    UPDATE TB_SY_USER SET pwd_hash=#{hash},temp_pwd_yn=
+      <choose><when test="temporary">'Y'</when><otherwise>'N'</otherwise></choose>,
+      pwd_err_cnt=0,mfa_err_cnt=0,mfa_code_hash=NULL,mfa_expr_dttm=NULL,
+      pwd_chg_dttm=#{now},mod_user_id=#{id},
+      mod_dttm=GREATEST(#{now},COALESCE(mod_dttm,reg_dttm)+INTERVAL '1 microsecond')
+    WHERE user_id=#{id}
+  </update>
+  <insert id="access">
+    INSERT INTO TB_SY_ACCS_LOG(user_id,act_type_cd,scrn_id,trgt_desc,client_ip,act_dttm,reg_user_id)
+    VALUES(#{id},#{action},'UI-22',#{target},#{ip,jdbcType=VARCHAR},#{now},#{id})
+  </insert>
+</mapper>

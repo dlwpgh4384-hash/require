@@ -224,6 +224,37 @@ class CommonCandidateControllerTest {
         mvc.perform(get("/api/common/candidates/{id}/contacts", id)).andExpect(jsonPath("$.data.items[0].memo").value("정보 수정"))
             .andExpect(jsonPath("$.data.items[0].systemRecord").value(true)).andExpect(jsonPath("$.data.items.length()").value(2));
     }
+    /** 민감 체크가 없는 로그인 사용자(보안 필터가 요청에 남기는 값과 같은 모양). */
+    static org.springframework.test.web.servlet.request.RequestPostProcessor nonSensitive() {
+        return request -> {
+            new com.company.common.support.auth.RequestAccess("viewer", Set.of("PM"),
+                new com.company.common.users.service.UserScopePolicy.Scope(true, Set.of(), Set.of()), false,
+                Set.of(), Set.of(), "127.0.0.1", false, Set.of()).store(request);
+            return request;
+        };
+    }
+    @ParameterizedTest @ValueSource(strings = {"missing", "null", "number"})
+    @DisplayName("민감 체크 없는 사용자의 수정: 희망 단가는 빠지거나 null·다른 값이 와도 저장된 값을 그대로 둔다")
+    void nonSensitiveUpdateKeepsStoredDesiredRate(String shape) throws Exception {
+        String id = create(); assertThat(rows.get(id).desiredMonthlyRate()).isEqualByComparingTo("6500000");
+        var b = input(); b.putNull("modifiedAt"); b.put("memo", "바꾼 메모");
+        switch (shape) {
+            case "missing" -> b.remove("desiredMonthlyRate");
+            case "null" -> b.putNull("desiredMonthlyRate");
+            default -> b.put("desiredMonthlyRate", 1);
+        }
+        mvc.perform(put("/api/common/candidates/{id}", id).with(nonSensitive()).contentType("application/json").content(b.toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.desiredMonthlyRate").doesNotExist())
+            .andExpect(jsonPath("$.data.memo").value("바꾼 메모"));
+        assertThat(rows.get(id).desiredMonthlyRate()).isEqualByComparingTo("6500000");
+        assertThat(rows.get(id).memo()).isEqualTo("바꾼 메모");
+    }
+    @Test void sensitiveUpdateStillRequiresDesiredRate() throws Exception {
+        String id = create(); var before = rows.get(id); var b = input(); b.putNull("modifiedAt"); b.remove("desiredMonthlyRate");
+        mvc.perform(put("/api/common/candidates/{id}", id).contentType("application/json").content(b.toString()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("desiredMonthlyRate"));
+        assertThat(rows.get(id)).isEqualTo(before);
+    }
     @Test void oversizedUpdateMemoLeavesOriginal() throws Exception {
         String id = create(); var old = rows.get(id); var b = input(); b.putNull("modifiedAt"); b.put("memo", "가".repeat(501));
         mvc.perform(put("/api/common/candidates/{id}", id).contentType("application/json").content(b.toString()))

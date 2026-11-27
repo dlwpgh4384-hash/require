@@ -3,6 +3,7 @@ import { Dialog } from "../../shared/feedback/Dialog";
 import { Banner } from "../../shared/list";
 import { usePreferenceBusinessShortcuts } from "../userpreferences/UserPreferenceTools";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
+import { useSensitiveView } from "../../shared/permission";
 import { useScreenTitleOverride } from "../../shared/layout/ScreenTitleOverride";
 import {
   DeveloperRequestError,
@@ -52,6 +53,7 @@ export function DeveloperForm({
   onCancel: () => void;
   onSaved: (developer: Developer) => void;
 }) {
+  const sensitive = useSensitiveView();
   const skillName = (code: string) => options.codes.SKILL?.find((c) => c.code === code)?.codeName || code;
   const [draft, setDraft] = useState(() => ({
     name: developer?.name || "",
@@ -423,6 +425,8 @@ export function DeveloperForm({
           )}
         </div>
       </section>
+      {/* 민감 칸을 볼 수 없는 사람에게는 서버가 단가·급여를 보내지 않는다. 빈 칸으로 보이지 않게 칸을 숨긴다(서버는 저장 때 원래 값을 지킨다). */}
+      {sensitive && (
       <section className="developer-card">
         <h2>금액</h2>
         <div className="developer-fgrid">
@@ -442,6 +446,7 @@ export function DeveloperForm({
           )}
         </div>
       </section>
+      )}
       {(areaError || error != null) && (
         <div role="alert" className="developer-error">
           {areaError || (conflict

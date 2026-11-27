@@ -33,7 +33,7 @@ import {
   KIND_LABEL,
   addDays,
   assignmentInitialDates,
-  assignmentPriceEditable,
+  useAssignmentPriceEditable,
   getCommonAssignmentContractDevelopers,
   isAssignmentConflict,
   mmf,
@@ -107,7 +107,7 @@ const personText = (p: DeveloperListRow) => `${p.name} (${p.managementNumber})`;
 export function AssignmentForm({
   projects,
   candidate,
-  roles,
+  canRate: canRateOverride,
   onClose,
   onSaved,
   onConflict,
@@ -119,7 +119,8 @@ export function AssignmentForm({
 }: {
   projects: Project[];
   candidate?: AssignmentCandidate;
-  roles: readonly string[];
+  /** 청구 단가 직접 입력. 안 주면 민감 체크 + 투입 배정 수정 권한(⑨-5). */
+  canRate?: boolean;
   onClose: () => void;
   onSaved: (row: Assignment, message: string) => void;
   /** 저장이 409(다른 사람이 먼저 바꿈, 예: 후보를 이미 확정·뺌)면 부른다. 없으면 창 안에 안내만 띄운다. */
@@ -140,7 +141,8 @@ export function AssignmentForm({
   extraWarning?: string;
 }) {
   const openAiRecommendation = useOpenAiRecommendation();
-  const canRate = assignmentPriceEditable(roles);
+  const priceEditable = useAssignmentPriceEditable();
+  const canRate = canRateOverride ?? priceEditable;
   const initial =
     projects.find(
       (p) => p.projectId === (candidate?.projectId ?? initialValues?.projectId),

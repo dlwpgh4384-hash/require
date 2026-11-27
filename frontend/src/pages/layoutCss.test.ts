@@ -13,6 +13,15 @@ import "./projectboard/projectBoard.css?render-test";
 import "./assignments/assignments.css?render-test";
 import "./projects/projects.css?render-test";
 import "../shared/list/list.css?render-test";
+import "./candidates/candidates.css?render-test";
+import "./salespipeline/salesOpportunities.css?render-test";
+import "./manpowerboard/manpowerBoard.css?render-test";
+import "./userpreferences/userPreferences.css?render-test";
+import "./operatingstandards/operatingStandards.css?render-test";
+import "../shared/layout/shell.css?render-test";
+import { PlaceholderScreen } from "./common/PlaceholderScreen";
+import { NavigationState } from "../shared/layout/NavigationState";
+import { ShortcutHelpDialog } from "./userpreferences/UserPreferenceTools";
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -60,7 +69,6 @@ it("배정 창: AI 추천 단추는 다른 칸처럼 폭 가득, 설명 글은 �
       null,
       h(AssignmentForm, {
         projects: [],
-        roles: [],
         onClose: vi.fn(),
         onSaved: vi.fn(),
       }),
@@ -117,74 +125,183 @@ it("프로젝트 화면에서도 공통 Banner가 아이콘을 맞춘다", () =>
   ).toBe("0");
 });
 
-// 아래는 CSS 글을 직접 읽어 확인한다(시험 도구는 CSS를 빈 글로 바꾸므로 파일을 읽는다).
-const readText = async (path: string): Promise<string> => {
-  const fs: { readFileSync(file: URL, encoding: "utf8"): string } = await import(
-    "node:" + "fs"
-  );
-  return fs.readFileSync(new URL(path, import.meta.url), "utf8");
-};
-const rule = (css: string, selector: string) => {
-  const at = css.indexOf(`${selector} {`);
-  expect(at, selector).toBeGreaterThanOrEqual(0);
-  return css.slice(at, css.indexOf("}", at));
-};
-const candidatesCss = await readText("./candidates/candidates.css");
-const salesCss = await readText("./salespipeline/salesOpportunities.css");
-const listCss = await readText("../shared/list/list.css");
-const boardCss = await readText("./manpowerboard/manpowerBoard.css");
-const preferencesCss = await readText("./userpreferences/userPreferences.css");
-const operatingCss = await readText(
-  "./operatingstandards/operatingStandards.css",
-);
-
 it("후보 메모 칸: 시안 textarea.in(높이 자동·최소 76·줄 높이 20)으로 .ls-in 높이 36을 푼다", () => {
-  const css = rule(candidatesCss, ".candidate-contact-form textarea");
-  expect(css).toContain("height: auto");
-  expect(css).toContain("min-height: 76px");
-  expect(css).toContain("line-height: 20px");
-  expect(css).toContain("resize: vertical");
+  render(
+    h(
+      "form",
+      { className: "candidate-contact-form" },
+      h("textarea", { className: "ls-in", "aria-label": "메모" }),
+    ),
+  );
+  const style = getComputedStyle(screen.getByRole("textbox", { name: "메모" }));
+  expect(style.height).toBe("auto");
+  expect(style.minHeight).toBe("76px");
+  expect(style.lineHeight).toBe("20px");
+  expect(style.resize).toBe("vertical");
 });
 
 it("영업 필요 인력 표: 칸 위 맞춤 없음(시안 가운데), 고르기 칸 오른쪽 4px", () => {
-  expect(salesCss).not.toContain(".so-needs td");
-  expect(rule(salesCss, ".so-needs select.so-in")).toContain(
-    "padding-right: 4px",
+  render(
+    h(
+      "table",
+      { className: "so-needs" },
+      h(
+        "tbody",
+        null,
+        h(
+          "tr",
+          null,
+          h(
+            "td",
+            null,
+            h("select", { className: "so-in", "aria-label": "필요 인력" }),
+          ),
+        ),
+      ),
+    ),
+  );
+  expect(getComputedStyle(screen.getByRole("cell")).verticalAlign).not.toBe(
+    "top",
+  );
+  expect(getComputedStyle(screen.getByRole("combobox")).paddingRight).toBe(
+    "4px",
   );
 });
 
 it("서랍 안 요약 칸은 시안 .db .kpis처럼 늘 두 칸, 사이 8px", () => {
-  const css = rule(listCss, ".ls-db .ls-kpis");
-  expect(css).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
-  expect(css).toContain("gap: 8px");
+  render(
+    h(
+      "div",
+      { className: "ls-db" },
+      h("section", { className: "ls-kpis", "aria-label": "요약" }),
+    ),
+  );
+  const style = getComputedStyle(screen.getByRole("region", { name: "요약" }));
+  expect(style.gridTemplateColumns).toBe("repeat(2, minmax(0, 1fr))");
+  expect(style.gap).toBe("8px");
 });
 
 it("인력 운영 보드 탭 줄: 시안 .content>.tabs(좌우 여백 0, 아래 -8px)", () => {
-  const css = rule(boardCss, ".manpower-board-page .ls-tabs");
-  expect(css).toContain("padding: 0");
-  expect(css).toContain("margin-bottom: -8px");
+  render(
+    h(
+      "div",
+      { className: "manpower-board-page" },
+      h("div", { className: "ls-tabs", role: "tablist" }),
+    ),
+  );
+  const style = getComputedStyle(screen.getByRole("tablist"));
+  expect(style.padding).toBe("0px");
+  expect(style.marginBottom).toBe("-8px");
 });
 
 it("왼쪽 즐겨찾기·최근 본 화면: 시안 .nq-t·.nq-empty 간격", () => {
-  expect(rule(preferencesCss, ".preference-personal-lists h2")).toContain(
-    "padding: 8px 12px 4px",
+  render(
+    h(
+      "section",
+      { className: "preference-personal-lists" },
+      h("h2", null, "즐겨찾기"),
+      h("p", null, "최근 본 화면 없음"),
+      h("ul"),
+    ),
   );
-  expect(rule(preferencesCss, ".preference-personal-lists p")).toContain(
-    "padding: 2px 12px 4px",
+  expect(getComputedStyle(screen.getByRole("heading")).padding).toBe(
+    "8px 12px 4px",
   );
-  expect(rule(preferencesCss, ".preference-personal-lists ul")).toContain(
-    "margin: 0",
+  expect(getComputedStyle(screen.getByText("최근 본 화면 없음")).padding).toBe(
+    "2px 12px 4px",
   );
+  expect(getComputedStyle(screen.getByRole("list")).margin).toBe("0px");
 });
 
 it("운영 기준값 저장 창: 시안 .mb·.mf 간격", () => {
-  const body = rule(operatingCss, ".operating-save-body");
-  expect(body).toContain("gap: 12px");
-  expect(body).toContain("padding: 4px 24px 16px");
-  expect(
-    rule(
-      operatingCss,
-      '.code-page .app-dialog[data-testid="operating-save-dialog"] > .app-actions',
+  render(
+    h(
+      "div",
+      { className: "code-page" },
+      h(
+        "div",
+        { className: "app-dialog", "data-testid": "operating-save-dialog" },
+        h("section", {
+          className: "operating-save-body",
+          "aria-label": "저장 내용",
+        }),
+        h("footer", {
+          className: "app-actions",
+          "data-testid": "save-actions",
+        }),
+      ),
     ),
-  ).toContain("padding: 12px 24px 20px");
+  );
+  const body = getComputedStyle(
+    screen.getByRole("region", { name: "저장 내용" }),
+  );
+  expect(body.gap).toBe("12px");
+  expect(body.padding).toBe("4px 24px 16px");
+  expect(getComputedStyle(screen.getByTestId("save-actions")).padding).toBe(
+    "12px 24px 20px",
+  );
+});
+
+// 화면 틀 카드(.shell-state 흰 바탕·테두리): 실제 화면은 회색 바탕 위에, 준비 중·안내만 카드로.
+function shellFrame(...panels: ReturnType<typeof h>[]) {
+  render(h("div", { className: "shell-state", "data-testid": "frame" }, ...panels));
+  return getComputedStyle(screen.getByTestId("frame"));
+}
+const panel = (hidden: boolean, ...children: ReturnType<typeof h>[]) =>
+  h("div", { className: "screen-tab-panel", hidden }, ...children);
+const CLEAR = /^(transparent|rgba\(0, 0, 0, 0\))$/;
+const gate = (child: ReturnType<typeof h>) =>
+  h("div", { className: "screen-permission", style: { display: "contents" } }, child);
+
+it("화면 틀: 등록·수정·상세 폼처럼 뿌리에 screen-body가 없어도 실제 화면이면 카드 없음", () => {
+  // 예: 청구 등록(BillForm)·후보 상세·거래처 폼 — 권한 틀 안 폼 뿌리
+  const style = shellFrame(
+    panel(true, gate(h("section", { className: "screen-body" }))),
+    panel(false, gate(h("form", { className: "bill-form" }))),
+  );
+  expect(style.borderRadius).toMatch(/^0(px)?$/);
+  expect(style.backgroundColor).toMatch(CLEAR);
+});
+
+it("화면 틀: data-screen-id가 있는 화면 뿌리도 카드 없음(권한 틀 없이 그려도)", () => {
+  const style = shellFrame(
+    panel(false, h("div", { "data-screen-id": "UI-03" })),
+  );
+  expect(style.borderRadius).toMatch(/^0(px)?$/);
+});
+
+it("화면 틀: 준비 중 화면·메뉴 없음 안내는 카드를 그대로 둔다", () => {
+  const ready = shellFrame(
+    panel(true, gate(h("section", { className: "screen-body" }))),
+    panel(false, h(PlaceholderScreen, { scrnId: "UI-99" })),
+  );
+  expect(screen.getByTestId("navigation-state-ready")).toBeInTheDocument();
+  expect(ready.borderRadius).toBe("8px");
+  cleanup();
+  const empty = shellFrame(h(NavigationState, { kind: "no-screen" }));
+  expect(empty.borderRadius).toBe("8px");
+});
+
+it("단축키 창: 시안 keys(.modal 400·머리 16/16/8/24·본문 4/24/16·표 13px 40줄·단추 줄 12/24/20)", () => {
+  render(h(ShortcutHelpDialog, { onClose: vi.fn() }));
+  const dialog = screen.getByRole("dialog", { name: "단축키" });
+  const style = getComputedStyle(dialog);
+  expect(style.width).toBe("min(400px, 100%)");
+  expect(style.padding).toBe("0px");
+  expect(
+    getComputedStyle(dialog.querySelector(".app-dialog-head")!).padding,
+  ).toBe("16px 16px 8px 24px");
+  expect(
+    getComputedStyle(dialog.querySelector(".shortcut-help-body")!).padding,
+  ).toBe("4px 24px 16px");
+  const wrap = getComputedStyle(dialog.querySelector(".shortcut-help-wrap")!);
+  expect(wrap.overflow).toBe("auto");
+  expect(wrap.borderRadius).toBe("8px");
+  expect(getComputedStyle(dialog.querySelector("table")!).fontSize).toBe("13px");
+  const cell = getComputedStyle(dialog.querySelector("td")!);
+  expect(cell.height).toBe("40px");
+  expect(cell.padding).toBe("0px 12px");
+  expect(
+    getComputedStyle(dialog.querySelector(".shortcut-help-actions")!).padding,
+  ).toBe("12px 24px 20px");
 });

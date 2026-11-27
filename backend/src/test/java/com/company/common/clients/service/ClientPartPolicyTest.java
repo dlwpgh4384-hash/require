@@ -36,19 +36,21 @@ class ClientPartPolicyTest {
     @Test void salesLeaderCannotCreatePart() {
         assertThat(ClientPartPolicy.canCreatePart(Set.of("SALES_LDR"))).isFalse();
     }
-    @Test void fullAccountRequiresFinanceCapability() {
-        assertThat(ClientPartPolicy.canReadPaymentAccount(Set.of("FIN"))).isTrue();
+    // 계좌는 역할 이름이 아니라 민감 체크로만 본다(명세 ⑨-3).
+    @Test void fullAccountFollowsSensitiveFlagOnly() {
+        assertThat(ClientPartPolicy.canReadPaymentAccount(true)).isTrue();
+        assertThat(ClientPartPolicy.canReadPaymentAccount(false)).isFalse();
     }
-    @ParameterizedTest @ValueSource(strings = {"ADMIN", "SALES_LDR", "PM"})
-    void withoutFinanceNoFullAccountIsAllowed(String role) {
-        assertThat(ClientPartPolicy.canReadPaymentAccount(Set.of(role))).isFalse();
-    }
-    @Test void developmentActorIsAdminWithAllCapabilitiesWithoutLogin() {
-        var actor = new CurrentBusinessActor();
-        assertThat(actor.userId()).isEqualTo("admin");
-        assertThat(ClientPartPolicy.canCreateClient(actor.roles(), "BOTH")).isTrue();
-        assertThat(ClientPartPolicy.canCreatePart(actor.roles())).isTrue();
-        assertThat(ClientPartPolicy.canReadPaymentAccount(actor.roles())).isTrue();
-        assertThatThrownBy(() -> actor.roles().clear()).isInstanceOf(UnsupportedOperationException.class);
+    @Test void developmentActorIsAdminWithAllCapabilitiesWithoutLogin() throws Exception {
+        // 로그인(UI-22) 뒤 현재 사용자는 로그인 정보에서만 온다: 로그인 전 개발 사용자(admin)로 로그인한 상태로 본다.
+        try (var login = com.company.common.support.test.AuthenticatedMockMvcCustomizerFactory.loginDevelopmentAdmin()) {
+            var actor = new CurrentBusinessActor();
+            assertThat(actor.userId()).isEqualTo("admin");
+            assertThat(ClientPartPolicy.canCreateClient(actor.roles(), "BOTH")).isTrue();
+            assertThat(ClientPartPolicy.canCreatePart(actor.roles())).isTrue();
+            assertThat(ClientPartPolicy.canReadPaymentAccount(actor.sensitive())).isTrue();
+            assertThatThrownBy(() -> actor.roles().clear()).isInstanceOf(UnsupportedOperationException.class);
+
+        }
     }
 }

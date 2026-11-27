@@ -12,6 +12,7 @@ import {
   type ListSort,
 } from "../../shared/list";
 import { ClientDetail } from "./ClientDetail";
+import { useSensitiveView } from "../../shared/permission";
 import { ClientForm } from "./ClientForm";
 import { UploadActions } from "../uploads/UploadActions";
 import {
@@ -80,8 +81,10 @@ export function ClientPage({
   const [page, setPage] = useState(1);
   const presentation = useListPresentation();
 
+  // 민감 칸을 볼 수 없으면 서버가 지급 계좌를 보내지 않는다 → 열을 숨긴다.
+  const sensitive = useSensitiveView();
   const columns = useMemo<ListColumn<Client>[]>(
-    () => [
+    () => ([
       {
         key: "type",
         label: "구분",
@@ -151,8 +154,10 @@ export function ClientPage({
           <Badge kind={row.useYn === "Y" ? "ok" : "lock"}>{row.useYn === "Y" ? "사용" : "중지"}</Badge>
         ),
       },
-    ],
-    [codes],
+    ] as ListColumn<Client>[]).filter(
+      (column) => sensitive || column.key !== "account",
+    ),
+    [codes, sensitive],
   );
   const cols = useListColumns(SCREEN, columns);
 

@@ -69,6 +69,6 @@ class RoleProjectionTest {
         String number=config.getMappedStatement(RoleMapper.class.getName()+".selectIssuedNumber").getBoundSql(null).getSql();
         assertThat(number).contains("TB_SY_ROLE", "TB_SY_CHG_HIST", "trgt_tbl_nm='TB_SY_ROLE'").doesNotContain("use_yn", "nextval");
         String access=config.getMappedStatement(RoleMapper.class.getName()+".insertRoleAccess").getBoundSql(Map.of("id","ADMIN")).getSql();
-        assertThat(access).contains("'admin'", "'UI-24'", "'AUTH_CHG'", "clock_timestamp()").doesNotContain("UI-23");
+        assertThat(access).contains("'UI-24'", "'AUTH_CHG'", "clock_timestamp()").doesNotContain("UI-23", "'admin'");
     }
 }

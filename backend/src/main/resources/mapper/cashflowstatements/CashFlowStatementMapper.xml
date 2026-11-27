@@ -49,11 +49,16 @@
       AND (p.APLY_END_YM IS NULL OR p.APLY_END_YM &gt;= #{month})
     ORDER BY p.DEV_ID,p.APLY_BGN_YM
   </select>
+  <select id="leaves" resultMap="com.company.common.personalcostprofits.mapper.PersonalCostProfitMapper.leave">
+    SELECT DEV_ID AS "developerId",BGN_DT AS "startDate",END_DT AS "endDate" FROM TB_HR_DEV_STAT
+    WHERE WORK_STAT_CD='LEAVE'
+  </select>
   <select id="activeDevelopers" resultType="java.lang.String">
     SELECT DEV_ID FROM TB_HR_DEV WHERE USE_YN='Y'
   </select>
   <insert id="insertAccess">
-    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
-    VALUES(#{userId},'DNLD','UI-21',#{target},clock_timestamp(),#{userId},clock_timestamp())
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
+    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM,CLIENT_IP)
+    VALUES(#{userId},'DNLD','UI-21',#{target},clock_timestamp(),#{userId},clock_timestamp(),#{accessIp,jdbcType=VARCHAR})
   </insert>
 </mapper>

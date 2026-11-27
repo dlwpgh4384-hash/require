@@ -3,6 +3,7 @@ import { useInRouterContext, useNavigate } from "react-router-dom";
 import { Badge } from "../../shared/list";
 import { Toast } from "../../shared/feedback/Dialog";
 import { screenPeriodChannel } from "../../shared/layout/screenPeriodChannel";
+import { useCanViewScreen } from "../../shared/permission";
 import {
   LineChart,
   chartColor,
@@ -119,6 +120,7 @@ export function AiAnalysisAnswer({
   // Same stable optional-router convention as createScreenRequest.
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const navigate = inRouter ? useNavigate() : null;
+  const canView = useCanViewScreen();
   const [toast, setToast] = useState("");
   const [downloading, setDownloading] = useState(false);
   const id = answer.questionId;
@@ -173,7 +175,10 @@ export function AiAnalysisAnswer({
     );
   }
   const assumptions = answer.assumptions ?? [];
-  const actions = answer.actions ?? [];
+  // [○○ 열기]는 그 화면 조회 권한이 있을 때만(⑦-5).
+  const actions = (answer.actions ?? []).filter((action) =>
+    canView(action.targetScreenId),
+  );
   const chart = answer.chart;
   return (
     <div className="ai-a" data-testid={`analysis-answer-${id}`}>

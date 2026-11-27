@@ -11,6 +11,7 @@
     FROM TB_PJ_PROJ p LEFT JOIN TB_BS_CLNT c ON c.CLNT_ID=p.CUST_CLNT_ID
     WHERE p.PROJ_STAT_CD='ING' AND p.CTRT_TYPE_CD IN ('MO','DP','TK')
     <if test="projectId != null">AND p.PROJ_ID=#{projectId}</if>
+    <include refid="dataScope"><property name="proj" value="p.PROJ_ID"/></include>
     ORDER BY p.PROJ_NM,p.PROJ_ID
   </select>
   <resultMap id="option" type="com.company.common.commonops.dto.BillingLookupContracts$StatusOption"><constructor>
@@ -51,8 +52,24 @@
       b.UNPAID_AMT AS "unpaidAmount",b.PAY_DUE_DT AS "payDueDate",(b.CNCL_YN='Y') AS "cancelled"
     FROM TB_BL_BILL b JOIN TB_PJ_PROJ p ON p.PROJ_ID=b.PROJ_ID
     WHERE <include refid="overduePredicate"/>
+    <include refid="dataScope"><property name="proj" value="b.PROJ_ID"/></include>
     ORDER BY b.BILL_DT DESC,b.BILL_ORD DESC,b.BILL_ID DESC
   </select>
+  <!-- 데이터 범위(명세 ⑧-2): 요청 중 전체가 아니면 「내 프로젝트」이거나 현재 영업 파트가 「내 파트」인 프로젝트만(배치는 전체). -->
+  <sql id="dataScope">
+    <bind name="scopeAll" value="@com.company.common.support.auth.RequestAccess@scopeAll()"/>
+    <bind name="scopeParts" value="@com.company.common.support.auth.RequestAccess@scopeParts()"/>
+    <bind name="scopeProjects" value="@com.company.common.support.auth.RequestAccess@scopeProjects()"/>
+    <if test="!scopeAll">
+      AND (FALSE
+      <if test="!scopeProjects.isEmpty()">OR ${proj} IN <foreach collection="scopeProjects" item="scopeProject" open="(" separator="," close=")">#{scopeProject}</foreach></if>
+      <if test="!scopeParts.isEmpty()">OR EXISTS (SELECT 1 FROM TB_PJ_PROJ_PART scope_part WHERE scope_part.PROJ_ID=${proj}
+        AND scope_part.APLY_BGN_YM=COALESCE((SELECT max(scope_x.APLY_BGN_YM) FROM TB_PJ_PROJ_PART scope_x WHERE scope_x.PROJ_ID=${proj}
+            AND scope_x.APLY_BGN_YM &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')),
+          (SELECT min(scope_x.APLY_BGN_YM) FROM TB_PJ_PROJ_PART scope_x WHERE scope_x.PROJ_ID=${proj}))
+        AND scope_part.PART_ID IN <foreach collection="scopeParts" item="scopePart" open="(" separator="," close=")">#{scopePart}</foreach>)</if>)
+    </if>
+  </sql>
   <resultMap id="history" type="com.company.common.commonops.mapper.BillingLookupMapper$HistoryRow"><constructor>
     <arg column="billId" javaType="string"/><arg column="sequence" javaType="_int"/>
     <arg column="step" javaType="_int"/><arg column="sentDate" javaType="java.time.LocalDate"/>

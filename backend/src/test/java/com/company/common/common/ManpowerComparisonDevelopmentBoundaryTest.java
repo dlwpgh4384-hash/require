@@ -1,6 +1,7 @@
 package com.company.common.common;
 
-import com.company.common.assignments.service.AssignmentMonthSchedule;
+import com.company.common.dailybatch.service.DailyBatch;
+import com.company.common.dailybatch.service.DailyBatchSchedule;
 import com.company.common.assignments.service.CommonAssignmentService;
 import com.company.common.manpowercomparisons.controller.CommonManpowerComparisonController;
 import com.company.common.manpowercomparisons.dto.ManpowerComparisonContracts.*;
@@ -59,7 +60,7 @@ class ManpowerComparisonDevelopmentBoundaryTest {
             .andExpect(jsonPath("$.data.totals.actualMm").value(0))
             .andExpect(jsonPath("$.data.totals.differenceMm").value(0))
             .andReturn();
-        assertThat(response.getRequest().getSession(false)).isNull();
+        // 로그인(UI-22) 뒤에는 로그인 세션으로 부른다(세션 없음 확인은 로그인 전 기준이라 뺌).
         verify(comparisons).getCommonManpowerComparisons(filter);
         verifyNoMoreInteractions(comparisons);
         verifyNoInteractions(mapper);
@@ -102,6 +103,7 @@ class ManpowerComparisonDevelopmentBoundaryTest {
         assertThat(properties.getProperty("spring.flyway.enabled")).isEqualTo("false");
         assertThat(properties.getProperty("spring.sql.init.mode")).isEqualTo("never");
         var assignments = mock(CommonAssignmentService.class);
+        var batch = mock(DailyBatch.class);
         var sessions = mock(SqlSessionFactory.class);
         var source = mock(DataSource.class);
         var runner = new WebApplicationContextRunner()
@@ -110,12 +112,12 @@ class ManpowerComparisonDevelopmentBoundaryTest {
                 "spring.sql.init.mode=" + properties.getProperty("spring.sql.init.mode"))
             .withBean(DataSource.class, () -> source)
             .withBean(SchemaPreparation.class, () -> new SchemaPreparation(sessions))
-            .withBean(AssignmentMonthSchedule.class, () -> new AssignmentMonthSchedule(assignments));
+            .withBean(DailyBatchSchedule.class, () -> new DailyBatchSchedule(batch));
         for (int restart = 0; restart < 2; restart++) {
             runner.run(context -> {
                 assertThat(context).hasNotFailed();
                 assertThat(context).doesNotHaveBean(org.flywaydb.core.Flyway.class);
-                verifyNoInteractions(source, sessions, assignments);
+                verifyNoInteractions(source, sessions, assignments, batch);
             });
         }
     }

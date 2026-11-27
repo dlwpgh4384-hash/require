@@ -165,6 +165,24 @@ class CommonDeveloperControllerTest {
         verify(mapper).savePrice(argThat(p -> p.month().equals("202611") && p.monthlyPay().equals(new BigDecimal("100"))));
         verify(mapper).updateDeveloper(argThat(w -> "admin".equals(w.actor()) && "FT".equals(w.input().employeeTypeCode())));
     }
+    @Test
+    @DisplayName("민감 체크 없는 사용자의 수정: 월 단가·월 급여는 빠지거나 달라도 저장된 값을 그대로 두고 단가 이력도 안 남긴다")
+    void nonSensitiveUpdateKeepsStoredRateAndPay() throws Exception {
+        var dev=developers.get("dev"); dev.monthlyRate=new BigDecimal("7000000"); dev.monthlyPay=new BigDecimal("5000000");
+        org.springframework.test.web.servlet.request.RequestPostProcessor viewer = request -> {
+            new com.company.common.support.auth.RequestAccess("viewer", Set.of("PM"),
+                new com.company.common.users.service.UserScopePolicy.Scope(true, Set.of(), Set.of()), false,
+                Set.of(), Set.of(), "127.0.0.1", false, Set.of()).store(request);
+            return request;
+        };
+        mvc.perform(put("/api/common/developers/dev").with(viewer).contentType("application/json")
+            .content(input().putNull("modifiedAt").put("name","새 이름").put("monthlyRate",1).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.monthlyRate").doesNotExist()).andExpect(jsonPath("$.data.monthlyPay").doesNotExist());
+        assertThat(developers.get("dev").monthlyRate).isEqualByComparingTo("7000000");
+        assertThat(developers.get("dev").monthlyPay).isEqualByComparingTo("5000000");
+        assertThat(developers.get("dev").name).isEqualTo("새 이름");
+        verify(mapper,never()).savePrice(any());
+    }
     @Test void updateCannotChangeManagementNumber() throws Exception {
         mvc.perform(put("/api/common/developers/dev").contentType("application/json").content(input().put("managementNumber","OTHER").toString()))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("managementNumber")); verify(mapper,never()).updateDeveloper(any());

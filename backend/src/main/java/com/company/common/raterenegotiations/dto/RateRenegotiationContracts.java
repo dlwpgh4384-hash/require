@@ -1,5 +1,7 @@
 package com.company.common.raterenegotiations.dto;
 
+import com.company.common.support.auth.SensitiveValueFilter;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -11,8 +13,14 @@ public final class RateRenegotiationContracts {
         String employeeTypeCode, String projectId, BigDecimal increaseRate) {}
     public record Row(String assignmentId, String developerId, String developerName,
         String employeeTypeName, String projectName, LocalDate renewalDate, int daysUntilRenewal,
-        BigDecimal monthlyMm, BigDecimal currentUnitPrice, BigDecimal monthlyCost,
-        BigDecimal profitRate, BigDecimal targetUnitPrice, BigDecimal requiredIncreaseRate,
+        // 민감 칸(명세 ⑨-1, 시안 canRate·canSens, 파트장 예외 없음): 현재 단가(월 단가)·월 원가(개인별 원가)·목표 단가(월 원가로
+        // 셀 수 있는 금액)는 민감 체크가 없으면 응답에서 뺀다. 이익률·필요 인상률·연 이익은 보인다(SFR-132-05).
+        BigDecimal monthlyMm,
+        @JsonInclude(value = JsonInclude.Include.CUSTOM, valueFilter = SensitiveValueFilter.class) BigDecimal currentUnitPrice,
+        @JsonInclude(value = JsonInclude.Include.CUSTOM, valueFilter = SensitiveValueFilter.class) BigDecimal monthlyCost,
+        BigDecimal profitRate,
+        @JsonInclude(value = JsonInclude.Include.CUSTOM, valueFilter = SensitiveValueFilter.class) BigDecimal targetUnitPrice,
+        BigDecimal requiredIncreaseRate,
         BigDecimal annualProfitIncrease, String projectId, String managementNumber) {}
     /** targetCount: 재협상 대상 줄 수(투입 단위, 시안 KPI, 2026-11-24 사용자 결정). */
     public record Summary(int targetCount, BigDecimal averageProfitRate, BigDecimal targetProfitRate,

@@ -45,7 +45,8 @@ public final class ProjectCostAnalysisContracts {
     public record CommonProjectCostAnalysisMonthlyCosts(List<CommonProjectCostAnalysisMonthlyCost> items) {}
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record CommonProjectCostAnalysisWorkforceRow(String developerId, String developerName,
-        String jobName, BigDecimal monthlyMm, BigDecimal allocatedCost, BigDecimal revenue,
+        // 사람별 배분 원가는 개인별 원가로 셀 수 있는 민감 칸(명세 ⑨-1): 민감 체크가 없으면 응답에서 뺀다.
+        String jobName, BigDecimal monthlyMm, @JsonInclude(value = JsonInclude.Include.CUSTOM, valueFilter = com.company.common.support.auth.SensitiveValueFilter.class) BigDecimal allocatedCost, BigDecimal revenue,
         String inputTypeCode, String inputTypeName) {}
     public record CommonProjectCostAnalysisWorkforce(List<CommonProjectCostAnalysisWorkforceRow> items) {}
     public record CommonProjectCostAnalysisSimulation(boolean virtual, BigDecimal marginRateBefore,

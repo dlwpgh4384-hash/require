@@ -6,6 +6,14 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class TemporaryUserPassword {
+    private final com.company.common.bills.service.BillLocalMailbox mailbox;
+    public TemporaryUserPassword() {
+        this(new com.company.common.bills.service.BillLocalMailbox(null, ""));
+    }
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public TemporaryUserPassword(com.company.common.bills.service.BillLocalMailbox mailbox) {
+        this.mailbox = mailbox;
+    }
     private final SecureRandom random = new SecureRandom();
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(10);
     private static final String[] GROUPS = {"abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "0123456789", "!@#$%&*+-=?"};
@@ -30,6 +38,17 @@ public class TemporaryUserPassword {
         }
     }
 
-    // In-process delivery boundary only: no transport, storage or logging.
-    private void deliver(String email, char[] password) {}
+    private void deliver(String email, char[] password) {
+        var path = mailbox.deliver(java.util.List.of(
+            new com.company.common.bills.mapper.BillRows.Recipient("", "", email)),
+            "임시 비밀번호 안내\n임시 비밀번호: " + new String(password) + "\n로그인 후 비밀번호를 변경해 주세요.", "임시 비밀번호");
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override public void afterCompletion(int status) {
+                        if (status != STATUS_COMMITTED) mailbox.discard(path);
+                    }
+                });
+        }
+    }
 }

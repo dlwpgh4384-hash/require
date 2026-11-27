@@ -21,6 +21,8 @@ public final class PartSettlementRows {
         public String assignmentId, projectId, projectName, contractType, inputType;
         public LocalDate startDate, retireDate, firstStart;
         public BigDecimal mm, price, salary, vendorSupply, monthlySalary, distribution, allocatedCost, contractAmount, budget;
+        /** 개발자 풀에 처음 넣은 월 급여(가장 이른 적용 시작월). 시작 달에 맞는 이력이 없을 때만 쓴다(식-42). */
+        public BigDecimal firstMonthlySalary;
         public Boolean uploaded;
     }
     public static class History {

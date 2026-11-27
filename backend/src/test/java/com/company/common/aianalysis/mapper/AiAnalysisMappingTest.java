@@ -41,7 +41,7 @@ class AiAnalysisMappingTest {
         var download = cfg.getMappedStatement(prefix() + "download").getBoundSql(Map.of("actor", "admin", "count", 3));
         assertThat(download.getSql()).contains("'AI 분석 도우미 답 '").contains("'건'");
         assertThat(download.getParameterMappings()).extracting(org.apache.ibatis.mapping.ParameterMapping::getProperty)
-            .containsExactly("actor", "count", "actor");
+            .containsExactly("actor", "count", "actor", "accessIp");
     }
     String prefix() { return AiAnalysisMapper.class.getName() + "."; }
     Configuration configuration() throws Exception {

@@ -6,8 +6,7 @@ import type { CodeItem } from "../codegroups/codeGroups";
 import type { Project } from "../projects/projects";
 import { ProjectField } from "../projects/ProjectField";
 import * as api from "./projectIssues";
-// 로그인(UI-22) 전: 헤더와 같은 현재 사용자 이름을 담당자 자리에 보인다(새 이슈 담당자 = 등록한 사람).
-import { CURRENT_USER } from "../userpreferences/UserPreferenceTools";
+import { useOptionalAccountSession } from "../commonops/AccountSessionBoundary";
 import "../projects/projects.css";
 import "./projectIssues.css";
 
@@ -60,6 +59,7 @@ export function ProjectIssueDialog({
   onConflict?: (message: string) => void;
   dirtyScreenId?: string;
 }) {
+  const account = useOptionalAccountSession();
   const [initial] = useState<api.ProjectIssueInput>(() => ({
     projectId: issue?.projectId ?? projectId ?? "",
     title: issue?.title ?? "",
@@ -238,12 +238,15 @@ export function ProjectIssueDialog({
                 ))}
               </select>
             </ProjectField>
-            <div className="project-issue-owner" data-testid="project-issue-owner">
+            <div
+              className="project-issue-owner"
+              data-testid="project-issue-owner"
+            >
               <span className="project-issue-owner-label">담당자</span>
               <span>
                 {issue
                   ? issue.assigneeName || issue.assigneeId
-                  : CURRENT_USER.name}
+                  : (account?.info?.name ?? "로그인 계정")}
               </span>
               <span
                 className="project-cap"

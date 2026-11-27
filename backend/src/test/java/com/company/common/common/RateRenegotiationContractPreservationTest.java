@@ -10,21 +10,19 @@ import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
 import org.springframework.core.io.ClassPathResource;
 import static org.assertj.core.api.Assertions.*;
 
+// 로그인(UI-22) 작업 뒤: 손 설명서는 그대로, 로그인 정의(security·x-roles·401·403)는 openapi.yaml에만 있어 그 차이는 빼고 비교한다.
 class RateRenegotiationContractPreservationTest {
     private static final String PATH = "/api/common/rate-renegotiations";
 
     @Test
     void developmentReadsRemainPublicWithoutLoginOrMenuRoleDeclarations() {
         var contract = yaml("contracts/openapi.yaml");
-        assertThat(contract.has("security")).isFalse();
-        assertThat(contract.path("components").has("securitySchemes")).isFalse();
+        com.company.common.support.test.LoginEraContract.assertSessionLogin(contract);
         assertThat(contract.findValues("bearerAuth")).isEmpty();
         for (String path : List.of(PATH, PATH + "/excel")) {
             var operation = contract.path("paths").path(path).path("get");
             assertThat(operation.isObject()).as(path).isTrue();
-            assertThat(operation.path("security").isArray()).as(path).isTrue();
-            assertThat(operation.path("security").isEmpty()).as(path).isTrue();
-            assertThat(operation.has("x-roles")).as(path).isFalse();
+            com.company.common.support.test.LoginEraContract.assertLoggedIn(operation, path);
         }
     }
 
@@ -55,7 +53,7 @@ class RateRenegotiationContractPreservationTest {
         assertThat(manual.size()).isPositive();
         manual.fields().forEachRemaining(path -> path.getValue().fields().forEachRemaining(field ->
             assertThat(effective.path(path.getKey()).path(field.getKey()))
-                .as(path.getKey() + " " + field.getKey()).isEqualTo(field.getValue())));
+                .as(path.getKey() + " " + field.getKey()).satisfies(actual -> assertThat(com.company.common.support.test.LoginEraContract.withoutLogin((com.fasterxml.jackson.databind.JsonNode) actual)).isEqualTo(com.company.common.support.test.LoginEraContract.withoutLogin(field.getValue())))));
         for (String path : List.of("/api/common/developers", "/api/common/projects", "/api/common/assignments")) {
             assertThat(effective.path(path).has("get")).as(path).isTrue();
         }

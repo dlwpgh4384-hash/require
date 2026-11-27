@@ -1034,6 +1034,19 @@ it("quote tab computes the saved needs", async () => {
     "15.0%목표 미달",
   );
 });
+it("55번 1-2: quote tab leaves out read-only tentativeAssignments so the server does not reject the line", async () => {
+  row.approvalStatusCode = "NONE";
+  row.needs[0].tentativeDeveloperIds = ["dev"];
+  row.needs[0].tentativeAssignments = [
+    { developerId: "dev", developerName: "개발자", startMonth: "2027-02", tentativeStatusCode: "ACT" },
+  ];
+  detail();
+  fireEvent.click(await screen.findByTestId("sales-opportunity-detail-tab-quote"));
+  expect(await screen.findByTestId("sales-quote-rate")).toBeVisible();
+  const sent = JSON.parse(String(calls(SALES_QUOTE_URL)[0][1]?.body));
+  expect(sent.needs[0]).not.toHaveProperty("tentativeAssignments");
+  expect(sent.needs[0].tentativeDeveloperIds).toEqual(["dev"]);
+});
 it("short-action conflict reloads detail and warns", async () => {
   detail();
   const approve = await screen.findByTestId("sales-opportunity-approve");
@@ -1164,6 +1177,10 @@ it("근무지 지역: 새 기회에서 시·도와 시·군·구만 고르면 �
   withAreas();
   form();
   expect(screen.getByLabelText("근무지 시·도")).toBe(screen.getByTestId("sales-opportunity-area-0"));
+  // 55번 4: 시·도 첫 줄은 빈 글자(「선택」 없음), 「근무지」는 「근무지 동」 바로 뒤
+  expect(screen.getByTestId("sales-opportunity-area-0").querySelector("option")).toHaveTextContent(/^$/);
+  const order = Array.from(document.querySelectorAll("#so-workAreaDong, #so-workplace")).map((e) => e.id);
+  expect(order).toEqual(["so-workAreaDong", "so-workplace"]);
   await waitFor(() => expect(screen.getByTestId("sales-opportunity-area-0")).toBeEnabled());
   expect(screen.getByTestId("sales-opportunity-area-1")).toBeDisabled();
   fireEvent.change(screen.getByTestId("sales-opportunity-area-0"), { target: { value: "1100000000" } });

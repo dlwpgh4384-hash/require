@@ -43,6 +43,39 @@ class CommonSalesOpportunityControllerTest {
     final Instant now = Instant.parse("2026-11-15T00:00:00Z");
     final LocalDate today = LocalDate.of(2026, 11, 15);
     final String root = "/api/common/sales-opportunities";
+    @Test void literalStageUpdatesProbabilityAndPersistsStage() throws Exception {
+        var id=create();
+        mvc.perform(put("/api/common/sales-opportunities/{opportunityId}/stage",id).contentType("application/json")
+            .content(version(id).put("stageCode","PROP").toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.stageCode").value("PROP"));
+        assertThat(headers.get(id).stageCode()).isEqualTo("PROP");
+        verify(mapper).stage(any());
+    }
+    @Test void literalLoseReleasesReservationsAndStoresReason() throws Exception {
+        var id=create();reserve(id,1);
+        mvc.perform(post("/api/common/sales-opportunities/{opportunityId}/lose",id).contentType("application/json")
+            .content(version(id).put("lossReasonCode","PRICE").toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.lossReasonCode").value("PRICE"));
+        assertThat(headers.get(id).status()).isEqualTo("LOSE");
+        assertThat(reservations).isEmpty();
+    }
+    @Test void literalTentativeCheckOnlyReadsAndReturnsWarnings() throws Exception {
+        var old=create();var id=create();reserve(old,1);
+        mvc.perform(post("/api/common/sales-opportunities/{opportunityId}/tentative-assignment-check",id).contentType("application/json")
+            .content(tentativeBody(id).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.warnings").isArray());
+        assertThat(reservations).hasSize(1);
+        verify(mapper,never()).tentative(any());
+    }
+    @Test void literalWinCreatesProjectAndConvertsCandidateReservation() throws Exception {
+        var id=create();state(id,"ING","WAIT","PROP","N");reserve(id,1);
+        mvc.perform(post("/api/common/sales-opportunities/{opportunityId}/win",id).contentType("application/json")
+            .content(winBody(id).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.projectId").value("project"));
+        assertThat(headers.get(id).status()).isEqualTo("WIN");
+        assertThat(reservations).allMatch(r -> "CNVT".equals(r.status()));
+        verify(projects).create(any(),any());
+    }
     Map<String, Header> headers;
     Map<String, List<NeedRow>> needs;
     Map<String, List<ApprovalHistory>> histories;

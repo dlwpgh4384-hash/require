@@ -352,6 +352,28 @@ describe("personal lists and tools", () => {
     ).not.toBeInTheDocument();
     expect(puts()).toHaveLength(0);
   });
+  it("55번 2-1: 지금 보는 화면은 즐겨찾기·최근 본 화면에서도 시안 .ni.on처럼 칠한다", async () => {
+    rows.set("FAV", row("FAV", '["UI-12","UI-14"]'));
+    rows.set("RECENT", row("RECENT", '["UI-14","UI-12"]'));
+    wrap(
+      <PersonalScreenLists
+        menus={menus}
+        available={available}
+        mobile={false}
+        collapsed={false}
+        onNavigate={vi.fn()}
+        current="UI-12"
+      />,
+    );
+    const fav = await screen.findByTestId("fav-open-ui-12");
+    expect(fav).toHaveClass("is-current");
+    expect(fav).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("recent-open-ui-12")).toHaveClass("is-current");
+    expect(screen.getByTestId("fav-open-ui-14")).not.toHaveClass("is-current");
+    expect(screen.getByTestId("recent-open-ui-14")).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
   it("collapsed lists are hidden", () => {
     wrap(
       <PersonalScreenLists
@@ -524,7 +546,48 @@ describe("personal lists and tools", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(caller).toHaveFocus();
   });
-  it("mobile search and AI dialog are usable while later tools only say 준비 중", async () => {
+  it("단축키 보기 opens the mockup keys dialog: title, table rows, [×] and [닫기]", () => {
+    wrap(
+      <UserPreferenceTools
+        menus={menus}
+        mobile={false}
+        available={available}
+        onNavigate={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("user-menu-open"));
+    fireEvent.click(screen.getByTestId("shortcut-help-open"));
+    const dialog = screen.getByRole("dialog", { name: "단축키" });
+    expect(within(dialog).getByRole("heading", { name: "단축키" })).toBeVisible();
+    // 시안 keys: 표 한 줄 = 굵은 키 + 설명, 이 순서.
+    const rowsShown = within(dialog)
+      .getAllByRole("row")
+      .map((tr) =>
+        Array.from(tr.querySelectorAll("td")).map((td) => td.textContent),
+      );
+    expect(rowsShown).toEqual([
+      ["Enter", "조회 조건에서 조회"],
+      ["Ctrl + S", "저장"],
+      ["Esc", "창 닫기"],
+      ["Ctrl + K", "메뉴 찾기"],
+      ["Ctrl + ← / →", "이전·다음 페이지"],
+    ]);
+    expect(dialog.querySelectorAll("td:first-child > strong")).toHaveLength(5);
+    expect(dialog.querySelector(".shortcut-help-wrap > table")).not.toBeNull();
+    expect(within(dialog).queryByText(/업무 화면 연결 시/)).not.toBeInTheDocument();
+    const footer = within(dialog).getByTestId("shortcut-help-close");
+    expect(footer).toHaveTextContent("닫기");
+    expect(footer).toHaveClass("primary-button");
+    // 머리 [×]로 닫기
+    fireEvent.click(within(dialog).getByTestId("shortcut-help-dialog-close"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // 아래 [닫기]로 닫기
+    fireEvent.click(screen.getByTestId("user-menu-open"));
+    fireEvent.click(screen.getByTestId("shortcut-help-open"));
+    fireEvent.click(screen.getByTestId("shortcut-help-close"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+  it("mobile search and AI dialog remain usable without duplicate account placeholders", async () => {
     wrap(
       <UserPreferenceTools
         menus={menus}
@@ -556,11 +619,10 @@ describe("personal lists and tools", () => {
       "password-unavailable",
       "logout-unavailable",
     ]) {
-      if (!screen.queryByTestId(id))
-        fireEvent.click(screen.getByTestId("user-menu-open"));
-      fireEvent.click(screen.getByTestId(id));
-      expect(screen.getByTestId("header-notice")).toHaveTextContent("준비 중");
+      expect(screen.queryByTestId(id)).not.toBeInTheDocument();
     }
+    expect(screen.getByTestId("screen-settings-open")).toBeVisible();
+    expect(screen.getByTestId("shortcut-help-open")).toBeVisible();
     expect(puts()).toHaveLength(0);
   });
   it("business shortcuts only call registered handlers", () => {
@@ -623,8 +685,8 @@ describe("personal lists and tools", () => {
   });
 });
 
-describe("시안 맞춤: 자동 로그아웃 시간·[연장]", () => {
-  it("사용자 메뉴 맨 아래에 남은 시간과 [연장]이 있고, 연장하면 30분으로 돌아간다", () => {
+describe("account controls belong to the authenticated shell", () => {
+  it("preference tools do not create a second local session timer", () => {
     vi.useRealTimers();
     wrap(
       <UserPreferenceTools
@@ -635,13 +697,8 @@ describe("시안 맞춤: 자동 로그아웃 시간·[연장]", () => {
       />,
     );
     fireEvent.click(screen.getByTestId("user-menu-open"));
-    expect(screen.getByTestId("session-left")).toHaveTextContent(
-      /자동 로그아웃까지 (29:5\d|30:00)/,
-    );
-    fireEvent.click(screen.getByTestId("session-extend"));
-    expect(screen.getByTestId("session-left")).toHaveTextContent("30:00");
-    expect(screen.getByTestId("header-notice")).toHaveTextContent(
-      "자동 로그아웃 시간을 30분으로 다시 늘렸습니다.",
-    );
+    expect(screen.queryByTestId("session-left")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("session-extend")).not.toBeInTheDocument();
+    expect(screen.queryByText("시스템 관리자")).not.toBeInTheDocument();
   });
 });

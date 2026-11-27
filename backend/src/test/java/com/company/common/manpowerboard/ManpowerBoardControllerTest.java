@@ -196,8 +196,10 @@ class ManpowerBoardControllerTest {
     }
 
     @Test void publicExcelIsRealAnnualWorkbookWithMatchingCountFilenameAndOneAudit() throws Exception {
-        var before = mvc.perform(get(ROOT).param("year", "2026")).andReturn().getResponse().getContentAsString();
-        var response = mvc.perform(get(ROOT + "/excel").param("year", "2026"))
+        var before = mvc.perform(get("/api/common/manpower-board").param("year", "2026"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.items").isArray())
+            .andReturn().getResponse().getContentAsString();
+        var response = mvc.perform(get("/api/common/manpower-board/excel").param("year", "2026"))
             .andExpect(status().isOk()).andExpect(header().string("X-Total-Count", "1"))
             .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .andReturn().getResponse();

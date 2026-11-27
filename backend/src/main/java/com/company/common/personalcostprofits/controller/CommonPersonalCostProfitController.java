@@ -24,7 +24,10 @@ public class CommonPersonalCostProfitController {
     }
     @GetMapping("/api/common/personal-cost-profits")
     public Response<Result> getCommonPersonalCostProfits(@ModelAttribute Filter filter) {
-        return Response.of(service.getCommonPersonalCostProfits(filter));
+        var result = service.getCommonPersonalCostProfits(filter);
+        // 급여·개인별 원가를 본 조회만 민감 항목 보기로 남긴다(명세 ⑤-4). 읽기 전용 조회 밖의 따로 저장.
+        service.recordSensitiveView(filter);
+        return Response.of(result);
     }
     @ExceptionHandler(org.springframework.validation.BindException.class)
     public ResponseEntity<com.company.common.support.controller.ApiExceptionHandler.Error> invalidQuery(

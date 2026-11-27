@@ -17,4 +17,5 @@ public interface PersonalCostProfitMapper {
     List<Code> selectCodes();
     List<Role> selectActorRoles(@Param("userId") String userId);
     int insertAccess(@Param("userId") String userId, @Param("target") String target);
+    int insertSensitiveView(@Param("userId") String userId, @Param("target") String target);
 }

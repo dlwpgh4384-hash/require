@@ -47,6 +47,7 @@
   </sql>
   <select id="selectProjects" resultMap="project">
     SELECT <include refid="projectColumns"/> <include refid="projectFrom"/>
+    WHERE TRUE <include refid="dataScope"><property name="proj" value="p.PROJ_ID"/></include>
     ORDER BY p.CTRT_BGN_DT DESC, p.PROJ_ID ASC
   </select>
   <select id="selectProject" resultMap="project">
@@ -254,8 +255,9 @@
     ORDER BY CASE WHEN i.ISSUE_STAT_CD='CLOSE' THEN 1 ELSE 0 END, c.SORT_ORD NULLS LAST, i.DDLN_DT NULLS LAST, i.ISSUE_ID
   </select>
   <insert id="insertAccess">
-    INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
-    VALUES (#{userId},#{action},'UI-01',#{target},clock_timestamp(),#{userId},clock_timestamp())
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
+    INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM,CLIENT_IP)
+    VALUES (#{userId},#{action},'UI-01',#{target},clock_timestamp(),#{userId},clock_timestamp(),#{accessIp,jdbcType=VARCHAR})
   </insert>
   <select id="memos" resultType="com.company.common.projects.dto.ProjectContracts$Memo">
     SELECT WRT_DT AS "writtenDate",THIS_WEEK_CN AS "thisWeek",NEXT_WEEK_CN AS "nextWeek",REQ_CN AS "request",
@@ -349,4 +351,19 @@
     INSERT INTO TB_PJ_TK_DSTRB(PROJ_ID,DSTRB_STEP_CD,ROW_SN,DSTRB_YM,ROW_TYPE_CD,DEV_ID,ITEM_NM,DSTRB_AMT,REG_USER_ID,UPLD_ID,REG_DTTM)
     VALUES(#{projectId},#{stage},#{row},#{month},#{type},#{developerId},#{itemName},#{amount},#{actor},#{uploadId},clock_timestamp())
   </insert>
+  <!-- 데이터 범위(명세 ⑧): 전체가 아니면 「내 프로젝트」이거나 현재 영업 파트가 「내 파트」인 프로젝트만. ${proj}: 프로젝트 ID 칸 -->
+  <sql id="dataScope">
+    <bind name="scopeAll" value="@com.company.common.support.auth.RequestAccess@scopeAll()"/>
+    <bind name="scopeParts" value="@com.company.common.support.auth.RequestAccess@scopeParts()"/>
+    <bind name="scopeProjects" value="@com.company.common.support.auth.RequestAccess@scopeProjects()"/>
+    <if test="!scopeAll">
+      AND (FALSE
+      <if test="!scopeProjects.isEmpty()">OR ${proj} IN <foreach collection="scopeProjects" item="scopeProject" open="(" separator="," close=")">#{scopeProject}</foreach></if>
+      <if test="!scopeParts.isEmpty()">OR EXISTS (SELECT 1 FROM TB_PJ_PROJ_PART scope_part WHERE scope_part.PROJ_ID=${proj}
+        AND scope_part.APLY_BGN_YM=COALESCE((SELECT max(scope_x.APLY_BGN_YM) FROM TB_PJ_PROJ_PART scope_x WHERE scope_x.PROJ_ID=${proj}
+            AND scope_x.APLY_BGN_YM &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')),
+          (SELECT min(scope_x.APLY_BGN_YM) FROM TB_PJ_PROJ_PART scope_x WHERE scope_x.PROJ_ID=${proj}))
+        AND scope_part.PART_ID IN <foreach collection="scopeParts" item="scopePart" open="(" separator="," close=")">#{scopePart}</foreach>)</if>)
+    </if>
+  </sql>
 </mapper>

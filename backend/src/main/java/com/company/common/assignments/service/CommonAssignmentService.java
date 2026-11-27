@@ -54,7 +54,7 @@ public class CommonAssignmentService {
         if (!blank(f.warning()) && !Set.of(OVER,PRE).contains(f.warning())) throw CodeFailure.invalid("warning","경고 조건을 확인해 주세요.");
         String q=blank(f.keyword())?null:f.keyword().trim().toLowerCase(Locale.ROOT);
         var rows=mapper.listRows(new ListFilter(y,blank(f.projectId())?null:f.projectId(),blank(f.jobCode())?null:f.jobCode(),blank(q)?null:q));
-        var figures=figures(rows,y); var names=new HashMap<String,String>(); boolean direct=AssignmentPricePolicy.direct(roles());
+        var figures=figures(rows,y); var names=new HashMap<String,String>(); boolean direct=actor.sensitive();
         var partDiff=partMismatches(rows);
         return new Items<>(rows.stream().map(r -> {
             Figures fig=figures.get(r.assignmentId());
@@ -129,7 +129,7 @@ public class CommonAssignmentService {
         if (p!=null && !"IN".equals(r.contractTypeCode()) && partDiffers(project,p.partId()))
             warnings.add("영업 파트가 다릅니다: "+p.name()+"님은 "+Objects.requireNonNullElse(p.partName(),p.partId())+" 소속, 프로젝트는 "+Objects.requireNonNullElse(project.salesPartName,project.salesPartId)+"입니다. 매출은 프로젝트 파트로, 이 사람 이익금은 소속 파트(본사면 파트 정산 제외)로 잡힙니다. 파트를 잘못 골랐다면 개발자 풀에서 고쳐 주세요.");
         if ("SUB".equals(r.inputTypeCode()) && "TK".equals(r.contractTypeCode()) && r.contractDeveloperId()!=null && mapper.distribution(r.projectId(),r.contractDeveloperId())) warnings.add("턴키 배분표는 다시 옮겨 올려 주셔야 합니다. 그 전까지는 배분 불일치 경고가 뜹니다.");
-        boolean direct=AssignmentPricePolicy.direct(roles());
+        boolean direct=actor.sensitive();
         // [변경 기록] 단가·월 MM 변경의 「지금 …」 안내와 같은 값 검사는 고른 달에 적용되는 값과 비교한다(SFR-112-07).
         var months=mapper.monthValues(r.assignmentId()).stream().map(m -> new AssignmentMonth(m.month(),m.monthlyMm(),direct?m.billingPrice():null)).toList();
         return assemble(r,fig,warnings,new HashMap<>(),direct,months);
@@ -198,7 +198,7 @@ public class CommonAssignmentService {
             .forEach(r -> groups.computeIfAbsent(r.developerId(),k -> new ArrayList<>()).add(r));
         return new Items<>(groups.values().stream().map(rows -> {
             var latest=rows.stream().max(Comparator.comparing(Row::endDate).thenComparing(Row::startDate).thenComparing(Row::assignmentId)).orElseThrow();
-            return new ContractDeveloper(latest.developerId(),latest.name(),latest.jobName(),latest.endDate(),AssignmentPricePolicy.direct(roles()) && Set.of("MO","DP").contains(latest.contractTypeCode())?Objects.requireNonNullElse(mapper.latestPrice(latest.assignmentId()),latest.billingPrice()):null,
+            return new ContractDeveloper(latest.developerId(),latest.name(),latest.jobName(),latest.endDate(),actor.sensitive() && Set.of("MO","DP").contains(latest.contractTypeCode())?Objects.requireNonNullElse(mapper.latestPrice(latest.assignmentId()),latest.billingPrice()):null,
                 start==null?new ArrayList<>():rows.stream().filter(r -> "ACT".equals(r.statusCode()) && r.startDate().isBefore(start) && !r.endDate().isBefore(start))
                     .map(r -> view(r,start.getYear())).toList());
         }).sorted(Comparator.comparing(ContractDeveloper::name).thenComparing(ContractDeveloper::developerId)).toList());
@@ -231,7 +231,7 @@ public class CommonAssignmentService {
         String contract=ProjectRules.text(b,"contractDeveloperId",20,false);
         if("SUB".equals(type) && (blank(contract) || contract.equals(developerId) || mapper.projectRows(projectId).stream().noneMatch(r -> contract.equals(r.developerId())))) throw CodeFailure.invalid("contractDeveloperId","계약상 인력을 골라 주세요.");
         if(!"SUB".equals(type) && contract!=null) throw CodeFailure.invalid("contractDeveloperId","대체투입에서만 계약상 인력을 선택합니다.");
-        AssignmentPricePolicy.registration(roles(),p.contractTypeCode,type,ProjectRules.money(b,"billingPrice",false),person.defaultPrice());
+        AssignmentPricePolicy.registration(AssignmentPricePolicy.direct(actor.sensitive()),p.contractTypeCode,type,ProjectRules.money(b,"billingPrice",false),person.defaultPrice());
         var warnings=new ArrayList<String>();
         if(!"IN".equals(p.contractTypeCode) && partDiffers(projectPartAt(projectId,start),person.partId())) warnings.add("영업 파트가 다른 배정");
         if(person.onLeave()) warnings.add("휴직 기간에 배정됩니다.");
@@ -283,7 +283,7 @@ public class CommonAssignmentService {
                 .max(Comparator.comparing(Row::endDate).thenComparing(Row::startDate).thenComparing(Row::assignmentId)).orElseThrow();
             standard=Objects.requireNonNullElse(mapper.latestPrice(previous.assignmentId()),previous.billingPrice());
         }
-        BigDecimal price=AssignmentPricePolicy.registration(roles(),project.contractTypeCode,input,requested,standard);
+        BigDecimal price=AssignmentPricePolicy.registration(AssignmentPricePolicy.direct(actor.sensitive()),project.contractTypeCode,input,requested,standard);
         String memo=ProjectRules.text(b,"memo",200,false),reason=ProjectRules.text(b,"reasonCode",10,false);
         String action=ProjectRules.text(b,"replacementAction",20,false);
         if (action!=null && !Set.of("together","assignment-only").contains(action)) throw CodeFailure.invalid("replacementAction","처리 방식을 골라 주세요.");
@@ -407,7 +407,7 @@ public class CommonAssignmentService {
                 if ("EXT".equals(type)) { if(count>=999) throw CodeFailure.invalid("newEndDate","연장 횟수 범위를 초과했습니다."); count++; } else early="Y";
             }
             case "UPRC" -> {
-                if (!AssignmentPricePolicy.direct(roles()) || !AssignmentPricePolicy.billable(r.contractTypeCode(),r.inputTypeCode())) throw CodeFailure.invalid("newBillingPrice","이 배정은 단가를 직접 변경할 수 없습니다.");
+                if (!AssignmentPricePolicy.direct(actor.sensitive()) || !AssignmentPricePolicy.billable(r.contractTypeCode(),r.inputTypeCode())) throw CodeFailure.invalid("newBillingPrice","이 배정은 단가를 직접 변경할 수 없습니다.");
                 newPrice=ProjectRules.money(b,"newBillingPrice",true);
                 if (newPrice.signum()<=0) throw CodeFailure.invalid("newBillingPrice","새 단가는 양수여야 합니다.");
                 BigDecimal current=rules.effective(mapper.history(id),"UPRC",YearMonth.from(effective),r.billingPrice());

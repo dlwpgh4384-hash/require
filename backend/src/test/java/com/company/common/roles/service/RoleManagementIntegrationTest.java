@@ -334,11 +334,13 @@ class RoleManagementIntegrationTest {
         assertThat(count("SELECT count(*) FROM TB_SY_USER_SCOPE")).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM TB_SY_CHG_HIST WHERE chg_type_cd!='NEW'")).isZero();
     }
-    @Test void preparationSeedsOnlyEmptyTableAndExecQuoteConfirmStartsOff() throws Exception {
-        assertThat(text("SELECT cnfm_yn FROM TB_SY_ROLE_MENU_AUTH WHERE role_id='EXEC' AND menu_id='M011'")).isEqualTo("N");
-        db.update("UPDATE TB_SY_ROLE_MENU_AUTH SET cnfm_yn='Y' WHERE role_id='EXEC' AND menu_id='M011'");
-        new SchemaPreparation(sessions).prepare();
+    @Test void preparationSeedsOnlyEmptyTableAndExecQuoteConfirmStartsOnAndPmPipelineOff() throws Exception {
         assertThat(text("SELECT cnfm_yn FROM TB_SY_ROLE_MENU_AUTH WHERE role_id='EXEC' AND menu_id='M011'")).isEqualTo("Y");
+        // PM·영업 파이프라인(M011)은 7개 모두 N(사용자 결정 2026-11-26).
+        assertThat(text("SELECT inq_yn||reg_yn||upd_yn||del_yn||upld_yn||dnld_yn||cnfm_yn FROM TB_SY_ROLE_MENU_AUTH WHERE role_id='PM' AND menu_id='M011'")).isEqualTo("NNNNNNN");
+        db.update("UPDATE TB_SY_ROLE_MENU_AUTH SET cnfm_yn='N',mod_user_id='admin' WHERE role_id='EXEC' AND menu_id='M011'");
+        new SchemaPreparation(sessions).prepare();
+        assertThat(text("SELECT cnfm_yn FROM TB_SY_ROLE_MENU_AUTH WHERE role_id='EXEC' AND menu_id='M011'")).isEqualTo("N");
         assertThat(count("SELECT count(*) FROM TB_SY_ROLE_MENU_AUTH")).isEqualTo(150);
     }
     @Test void creationHistoryKeepsHighWaterAfterDeletedIdentity() throws Exception {

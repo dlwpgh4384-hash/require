@@ -35,10 +35,19 @@ class PartSettlementRulesTest {
         assertThat(result.employeeTypeCode()).isEqualTo("CT");assertThat(result.salary()).isEqualByComparingTo("1548387");
         assertThat(result.retirementAmount()).isZero();assertThat(result.notes()).containsExactly("공통관리비","시작 달 12/31일");
     }
-    @Test void uploadedStartMonthWithoutPoolSalaryProratesUploadedPay() {
+    // 시험 회사 #31(2026-11-27): 풀 값이 아예 없으면 업로드 값(이미 일한 날만큼 준 실제 지급액)을 그대로 쓴다. 일할은 한 번.
+    @Test void uploadedStartMonthWithoutPoolSalaryUsesUploadedPayOnce() {
         var i=input("D","A");i.uploaded=true;i.payrollType="FT";i.salary=n("3100000");i.monthlySalary=null;i.firstStart=LocalDate.of(2026,1,16);
         var result=rules.calculate(part("A"),month,List.of(i),List.of()).get(0);
-        assertThat(result.salary()).isEqualByComparingTo("1600000");assertThat(result.missingMonthlySalary()).isFalse();
+        assertThat(result.salary()).isEqualByComparingTo("3100000");assertThat(result.missingMonthlySalary()).isFalse();
+    }
+    // 시험 회사 #31: K-9115 10월 시작(16/31), 그 달 풀 이력 없음(202611부터 5,000,000), 업로드 2,500,000 → 5,000,000 × 16/31 = 2,580,645.
+    @Test void startMonthBeforePoolHistoryUsesFirstPoolSalary() {
+        var i=input("D","A");i.uploaded=true;i.payrollType="FL";i.employeeTypeCode="FL";i.salary=n("2500000");i.monthlySalary=null;
+        i.firstMonthlySalary=n("5000000");i.firstStart=LocalDate.of(2026,10,16);i.mm=n("0.52");i.price=n("7500000");
+        var result=rules.calculate(part("A"),YearMonth.of(2026,10),List.of(i),List.of()).get(0);
+        assertThat(result.salary()).isEqualByComparingTo("2580645");
+        assertThat(result.retirementAmount()).isZero();
     }
     @Test void startOnFirstDayIsNotProrated() {
         var i=input("D","A");i.firstStart=LocalDate.of(2026,1,1);

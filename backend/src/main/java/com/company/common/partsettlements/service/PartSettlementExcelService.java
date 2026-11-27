@@ -28,6 +28,8 @@ public class PartSettlementExcelService {
     @Transactional(isolation=Isolation.REPEATABLE_READ)
     public ExcelFile getCommonPartSettlementsExcel(String partId,String yearMonth,String view,String columns) {
         PartSettlementRules.month(yearMonth);
+        // 민감 체크가 없으면 사람별 급여·퇴직금·비용·이익·이익금 열을 뺀다(명세 ⑨-2). 파트 합계 줄은 남긴다.
+        boolean sensitive=com.company.common.support.auth.RequestAccess.sensitiveVisible();
         List<String> headers;
         List<List<String>> rows=new ArrayList<>();
         if ("monthly".equals(view)) {
@@ -57,6 +59,22 @@ public class PartSettlementExcelService {
                 headers=keep.stream().map(full::get).toList();
                 rows.replaceAll(row->keep.stream().map(row::get).toList());
             }
+            if (!sensitive) {
+                // 이익금 열은 법인카드·파트 이익금 줄(파트 합계)이 쓰므로 열은 두고 사람별 값만 비운다.
+                var hidden=java.util.Set.of("급여","퇴직금","비용 계","이익");
+                var keep=new ArrayList<Integer>();
+                for (int i=0;i<headers.size();i++) if (!hidden.contains(headers.get(i))) keep.add(i);
+                int share=-1;
+                for (int i=0;i<headers.size();i++) if (headers.get(i).startsWith("이익금(")) share=i;
+                int people=data.items().size(), shareIndex=share;
+                var full=headers;
+                headers=keep.stream().map(full::get).toList();
+                for (int r=0;r<rows.size();r++) {
+                    var row=new ArrayList<>(rows.get(r));
+                    if (r<people && shareIndex>=0) row.set(shareIndex,"");
+                    rows.set(r,keep.stream().map(row::get).toList());
+                }
+            }
         } else if ("trend".equals(view)) {
             var data=service.getCommonPartSettlementTrends(partId,yearMonth);
             var trendHeaders=new ArrayList<>(List.of("이름","구분"));
@@ -67,7 +85,7 @@ public class PartSettlementExcelService {
             headers=trendHeaders;
             var notes=new HashMap<String,String>();
             for (var r:service.getCommonPartSettlement(partId,yearMonth).items()) notes.put(r.developerId(),String.join(" · ",r.notes()));
-            for (var person:data.items()) for (String metric:List.of("M/M","단가","비용","이익","이익금")) {
+            for (var person:data.items()) for (String metric:sensitive?List.of("M/M","단가","비용","이익","이익금"):List.of("M/M","단가")) {
                 var row=new ArrayList<>(List.of(person.developerName(),metric));
                 java.math.BigDecimal sum=java.math.BigDecimal.ZERO;
                 for (var m:person.months()) {

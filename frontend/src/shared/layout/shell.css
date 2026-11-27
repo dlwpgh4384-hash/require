@@ -280,9 +280,16 @@ main {
   border: 1px solid var(--divider);
   border-radius: 8px;
 }
-/* 실제 업무 화면(.screen-body)은 시안처럼 회색 바탕 위에 조건 상자·표를 따로 놓는다. 안내·준비 중 화면만 카드로 감싼다. */
+/* 실제 업무 화면은 시안처럼 회색 바탕 위에 조건 상자·표를 따로 놓는다. 안내·준비 중 화면만 카드로 감싼다.
+   화면 목록의 화면은 모두 권한 틀(.screen-permission)로 그려지므로, 보이는 탭에 그 틀이나 화면 뿌리(.screen-body·data-screen-id)가
+   있으면 실제 화면이다(등록·수정·상세 폼처럼 뿌리에 screen-body가 없어도). 준비 중(PlaceholderScreen)·메뉴 없음·없는 화면 등
+   안내(.navigation-state)는 이 틀 없이 그려져 카드를 그대로 둔다. */
 .shell-state:has(> .screen-body),
-.shell-state:has(> :not([hidden]) > .screen-body) {
+.shell-state:has(> .screen-permission),
+.shell-state:has(> [data-screen-id]),
+.shell-state:has(> :not([hidden]) > .screen-body),
+.shell-state:has(> :not([hidden]) > .screen-permission),
+.shell-state:has(> :not([hidden]) > [data-screen-id]) {
   background: transparent;
   border: 0;
   border-radius: 0;

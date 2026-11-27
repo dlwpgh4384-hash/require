@@ -30,6 +30,7 @@ import {
   type ProjectCostAnalysisPeriod,
 } from "./projectCostAnalyses";
 import { ProjectCostAnalysisDetail } from "./ProjectCostAnalysisDetail";
+import { subscribeProjectCostAnalysis } from "./projectCostRequest";
 import "./projectCostAnalyses.css";
 
 type Row = CommonProjectCostAnalysisRow;
@@ -78,6 +79,32 @@ export function ProjectCostAnalysisPage() {
   const [toast, setToast] = useState<{ kind: ToastKind; message: string } | null>(null);
   const form = useRef<HTMLElement>(null);
   const periodBox = useRef<HTMLDivElement>(null);
+  // 다른 화면(프로젝트 상세 [원가 분석])이 연 프로젝트: 그 프로젝트로 조회하고 상세를 연다(시안 costdet).
+  const openTarget = useRef<string | null>(null);
+  const latest = useRef({ data, filter });
+  latest.current = { data, filter };
+  useEffect(
+    () =>
+      subscribeProjectCostAnalysis((projectId) => {
+        const { data: shown, filter: current } = latest.current;
+        const row = shown?.items.find((item) => item.projectId === projectId);
+        setDraft({ ...EMPTY_FILTER, projectId });
+        if (row && current.projectId === projectId) {
+          // 이미 그 조건으로 받아 둔 목록이면 다시 묻지 않고 바로 연다.
+          setSelected(row);
+          return;
+        }
+        openTarget.current = projectId;
+        setFilter({ ...EMPTY_FILTER, projectId });
+      }),
+    [],
+  );
+  useEffect(() => {
+    if (!data || !openTarget.current) return;
+    const row = data.items.find((item) => item.projectId === openTarget.current);
+    openTarget.current = null;
+    if (row) setSelected(row);
+  }, [data]);
   const request = selectedPeriod && {
     ...selectedPeriod,
     projectId: filter.projectId,

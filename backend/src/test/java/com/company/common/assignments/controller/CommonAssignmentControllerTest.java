@@ -523,7 +523,7 @@ class CommonAssignmentControllerTest {
         when(mapper.person(anyString(),anyString(),any(),any())).thenReturn(new Person("new-developer","개발자","FT","part","영업파트",null,null,false));
         assertThatThrownBy(() -> service.postCommonAssignment(input()))
             .isInstanceOf(com.company.common.support.service.CodeFailure.class)
-            .hasMessageContaining("월 단가가 없어 배정할 수 없습니다. 파트장·재무에게 요청해 주세요.");
+            .hasMessageContaining("월 단가가 없어 배정할 수 없습니다. 단가를 볼 수 있는 담당자(재무 등)에게 요청해 주세요.");
         noWrites();
         service.postCommonAssignment(input().put("inputTypeCode","FREE"));
         assertThat(rows.get("A-0002").billingPrice()).isZero();

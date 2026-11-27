@@ -11,7 +11,8 @@ export interface Client {
   contactPhone: string;
   taxEmail: string;
   bankCode: string;
-  paymentAccountSummary: string;
+  /** 민감 칸을 볼 수 없는 사람에게는 서버가 보내지 않는다. */
+  paymentAccountSummary?: string | null;
   useYn: string;
   modifiedAt: string | null;
   projectCount: number;

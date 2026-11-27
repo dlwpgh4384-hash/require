@@ -9,6 +9,8 @@ import java.util.Base64;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import com.company.common.support.service.CodeFailure;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -20,21 +22,49 @@ import org.springframework.stereotype.Service;
 @Service
 public class PaymentAccountCipher {
     private static final SecureRandom RANDOM = new SecureRandom();
+    static final String MISSING = "계좌 암호화 키가 설정되지 않았습니다. 관리자에게 문의해 주세요.";
+    static final String INVALID = "계좌 암호화 키가 올바르지 않습니다. 관리자에게 문의해 주세요.";
     private final byte[] key;
+    /** 키 값은 있는데 Base64 32바이트가 아니다. */
+    private final boolean invalid;
 
     public PaymentAccountCipher(@Value("${payment.account-key:}") String base64Key) {
+        boolean present = base64Key != null && !base64Key.isBlank();
         byte[] decoded;
         try {
-            decoded = base64Key == null || base64Key.isBlank() ? new byte[0] : Base64.getDecoder().decode(base64Key.trim());
+            decoded = present ? Base64.getDecoder().decode(base64Key.trim()) : new byte[0];
         } catch (IllegalArgumentException exception) {
             decoded = new byte[0];
         }
         this.key = decoded.length == 32 ? decoded.clone() : null;
+        this.invalid = present && key == null;
         Arrays.fill(decoded, (byte) 0);
+        // 빈은 하나라 시작할 때 한 번만 남는다. 키 값·길이는 로그에 남기지 않는다.
+        if (invalid) LoggerFactory.getLogger(PaymentAccountCipher.class)
+            .warn("event=payment_account_key_invalid reason=not_base64_32_bytes");
+        // 로그인(UI-22) ⑬-2: application.yml의 개발용 기본 키로 켜지면 WARN 한 번(키 값은 쓰지 않는다).
+        if (key != null && developmentDefault(base64Key.trim())) LoggerFactory.getLogger(PaymentAccountCipher.class)
+            .warn("개발용 계좌 암호화 키를 쓰고 있습니다. 운영 전에 PAYMENT_ACCOUNT_KEY를 바꾸세요.");
     }
 
+    /** application.yml 개발용 기본 키의 SHA-256(16진). 코드에 키 값을 두지 않으려고 지문만 둔다. */
+    static final String DEVELOPMENT_KEY_SHA256 = "e67338e12c53116b7c0c8c1bd4b49c6725ccc706adfb1f181cd20a0b5d5a5640";
+
+    static boolean developmentDefault(String base64Key) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(base64Key.getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(digest).equals(DEVELOPMENT_KEY_SHA256);
+        } catch (GeneralSecurityException exception) {
+            return false;
+        }
+    }
+
+    /**
+     * 키가 없거나 틀리면 500 대신 알려진 오류(400)로 답한다(B.7 반영·거래처 저장).
+     * 목록의 끝 4자리는 CommonClientService가 이 오류도 「확인 필요」로 바꿔 목록 전체가 실패하지 않는다.
+     */
     private byte[] key() {
-        if (key == null) throw new IllegalStateException("계좌 암호화 키가 설정되지 않았습니다. 관리자에게 문의해 주세요.");
+        if (key == null) throw CodeFailure.invalid("paymentAccount", invalid ? INVALID : MISSING);
         return key;
     }
 

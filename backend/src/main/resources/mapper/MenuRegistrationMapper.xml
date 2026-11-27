@@ -49,16 +49,18 @@
     </choose>
   </select>
   <insert id="insertMenu">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_MENU (menu_id,upper_menu_id,menu_nm,scrn_id,menu_lvl,sort_ord,
       use_yn,pc_only_yn,lock_yn,icon_nm,reg_user_id,reg_dttm)
     VALUES (#{menuId},#{upperMenuId,jdbcType=VARCHAR},#{menuNm},#{scrnId,jdbcType=VARCHAR},
       #{menuLvl},#{sortOrd},#{useYn},#{pcOnlyYn},#{lockYn},#{iconNm,jdbcType=VARCHAR},
-      'admin',clock_timestamp())
+      #{actorId},clock_timestamp())
   </insert>
   <insert id="insertPermissions">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_ROLE_MENU_AUTH (role_id,menu_id,inq_yn,reg_yn,upd_yn,del_yn,
       upld_yn,dnld_yn,cnfm_yn,reg_user_id,reg_dttm)
-    SELECT r.role_id,#{id},'N','N','N','N','N','N','N','admin',clock_timestamp()
+    SELECT r.role_id,#{id},'N','N','N','N','N','N','N',#{actorId},clock_timestamp()
     FROM TB_SY_ROLE r
   </insert>
 </mapper>

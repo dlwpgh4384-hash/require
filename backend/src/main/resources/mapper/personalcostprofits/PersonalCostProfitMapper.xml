@@ -126,6 +126,23 @@
     <if test="affiliationId != null and affiliationId != '' and affiliationId != '__self'">AND h.BLNG_CLNT_ID=#{affiliationId}</if>
     <if test="salesPartId != null and salesPartId != ''">AND h.PART_ID=#{salesPartId}</if>
     <if test="jobCode != null and jobCode != ''">AND h.JOB_CD=#{jobCode}</if>
+    <!-- 데이터 범위(명세 ⑧-3): 전체가 아니면 고른 해 1월~기준월에 「내 프로젝트」이거나 현재 영업 파트가 「내 파트」인
+         프로젝트에 투입(취소 제외)된 사람만. 그 사람의 원가·수익 계산은 그대로 둔다(대기 원가 나눔이 바뀌지 않게). -->
+    <bind name="scopeAll" value="@com.company.common.support.auth.RequestAccess@scopeAll()"/>
+    <bind name="scopeParts" value="@com.company.common.support.auth.RequestAccess@scopeParts()"/>
+    <bind name="scopeProjects" value="@com.company.common.support.auth.RequestAccess@scopeProjects()"/>
+    <if test="!scopeAll">
+      AND EXISTS (SELECT 1 FROM TB_PJ_ASGN sa WHERE sa.DEV_ID=h.DEV_ID AND sa.ASGN_STAT_CD!='CNCL'
+        AND sa.INPUT_BGN_DT &lt; make_date(#{year},#{baseMonth},1)+interval '1 month'
+        AND sa.INPUT_END_DT &gt;= make_date(#{year},1,1)
+        AND (FALSE
+        <if test="!scopeProjects.isEmpty()">OR sa.PROJ_ID IN <foreach collection="scopeProjects" item="scopeProject" open="(" separator="," close=")">#{scopeProject}</foreach></if>
+        <if test="!scopeParts.isEmpty()">OR EXISTS (SELECT 1 FROM TB_PJ_PROJ_PART scope_part WHERE scope_part.PROJ_ID=sa.PROJ_ID
+          AND scope_part.APLY_BGN_YM=COALESCE((SELECT max(scope_x.APLY_BGN_YM) FROM TB_PJ_PROJ_PART scope_x WHERE scope_x.PROJ_ID=sa.PROJ_ID
+              AND scope_x.APLY_BGN_YM &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')),
+            (SELECT min(scope_x.APLY_BGN_YM) FROM TB_PJ_PROJ_PART scope_x WHERE scope_x.PROJ_ID=sa.PROJ_ID))
+          AND scope_part.PART_ID IN <foreach collection="scopeParts" item="scopePart" open="(" separator="," close=")">#{scopePart}</foreach>)</if>))
+    </if>
     ORDER BY h.DEV_NM,h.DEV_ID
   </select>
   <select id="selectPayroll" resultMap="pay">
@@ -182,7 +199,7 @@
     SELECT a.ym AS "yearMonth",a.DEV_ID AS "developerId",a.PROJ_ID AS "projectId",
       a.ASGN_ID AS "assignmentId",p.PROJ_NM AS "projectName",j.CODE_NM AS "jobName",
       p.CTRT_TYPE_CD AS "contractTypeCode",a.INPUT_TYPE_CD AS "inputTypeCode",a.mm AS "mm",
-      a.revenue AS "revenue",p.TEAM_EXPS_AMT AS "team",p.PROJ_EXPS_AMT AS "expense",
+      CASE WHEN p.PROJ_STAT_CD='PRE' THEN 0 ELSE a.revenue END AS "revenue",p.TEAM_EXPS_AMT AS "team",p.PROJ_EXPS_AMT AS "expense",
       p.CTRT_AMT AS "contractAmount",p.BDGT_AMT AS "budget",d.amount AS "distribution"
     FROM inputs a JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID
     LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=a.JOB_CD
@@ -215,7 +232,13 @@
     WHERE u.USER_ID=#{userId} AND r.USE_YN='Y'
   </select>
   <insert id="insertAccess">
-    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
-    VALUES(#{userId},'DNLD','UI-03',#{target},clock_timestamp(),#{userId},clock_timestamp())
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
+    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM,CLIENT_IP)
+    VALUES(#{userId},'DNLD','UI-03',#{target},clock_timestamp(),#{userId},clock_timestamp(),#{accessIp,jdbcType=VARCHAR})
+  </insert>
+  <insert id="insertSensitiveView">
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
+    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM,CLIENT_IP)
+    VALUES(#{userId},'SNSTV_VIEW','UI-03',#{target},clock_timestamp(),#{userId},clock_timestamp(),#{accessIp,jdbcType=VARCHAR})
   </insert>
 </mapper>

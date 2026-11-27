@@ -85,7 +85,7 @@ class NetProfitStatementControllerTest {
     }
     @Test void publicReportUsesSharedYearForTwoCardsAndNetProfitRow() throws Exception {
         var live = monthly.year(2026, 2, "202601").get("202602").values().netProfit();
-        mvc.perform(query("", "202602")).andExpect(status().isOk())
+        mvc.perform(get("/api/common/net-profit-statements").param("year", "2026").param("baseMonth", "202602")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.summary.cumulativeNetProfit").value(n("450000").add(live).intValueExact()))
             .andExpect(jsonPath("$.data.summary.baseMonthNetProfit").value(live.intValueExact()))
             .andExpect(jsonPath("$.data.numericTable.rows[16].label").value("당기순이익"))
@@ -163,7 +163,7 @@ class NetProfitStatementControllerTest {
     }
     @Test void publicWorkbookMatchesEveryProjectionCellAndHeading() throws Exception {
         var result = reports.getCommonNetProfitStatements(new Filter(2026, "202602")).data();
-        var bytes = mvc.perform(query("/excel", "202602")).andExpect(status().isOk())
+        var bytes = mvc.perform(get("/api/common/net-profit-statements/excel").param("year", "2026").param("baseMonth", "202602").param("amountUnit", "원")).andExpect(status().isOk())
             .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("attachment")))
             .andReturn().getResponse().getContentAsByteArray();

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 일 배치(PER-004, 명세 ⑪). 시각은 DB clock_timestamp(), 날짜 판단은 배치 기준일(한국 날짜). 기록 사용자 'SYSTEM'. -->
+<mapper namespace="com.company.common.dailybatch.mapper.DailyBatchMapper">
+  <update id="stopRetiredDevelopers">
+    UPDATE TB_HR_DEV SET use_yn='N', mod_user_id='SYSTEM', mod_dttm=clock_timestamp()
+    WHERE use_yn='Y' AND retire_dt IS NOT NULL AND retire_dt &lt; #{day}
+  </update>
+  <update id="endExpiredProjects">
+    UPDATE TB_PJ_PROJ SET proj_stat_cd='END', mod_user_id='SYSTEM', mod_dttm=clock_timestamp()
+    WHERE proj_stat_cd='ING' AND ctrt_end_dt &lt; #{day}
+  </update>
+  <resultMap id="withdrawal" type="com.company.common.notifications.service.NotificationPublisher$WithdrawalTarget">
+    <constructor>
+      <arg column="asgn_id" javaType="string"/>
+      <arg column="dev_id" javaType="string"/>
+    </constructor>
+  </resultMap>
+  <select id="dueWithdrawals" resultMap="withdrawal">
+    SELECT a.asgn_id, a.dev_id FROM TB_PJ_ASGN a
+    WHERE a.asgn_stat_cd='ACT' AND a.input_end_dt=#{endDate}
+    ORDER BY a.asgn_id
+  </select>
+  <select id="activeUsers" resultType="string">
+    SELECT u.user_id FROM TB_SY_USER u WHERE u.user_stat_cd='USE' ORDER BY u.user_id
+  </select>
+  <delete id="purgeAccessLogs">
+    DELETE FROM TB_SY_ACCS_LOG WHERE act_dttm &lt; #{cutoff}
+  </delete>
+  <delete id="purgeChangeHistory">
+    DELETE FROM TB_SY_CHG_HIST h
+    WHERE h.reg_dttm &lt; #{cutoff}
+      AND upper(h.trgt_tbl_nm) NOT LIKE 'TB\_PJ\_%'
+      AND upper(h.trgt_tbl_nm) NOT LIKE 'TB\_CO\_%'
+      AND upper(h.trgt_tbl_nm) NOT IN ('TB_HR_DEV_PRC','TB_HR_MON_PAY')
+      AND NOT (upper(h.trgt_tbl_nm)='TB_HR_DEV' AND h.chg_item_nm IN ('월 단가','월 급여·지급액'))
+  </delete>
+</mapper>

@@ -37,8 +37,8 @@ public class ProjectUploadForm implements UploadForm {
     public List<String> headers() { return HEADERS; }
     public Set<String> optionalHeaders() { return Set.copyOf(HEADERS.subList(AREA, AREA + 3)); }
     public String templateFileName() { return "project-template.xlsx"; }
-    public List<String> exampleRow() { return List.of("", "가온은행 차세대 여신", "가온은행", "턴키", "2026-01-01", "2026-12-31", "영업1파트", "서울 중구", "진행", "1200000000", "1000000000", "", "50000", "50000", "", "서울특별시", "중구", "을지로동"); }
-    public String templateNote() { return "B.9 신규 등록 전용. 프로젝트ID를 비우면 P-nnnn 자동 발급. 고객사는 상호 또는 사업자번호. 상태는 진행/수주예정. 내부는 고객사·파트·근무지 생략. 상태를 비우면 진행. 금액은 원 단위 숫자(쉼표 가능). 근무지 시·도·시·군·구·동은 선택(동 칸에는 동 이름만), 못 찾으면 찾은 단계까지만 저장하고 경고. 근무지 글자는 참고용."; }
+    public List<String> exampleRow() { return List.of("", "가온은행 차세대 여신", "가온은행", "턴키", "2026-01-01", "2026-12-31", "영업1파트", "서울 중구", "진행", "1200000000", "1000000000", "", "50000", "50000", "", "서울특별시", "중구", "을지로1가"); }
+    public String templateNote() { return "B.9 신규 등록 전용. 프로젝트ID를 비우면 P-nnnn 자동 발급. 고객사는 상호 또는 사업자번호. 상태는 진행/수주예정. 내부는 고객사·파트·근무지 생략. 상태를 비우면 진행. 금액은 원 단위 숫자(쉼표 가능). 근무지 시·도·시·군·구·동은 선택(동 칸에는 법정동 이름만, 예: 을지로1가), 못 찾으면 찾은 단계까지만 저장하고 경고. 근무지 글자는 참고용."; }
     public void lock() { mapper.lockSources(); }
     public record Row(int rowNumber, String id, Input input) {}
     public Inspection inspect(List<TabularRow> rows, YearMonth ignored) {
@@ -133,6 +133,11 @@ public class ProjectUploadForm implements UploadForm {
         }
         issues.sort(Comparator.comparingInt(i -> "오류".equals(i.severity())?0:1));
         return new Inspection(records,issues,successes,warnings,errors,rows.size(),assigned);
+    }
+    /** 데이터 범위: 새 프로젝트 줄은 그 영업 파트(영업 파트 칸)로 본다. 내 파트 밖으로 등록할 수 없다. */
+    public List<ScopeTarget> scopeTargets(Inspection inspection) {
+        return inspection.records().stream().map(Row.class::cast)
+            .map(r -> new ScopeTarget(r.rowNumber(),6,"PART",r.input().salesPartId())).toList();
     }
     /** 칸 글자. 줄이 짧으면(근무지 지역 칸을 더하기 전 모양) 빈칸으로 본다. */
     private static String cell(TabularRow row,int col) {

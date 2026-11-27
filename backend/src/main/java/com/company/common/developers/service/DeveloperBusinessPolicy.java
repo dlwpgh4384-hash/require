@@ -10,7 +10,8 @@ import java.util.Set;
 public final class DeveloperBusinessPolicy {
     private DeveloperBusinessPolicy() {}
 
-    public record Actor(Set<String> roles, Scope scope) {
+    /** sensitive = 역할의 민감 체크(SNSTV_VIEW_YN, 역할 여럿이면 하나라도 Y). 역할 이름으로 정하지 않는다(명세 ⑨-1). */
+    public record Actor(Set<String> roles, Scope scope, boolean sensitive) {
         public Actor {
             roles = Set.copyOf(roles);
             Objects.requireNonNull(scope);
@@ -24,19 +25,13 @@ public final class DeveloperBusinessPolicy {
             || (partId != null && actor.scope().partIds().contains(partId));
     }
 
+    /** 월 단가: 민감 체크만. 파트장 자기 파트 예외도 없다(명세 ⑨-1). */
     public static boolean canReadMonthlyRate(Actor actor, String partId) {
-        if (!canReadDeveloper(actor, partId)) return false;
-        return sensitiveRole(actor.roles())
-            || (actor.roles().contains("SALES_LDR") && partId != null
-                && actor.scope().partIds().contains(partId));
+        return canReadDeveloper(actor, partId) && actor.sensitive();
     }
 
     public static boolean canReadMonthlyPay(Actor actor, String partId) {
-        return canReadDeveloper(actor, partId) && sensitiveRole(actor.roles());
-    }
-
-    private static boolean sensitiveRole(Set<String> roles) {
-        return roles.contains("ADMIN") || roles.contains("EXEC") || roles.contains("FIN");
+        return canReadDeveloper(actor, partId) && actor.sensitive();
     }
 
     public static boolean canManageStatuses(Set<String> roles) {
@@ -49,10 +44,6 @@ public final class DeveloperBusinessPolicy {
         Objects.requireNonNull(today);
         if (closedMonth) return false;
         return retirementDate.isBefore(today) ? roles.contains("ADMIN") : canManageStatuses(roles);
-    }
-
-    public static boolean canUploadPayroll(Set<String> roles) {
-        return roles.contains("FIN");
     }
 
     public static boolean retired(LocalDate retirementDate, LocalDate today) {
@@ -78,14 +69,13 @@ public final class DeveloperBusinessPolicy {
         return "INDRCT".equals(directClassCode);
     }
 
-    /** 비어 있는 기본 단가는 월단위·파견에 한해 파트장·재무의 명시 입력이 필요하다. */
-    public static boolean canAssignWithRate(Set<String> roles, String contractTypeCode,
+    /** 비어 있는 기본 단가는 월단위·파견에 한해 민감 체크가 있는 사람의 명시 입력이 필요하다(명세 ⑨-5). */
+    public static boolean canAssignWithRate(boolean sensitive, String contractTypeCode,
         BigDecimal monthlyRate, BigDecimal enteredRate) {
         if (!Set.of("TK", "MO", "DP", "IN").contains(contractTypeCode)) return false;
         if (!"MO".equals(contractTypeCode) && !"DP".equals(contractTypeCode)) return true;
         if (monthlyRate != null) return monthlyRate.signum() >= 0;
-        return enteredRate != null && enteredRate.signum() >= 0
-            && (roles.contains("SALES_LDR") || roles.contains("FIN"));
+        return enteredRate != null && enteredRate.signum() >= 0 && sensitive;
     }
 
     /** 식-42 시작월에만 쓰며 B.1 월 원가를 대체하지 않는다. */

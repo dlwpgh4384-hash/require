@@ -26,7 +26,17 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcBuilderCustomizer;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -47,7 +57,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CommonAiAnalysisControllerTest {
     @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods = false)
     @org.springframework.transaction.annotation.EnableTransactionManagement
-    static class Transactions {}
+    static class Transactions {
+        @Bean
+        MockMvcBuilderCustomizer authenticatedRequests(CurrentBusinessActor actor) {
+            return builder -> builder.defaultRequest(get("/").with(request -> {
+                // Keep the slice's security filters active and match its business actor.
+                var context = SecurityContextHolder.createEmptyContext();
+                var authorities = actor.roles().stream()
+                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role)).toList();
+                context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
+                    actor.userId(), null, authorities));
+                request.getSession().setAttribute(
+                    HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+                var repository = new HttpSessionCsrfTokenRepository();
+                var token = repository.generateToken(request);
+                repository.saveToken(token, request, null);
+                // The slice's default Spring Security handler expects an XOR-masked token.
+                new XorCsrfTokenRequestAttributeHandler().handle(request, new MockHttpServletResponse(), () -> token);
+                var maskedToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+                request.addHeader(maskedToken.getHeaderName(), maskedToken.getToken());
+                return request;
+            }));
+        }
+    }
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired AiAnalysisProgress progress;

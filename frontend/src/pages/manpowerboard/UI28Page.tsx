@@ -1,3 +1,4 @@
+import { useCanViewScreen } from "../../shared/permission";
 import {
   useEffect,
   useMemo,
@@ -120,6 +121,7 @@ export function UI28Page({
   renderActions,
 }: { renderActions?: (actions: ReactNode) => ReactNode } = {}) {
   const navigate = useNavigate();
+  const canView = useCanViewScreen();
   const openDeveloperAction = useOpenDeveloperAction();
   // [AI에게 묻기] 기간은 아래 한 곳에서만 알린다(달력 탭은 고른 해, 예측 탭은 예측 달). 훅은 알리지 않는다.
   const period = useScreenPeriod("UI-28", periodOptions, undefined, {
@@ -360,14 +362,14 @@ export function UI28Page({
           value={summary ? `${summary.withdrawalCount}명` : "–"}
           description={`연장 가능성 높음 ${summary?.highExtensionCount ?? "–"}명`}
           testId="manpower-board-withdrawal"
-          onClick={() => navigate("/screens/UI-05")}
+          onClick={canView("UI-05") ? () => navigate("/screens/UI-05") : undefined}
         />
         <KpiCard
           label="동시 투입"
           value={summary ? `${summary.concurrentCount}명` : "–"}
           description={`이번 달 2건 이상 · 1.0 초과 ${summary?.overAllocatedCount ?? "–"}명`}
           testId="manpower-board-concurrent"
-          onClick={() => navigate("/screens/UI-12")}
+          onClick={canView("UI-12") ? () => navigate("/screens/UI-12") : undefined}
         />
         <KpiCard
           label="3개월 뒤 남는 MM"

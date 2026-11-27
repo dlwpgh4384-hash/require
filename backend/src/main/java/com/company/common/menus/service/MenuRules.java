@@ -81,6 +81,35 @@ public final class MenuRules {
         return new MenuResponse(true, Map.of("screenAccess", List.copyOf(access)), data);
     }
 
+    /**
+     * 조회(INQ_YN) 권한으로 거른다. 화면 메뉴(아래 메뉴 없음)는 권한이 있어야 남고,
+     * 대메뉴는 남은 화면 메뉴의 위에 있을 때만 남는다. 화면 열기(screenAccess)도 같은 결과를 따른다.
+     */
+    public static MenuResponse readable(MenuResponse all, java.util.function.Predicate<String> menuReadable) {
+        Map<String, MenuItem> byId = new HashMap<>();
+        Set<String> parents = new HashSet<>();
+        for (MenuItem item : all.data()) {
+            byId.put(item.menuId(), item);
+            if (nonempty(item.upperMenuId())) parents.add(item.upperMenuId());
+        }
+        Set<String> kept = new HashSet<>();
+        Set<String> screens = new HashSet<>();
+        for (MenuItem item : all.data()) {
+            if (parents.contains(item.menuId()) || !nonempty(item.scrnId()) || !menuReadable.test(item.menuId())) continue;
+            screens.add(item.scrnId());
+            Set<String> visited = new HashSet<>();
+            for (MenuItem cursor = item; cursor != null && visited.add(cursor.menuId());
+                 cursor = nonempty(cursor.upperMenuId()) ? byId.get(cursor.upperMenuId()) : null) kept.add(cursor.menuId());
+        }
+        List<MenuItem> data = all.data().stream().filter(item -> kept.contains(item.menuId())).toList();
+        List<ScreenAccess> access = new ArrayList<>();
+        @SuppressWarnings("unchecked")
+        List<ScreenAccess> previous = (List<ScreenAccess>) all.meta().getOrDefault("screenAccess", List.of());
+        for (ScreenAccess screen : previous)
+            access.add(new ScreenAccess(screen.scrnId(), screen.available() && screens.contains(screen.scrnId()), screen.pcOnlyYn()));
+        return new MenuResponse(all.success(), Map.of("screenAccess", List.copyOf(access)), data);
+    }
+
     private static boolean nonempty(String value) { return value != null && !value.isEmpty(); }
 
     private static void warn(Set<String> warned, String reason, String id) {

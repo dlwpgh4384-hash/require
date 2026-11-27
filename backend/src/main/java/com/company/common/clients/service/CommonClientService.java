@@ -84,7 +84,7 @@ public class CommonClientService {
         if (row.encryptedAccount == null) return "";
         try {
             return value(row.bankName) + " " + cipher.lastFour(row.encryptedAccount);
-        } catch (IllegalStateException unreadable) {
+        } catch (IllegalStateException | CodeFailure unreadable) {
             // 키가 바뀌었거나 값이 망가진 계좌 하나 때문에 목록 전체가 실패하지 않게 한다. 전체 보기에서는 그대로 오류를 알린다.
             return value(row.bankName) + " 확인 필요";
         }

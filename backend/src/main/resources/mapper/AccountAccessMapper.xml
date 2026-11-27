@@ -83,11 +83,13 @@
       <when test="kind == 'BILL'">SELECT proj_id FROM TB_BL_BILL WHERE bill_id=#{id}</when>
       <when test="kind == 'RCPT'">SELECT b.proj_id FROM TB_BL_RCPT r JOIN TB_BL_BILL b ON b.bill_id=r.bill_id WHERE CAST(r.rcpt_id AS TEXT)=#{id}</when>
       <when test="kind == 'ASGN'">SELECT proj_id FROM TB_PJ_ASGN WHERE asgn_id=#{id}</when>
+      <when test="kind == 'RCMD'">SELECT proj_id FROM TB_SL_RCMD_LOG WHERE CAST(rcmd_id AS TEXT)=#{id} ORDER BY rank_ord LIMIT 1</when>
       <when test="kind == 'ISSUE'">SELECT proj_id FROM TB_PJ_ISSUE WHERE CAST(issue_id AS TEXT)=#{id}</when>
       <otherwise>SELECT proj_id FROM TB_PJ_PROJ WHERE proj_id=#{id}</otherwise>
     </choose>
   </select>
   <select id="opportunityPart" resultType="string">SELECT part_id FROM TB_SL_OPP WHERE opp_id=#{id}</select>
+  <select id="recommendationOpportunity" resultType="string">SELECT opp_id FROM TB_SL_RCMD_LOG WHERE CAST(rcmd_id AS TEXT)=#{id} ORDER BY rank_ord LIMIT 1</select>
   <select id="developerPart" resultType="string">SELECT COALESCE(part_id,'') FROM TB_HR_DEV WHERE dev_id=#{id}</select>
   <select id="projectInParts" resultType="boolean">
     SELECT EXISTS (SELECT 1 FROM TB_PJ_PROJ_PART h WHERE h.proj_id=#{projectId}

@@ -46,10 +46,6 @@ public final class DeveloperBusinessPolicy {
         return retirementDate.isBefore(today) ? roles.contains("ADMIN") : canManageStatuses(roles);
     }
 
-    public static boolean canUploadPayroll(Set<String> roles) {
-        return roles.contains("FIN");
-    }
-
     public static boolean retired(LocalDate retirementDate, LocalDate today) {
         Objects.requireNonNull(today);
         return retirementDate != null && retirementDate.isBefore(today);

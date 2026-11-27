@@ -32,6 +32,8 @@
     LEFT JOIN TB_HR_DEV d ON d.DEV_ID=m.DEV_ID
     WHERE m.INPUT_YM=#{month} AND p.CTRT_TYPE_CD IN ('MO','DP') AND a.INPUT_TYPE_CD&lt;&gt;'FREE'
       AND a.ASGN_STAT_CD='ACT'
+      <!-- 수주예정은 청구 등록 대상이 아니라 점검에서 뺀다(2026-11-27 사용자 결정, SFR-113-04). -->
+      AND p.PROJ_STAT_CD&lt;&gt;'PRE'
       <include refid="dataScope"><property name="proj" value="p.PROJ_ID"/></include>
     ORDER BY p.PROJ_NM,p.PROJ_ID,m.ASGN_ID
   </select>

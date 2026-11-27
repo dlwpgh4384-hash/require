@@ -14,6 +14,7 @@ import com.company.common.support.service.CodeFailure;
 import com.company.common.users.dto.UserContracts.Response;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -96,6 +97,9 @@ public class CommonCashFlowStatementService {
             String key = month.format(YM);
             boolean supported = base != null && !month.isBefore(base) && balance != null;
             var values = flows.get(key);
+            // 자금수지는 시작 월(기초 잔액)부터 잡는다(SFR-108-07). 시작 월 전 달 수입·지출은 「–」로 두어
+            // 기간 합계가 「전월이월금 + 수입 − 지출 = 이월금」과 맞게 한다(식-52, 시험 회사 #27 2026-11-27).
+            if (base != null && balance != null && month.isBefore(base)) values = null;
             boolean populated = values != null || supported;
             if (values == null) values = Map.of();
             BigDecimal cash = value(values, "CASH_SALES", populated);
@@ -155,6 +159,7 @@ public class CommonCashFlowStatementService {
         for (var pay : stored) byMonth.computeIfAbsent(pay.yearMonth(), k -> new HashMap<>()).put(pay.developerId(), pay);
         var persons = people.people(new Query(last.getYear(), 12));
         var active = new HashSet<>(source.activeDevelopers());
+        var leaves = Objects.requireNonNullElse(source.leaves(), List.<Leave>of());
         var latest = new HashMap<String, Pay>();
         for (var pay : stored) if (pay.yearMonth().compareTo(first.format(YM)) < 0)
             latest.merge(pay.developerId(), pay, (a, b) -> a.yearMonth().compareTo(b.yearMonth()) > 0 ? a : b);
@@ -163,13 +168,19 @@ public class CommonCashFlowStatementService {
             String key = month.format(YM);
             var uploaded = byMonth.getOrDefault(key, Map.of());
             for (var pay : uploaded.values()) { payment(flows, pay, rules); latest.put(pay.developerId(), pay); }
-            // 급여 업로드는 그 달 전체를 한 파일로 바꾸므로, 지난달에 업로드가 있으면 빠진 사람은 실제로 안 준 것으로 본다.
-            if (isClosed.test(key) || (month.isBefore(now) && !uploaded.isEmpty())) continue;
+            // 급여 업로드는 그 달 전체를 한 파일로 바꾸므로, 업로드가 있는 달(이번 달 포함)은 올린 줄만 쓰고
+            // 빠진 사람은 실제로 안 준 것으로 본다(SFR-121-04 「아직 업로드 안 한 앞으로의 달만」 예정, 시험 회사 #11 2026-11-27).
+            if (isClosed.test(key) || !uploaded.isEmpty()) continue;
             Map<String, BigDecimal> pool = null;
+            LocalDate monthStart = month.atDay(1), monthEnd = month.atEndOfMonth();
             for (var person : persons) {
-                if (uploaded.containsKey(person.developerId()) || !active.contains(person.developerId())
+                if (!active.contains(person.developerId())
                     || (person.joinDate() != null && YearMonth.from(person.joinDate()).isAfter(month))
                     || (person.retireDate() != null && YearMonth.from(person.retireDate()).isBefore(month))) continue;
+                // 그 달 내내 휴직이면 급여를 주지 않으므로 예정에 넣지 않는다.
+                if (leaves.stream().anyMatch(l -> person.developerId().equals(l.developerId())
+                    && l.startDate() != null && !l.startDate().isAfter(monthStart)
+                    && (l.endDate() == null || !l.endDate().isBefore(monthEnd)))) continue;
                 var basis = latest.get(person.developerId());
                 if (basis == null) {
                     if (pool == null) {

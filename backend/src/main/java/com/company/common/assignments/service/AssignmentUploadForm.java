@@ -86,6 +86,11 @@ public class AssignmentUploadForm implements UploadForm {
         issues.sort(Comparator.comparingInt(i -> "오류".equals(i.severity())?0:1));
         return new Inspection(records,issues,success,warning,error,rows.size());
     }
+    /** 데이터 범위: 배정 줄은 그 프로젝트(프로젝트ID 칸)로 본다. 개발자는 화면 배정 등록처럼 보지 않는다. */
+    public List<ScopeTarget> scopeTargets(Inspection inspection) {
+        return inspection.records().stream().map(UploadRow.class::cast)
+            .map(r -> new ScopeTarget(r.number(),0,"PROJ",r.body().path("projectId").asText(null))).toList();
+    }
     private String resolve(String group,String value,TabularRow row,int column,List<Issue> issues) {
         return warn(codes.resolve(group,value.trim()),value,row,column,issues);
     }

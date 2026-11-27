@@ -3484,6 +3484,26 @@ describe("application route registration", () => {
     expectSingleShell();
   });
 
+  it("UI-23 mobile direct entry shows the PC-only notice and never loads user data (USR-24)", async () => {
+    const { request } = respondWithUsers();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query === "(max-width: 767px)",
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    mount("/screens/UI-23");
+    expect(await screen.findByText("PC에서 이용해 주세요")).toBeVisible();
+    expect(screen.queryByTestId("user-page")).not.toBeInTheDocument();
+    expect(
+      request.mock.calls.filter(([url]) => String(url).startsWith("/api/common/users")),
+    ).toHaveLength(0);
+    expect(router?.state.location.pathname).toBe("/screens/UI-23");
+    expectSingleShell();
+  });
+
   it("UI-23 direct entry uses the existing shell, feature clients and title registration action", async () => {
     const { request } = respondWithUsers();
     mount("/screens/UI-23");

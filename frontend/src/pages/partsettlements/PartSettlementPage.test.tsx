@@ -393,17 +393,17 @@ it("monthly table shows mockup columns, code names, notes and plain column sums"
   expect(screen.getByText("시작 달 16/31일")).not.toHaveClass("ls-neg");
   expect(screen.getByTestId("list-cell-E-notes")).toHaveTextContent("–");
   expect(screen.getByTestId("list-cell-E-monthlyMm")).toHaveTextContent("0.50");
-  // 합계 줄: 열마다 더한 값(이익금도 법인카드를 빼지 않음). 단위 천 원.
+  // 합계 줄: 열마다 더한 값(이익금도 법인카드를 빼지 않음). 단위 원.
   const foot = (key: string) => screen.getByTestId(`list-footer-${key}`);
   expect(foot("developerName")).toHaveTextContent("합계");
   expect(foot("monthlyMm")).toHaveTextContent("1.50");
-  expect(foot("unitPrice")).toHaveTextContent("8,500");
-  expect(foot("salary")).toHaveTextContent("8,000");
-  expect(foot("salesExpense")).toHaveTextContent("1,500");
-  expect(foot("retirementAmount")).toHaveTextContent("333");
-  expect(foot("totalCost")).toHaveTextContent("9,833");
-  expect(foot("profit")).toHaveTextContent("−1,333");
-  expect(foot("profitShare")).toHaveTextContent("−533");
+  expect(foot("unitPrice")).toHaveTextContent("8,500,000");
+  expect(foot("salary")).toHaveTextContent("8,000,000");
+  expect(foot("salesExpense")).toHaveTextContent("1,500,000");
+  expect(foot("retirementAmount")).toHaveTextContent("333,333");
+  expect(foot("totalCost")).toHaveTextContent("9,833,333");
+  expect(foot("profit")).toHaveTextContent("−1,333,333");
+  expect(foot("profitShare")).toHaveTextContent("−533,333");
   expect(screen.getByTestId("list-head-developerName")).toHaveClass("ls-sc");
 });
 
@@ -674,7 +674,7 @@ it("trend shows the Excel 원가표 layout: five lines per person, sums over inv
     "1.50",
     "시작 달 16/31일 · ⚠ 월 급여 없음(시작 달 급여 0)",
   ]);
-  expect(line("D", "profitShare")).toEqual(["이익금", "−933", "100", "−833"]);
+  expect(line("D", "profitShare")).toEqual(["이익금", "−933,333", "100,000", "−833,333"]);
   expect(screen.getByTestId("part-settlement-trend-D-profitShare")).toHaveClass(
     "part-settlement-strong",
   );
@@ -687,11 +687,11 @@ it("trend shows the Excel 원가표 layout: five lines per person, sums over inv
     "1.00",
     "–",
   ]);
-  expect(line("E", "unitPrice")).toEqual(["단가", "–", "5,000", "5,000"]);
+  expect(line("E", "unitPrice")).toEqual(["단가", "–", "5,000,000", "5,000,000"]);
   const total = within(screen.getByTestId("part-settlement-trend-total"))
     .getAllByRole("cell")
     .map((cell) => cell.textContent);
-  expect(total).toEqual(["파트 이익금 ⓘ", "", "−1,033", "400", "−633", ""]);
+  expect(total).toEqual(["파트 이익금 ⓘ", "", "−1,033,333", "400,000", "−633,333", ""]);
   expect(
     panel.getByTitle("인력별 이익금 합 − 그 달 법인카드 사용액"),
   ).toBeVisible();

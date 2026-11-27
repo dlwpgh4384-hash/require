@@ -1,6 +1,7 @@
 package com.company.common.cashflowstatements.mapper;
 
 import com.company.common.financeitems.dto.FinanceItemContracts.CashContribution;
+import com.company.common.personalcostprofits.mapper.PersonalCostProfitRows.Leave;
 import com.company.common.personalcostprofits.mapper.PersonalCostProfitRows.Pay;
 import java.math.BigDecimal;
 import java.util.List;
@@ -15,6 +16,8 @@ public interface CashFlowStatementMapper {
     List<CashContribution> miscellaneousIncome();
     List<Pay> payroll(@Param("end") String end);
     List<String> activeDevelopers();
+    /** 휴직 기간(TB_HR_DEV_STAT LEAVE). 그 달 내내 휴직이면 예상 급여를 넣지 않는다. */
+    List<Leave> leaves();
     /** 개발자 풀 월 급여·지급액(그 달에 맞는 이력). 급여를 한 번도 올리지 않은 사람의 예상 급여에 쓴다. */
     List<PoolPay> poolPays(@Param("month") String month);
     record PoolPay(String developerId, BigDecimal amount) {}

@@ -43,4 +43,30 @@ class AccountApiPolicyCoverageTest {
         assertThat(checked).isGreaterThan(100);
         assertThat(missing).isEmpty();
     }
+
+    /** 「로그인만」(SELF)은 내 것(내 정보·내 기억·내 비밀번호·내 알림·세션)과 여러 화면이 함께 쓰는 고르기 목록·왼쪽 메뉴만. */
+    private static final List<String> SELF_ALLOWED = List.of(
+        "GET /api/common/my-info", "GET /api/common/session/remaining", "GET /api/common/notifications",
+        "GET /api/common/user-preferences/{prefTypeCd}/{prefKey}", "GET /api/common/menus",
+        "GET /api/common/user-options", "GET /api/common/code-groups/{groupId}/codes", "GET /api/common/clients",
+        "GET /api/common/parts", "GET /api/common/parts/options", "GET /api/common/developers",
+        "GET /api/common/developers/areas", "GET /api/common/projects", "GET /api/common/bill-options",
+        "GET /api/common/ai-recommendation-options",
+        "PUT /api/common/user-preferences/{prefTypeCd}/{prefKey}", "PUT /api/common/my-password",
+        "PUT /api/common/notifications/{notificationId}/read", "PUT /api/common/notifications/read-all",
+        "POST /api/common/logout", "POST /api/common/session/extend");
+    /** 등록·변경(GET 아닌 요청) 중 로그인만으로 되는 것은 내 것뿐이다. */
+    private static final List<String> SELF_WRITES = List.of(
+        "PUT /api/common/user-preferences/{prefTypeCd}/{prefKey}", "PUT /api/common/my-password",
+        "PUT /api/common/notifications/{notificationId}/read", "PUT /api/common/notifications/read-all",
+        "POST /api/common/logout", "POST /api/common/session/extend");
+
+    @Test void loginOnlyRoutesAreOnlyPersonalOrSharedSelectors() {
+        var self = new AccountApiPolicy().selfRoutes();
+        // 메뉴 등록(POST menus)처럼 관리 화면 쓰기가 로그인만으로 분류되면 여기서 잡힌다(MNU-19).
+        assertThat(self).as("로그인만 목록에 새로 넣으려면 명세(⑦-1)를 확인하고 여기에도 적는다").allMatch(SELF_ALLOWED::contains);
+        assertThat(self.stream().filter(route -> !route.startsWith("GET ")).toList())
+            .as("로그인만 쓰기는 내 것뿐").allMatch(SELF_WRITES::contains);
+        assertThat(self).doesNotContain("POST /api/common/menus", "GET /api/common/menu-options");
+    }
 }

@@ -51,7 +51,7 @@ class CommonMfaServiceTest {
             Path path = (Path) call.callRealMethod();
             mail.add(path);
             return path;
-        }).when(mailbox).deliver(anyList(), anyString());
+        }).when(mailbox).deliver(anyList(), anyString(), anyString());
         completion = mock(LoginCompletion.class);
         when(completion.prepare(anyString(), anyBoolean())).thenReturn(
             new LoginCompletion.Prepared("UI-34", Map.of("modifiedAt", now.toString(), "passwordChangeDays", 90)));
@@ -90,7 +90,7 @@ class CommonMfaServiceTest {
 
     @Test void initialDeliveryIsRealMimeAndOnlyBcryptIsStored() throws Exception {
         var result = service.startAfterPasswordVerified(request, account.userId);
-        assertThat(mail).hasSize(1);
+        assertThat(mail).hasSize(1); verify(mailbox).deliver(anyList(), anyString(), eq("인증번호"));
         assertThat(result.delivery().maskedEmail()).isEqualTo("m***@example.invalid");
         assertThat(result.delivery().expiresAt()).isEqualTo(now.plusSeconds(300));
         assertThat(account.codeHash).startsWith("$2a$10$");
@@ -220,7 +220,7 @@ class CommonMfaServiceTest {
         verifyNoInteractions(completion);
     }
     @Test void initialMailFailureLeavesOnlyRetryAndNoLogin() {
-        doThrow(new IllegalStateException("transport unavailable")).when(mailbox).deliver(anyList(), anyString());
+        doThrow(new IllegalStateException("transport unavailable")).when(mailbox).deliver(anyList(), anyString(), anyString());
         var result = service.startAfterPasswordVerified(request, account.userId);
         assertThat(result.deliveryError()).isEqualTo(CommonMfaService.DELIVERY_FAILURE);
         assertThat(account.expiresAt).isNull();
@@ -233,7 +233,7 @@ class CommonMfaServiceTest {
         Instant expires = account.expiresAt;
         Object pending = request.getSession(false).getAttribute(CommonMfaService.PENDING_ATTRIBUTE);
         clearInvocations(mapper, completion);
-        doThrow(new IllegalStateException("transport unavailable")).when(mailbox).deliver(anyList(), anyString());
+        doThrow(new IllegalStateException("transport unavailable")).when(mailbox).deliver(anyList(), anyString(), anyString());
         assertThatThrownBy(() -> service.postCommonMfaResend(request)).hasMessage(CommonMfaService.DELIVERY_FAILURE);
         assertThat(account.codeHash).isEqualTo(hash);
         assertThat(account.expiresAt).isEqualTo(expires);
@@ -250,7 +250,7 @@ class CommonMfaServiceTest {
                 Path path = (Path) call.callRealMethod();
                 mail.add(path);
                 return path;
-            }).when(mailbox).deliver(anyList(), anyString());
+            }).when(mailbox).deliver(anyList(), anyString(), anyString());
         assertThatThrownBy(() -> service.postCommonMfaResend(request)).hasMessage(CommonMfaService.DELIVERY_FAILURE);
         assertThatCode(() -> service.postCommonMfaResend(request)).doesNotThrowAnyException();
         for (int attempt = 0; attempt < 4; attempt++) {
@@ -267,7 +267,7 @@ class CommonMfaServiceTest {
         Instant expires = account.expiresAt;
         request = new MockHttpServletRequest();
         clearInvocations(mapper);
-        doThrow(new IllegalStateException("transport unavailable")).when(mailbox).deliver(anyList(), anyString());
+        doThrow(new IllegalStateException("transport unavailable")).when(mailbox).deliver(anyList(), anyString(), anyString());
         assertThat(service.startAfterPasswordVerified(request, account.userId).deliveryError())
             .isEqualTo(CommonMfaService.DELIVERY_FAILURE);
         assertThat(account.codeHash).isEqualTo(hash);
@@ -285,7 +285,7 @@ class CommonMfaServiceTest {
                 Path path = (Path) call.callRealMethod();
                 mail.add(path);
                 return path;
-            }).when(mailbox).deliver(anyList(), anyString());
+            }).when(mailbox).deliver(anyList(), anyString(), anyString());
         assertThat(service.startAfterPasswordVerified(request, account.userId).deliveryError())
             .isEqualTo(CommonMfaService.DELIVERY_FAILURE);
         assertThat(account.codeHash).isNull();

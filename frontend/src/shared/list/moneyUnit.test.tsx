@@ -21,7 +21,7 @@ import {
 afterEach(cleanup);
 
 it("formats money like the mockup money(): divide, round, comma and − for negatives", () => {
-  expect(DEFAULT_MONEY_UNIT).toBe("천 원");
+  expect(DEFAULT_MONEY_UNIT).toBe("원");
   expect(formatMoney(1234567, "원")).toBe("1,234,567");
   expect(formatMoney(1234567, "천 원")).toBe("1,235");
   expect(formatMoney(1234567, "백만 원")).toBe("1");
@@ -60,7 +60,7 @@ it("unit select offers 원·천 원·백만 원 and Money marks negatives", () =
   );
 });
 
-// 금액 단위 저장(AMT_UNIT/GLOBAL): 처음에 읽고, 없으면 천 원, 바꾸면 읽은 시각으로 저장, 409면 다시 읽기
+// 금액 단위 저장(AMT_UNIT/GLOBAL): 처음에 읽고, 없으면 원, 바꾸면 읽은 시각으로 저장, 409면 다시 읽기
 const preference = (prefVal: string | null, modDttm: string | null) => ({
   ok: true,
   status: 200,
@@ -114,7 +114,7 @@ it("unit select loads the saved account unit and saves a change with the read ti
   });
   vi.unstubAllGlobals();
 });
-it("unit select uses 천 원 when nothing is saved and reloads after a 409", async () => {
+it("unit select uses 원 when nothing is saved and reloads after a 409", async () => {
   let saved: string | null = null;
   const fetchMock = vi.fn(async (_path: string, init?: RequestInit) => {
     if (init?.method === "PUT") {
@@ -130,8 +130,10 @@ it("unit select uses 천 원 when nothing is saved and reloads after a 409", asy
   vi.stubGlobal("fetch", fetchMock);
   render(<UnitHarness onChange={() => undefined} />);
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-  expect(screen.getByLabelText("단위")).toHaveValue("천 원");
-  fireEvent.change(screen.getByLabelText("단위"), { target: { value: "원" } });
+  expect(screen.getByLabelText("단위")).toHaveValue("원");
+  fireEvent.change(screen.getByLabelText("단위"), {
+    target: { value: "천 원" },
+  });
   await waitFor(() =>
     expect(screen.getByLabelText("단위")).toHaveValue("백만 원"),
   );

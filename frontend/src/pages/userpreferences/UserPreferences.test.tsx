@@ -546,6 +546,47 @@ describe("personal lists and tools", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(caller).toHaveFocus();
   });
+  it("단축키 보기 opens the mockup keys dialog: title, table rows, [×] and [닫기]", () => {
+    wrap(
+      <UserPreferenceTools
+        menus={menus}
+        mobile={false}
+        available={available}
+        onNavigate={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("user-menu-open"));
+    fireEvent.click(screen.getByTestId("shortcut-help-open"));
+    const dialog = screen.getByRole("dialog", { name: "단축키" });
+    expect(within(dialog).getByRole("heading", { name: "단축키" })).toBeVisible();
+    // 시안 keys: 표 한 줄 = 굵은 키 + 설명, 이 순서.
+    const rowsShown = within(dialog)
+      .getAllByRole("row")
+      .map((tr) =>
+        Array.from(tr.querySelectorAll("td")).map((td) => td.textContent),
+      );
+    expect(rowsShown).toEqual([
+      ["Enter", "조회 조건에서 조회"],
+      ["Ctrl + S", "저장"],
+      ["Esc", "창 닫기"],
+      ["Ctrl + K", "메뉴 찾기"],
+      ["Ctrl + ← / →", "이전·다음 페이지"],
+    ]);
+    expect(dialog.querySelectorAll("td:first-child > strong")).toHaveLength(5);
+    expect(dialog.querySelector(".shortcut-help-wrap > table")).not.toBeNull();
+    expect(within(dialog).queryByText(/업무 화면 연결 시/)).not.toBeInTheDocument();
+    const footer = within(dialog).getByTestId("shortcut-help-close");
+    expect(footer).toHaveTextContent("닫기");
+    expect(footer).toHaveClass("primary-button");
+    // 머리 [×]로 닫기
+    fireEvent.click(within(dialog).getByTestId("shortcut-help-dialog-close"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // 아래 [닫기]로 닫기
+    fireEvent.click(screen.getByTestId("user-menu-open"));
+    fireEvent.click(screen.getByTestId("shortcut-help-open"));
+    fireEvent.click(screen.getByTestId("shortcut-help-close"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
   it("mobile search and AI dialog remain usable without duplicate account placeholders", async () => {
     wrap(
       <UserPreferenceTools

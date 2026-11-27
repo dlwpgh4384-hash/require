@@ -275,6 +275,100 @@ describe("역할별 메뉴·동작 권한", () => {
     expect(screen.getByRole("button", { name: "AI에게 묻기" })).toBeVisible();
   });
 
+  // 시험 케이스 장부: 메뉴 권한이 없는 역할이 주소로 직접 열면 토스트 뒤 대시보드(처음 값 권한 = DML).
+  it.each([
+    ["PCP-17", "SALES_LDR", "UI-03", "M014"],
+    ["PCP-17", "PM", "UI-03", "M014"],
+    ["PCA-20", "PM", "UI-04", "M015"],
+    ["PCA-20", "SALES_LDR", "UI-04", "M015"],
+    ["RRN-16", "PM", "UI-32", "M017"],
+    ["FIN-34", "SALES_LDR", "UI-10", "M018"],
+    ["FIN-34", "PM", "UI-10", "M018"],
+    ["PFS-29", "PM", "UI-07", "M019"],
+    ["OPS-28", "SALES_LDR", "UI-08", "M020"],
+    ["OPS-28", "PM", "UI-08", "M020"],
+    ["NPS-24", "SALES_LDR", "UI-09", "M021"],
+    ["NPS-24", "PM", "UI-09", "M021"],
+    ["BPA-27", "SALES_LDR", "UI-18", "M022"],
+    ["BPA-27", "PM", "UI-18", "M022"],
+    ["CF-31", "SALES_LDR", "UI-21", "M023"],
+    ["CF-31", "PM", "UI-21", "M023"],
+    ["MCL-18", "SALES_LDR", "UI-14", "M024"],
+    ["MCL-18", "PM", "UI-14", "M024"],
+    ["USR-21", "EXEC", "UI-23", "M027"],
+    ["USR-21", "SALES_LDR", "UI-23", "M027"],
+    ["USR-21", "PM", "UI-23", "M027"],
+  ] as const)(
+    "%s: %s가 %s 주소로 들어오면 토스트 뒤 대시보드로 가고 메뉴 %s가 없다",
+    async (_row, role, screenId, menuId) => {
+      await open(testAccount([role]), `/screens/${screenId}`);
+      expect(await screen.findByTestId("account-forbidden-toast")).toHaveTextContent(
+        "이 화면을 볼 권한이 없습니다. 대시보드로 갑니다.",
+      );
+      await waitFor(() => expect(router!.state.location.pathname).toBe("/screens/UI-16"));
+      await body("UI-16");
+      expect(menu(menuId)).not.toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    ["WDR-20", "UI-05"],
+    ["ASN-24", "UI-12"],
+    ["BIL-29", "UI-13"],
+    ["PBD-22", "UI-31"],
+    ["FIN-34", "UI-10"],
+    ["PST-21", "UI-19"],
+    ["CLI-25", "UI-15"],
+    ["CAN-21", "UI-33"],
+    ["AIR-19", "UI-30"],
+    ["DEV-36", "UI-02"],
+    ["MCL-18", "UI-14"],
+    ["OPS-28", "UI-08"],
+    ["BPA-27", "UI-18"],
+  ] as const)(
+    "%s: 경영진은 %s에서 등록·수정·업로드·확정 단추가 없고 엑셀 다운로드만 있다",
+    async (_row, screenId) => {
+      await open(testAccount(["EXEC"]), `/screens/${screenId}`);
+      const panel = await body(screenId);
+      for (const name of ["+ 프로젝트 등록", "수정", "삭제", "엑셀 업로드", "마감하기"])
+        expect(button(panel, name)).toBeNull();
+      expect(button(panel, "엑셀 다운로드")).toBeVisible();
+    },
+  );
+
+  it.each([
+    ["WDR-20", "UI-05"],
+    ["MPC-17", "UI-11"],
+    ["MPB-21", "UI-28"],
+    ["MPF-15", "UI-17"],
+    ["ASN-24", "UI-12"],
+    ["BIL-29", "UI-13"],
+    ["PBD-22", "UI-31"],
+  ] as const)("%s: PM은 %s에서 엑셀 다운로드·업로드·확정 단추가 없다", async (_row, screenId) => {
+    await open(testAccount(["PM"]), `/screens/${screenId}`);
+    const panel = await body(screenId);
+    for (const name of ["엑셀 다운로드", "엑셀 업로드", "삭제", "마감하기"])
+      expect(button(panel, name)).toBeNull();
+  });
+
+  it.each([
+    ["PST-21", "UI-19"],
+    ["BIL-29", "UI-13"],
+    ["CLI-25", "UI-15"],
+  ] as const)("%s: 영업 파트장은 %s에서 확정(마감하기)·업로드·삭제 단추가 없다", async (_row, screenId) => {
+    await open(testAccount(["SALES_LDR"]), `/screens/${screenId}`);
+    const panel = await body(screenId);
+    for (const name of ["엑셀 업로드", "삭제", "마감하기"]) expect(button(panel, name)).toBeNull();
+    expect(button(panel, "엑셀 다운로드")).toBeVisible();
+  });
+
+  it("CF-27: 경영진 메뉴에 자금수지표(M023)가 있고 주소로 열면 그 화면이 열린다", async () => {
+    await open(testAccount(["EXEC"]), "/screens/UI-21");
+    await body("UI-21");
+    expect(menu("M023")).toBeInTheDocument();
+    expect(router!.state.location.pathname).toBe("/screens/UI-21");
+  });
+
   it("등록만 있는 화면: 기존 자료 입력은 잠그고 새 자료 창(…등록)만 쓸 수 있다", async () => {
     const account = testAccount(["PM"]);
     account.meta.permissions = account.meta.permissions!.map((row) =>

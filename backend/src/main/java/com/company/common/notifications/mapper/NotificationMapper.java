@@ -10,7 +10,7 @@ import static com.company.common.notifications.mapper.NotificationRows.*;
 public interface NotificationMapper {
     boolean activeAccount(@Param("actor") String actor);
     boolean eligibleAccount(@Param("actor") String actor);
-    boolean withdrawalDue(@Param("id") String id);
+    String uploadOwner(@Param("id") String id);
     Integer uploadWarnings(@Param("actor") String actor, @Param("id") String id);
     List<Notification> selectNotifications(Window window);
     Notification lockNotification(Selection selection);

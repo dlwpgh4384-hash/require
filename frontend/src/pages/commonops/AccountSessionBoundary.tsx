@@ -82,6 +82,8 @@ export function AccountSessionBoundary({
   const loginName = useRef<string>();
   const passwordChanged = useRef(false);
   const sessionGeneration = useRef(0);
+  // 이 탭에서 실제로 로그인된 적이 있는지. 처음 열 때(세션 없음) 내 정보 401은 만료가 아니다.
+  const signedIn = useRef(false);
   const screenId = location.pathname.split("/").pop();
   const mobile =
     typeof window !== "undefined" &&
@@ -89,6 +91,7 @@ export function AccountSessionBoundary({
   const first = firstAccountScreen(meta.permissions ?? [], Boolean(mobile));
   function reset(text = "", error = "") {
     sessionGeneration.current += 1;
+    signedIn.current = false;
     loginPassword.current = undefined;
     loginName.current = undefined;
     passwordChanged.current = false;
@@ -122,6 +125,7 @@ export function AccountSessionBoundary({
       .myInfo()
       .then((response) => {
         if (active && generation === sessionGeneration.current) {
+          signedIn.current = true;
           setInfo(response.data);
           setMeta(response.meta);
         }
@@ -141,9 +145,15 @@ export function AccountSessionBoundary({
   }, [api]);
   useEffect(() => {
     // 세션이 끝나면 한 가지 문구로 토스트(시안: 「30분 동안 사용하지 않아 로그아웃되었습니다」).
-    const expired = () => reset(SESSION_EXPIRED_MESSAGE);
+    // 로그인된 적 없는 탭(처음 방문)의 401은 만료 토스트 없이 로그인 카드만 둔다.
+    const expired = () => {
+      if (signedIn.current) reset(SESSION_EXPIRED_MESSAGE);
+      else if (screenId !== "UI-22") reset();
+    };
     const changed = () => {
-      void refresh().catch(() => reset(SESSION_EXPIRED_MESSAGE));
+      void refresh().catch(() =>
+        reset(signedIn.current ? SESSION_EXPIRED_MESSAGE : ""),
+      );
     };
     window.addEventListener("account-session-expired", expired);
     window.addEventListener("account-permissions-changed", changed);
@@ -154,6 +164,7 @@ export function AccountSessionBoundary({
   });
   async function completed(response: AccountResponse<LoginResult>) {
     const generation = sessionGeneration.current;
+    signedIn.current = true;
     if (response.data.userName) loginName.current = response.data.userName;
     setMeta(response.meta);
     setNotice("");
@@ -299,7 +310,7 @@ export function AccountSessionBoundary({
     <AccountSessionContext.Provider
       value={{ info, meta, refresh, api, signOut }}
     >
-      <div data-testid="account-authenticated-shell" data-screen-id="UI-34">
+      <div data-testid="account-authenticated-shell" data-screen-id="UI-34" style={{ display: "contents" }}>
         {noticeToast}
         {forbiddenToast}
         {screenId === "UI-41" ? (

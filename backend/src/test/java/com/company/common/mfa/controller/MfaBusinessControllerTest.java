@@ -79,7 +79,7 @@ class MfaBusinessControllerTest {
             account.expiresAt = call.getArgument(2);
             return null;
         }).when(mapper).challenge(eq(account.userId), anyString(), nullable(Instant.class));
-        when(mailbox.deliver(anyList(), anyString())).thenAnswer(call -> {
+        when(mailbox.deliver(anyList(), anyString(), anyString())).thenAnswer(call -> {
             var match = Pattern.compile("인증번호: ([0-9]{6})").matcher((String) call.getArgument(1));
             assertThat(match.find()).isTrue();
             deliveredCode = match.group(1);

@@ -5,11 +5,11 @@
   "type": "module",
   "engines": { "node": "20.x", "npm": "10.x" },
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
+    "dev": "vite",
     "test": "vitest --environment jsdom --minWorkers=1 --maxWorkers=2",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1",
+    "preview": "vite preview",
     "test:e2e": "playwright test"
   },
   "dependencies": {

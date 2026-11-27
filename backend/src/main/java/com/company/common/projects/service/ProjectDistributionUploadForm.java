@@ -103,6 +103,11 @@ public class ProjectDistributionUploadForm implements UploadForm {
             }
             return new Inspection(records,issues,success,warnings,errors,rows.size());
         }
+        /** 데이터 범위: 배분표의 모든 줄은 화면에서 고른 프로젝트를 쓴다(오류는 구분 칸에 붙인다). */
+        public List<ScopeTarget> scopeTargets(Inspection inspection) {
+            return inspection.records().stream().map(DistributionLine.class::cast)
+                .map(line -> new ScopeTarget(line.row(),0,"PROJ",context.projectId())).toList();
+        }
         public Map<Integer,String> apply(Inspection inspection,YearMonth ignored,long uploadId) {
             Project p=project(); if(!p.canEdit) throw CodeFailure.invalid("projectId","읽기 전용 프로젝트입니다.");
             mapper.deleteDistribution(context.projectId(),context.distributionStepCode());

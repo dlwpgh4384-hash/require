@@ -43,7 +43,6 @@ class DeveloperBusinessPolicyTest {
             assertThat(DeveloperBusinessPolicy.canReadDeveloper(actor, "other-part")).isTrue();
             assertThat(DeveloperBusinessPolicy.canReadMonthlyRate(actor, "other-part")).isTrue();
             assertThat(DeveloperBusinessPolicy.canReadMonthlyPay(actor, "other-part")).isTrue();
-            assertThat(DeveloperBusinessPolicy.canUploadPayroll(actor.roles())).isTrue();
 
         }
     }
@@ -104,12 +103,6 @@ class DeveloperBusinessPolicyTest {
     @Test void closedMonthBlocksEvenSystemAdministrator() {
         assertThat(DeveloperBusinessPolicy.canCancelRetirement(Set.of("ADMIN"), TODAY.minusDays(1), TODAY, true))
             .isFalse();
-    }
-
-    @Test void payrollUsesFinancePolicySeparateFromStatusPolicy() {
-        assertThat(DeveloperBusinessPolicy.canUploadPayroll(Set.of("FIN"))).isTrue();
-        assertThat(DeveloperBusinessPolicy.canUploadPayroll(Set.of("SALES_LDR"))).isFalse();
-        assertThat(DeveloperBusinessPolicy.canUploadPayroll(Set.of("PM"))).isFalse();
     }
 
     @Test void retirementIsStrictlyAfterItsKoreanCalendarDay() {

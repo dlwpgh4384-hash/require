@@ -63,6 +63,23 @@ class AccountApiPolicyTest {
         policy.check("PUT", "/api/common/my-password", null, List.of(), List.of());
         policy.check("POST", "/api/common/logout", null, List.of(), List.of());
     }
+    @Test void menuRegistrationNeedsMenuScreenRegistration() {
+        // MNU-19: 메뉴 등록과 그 창의 상위 메뉴 고르기는 메뉴(UI-25, M029) 권한. 왼쪽 메뉴 목록은 로그인만.
+        assertThatThrownBy(() -> policy.check("POST", "/api/common/menus", null, List.of(), List.of())).isInstanceOf(AccountAccessFailure.class);
+        assertThatThrownBy(() -> policy.check("GET", "/api/common/menu-options", null, List.of(), List.of())).isInstanceOf(AccountAccessFailure.class);
+        var p = permission("M029"); p.createYn = "N";
+        assertThatThrownBy(() -> policy.check("POST", "/api/common/menus", null, List.of(p), List.of())).isInstanceOf(AccountAccessFailure.class);
+        p.createYn = "Y"; policy.check("POST", "/api/common/menus", null, List.of(p), List.of());
+        policy.check("GET", "/api/common/menu-options", null, List.of(p), List.of());
+        policy.check("GET", "/api/common/menus", null, List.of(), List.of());
+    }
+    @Test void askingAiNeedsOnlyAiAssistantRead() {
+        // AIA-21: [AI에게 묻기]는 AI 분석 도우미 조회 권한(명세 ⑦-5). 등록 권한이 없어도 물을 수 있다.
+        var p = permission("M025"); p.createYn = "N";
+        policy.check("POST", "/api/common/ai-analysis/questions", null, List.of(p), List.of());
+        p.readYn = "N";
+        assertThatThrownBy(() -> policy.check("POST", "/api/common/ai-analysis/questions", null, List.of(p), List.of())).isInstanceOf(AccountAccessFailure.class);
+    }
     @Test void unknownOperationIsDenied() {
         assertThatThrownBy(() -> policy.check("POST", "/api/common/unknown", null, List.of(), List.of("ADMIN"))).isInstanceOf(AccountAccessFailure.class);
     }

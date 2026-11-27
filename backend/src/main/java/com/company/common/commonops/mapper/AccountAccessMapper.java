@@ -27,9 +27,11 @@ public interface AccountAccessMapper {
     List<String> scopeParts(@Param("id") String id);
     List<String> scopeProjects(@Param("id") String id);
     boolean sensitive(@Param("id") String id);
-    /** 주소의 ID(프로젝트·청구·입금·배정·이슈)가 속한 프로젝트. 없으면 null. */
+    /** 주소의 ID(프로젝트·청구·입금·배정·이슈·추천)가 속한 프로젝트. 없으면 null. */
     String projectOf(@Param("kind") String kind, @Param("id") String id);
     String opportunityPart(@Param("id") String id);
+    /** 추천 기록(UI-30)의 대상 영업 기회. 프로젝트 대상이거나 없으면 null. */
+    String recommendationOpportunity(@Param("id") String id);
     /** 개발자의 소속 영업 파트. 파트가 없으면 '', 개발자가 없으면 null. */
     String developerPart(@Param("id") String id);
     /** 프로젝트의 현재 영업 파트(이번 달 기준, 시작 전이면 첫 파트)가 이 파트들 중 하나인지. */

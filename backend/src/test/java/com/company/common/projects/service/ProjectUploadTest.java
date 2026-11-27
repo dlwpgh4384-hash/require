@@ -170,6 +170,17 @@ class ProjectUploadTest {
         var rows=reader.readTabular("old.xlsx",old,b9.headers(),b9.optionalHeaders());
         assertThat(rows).singleElement().satisfies(r->{assertThat(r.values()).hasSize(18);assertThat(r.values().subList(15,18)).containsOnly("");});
     }
+    /** 행정구역 표(TB_SY_ADM_AREA)는 법정동 이름이라 예시 동도 표에 있는 법정동이어야 앱이 동까지 찾는다(「을지로동」은 행정동이라 못 찾음). */
+    @Test void b9ExampleWorkAreaIsALegalDongInTheAreaSeed() throws Exception {
+        var example=b9.exampleRow();
+        String seed;
+        try(var in=getClass().getResourceAsStream("/db/migration/V11__developer_pool_schema.sql")) {
+            seed=new String(in.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
+        }
+        assertThat(seed).contains("'"+example.get(15)+"', '"+example.get(16)+"', '"+example.get(17)+"', 'Y'");
+        assertThat(example.get(17)).isEqualTo("을지로1가");
+        assertThat(b9.templateNote()).contains("법정동");
+    }
     @Test void progressIsComputedInCodeEvenWhenDefinitionTextDiffers() {
         var metadata=mock(CalculationRuleService.class);var rules=new ProjectProgressRules(metadata,new com.company.common.common.ProjectBoardSignalRules());var step=new Step();step.weightRate=BigDecimal.TEN;step.plannedStartDate=LocalDate.of(2026,11,1);step.plannedEndDate=LocalDate.of(2026,11,10);
         when(metadata.definition("식-73")).thenReturn(new Definition("식-73","Runtime.exec()",""));

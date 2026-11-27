@@ -224,3 +224,99 @@
   align-items: center;
   gap: 6px;
 }
+/* 시안 keys 창(.modal 400px): 머리 .mh(16·16·8·24), 본문 .mb(4·24·16, 회색 글자), 표 .twrap.free·table.t, 단추 줄 .mf(12·24·20). */
+.app-dialog[data-testid="shortcut-help-dialog"] {
+  width: min(400px, 100%);
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-dialog[data-testid="shortcut-help-dialog"] > .app-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 16px 16px 8px 24px;
+}
+.app-dialog[data-testid="shortcut-help-dialog"] .app-dialog-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+.app-dialog[data-testid="shortcut-help-dialog"] .app-dialog-close {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-sub);
+}
+.app-dialog[data-testid="shortcut-help-dialog"] .app-dialog-close:hover {
+  background: var(--hover);
+}
+.shortcut-help-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 4px 24px 16px;
+  overflow: auto;
+  color: var(--text-sub);
+}
+.shortcut-help-wrap {
+  overflow: auto;
+  max-width: 100%;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.shortcut-help-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.shortcut-help-table td {
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--divider);
+  white-space: nowrap;
+  background: var(--surface);
+}
+.shortcut-help-table tbody tr:hover td {
+  background: var(--hover);
+}
+.shortcut-help-table strong {
+  font-weight: 700;
+  color: inherit;
+}
+.shortcut-help-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 12px 24px 20px;
+}
+.shortcut-help-actions .primary-button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  font-weight: 500;
+}
+/* 시안 휴대폰(767px 이하): .btn 44px. 표는 창 안에서만 옆으로 밀린다(.twrap overflow). */
+@media (max-width: 767px) {
+  .shortcut-help-actions .primary-button {
+    height: 44px;
+    min-height: 44px;
+  }
+}

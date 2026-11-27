@@ -8,6 +8,8 @@ import com.company.common.projects.mapper.ProjectMapper;
 import com.company.common.support.service.*;
 import java.nio.file.Path;
 import java.util.List;
+import com.company.common.notifications.service.NotificationPublisher;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -21,15 +23,19 @@ public class BillDunningService {
     private final BusinessCalendar calendar;
     private final CurrentBusinessActor actor;
     private final BillLocalMailbox mailbox;
+    /** ⑩-4 받는 사람 검사(사용 중·청구·입금(UI-13) 조회 권한·범위). 화면 조각 시험처럼 알림 부품이 없는 문맥에서는 거르지 않는다. */
+    private final ObjectProvider<NotificationPublisher> notifications;
 
     public BillDunningService(BillMapper mapper, ProjectMapper projects, BillingCalculationRules rules,
-        BusinessCalendar calendar, CurrentBusinessActor actor, BillLocalMailbox mailbox) {
+        BusinessCalendar calendar, CurrentBusinessActor actor, BillLocalMailbox mailbox,
+        ObjectProvider<NotificationPublisher> notifications) {
         this.mapper=mapper;
         this.projects=projects;
         this.rules=rules;
         this.calendar=calendar;
         this.actor=actor;
         this.mailbox=mailbox;
+        this.notifications=notifications;
     }
 
     @Transactional
@@ -51,6 +57,16 @@ public class BillDunningService {
         var recipients=mapper.recipients(new RecipientFilter(projectId,month,step));
         if (recipients.isEmpty() && step==1) recipients=mapper.recipients(new RecipientFilter(projectId,month,2));
         return recipients.stream().map(r -> r.name()).toList();
+    }
+
+    /**
+     * 명세 ⑩-4: 단계 규칙(SFR-113-08)으로 고른 사람 가운데 사용 중 + 청구·입금(UI-13) 조회 권한 + 그 청구가 범위 안인
+     * 사람만 남긴다(메일·시스템 알림 모두). 1단계 PM이 이 검사로 모두 빠지면 앞 결정대로 2단계 받는 사람에게 대신 보낸다.
+     */
+    private List<Recipient> eligible(List<Recipient> recipients, String billId) {
+        var publisher=notifications.getIfAvailable();
+        if (publisher==null) return recipients;
+        return recipients.stream().filter(r -> publisher.canReceive(r.userId(),"DUN","UI-13",billId)).toList();
     }
 
     /** 받는 사람 설명이 300자(TB 칸 길이)를 넘으면 앞사람부터 넣고 「외 n명」으로 줄인다(2026-11-24 사용자 결정). */
@@ -82,12 +98,12 @@ public class BillDunningService {
         if (resend && mapper.resent(id,step)) throw CodeFailure.invalid("billId","이 단계의 다시 알림은 이미 보냈습니다.");
         if (!resend && mapper.automaticallySent(id,step)) return null;
         String month=calendar.toDatabaseMonth(calendar.currentMonth());
-        var recipients=mapper.recipients(new RecipientFilter(bill.projectId(),month,step));
+        var recipients=eligible(mapper.recipients(new RecipientFilter(bill.projectId(),month,step)),id);
         String memo=null;
         if (recipients.isEmpty() && step==1) {
             // 사용자 결정(2026-11-19): 1단계 받을 PM이 없으면 2단계 받는 사람(그 달 파트장, 본사 직접 영업은 본사 영업
             // 책임자, 없으면 경영진)에게 한 번 대신 보내고 이력에 남긴다(명세 「파트 없으면 경영진」과 같은 방식).
-            recipients=mapper.recipients(new RecipientFilter(bill.projectId(),month,2));
+            recipients=eligible(mapper.recipients(new RecipientFilter(bill.projectId(),month,2)),id);
             memo="PM 없음, 대신 보냄";
         }
         if (recipients.isEmpty()) throw CodeFailure.invalid("delivery","현재 단계의 받는 사람이 없습니다.");
@@ -96,7 +112,7 @@ public class BillDunningService {
         String description=fitDescription(recipients.stream().map(r -> r.name()+" ("+r.userId()+")"
                 +(BillLocalMailbox.deliverable(r)?"":" (메일 없음)")).toList(), memo==null?"":" ("+memo+")");
         String content=content(bill,step,resend,balance);
-        Path accepted=mailable.isEmpty()?null:mailbox.deliver(mailable,content);
+        Path accepted=mailable.isEmpty()?null:mailbox.deliver(mailable,content,"미수 "+step+"단계");
         if (accepted!=null && TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override public void afterCompletion(int status) {

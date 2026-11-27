@@ -1,7 +1,7 @@
-/** 시안 unitSel·money(): 금액 표시 단위. 처음 값은 「천 원」. */
+/** 시안 unitSel·money(): 금액 표시 단위. 처음 값은 「원」(2026-11-27 사용자 결정, 시안은 「천 원」). */
 export const MONEY_UNITS = ["원", "천 원", "백만 원"] as const;
 export type MoneyUnit = (typeof MONEY_UNITS)[number];
-export const DEFAULT_MONEY_UNIT: MoneyUnit = "천 원";
+export const DEFAULT_MONEY_UNIT: MoneyUnit = "원";
 /** 저장된 값이 세 단위 중 하나인지. */
 export const isMoneyUnit = (value: unknown): value is MoneyUnit =>
   MONEY_UNITS.includes(value as MoneyUnit);

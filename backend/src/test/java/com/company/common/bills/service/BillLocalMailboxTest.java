@@ -151,11 +151,24 @@ class BillLocalMailboxTest {
     @Test void sendFailureLogsTypeAndAccountButNoAddressOrBody(CapturedOutput output) {
         var sender=mock(JavaMailSender.class);
         doThrow(new MailSendException("smtp down for recipient@example.test")).when(sender).send(any(SimpleMailMessage.class));
-        assertThatThrownBy(() -> new BillLocalMailbox(provider(sender),FROM).deliver(one(),"비밀 본문 123456"))
+        assertThatThrownBy(() -> new BillLocalMailbox(provider(sender),FROM).deliver(one(),"비밀 본문 123456","인증번호"))
             .isInstanceOf(CodeFailure.class);
         String log=output.getOut()+output.getErr();
-        assertThat(log).contains("event=mail_send_failed","type=MailSendException","[recipient]");
+        assertThat(log).contains("event=mail_send_failed kind=\"인증번호\" type=MailSendException recipients=[recipient]");
         assertThat(log).doesNotContain("@example.test","123456","smtp down");
+    }
+    /** F15: 실패 로그에 메일 종류(임시 비밀번호·미수 n단계)를 남기고, 줄바꿈으로 로그를 꾸밀 수 없다. */
+    @Test void sendFailureLogsMailKindForEachSender(CapturedOutput output) {
+        var sender=mock(JavaMailSender.class);
+        doThrow(new MailSendException("down")).when(sender).send(any(SimpleMailMessage.class));
+        assertThatThrownBy(() -> new BillLocalMailbox(provider(sender),FROM).deliver(one(),"임시 비밀번호: Ab1!xyz","임시 비밀번호"))
+            .isInstanceOf(CodeFailure.class);
+        assertThatThrownBy(() -> new BillLocalMailbox(provider(sender),FROM).deliver(one(),"미수 2단계 알림","미수 2단계\r\nfake=1"))
+            .isInstanceOf(CodeFailure.class);
+        String log=output.getOut()+output.getErr();
+        assertThat(log).contains("kind=\"임시 비밀번호\" type=MailSendException","kind=\"미수 2단계fake=1\" type=MailSendException");
+        assertThat(log).doesNotContain("Ab1!xyz","미수 2단계 알림");
+        assertThat(BillLocalMailbox.kind(null)).isEqualTo("기타");
     }
     /** 내 PC 설정 예시는 빈 칸만, 실제 파일은 git에서 뺀다(⑫-1). 저장소 뿌리가 없는 곳에서는 건너뛴다. */
     @Test void localExampleIsBlankAndRealLocalFileIsGitIgnored() throws Exception {

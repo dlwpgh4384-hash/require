@@ -160,7 +160,7 @@ public class CommonMfaService {
         Path path;
         try {
             path = mailbox.deliver(List.of(new Recipient(row.userId, row.userId, row.email)),
-                "관리자 인증번호\n인증번호: " + code + "\n5분 안에 입력해 주세요.");
+                "관리자 인증번호\n인증번호: " + code + "\n5분 안에 입력해 주세요.", "인증번호");
         } catch (RuntimeException failure) {
             // 인증번호·받는 주소는 남기지 않는다.
             log.warn("event=mfa_delivery_failed resend={} reason={}", resend, failure.getClass().getSimpleName());

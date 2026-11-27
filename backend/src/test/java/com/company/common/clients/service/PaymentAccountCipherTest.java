@@ -54,11 +54,64 @@ class PaymentAccountCipherTest {
         assertThat(cipher.decrypt(null)).isNull();
         assertThat(cipher.lastFour(null)).isNull();
     }
-    @Test void missingOrWrongSizedKeyRefusesToEncrypt() {
-        for (String key : new String[]{"", "not-base64!", Base64.getEncoder().encodeToString(new byte[16])}) {
-            assertThatThrownBy(() -> new PaymentAccountCipher(key).encrypt(account()))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("계좌 암호화 키가 설정되지 않았습니다. 관리자에게 문의해 주세요.");
+    @Test void missingKeyRefusesWithAKnownError() {
+        assertThatThrownBy(() -> new PaymentAccountCipher("").encrypt(account()))
+            .isInstanceOfSatisfying(com.company.common.support.service.CodeFailure.class, f -> assertThat(f.getStatus()).isEqualTo(400))
+            .hasMessage("계좌 암호화 키가 설정되지 않았습니다. 관리자에게 문의해 주세요.");
+    }
+    /** B.7 반영 500 수정(2026-11-27): 키 값은 있는데 Base64 32바이트가 아니면 400 「올바르지 않습니다」, 시작 때 WARN 한 번(키 값 없이). */
+    @Test void invalidConfiguredKeyRefusesWith400AndWarnsOnceWithoutTheKey() {
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(PaymentAccountCipher.class);
+        var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start(); logger.addAppender(appender);
+        try {
+            String shortKey = Base64.getEncoder().encodeToString(new byte[16]);
+            for (String key : new String[]{"not-base64!", shortKey}) {
+                appender.list.clear();
+                var cipher = new PaymentAccountCipher(key);
+                assertThatThrownBy(() -> cipher.encrypt(account()))
+                    .isInstanceOfSatisfying(com.company.common.support.service.CodeFailure.class, f -> assertThat(f.getStatus()).isEqualTo(400))
+                    .hasMessage("계좌 암호화 키가 올바르지 않습니다. 관리자에게 문의해 주세요.");
+                assertThatThrownBy(() -> cipher.encrypt(account())).hasMessageContaining("올바르지 않습니다");
+                assertThat(appender.list).singleElement().satisfies(event -> {
+                    assertThat(event.getLevel()).isEqualTo(ch.qos.logback.classic.Level.WARN);
+                    assertThat(event.getFormattedMessage()).contains("payment_account_key_invalid").doesNotContain(key);
+                });
+            }
+            appender.list.clear();
+            new PaymentAccountCipher(TEST_KEY);
+            new PaymentAccountCipher("");
+            assertThat(appender.list).isEmpty();
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+    /** 로그인(UI-22) ⑬-2: application.yml의 개발용 기본 키로 켜지면 WARN 한 번, 키 값은 로그에 없다. 다른 키는 조용하다. */
+    @Test void developmentDefaultKeyWarnsOnceWithoutTheKey() throws Exception {
+        String yml;
+        try (var in = PaymentAccountCipher.class.getResourceAsStream("/application.yml")) {
+            yml = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+        var found = java.util.regex.Pattern.compile("\\$\\{PAYMENT_ACCOUNT_KEY:([^}]+)}").matcher(yml);
+        assertThat(found.find()).as("application.yml에 개발용 기본 키가 있다(⑬-2)").isTrue();
+        String developmentKey = found.group(1).trim();
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(PaymentAccountCipher.class);
+        var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start(); logger.addAppender(appender);
+        try {
+            var cipher = new PaymentAccountCipher(developmentKey);
+            assertThat(cipher.decrypt(cipher.encrypt(account()))).isEqualTo(account());
+            assertThat(appender.list).singleElement().satisfies(event -> {
+                assertThat(event.getLevel()).isEqualTo(ch.qos.logback.classic.Level.WARN);
+                assertThat(event.getFormattedMessage())
+                    .isEqualTo("개발용 계좌 암호화 키를 쓰고 있습니다. 운영 전에 PAYMENT_ACCOUNT_KEY를 바꾸세요.")
+                    .doesNotContain(developmentKey);
+            });
+            appender.list.clear();
+            new PaymentAccountCipher(TEST_KEY);
+            assertThat(appender.list).isEmpty();
+        } finally {
+            logger.detachAppender(appender);
         }
     }
 }

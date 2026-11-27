@@ -28,12 +28,12 @@ class NotificationPublisherTest {
     }
     @Test void stoppedRecipientNeverReceives() {
         when(mapper.eligibleAccount("recipient")).thenReturn(false);
-        assertThat(publisher.cashShortage("recipient", "202611")).isFalse();
+        assertThat(publisher.cashShortage("recipient", "202611", new java.math.BigDecimal("1000000000"))).isFalse();
         verify(mapper, never()).insert(any());
     }
     @Test void revokedReadNeverReceives() {
         access.readAllowed = false;
-        assertThat(publisher.cashShortage("recipient", "202611")).isFalse();
+        assertThat(publisher.cashShortage("recipient", "202611", new java.math.BigDecimal("1000000000"))).isFalse();
         verify(mapper, never()).insert(any());
     }
     @Test void outOfScopeNeverReceives() {
@@ -42,7 +42,7 @@ class NotificationPublisherTest {
         verify(mapper, never()).insert(any());
     }
     @Test void cashShortageUsesCurrentPermissionNotRoleNameAndDailyLock() {
-        assertThat(publisher.cashShortage("recipient", "202611")).isTrue();
+        assertThat(publisher.cashShortage("recipient", "202611", new java.math.BigDecimal("1000000000"))).isTrue();
         var order = inOrder(mapper);
         order.verify(mapper).eligibleAccount("recipient");
         order.verify(mapper).selectAccess(eq("recipient"), any());
@@ -52,23 +52,54 @@ class NotificationPublisherTest {
     }
     @Test void sameMonthSameDayIsNotCreatedTwice() {
         when(mapper.deliveredToday(any())).thenReturn(true);
-        assertThat(publisher.cashShortage("recipient", "202611")).isFalse();
+        assertThat(publisher.cashShortage("recipient", "202611", new java.math.BigDecimal("1000000000"))).isFalse();
         verify(mapper, never()).insert(any());
     }
-    @Test void withdrawalRequiresExactDatabaseThresholdDay() {
-        when(mapper.withdrawalDue("assignment")).thenReturn(false);
-        assertThat(publisher.withdrawal("recipient", "assignment")).isFalse();
+    static final java.time.LocalDate END = java.time.LocalDate.of(2026, 12, 27);
+    static final java.util.List<NotificationPublisher.WithdrawalTarget> DUE = java.util.List.of(
+        new NotificationPublisher.WithdrawalTarget("a1", "dev1"), new NotificationPublisher.WithdrawalTarget("a2", "dev1"),
+        new NotificationPublisher.WithdrawalTarget("a3", "dev2"));
+    @Test void withdrawalCountsInScopeDevelopersWithMockupText() {
+        var outside = new Access(); outside.readAllowed = true; outside.inScope = false; outside.targetExists = true;
+        when(mapper.selectAccess(eq("recipient"), argThat(n -> n != null && "a3".equals(n.targetKey)))).thenReturn(outside);
+        assertThat(publisher.withdrawalSummary("recipient", END, 30, DUE)).isTrue();
+        var capture = ArgumentCaptor.forClass(Delivery.class);
+        verify(mapper).insert(capture.capture());
+        assertThat(capture.getValue().content()).isEqualTo("철수 30일 전: 1명");
+        assertThat(capture.getValue().targetKey()).isEqualTo("2026-12-27");
+        assertThat(capture.getValue().screenId()).isEqualTo("UI-05");
+        verify(mapper).lockDelivery("recipient:WTHDR:2026-12-27");
+    }
+    @Test void withdrawalWithNothingInScopeCreatesNothing() {
+        access.inScope = false;
+        assertThat(publisher.withdrawalSummary("recipient", END, 30, DUE)).isFalse();
+        assertThat(publisher.withdrawalSummary("recipient", END, 30, java.util.List.of())).isFalse();
         verify(mapper, never()).insert(any());
     }
     @Test void withdrawalDuplicateIsSuppressed() {
-        when(mapper.withdrawalDue("assignment")).thenReturn(true);
         when(mapper.deliveredToday(any())).thenReturn(true);
-        assertThat(publisher.withdrawal("recipient", "assignment")).isFalse();
+        assertThat(publisher.withdrawalSummary("recipient", END, 30, DUE)).isFalse();
+        verify(mapper, never()).insert(any());
+    }
+    @Test void cashShortageTextFollowsMockupWithoutExpectedBalance() {
+        assertThat(publisher.cashShortage("recipient", "202611", new java.math.BigDecimal("1000000000"))).isTrue();
+        var capture = ArgumentCaptor.forClass(Delivery.class);
+        verify(mapper).insert(capture.capture());
+        assertThat(capture.getValue().content()).isEqualTo("2026-11 자금 부족 예상 (최소 운영자금 10억 원 미만)");
+        assertThat(capture.getValue().type()).isEqualTo("CASH_SHORT");
+    }
+    @Test void canReceiveChecksStatusPermissionScopeAndTarget() {
+        assertThat(publisher.canReceive("recipient", "DUN", "UI-13", "bill")).isTrue();
+        access.targetExists = false;
+        assertThat(publisher.canReceive("recipient", "DUN", "UI-13", "bill")).isFalse();
+        access.targetExists = true;
+        when(mapper.eligibleAccount("recipient")).thenReturn(false);
+        assertThat(publisher.canReceive("recipient", "DUN", "UI-13", "bill")).isFalse();
         verify(mapper, never()).insert(any());
     }
     @Test void uploadReadsWarningCountFromStoredUploadAndTargetsUploaderOnly() {
-        when(mapper.uploadWarnings("recipient", "42")).thenReturn(7);
-        assertThat(publisher.uploadCompleted("recipient", "42", "UI-20")).isTrue();
+        when(mapper.uploadOwner("42")).thenReturn("recipient"); when(mapper.uploadWarnings("recipient", "42")).thenReturn(7);
+        assertThat(publisher.uploadCompleted("42", "UI-20", null)).isTrue();
         var capture = ArgumentCaptor.forClass(Delivery.class);
         verify(mapper).insert(capture.capture());
         assertThat(capture.getValue().recipient()).isEqualTo("recipient");
@@ -76,13 +107,14 @@ class NotificationPublisherTest {
         assertThat(capture.getValue().type()).isEqualTo("UPLD_DONE");
     }
     @Test void anotherUploaderCannotReceiveUploadCompletion() {
-        when(mapper.uploadWarnings("recipient", "not-owned")).thenReturn(null);
-        assertThat(publisher.uploadCompleted("recipient", "not-owned", "UI-20")).isFalse();
+        when(mapper.uploadOwner("not-owned")).thenReturn(null);
+        assertThat(publisher.uploadCompleted("not-owned", "UI-20", "투입 배정")).isFalse();
+        verify(mapper, never()).selectAccess(any(), any());
         verify(mapper, never()).insert(any());
     }
     @Test void ownedUploadWithoutWarningsReceivesUploadCompletion() {
-        when(mapper.uploadWarnings("recipient", "42")).thenReturn(0);
-        assertThat(publisher.uploadCompleted("recipient", "42", "UI-20")).isTrue();
+        when(mapper.uploadOwner("42")).thenReturn("recipient"); when(mapper.uploadWarnings("recipient", "42")).thenReturn(0);
+        assertThat(publisher.uploadCompleted("42", "UI-20", null)).isTrue();
         var capture = ArgumentCaptor.forClass(Delivery.class);
         verify(mapper).insert(capture.capture());
         assertThat(capture.getValue().recipient()).isEqualTo("recipient");

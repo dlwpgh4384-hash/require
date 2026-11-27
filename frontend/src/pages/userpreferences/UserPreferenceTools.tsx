@@ -18,7 +18,7 @@ import {
 } from "../commonops/accountAccessApi";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { SessionTimer, useOptionalSession } from "../session/SessionProvider";
-import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
+import { Dialog, Toast, type ToastKind } from "../../shared/feedback/Dialog";
 import { useCanViewScreen } from "../../shared/permission";
 import {
   AiAnalysisWorkspaceProvider,
@@ -96,30 +96,51 @@ export function MenuSearchDialog({
   );
 }
 
+// 시안 keys 창: 제목 「단축키」, 표(.twrap.free > table.t) 한 줄에 굵은 키·설명, 아래 [닫기](btn-p).
+export const SHORTCUT_ROWS: ReadonlyArray<readonly [string, string]> = [
+  ["Enter", "조회 조건에서 조회"],
+  ["Ctrl + S", "저장"],
+  ["Esc", "창 닫기"],
+  ["Ctrl + K", "메뉴 찾기"],
+  ["Ctrl + ← / →", "이전·다음 페이지"],
+];
+
 export function ShortcutHelpDialog({ onClose }: { onClose: () => void }) {
   return (
-    <UserPreferenceDialog
-      title="단축키 보기"
+    <Dialog
+      title="단축키"
       onClose={onClose}
       testId="shortcut-help-dialog"
+      closable
     >
       {/* UI-37 */}
-      <dl>
-        <dt>Ctrl+K</dt>
-        <dd>메뉴 찾기</dd>
-        <dt>Esc</dt>
-        <dd>창 닫기</dd>
-        <dt>Enter</dt>
-        <dd>조회 (업무 화면 연결 시)</dd>
-        <dt>Ctrl+S</dt>
-        <dd>저장 (업무 화면 연결 시)</dd>
-        <dt>Ctrl+← / Ctrl+→</dt>
-        <dd>이전·다음 페이지 (업무 화면 연결 시)</dd>
-      </dl>
-      <button type="button" data-testid="shortcut-help-close" onClick={onClose}>
-        닫기
-      </button>
-    </UserPreferenceDialog>
+      <div className="shortcut-help-body">
+        <div className="shortcut-help-wrap">
+          <table className="shortcut-help-table">
+            <tbody>
+              {SHORTCUT_ROWS.map(([key, label]) => (
+                <tr key={key}>
+                  <td>
+                    <strong>{key}</strong>
+                  </td>
+                  <td>{label}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="shortcut-help-actions">
+        <button
+          type="button"
+          className="primary-button"
+          data-testid="shortcut-help-close"
+          onClick={onClose}
+        >
+          닫기
+        </button>
+      </div>
+    </Dialog>
   );
 }
 

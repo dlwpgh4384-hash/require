@@ -422,7 +422,7 @@ it("successful download shows completion only after the download helper resolves
   );
   expect(exportFile).toHaveBeenCalledWith(
     { year: 2026, baseMonth: "202602" },
-    "천 원",
+    "원",
   );
 });
 it("zero contribution keeps zero amount without a visible bar", async () => {

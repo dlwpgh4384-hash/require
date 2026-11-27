@@ -49,6 +49,10 @@
       AND (p.APLY_END_YM IS NULL OR p.APLY_END_YM &gt;= #{month})
     ORDER BY p.DEV_ID,p.APLY_BGN_YM
   </select>
+  <select id="leaves" resultMap="com.company.common.personalcostprofits.mapper.PersonalCostProfitMapper.leave">
+    SELECT DEV_ID AS "developerId",BGN_DT AS "startDate",END_DT AS "endDate" FROM TB_HR_DEV_STAT
+    WHERE WORK_STAT_CD='LEAVE'
+  </select>
   <select id="activeDevelopers" resultType="java.lang.String">
     SELECT DEV_ID FROM TB_HR_DEV WHERE USE_YN='Y'
   </select>

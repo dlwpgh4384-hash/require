@@ -96,11 +96,14 @@ public final class PartSettlementRules {
             if (outsourced) salary = uploaded ? nz(person.vendorSupply) : nz(person.monthlySalary);
             else if (startMonth) {
                 // 식-42: 시작 달은 월 급여(개발자 풀) × 일수 비례. 업로드 값은 개발자 풀 월 급여가 없을 때만 쓴다(2026-11-21 사용자 결정).
-                BigDecimal base = person.monthlySalary != null ? person.monthlySalary : uploaded ? person.salary : null;
+                // 그 달에 맞는 풀 이력이 없으면 풀에 처음 넣은 월 급여를 쓴다. 풀 값이 아예 없어 업로드 값을 쓰면
+                // 그 값은 이미 일한 날만큼 준 실제 지급액이라 다시 일할하지 않는다(일할은 한 번, 시험 회사 #31 2026-11-27).
+                BigDecimal monthly = person.monthlySalary != null ? person.monthlySalary : person.firstMonthlySalary;
+                BigDecimal base = monthly != null ? monthly : uploaded ? person.salary : null;
                 missing = base == null;
                 salary = nz(base);
                 int days = month.lengthOfMonth(), from = person.firstStart.getDayOfMonth();
-                if (from > 1) {
+                if (from > 1 && (monthly != null || !uploaded)) {
                     salary = salary.multiply(BigDecimal.valueOf(days - from + 1)).divide(BigDecimal.valueOf(days), 16, RoundingMode.DOWN);
                     notes.add("시작 달 " + (days - from + 1) + "/" + days + "일");
                 }

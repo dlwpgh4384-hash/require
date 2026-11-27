@@ -18,6 +18,10 @@ import "./salespipeline/salesOpportunities.css?render-test";
 import "./manpowerboard/manpowerBoard.css?render-test";
 import "./userpreferences/userPreferences.css?render-test";
 import "./operatingstandards/operatingStandards.css?render-test";
+import "../shared/layout/shell.css?render-test";
+import { PlaceholderScreen } from "./common/PlaceholderScreen";
+import { NavigationState } from "../shared/layout/NavigationState";
+import { ShortcutHelpDialog } from "./userpreferences/UserPreferenceTools";
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -236,4 +240,68 @@ it("운영 기준값 저장 창: 시안 .mb·.mf 간격", () => {
   expect(getComputedStyle(screen.getByTestId("save-actions")).padding).toBe(
     "12px 24px 20px",
   );
+});
+
+// 화면 틀 카드(.shell-state 흰 바탕·테두리): 실제 화면은 회색 바탕 위에, 준비 중·안내만 카드로.
+function shellFrame(...panels: ReturnType<typeof h>[]) {
+  render(h("div", { className: "shell-state", "data-testid": "frame" }, ...panels));
+  return getComputedStyle(screen.getByTestId("frame"));
+}
+const panel = (hidden: boolean, ...children: ReturnType<typeof h>[]) =>
+  h("div", { className: "screen-tab-panel", hidden }, ...children);
+const CLEAR = /^(transparent|rgba\(0, 0, 0, 0\))$/;
+const gate = (child: ReturnType<typeof h>) =>
+  h("div", { className: "screen-permission", style: { display: "contents" } }, child);
+
+it("화면 틀: 등록·수정·상세 폼처럼 뿌리에 screen-body가 없어도 실제 화면이면 카드 없음", () => {
+  // 예: 청구 등록(BillForm)·후보 상세·거래처 폼 — 권한 틀 안 폼 뿌리
+  const style = shellFrame(
+    panel(true, gate(h("section", { className: "screen-body" }))),
+    panel(false, gate(h("form", { className: "bill-form" }))),
+  );
+  expect(style.borderRadius).toMatch(/^0(px)?$/);
+  expect(style.backgroundColor).toMatch(CLEAR);
+});
+
+it("화면 틀: data-screen-id가 있는 화면 뿌리도 카드 없음(권한 틀 없이 그려도)", () => {
+  const style = shellFrame(
+    panel(false, h("div", { "data-screen-id": "UI-03" })),
+  );
+  expect(style.borderRadius).toMatch(/^0(px)?$/);
+});
+
+it("화면 틀: 준비 중 화면·메뉴 없음 안내는 카드를 그대로 둔다", () => {
+  const ready = shellFrame(
+    panel(true, gate(h("section", { className: "screen-body" }))),
+    panel(false, h(PlaceholderScreen, { scrnId: "UI-99" })),
+  );
+  expect(screen.getByTestId("navigation-state-ready")).toBeInTheDocument();
+  expect(ready.borderRadius).toBe("8px");
+  cleanup();
+  const empty = shellFrame(h(NavigationState, { kind: "no-screen" }));
+  expect(empty.borderRadius).toBe("8px");
+});
+
+it("단축키 창: 시안 keys(.modal 400·머리 16/16/8/24·본문 4/24/16·표 13px 40줄·단추 줄 12/24/20)", () => {
+  render(h(ShortcutHelpDialog, { onClose: vi.fn() }));
+  const dialog = screen.getByRole("dialog", { name: "단축키" });
+  const style = getComputedStyle(dialog);
+  expect(style.width).toBe("min(400px, 100%)");
+  expect(style.padding).toBe("0px");
+  expect(
+    getComputedStyle(dialog.querySelector(".app-dialog-head")!).padding,
+  ).toBe("16px 16px 8px 24px");
+  expect(
+    getComputedStyle(dialog.querySelector(".shortcut-help-body")!).padding,
+  ).toBe("4px 24px 16px");
+  const wrap = getComputedStyle(dialog.querySelector(".shortcut-help-wrap")!);
+  expect(wrap.overflow).toBe("auto");
+  expect(wrap.borderRadius).toBe("8px");
+  expect(getComputedStyle(dialog.querySelector("table")!).fontSize).toBe("13px");
+  const cell = getComputedStyle(dialog.querySelector("td")!);
+  expect(cell.height).toBe("40px");
+  expect(cell.padding).toBe("0px 12px");
+  expect(
+    getComputedStyle(dialog.querySelector(".shortcut-help-actions")!).padding,
+  ).toBe("12px 24px 20px");
 });

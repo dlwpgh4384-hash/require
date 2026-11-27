@@ -634,7 +634,7 @@ export function ProjectDetail({
               {partHistory}
             </>,
           ],
-          ["근무지", internal ? "–" : p.workplace || "–"],
+          ["근무지 주소", internal ? "–" : p.workplace || "–"],
           // 근무지 지역(2026-11-25): 고른 행정구역(시·도 줄임 이름 + 시·군·구 + 동). 근무지 글자는 참고용.
           ["근무지 지역", internal ? "–" : p.workAreaName || "–"],
           [

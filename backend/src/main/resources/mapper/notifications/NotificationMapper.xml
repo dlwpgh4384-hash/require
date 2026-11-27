@@ -29,12 +29,8 @@
   <select id="eligibleAccount" resultType="boolean">
     SELECT EXISTS (SELECT 1 FROM TB_SY_USER u WHERE u.user_id=#{actor} AND u.user_stat_cd='USE')
   </select>
-  <select id="withdrawalDue" resultType="boolean">
-    SELECT EXISTS (SELECT 1 FROM TB_PJ_ASGN a WHERE a.asgn_id=#{id}
-      AND a.input_end_dt=(clock_timestamp() AT TIME ZONE 'Asia/Seoul')::date
-        + (SELECT s.std_val::integer FROM TB_SY_OPER_STD s WHERE s.std_cd='WTHDR_NOTI_D'
-          AND s.aply_bgn_ym &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')
-          ORDER BY s.aply_bgn_ym DESC LIMIT 1))
+  <select id="uploadOwner" resultType="string">
+    SELECT u.reg_user_id FROM TB_SY_UPLD u WHERE u.upld_id::text=#{id}
   </select>
   <select id="uploadWarnings" resultType="java.lang.Integer">
     SELECT u.warn_cnt::integer FROM TB_SY_UPLD u
@@ -84,8 +80,12 @@
       SELECT b.proj_id, NULL::varchar AS part_id
       FROM TB_BL_BILL b WHERE #{notification.type}='DUN' AND b.bill_id=#{notification.targetKey}
       UNION ALL
-      SELECT a.proj_id, d.part_id FROM TB_PJ_ASGN a JOIN TB_HR_DEV d ON d.dev_id=a.dev_id
-      WHERE #{notification.type}='WTHDR' AND a.asgn_id=#{notification.targetKey}
+      <!-- 철수: 투입 한 건(asgn_id) 또는 묶음 알림의 종료일(YYYY-MM-DD, 그날 끝나는 유효 투입 전체).
+           범위는 철수 리스트(UI-05)와 같이 프로젝트 기준(명세 ⑧-3). -->
+      SELECT a.proj_id, NULL::varchar AS part_id FROM TB_PJ_ASGN a
+      WHERE #{notification.type}='WTHDR' AND (a.asgn_id=#{notification.targetKey}
+        OR (#{notification.targetKey} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' AND a.asgn_stat_cd='ACT'
+          AND a.input_end_dt=to_date(#{notification.targetKey},'YYYY-MM-DD')))
       UNION ALL
       SELECT o.proj_id, o.part_id FROM TB_SL_OPP o
       WHERE #{notification.type}='QUOTE_REJ' AND o.opp_id=#{notification.targetKey}

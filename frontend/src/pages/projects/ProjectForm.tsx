@@ -408,7 +408,7 @@ export function ProjectForm({
     ? `목표 마진율 ${Math.round(rule.targetMarginRate)}%면 ${Math.round(rule.budgetFactor * 100)}%`
     : "목표 마진율 20%면 80%";
   return (
-    <section className="project-form" data-testid="project-form" data-screen-id="UI-01">
+    <section className="screen-body project-form" data-testid="project-form" data-screen-id="UI-01">
       <section className="project-card">
         <h2>기본 정보</h2>
         <div className="project-fgrid">
@@ -439,14 +439,14 @@ export function ProjectForm({
                   options.parts,
                   "본사가 직접 영업했으면 「본사(직접 영업)」 — 파트 이익금 정산에서 빠집니다. 내부(자체 개발)는 이 칸이 없습니다.",
                 ))}
-          {!internal && areaField(0, "workAreaCode", "근무지 시·도", "근무지 지역은 시·도, 시·군·구, 동 순서로 고릅니다(모두 선택). 고른 마지막 단계까지 저장합니다.")}
-          {!internal && areaField(1, "workAreaSgg", "근무지 시·군·구", "시·도를 먼저 고르면 그 시·도의 시·군·구가 나옵니다. 선택.")}
-          {!internal && areaField(2, "workAreaDong", "근무지 동", "시·군·구를 먼저 고르면 그 시·군·구의 읍·면·동이 나옵니다. 선택.")}
+          {!internal && areaField(0, "workAreaCode", "근무지 시·도", "근무지 지역은 시·도, 시·군·구, 동 순서로 고릅니다. 고른 마지막 단계까지 저장합니다.")}
+          {!internal && areaField(1, "workAreaSgg", "근무지 시·군·구", "시·도를 먼저 고르면 그 시·도의 시·군·구가 나옵니다.")}
+          {!internal && areaField(2, "workAreaDong", "근무지 동", "시·군·구를 먼저 고르면 그 시·군·구의 읍·면·동이 나옵니다.")}
           {/* 55번 4: 「근무지」는 「근무지 동」 옆(한 줄에 2칸). */}
           {!internal &&
             text(
               "workplace",
-              "근무지",
+              "근무지 주소",
               false,
               200,
               "근무지 주소 전체를 적습니다(예: 서울 중구 을지로 66). 확인용 글자이고, AI 인력 추천 근무지 점수는 근무지 지역(시·도·시·군·구·동)으로 매깁니다.",

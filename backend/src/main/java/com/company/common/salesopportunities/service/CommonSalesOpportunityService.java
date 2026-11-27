@@ -20,16 +20,20 @@ public class CommonSalesOpportunityService {
     private final SalesOpportunityProjects projects;
     private final BusinessCalendar calendar;
     private final CurrentBusinessActor actor;
+    /** ⑩-4 받는 사람 검사. 알림 부품이 없는 화면 조각 시험 문맥에서는 거르지 않는다. */
+    private final org.springframework.beans.factory.ObjectProvider<com.company.common.notifications.service.NotificationPublisher> notifications;
 
     public CommonSalesOpportunityService(SalesOpportunityMapper mapper, SalesPipelineCodes codes,
         SalesOpportunityCalculations calculations, SalesOpportunityProjects projects,
-        BusinessCalendar calendar, CurrentBusinessActor actor) {
+        BusinessCalendar calendar, CurrentBusinessActor actor,
+        org.springframework.beans.factory.ObjectProvider<com.company.common.notifications.service.NotificationPublisher> notifications) {
         this.mapper = mapper;
         this.codes = codes;
         this.calculations = calculations;
         this.projects = projects;
         this.calendar = calendar;
         this.actor = actor;
+        this.notifications = notifications;
     }
     private Header required(String id, boolean lock) {
         if (id == null || id.isBlank() || id.length() > 20) throw SalesOpportunityRules.invalid("opportunityId");
@@ -296,7 +300,10 @@ public class CommonSalesOpportunityService {
         if ("REJ".equals(status)) {
             String text = "「" + old.opportunityName() + "」 견적이 반려됐습니다" + (reason == null || reason.isBlank() ? "" : ": " + reason);
             if (text.codePointCount(0, text.length()) > 300) text = text.substring(0, text.offsetByCodePoints(0, 299)) + "…";
-            mapper.notifyOwner(new Notification(id, old.creator(), text, actor.userId()));
+            // ⑩-4: 등록자가 사용 중 + 영업 파이프라인(UI-29) 조회 권한 + 그 기회가 범위 안일 때만 알린다.
+            var publisher = notifications.getIfAvailable();
+            if (publisher == null || publisher.canReceive(old.creator(), "QUOTE_REJ", "UI-29", id))
+                mapper.notifyOwner(new Notification(id, old.creator(), text, actor.userId()));
         }
         return detail(required(id, false));
     }

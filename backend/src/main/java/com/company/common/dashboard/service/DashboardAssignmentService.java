@@ -2,9 +2,13 @@ package com.company.common.dashboard.service;
 
 import com.company.common.assignments.dto.AssignmentContracts;
 import com.company.common.assignments.service.CommonAssignmentService;
+import com.company.common.dashboard.mapper.DashboardMapper;
 import com.company.common.manpowerboard.dto.ManpowerBoardContracts;
 import com.company.common.manpowerboard.service.CommonManpowerBoardService;
+import com.company.common.support.auth.RequestAccess;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
@@ -15,12 +19,14 @@ public class DashboardAssignmentService {
     private final CommonManpowerBoardService board;
     private final CommonAssignmentService assignments;
     private final DashboardFilters filters;
+    private final DashboardMapper mapper;
 
     public DashboardAssignmentService(CommonManpowerBoardService board, CommonAssignmentService assignments,
-        DashboardFilters filters) {
+        DashboardFilters filters, DashboardMapper mapper) {
         this.board = board;
         this.assignments = assignments;
         this.filters = filters;
+        this.mapper = mapper;
     }
 
     /**
@@ -41,7 +47,21 @@ public class DashboardAssignmentService {
                 .forEach(a -> byId.putIfAbsent(a.assignmentId(), a));
         var pending = List.copyOf(byId.values());
         var names = pending.stream().map(a -> a.projectName()).distinct().toList();
-        return new Counts(operating.summary().overAllocatedCount(), operating.summary().idleCount(),
+        return new Counts(operating.summary().overAllocatedCount(), idle(operating, today),
             pending.size(), names);
+    }
+
+    /**
+     * 대기 인원은 가동률(식-37)과 같은 데이터 범위로 센다(명세 SFR-116-08 파트장 요약은 자기 파트, 시험 회사 #46 2026-11-27).
+     * 전체 범위면 운영 보드 값 그대로, 아니면 운영 보드의 이번 달 「비어 있음」 칸 가운데 범위 안 인력만 센다.
+     */
+    private int idle(ManpowerBoardContracts.Result operating, LocalDate today) {
+        if (RequestAccess.scopeAll()) return operating.summary().idleCount();
+        var month = YearMonth.from(today);
+        var scoped = new HashSet<>(mapper.scopedDevelopers(month.toString().replace("-", "")));
+        int index = month.getMonthValue() - 1;
+        return (int) operating.items().stream()
+            .filter(p -> scoped.contains(p.developerId()) && p.cells().size() > index)
+            .filter(p -> "idle".equals(p.cells().get(index).statusCode())).count();
     }
 }

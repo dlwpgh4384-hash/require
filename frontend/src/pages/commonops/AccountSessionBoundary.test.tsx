@@ -131,6 +131,36 @@ describe("shared account session owner", () => {
       "30분 동안 사용하지 않아 로그아웃되었습니다",
     );
   });
+  it("fresh visit without a session shows the login card without the expiry toast", async () => {
+    const { api } = setup();
+    // 공통 fetch 틀처럼: 내 정보 401이면 만료 알림을 보낸 뒤 실패한다.
+    vi.mocked(api.myInfo).mockImplementation(async () => {
+      window.dispatchEvent(
+        new CustomEvent("account-session-expired", {
+          detail: "다시 로그인해 주세요.",
+        }),
+      );
+      throw new Error("401");
+    });
+    shell("/screens/UI-06");
+    expect(await screen.findByLabelText("아이디")).toHaveValue("");
+    await waitFor(() =>
+      expect(screen.getByTestId("current-account-path")).toHaveTextContent(
+        "/screens/UI-22",
+      ),
+    );
+    expect(screen.queryByTestId("account-login-message")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("30분 동안 사용하지 않아 로그아웃되었습니다"),
+    ).not.toBeInTheDocument();
+  });
+  it("a stray 401 on the login screen before signing in shows no expiry toast", async () => {
+    setup();
+    shell("/screens/UI-22");
+    await screen.findByLabelText("아이디");
+    fireEvent(window, new Event("account-session-expired"));
+    expect(screen.queryByTestId("account-login-message")).not.toBeInTheDocument();
+  });
   it("permission refresh reports only retained tabs to the existing tab owner", async () => {
     const { api, identity } = setup();
     const changed = vi.fn();

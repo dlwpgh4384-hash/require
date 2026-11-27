@@ -113,7 +113,7 @@ class MfaPersistenceIntegrationTest {
         db.update("INSERT INTO TB_SY_ROLE(role_id,role_nm,data_scope_cd,sort_ord,reg_user_id) VALUES ('ADMIN','시험 관리자','ALL',1,'mfa-admin')");
         db.update("INSERT INTO TB_SY_USER_ROLE(user_id,role_id,reg_user_id) VALUES ('mfa-admin','ADMIN','mfa-admin')");
         doAnswer(call -> { Path path = (Path) call.callRealMethod(); mail.add(path); return path; })
-            .when(mailbox).deliver(anyList(), anyString());
+            .when(mailbox).deliver(anyList(), anyString(), anyString());
     }
     @AfterEach void cleanup() throws Exception {
         mail.forEach(mailbox::discard);
@@ -211,7 +211,7 @@ class MfaPersistenceIntegrationTest {
             "SELECT mfa_expr_dttm FROM TB_SY_USER WHERE user_id='mfa-admin'", java.sql.Timestamp.class);
         Object pending = session.getAttribute(CommonMfaService.PENDING_ATTRIBUTE);
         now = now.plusSeconds(60);
-        doThrow(new IllegalStateException("delivery unavailable")).when(mailbox).deliver(anyList(), anyString());
+        doThrow(new IllegalStateException("delivery unavailable")).when(mailbox).deliver(anyList(), anyString(), anyString());
         mvc.perform(post("/api/common/mfa/resend").session(session))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value(CommonMfaService.DELIVERY_FAILURE));
@@ -229,7 +229,7 @@ class MfaPersistenceIntegrationTest {
         var previous = start();
         String previousCode = code();
         String previousHash = hash();
-        doThrow(new IllegalStateException("delivery unavailable")).when(mailbox).deliver(anyList(), anyString());
+        doThrow(new IllegalStateException("delivery unavailable")).when(mailbox).deliver(anyList(), anyString(), anyString());
         var request = new MockHttpServletRequest();
         assertThat(service.startAfterPasswordVerified(request, "mfa-admin").deliveryError())
             .isEqualTo(CommonMfaService.DELIVERY_FAILURE);

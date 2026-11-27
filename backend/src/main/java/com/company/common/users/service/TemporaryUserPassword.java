@@ -41,7 +41,7 @@ public class TemporaryUserPassword {
     private void deliver(String email, char[] password) {
         var path = mailbox.deliver(java.util.List.of(
             new com.company.common.bills.mapper.BillRows.Recipient("", "", email)),
-            "임시 비밀번호 안내\n임시 비밀번호: " + new String(password) + "\n로그인 후 비밀번호를 변경해 주세요.");
+            "임시 비밀번호 안내\n임시 비밀번호: " + new String(password) + "\n로그인 후 비밀번호를 변경해 주세요.", "임시 비밀번호");
         if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
             org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
                 new org.springframework.transaction.support.TransactionSynchronization() {

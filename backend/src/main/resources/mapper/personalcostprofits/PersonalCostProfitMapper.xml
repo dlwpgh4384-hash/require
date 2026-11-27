@@ -199,7 +199,7 @@
     SELECT a.ym AS "yearMonth",a.DEV_ID AS "developerId",a.PROJ_ID AS "projectId",
       a.ASGN_ID AS "assignmentId",p.PROJ_NM AS "projectName",j.CODE_NM AS "jobName",
       p.CTRT_TYPE_CD AS "contractTypeCode",a.INPUT_TYPE_CD AS "inputTypeCode",a.mm AS "mm",
-      a.revenue AS "revenue",p.TEAM_EXPS_AMT AS "team",p.PROJ_EXPS_AMT AS "expense",
+      CASE WHEN p.PROJ_STAT_CD='PRE' THEN 0 ELSE a.revenue END AS "revenue",p.TEAM_EXPS_AMT AS "team",p.PROJ_EXPS_AMT AS "expense",
       p.CTRT_AMT AS "contractAmount",p.BDGT_AMT AS "budget",d.amount AS "distribution"
     FROM inputs a JOIN TB_PJ_PROJ p ON p.PROJ_ID=a.PROJ_ID
     LEFT JOIN TB_SY_CODE j ON j.CODE_GRP_ID='JOB' AND j.CODE=a.JOB_CD

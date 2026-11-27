@@ -156,7 +156,7 @@ class AccountAccessDatabaseTest {
         org.mockito.Mockito.doAnswer(call -> {
             var path = (java.nio.file.Path) call.callRealMethod();
             delivery.set(path); return path;
-        }).when(mailbox).deliver(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyString());
+        }).when(mailbox).deliver(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
         var actual = new TemporaryUserPassword(mailbox);
         org.mockito.Mockito.when(passwords.hashAndDeliver("reader@example.invalid"))
             .thenAnswer(call -> actual.hashAndDeliver(call.getArgument(0)));

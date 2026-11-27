@@ -23,10 +23,10 @@ class AccountPasswordDeliveryTest {
     @Test void localDeliveryContainsRealGeneratedPasswordWithStrengthTenHash() throws Exception {
         var mailbox = spy(new BillLocalMailbox(null, ""));
         List<Path> mail = new ArrayList<>();
-        doAnswer(call -> { Path path = (Path) call.callRealMethod(); mail.add(path); return path; }).when(mailbox).deliver(anyList(), anyString());
+        doAnswer(call -> { Path path = (Path) call.callRealMethod(); mail.add(path); return path; }).when(mailbox).deliver(anyList(), anyString(), anyString());
         try {
             String hash = new TemporaryUserPassword(mailbox).hashAndDeliver("test@example.invalid");
-            assertThat(mail).hasSize(1);
+            assertThat(mail).hasSize(1); verify(mailbox).deliver(anyList(), anyString(), eq("임시 비밀번호"));
             String mime = Files.readString(mail.get(0), StandardCharsets.UTF_8);
             String body = new String(Base64.getMimeDecoder().decode(mime.substring(mime.indexOf("\r\n\r\n") + 4)), StandardCharsets.UTF_8);
             var pattern = java.util.regex.Pattern.compile("임시 비밀번호: ([^\\r\\n]+)").matcher(body);
@@ -38,13 +38,13 @@ class AccountPasswordDeliveryTest {
     }
     @Test void transportFailureDoesNotReturnAHash() {
         var mailbox = mock(BillLocalMailbox.class);
-        when(mailbox.deliver(anyList(), anyString())).thenThrow(new IllegalStateException("mail unavailable"));
+        when(mailbox.deliver(anyList(), anyString(), anyString())).thenThrow(new IllegalStateException("mail unavailable"));
         assertThatThrownBy(() -> new TemporaryUserPassword(mailbox).hashAndDeliver("test@example.invalid"))
             .isInstanceOf(IllegalStateException.class).hasMessage("mail unavailable");
     }
     @Test void rollbackCompensatesLocalDelivery() {
         var mailbox = mock(BillLocalMailbox.class); var path = Path.of("rollback-test.eml");
-        when(mailbox.deliver(anyList(), anyString())).thenReturn(path);
+        when(mailbox.deliver(anyList(), anyString(), anyString())).thenReturn(path);
         TransactionSynchronizationManager.initSynchronization();
         try {
             new TemporaryUserPassword(mailbox).hashAndDeliver("test@example.invalid");

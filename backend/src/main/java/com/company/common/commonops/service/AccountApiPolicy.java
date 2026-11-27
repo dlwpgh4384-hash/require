@@ -20,7 +20,9 @@ public class AccountApiPolicy {
         add("M027", "DNLD_YN", "GET", "users/excel");
         add("M028", "INQ_YN", "GET", "roles roles/{roleId} roles/{roleId}/change-impact roles/{roleId}/change-history");
         add("M028", "REG_YN", "POST", "roles"); add("M028", "UPD_YN", "PUT", "roles/{roleId}"); add("M028", "UPD_YN", "POST", "roles/{roleId}/stop");
-        add("M029", "INQ_YN", "GET", "menu-settings"); add("M029", "UPD_YN", "PUT", "menu-settings");
+        // 메뉴(UI-25) 관리: 설정 조회·저장, 메뉴 등록과 그 창의 상위 메뉴 고르기(명세 ⑦-1). 왼쪽 메뉴 목록(GET menus)만 로그인만.
+        add("M029", "INQ_YN", "GET", "menu-settings menu-options"); add("M029", "UPD_YN", "PUT", "menu-settings");
+        add("M029", "REG_YN", "POST", "menus");
         add("M030", "INQ_YN", "GET", "code-groups operating-standards code-maps code-change-history");
         add("M030", "REG_YN", "POST", "code-groups code-groups/{groupId}/codes code-maps");
         add("M030", "UPD_YN", "PUT", "code-groups/{groupId}/codes operating-standards");
@@ -79,12 +81,13 @@ public class AccountApiPolicy {
         add("M023", "INQ_YN", "GET", "cash-flow-statements"); add("M023", "DNLD_YN", "GET", "cash-flow-statements/excel");
         add("M024", "INQ_YN", "GET", "month-closes/{yearMonth} month-closes/{yearMonth}/reopen-impact month-close-history month-close-badge");
         add("M024", "CNFM_YN", "PUT", "month-closes/{yearMonth}/confirm month-closes/{yearMonth}/reopen");
-        add("M025", "INQ_YN", "GET", "ai-analysis/questions ai-analysis/requests/{requestId}"); add("M025", "REG_YN", "POST", "ai-analysis/questions"); add("M025", "DNLD_YN", "GET", "ai-analysis/questions/{questionId}/excel");
+        add("M025", "INQ_YN", "GET", "ai-analysis/questions ai-analysis/requests/{requestId}"); // [AI에게 묻기]는 AI 분석 도우미 조회 권한만 본다(명세 ⑦-5).
+        add("M025", "INQ_YN", "POST", "ai-analysis/questions"); add("M025", "DNLD_YN", "GET", "ai-analysis/questions/{questionId}/excel");
         add("M026", "REG_YN", "POST", "ai-recommendations"); add("M026", "UPD_YN", "POST", "ai-recommendations/{recommendationId}/assignment ai-recommendations/{recommendationId}/exclusions"); add("M026", "UPD_YN", "PUT", "ai-recommendations/{recommendationId}/tentative-assignment");
         add("M001", "INQ_YN", "GET", "dashboard"); add("M001", "DNLD_YN", "GET", "dashboard/excel");
-        add("", "SELF", "GET", "menus user-preferences/{prefTypeCd}/{prefKey} user-options menu-options code-groups/{groupId}/codes clients parts parts/options developers developers/areas projects bill-options ai-recommendation-options my-info session/remaining notifications");
+        add("", "SELF", "GET", "menus user-preferences/{prefTypeCd}/{prefKey} user-options code-groups/{groupId}/codes clients parts parts/options developers developers/areas projects bill-options ai-recommendation-options my-info session/remaining notifications");
         add("", "SELF", "PUT", "user-preferences/{prefTypeCd}/{prefKey} my-password notifications/{notificationId}/read notifications/read-all");
-        add("", "SELF", "POST", "menus logout session/extend");
+        add("", "SELF", "POST", "logout session/extend");
         add("", "FORM", "GET", "uploads/templates/{formTypeCode} uploads/{uploadId} uploads/{uploadId}/errors");
         add("", "FORM", "POST", "uploads uploads/{uploadId}/apply");
     }
@@ -94,6 +97,10 @@ public class AccountApiPolicy {
     /** 시험용: 이 요청이 목록(메뉴×동작 또는 로그인만)에 있는지. 없으면 실제 요청은 403이다. */
     public boolean covers(String method, String path) {
         return rules.stream().anyMatch(item -> item.method.equals(method) && matcher.match(item.path, path));
+    }
+    /** 시험용: 「로그인만」(SELF)으로 분류한 요청 목록("METHOD /api/common/..."). 업무·관리 쓰기가 섞이지 않았는지 본다. */
+    public List<String> selfRoutes() {
+        return rules.stream().filter(item -> item.action.equals("SELF")).map(item -> item.method + " " + item.path).toList();
     }
     public void check(String method, String path, String form, List<AccountAccessMapper.Permission> permissions, List<String> roles) {
         Rule rule = rules.stream().filter(item -> item.method.equals(method) && matcher.match(item.path, path))

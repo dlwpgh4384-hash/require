@@ -27,6 +27,20 @@
         AND sm.PROJ_ID IN <foreach collection="scopeProjects" item="scopeProject" open="(" separator="," close=")">#{scopeProject}</foreach>)</if>)
     </if>
   </select>
+  <select id="scopedDevelopers" resultType="java.lang.String">
+    SELECT d.DEV_ID FROM TB_HR_DEV d WHERE TRUE
+    <!-- 위 utilization과 같은 데이터 범위(명세 ⑧-4): 「내 파트」 소속 인력, 「내 프로젝트」만이면 그 달 맡은 프로젝트에 투입된 인력. -->
+    <bind name="scopeAll" value="@com.company.common.support.auth.RequestAccess@scopeAll()"/>
+    <bind name="scopeParts" value="@com.company.common.support.auth.RequestAccess@scopeParts()"/>
+    <bind name="scopeProjects" value="@com.company.common.support.auth.RequestAccess@scopeProjects()"/>
+    <if test="!scopeAll">
+      AND (FALSE
+      <if test="!scopeParts.isEmpty()">OR d.PART_ID IN <foreach collection="scopeParts" item="scopePart" open="(" separator="," close=")">#{scopePart}</foreach></if>
+      <if test="scopeParts.isEmpty() and !scopeProjects.isEmpty()">OR EXISTS (SELECT 1 FROM TB_PJ_ASGN_MON sm WHERE sm.DEV_ID=d.DEV_ID
+        AND sm.INPUT_YM=#{month} AND sm.MON_MM &gt; 0
+        AND sm.PROJ_ID IN <foreach collection="scopeProjects" item="scopeProject" open="(" separator="," close=")">#{scopeProject}</foreach>)</if>)
+    </if>
+  </select>
   <insert id="insertAccess">
     <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
     INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM,CLIENT_IP)

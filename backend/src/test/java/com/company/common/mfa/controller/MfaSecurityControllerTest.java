@@ -98,7 +98,7 @@ class MfaSecurityControllerTest {
             account.expiresAt = null;
             return null;
         }).when(mapper).clear(account.userId);
-        when(mailbox.deliver(anyList(), anyString())).thenAnswer(call -> {
+        when(mailbox.deliver(anyList(), anyString(), anyString())).thenAnswer(call -> {
             var match = Pattern.compile("인증번호: ([0-9]{6})").matcher((String) call.getArgument(1));
             assertThat(match.find()).isTrue();
             deliveredCode = match.group(1);
@@ -248,7 +248,7 @@ class MfaSecurityControllerTest {
         now = now.plusSeconds(60);
         clearInvocations(mapper, mailbox);
         doThrow(new IllegalStateException("delivery unavailable"))
-            .when(mailbox).deliver(anyList(), anyString());
+            .when(mailbox).deliver(anyList(), anyString(), anyString());
         mvc.perform(postWithCsrf("/api/common/mfa/resend").session(pending))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value(CommonMfaService.DELIVERY_FAILURE));

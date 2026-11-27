@@ -88,8 +88,16 @@ public class BillLocalMailbox {
             && recipient.email().matches("[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+");
     }
 
-    /** 실제 메일을 보냈으면 null(되돌릴 파일 없음), 로컬 메일함에 썼으면 그 .eml 파일. */
+    /** 종류를 모르는 메일(시험용). 실제로 보내는 곳은 종류를 넘기는 아래 메서드를 쓴다. */
     public Path deliver(List<Recipient> recipients, String content) {
+        return deliver(recipients,content,"기타");
+    }
+
+    /**
+     * 실제 메일을 보냈으면 null(되돌릴 파일 없음), 로컬 메일함에 썼으면 그 .eml 파일.
+     * kind = 메일 종류(인증번호·임시 비밀번호·미수 n단계 등). 실패 로그에 종류로 남긴다(F15).
+     */
+    public Path deliver(List<Recipient> recipients, String content, String kind) {
         if (recipients==null || recipients.isEmpty())
             throw CodeFailure.invalid("delivery","받는 사람이 없습니다.");
         for (var recipient:recipients) {
@@ -99,7 +107,7 @@ public class BillLocalMailbox {
         String[] to=recipients.stream().map(Recipient::email).toArray(String[]::new);
         JavaMailSender sender=senders==null?null:senders.getIfAvailable();
         if (smtpRequired && (sender==null || from==null || from.isEmpty())) {
-            LOG.warn("event=mail_send_failed type=smtp_not_configured recipients={}", accounts(recipients));
+            LOG.warn("event=mail_send_failed kind=\"{}\" type=smtp_not_configured recipients={}", kind(kind), accounts(recipients));
             throw CodeFailure.invalid("delivery","메일을 보내지 못했습니다. 다시 시도해 주세요.");
         }
         if (sender!=null && !from.isEmpty()) {
@@ -113,11 +121,18 @@ public class BillLocalMailbox {
                 return null;
             } catch (MailException exception) {
                 // ⑫-3: 시각(로그 시각)·종류·받는 계정만 남긴다. 본문·번호·비밀번호·메일 주소·예외 문구는 남기지 않는다.
-                LOG.warn("event=mail_send_failed type={} recipients={}", exception.getClass().getSimpleName(), accounts(recipients));
+                LOG.warn("event=mail_send_failed kind=\"{}\" type={} recipients={}", kind(kind), exception.getClass().getSimpleName(), accounts(recipients));
                 throw CodeFailure.invalid("delivery","메일을 보내지 못했습니다. 다시 시도해 주세요.");
             }
         }
         return local(String.join(", ",to),content);
+    }
+
+    /** 로그용 메일 종류(제어 문자·따옴표를 빼고 30자까지, 비면 「기타」). */
+    static String kind(String kind) {
+        String value=kind==null?"":kind.replaceAll("[\\p{Cntrl}\"]","").strip();
+        if (value.isEmpty()) return "기타";
+        return value.length()>30?value.substring(0,30):value;
     }
 
     /** 로그용 받는 계정 아이디(메일 주소는 쓰지 않는다). */

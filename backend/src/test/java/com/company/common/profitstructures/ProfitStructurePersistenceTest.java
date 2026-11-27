@@ -45,6 +45,7 @@ class ProfitStructurePersistenceTest {
     @Autowired JdbcTemplate jdbc;@Autowired MockMvc mvc;
     @Autowired ProfitStructureMonthlyProfitService monthly;
     @Autowired ProfitStructureExcelService exports;
+    @Autowired ProfitStructureMapper mapper;
     @BeforeAll static void prepare() throws Exception {
         Assumptions.assumeTrue(URL!=null && !URL.isBlank(),"Runner PostgreSQL is optional");
         try(var c=java.sql.DriverManager.getConnection(URL,USER,PASSWORD);var s=c.createStatement()) {
@@ -110,6 +111,30 @@ class ProfitStructurePersistenceTest {
         try { assertThatThrownBy(()->exports.getCommonProfitStructuresExcel(new Filter(2026,"month","202602"))).isInstanceOf(RuntimeException.class); }
         finally { jdbc.execute("DROP TRIGGER reject_profit_download ON TB_SY_ACCS_LOG");jdbc.execute("DROP FUNCTION reject_profit_download()"); }
         assertThat(downloads()).isEqualTo(logs);assertThat(business()).isEqualTo(before);
+    }
+    // 시험 회사 #15·#35(2026-11-27): 수주예정 프로젝트 투입은 매출 0(사용자 결정), 턴키 투입은 그 달 배분표 금액(식-55)을 읽는다.
+    // 월 마감 저장(TB_CO_MON_COST.SALES_AMT)이 이 읽기를 쓰므로 9·10월 K-9102 단가가 배분표 3,000,000으로 저장된다.
+    @Test void preContractRevenueIsZeroAndTurnkeyReadsDistribution() {
+        jdbc.update("INSERT INTO TB_BS_PART(PART_ID,PART_NM,REG_USER_ID) VALUES('fx-part','이음 파트','admin') ON CONFLICT DO NOTHING");
+        jdbc.update("INSERT INTO TB_HR_DEV(DEV_ID,MNG_NO,DEV_NM,EMP_TYPE_CD,JOB_CD,DRCT_CLS_CD,PART_ID,WORK_STAT_CD,REG_USER_ID) VALUES ('fx-dev','fx-dev','이음','FT',(SELECT min(CODE) FROM TB_SY_CODE WHERE CODE_GRP_ID='JOB'),'DRCT','fx-part','WORK','admin') ON CONFLICT DO NOTHING");
+        jdbc.update("INSERT INTO TB_PJ_PROJ(PROJ_ID,PROJ_NM,CTRT_TYPE_CD,PROJ_STAT_CD,CTRT_BGN_DT,CTRT_END_DT,CTRT_AMT,BDGT_AMT,TEAM_EXPS_AMT,PROJ_EXPS_AMT,REG_USER_ID) VALUES ('FX-PRE','수주예정','MO','PRE','2026-02-01','2026-12-31',0,0,0,0,'admin'),('FX-TK','턴키 배분','TK','ING','2026-02-01','2026-12-31',100000000,70000000,0,0,'admin')");
+        String insert="INSERT INTO TB_PJ_ASGN(ASGN_ID,PROJ_ID,DEV_ID,JOB_CD,INPUT_BGN_DT,INPUT_END_DT,CTRT_MM,BILL_UPRC,INPUT_TYPE_CD,EXT_CNT,EARLY_WTHDR_YN,ASGN_STAT_CD,REG_USER_ID) VALUES(?,?,'fx-dev',(SELECT min(CODE) FROM TB_SY_CODE WHERE CODE_GRP_ID='JOB'),'2026-02-01','2026-02-28',?,?,'NEW',0,'N','ACT','admin')";
+        jdbc.update(insert,"FX-A1","FX-PRE",new java.math.BigDecimal("0.5"),5500000);
+        jdbc.update(insert,"FX-A2","FX-TK",new java.math.BigDecimal("0.5"),0);
+        jdbc.update("INSERT INTO TB_PJ_TK_DSTRB(PROJ_ID,DSTRB_STEP_CD,ROW_SN,DSTRB_YM,ROW_TYPE_CD,DEV_ID,DSTRB_AMT,REG_USER_ID) VALUES ('FX-TK','CTRT',1,'202602','DEV','fx-dev',3000000,'admin'),('FX-TK','EST',1,'202602','DEV','fx-dev',9999999,'admin')");
+        try {
+            var rows=mapper.assignments(new com.company.common.profitstructures.mapper.ProfitStructureRows.Query(2026,2));
+            var pre=rows.stream().filter(r->"FX-PRE".equals(r.projectId())).findFirst().orElseThrow();
+            var tk=rows.stream().filter(r->"FX-TK".equals(r.projectId())).findFirst().orElseThrow();
+            assertThat(pre.revenue()).isZero();
+            assertThat(tk.distribution()).isEqualByComparingTo("3000000");
+        } finally {
+            jdbc.update("DELETE FROM TB_PJ_TK_DSTRB WHERE PROJ_ID='FX-TK'");
+            jdbc.update("DELETE FROM TB_PJ_ASGN WHERE ASGN_ID IN ('FX-A1','FX-A2')");
+            jdbc.update("DELETE FROM TB_PJ_PROJ WHERE PROJ_ID IN ('FX-PRE','FX-TK')");
+            jdbc.update("DELETE FROM TB_HR_DEV WHERE DEV_ID='fx-dev'");
+            jdbc.update("DELETE FROM TB_BS_PART WHERE PART_ID='fx-part'");
+        }
     }
     @Test void futureRoleProjectionUsesExistingSeedsWithoutHttpEnforcement() {
         assertThat(jdbc.queryForList("SELECT ROLE_ID FROM TB_SY_ROLE WHERE ROLE_ID IN ('FIN','EXEC','ADMIN')",String.class))

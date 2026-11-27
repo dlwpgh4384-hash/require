@@ -159,10 +159,11 @@ class CashFlowStatementControllerTest {
         assertThat(result.months()).allSatisfy(m -> { assertThat(m.openingBalance()).isNull(); assertThat(m.closingBalance()).isNull(); });
         assertThat(result.warnings()).isEmpty();
     }
-    @Test void beforeBaseYearStillReturnsFlows() {
+    // 시험 회사 #27(2026-11-27): 자금수지는 시작 월부터(SFR-108-07). 시작 월 전 달 수입·지출은 「–」.
+    @Test void beforeBaseYearFlowsAreBlank() {
         when(source.receipts()).thenReturn(List.of(contribution("202501", "RECEIPT", "50")));
         var result = reports.getCommonCashFlowStatements(new Filter(2025)).data();
-        assertThat(result.months().get(0).cashSales()).isEqualByComparingTo("50");
+        assertThat(result.months().get(0).cashSales()).isNull();
         assertThat(result.months().get(0).closingBalance()).isNull();
         assertThat(result.warnings()).isEmpty();
     }
@@ -187,7 +188,7 @@ class CashFlowStatementControllerTest {
         when(source.immediateStandard("CASH_BASE_YM")).thenReturn(n("202607"));
         when(source.receipts()).thenReturn(List.of(contribution("202603", "RECEIPT", "40"), contribution("202607", "RECEIPT", "60")));
         mvc.perform(get(PATH).param("year", "2026")).andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.months[2].cashSales").value(40))
+            .andExpect(jsonPath("$.data.months[2].cashSales").isEmpty())
             .andExpect(jsonPath("$.data.months[2].openingBalance").isEmpty())
             .andExpect(jsonPath("$.data.months[2].closingBalance").isEmpty())
             .andExpect(jsonPath("$.data.numericTable.rows[0].values[12]").isEmpty())
@@ -196,7 +197,7 @@ class CashFlowStatementControllerTest {
             .andExpect(jsonPath("$.data.numericTable.rows[0].values[14]").value(1000000000))
             .andExpect(jsonPath("$.data.numericTable.rows[14].values[12]").isEmpty())
             .andExpect(jsonPath("$.data.numericTable.rows[14].values[14]").value(1000000060))
-            .andExpect(jsonPath("$.data.numericTable.rows[2].values[14]").value(100))
+            .andExpect(jsonPath("$.data.numericTable.rows[2].values[14]").value(60))
             .andExpect(jsonPath("$.data.warnings.length()").value(0));
         verify(source, never()).insertAccess(anyString(), anyString());
     }
@@ -231,7 +232,7 @@ class CashFlowStatementControllerTest {
             contribution("202608", "REMAINDER", "80")));
         var months = reports.getCommonCashFlowStatements(new Filter(2026)).data().months();
         assertThat(months.get(2).closed()).isTrue();
-        assertThat(months.get(2).cashSales()).isEqualByComparingTo("5");
+        assertThat(months.get(2).cashSales()).isNull();
         assertThat(months.get(7).closed()).isFalse();
         assertThat(months.get(7).cashSales()).isEqualByComparingTo("80");
     }
@@ -243,6 +244,34 @@ class CashFlowStatementControllerTest {
         var months = reports.getCommonCashFlowStatements(new Filter(2026)).data().months();
         assertThat(months.get(8).regularPayroll()).isEqualByComparingTo("4500000");
         assertThat(months.get(9).regularPayroll()).isEqualByComparingTo("4999400");
+    }
+    // 시험 회사 #11·12·29(2026-11-27): 이번 달(11월)에 급여 업로드가 있으면 올린 줄만 쓴다(무급 휴직 K-9119 줄 없음 → 0).
+    // 12월 예정은 가장 최근 업로드로 잡되, 그 달 내내 휴직인 사람은 넣지 않는다.
+    @Test void currentMonthUploadIsUsedAsIsAndLeaveIsNotForecast() {
+        var worker = new Pay("202611", "worker", "FT", n("5000000"), n("0"), n("500000"), n("0"), n("450000"), n("0"), n("50000"), n("4500000"), n("0"));
+        var onLeave = new Pay("202610", "leave", "FT", n("2000000"), n("0"), n("200000"), n("0"), n("180000"), n("0"), n("100000"), n("1720000"), n("0"));
+        when(source.payroll("202612")).thenReturn(List.of(worker, onLeave));
+        when(source.activeDevelopers()).thenReturn(List.of("worker", "leave"));
+        when(people.people(any())).thenReturn(List.of(
+            new Person("worker", "일꾼", null, null, null, null, "FT", "정규직", null, null, null, null, null, null, null, null, null, null),
+            new Person("leave", "휴직", null, null, null, null, "FT", "정규직", null, null, null, null, null, null, null, null, null, null)));
+        when(source.leaves()).thenReturn(List.of(new Leave("leave", java.time.LocalDate.of(2026, 10, 16), java.time.LocalDate.of(2027, 1, 31))));
+        var months = reports.getCommonCashFlowStatements(new Filter(2026)).data().months();
+        assertThat(months.get(10).regularPayroll()).isEqualByComparingTo("4500000");
+        assertThat(months.get(11).regularPayroll()).isEqualByComparingTo("4500000");
+        // 12월 제경비 = 11월분 보험·세금(올린 줄만) 1,000,000. 휴직자 예상분 480,000은 없다.
+        assertThat(months.get(11).overhead()).isEqualByComparingTo("1000000");
+    }
+    @Test void leaveEndingMidMonthIsStillForecast() {
+        var onLeave = new Pay("202610", "leave", "FT", n("2000000"), n("0"), n("0"), n("0"), n("0"), n("0"), n("0"), n("1720000"), n("0"));
+        when(source.payroll("202612")).thenReturn(List.of(onLeave));
+        when(source.activeDevelopers()).thenReturn(List.of("leave"));
+        when(people.people(any())).thenReturn(List.of(
+            new Person("leave", "휴직", null, null, null, null, "FT", "정규직", null, null, null, null, null, null, null, null, null, null)));
+        when(source.leaves()).thenReturn(List.of(new Leave("leave", java.time.LocalDate.of(2026, 10, 16), java.time.LocalDate.of(2026, 12, 15))));
+        var months = reports.getCommonCashFlowStatements(new Filter(2026)).data().months();
+        assertThat(months.get(10).regularPayroll()).isZero();
+        assertThat(months.get(11).regularPayroll()).isEqualByComparingTo("2000000");
     }
     // 46번 점검: 급여를 한 번도 안 올린 사람은 개발자 풀 월 급여로 예상한다.
     @Test void neverUploadedPersonIsForecastFromPoolPay() {

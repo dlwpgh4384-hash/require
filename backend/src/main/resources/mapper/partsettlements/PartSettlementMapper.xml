@@ -40,6 +40,7 @@
     <result column="pay_amt" property="salary"/>
     <result column="vndr_sply_amt" property="vendorSupply"/>
     <result column="mon_pay_amt" property="monthlySalary"/>
+    <result column="first_mon_pay_amt" property="firstMonthlySalary"/>
     <result column="uploaded" property="uploaded"/>
     <result column="distribution" property="distribution"/>
     <result column="allocated_cost" property="allocatedCost"/>
@@ -109,7 +110,9 @@
         (LEAST(a.input_end_dt,m.last_day)-GREATEST(a.input_bgn_dt,m.first_day)+1)
         /extract(day from m.last_day),2)) AS mm,
       COALESCE(n.aply_uprc,h.price,a.bill_uprc,0) AS price,
-      pay.pay_amt,pay.vndr_sply_amt,prc.mon_pay_amt,(pay.dev_id IS NOT NULL) AS uploaded,
+      pay.pay_amt,pay.vndr_sply_amt,prc.mon_pay_amt,
+      (SELECT x.mon_pay_amt FROM TB_HR_DEV_PRC x WHERE x.dev_id=d.dev_id AND x.mon_pay_amt IS NOT NULL
+        ORDER BY x.aply_bgn_ym LIMIT 1) AS first_mon_pay_amt,(pay.dev_id IS NOT NULL) AS uploaded,
       dist.amount AS distribution,cost.amount AS allocated_cost,p.ctrt_amt,p.bdgt_amt
     FROM TB_PJ_ASGN a JOIN TB_HR_DEV d ON d.dev_id=a.dev_id JOIN TB_PJ_PROJ p ON p.proj_id=a.proj_id
     CROSS JOIN month m

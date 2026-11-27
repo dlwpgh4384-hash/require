@@ -87,6 +87,13 @@ public class AccountAccessConfiguration {
                             com.company.common.commonops.service.AccountScopeGuard.check(mapper, path, access.scope());
                             if (access.partScope() && !access.scope().all())
                                 com.company.common.commonops.service.AccountScopeGuard.checkDeveloper(mapper, path, access.scope());
+                            // 대상 ID가 본문에 있는 쓰기(입금 등록·청구 등록·배정 등록 등)도 범위로 거른다(명세 ⑧-2).
+                            if (!access.scope().all() && com.company.common.commonops.service.AccountScopeGuard.readsBody(request.getMethod(), path)) {
+                                var cached = new CachedBodyRequest(request);
+                                request = cached;
+                                com.company.common.commonops.service.AccountScopeGuard.checkBody(mapper, path, cached.json(json),
+                                    access.scope(), access.partScope());
+                            }
                         } catch (AccountAccessFailure failure) {
                             error(response, json, failure.status, failure.getMessage());
                             return;
@@ -135,6 +142,33 @@ public class AccountAccessConfiguration {
         }
         @EventListener public void ended(AccountSessions.Ended event) {
             transaction.executeWithoutResult(status -> mapper.access(event.userId(), "LOGOUT", event.reason(), event.ip(), calendar.now()));
+        }
+    }
+    /** 범위 검사로 본문을 한 번 읽은 뒤에도 화면 API가 같은 본문을 다시 읽을 수 있게 담아 둔다. */
+    static final class CachedBodyRequest extends jakarta.servlet.http.HttpServletRequestWrapper {
+        private final byte[] body;
+        CachedBodyRequest(HttpServletRequest request) throws IOException {
+            super(request);
+            this.body = request.getInputStream().readAllBytes();
+        }
+        /** JSON이 아니거나 깨진 본문은 null(화면 API가 400으로 답한다). */
+        com.fasterxml.jackson.databind.JsonNode json(ObjectMapper json) {
+            if (body.length == 0) return null;
+            try { return json.readTree(body); } catch (IOException invalid) { return null; }
+        }
+        @Override public jakarta.servlet.ServletInputStream getInputStream() {
+            var source = new java.io.ByteArrayInputStream(body);
+            return new jakarta.servlet.ServletInputStream() {
+                @Override public int read() { return source.read(); }
+                @Override public int read(byte[] target, int offset, int length) { return source.read(target, offset, length); }
+                @Override public boolean isFinished() { return source.available() == 0; }
+                @Override public boolean isReady() { return true; }
+                @Override public void setReadListener(jakarta.servlet.ReadListener listener) { throw new UnsupportedOperationException(); }
+            };
+        }
+        @Override public java.io.BufferedReader getReader() {
+            String encoding = getCharacterEncoding() == null ? "UTF-8" : getCharacterEncoding();
+            return new java.io.BufferedReader(new java.io.InputStreamReader(getInputStream(), java.nio.charset.Charset.forName(encoding)));
         }
     }
     static void error(HttpServletResponse response, ObjectMapper json, int status, String message) throws IOException {

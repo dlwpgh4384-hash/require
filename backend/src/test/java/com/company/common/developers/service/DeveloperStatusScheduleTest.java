@@ -40,7 +40,7 @@ class DeveloperStatusScheduleTest {
     }
 
     @Test
-    void servletContextStillRefreshesOnReadyAndSchedulesDailyAtTwoInSeoul() {
+    void servletContextStillRefreshesOnReadyButDailyRefreshMovedToDailyBatch() {
         CommonDeveloperService service = mock(CommonDeveloperService.class);
         new WebApplicationContextRunner()
             .withUserConfiguration(DeveloperConfiguration.class, DeveloperStatusSchedule.class)
@@ -53,15 +53,8 @@ class DeveloperStatusScheduleTest {
                 context.publishEvent(new ApplicationReadyEvent(new SpringApplication(),
                     new String[0], context.getSourceApplicationContext(), Duration.ZERO));
                 verify(service).refreshAll();
-                var scheduled = context.getBean(ScheduledAnnotationBeanPostProcessor.class).getScheduledTasks();
-                assertThat(scheduled).hasSize(1);
-                CronTask task = (CronTask) scheduled.iterator().next().getTask();
-                assertThat(task.getExpression()).isEqualTo("0 0 2 * * *");
-                assertThat(task.getTrigger().nextExecution(new SimpleTriggerContext(
-                    Clock.fixed(Instant.parse("2026-01-01T16:00:00Z"), ZoneOffset.UTC))))
-                    .isEqualTo(Instant.parse("2026-01-01T17:00:00Z"));
-                task.getRunnable().run();
-                verify(service, times(2)).refreshAll();
+                // 매일 02:00 갱신은 일 배치(DailyBatch) ①단계로 옮겼다(명세 ⑪-1): 이 부품에는 따로 도는 예약이 없다.
+                assertThat(context.getBean(ScheduledAnnotationBeanPostProcessor.class).getScheduledTasks()).isEmpty();
                 verifyNoMoreInteractions(service);
             });
     }

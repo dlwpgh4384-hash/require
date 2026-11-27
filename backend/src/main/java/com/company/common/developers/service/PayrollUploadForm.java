@@ -45,6 +45,8 @@ public class PayrollUploadForm implements UploadForm {
     @Override public String templateFileName() { return "payroll-template.xlsx"; }
     @Override public List<String> exampleRow() { return List.of("K-0001", "홍길동", "4000000", "", "", "120000", ""); }
     @Override public boolean monthly() { return true; }
+    /** 반영이 그 달 급여 전체를 바꾸므로 범위 「전체」+민감 체크가 있는 사람만 검사·반영한다(2026-11-27 사용자 결정). */
+    @Override public boolean allScopeSensitiveOnly() { return true; }
     @Override public String templateNote() {
         return "B.1 월별 급여. 연월은 올릴 때 고릅니다(엑셀 칸 아님). 관리번호 필수, 이름은 확인용. "
             + "급여는 정규직·계약직이면 공제 전 월급(실제 받는 돈 아님), 프리랜서면 원천세 차감 전 지급액, 외주는 외주 공급가를 적습니다. "

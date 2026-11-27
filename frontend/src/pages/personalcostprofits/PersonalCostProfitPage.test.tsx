@@ -323,40 +323,45 @@ it("keeps contribution matrix folded initially with exactly four grades and miss
   expect(
     within(panel).getByRole("cell", { name: "백엔드" }),
   ).toBeVisible();
-  // 시안: 「금액 (인원)」, 없는 칸은 「–」, 단위는 화면 단위(처음 천 원)
+  // 시안: 「금액 (인원)」, 없는 칸은 「–」, 단위는 화면 단위(처음 원)
   expect(panel.querySelector("summary")).toHaveTextContent(
-    "직무·등급별 인당 공헌이익 (인당 평균 영업이익 · 단위 천 원)",
+    "직무·등급별 인당 공헌이익 (인당 평균 영업이익 · 단위 원)",
   );
   const cells = [
     ...screen.getByTestId("personal-contribution-BE").querySelectorAll("td"),
   ].map((cell) => cell.textContent);
   // 시안 td.sc: 직무 칸도 몸통 칸(td)이다.
-  expect(cells).toEqual(["백엔드", "–", "−1 (1)", "–", "–", "−1 (1)"]);
+  expect(cells).toEqual(["백엔드", "–", "−1,120 (1)", "–", "–", "−1,120 (1)"]);
 });
 it("money cells, footer and contribution cells follow the selected unit", async () => {
   mount();
   await ready();
-  expect(screen.getByLabelText("단위")).toHaveValue("천 원");
-  expect(screen.getByTestId("list-cell-D1-totalCost")).toHaveTextContent("1");
-  expect(screen.getByTestId("list-cell-D1-operatingProfit")).toHaveTextContent(
-    "−1",
-  );
-  expect(
-    screen.getByTestId("list-cell-D1-operatingProfit").querySelector(".ls-neg"),
-  ).not.toBeNull();
-  fireEvent.change(screen.getByLabelText("단위"), { target: { value: "원" } });
+  expect(screen.getByLabelText("단위")).toHaveValue("원");
   expect(screen.getByTestId("list-cell-D1-totalCost")).toHaveTextContent(
     "1,120",
   );
   expect(screen.getByTestId("list-cell-D1-operatingProfit")).toHaveTextContent(
     "−1,120",
   );
+  expect(
+    screen.getByTestId("list-cell-D1-operatingProfit").querySelector(".ls-neg"),
+  ).not.toBeNull();
   expect(screen.getByTestId("list-footer-totalCost")).toHaveTextContent(
     "1,120",
   );
   expect(
     screen.getByTestId("personal-cost-profit-contributions"),
   ).toHaveTextContent("단위 원");
+  fireEvent.change(screen.getByLabelText("단위"), {
+    target: { value: "천 원" },
+  });
+  expect(screen.getByTestId("list-cell-D1-totalCost")).toHaveTextContent(/^1$/);
+  expect(screen.getByTestId("list-cell-D1-operatingProfit")).toHaveTextContent(
+    /^−1$/,
+  );
+  expect(
+    screen.getByTestId("personal-cost-profit-contributions"),
+  ).toHaveTextContent("단위 천 원");
   fireEvent.change(screen.getByLabelText("단위"), {
     target: { value: "백만 원" },
   });

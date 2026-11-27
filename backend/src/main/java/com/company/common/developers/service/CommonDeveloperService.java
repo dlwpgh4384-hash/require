@@ -81,7 +81,11 @@ public class CommonDeveloperService {
     public Developer getCommonDeveloper(String id) { lock(); Developer row=require(id); refresh(row,false); return detail(row); }
     public Items<ListRow> getCommonDevelopers(Filter requested) {
         Filter f=DeveloperRules.filter(requested); lock(); var items=new ArrayList<ListRow>();
+        // 「담당 파트」 역할(전체 없음)은 자기 파트 인력만(명세 ⑧-3, 시안 devInScope). PM은 거르지 않는다.
+        boolean partOnly=com.company.common.support.auth.RequestAccess.developerPartOnly();
+        var parts=com.company.common.support.auth.RequestAccess.scopeParts();
         for (Developer row : mapper.selectDevelopers(f,month())) {
+            if (partOnly && (row.salesPartId==null || !parts.contains(row.salesPartId))) continue;
             refresh(row,false);
             if (f.workStatusName()!=null && !f.workStatusName().equals(row.workStatusName)) continue;
             if (!f.includeStopped() && !"퇴사".equals(f.workStatusName()) && (!"Y".equals(row.useYn) || "퇴사".equals(row.workStatusName))) continue;
@@ -132,8 +136,12 @@ public class CommonDeveloperService {
         if (mapper.hasAssignmentHistory()) for (Assignment a:assignments) a.mm=mapper.selectAssignmentMm(a.assignmentId,calendar.today());
         return new Items<>(assignments);
     }
+    /** 월 단가·월 급여 변경 줄은 민감 체크가 없으면 뺀다(변경 이력 글에서도 빼기, 명세 ⑨-2). */
+    static final Set<String> SENSITIVE_HISTORY = Set.of("월 단가", "월 급여·지급액");
     public Items<DeveloperRows.Change> getCommonDeveloperChangeHistory(String id) {
-        lock(); require(id); return new Items<>(mapper.selectChanges(id));
+        lock(); require(id); var rows=mapper.selectChanges(id);
+        if (!actor.sensitive()) rows=rows.stream().filter(row -> !SENSITIVE_HISTORY.contains(row.fieldName)).toList();
+        return new Items<>(rows);
     }
     public Items<Area> getCommonDeveloperAreas(String parent) {
         if (parent!=null && (!parent.matches("[0-9]{1,10}") || mapper.selectAddress(parent)==null)) throw DeveloperRules.invalid("parentAreaCode");
@@ -163,8 +171,12 @@ public class CommonDeveloperService {
         boolean unchanged=previous!=null && in.homeAreaCode()!=null && in.homeAreaCode().equals(previous.homeAreaCode);
         if (in.homeAreaCode()!=null && address==null && !unchanged) throw DeveloperRules.invalid("homeAreaCode");
         String homeAddress=address!=null?address.address:unchanged?previous.homeAddress:null;
+        // 민감 체크가 없으면 월 단가·월 급여 칸을 받지 않고 저장된 값을 그대로 둔다(화면에 칸이 없음, 명세 ⑨-2).
+        boolean sensitive=actor.sensitive();
+        BigDecimal rate=sensitive?in.monthlyRate():previous==null?null:previous.monthlyRate;
+        BigDecimal pay=sensitive?in.monthlyPay():previous==null?null:previous.monthlyPay;
         return new Input(number,in.name(),in.employeeTypeCode(),in.organizationId(),in.gradeCode(),in.primaryJobCode(),
-            in.secondaryJobCode(),position,in.directClassCode(),in.salesPartId(),in.hireDate(),in.monthlyRate(),in.monthlyPay(),
+            in.secondaryJobCode(),position,in.directClassCode(),in.salesPartId(),in.hireDate(),rate,pay,
             in.skillCodes(),in.homeAreaCode(),homeAddress);
     }
     public Developer postCommonDeveloper(Input request) {

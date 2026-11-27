@@ -11,28 +11,43 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   AccountLoginPage,
   AccountMyInfo,
+  AccountPasswordDialog,
   AccountPasswordPage,
   AccountLogout,
-  AccountIdentity,
 } from "./AccountAccessPages";
 import {
   createAccountAccessApi,
   firstAccountScreen,
+  forbiddenScreenMessage,
+  loginNotice,
+  NO_ACCOUNT_MENUS,
+  NO_ACCOUNT_MENUS_TITLE,
+  PASSWORD_CHANGED_MESSAGE,
+  SESSION_EXPIRED_MESSAGE,
+  type AccountAccessApi,
   type AccountInfo,
   type AccountMeta,
   type AccountResponse,
+  type LoginResult,
 } from "./accountAccessApi";
 import { MfaPage } from "../mfa/MfaPage";
 import { createMfaApi } from "../mfa/mfaApi";
+import { Toast } from "../../shared/feedback/Dialog";
 
 interface SessionValue {
   info?: AccountInfo;
   meta: AccountMeta;
   refresh: () => Promise<void>;
+  /** 헤더 사용자 메뉴(내 정보·비밀번호 변경·로그아웃)가 쓰는 계정 API. */
+  api?: AccountAccessApi;
+  /** 로그아웃이 끝난 뒤 로그인 화면으로 돌린다. */
+  signOut?: () => void;
 }
 const AccountSessionContext = createContext<SessionValue | undefined>(
   undefined,
 );
+/** 로그인 틀 없이 그린 화면에 계정 값을 넣는 자리(화면 단위 시험용). */
+export const AccountSessionValueProvider = AccountSessionContext.Provider;
 export function useOptionalAccountSession() {
   return useContext(AccountSessionContext);
 }
@@ -58,21 +73,30 @@ export function AccountSessionBoundary({
   const [info, setInfo] = useState<AccountInfo>();
   const [meta, setMeta] = useState<AccountMeta>({});
   const [loading, setLoading] = useState(true);
+  // notice: 토스트(로그인 완료·세션 만료), loginError: 로그인 카드 비밀번호 칸 아래 문구(시안).
   const [notice, setNotice] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [forbiddenNotice, setForbiddenNotice] = useState("");
   const loginPassword = useRef<string>();
+  // 로그인 결과의 사용자 이름(첫 로그인 안내·로그인 토스트, 시안).
+  const loginName = useRef<string>();
+  const passwordChanged = useRef(false);
   const sessionGeneration = useRef(0);
   const screenId = location.pathname.split("/").pop();
   const mobile =
     typeof window !== "undefined" &&
     window.matchMedia?.("(max-width: 767px)").matches;
   const first = firstAccountScreen(meta.permissions ?? [], Boolean(mobile));
-  function reset(text = "") {
+  function reset(text = "", error = "") {
     sessionGeneration.current += 1;
     loginPassword.current = undefined;
+    loginName.current = undefined;
+    passwordChanged.current = false;
     setInfo(undefined);
     setMeta({});
     setLoading(false);
     setNotice(text);
+    setLoginError(error);
     navigate("/screens/UI-22", { replace: true });
   }
   async function refresh() {
@@ -103,8 +127,8 @@ export function AccountSessionBoundary({
         }
       })
       .catch(() => {
-        if (active && generation === sessionGeneration.current)
-          reset("다시 로그인해 주세요.");
+        // 처음 열 때 로그인 안 된 상태면 안내 없이 로그인 카드만(시안).
+        if (active && generation === sessionGeneration.current) reset();
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -116,9 +140,10 @@ export function AccountSessionBoundary({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api]);
   useEffect(() => {
-    const expired = () => reset("다시 로그인해 주세요.");
+    // 세션이 끝나면 한 가지 문구로 토스트(시안: 「30분 동안 사용하지 않아 로그아웃되었습니다」).
+    const expired = () => reset(SESSION_EXPIRED_MESSAGE);
     const changed = () => {
-      void refresh().catch(() => reset("다시 로그인해 주세요."));
+      void refresh().catch(() => reset(SESSION_EXPIRED_MESSAGE));
     };
     window.addEventListener("account-session-expired", expired);
     window.addEventListener("account-permissions-changed", changed);
@@ -127,10 +152,9 @@ export function AccountSessionBoundary({
       window.removeEventListener("account-permissions-changed", changed);
     };
   });
-  async function completed(
-    response: AccountResponse<{ nextScreenId: string }>,
-  ) {
+  async function completed(response: AccountResponse<LoginResult>) {
     const generation = sessionGeneration.current;
+    if (response.data.userName) loginName.current = response.data.userName;
     setMeta(response.meta);
     setNotice("");
     if (["UI-39", "UI-40"].includes(response.data.nextScreenId)) {
@@ -146,43 +170,60 @@ export function AccountSessionBoundary({
       identity.meta.permissions ?? [],
       Boolean(mobile),
     );
+    // 시안 loginDone·첫 비밀번호 변경: 토스트 「이름(역할)으로 로그인했습니다.」
     setNotice(
-      `${identity.data.name}(${identity.data.roles[0] ?? "역할 없음"}${identity.data.roles.length > 1 ? ` 외 ${identity.data.roles.length - 1}` : ""})으로 로그인했습니다.`,
+      `${passwordChanged.current ? "비밀번호를 바꿨습니다. " : ""}${loginNotice(identity.data, loginName.current)}`,
     );
+    passwordChanged.current = false;
+    loginName.current = undefined;
     navigate(`/screens/${target.screenId}`, { replace: true });
   }
+  const failedLogin = () => reset("", "다시 로그인해 주세요.");
   const restricted = meta.passwordChangeRequired;
   const special = ["UI-34", "UI-39", "UI-40", "UI-41", "UI-42"].includes(
     screenId ?? "",
   );
+  // 권한 검사는 화면 주소(/screens/화면 ID)에만 건다. 첫 주소(/)·없는 주소는 화면 틀이 첫 화면·「없는 화면」으로 보낸다.
+  const screenRoute = /^\/screens\/[^/]+$/.test(location.pathname);
+  // 권한표에 있는 화면인데 조회 권한이 없을 때만 막는다(시안 go(): META[id] && !canSee(id)).
+  // 권한표에 없는 주소는 화면 틀의 「없는 화면」, 휴대폰의 PC 전용 화면은 화면 틀의 PC 전용 안내가 맡는다.
+  const rows = (meta.permissions ?? []).filter(
+    (item) => item.screenId === screenId,
+  );
   const forbidden = Boolean(
     info &&
+      screenRoute &&
       !special &&
-      !(meta.permissions ?? []).some(
-        (item) =>
-          item.screenId === screenId &&
-          item.readYn === "Y" &&
-          (!mobile || item.pcOnlyYn !== "Y"),
-      ),
+      rows.length > 0 &&
+      !rows.some((item) => item.readYn === "Y"),
   );
   useEffect(() => {
     if (forbidden) {
-      setNotice("볼 권한이 없습니다.");
+      setForbiddenNotice(forbiddenScreenMessage(first.screenId));
       navigate(`/screens/${first.screenId}`, { replace: true });
     } else if (restricted && screenId !== "UI-40")
       navigate("/screens/UI-40", { replace: true });
   }, [forbidden, restricted, screenId, first.screenId, navigate]);
+  const noticeToast = notice && (
+    <Toast
+      message={notice}
+      kind={notice === SESSION_EXPIRED_MESSAGE ? "info" : "ok"}
+      testId="account-login-message"
+      onDismiss={() => setNotice("")}
+    />
+  );
   if (screenId === "UI-22")
     return (
       <>
-        {notice && <p role="status">{notice}</p>}
+        {noticeToast}
         <AccountLoginPage
+          key={`${sessionGeneration.current}:${loginError}`}
           api={api}
+          initialError={loginError}
           onCompleted={(response, currentPassword) => {
             loginPassword.current = currentPassword;
-            void completed(response).catch(() =>
-              reset("다시 로그인해 주세요."),
-            );
+            setLoginError("");
+            void completed(response).catch(failedLogin);
           }}
         />
       </>
@@ -193,68 +234,86 @@ export function AccountSessionBoundary({
         api={mfa}
         initial={meta.mfaDelivery}
         deliveryError={meta.deliveryError}
-        onCompleted={(response) =>
-          void completed(response).catch(() => reset("다시 로그인해 주세요."))
-        }
-        onRestart={() => reset()}
+        onCompleted={(response) => void completed(response).catch(failedLogin)}
+        // 인증번호 5번 틀림 등 서버가 처음으로 돌리면 그 문구를 로그인 카드 비밀번호 칸 아래에(시안).
+        onRestart={(text) => reset("", text ?? "")}
       />
     );
   if (loading) return <p role="status">불러오는 중…</p>;
-  if (screenId === "UI-40" || restricted)
+  if (restricted)
     return (
       <AccountPasswordPage
         api={api}
         meta={meta}
-        currentPassword={restricted ? loginPassword.current : undefined}
-        onCompleted={(updated) =>
+        currentPassword={loginPassword.current}
+        name={loginName.current ?? info?.name}
+        onCompleted={(updated) => {
+          passwordChanged.current = true;
           void completed({
             success: true,
-            data: { nextScreenId: "UI-34" },
+            data: {
+              nextScreenId: "UI-34",
+              userName: loginName.current ?? info?.name ?? "",
+            },
             meta: updated,
-          })
-        }
+          }).catch(failedLogin);
+        }}
         onBack={async () => {
-          if (restricted) {
-            await api.logout();
-            reset();
-          } else navigate(`/screens/${first.screenId}`);
+          await api.logout().catch(() => undefined);
+          reset();
         }}
       />
     );
   if (!info || forbidden) return null;
+  const signOut = () => reset();
   if (first.message)
     return (
       <div data-testid="account-empty-shell" data-screen-id="UI-34">
-        <p role="status">{first.message}</p>
-        <AccountLogout api={api} dirty={dirty} onLoggedOut={() => reset()} />
+        {first.message === NO_ACCOUNT_MENUS ? (
+          <div className="account-empty" role="status">
+            <h2>{NO_ACCOUNT_MENUS_TITLE}</h2>
+            <p>{NO_ACCOUNT_MENUS}</p>
+          </div>
+        ) : (
+          <p role="status">{first.message}</p>
+        )}
+        <AccountLogout
+          api={api}
+          dirty={dirty}
+          className="primary-button"
+          onLoggedOut={signOut}
+        />
       </div>
     );
+  const forbiddenToast = forbiddenNotice && (
+    <Toast
+      message={forbiddenNotice}
+      kind="info"
+      testId="account-forbidden-toast"
+      onDismiss={() => setForbiddenNotice("")}
+    />
+  );
+  // 내 정보(UI-41)·비밀번호 변경(UI-40)은 시안처럼 헤더 사용자 메뉴의 창이다. 옛 주소로 들어와도 같은 창을 띄운다.
+  const leave = () => navigate(`/screens/${first.screenId}`, { replace: true });
   return (
-    <AccountSessionContext.Provider value={{ info, meta, refresh }}>
+    <AccountSessionContext.Provider
+      value={{ info, meta, refresh, api, signOut }}
+    >
       <div data-testid="account-authenticated-shell" data-screen-id="UI-34">
-        {notice && <p role="status">{notice}</p>}
-        <div data-testid="account-tools">
-          <AccountIdentity info={info} />
-          <button
-            data-testid="account-open-info"
-            onClick={() => navigate("/screens/UI-41")}
-          >
-            내 정보
-          </button>
-          <button
-            data-testid="account-open-password"
-            onClick={() => navigate("/screens/UI-40")}
-          >
-            비밀번호 변경
-          </button>
-          <AccountLogout api={api} dirty={dirty} onLoggedOut={() => reset()} />
-        </div>
-        {first.message ? (
-          <p role="status">{first.message}</p>
-        ) : screenId === "UI-41" ? (
-          <AccountMyInfo
+        {noticeToast}
+        {forbiddenToast}
+        {screenId === "UI-41" ? (
+          <AccountMyInfo api={api} onClose={leave} />
+        ) : screenId === "UI-40" ? (
+          <AccountPasswordDialog
             api={api}
-            onClose={() => navigate(`/screens/${first.screenId}`)}
+            meta={meta}
+            onClose={leave}
+            onCompleted={() => {
+              setNotice(PASSWORD_CHANGED_MESSAGE);
+              void refresh().catch(() => undefined);
+              leave();
+            }}
           />
         ) : (
           children

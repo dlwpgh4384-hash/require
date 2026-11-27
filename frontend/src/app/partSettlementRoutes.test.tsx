@@ -337,16 +337,9 @@ it.each([
         `/api/common/developers/${developerId}${suffix}`,
         undefined,
       );
-    expect(
-      panel.queryByRole("button", { name: "수정" }),
-    ).not.toBeInTheDocument();
-    expect(
-      panel.queryByRole("button", { name: "사용 중지" }),
-    ).not.toBeInTheDocument();
+    // 55번 5-2: 시안 openPerson처럼 영업 파트 이익금에서도 [수정]을 쓴다(읽기 전용 아님).
+    expect(panel.getByRole("button", { name: "수정" })).toBeVisible();
     fireEvent.click(panel.getByRole("tab", { name: "근무 상태 이력" }));
-    expect(
-      panel.queryByRole("button", { name: "상태 등록" }),
-    ).not.toBeInTheDocument();
     fireEvent.click(panel.getByRole("button", { name: "닫기" }));
     expect(screen.queryByTestId("developer-detail")).not.toBeInTheDocument();
     expect(

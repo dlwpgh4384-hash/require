@@ -6,21 +6,24 @@
     <result column="mod_dttm" property="modDttm" javaType="java.time.Instant"/>
   </resultMap>
   <select id="selectPreference" resultMap="userPreferenceRow">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     SELECT pref_val, mod_dttm
     FROM TB_SY_USER_PREF
-    WHERE user_id = 'admin' AND pref_type_cd = #{type} AND pref_key = #{key}
+    WHERE user_id = #{actorId} AND pref_type_cd = #{type} AND pref_key = #{key}
   </select>
   <insert id="insertPreference">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_USER_PREF
       (user_id, pref_type_cd, pref_key, pref_val, reg_user_id, reg_dttm, mod_user_id, mod_dttm)
-    VALUES ('admin', #{type}, #{key}, #{value}, 'admin', clock_timestamp(),
-      'admin', clock_timestamp())
+    VALUES (#{actorId}, #{type}, #{key}, #{value}, #{actorId}, clock_timestamp(),
+      #{actorId}, clock_timestamp())
   </insert>
   <update id="updatePreference">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     UPDATE TB_SY_USER_PREF
-    SET pref_val = #{value}, mod_user_id = 'admin',
+    SET pref_val = #{value}, mod_user_id = #{actorId},
         mod_dttm = GREATEST(clock_timestamp(), mod_dttm + INTERVAL '1 microsecond')
-    WHERE user_id = 'admin' AND pref_type_cd = #{type} AND pref_key = #{key}
+    WHERE user_id = #{actorId} AND pref_type_cd = #{type} AND pref_key = #{key}
       AND mod_dttm IS NOT DISTINCT FROM #{token,jdbcType=TIMESTAMP}
   </update>
 </mapper>

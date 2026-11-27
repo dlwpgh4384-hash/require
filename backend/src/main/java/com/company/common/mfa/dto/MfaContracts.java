@@ -11,6 +11,7 @@ public final class MfaContracts {
     }
     public record Verify(String code) {}
     public record Delivery(String maskedEmail, Instant expiresAt, Instant resendAvailableAt) {}
-    public record Login(String nextScreenId) {}
+    /** userName: 첫 로그인 안내에 쓰는 사용자 이름(로그인 응답 LoginResult와 같은 이름). */
+    public record Login(String nextScreenId, String userName) {}
     public record Started(Delivery delivery, String deliveryError) {}
 }

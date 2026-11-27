@@ -86,7 +86,8 @@ export interface CommonProjectCostAnalysisWorkforce {
     developerName: string;
     jobName: string;
     monthlyMm: number;
-    allocatedCost: number;
+    /** 민감 칸을 볼 수 없는 사람에게는 서버가 보내지 않는다. */
+    allocatedCost?: number | null;
     revenue: number | null;
     inputTypeCode: string;
     inputTypeName: string;

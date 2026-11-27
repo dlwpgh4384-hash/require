@@ -28,8 +28,9 @@
     )
   </select>
   <insert id="insertMap" useGeneratedKeys="true" keyProperty="mapId" keyColumn="map_id">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_CODE_MAP (src_text, code_grp_id, code, reg_user_id, reg_dttm)
-    VALUES (#{excelText}, #{groupId}, #{code}, 'admin', clock_timestamp())
+    VALUES (#{excelText}, #{groupId}, #{code}, #{actorId}, clock_timestamp())
   </insert>
   <delete id="deleteMap">
     DELETE FROM TB_SY_CODE_MAP WHERE map_id=#{mapId}

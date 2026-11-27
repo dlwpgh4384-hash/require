@@ -17,7 +17,8 @@ public final class ClientPartPolicy {
         return roles.contains("ADMIN") || roles.contains("FIN");
     }
 
-    public static boolean canReadPaymentAccount(Set<String> roles) {
-        return roles.contains("FIN");
+    /** 지급 계좌(끝 4자리·[보기] 전체)는 역할의 민감 체크로만 본다(명세 ⑨-3, 역할 이름 예외 없음). */
+    public static boolean canReadPaymentAccount(boolean sensitive) {
+        return sensitive;
     }
 }

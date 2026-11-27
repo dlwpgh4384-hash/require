@@ -17,6 +17,8 @@ import {
 } from "./ProjectWorkspace";
 import type { Project } from "./projects";
 import { requestProjectDistribution, requestProjectEdit } from "./projectEdit";
+import { subscribeProjectCostAnalysis } from "../projectcostanalyses/projectCostRequest";
+import { testAccount, WithTestAccount } from "../../test/testAccounts";
 
 const viewport = vi.hoisted(() => ({ mobile: false, width: 1280 }));
 vi.mock("../../shared/layout/useViewport", () => ({
@@ -1213,6 +1215,12 @@ it("근무지 지역: 등록 폼에서 시·도 → 시·군·구 → 동을 고
   );
   expect(form.getByLabelText("근무지 시·도")).toBe(form.getByTestId("project-area-0"));
   expect(form.getByTestId("project-area-1")).toBeDisabled();
+  // 55번 4: 시·도 첫 줄은 빈 글자(「선택」 없음), 「근무지」는 「근무지 동」 바로 뒤 반 칸(한 줄에 2칸)
+  expect(form.getByTestId("project-area-0").querySelector("option")).toHaveTextContent(/^$/);
+  const dong = form.getByTestId("project-area-2").closest(".project-fld")!;
+  const workplace = form.getByTestId("project-workplace").closest(".project-fld")!;
+  expect(dong.nextElementSibling).toBe(workplace);
+  expect(workplace).not.toHaveClass("project-full");
   fireEvent.change(form.getByTestId("project-contractTypeCode"), { target: { value: "IN" } });
   expect(form.queryByTestId("project-area-0")).toBeNull();
   fireEvent.change(form.getByTestId("project-contractTypeCode"), { target: { value: "TK" } });
@@ -1274,4 +1282,46 @@ it("근무지 지역: 서버가 거부하면(400 workAreaCode) 시·도 칸 아�
   fireEvent.click(form.getByTestId("project-save"));
   expect(await form.findByText("근무지 지역을 목록에서 다시 골라 주세요.")).toBeVisible();
   expect(form.getByTestId("project-area-0")).toHaveAttribute("aria-invalid", "true");
+});
+
+it("원가 사용률 줄 [원가 분석]은 UI-04 조회 권한이 있을 때만 보이고 그 프로젝트로 원가 분석을 연다", async () => {
+  Object.assign(row, { costUsageRate: 42.5, costProgressGap: 3 });
+  const opened: string[] = [];
+  const stop = subscribeProjectCostAnalysis((id) => opened.push(id));
+  shell();
+  const detail = await openDetail();
+  fireEvent.click(detail.getByRole("tab", { name: "진행 현황" }));
+  expect(await detail.findByText(/누적 원가 ÷ 예산/)).toBeVisible();
+  fireEvent.click(detail.getByRole("button", { name: "원가 분석" }));
+  expect(opened).toEqual(["P-0001"]);
+  stop();
+});
+
+it("UI-04 조회 권한이 없으면 [원가 분석]을 그리지 않는다", async () => {
+  Object.assign(row, { costUsageRate: 42.5, costProgressGap: 3 });
+  const account = testAccount(["ADMIN"]);
+  render(
+    <WithTestAccount
+      account={{
+        ...account,
+        meta: {
+          ...account.meta,
+          permissions: (account.meta.permissions ?? []).filter(
+            (item) => item.screenId !== "UI-04",
+          ),
+        },
+      }}
+    >
+      <ProjectWorkspaceProvider>
+        <ProjectTitleActions />
+        <ProjectPage />
+      </ProjectWorkspaceProvider>
+    </WithTestAccount>,
+  );
+  const detail = await openDetail();
+  fireEvent.click(detail.getByRole("tab", { name: "진행 현황" }));
+  expect(await detail.findByText(/누적 원가 ÷ 예산/)).toBeVisible();
+  expect(
+    detail.queryByRole("button", { name: "원가 분석" }),
+  ).not.toBeInTheDocument();
 });

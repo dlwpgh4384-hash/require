@@ -34,14 +34,10 @@ public final class CandidateRules {
         ClientRules.object(body, allowed);
         if (update) ClientRules.token(body);
         String name = text(body, "name", 50, true);
-        var amount = body.get("desiredMonthlyRate");
-        if (amount == null || !amount.isNumber()) throw invalid("desiredMonthlyRate");
-        java.math.BigDecimal rate;
-        try {
-            rate = amount.decimalValue();
-            if (rate.signum() < 0 || rate.stripTrailingZeros().scale() > 0
-                || rate.compareTo(new java.math.BigDecimal("999999999999999")) > 0) throw invalid("desiredMonthlyRate");
-        } catch (NumberFormatException failure) { throw invalid("desiredMonthlyRate"); }
+        // 민감 체크가 없는 사용자의 수정: 희망 단가는 응답에서 빠지므로 보내온 값(빈 값 포함)은 보지 않고
+        // 저장된 값을 그대로 둔다(명세 ⑨-2). 옛 값은 서비스에서 채운다.
+        boolean keepRate = update && !com.company.common.support.auth.RequestAccess.sensitiveVisible();
+        java.math.BigDecimal rate = keepRate ? null : rate(body.get("desiredMonthlyRate"));
         String type = text(body, "employeeTypeCode", 10, true);
         if (!Set.of("FL", "OS").contains(type)) throw invalid("employeeTypeCode");
         String company = text(body, "companyId", 20, "OS".equals(type));
@@ -70,6 +66,15 @@ public final class CandidateRules {
             job, job.equals(secondary) ? null : secondary, java.util.List.copyOf(skills),
             text(body, "gradeCode", 10, true), available, text(body, "homeAreaCode", 10, false),
             text(body, "homeAddress", 50, false), text(body, "sourceCode", 10, true), text(body, "memo", 500, false));
+    }
+    private static java.math.BigDecimal rate(JsonNode amount) {
+        if (amount == null || !amount.isNumber()) throw invalid("desiredMonthlyRate");
+        try {
+            var rate = amount.decimalValue();
+            if (rate.signum() < 0 || rate.stripTrailingZeros().scale() > 0
+                || rate.compareTo(new java.math.BigDecimal("999999999999999")) > 0) throw invalid("desiredMonthlyRate");
+            return rate;
+        } catch (NumberFormatException failure) { throw invalid("desiredMonthlyRate"); }
     }
     public static ContactInput contact(JsonNode body) {
         ClientRules.object(body, Set.of("modifiedAt", "contactStatusCode", "memo"));

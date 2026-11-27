@@ -22,8 +22,11 @@ import {
   screenPeriodChannel,
 } from "../shared/layout/screenPeriodChannel";
 
+import { setTestAccount, testAccount } from "../test/testAccountData";
 let router: ReturnType<typeof createAppRouter> | undefined;
 beforeEach(() => {
+  // 처음 권한표의 시스템 관리자 + 이 시험이 만든 메뉴 화면(ADDED).
+  setTestAccount(testAccount(["ADMIN"], { extraScreens: ["ADDED"] }));
   vi.stubGlobal(
     "matchMedia",
     vi.fn(() => ({

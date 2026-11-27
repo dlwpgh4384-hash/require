@@ -13320,6 +13320,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
       requestBody:
         required: true
         content:
@@ -14326,6 +14328,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ApiError'
+    TooManyRequests:
+      description: 로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
   schemas:
     CommonInitialRoleCode:
       type: string
@@ -14337,8 +14345,12 @@ components:
         nextScreenId:
           type: string
           description: UI-39 인증·UI-40 강제변경 또는 서버가 고른 가시 첫 화면. 메뉴0개는 공통 안내 영역.
+        userName:
+          type: string
+          description: 사용자 이름(USER_NM). 첫 로그인 안내 「○○님은 임시 비밀번호로 로그인했습니다」에 쓴다.
       required:
       - nextScreenId
+      - userName
     CommonMfaDeliveryResult:
       type: object
       properties:
@@ -14402,6 +14414,11 @@ components:
           type: array
           items:
             type: string
+        roleNames:
+          type: array
+          description: roles와 같은 순서의 역할 이름(TB_SY_ROLE.ROLE_NM).
+          items:
+            type: string
         parts:
           type: array
           items:
@@ -14410,6 +14427,7 @@ components:
       - userId
       - name
       - roles
+      - roleNames
       - parts
     CommonNotificationItem:
       type: object
@@ -14948,6 +14966,7 @@ components:
       - pipeline
       - cash
       - minimumCash
+      - dashMode
       properties:
         selectedMonth:
           type: string
@@ -14983,13 +15002,19 @@ components:
           description: 지난달을 고르면 「미수금·확인할 일·프로젝트 경보·인력 수급·파이프라인·자금은 오늘 기준(청구 누락 의심은 고른 달)」, 이번 달이면 null
           nullable: true
         summary:
-          $ref: '#/components/schemas/CommonDashboardSummary'
+          allOf:
+          - $ref: '#/components/schemas/CommonDashboardSummary'
+          nullable: true
+          description: PM 모양에서는 null, 파트장 모양은 자기 파트 값(목표·전월 대비 null)
         todos:
           type: array
           items:
             $ref: '#/components/schemas/CommonDashboardTodo'
         closing:
-          $ref: '#/components/schemas/CommonDashboardClosing'
+          allOf:
+          - $ref: '#/components/schemas/CommonDashboardClosing'
+          nullable: true
+          description: 파트장·PM 모양에서는 null(마감 진행 숨김)
         projectAlerts:
           type: array
           items:
@@ -15013,18 +15038,27 @@ components:
           items:
             $ref: '#/components/schemas/CommonDashboardSalesPart'
         pipeline:
-          $ref: '#/components/schemas/CommonDashboardPipeline'
+          allOf:
+          - $ref: '#/components/schemas/CommonDashboardPipeline'
+          nullable: true
+          description: PM 모양에서는 null
         cash:
           type: array
           items:
             $ref: '#/components/schemas/CommonDashboardCashMonth'
-          minItems: 3
           maxItems: 3
-          description: 마지막 마감 달 다음 달부터 3달(시안 CF.m > closedTo), 자금수지표 값
+          description: 마지막 마감 달 다음 달부터 3달(시안 CF.m > closedTo), 자금수지표 값. 파트장·PM 모양에서는 빈 목록
         minimumCash:
           type: number
           description: 최소 운영자금(MIN_CASH), 자금수지표와 같은 값
           nullable: true
+        dashMode:
+          type: string
+          description: 대시보드 모양(명세 ⑧-4, 시안 dashMode) — all 전체, part 파트장(자기 파트·마감 진행/자금 숨김), pm 맡은 프로젝트(요약·마감·추이·하단 3칸 숨김). 숨긴 칸은 null 또는 빈 목록
+          enum:
+          - all
+          - part
+          - pm
       description: '업무 데이터 저장 없는 실시간 projection. 선택월: 매출/이익/누계/가동률/마감/추이/파트/청구누락. 오늘: 미수/나머지할일/경보/수급/파이프라인/자금. 추이는 선택월까지,
         수급6개월·자금3개월은 오늘 기준이다.'
     CommonManpowerForecastMonth:
@@ -16991,9 +17025,7 @@ components:
       - renewalDate
       - daysUntilRenewal
       - monthlyMm
-      - currentUnitPrice
       - profitRate
-      - targetUnitPrice
       - requiredIncreaseRate
       - annualProfitIncrease
       - projectId
@@ -17467,7 +17499,6 @@ components:
       - developerName
       - jobName
       - monthlyMm
-      - allocatedCost
       - revenue
       - inputTypeCode
       - inputTypeName
@@ -19932,10 +19963,6 @@ components:
       - projectNames
       - monthlyMm
       - salesExpense
-      - retirementAmount
-      - totalCost
-      - profit
-      - profitShare
       - notes
       - missingMonthlySalary
       properties:
@@ -20057,9 +20084,6 @@ components:
       required:
       - yearMonth
       - monthlyMm
-      - totalCost
-      - profit
-      - profitShare
       properties:
         yearMonth:
           type: string
@@ -21784,7 +21808,6 @@ components:
       - businessNumber
       - useYn
       - modifiedAt
-      - paymentAccountSummary
       - projectCount
       - personCount
       properties:
@@ -21830,7 +21853,7 @@ components:
           nullable: true
         paymentAccountSummary:
           type: string
-          description: 은행 표시명 + 끝4자리
+          description: 은행 표시명 + 끝4자리. 민감 체크가 없는 사용자에게는 이 칸이 없다.
         projectCount:
           type: integer
           minimum: 0

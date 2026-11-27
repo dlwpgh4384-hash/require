@@ -53,7 +53,8 @@
     SELECT DEV_ID FROM TB_HR_DEV WHERE USE_YN='Y'
   </select>
   <insert id="insertAccess">
-    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
-    VALUES(#{userId},'DNLD','UI-21',#{target},clock_timestamp(),#{userId},clock_timestamp())
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
+    INSERT INTO TB_SY_ACCS_LOG(USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM,CLIENT_IP)
+    VALUES(#{userId},'DNLD','UI-21',#{target},clock_timestamp(),#{userId},clock_timestamp(),#{accessIp,jdbcType=VARCHAR})
   </insert>
 </mapper>

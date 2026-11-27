@@ -43,6 +43,9 @@ public class CommonAiAnalysisService {
             Answer answer;
             if (query.salary() && !projection.salaryAllowed())
                 answer = unavailable(query, DENIED, DENIED_SCOPE, List.of(), "NO_ANS");
+            else if (!projection.functionAllowed(query.function()))
+                // 그 화면 조회 권한이 없으면 숫자를 읽지 않고 답하지 않는다(명세 SFR-126-06·⑨-4).
+                answer = unavailable(query, DENIED, null, List.of(), "NO_ANS");
             else if (query.function() == null)
                 answer = query.notice() == null ? unavailable(query, NOT_FOUND, null, SUGGESTIONS, "NO_ANS")
                     : unavailable(query, query.notice(), null, List.of("앞으로 6개월 매출은?"), "NO_ANS");

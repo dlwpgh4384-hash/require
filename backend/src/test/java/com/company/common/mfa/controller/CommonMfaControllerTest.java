@@ -28,10 +28,10 @@ class CommonMfaControllerTest {
 
     @Test void verifyReturnsCompletionMetadata() throws Exception {
         when(service.postCommonMfaVerify(any(), eq("123456"))).thenReturn(
-            new Response<>(true, Map.of("modifiedAt", "2026-01-02T00:00:00Z"), new Login("UI-40")));
+            new Response<>(true, Map.of("modifiedAt", "2026-01-02T00:00:00Z"), new Login("UI-40", "시험 사용자")));
         mvc.perform(post("/api/common/mfa/verify").contentType("application/json")
             .content(json.writeValueAsString(Map.of("code", "123456"))))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.data.nextScreenId").value("UI-40"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.nextScreenId").value("UI-40")).andExpect(jsonPath("$.data.userName").value("시험 사용자"))
             .andExpect(com.company.common.support.controller.OpenApiResponseContract.response("POST", "/api/common/mfa/verify"))
             .andExpect(jsonPath("$.meta.modifiedAt").value("2026-01-02T00:00:00Z"));
     }

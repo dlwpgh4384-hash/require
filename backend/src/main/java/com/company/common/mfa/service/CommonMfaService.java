@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Supplier;
+
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -43,7 +43,7 @@ public class CommonMfaService {
     private final TransactionTemplate transaction;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(10);
     private final SecureRandom random = new SecureRandom();
-    private final Object[] locks = new Object[256];
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CommonMfaService.class);
     // Only rate-limit timestamps are cached; account/challenge source of truth remains PostgreSQL.
     private final Map<String, ArrayDeque<Instant>> deliveries = new LinkedHashMap<>();
 
@@ -54,7 +54,6 @@ public class CommonMfaService {
         this.calendar = calendar;
         this.completions = completions;
         this.transaction = new TransactionTemplate(transactions);
-        for (int index = 0; index < locks.length; index++) locks[index] = new Object();
     }
 
     private static final class Pending {
@@ -76,11 +75,8 @@ public class CommonMfaService {
         Outcome(T value, MfaFailure failure) { this.value = value; this.failure = failure; }
         T result() { if (failure != null) throw failure; return value; }
     }
-    private <T> T serialized(String userId, Supplier<T> operation) {
-        synchronized (locks[(userId.hashCode() & Integer.MAX_VALUE) % locks.length]) {
-            return operation.get();
-        }
-    }
+    // 계정 단위 잠금은 트랜잭션 안의 DB 행 잠금(lockAccount FOR UPDATE)만 쓴다. 로그인과 같은 순서라 서로 막히지 않는다.
+    // synchronized(pending)은 세션 하나의 메모리 값만 지키며, DB 잠금을 쥔 채 이 잠금을 기다리는 곳은 없다.
     private Pending pending(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         if (session == null || !(session.getAttribute(PENDING_ATTRIBUTE) instanceof Pending value))
@@ -98,7 +94,7 @@ public class CommonMfaService {
      * Returns null for non-ADMIN; never establishes a business session. */
     public Started startAfterPasswordVerified(HttpServletRequest request, String userId) {
         if (userId == null || userId.isBlank() || userId.length() > 30) throw MfaFailure.unauthorized();
-        return serialized(userId, () -> transaction.execute(status -> {
+        return transaction.execute(status -> {
             Account row = mapper.lockAccount(userId);
             if (row == null || !"USE".equals(row.status)) throw MfaFailure.unauthorized();
             if (!row.administrator) {
@@ -122,30 +118,28 @@ public class CommonMfaService {
                 }
             });
             return started;
-        }));
+        });
     }
 
     public Response<Delivery> postCommonMfaResend(HttpServletRequest request) {
         Pending pending = pending(request);
-        return serialized(pending.userId, () -> {
-            synchronized (pending) {
-                Outcome<Response<Delivery>> outcome = transaction.execute(status -> {
-                    Account row = account(pending);
-                    Instant now = calendar.now();
-                    if (pending.resends >= 5) {
-                        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                            @Override public void afterCommit() {
-                                request.getSession(false).removeAttribute(PENDING_ATTRIBUTE);
-                            }
-                        });
-                        return new Outcome<>(null, new MfaFailure(400, "code", LOGIN_LIMIT, true));
-                    }
-                    if (now.isBefore(pending.availableAt)) throw MfaFailure.invalid(RESEND_WAIT);
-                    return new Outcome<>(Response.of(send(row, pending, true)), null);
-                });
-                return outcome.result();
-            }
-        });
+        synchronized (pending) {
+            Outcome<Response<Delivery>> outcome = transaction.execute(status -> {
+                Account row = account(pending);
+                Instant now = calendar.now();
+                if (pending.resends >= 5) {
+                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                        @Override public void afterCommit() {
+                            request.getSession(false).removeAttribute(PENDING_ATTRIBUTE);
+                        }
+                    });
+                    return new Outcome<>(null, new MfaFailure(400, "code", LOGIN_LIMIT, true));
+                }
+                if (now.isBefore(pending.availableAt)) throw MfaFailure.invalid(RESEND_WAIT);
+                return new Outcome<>(Response.of(send(row, pending, true)), null);
+            });
+            return outcome.result();
+        }
     }
 
     private Delivery send(Account row, Pending pending, boolean resend) {
@@ -168,6 +162,8 @@ public class CommonMfaService {
             path = mailbox.deliver(List.of(new Recipient(row.userId, row.userId, row.email)),
                 "관리자 인증번호\n인증번호: " + code + "\n5분 안에 입력해 주세요.");
         } catch (RuntimeException failure) {
+            // 인증번호·받는 주소는 남기지 않는다.
+            log.warn("event=mfa_delivery_failed resend={} reason={}", resend, failure.getClass().getSimpleName());
             throw MfaFailure.invalid(DELIVERY_FAILURE);
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -204,50 +200,48 @@ public class CommonMfaService {
     public Response<Login> postCommonMfaVerify(HttpServletRequest request, String code) {
         Pending pending = pending(request);
         if (code == null || !code.matches("[0-9]{6}")) throw MfaFailure.invalid(CODE_LENGTH);
-        return serialized(pending.userId, () -> {
-            synchronized (pending) {
-                Outcome<Response<Login>> outcome = transaction.execute(status -> {
-                    Account row = account(pending);
-                    if (pending.deliveryFailed) throw MfaFailure.invalid(DELIVERY_FAILURE);
-                    Instant now = calendar.now();
-                    if (row.expiresAt == null || !now.isBefore(row.expiresAt)) throw MfaFailure.invalid(EXPIRED);
-                    if (!encoder.matches(code, row.codeHash)) {
-                        mapper.wrongCode(row.userId);
-                        int mistakes = pending.mistakes + 1;
-                        boolean restart = mistakes >= 5;
-                        mapper.failureAccess(row.userId, restart ? "인증번호 5회 오류"
-                            : "인증번호 오류 (" + mistakes + "/5)", request.getRemoteAddr(), now);
-                        if (restart) mapper.clear(row.userId);
-                        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                            @Override public void afterCommit() {
-                                pending.mistakes = mistakes;
-                                if (restart) request.getSession(false).removeAttribute(PENDING_ATTRIBUTE);
-                            }
-                        });
-                        // Return the failure and throw only AFTER commit, preserving MFA_ERR_CNT.
-                        return new Outcome<>(null, new MfaFailure(400, "code", restart
-                            ? "인증번호를 5번 틀렸습니다. 처음부터 다시 로그인해 주세요."
-                            : INCORRECT + " (" + mistakes + "/5)", restart));
-                    }
-                    LoginCompletion completion = completions.getIfAvailable();
-                    if (completion == null) throw MfaFailure.unauthorized();
-                    boolean temporary = "Y".equals(row.temporary);
-                    var prepared = completion.prepare(row.userId, temporary);
-                    mapper.complete(row.userId, now);
-                    mapper.loginAccess(row.userId, temporary, request.getRemoteAddr(), now);
+        synchronized (pending) {
+            Outcome<Response<Login>> outcome = transaction.execute(status -> {
+                Account row = account(pending);
+                if (pending.deliveryFailed) throw MfaFailure.invalid(DELIVERY_FAILURE);
+                Instant now = calendar.now();
+                if (row.expiresAt == null || !now.isBefore(row.expiresAt)) throw MfaFailure.invalid(EXPIRED);
+                if (!encoder.matches(code, row.codeHash)) {
+                    mapper.wrongCode(row.userId);
+                    int mistakes = pending.mistakes + 1;
+                    boolean restart = mistakes >= 5;
+                    mapper.failureAccess(row.userId, restart ? "인증번호 5회 오류"
+                        : "인증번호 오류 (" + mistakes + "/5)", request.getRemoteAddr(), now);
+                    if (restart) mapper.clear(row.userId);
                     TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                         @Override public void afterCommit() {
-                            request.getSession(false).removeAttribute(PENDING_ATTRIBUTE);
-                            request.changeSessionId();
-                            completion.establish(request, row.userId, temporary);
+                            pending.mistakes = mistakes;
+                            if (restart) request.getSession(false).removeAttribute(PENDING_ATTRIBUTE);
                         }
                     });
-                    return new Outcome<>(new Response<>(true, prepared.meta(),
-                        new Login(temporary ? "UI-40" : prepared.nextScreenId())), null);
+                    // Return the failure and throw only AFTER commit, preserving MFA_ERR_CNT.
+                    return new Outcome<>(null, new MfaFailure(400, "code", restart
+                        ? "인증번호를 5번 틀렸습니다. 처음부터 다시 로그인해 주세요."
+                        : INCORRECT + " (" + mistakes + "/5)", restart));
+                }
+                LoginCompletion completion = completions.getIfAvailable();
+                if (completion == null) throw MfaFailure.unauthorized();
+                boolean temporary = "Y".equals(row.temporary);
+                var prepared = completion.prepare(row.userId, temporary);
+                mapper.complete(row.userId, now);
+                mapper.loginAccess(row.userId, temporary, request.getRemoteAddr(), now);
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override public void afterCommit() {
+                        request.getSession(false).removeAttribute(PENDING_ATTRIBUTE);
+                        request.changeSessionId();
+                        completion.establish(request, row.userId, temporary);
+                    }
                 });
-                return outcome.result();
-            }
-        });
+                return new Outcome<>(new Response<>(true, prepared.meta(),
+                    new Login(temporary ? "UI-40" : prepared.nextScreenId(), row.name)), null);
+            });
+            return outcome.result();
+        }
     }
 
     static String mask(String email) {

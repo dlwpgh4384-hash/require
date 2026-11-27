@@ -79,7 +79,14 @@ public class AccountAccessConfiguration {
                                 String number = path.substring("/api/common/uploads/".length()).split("/")[0];
                                 if (number.matches("[0-9]{1,12}")) form = mapper.uploadForm(Long.parseLong(number), actor.userId);
                             }
-                            policy.check(request.getMethod(), path, form, mapper.permissions(actor.userId), mapper.roles(actor.userId));
+                            var permissions = mapper.permissions(actor.userId);
+                            var roles = mapper.roles(actor.userId);
+                            policy.check(request.getMethod(), path, form, permissions, roles);
+                            var access = access(mapper, actor.userId, roles, permissions, request.getRemoteAddr());
+                            access.store(request);
+                            com.company.common.commonops.service.AccountScopeGuard.check(mapper, path, access.scope());
+                            if (access.partScope() && !access.scope().all())
+                                com.company.common.commonops.service.AccountScopeGuard.checkDeveloper(mapper, path, access.scope());
                         } catch (AccountAccessFailure failure) {
                             error(response, json, failure.status, failure.getMessage());
                             return;
@@ -97,6 +104,21 @@ public class AccountAccessConfiguration {
                 }
             }, CsrfFilter.class);
         return http.build();
+    }
+    /** 요청마다 DB에서 다시 읽은 권한·범위·민감 체크(명세 ③-6). 역할이 여럿이면 합집합(⑧-1). */
+    static com.company.common.support.auth.RequestAccess access(AccountAccessMapper mapper, String userId,
+        List<String> roles, List<AccountAccessMapper.Permission> permissions, String ip) {
+        var parts = Set.copyOf(mapper.scopeParts(userId));
+        var projects = Set.copyOf(mapper.scopeProjects(userId));
+        var codes = mapper.scopeCodes(userId);
+        var scope = com.company.common.users.service.UserScopePolicy.union(codes.stream()
+            .map(code -> new com.company.common.users.service.UserScopePolicy.Grant(code, parts, projects)).toList());
+        var readable = permissions.stream().filter(permission -> "Y".equals(permission.readYn)).toList();
+        return new com.company.common.support.auth.RequestAccess(userId, Set.copyOf(roles), scope, mapper.sensitive(userId),
+            readable.stream().map(permission -> permission.menuId).collect(java.util.stream.Collectors.toSet()),
+            readable.stream().map(permission -> permission.screenId).collect(java.util.stream.Collectors.toSet()), ip,
+            codes.contains("PART"), readable.stream().filter(permission -> "Y".equals(permission.updateYn))
+                .map(permission -> permission.menuId).collect(java.util.stream.Collectors.toSet()));
     }
     @Bean
     SessionAudit accountSessionAudit(AccountAccessMapper mapper, BusinessCalendar calendar,

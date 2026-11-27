@@ -148,7 +148,8 @@
   </update>
   <delete id="deleteSkills">DELETE FROM TB_HR_DEV_SKILL WHERE dev_id=#{id}</delete>
   <insert id="insertSkill">
-    INSERT INTO TB_HR_DEV_SKILL(dev_id,skill_nm,sort_ord,reg_user_id) VALUES(#{id},#{name},#{order},'admin')
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
+    INSERT INTO TB_HR_DEV_SKILL(dev_id,skill_nm,sort_ord,reg_user_id) VALUES(#{id},#{name},#{order},#{actorId})
   </insert>
   <select id="selectSkills" resultType="string">SELECT skill_nm FROM TB_HR_DEV_SKILL WHERE dev_id=#{id} ORDER BY sort_ord,skill_nm</select>
   <update id="closePreviousPrice">
@@ -206,8 +207,9 @@
       #{closedLeaveSequence,jdbcType=NUMERIC},#{originalEndDate,jdbcType=DATE},#{registeredBy})
   </insert>
   <update id="updateStatus">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     UPDATE TB_HR_DEV_STAT SET end_dt=#{endDate,jdbcType=DATE},close_leave_sn=#{closedLeaveSequence,jdbcType=NUMERIC},
-      orgnl_leave_end_dt=#{originalEndDate,jdbcType=DATE},mod_user_id='admin',mod_dttm=clock_timestamp()
+      orgnl_leave_end_dt=#{originalEndDate,jdbcType=DATE},mod_user_id=#{actorId},mod_dttm=clock_timestamp()
     WHERE dev_id=#{developerId} AND stat_sn=#{sequence}
   </update>
   <delete id="deleteStatus">DELETE FROM TB_HR_DEV_STAT WHERE dev_id=#{id} AND stat_sn=#{sequence}</delete>
@@ -216,13 +218,14 @@
       OR COALESCE(#{month} &lt; (SELECT std_val::bigint::text FROM TB_SY_OPER_STD WHERE std_cd='CASH_BASE_YM' ORDER BY aply_bgn_ym DESC LIMIT 1),false)
   </select>
   <update id="updateDerived">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     UPDATE TB_HR_DEV SET retire_dt=#{retirement,jdbcType=DATE},work_stat_cd=#{code},
       use_yn=CASE WHEN #{retirement,jdbcType=DATE} &lt; #{today} THEN 'N' WHEN #{resume} THEN 'Y' ELSE use_yn END,
       <!-- 근무 상태만 날짜에 따라 바뀔 때는 수정 시각을 그대로 둔다(화면을 열기만 해도 괜한 409가 나지 않게, 2026-11-24 사용자 결정).
            퇴사일·사용 여부가 바뀌면 수정 시각을 새로 남긴다. -->
       mod_user_id=CASE WHEN retire_dt IS DISTINCT FROM #{retirement,jdbcType=DATE}
           OR (#{retirement,jdbcType=DATE} &lt; #{today} AND use_yn!='N') OR (#{resume} AND use_yn!='Y')
-        THEN 'admin' ELSE mod_user_id END,
+        THEN #{actorId} ELSE mod_user_id END,
       mod_dttm=CASE WHEN retire_dt IS DISTINCT FROM #{retirement,jdbcType=DATE}
           OR (#{retirement,jdbcType=DATE} &lt; #{today} AND use_yn!='N') OR (#{resume} AND use_yn!='Y')
         THEN clock_timestamp() ELSE mod_dttm END
@@ -242,8 +245,9 @@
     WHERE h.trgt_tbl_nm='TB_HR_DEV' AND h.trgt_key=#{id} ORDER BY h.reg_dttm DESC,h.hist_id DESC
   </select>
   <insert id="insertAccess">
-    INSERT INTO TB_SY_ACCS_LOG(user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id)
-    VALUES(#{actor},'DNLD','UI-02',concat('개발자 목록 ',#{count},'건'),clock_timestamp(),#{actor})
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
+    INSERT INTO TB_SY_ACCS_LOG(user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,client_ip)
+    VALUES(#{actor},'DNLD','UI-02',concat('개발자 목록 ',#{count},'건'),clock_timestamp(),#{actor},#{accessIp,jdbcType=VARCHAR})
   </insert>
   <!-- 엑셀 업로드(B.8 개발자·B.1 급여) -->
   <select id="selectVendorIdsByName" resultType="string">

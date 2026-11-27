@@ -60,6 +60,8 @@ class MfaPersistenceIntegrationTest {
     @Autowired DataSource source;
     @Autowired OwnedSchema owned;
     @Autowired CommonMfaService service;
+    @Autowired MfaMapper mfaMapper;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
     @SpyBean BillLocalMailbox mailbox;
     @MockBean BusinessCalendar calendar;
     @MockBean LoginCompletion completion;
@@ -163,6 +165,37 @@ class MfaPersistenceIntegrationTest {
         assertThat(db.queryForObject("SELECT user_stat_cd FROM TB_SY_USER WHERE user_id='mfa-admin'", String.class)).isEqualTo("USE");
         assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE act_type_cd='LOGIN'", Long.class)).isZero();
         verifyNoInteractions(completion);
+    }
+    @Test
+    @DisplayName("로그인(DB 행 잠금 먼저)과 같은 계정 인증번호 확인이 동시에 와도 둘 다 끝난다")
+    void concurrentLoginAndVerifyDoNotDeadlock() throws Exception {
+        var waiting = start(); String code = code();
+        var tx = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        var locked = new java.util.concurrent.CountDownLatch(1);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            // 로그인과 같은 순서: 트랜잭션 안에서 계정 행을 먼저 잠그고, 잠근 채 인증번호 단계를 시작한다.
+            var login = pool.submit(() -> tx.execute(status -> {
+                mfaMapper.lockAccount("mfa-admin");
+                locked.countDown();
+                try { Thread.sleep(500); } catch (InterruptedException stop) { Thread.currentThread().interrupt(); }
+                return service.startAfterPasswordVerified(new MockHttpServletRequest(), "mfa-admin");
+            }));
+            assertThat(locked.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            var verify = pool.submit(() -> {
+                var request = new MockHttpServletRequest(); request.setSession(waiting);
+                try { return service.postCommonMfaVerify(request, code).success(); }
+                catch (MfaFailure failure) { return false; }
+            });
+            assertThat(login.get(20, java.util.concurrent.TimeUnit.SECONDS)).isNotNull();
+            verify.get(20, java.util.concurrent.TimeUnit.SECONDS);
+        } finally { pool.shutdownNow(); }
+    }
+    @Test void wrongCodeCounterIsCappedForTwoDigitColumn() throws Exception {
+        var session = start(); String incorrect = code().equals("000000") ? "000001" : "000000";
+        db.update("UPDATE TB_SY_USER SET mfa_err_cnt=99 WHERE user_id='mfa-admin'");
+        verifyCode(session, incorrect, 400);
+        assertThat(db.queryForObject("SELECT mfa_err_cnt FROM TB_SY_USER WHERE user_id='mfa-admin'", Integer.class)).isEqualTo(99);
     }
     @Test void newerDeviceCannotBeCompletedByPreviousPendingSession() throws Exception {
         var old = start(); var latest = start(); String code = code();

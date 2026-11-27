@@ -46,7 +46,7 @@ public class CommonBillService {
         this.excel=excel;
     }
 
-    /** 메뉴 배지(SFR-001-04): 취소 안 된 청구 중 미수 잔액이 남은 건수. 로그인 뒤 데이터 범위는 마지막 로그인(UI-22) 작업에서 더한다. */
+    /** 메뉴 배지(SFR-001-04): 취소 안 된 청구 중 미수 잔액이 남은 건수. 데이터 범위 안 청구만 센다(명세 ⑧-5, 매퍼 dataScope). */
     public UnpaidCount getCommonBillUnpaidCount() {
         return new UnpaidCount(mapper.unpaidCount());
     }

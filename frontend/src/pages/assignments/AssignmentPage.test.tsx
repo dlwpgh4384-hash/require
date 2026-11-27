@@ -16,6 +16,7 @@ import {
 } from "./assignments";
 import { AssignmentWorkspaceProvider, AssignmentTitleActions } from "./AssignmentWorkspace";
 import type { Project } from "../projects/projects";
+import { testAccount, WithTestAccount, type TestAccount } from "../../test/testAccounts";
 import {
   subscribeAiRecommendation,
   type AiRecommendationEvent,
@@ -192,23 +193,29 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
-function page(roles?: string[]) {
+/** 계정을 주면 그 계정 권한(민감 체크·메뉴 × 동작)으로 그린다. 없으면 로그인 틀 밖(모두 허용). */
+const asAccount = (node: React.ReactNode, account?: TestAccount) =>
+  account ? <WithTestAccount account={account}>{node}</WithTestAccount> : node;
+function page(account?: TestAccount) {
   return render(
-    <MemoryRouter>
-      <AssignmentWorkspaceProvider>
-        <header data-testid="assignment-title">
-          <AssignmentTitleActions />
-        </header>
-        <AssignmentPage roles={roles} />
-      </AssignmentWorkspaceProvider>
-    </MemoryRouter>,
+    asAccount(
+      <MemoryRouter>
+        <AssignmentWorkspaceProvider>
+          <header data-testid="assignment-title">
+            <AssignmentTitleActions />
+          </header>
+          <AssignmentPage />
+        </AssignmentWorkspaceProvider>
+      </MemoryRouter>,
+      account,
+    ),
   );
 }
 const inRouter = (node: React.ReactNode) => render(<MemoryRouter>{node}</MemoryRouter>);
 const form = (props: Partial<Parameters<typeof AssignmentForm>[0]> = {}) =>
-  inRouter(<AssignmentForm projects={[project]} roles={["FIN"]} onClose={vi.fn()} onSaved={vi.fn()} {...props} />);
-const detail = (readOnly = false, roles = ["FIN"]) =>
-  inRouter(<AssignmentDetail id={row.assignmentId} roles={roles} readOnly={readOnly} onClose={vi.fn()} onChanged={vi.fn()} />);
+  inRouter(<AssignmentForm projects={[project]} onClose={vi.fn()} onSaved={vi.fn()} {...props} />);
+const detail = (readOnly = false, account?: TestAccount) =>
+  render(asAccount(<MemoryRouter><AssignmentDetail id={row.assignmentId} readOnly={readOnly} onClose={vi.fn()} onChanged={vi.fn()} /></MemoryRouter>, account));
 // 고른 연도 저장(사용자 설정 PERIOD)은 업무 쓰기가 아니라서 뺀다.
 const writes = () => request.mock.calls.filter((c) => ["POST", "PUT"].includes((c[1] as RequestInit | undefined)?.method ?? "GET") && !String(c[0]).startsWith("/api/common/user-preferences/"));
 const body = (n = 0) => JSON.parse(String((writes()[n][1] as RequestInit).body));
@@ -386,13 +393,13 @@ it("detail shows free support and turnkey prices like the mockup and hides price
   detail();
   expect(await screen.findByTestId("kv-row-단가")).toHaveTextContent("없음 (무상지원)");
   cleanup();
-  detail(false, ["PM"]);
+  detail(false, testAccount(["PM"]));
   await screen.findByTestId("kv-row-월 MM");
   expect(screen.queryByTestId("kv-row-단가")).not.toBeInTheDocument();
 });
 
 it("PM list has no price column", async () => {
-  page(["PM"]);
+  page(testAccount(["PM"]));
   await screen.findByTestId("list-row-A-0001");
   expect(screen.queryByRole("columnheader", { name: "단가" })).not.toBeInTheDocument();
 });
@@ -507,7 +514,7 @@ it("saving a change sends the read version, toasts the mockup text and opens the
 it("correction modal starts empty, requires both fields and toasts after save", async () => {
   history[0] = { ...history[0], changeTypeCode: "EARLY", changeTypeName: "조기철수", beforeValue: "종료 2026-12-31", afterValue: "철수 2026-11-30" };
   const onChanged = vi.fn();
-  inRouter(<AssignmentDetail id={row.assignmentId} roles={["FIN"]} readOnly={false} onClose={vi.fn()} onChanged={onChanged} />);
+  inRouter(<AssignmentDetail id={row.assignmentId} readOnly={false} onClose={vi.fn()} onChanged={onChanged} />);
   await openHistory();
   fireEvent.click(within(await screen.findByTestId("assignment-history-1")).getByRole("button", { name: "정정" }));
   const dialog = screen.getByRole("dialog", { name: "기록 정정" });
@@ -659,7 +666,7 @@ it("assign form validates with the mockup messages before any POST", async () =>
 
 it("PM has no price field; the server checks the rate and its message shows under the developer", async () => {
   developer.monthlyRate = null;
-  form({ roles: ["PM"] });
+  form({ canRate: false });
   await pick();
   expect(screen.queryByTestId("assignment-billing-price")).not.toBeInTheDocument();
   const message = "월 단가가 없어 배정할 수 없습니다. 파트장·재무에게 요청해 주세요.";
@@ -892,7 +899,7 @@ it("assign form subtitle follows how it was opened", async () => {
 });
 
 it("shows the no-price notice whenever the price field is hidden, with a reason that fits", async () => {
-  form({ roles: ["PM"] });
+  form({ canRate: false });
   await ready();
   expect(screen.getByTestId("assignment-no-price")).toHaveTextContent("청구 단가는 개발자 월 단가(대체투입은 계약상 인력 단가)로 저장됩니다. 단가는 파트장·재무가 고칩니다.");
   cleanup();
@@ -917,7 +924,7 @@ function Where() {
 const formWithWhere = (onClose = vi.fn()) =>
   render(
     <MemoryRouter>
-      <AssignmentForm projects={[project]} roles={["FIN"]} onClose={onClose} onSaved={vi.fn()} />
+      <AssignmentForm projects={[project]} onClose={onClose} onSaved={vi.fn()} />
       <Where />
     </MemoryRouter>,
   );
@@ -959,7 +966,6 @@ it("the form shows the given subtitle and extra warning, and marks the hosting s
     <MemoryRouter>
       <AssignmentForm
         projects={[project]}
-        roles={["FIN"]}
         onClose={vi.fn()}
         onSaved={vi.fn()}
         subtitle="AI 인력 추천에서 채움"
@@ -1192,8 +1198,10 @@ it("date helpers distinguish first open, project change and recommendation", () 
   expect(assignmentInitialDates("2026-11-15", { startDate: "2026-12-10", endDate: "2026-12-31" }, false, "2026-12").startDate).toBe("2026-12-10");
   expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
   expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
-  expect(assignmentPriceEditable(["PM"])).toBe(false);
-  expect(assignmentPriceEditable(["SALES_LDR"])).toBe(true);
+  // ⑨-5: 민감 체크 + 투입 배정 수정 권한. 역할 이름은 보지 않는다.
+  expect(assignmentPriceEditable(false, true)).toBe(false);
+  expect(assignmentPriceEditable(true, false)).toBe(false);
+  expect(assignmentPriceEditable(true, true)).toBe(true);
 });
 
 it("a 409 on bulk cancel or bulk extension toasts and reloads the list, and cancel sends once on double click", async () => {
@@ -1218,7 +1226,7 @@ it("a 409 on bulk cancel or bulk extension toasts and reloads the list, and canc
 
 it("a 409 on a change closes the dialog, reloads the detail and tells the page; server field errors go under the fields", async () => {
   const onChanged = vi.fn();
-  inRouter(<AssignmentDetail id={row.assignmentId} roles={["FIN"]} readOnly={false} onClose={vi.fn()} onChanged={onChanged} />);
+  inRouter(<AssignmentDetail id={row.assignmentId} readOnly={false} onClose={vi.fn()} onChanged={onChanged} />);
   await openHistory();
   fireEvent.click(await screen.findByTestId("assignment-change-open"));
   fireEvent.change(screen.getByTestId("assignment-change-type"), { target: { value: "EXTP" } });

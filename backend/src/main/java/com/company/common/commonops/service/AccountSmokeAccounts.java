@@ -3,6 +3,7 @@ package com.company.common.commonops.service;
 import com.company.common.commonops.mapper.AccountAccessMapper;
 import java.util.Arrays;
 import java.util.List;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -10,6 +11,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+/**
+ * 도구·시험 실행 전용 시험 계정. 환경 변수 AIOPS_SMOKE_LOGIN_ID·AIOPS_SMOKE_LOGIN_PASSWORD·AIOPS_SMOKE_ROLE_CODES가
+ * 모두 있을 때만 돈다. 새 계정만 넣고, 같은 아이디가 이미 있으면 WARN만 남기고 건너뛴다
+ * (이미 있는 계정의 비밀번호·잠금·역할은 바꾸지 않는다 — 보안 검토 결정).
+ */
 @Component
 public class AccountSmokeAccounts implements ApplicationRunner {
     private final AccountAccessMapper mapper;
@@ -30,8 +36,11 @@ public class AccountSmokeAccounts implements ApplicationRunner {
         String hash = new BCryptPasswordEncoder(10).encode(password);
         transaction.executeWithoutResult(status -> {
             if (mapper.activeRoleCount(roles) != roles.size()) throw new IllegalStateException("시험 계정 역할을 확인해 주세요.");
-            mapper.upsertSmoke(id, hash);
-            mapper.clearSmokeRoles(id);
+            if (mapper.insertSmoke(id, hash) == 0) {
+                LoggerFactory.getLogger(AccountSmokeAccounts.class)
+                    .warn("event=smoke_account_skipped reason=existing_user userId={}", id);
+                return;
+            }
             mapper.assignSmokeRoles(id, roles);
         });
     }

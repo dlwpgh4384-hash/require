@@ -65,7 +65,6 @@ it("배정 창: AI 추천 단추는 다른 칸처럼 폭 가득, 설명 글은 �
       null,
       h(AssignmentForm, {
         projects: [],
-        roles: [],
         onClose: vi.fn(),
         onSaved: vi.fn(),
       }),

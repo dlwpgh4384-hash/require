@@ -112,9 +112,9 @@ it("renders the three API KPIs, banner, grouped chart and read-only three-row ta
   expect(
     screen.queryByTestId("manpower-forecast-current-year"),
   ).not.toBeInTheDocument();
-  expect(
-    screen.getByTestId("manpower-forecast-excel").querySelector("svg"),
-  ).not.toBeNull();
+  // 55번 6(사용자 결정): 엑셀 다운로드 단추는 뺐다.
+  expect(screen.queryByTestId("manpower-forecast-excel")).not.toBeInTheDocument();
+  expect(screen.queryByText("엑셀 다운로드")).not.toBeInTheDocument();
   expect(
     screen.getByRole("img", { name: "월별 가용 인력, 필요 인력 비교" }),
   ).toBeVisible();
@@ -137,11 +137,10 @@ it("renders the three API KPIs, banner, grouped chart and read-only three-row ta
   ).not.toBeInTheDocument();
   expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
 });
-it("does not request forecast before period metadata is ready and disables the download while loading", () => {
+it("does not request forecast before period metadata is ready", () => {
   periodControl.ready = false;
   render(<UI17Page />);
   expect(screen.getByTestId("manpower-forecast-loading")).toBeVisible();
-  expect(screen.getByTestId("manpower-forecast-excel")).toBeDisabled();
   expect(api.getCommonManpowerForecasts).not.toHaveBeenCalled();
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
 });
@@ -192,16 +191,6 @@ it("labels each month's bars with 필요 and 그중 미충원 above the group", 
   ).toEqual(["필요 3.3", "그중 미충원 0.3"]);
   expect(label.getAttribute("style")).toContain("font-size: 11px");
 });
-it("download is public and uses the returned count unchanged in the completion Toast", async () => {
-  render(<UI17Page />);
-  const download = screen.getByTestId("manpower-forecast-excel");
-  await waitFor(() => expect(download).toBeEnabled());
-  fireEvent.click(download);
-  expect(
-    await screen.findByText("엑셀 파일을 만들었습니다 (조회 결과 3건)"),
-  ).toBeVisible();
-  expect(api.getCommonManpowerForecastsExcel).toHaveBeenCalledWith(2026);
-});
 it("renders no-shortage messages instead of a job code", async () => {
   const data = result();
   data.summary.mostShortage = null;
@@ -210,7 +199,7 @@ it("renders no-shortage messages instead of a job code", async () => {
   expect(await screen.findByText("부족 없음")).toBeVisible();
   expect(screen.getByText("모든 직무가 남거나 맞음")).toBeVisible();
 });
-it("keeps labelled rows for empty historical projections and allows the three-row export", async () => {
+it("keeps labelled rows for empty historical projections", async () => {
   vi.mocked(api.getCommonManpowerForecasts).mockResolvedValue({
     ...result(),
     months: [],
@@ -222,9 +211,6 @@ it("keeps labelled rows for empty historical projections and allows the three-ro
   expect(
     screen.queryByTestId("manpower-forecast-chart"),
   ).not.toBeInTheDocument();
-  await waitFor(() =>
-    expect(screen.getByTestId("manpower-forecast-excel")).toBeEnabled(),
-  );
 });
 it("shows failed request and field validation, retains the year bar and retries", async () => {
   vi.mocked(api.getCommonManpowerForecasts).mockRejectedValueOnce(
@@ -234,24 +220,9 @@ it("shows failed request and field validation, retains the year bar and retries"
   );
   render(<UI17Page />);
   expect(await screen.findByText("선택 범위 밖입니다.")).toBeVisible();
-  expect(screen.getByTestId("manpower-forecast-excel")).toBeDisabled();
   expect(screen.getByRole("group", { name: "조회 연도" })).toBeVisible();
   fireEvent.click(screen.getByTestId("manpower-forecast-retry"));
   expect(await screen.findByText("백엔드")).toBeVisible();
-});
-it("download failures produce a warning rather than a success Toast", async () => {
-  vi.mocked(api.getCommonManpowerForecastsExcel).mockRejectedValue(
-    new ProjectRequestError("파일을 만들지 못했습니다.", []),
-  );
-  render(<UI17Page />);
-  await waitFor(() =>
-    expect(screen.getByTestId("manpower-forecast-excel")).toBeEnabled(),
-  );
-  fireEvent.click(screen.getByTestId("manpower-forecast-excel"));
-  expect(await screen.findByText("파일을 만들지 못했습니다.")).toBeVisible();
-  expect(
-    screen.queryByText(/엑셀 파일을 만들었습니다/),
-  ).not.toBeInTheDocument();
 });
 it("discards late previous-year responses and bounds selection to this year through next year", async () => {
   let first!: (value: api.ManpowerForecastResult) => void;
@@ -284,28 +255,18 @@ it("discards late previous-year responses and bounds selection to this year thro
   );
   expect(screen.getByRole("button", { name: "이전 해" })).toBeDisabled();
 });
-it("places a single download action in the shell slot and removes it on unmount", async () => {
-  const view = render(
+it("puts no action button in the shell slot (Excel removed)", async () => {
+  render(
     <ManpowerForecastWorkspaceProvider>
       <ManpowerForecastTitleActions />
       <ManpowerForecastWorkspace />
     </ManpowerForecastWorkspaceProvider>,
   );
-  await waitFor(() =>
-    expect(screen.getByTestId("manpower-forecast-excel")).toBeEnabled(),
-  );
+  await screen.findByText("백엔드");
   expect(
-    within(screen.getByTestId("manpower-forecast-title-actions")).getAllByRole(
+    within(screen.getByTestId("manpower-forecast-title-actions")).queryAllByRole(
       "button",
     ),
-  ).toHaveLength(1);
-  expect(
-    within(screen.getByTestId("manpower-forecast-page")).queryByTestId(
-      "manpower-forecast-excel",
-    ),
-  ).not.toBeInTheDocument();
-  view.unmount();
-  expect(
-    screen.queryByTestId("manpower-forecast-excel"),
-  ).not.toBeInTheDocument();
+  ).toHaveLength(0);
+  expect(api.getCommonManpowerForecastsExcel).not.toHaveBeenCalled();
 });

@@ -34,7 +34,9 @@ public class AuthenticatedMockMvcCustomizerFactory implements ContextCustomizerF
     private static final List<String> OWN_SECURITY_TESTS = List.of(
         "com.company.common.commonops.Account", "com.company.common.commonops.LoginFailure",
         "com.company.common.session.", "com.company.common.mfa.",
-        "com.company.common.notifications.", "com.company.common.aianalysis.controller.CommonAiAnalysisControllerTest");
+        "com.company.common.notifications.", "com.company.common.aianalysis.controller.CommonAiAnalysisControllerTest",
+        // 실제 로그인 API·보안 필터로 역할 5개를 시험한다(자동 admin 로그인을 쓰지 않음).
+        "com.company.common.rolesecurity.");
 
     static boolean ownSecurity(Class<?> testClass) {
         String name = testClass.getName();

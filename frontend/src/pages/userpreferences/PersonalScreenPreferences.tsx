@@ -93,12 +93,15 @@ export function PersonalScreenLists({
   mobile,
   collapsed,
   onNavigate,
+  current = null,
 }: {
   menus: PreferenceMenu[];
   available: (id: string) => boolean;
   mobile: boolean;
   collapsed: boolean;
   onNavigate: (screenId: string) => void;
+  /** 지금 보는 화면. 시안 navLink처럼 즐겨찾기·최근 본 화면에서도 그 줄을 「보는 중」(.ni.on)으로 칠한다. */
+  current?: string | null;
 }) {
   const { states, reload } = useUserPreferences();
   if (collapsed) return null;
@@ -146,6 +149,10 @@ export function PersonalScreenLists({
                   >
                     <button
                       type="button"
+                      className={
+                        item.scrnId === current ? "is-current" : undefined
+                      }
+                      aria-current={item.scrnId === current ? "page" : undefined}
                       data-testid={`${type.toLowerCase()}-open-${item.scrnId!.toLowerCase()}`}
                       onClick={() => onNavigate(item.scrnId!)}
                     >

@@ -21,11 +21,13 @@ public class CommonDashboardService {
     private final CommonMonthCloseService closes;
     private final UserPreferencePeriodBasis periods;
     private final BusinessCalendar calendar;
+    private final org.springframework.beans.factory.ObjectProvider<com.company.common.partsettlements.service.CommonPartSettlementService> partSettlements;
     public CommonDashboardService(DashboardFinancialService financial, DashboardOutlookService outlook,
         DashboardActivityService activity, DashboardAssignmentService assignments, CommonMonthCloseService closes,
-        UserPreferencePeriodBasis periods, BusinessCalendar calendar) {
+        UserPreferencePeriodBasis periods, BusinessCalendar calendar,
+        org.springframework.beans.factory.ObjectProvider<com.company.common.partsettlements.service.CommonPartSettlementService> partSettlements) {
         this.financial = financial; this.outlook = outlook; this.activity = activity; this.assignments = assignments;
-        this.closes = closes; this.periods = periods; this.calendar = calendar;
+        this.closes = closes; this.periods = periods; this.calendar = calendar; this.partSettlements = partSettlements;
     }
     static final String PAST_MONTH_NOTICE = "미수금·확인할 일·프로젝트 경보·인력 수급·파이프라인·자금은 오늘 기준(청구 누락 의심은 고른 달)";
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -56,7 +58,10 @@ public class CommonDashboardService {
             asOf, provisional, month.equals(current) ? null : PAST_MONTH_NOTICE,
             money.summary(), activity.read(month, today, money, forward, assigned), closing,
             forward.alerts(), DashboardOutlookService.alertMonth(open, current).toString(), money.trend(), forward.manpower(), forward.parts(), forward.pipeline(), forward.cash(),
-            forward.minimumCash());
+            forward.minimumCash(), "all");
+        // 모양은 로그인 사용자의 데이터 범위로(명세 ⑧-4): 전체 / 파트장 / PM.
+        String mode = com.company.common.support.auth.RequestAccess.dashboardMode();
+        result = DashboardScopeShape.shape(mode, result, month, "part".equals(mode) ? partSettlements.getIfAvailable() : null);
         return new Response<>(true, metadata, result);
     }
     public static YearMonth month(String value) {

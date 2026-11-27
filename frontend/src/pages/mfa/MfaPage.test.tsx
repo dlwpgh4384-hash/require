@@ -68,10 +68,31 @@ describe("UI-39 administrator pending challenge", () => {
       "UI-39",
     );
   });
+  it("uses the mockup wording: sent notice, remaining time, buttons and guidance", () => {
+    show();
+    expect(screen.getByTestId("mfa-page")).toHaveTextContent(
+      `${initial.maskedEmail}로 인증번호 6자리를 보냈습니다. 시스템 관리자 계정은 2단계 인증이 필요합니다.`,
+    );
+    expect(screen.getByTestId("mfa-remaining")).toHaveTextContent(
+      /^남은 시간 \d:\d{2}$/,
+    );
+    expect(screen.getByTestId("mfa-verify-button")).toHaveTextContent(/^확인$/);
+    expect(screen.getByTestId("mfa-resend-button")).toHaveTextContent(
+      "다시 보내기",
+    );
+    expect(screen.getByTestId("mfa-restart-button")).toHaveTextContent(
+      "처음으로",
+    );
+    expect(
+      screen.getByText(
+        "5분 안에 넣어 주세요. 다시 보내면 이전 번호는 쓸 수 없습니다. 5번 틀리면 처음부터 다시 로그인합니다.",
+      ),
+    ).toBeInTheDocument();
+  });
   it("rejects fewer than six digits without calling server", () => {
     show();
     enter("12345");
-    fireEvent.click(screen.getByRole("button", { name: "인증번호 확인" }));
+    fireEvent.click(screen.getByRole("button", { name: "확인" }));
     expect(screen.getByTestId("mfa-code-error")).toHaveTextContent(
       "인증번호 6자리를 넣어 주세요.",
     );
@@ -80,7 +101,7 @@ describe("UI-39 administrator pending challenge", () => {
   it("passes completion and metadata to session owner for forced password navigation", async () => {
     const response = {
       success: true as const,
-      data: { nextScreenId: "UI-40" },
+      data: { nextScreenId: "UI-40", userName: "홍길동" },
       meta: { modifiedAt: "2026-01-02T00:00:00Z" },
     };
     vi.mocked(api.verify).mockResolvedValue(response);
@@ -104,7 +125,7 @@ describe("UI-39 administrator pending challenge", () => {
     expect(screen.getByTestId("mfa-resend-button")).toBeDisabled();
     expect(api.verify).toHaveBeenCalledTimes(1);
     await act(async () =>
-      resolve({ success: true, data: { nextScreenId: "UI-34" }, meta: {} }),
+      resolve({ success: true, data: { nextScreenId: "UI-34", userName: "홍길동" }, meta: {} }),
     );
   });
   it("keeps code and displays original server field error on failure", async () => {

@@ -81,6 +81,7 @@ class MfaSecurityControllerTest {
             new LoginCompletion.Prepared("UI-34", Map.of("passwordChangeRequired", false)));
         account = new Account();
         account.userId = "mfa-" + java.util.UUID.randomUUID().toString().substring(0, 12);
+        account.name = "인증 관리자";
         account.email = "mfa-security@example.invalid";
         account.status = "USE";
         account.temporary = "N";
@@ -194,9 +195,13 @@ class MfaSecurityControllerTest {
         assertThat(account.codeHash).isNotEqualTo(previousHash);
         mvc.perform(verifyCode(pending, previous)).andExpect(status().isBadRequest());
         verifyNoInteractions(completion);
-        mvc.perform(verifyCode(pending, deliveredCode))
+        String pendingId = pending.getId();
+        var completed = mvc.perform(verifyCode(pending, deliveredCode))
             .andExpect(status().isOk()).andExpect(response("POST", "/api/common/mfa/verify"))
-            .andExpect(jsonPath("$.data.nextScreenId").value("UI-34"));
+            .andExpect(jsonPath("$.data.nextScreenId").value("UI-34")).andReturn();
+        // 로그인 완료 뒤 세션 번호·요청 토큰을 새로 만든다.
+        assertThat(pending.getId()).isNotEqualTo(pendingId);
+        assertThat(completed.getResponse().getCookie("XSRF-TOKEN").getValue()).isNotBlank().isNotEqualTo(csrf.getValue());
         verify(mapper).complete(account.userId, now);
         verify(mapper).loginAccess(eq(account.userId), eq(false), anyString(), eq(now));
         verify(completion).establish(any(), eq(account.userId), eq(false));

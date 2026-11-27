@@ -22,20 +22,22 @@ import static org.assertj.core.api.Assertions.*;
 class DeveloperBusinessPolicyTest {
     private static final LocalDate TODAY = LocalDate.of(2026, 11, 15);
 
+    // 처음 값 민감 체크: 관리자·경영진·재무 Y, 파트장·PM N(명세 ⑨-1). 정책은 역할 이름이 아니라 이 체크만 본다.
     private Actor all(String role) {
-        return new Actor(Set.of(role), UserScopePolicy.union(List.of(new Grant("ALL", Set.of(), Set.of()))));
+        return new Actor(Set.of(role), UserScopePolicy.union(List.of(new Grant("ALL", Set.of(), Set.of()))),
+            Set.of("ADMIN", "EXEC", "FIN").contains(role));
     }
 
     private Actor leader() {
         return new Actor(Set.of("SALES_LDR"),
-            UserScopePolicy.union(List.of(new Grant("PART", Set.of("owned-part"), Set.of()))));
+            UserScopePolicy.union(List.of(new Grant("PART", Set.of("owned-part"), Set.of()))), false);
     }
 
     @Test void currentAnonymousActorHasAllDeveloperCapabilities() throws Exception {
         // 로그인(UI-22) 뒤 현재 사용자는 로그인 정보에서만 온다: 로그인 전 개발 사용자(admin)로 로그인한 상태로 본다.
         try (var login = com.company.common.support.test.AuthenticatedMockMvcCustomizerFactory.loginDevelopmentAdmin()) {
             var current = new CurrentBusinessActor();
-            var actor = new Actor(current.roles(), all("ADMIN").scope());
+            var actor = new Actor(current.roles(), all("ADMIN").scope(), current.sensitive());
             assertThat(current.userId()).isEqualTo("admin");
             assertThat(DeveloperBusinessPolicy.canReadDeveloper(actor, "first-part")).isTrue();
             assertThat(DeveloperBusinessPolicy.canReadDeveloper(actor, "other-part")).isTrue();
@@ -52,8 +54,8 @@ class DeveloperBusinessPolicyTest {
         assertThat(DeveloperBusinessPolicy.canReadDeveloper(leader(), null)).isFalse();
     }
 
-    @Test void leaderOnlyReadsOwnPartRateAndNeverPersonalPay() {
-        assertThat(DeveloperBusinessPolicy.canReadMonthlyRate(leader(), "owned-part")).isTrue();
+    @Test void leaderWithoutSensitiveFlagReadsNeitherRateNorPay() {
+        assertThat(DeveloperBusinessPolicy.canReadMonthlyRate(leader(), "owned-part")).isFalse();
         assertThat(DeveloperBusinessPolicy.canReadMonthlyRate(leader(), "other-part")).isFalse();
         assertThat(DeveloperBusinessPolicy.canReadMonthlyPay(leader(), "owned-part")).isFalse();
         assertThat(DeveloperBusinessPolicy.canReadMonthlyPay(leader(), "other-part")).isFalse();
@@ -144,23 +146,22 @@ class DeveloperBusinessPolicyTest {
 
     @ParameterizedTest @ValueSource(strings = {"MO", "DP"})
     void missingRateBlocksPmMonthlyAndDispatchAssignmentsEvenWithSubmittedRate(String contract) {
-        assertThat(DeveloperBusinessPolicy.canAssignWithRate(Set.of("PM"), contract, null, BigDecimal.TEN)).isFalse();
+        assertThat(DeveloperBusinessPolicy.canAssignWithRate(false, contract, null, BigDecimal.TEN)).isFalse();
     }
 
-    @ParameterizedTest @ValueSource(strings = {"SALES_LDR", "FIN"})
-    void leaderAndFinanceMustExplicitlyEnterMissingMonthlyRate(String role) {
-        assertThat(DeveloperBusinessPolicy.canAssignWithRate(Set.of(role), "MO", null, null)).isFalse();
-        assertThat(DeveloperBusinessPolicy.canAssignWithRate(Set.of(role), "MO", null, BigDecimal.ZERO)).isTrue();
-        assertThat(DeveloperBusinessPolicy.canAssignWithRate(Set.of(role), "DP", null, BigDecimal.TEN)).isTrue();
+    @Test void sensitiveUserMustExplicitlyEnterMissingMonthlyRate() {
+        assertThat(DeveloperBusinessPolicy.canAssignWithRate(true, "MO", null, null)).isFalse();
+        assertThat(DeveloperBusinessPolicy.canAssignWithRate(true, "MO", null, BigDecimal.ZERO)).isTrue();
+        assertThat(DeveloperBusinessPolicy.canAssignWithRate(true, "DP", null, BigDecimal.TEN)).isTrue();
     }
 
     @ParameterizedTest @ValueSource(strings = {"TK", "IN"})
     void turnkeyAndInternalDoNotRequireMonthlyRate(String contract) {
-        assertThat(DeveloperBusinessPolicy.canAssignWithRate(Set.of("PM"), contract, null, null)).isTrue();
+        assertThat(DeveloperBusinessPolicy.canAssignWithRate(false, contract, null, null)).isTrue();
     }
 
     @Test void existingRateAllowsPmAssignment() {
-        assertThat(DeveloperBusinessPolicy.canAssignWithRate(Set.of("PM"), "MO", BigDecimal.TEN, null)).isTrue();
+        assertThat(DeveloperBusinessPolicy.canAssignWithRate(false, "MO", BigDecimal.TEN, null)).isTrue();
     }
 
     @Test void missingSalaryOnlyDefaultsPartStartingCostToZeroWithWarning() {

@@ -16,25 +16,48 @@ import type {
   AccountPermission,
 } from "../pages/commonops/accountAccessApi";
 
-vi.mock("../pages/common/CommonNavigationPage", () => {
+vi.mock("../pages/common/CommonNavigationPage", async () => {
+  const { useNavigate } = await import("react-router-dom");
+  const { UserPreferenceTools } = await import(
+    "../pages/userpreferences/UserPreferenceTools"
+  );
+  // 실제 화면 틀처럼 헤더 오른쪽에 종·사용자 메뉴(자동 로그아웃 시계 포함)를 둔다.
+  function Header() {
+    const navigate = useNavigate();
+    return (
+      <header>
+        <UserPreferenceTools
+          menus={[]}
+          mobile={false}
+          available={() => true}
+          onNavigate={(id) => navigate(`/screens/${id}`)}
+        />
+      </header>
+    );
+  }
   return {
     CommonNavigationPage: () => (
-      <main data-testid="protected-business-page">
-        <input
-          data-testid="business-draft"
-          aria-label="업무 입력"
-          defaultValue=""
-        />
-        <button
-          data-testid="business-request"
-          onClick={() => void fetch("/api/common/menus")}
-        >
-          조회
-        </button>
-      </main>
+      <>
+        <Header />
+        <main data-testid="protected-business-page">
+          <input
+            data-testid="business-draft"
+            aria-label="업무 입력"
+            defaultValue=""
+          />
+          <button
+            data-testid="business-request"
+            onClick={() => void fetch("/api/common/menus")}
+          >
+            조회
+          </button>
+        </main>
+      </>
     ),
   };
 });
+const openUserMenu = async () =>
+  fireEvent.click(await screen.findByTestId("user-menu-open"));
 
 let router: ReturnType<typeof createAppRouter> | undefined;
 const permission: AccountPermission = {
@@ -97,6 +120,7 @@ function setup(
     userId: "route-reader",
     name: "시험 사용자",
     roles: ["FIN"],
+    roleNames: ["재무 담당"],
     parts: [],
   };
   const request = vi.fn(
@@ -109,7 +133,7 @@ function setup(
       if (path === "/api/common/my-info")
         return json(identity, meta, options.anonymous ? 401 : 200);
       if (path === "/api/common/login")
-        return json({ nextScreenId: "UI-06" }, meta);
+        return json({ nextScreenId: "UI-06", userName: "시험 사용자" }, meta);
       if (path === "/api/common/logout")
         return new Response(null, { status: 204 });
       if (
@@ -175,6 +199,10 @@ describe("account route composition", () => {
     const login = callsTo(request, "/api/common/login")[0][1]!;
     expect(login.credentials).toBe("same-origin");
     expect(new Headers(login.headers).get("X-XSRF-TOKEN")).toBe("route-csrf");
+    expect(screen.getByTestId("account-login-message")).toHaveTextContent(
+      "시험 사용자(재무)으로 로그인했습니다.",
+    );
+    await openUserMenu();
     expect(screen.getByTestId("session-left")).toHaveTextContent("07:00");
     expect(callsTo(request, "/api/common/session/remaining")).toHaveLength(0);
   });
@@ -193,12 +221,13 @@ describe("account route composition", () => {
   it("the authenticated shell exposes the existing API-backed notification bell", async () => {
     const { request } = setup();
     mount("/screens/UI-06");
-    fireEvent.click(await screen.findByTestId("M25-521"));
+    const bell = await screen.findByRole("button", { name: "알림 0건" });
+    fireEvent.click(bell);
     expect(await screen.findByTestId("notifications-empty")).toBeVisible();
     expect(
       callsTo(request, "/api/common/notifications").length,
     ).toBeGreaterThan(0);
-    fireEvent.click(screen.getByTestId("M25-524"));
+    fireEvent.click(bell);
     expect(screen.queryByTestId("notifications-empty")).not.toBeInTheDocument();
     expect(router?.state.location.pathname).toBe("/screens/UI-06");
   });
@@ -210,7 +239,7 @@ describe("account route composition", () => {
       String(input) === "/api/common/login"
         ? Promise.resolve(
             json(
-              { nextScreenId: "UI-39" },
+              { nextScreenId: "UI-39", userName: "시험 사용자" },
               {
                 ...meta,
                 mfaDelivery: {
@@ -242,7 +271,7 @@ describe("account route composition", () => {
       String(input) === "/api/common/login"
         ? Promise.resolve(
             json(
-              { nextScreenId: "UI-40" },
+              { nextScreenId: "UI-40", userName: "시험 사용자" },
               {
                 ...meta,
                 passwordChangeRequired: true,
@@ -284,7 +313,7 @@ describe("account route composition", () => {
     expect(screen.getByTestId("account-authenticated-shell")).toBeVisible();
     expect(callsTo(request, "/api/common/notifications")).toHaveLength(1);
     expect(callsTo(request, "/api/common/menus")).toHaveLength(0);
-    fireEvent.click(screen.getByTestId("M25-524"));
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(await screen.findByTestId("protected-business-page")).toBeVisible();
     expect(router?.state.location.pathname).toBe("/screens/UI-06");
   });
@@ -293,10 +322,9 @@ describe("account route composition", () => {
     const { request } = setup({ permissions: [] });
     mount("/screens/UI-34");
     expect(
-      await screen.findByText(
-        "볼 수 있는 메뉴가 없습니다. 관리자에게 권한을 요청해 주세요.",
-      ),
+      await screen.findByRole("heading", { name: "볼 수 있는 화면이 없습니다" }),
     ).toBeVisible();
+    expect(screen.getByText("관리자에게 권한을 요청해 주세요.")).toBeVisible();
     expect(screen.getByTestId("account-logout")).toBeVisible();
     expect(
       screen.queryByTestId("protected-business-page"),
@@ -313,6 +341,7 @@ describe("account route composition", () => {
       },
     });
     mount("/screens/UI-06");
+    await openUserMenu();
     expect(await screen.findByTestId("session-left")).toHaveTextContent(
       "07:00",
     );
@@ -322,6 +351,7 @@ describe("account route composition", () => {
   it("session extension uses the shared CSRF transport without posting a body", async () => {
     const { request } = setup();
     mount("/screens/UI-06");
+    await openUserMenu();
     fireEvent.click(await screen.findByTestId("session-extend"));
     await waitFor(() =>
       expect(callsTo(request, "/api/common/session/extend")).toHaveLength(1),

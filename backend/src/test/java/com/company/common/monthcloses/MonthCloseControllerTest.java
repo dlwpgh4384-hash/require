@@ -121,6 +121,15 @@ class MonthCloseControllerTest {
         mvc.perform(get(ROOT + "2026-05")).andExpect(status().isOk()).andExpect(jsonPath("$.data.isClosed").value(false));
         verifyNoInteractions(recorder);
     }
+    @Test void nonAdministratorSeesNoReopenableMonthAndReopenIsForbidden() throws Exception {
+        // 마감 해제는 시스템 관리자만(명세 ⑦-10): 확정 권한이 있는 재무도 해제 단추가 안 보이고 API는 403.
+        closed(); when(actor.roles()).thenReturn(Set.of("FIN"));
+        mvc.perform(get(ROOT + "2026-01")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.isClosed").value(true)).andExpect(jsonPath("$.data.reopenable").value(false));
+        mvc.perform(put(ROOT + "2026-01/reopen").contentType("application/json").content(reopenBody("정정")))
+            .andExpect(status().isForbidden()).andExpect(jsonPath("$.message").value("시스템 관리자만 마감을 해제할 수 있습니다."));
+        verify(mapper, never()).saveClose(any());
+    }
     @Test void olderClosedMonthIsNotReopenable() throws Exception {
         closed(); when(mapper.latestClosedMonth()).thenReturn("202602");
         mvc.perform(get(ROOT + "2026-01")).andExpect(status().isOk())
@@ -202,7 +211,7 @@ class MonthCloseControllerTest {
         closed(); when(actor.roles()).thenReturn(Set.of("FIN"));
         assertThat(MonthCloseRules.canReopen(Set.of("ADMIN"))).isTrue();
         assertThat(MonthCloseRules.canReopen(Set.of("FIN"))).isFalse();
-        mvc.perform(put(ROOT + "2026-01/reopen").contentType("application/json").content(reopenBody("정정"))).andExpect(status().isBadRequest());
+        mvc.perform(put(ROOT + "2026-01/reopen").contentType("application/json").content(reopenBody("정정"))).andExpect(status().isForbidden());
         verifyNoInteractions(snapshots, management); verify(mapper, never()).saveClose(any());
         // The role is checked before the month locks and the version check.
         verify(mapper, never()).lockSources(); verify(mapper, never()).selectHeader(any());

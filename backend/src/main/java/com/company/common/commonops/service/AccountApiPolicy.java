@@ -91,6 +91,10 @@ public class AccountApiPolicy {
     private void add(String menu, String action, String method, String paths) {
         for (String path : paths.split(" ")) rules.add(new Rule(method, "/api/common/" + path, menu, action));
     }
+    /** 시험용: 이 요청이 목록(메뉴×동작 또는 로그인만)에 있는지. 없으면 실제 요청은 403이다. */
+    public boolean covers(String method, String path) {
+        return rules.stream().anyMatch(item -> item.method.equals(method) && matcher.match(item.path, path));
+    }
     public void check(String method, String path, String form, List<AccountAccessMapper.Permission> permissions, List<String> roles) {
         Rule rule = rules.stream().filter(item -> item.method.equals(method) && matcher.match(item.path, path))
             .min(Comparator.comparing(item -> item.path, matcher.getPatternComparator(path))).orElseThrow(AccountApiPolicy::denied);

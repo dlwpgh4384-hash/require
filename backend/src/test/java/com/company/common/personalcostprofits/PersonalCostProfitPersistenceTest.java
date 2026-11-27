@@ -148,7 +148,9 @@ class PersonalCostProfitPersistenceTest {
         assertThat(annual.path("items").get(0).path("managementNumber").asText()).isEqualTo("personal-a");
         read("월평균",null); read("연누계",null);
         assertThat(businessSnapshot()).isEqualTo(before);
-        assertThat(writes.count).hasValue(0);
+        // 조회는 원본·다운로드 기록을 쓰지 않고, 민감 항목 보기(SNSTV_VIEW) 한 줄씩만 남긴다(명세 ⑤-4).
+        assertThat(writes.count).hasValue(3);
+        assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE SCRN_ID='UI-03' AND ACT_TYPE_CD='SNSTV_VIEW'",Long.class)).isEqualTo(3L);
         assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE SCRN_ID='UI-03' AND ACT_TYPE_CD='DNLD'",Long.class)).isZero();
     }
     @Test void sourceMutationChangesLiveOnlyAndAdditionalDirectExpenseIsNotPersonal() throws Exception {

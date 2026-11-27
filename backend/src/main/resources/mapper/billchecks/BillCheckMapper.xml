@@ -32,8 +32,24 @@
     LEFT JOIN TB_HR_DEV d ON d.DEV_ID=m.DEV_ID
     WHERE m.INPUT_YM=#{month} AND p.CTRT_TYPE_CD IN ('MO','DP') AND a.INPUT_TYPE_CD&lt;&gt;'FREE'
       AND a.ASGN_STAT_CD='ACT'
+      <include refid="dataScope"><property name="proj" value="p.PROJ_ID"/></include>
     ORDER BY p.PROJ_NM,p.PROJ_ID,m.ASGN_ID
   </select>
+  <!-- 데이터 범위(명세 ⑧-2·⑧-3 UI-13): 전체가 아니면 「내 프로젝트」이거나 현재 영업 파트가 「내 파트」인 프로젝트만. ${proj}: 프로젝트 ID 칸 -->
+  <sql id="dataScope">
+    <bind name="scopeAll" value="@com.company.common.support.auth.RequestAccess@scopeAll()"/>
+    <bind name="scopeParts" value="@com.company.common.support.auth.RequestAccess@scopeParts()"/>
+    <bind name="scopeProjects" value="@com.company.common.support.auth.RequestAccess@scopeProjects()"/>
+    <if test="!scopeAll">
+      AND (FALSE
+      <if test="!scopeProjects.isEmpty()">OR ${proj} IN <foreach collection="scopeProjects" item="scopeProject" open="(" separator="," close=")">#{scopeProject}</foreach></if>
+      <if test="!scopeParts.isEmpty()">OR EXISTS (SELECT 1 FROM TB_PJ_PROJ_PART scope_part WHERE scope_part.PROJ_ID=${proj}
+        AND scope_part.APLY_BGN_YM=COALESCE((SELECT max(scope_x.APLY_BGN_YM) FROM TB_PJ_PROJ_PART scope_x WHERE scope_x.PROJ_ID=${proj}
+            AND scope_x.APLY_BGN_YM &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')),
+          (SELECT min(scope_x.APLY_BGN_YM) FROM TB_PJ_PROJ_PART scope_x WHERE scope_x.PROJ_ID=${proj}))
+        AND scope_part.PART_ID IN <foreach collection="scopeParts" item="scopePart" open="(" separator="," close=")">#{scopePart}</foreach>)</if>)
+    </if>
+  </sql>
   <resultMap id="invoice" type="com.company.common.billchecks.mapper.BillCheckSources$Invoice" autoMapping="false">
     <id column="billId" property="billId"/>
     <result column="projectId" property="projectId"/>

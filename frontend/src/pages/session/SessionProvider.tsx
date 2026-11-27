@@ -13,22 +13,30 @@ import {
   type SessionApi,
   type SessionTiming,
 } from "./sessionApi";
+import { SESSION_EXPIRED_MESSAGE } from "../commonops/accountAccessApi";
 
 interface SessionContextValue {
   remainingSeconds: number | null;
   loading: boolean;
   extending: boolean;
   error: string;
-  extend: () => Promise<void>;
+  /** 연장에 성공하면 true. */
+  extend: () => Promise<boolean>;
   retry: () => Promise<void>;
   acceptTiming: (timing: SessionTiming) => void;
   expire: () => void;
+  /** 서버가 준 미사용 시간(분). 모르면 null. */
+  sessionMinutes: number | null;
 }
 const SessionContext = createContext<SessionContextValue | null>(null);
 export function useSession() {
   const value = useContext(SessionContext);
   if (!value) throw new Error("SessionProvider가 필요합니다.");
   return value;
+}
+/** 세션 틀 밖(화면 단위 시험)에서는 null. */
+export function useOptionalSession() {
+  return useContext(SessionContext);
 }
 
 /** UI-34 shell boundary. Unmounting the protected subtree discards local drafts, including dirty tabs. */
@@ -166,14 +174,16 @@ export function SessionProvider({
     if (remainingSeconds === 0) expire();
   }, [remainingSeconds, expire]);
   const extend = useCallback(async () => {
-    if (ended.current || pending.current) return;
+    if (ended.current || pending.current) return false;
     pending.current = true;
     setExtending(true);
     setError("");
     try {
       acceptTiming(await api.extend());
+      return !ended.current;
     } catch (failure) {
       handleError(failure);
+      return false;
     } finally {
       pending.current = false;
       setExtending(false);
@@ -190,11 +200,12 @@ export function SessionProvider({
         retry,
         acceptTiming,
         expire,
+        sessionMinutes: sample?.timing.sessionMinutes ?? null,
       }}
     >
       {expired ? (
         <p role="status" data-testid="session-expired">
-          세션이 만료되었습니다. 다시 로그인해 주세요.
+          {SESSION_EXPIRED_MESSAGE}
         </p>
       ) : loading && !sample ? (
         <p role="status" data-testid="session-loading">
@@ -218,8 +229,19 @@ export function SessionProvider({
   );
 }
 
-export function SessionTimer() {
-  const { remainingSeconds, extending, error, extend } = useSession();
+/** 시안 sessext 토스트 문구. */
+export const sessionExtendedMessage = (minutes: number | null) =>
+  `자동 로그아웃 시간을 ${minutes ?? 30}분으로 다시 늘렸습니다`;
+
+/** 사용자 메뉴 맨 아래: 「자동 로그아웃까지 mm:ss [연장]」(시안 userPop). */
+export function SessionTimer({
+  onExtended,
+}: {
+  /** 연장에 성공하면 토스트 문구를 넘긴다. */
+  onExtended?: (message: string) => void;
+} = {}) {
+  const { remainingSeconds, extending, error, extend, sessionMinutes } =
+    useSession();
   const time =
     remainingSeconds === null
       ? "—"
@@ -232,7 +254,11 @@ export function SessionTimer() {
         className="hd-sess-ext"
         data-testid="session-extend"
         disabled={extending || remainingSeconds === 0}
-        onClick={() => void extend()}
+        onClick={() =>
+          void extend().then((done) => {
+            if (done) onExtended?.(sessionExtendedMessage(sessionMinutes));
+          })
+        }
       >
         {extending ? "연장 중…" : "연장"}
       </button>

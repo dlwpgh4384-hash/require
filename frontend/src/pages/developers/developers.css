@@ -389,6 +389,13 @@
   color: var(--text-sub);
 }
 
+/* 근무 상태 등록 창은 개발자 풀 밖(개인 원가·수익표 상세 등)에서도 열린다.
+   fieldset 테두리는 공통 창(feedback.css)이 없애고, 여기서는 칸 사이 간격만 개발자 풀과 같게 둔다. */
+.app-dialog .developer-status-form > fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 /* 시안 .mb > p·.errmsg: 창 안 글줄은 바깥 여백 없음 */
 .developer-status-form fieldset > p,
 .developer-status-form .developer-errmsg,

@@ -335,34 +335,18 @@ it("저장된 달로 연다(다른 월 화면처럼)", async () => {
   expect(screen.getByText("9월 매출")).toBeVisible();
 });
 
-it("엑셀: 아이콘 단추, 정확한 건수 알림, 만드는 중 두 번 누르지 않음", async () => {
-  let finish!: (value: number) => void;
-  vi.mocked(api.getCommonDashboardExcel).mockReturnValue(
-    new Promise((resolve) => {
-      finish = resolve;
-    }),
-  );
+it("엑셀 다운로드 단추가 없다(55번 3-5 사용자 결정)", async () => {
   mount();
   await screen.findByTestId("dashboard-revenue");
-  const button = screen.getByTestId("dashboard-excel");
-  expect(button).toHaveTextContent("엑셀 다운로드");
-  expect(button.querySelector("svg")).not.toBeNull();
-  await waitFor(() => expect(button).toBeEnabled());
-  fireEvent.click(button);
-  fireEvent.click(button);
-  expect(button).toBeDisabled();
-  expect(api.getCommonDashboardExcel).toHaveBeenCalledTimes(1);
-  await act(async () => finish(37));
-  expect(
-    await screen.findByText("엑셀 파일을 만들었습니다 (조회 결과 37건)"),
-  ).toBeVisible();
-  expect(api.getCommonDashboardExcel).toHaveBeenCalledWith("2026-11");
+  expect(screen.queryByTestId("dashboard-excel")).not.toBeInTheDocument();
+  expect(screen.queryByText("엑셀 다운로드")).not.toBeInTheDocument();
+  expect(api.getCommonDashboardExcel).not.toHaveBeenCalled();
   expect(
     screen.queryByRole("button", { name: /저장|등록|업로드|삭제/ }),
   ).not.toBeInTheDocument();
 });
 
-it("칸 오류를 보이고 다시 시도하면 깨끗이 다시 읽는다(잘못된 내려받기 성공 없음)", async () => {
+it("칸 오류를 보이고 다시 시도하면 깨끗이 다시 읽는다", async () => {
   vi.mocked(api.getCommonDashboard).mockRejectedValueOnce(
     new ProjectRequestError("기준월 오류", [
       { field: "yearMonth", message: "기간 확인" },
@@ -372,20 +356,10 @@ it("칸 오류를 보이고 다시 시도하면 깨끗이 다시 읽는다(잘�
   expect(await screen.findByTestId("dashboard-month-error")).toHaveTextContent(
     "기간 확인",
   );
-  expect(screen.getByTestId("dashboard-excel")).toBeDisabled();
   fireEvent.click(screen.getByTestId("dashboard-retry"));
   await screen.findByTestId("dashboard-revenue");
   expect(screen.queryByTestId("dashboard-month-error")).not.toBeInTheDocument();
-  vi.mocked(api.getCommonDashboardExcel).mockRejectedValueOnce(
-    new Error("내려받기 실패"),
-  );
-  fireEvent.click(screen.getByTestId("dashboard-excel"));
-  expect(await screen.findByText("내려받기 실패")).toBeVisible();
-  expect(
-    screen.queryByText(/엑셀 파일을 만들었습니다/),
-  ).not.toBeInTheDocument();
 });
-
 it("이번 달이 허용 범위 밖이면 최근 허용월과 안내", async () => {
   period.latest = "202610";
   mount();
@@ -421,4 +395,51 @@ it("늦게 온 앞 달 응답은 나중에 고른 달을 덮지 않는다", asyn
   await act(async () => finishOld(dashboardResult("2026-11")));
   expect(screen.getByText("10월 매출")).toBeVisible();
   expect(screen.queryByText("이번 달 매출")).not.toBeInTheDocument();
+});
+
+it.each(["part", "pm"] as const)(
+  "%s 모양(명세 ⑧-4): 서버가 비운 요약·마감·추이·파트별·파이프라인·자금은 그리지 않는다",
+  async (mode) => {
+    vi.mocked(api.getCommonDashboard).mockImplementation(async (month) =>
+      dashboardResult(month, {
+        dashMode: mode,
+        summary: null,
+        closing: null,
+        pipeline: null,
+        minimumCash: null,
+        cash: [],
+        trend: [],
+        salesParts: [],
+      }),
+    );
+    mount();
+    expect(await screen.findByTestId("dashboard-mode-notice")).toHaveTextContent(
+      mode === "part" ? "담당 파트 기준으로 봅니다" : "맡은 프로젝트 기준으로 봅니다",
+    );
+    expect(screen.getByTestId("dashboard-todos")).toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-alerts")).toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-supply")).toHaveTextContent(
+      "앞으로 6개월 인력 수급 (회사 전체)",
+    );
+    for (const id of [
+      "dashboard-revenue",
+      "dashboard-close",
+      "dashboard-trend",
+      "dashboard-parts",
+      "dashboard-pipeline",
+      "dashboard-cash",
+    ])
+      expect(screen.queryByTestId(id)).not.toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-page")).not.toHaveTextContent("NaN");
+  },
+);
+
+it("전체 모양은 안내 띠 없이 그대로", async () => {
+  vi.mocked(api.getCommonDashboard).mockImplementation(async (month) =>
+    dashboardResult(month, { dashMode: "all" }),
+  );
+  mount();
+  expect(await screen.findByTestId("dashboard-revenue")).toBeInTheDocument();
+  expect(screen.queryByTestId("dashboard-mode-notice")).not.toBeInTheDocument();
+  expect(screen.getByTestId("dashboard-supply")).not.toHaveTextContent("회사 전체");
 });

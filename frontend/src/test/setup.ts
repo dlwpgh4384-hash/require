@@ -1,5 +1,9 @@
 import { configure } from "@testing-library/react";
-import { expect, vi } from "vitest";
+import { afterEach, expect, vi } from "vitest";
+import { currentTestAccount, resetTestAccount } from "./testAccountData";
+
+// 시험마다 계정을 바꿔 쓸 수 있다(setTestAccount). 끝나면 처음 관리자로 돌린다.
+afterEach(() => resetTestAccount());
 
 // 바쁜 PC(품질 검사)에서 1초 기본값 때문에 깜빡 실패하지 않게, findBy·waitFor 기본 기다림을 3초로 둔다.
 // 확인하는 내용은 그대로이고 기다리는 시간만 늘린다.
@@ -25,29 +29,14 @@ function ownLoginTest() {
 }
 
 // 로그인(UI-22) 작업 뒤 앱은 처음에 내 정보(/api/common/my-info)로 로그인 상태를 확인한다.
-// 로그인 자체를 시험하지 않는 기존 화면 시험은 로그인 전 개발 사용자(admin, 모든 화면 권한)로 로그인된 상태로 본다.
+// 로그인 자체를 시험하지 않는 기존 화면 시험은 처음 권한표 그대로의 시스템 관리자(메뉴 30개, 민감 Y)로 로그인된 상태로 본다.
+// 모든 것을 허용하는 가짜 권한은 쓰지 않는다(권한 빈자리를 가린다, 55번 점검). 역할별 시험은 setTestAccount로 바꾼다.
 // 시험 파일이 내 정보·로그인 경계를 직접 다루면(로그인·세션·2차 인증 시험) 실제 그대로 둔다.
 vi.mock("../pages/commonops/accountAccessApi", async (importOriginal) => {
   const actual =
     await importOriginal<
       typeof import("../pages/commonops/accountAccessApi")
     >();
-  const screens = Array.from(
-    { length: 60 },
-    (_, index) => `UI-${String(index + 1).padStart(2, "0")}`,
-  );
-  const permissions = screens.map((screenId) => ({
-    menuId: screenId,
-    screenId,
-    readYn: "Y",
-    pcOnlyYn: "N",
-    createYn: "Y",
-    updateYn: "Y",
-    deleteYn: "Y",
-    uploadYn: "Y",
-    downloadYn: "Y",
-    cnfmYn: "Y",
-  }));
   return {
     ...actual,
     createAccountAccessApi: (
@@ -57,21 +46,17 @@ vi.mock("../pages/commonops/accountAccessApi", async (importOriginal) => {
       if (ownLoginTest()) return api;
       return {
         ...api,
-        myInfo: async () => ({
-          success: true as const,
-          data: {
-            userId: "admin",
-            name: "관리자",
-            roles: ["ADMIN", "FIN", "SALES_LDR"],
-            parts: [],
-          },
-          // 시험이 만든 화면(예: 추가한 메뉴)까지 모두 볼 수 있는 개발 사용자로 본다.
-          meta: {
-            permissions: Object.assign([...permissions], { some: () => true }),
-            passwordChangeRequired: false,
-            sensitive: true,
-          },
-        }),
+        myInfo: async () => {
+          const account = currentTestAccount();
+          return {
+            success: true as const,
+            data: { ...account.info },
+            meta: {
+              ...account.meta,
+              permissions: [...(account.meta.permissions ?? [])],
+            },
+          };
+        },
       };
     },
   };

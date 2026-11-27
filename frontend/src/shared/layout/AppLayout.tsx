@@ -81,10 +81,18 @@ export function AppLayout({
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [mobile]);
+  // 시안 go(): 화면을 옮기면 새 화면은 맨 위부터(#main.scrollTop=0, 55번 3-2 모든 화면 이동).
+  // 탭 화면은 주소가 바뀐 뒤 한 번 더 그려져서 바뀌므로(screenId), 그때와 다음 그리기 때도 다시 맨 위로 둔다.
   useEffect(() => {
-    if (mainRef.current) mainRef.current.scrollTop = 0;
+    const main = mainRef.current;
+    if (main) main.scrollTop = 0;
     if (mobile) setMobileOpen(false);
-  }, [navigationKey, mobile]);
+    if (!main || typeof window.requestAnimationFrame !== "function") return;
+    const frame = window.requestAnimationFrame(() => {
+      main.scrollTop = 0;
+    });
+    return () => window.cancelAnimationFrame?.(frame);
+  }, [navigationKey, screenId, mobile]);
   const closeNavigation = () => {
     if (mobile) {
       setMobileOpen(false);

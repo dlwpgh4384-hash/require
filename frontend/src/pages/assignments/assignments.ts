@@ -1,3 +1,4 @@
+import { usePermission, useSensitiveView } from "../../shared/permission";
 import { ProjectRequestError } from "../projects/projects";
 import { downloadFile } from "../../shared/list/download";
 
@@ -215,10 +216,15 @@ export const putCommonAssignmentExtensionPossibility = (
   });
 export const getCommonAssignmentsExcel = (filter: AssignmentFilter) =>
   downloadFile(`${root}/excel?${query(filter)}`, `투입 배정_${filter.year}년.xlsx`);
-/** 로그인을 붙이기 전(고정 사용자) 투입 배정 창이 쓰는 역할. 투입 배정(UI-12)·AI 인력 추천(UI-30)이 같이 쓴다. */
-export const assignmentDevelopmentRoles: readonly string[] = ["FIN", "SALES_LDR"];
-export const assignmentPriceEditable = (roles: readonly string[]) =>
-  roles.includes("FIN") || roles.includes("SALES_LDR");
+/** 청구 단가 직접 입력·「단가 변경」 = 민감 체크 + 투입 배정 수정 권한(⑨-5). 역할 이름은 보지 않는다. */
+export const assignmentPriceEditable = (sensitive: boolean, canModify: boolean) =>
+  sensitive && canModify;
+/** 투입 배정(UI-12)·AI 인력 추천(UI-30)·철수 리스트(UI-05)의 배정 창이 같이 쓴다. */
+export function useAssignmentPriceEditable() {
+  const sensitive = useSensitiveView();
+  const permission = usePermission("UI-12");
+  return assignmentPriceEditable(sensitive, permission.can("MOD"));
+}
 export function assignmentInitialDates(
   today: string,
   project: { startDate: string; endDate: string },

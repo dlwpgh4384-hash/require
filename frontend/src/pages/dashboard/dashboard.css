@@ -8,14 +8,15 @@
   margin-bottom: 0;
 }
 /* 시안 asof: .pbar 안 .cap 글 줄 */
+/* 「n월은 마감 전이라 숫자는 잠정입니다」 글자가 날짜 줄 글자와 같은 높이에 오게 글자 기준선으로 맞춘다(55번 3-4). */
 .dashboard-asof {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   gap: 8px 12px;
 }
 .dashboard-asof .ls-b {
-  vertical-align: 1px;
+  vertical-align: baseline;
 }
 .dashboard-ok {
   color: var(--ls-ok);

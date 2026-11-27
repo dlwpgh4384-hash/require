@@ -7,6 +7,7 @@ import {
 import { Badge, DetailPanel, KeyValues } from "../../shared/list";
 import { useScreenDirty } from "../../shared/layout/ScreenTabs";
 import { formatDate } from "../../shared/time";
+import { useSensitiveView } from "../../shared/permission";
 import { developerFailure, won } from "../developers/developers";
 import { CandidateForm } from "./CandidateForm";
 import {
@@ -34,7 +35,7 @@ export function CandidateDetail({
   candidateId,
   revision = 0,
   options,
-  showAmounts = true,
+  showAmounts: showAmountsProp,
   canManage = true,
   onClose,
   onChanged,
@@ -49,6 +50,9 @@ export function CandidateDetail({
   onChanged: () => void;
   onNotice: (message: string, kind?: ToastKind) => void;
 }) {
+  // 희망 단가·예상 이익률은 서버 meta.sensitive(민감 체크)일 때만(⑨-1). 아니면 서버가 값을 보내지 않는다.
+  const sensitive = useSensitiveView();
+  const showAmounts = sensitive && (showAmountsProp ?? true);
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [contacts, setContacts] = useState<CandidateContact[]>([]);
   const [matches, setMatches] = useState<CandidateMatches>({ items: [] });

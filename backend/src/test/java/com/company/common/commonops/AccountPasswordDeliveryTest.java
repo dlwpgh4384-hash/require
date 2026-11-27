@@ -1,6 +1,5 @@
 package com.company.common.commonops;
 
-import com.company.common.commonops.service.LoginFailureDelay;
 import com.company.common.users.service.TemporaryUserPassword;
 import com.company.common.bills.service.BillLocalMailbox;
 import java.nio.file.Files;
@@ -52,13 +51,5 @@ class AccountPasswordDeliveryTest {
             for (var sync : TransactionSynchronizationManager.getSynchronizations()) sync.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
             verify(mailbox).discard(path);
         } finally { TransactionSynchronizationManager.clearSynchronization(); }
-    }
-    @Test void ipDelayBeginsAfterFifthFailureAndCapsAtOneSecond() {
-        var waits = new ArrayList<Long>();
-        var delay = new LoginFailureDelay(Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC), waits::add);
-        for (int index = 0; index < 5; index++) delay.failed("127.0.0.1"); assertThat(waits).isEmpty();
-        for (int index = 0; index < 5; index++) delay.failed("127.0.0.1");
-        assertThat(waits).containsExactly(250L, 500L, 750L, 1000L, 1000L);
-        delay.failed("127.0.0.2"); assertThat(waits).hasSize(5);
     }
 }

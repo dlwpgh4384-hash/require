@@ -40,7 +40,7 @@ import static com.company.common.support.controller.OpenApiResponseContract.resp
 @WebMvcTest(AccountAccessController.class)
 @ContextConfiguration(classes = {AccountAccessController.class, AccountAccessExceptionHandler.class,
     AccountAccessService.class, AccountLoginCompletion.class, AccountSessions.class,
-    LoginFailureDelay.class, AccountApiPolicy.class, AccountAccessConfiguration.class, AccountAccessControllerTest.Transactions.class})
+    LoginAttemptLimit.class, AccountApiPolicy.class, AccountAccessConfiguration.class, AccountAccessControllerTest.Transactions.class})
 class AccountAccessControllerTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
@@ -50,12 +50,18 @@ class AccountAccessControllerTest {
     @MockBean TemporaryUserPassword passwords;
     @MockBean BusinessCalendar calendar;
     @MockBean CommonMfaService mfa;
+    @Autowired AccountAccessService service;
+    @Autowired LoginAttemptLimit limit;
+    @Autowired FindWork findWork;
     Account account;
     final Instant now = Instant.parse("2026-01-02T00:00:00Z");
     final String secret = java.util.UUID.randomUUID() + "a1!";
     final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(10);
     final Cookie csrf = new Cookie("XSRF-TOKEN", "contract-csrf-token");
     @BeforeEach void setup() {
+        // 시험끼리 실패 횟수가 섞이지 않게 비운다(같은 문맥을 함께 씀).
+        for (String ip : List.of("127.0.0.1", "192.0.2.8", "192.0.2.9")) limit.succeeded(ip);
+        findWork.queued.clear(); findWork.deferred = false;
         account = new Account(); account.userId = "access-test"; account.name = "시험 사용자";
         account.email = "access@example.invalid"; account.hash = encoder.encode(secret);
         account.status = "USE"; account.temporary = "N"; account.modifiedAt = now.minusSeconds(100);
@@ -130,7 +136,7 @@ class AccountAccessControllerTest {
         assertThat(account.status).isEqualTo("LOCK"); info(device, 401);
         assertThat(account.failures).isEqualTo(5);
         verify(mapper, never()).complete(anyString(), any());
-        verify(mapper).access(eq(account.userId), eq("LOGIN_FAIL"), eq(AccountAccessService.LOCKED), anyString(), eq(now));
+        verify(mapper).access(eq(account.userId), eq("LOGIN_FAIL"), eq("계정 잠김"), anyString(), eq(now));
     }
     @Test void stoppedAccountDoesNotCompleteLogin() throws Exception {
         account.status = "STOP";
@@ -145,14 +151,14 @@ class AccountAccessControllerTest {
         assertThat(account.failures).isEqualTo(1);
         assertThat(account.status).isEqualTo("USE");
         verify(mapper).failed(account.userId, 3);
-        verify(mapper).access(eq(account.userId), eq("LOGIN_FAIL"), eq(AccountAccessService.INVALID), anyString(), eq(now));
+        verify(mapper).access(eq(account.userId), eq("LOGIN_FAIL"), eq("비밀번호 오류 (1/3)"), anyString(), eq(now));
     }
     @Test void unknownLoginAuditUsesAttemptedIdAndRemoteAddressNotForwardedHeaders() throws Exception {
         mvc.perform(postJson("/api/common/login", Map.of("userId", "unknown-user", "password", "wrong"))
                 .header("X-User-Id", "forged").header("X-Forwarded-For", "203.0.113.9")
                 .with(request -> { request.setRemoteAddr("192.0.2.8"); return request; }))
             .andExpect(status().isUnauthorized());
-        verify(mapper).access("unknown-user", "LOGIN_FAIL", AccountAccessService.INVALID, "192.0.2.8", now);
+        verify(mapper).access("unknown-user", "LOGIN_FAIL", "비밀번호 오류", "192.0.2.8", now);
         verify(mapper, never()).failed(anyString(), anyInt());
     }
     @Test void oversizedLoginPasswordIsAFieldErrorNotAnEncoderException() throws Exception {
@@ -358,6 +364,33 @@ class AccountAccessControllerTest {
             .andExpect(jsonPath("$.data.hash").doesNotExist()).andExpect(jsonPath("$.data.passwordChangedAt").doesNotExist())
             .andExpect(jsonPath("$.meta.passwordChangeDays").value(90));
     }
+    @Test
+    @DisplayName("내 정보: 역할 ID(roles)와 같은 순서로 역할 이름(roleNames)을 함께 준다")
+    void myInfoListsRoleNamesInRoleOrder() throws Exception {
+        when(mapper.roles(account.userId)).thenReturn(List.of("FIN", "PM"));
+        when(mapper.roleNames(account.userId)).thenReturn(List.of("재무", "PM"));
+        var device = login(); mvc.perform(get("/api/common/my-info").servletPath("/api/common/my-info").session(device))
+            .andExpect(status().isOk()).andExpect(response("GET", "/api/common/my-info"))
+            .andExpect(jsonPath("$.data.roles[0]").value("FIN")).andExpect(jsonPath("$.data.roles[1]").value("PM"))
+            .andExpect(jsonPath("$.data.roleNames[0]").value("재무")).andExpect(jsonPath("$.data.roleNames[1]").value("PM"))
+            .andExpect(jsonPath("$.data.name").value("시험 사용자"));
+    }
+    @Test
+    @DisplayName("로그인 응답에 사용자 이름(userName): 일반 로그인·임시 비밀번호(UI-40)·관리자 비밀번호 단계(UI-39)")
+    void loginResponsesCarryUserName() throws Exception {
+        mvc.perform(postJson("/api/common/login", Map.of("userId", account.userId, "password", secret)))
+            .andExpect(status().isOk()).andExpect(response("POST", "/api/common/login"))
+            .andExpect(jsonPath("$.data.userName").value("시험 사용자"));
+        account.temporary = "Y";
+        mvc.perform(postJson("/api/common/login", Map.of("userId", account.userId, "password", secret)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.nextScreenId").value("UI-40"))
+            .andExpect(jsonPath("$.data.userName").value("시험 사용자"));
+        account.temporary = "N";
+        when(mapper.roles(account.userId)).thenReturn(List.of("ADMIN"));
+        mvc.perform(postJson("/api/common/login", Map.of("userId", account.userId, "password", secret)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.nextScreenId").value("UI-39"))
+            .andExpect(jsonPath("$.data.userName").value("시험 사용자"));
+    }
     @Test void pendingAdministratorMfaDoesNotCompleteLoginOrResetCounters() throws Exception {
         when(mapper.roles(account.userId)).thenReturn(List.of("ADMIN")); account.failures = 2;
         mvc.perform(postJson("/api/common/login", Map.of("userId", account.userId, "password", secret)))
@@ -382,19 +415,121 @@ class AccountAccessControllerTest {
     }
     @Test void actualServerSessionDestructionRecordsAutomaticLogout() throws Exception {
         var device = login(); device.invalidate();
-        verify(mapper).access(eq(account.userId), eq("LOGOUT"), eq("자동 로그아웃"), anyString(), eq(now));
+        verify(mapper).access(eq(account.userId), eq("LOGOUT"), eq(AccountSessions.AUTOMATIC_LOGOUT), anyString(), eq(now));
     }
     @Test void stoppedAccountNextRequestTerminatesAllDevices() throws Exception {
         var first = login(); var second = login(); account.status = "STOP";
         info(first, 401); info(second, 401);
+    }
+    @Test
+    @DisplayName("중지 계정의 다음 요청은 401과 「사용할 수 없는 계정입니다…」, LOGOUT 사유는 명세 문구")
+    void stoppedAccountRequestShowsUnusableMessageAndSpecLogoutReason() throws Exception {
+        var device = login(); account.status = "STOP";
+        mvc.perform(get("/api/common/my-info").servletPath("/api/common/my-info").session(device))
+            .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.message").value(AccountAccessService.UNUSABLE));
+        verify(mapper, atLeastOnce()).access(eq(account.userId), eq("LOGOUT"), eq(AccountSessions.ACCOUNT_ENDED), anyString(), eq(now));
+    }
+    @Test
+    @DisplayName("같은 IP 실패 20번 뒤 21번째는 비밀번호 확인 없이 바로 429, 5번째 잠김 문구는 가리지 않고 다른 IP는 그대로")
+    void attemptAfterTwentyFailuresFromOneAddressIsRejectedImmediatelyWith429() throws Exception {
+        for (int attempt = 0; attempt < 20; attempt++)
+            mvc.perform(postJson("/api/common/login", Map.of("userId", attempt < 10 ? "not-found" : "ghost", "password", "wrong")))
+                .andExpect(status().isUnauthorized());
+        long started = System.nanoTime();
+        mvc.perform(postJson("/api/common/login", Map.of("userId", "unknown-user", "password", "wrong")))
+            .andExpect(status().isTooManyRequests()).andExpect(jsonPath("$.message").value(LoginAttemptLimit.TOO_MANY))
+            .andExpect(response("POST", "/api/common/login"));
+        assertThat(java.time.Duration.ofNanos(System.nanoTime() - started)).isLessThan(java.time.Duration.ofSeconds(1));
+        verify(mapper, times(10)).lockAccount("not-found");
+        verify(mapper, never()).lockAccount("unknown-user");
+        mvc.perform(postJson("/api/common/login", Map.of("userId", "not-found", "password", "wrong"))
+                .with(request -> { request.setRemoteAddr("192.0.2.9"); return request; }))
+            .andExpect(status().isUnauthorized());
+    }
+    @Test
+    @DisplayName("잠김·중지 계정은 비밀번호가 틀리면 일반 문구만, 기록은 「계정 잠김」「사용 중지 계정」")
+    void lockedOrStoppedAccountWithWrongPasswordGetsGenericMessage() throws Exception {
+        account.status = "LOCK";
+        mvc.perform(postJson("/api/common/login", Map.of("userId", account.userId, "password", "wrong")))
+            .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.message").value(AccountAccessService.INVALID));
+        mvc.perform(postJson("/api/common/login", Map.of("userId", account.userId, "password", secret)))
+            .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.message").value(AccountAccessService.LOCKED));
+        verify(mapper, times(2)).access(eq(account.userId), eq("LOGIN_FAIL"), eq("계정 잠김"), anyString(), eq(now));
+        account.status = "STOP";
+        mvc.perform(postJson("/api/common/login", Map.of("userId", account.userId, "password", "wrong")))
+            .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.message").value(AccountAccessService.INVALID));
+        verify(mapper).access(eq(account.userId), eq("LOGIN_FAIL"), eq("사용 중지 계정"), anyString(), eq(now));
+        verify(mapper, never()).failed(anyString(), anyInt());
+    }
+    @Test
+    @DisplayName("옛 비밀번호 자격으로 온 다른 세션 요청은 그 세션만 끝내고 현재 세션은 남긴다")
+    void staleCredentialEndsOnlyThatSession() throws Exception {
+        var current = login(); var stale = login();
+        sessions.current(stale).credentialHash = encoder.encode("old-password");
+        info(stale, 401);
+        assertThat(stale.isInvalid()).isTrue();
+        info(current, 200);
+        verify(mapper).access(eq(account.userId), eq("LOGOUT"), eq(AccountSessions.ACCOUNT_ENDED), anyString(), eq(now));
+    }
+    @Test
+    @DisplayName("비밀번호 변경 커밋 중 같은 세션(다른 탭) 요청은 끊기지 않는다")
+    void sameSessionRequestDuringPasswordChangeKeepsSession() throws Exception {
+        var current = login(); String next = java.util.UUID.randomUUID() + "c3!";
+        var during = new java.util.concurrent.atomic.AtomicBoolean();
+        doAnswer(call -> {
+            account.hash = call.getArgument(1); account.modifiedAt = now;
+            var tab = new org.springframework.mock.web.MockHttpServletRequest(); tab.setSession(current);
+            service.authenticated(tab); during.set(true); return 1;
+        }).when(mapper).password(anyString(), anyString(), anyBoolean(), any());
+        mvc.perform(change(next, account.modifiedAt).session(current)).andExpect(status().isOk());
+        assertThat(during).isTrue(); assertThat(current.isInvalid()).isFalse();
+        assertThat(sessions.current(current).pendingHash).isNull();
+        info(current, 200);
+    }
+    @Test
+    @DisplayName("로그인과 관리자 비밀번호 단계는 세션 번호와 요청 토큰을 새로 만든다")
+    void loginRotatesSessionIdAndCsrfTokenAtEachStep() throws Exception {
+        var plain = new MockHttpSession(); String before = plain.getId();
+        var result = mvc.perform(postJson("/api/common/login", Map.of("userId", account.userId, "password", secret)).session(plain))
+            .andExpect(status().isOk()).andExpect(cookie().exists("XSRF-TOKEN")).andReturn();
+        assertThat(plain.getId()).isNotEqualTo(before);
+        assertThat(result.getResponse().getCookie("XSRF-TOKEN").getValue()).isNotBlank().isNotEqualTo(csrf.getValue());
+        when(mapper.roles(account.userId)).thenReturn(List.of("ADMIN"));
+        var pending = new MockHttpSession(); String pendingBefore = pending.getId();
+        var admin = mvc.perform(postJson("/api/common/login", Map.of("userId", account.userId, "password", secret)).session(pending))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.nextScreenId").value("UI-39")).andReturn();
+        assertThat(pending.getId()).isNotEqualTo(pendingBefore);
+        assertThat(admin.getResponse().getCookie("XSRF-TOKEN").getValue()).isNotEqualTo(csrf.getValue());
+    }
+    @Test
+    @DisplayName("비밀번호 찾기는 계정이 맞아도 메일·저장 전에 같은 응답을 돌려주고, 처리는 응답 뒤에 한다")
+    void passwordFindRespondsBeforeMatchingWork() throws Exception {
+        findWork.deferred = true;
+        when(passwords.hashAndDeliver(account.email)).thenReturn(encoder.encode(java.util.UUID.randomUUID().toString()));
+        clearInvocations(mapper);
+        mvc.perform(postJson("/api/common/password-find", Map.of("userId", account.userId, "email", account.email)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.message").value(AccountAccessService.FIND_MESSAGE));
+        verifyNoInteractions(passwords);
+        verify(mapper, never()).lockAccount(anyString());
+        assertThat(findWork.queued).hasSize(1);
+        findWork.queued.forEach(Runnable::run);
+        verify(passwords).hashAndDeliver(account.email);
+        assertThat(account.temporary).isEqualTo("Y");
     }
     @Test void spoofedActorHeadersCannotChangeIdentity() throws Exception {
         var device = login(); mvc.perform(get("/api/common/my-info").servletPath("/api/common/my-info").session(device)
             .header("X-User-Id", "other").header("X-Roles", "ADMIN").header("X-Forwarded-For", "untrusted"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.userId").value(account.userId));
     }
+    /** 비밀번호 찾기 처리기: 보통은 같은 스레드에서 바로, deferred면 쌓아 두었다가 시험이 직접 돌린다. */
+    static class FindWork implements java.util.concurrent.Executor {
+        final java.util.List<Runnable> queued = new java.util.concurrent.CopyOnWriteArrayList<>();
+        volatile boolean deferred;
+        @Override public void execute(Runnable work) { if (deferred) queued.add(work); else work.run(); }
+    }
     @TestConfiguration(proxyBeanMethods = false)
     static class Transactions {
+        @Bean FindWork accountFindExecutor() { return new FindWork(); }
         @Bean AbstractPlatformTransactionManager accountTestTransactions() {
             return new AbstractPlatformTransactionManager() {
                 @Override protected Object doGetTransaction() { return new Object(); }

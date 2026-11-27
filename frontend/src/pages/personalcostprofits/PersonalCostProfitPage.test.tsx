@@ -321,7 +321,7 @@ it("keeps contribution matrix folded initially with exactly four grades and miss
       .map((cell) => cell.textContent),
   ).toEqual(["직무", "초급", "중급", "고급", "특급", "전체"]);
   expect(
-    within(panel).getByRole("rowheader", { name: "백엔드" }),
+    within(panel).getByRole("cell", { name: "백엔드" }),
   ).toBeVisible();
   // 시안: 「금액 (인원)」, 없는 칸은 「–」, 단위는 화면 단위(처음 천 원)
   expect(panel.querySelector("summary")).toHaveTextContent(
@@ -330,7 +330,8 @@ it("keeps contribution matrix folded initially with exactly four grades and miss
   const cells = [
     ...screen.getByTestId("personal-contribution-BE").querySelectorAll("td"),
   ].map((cell) => cell.textContent);
-  expect(cells).toEqual(["–", "−1 (1)", "–", "–", "−1 (1)"]);
+  // 시안 td.sc: 직무 칸도 몸통 칸(td)이다.
+  expect(cells).toEqual(["백엔드", "–", "−1 (1)", "–", "–", "−1 (1)"]);
 });
 it("money cells, footer and contribution cells follow the selected unit", async () => {
   mount();

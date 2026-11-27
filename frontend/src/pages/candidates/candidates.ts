@@ -1,3 +1,4 @@
+import type { ScreenPermission } from "../../shared/permission";
 import { getCommonCodes } from "../codegroups/codeGroups";
 import { getCommonClients } from "../clients/clients";
 import {
@@ -25,7 +26,9 @@ export interface CandidateInput {
   sourceCode: string;
   memo: string | null;
 }
-export interface Candidate extends CandidateInput {
+export interface Candidate extends Omit<CandidateInput, "desiredMonthlyRate"> {
+  /** 민감 칸을 볼 수 없는 사람에게는 서버가 보내지 않는다. */
+  desiredMonthlyRate?: number;
   candidateId: string;
   employeeTypeName: string;
   companyName: string | null;
@@ -336,9 +339,12 @@ export function candidateDefaults(options: CandidateOptions): CandidateInput {
     memo: null,
   };
 }
-export function candidatePolicy(roles: string[]) {
-  const canManage = roles.includes("ADMIN") || roles.includes("SALES_LDR");
-  return { canManage, showAmounts: canManage || !roles.includes("PM") };
+/** 외부 인력 후보(UI-33) 권한: 등록·수정은 메뉴 × 동작 권한, 희망 단가·예상 이익률은 민감 체크(⑦-9·⑨-1). 역할 이름은 안 본다. */
+export function candidatePolicy(permission: ScreenPermission, sensitive: boolean) {
+  return {
+    canManage: permission.can("REG") || permission.can("MOD"),
+    showAmounts: sensitive,
+  };
 }
 
 const PHONE = /^[0-9][0-9-]{7,19}$/;

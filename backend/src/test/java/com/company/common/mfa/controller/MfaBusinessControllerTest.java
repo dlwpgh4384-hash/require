@@ -68,6 +68,7 @@ class MfaBusinessControllerTest {
             .build();
         account = new Account();
         account.userId = "mfa-contract-admin";
+        account.name = "인증 관리자";
         account.email = "mfa-contract@example.invalid";
         account.status = "USE";
         account.temporary = "N";
@@ -147,7 +148,7 @@ class MfaBusinessControllerTest {
         mvc.perform(post("/api/common/mfa/verify").session((MockHttpSession) pending.getSession(false))
             .contentType("application/json").content("{\"code\":\"" + deliveredCode + "\"}"))
             .andExpect(status().isOk()).andExpect(response("POST", "/api/common/mfa/verify"))
-            .andExpect(jsonPath("$.data.nextScreenId").value("UI-34"));
+            .andExpect(jsonPath("$.data.nextScreenId").value("UI-34")).andExpect(jsonPath("$.data.userName").value("인증 관리자"));
         verify(mapper).complete(account.userId, now);
         verify(mapper).loginAccess(eq(account.userId), eq(false), anyString(), eq(now));
         verify(completion).establish(any(), eq(account.userId), eq(false));

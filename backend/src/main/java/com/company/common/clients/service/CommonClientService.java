@@ -60,10 +60,10 @@ public class CommonClientService {
         require(id);
         return new Items<>(mapper.selectChanges(id));
     }
-    /** 지급 계좌 전체 보기(재무 권한). 시안: [보기]를 누르면 전체가 보이고 접근 기록에 남는다(SER-006). */
+    /** 지급 계좌 전체 보기(민감 체크, 명세 ⑨-3). 시안: [보기]를 누르면 전체가 보이고 접근 기록에 남는다(SER-006). */
     @Transactional
     public Account getCommonClientPaymentAccount(String id) {
-        if (!ClientPartPolicy.canReadPaymentAccount(actor.roles()))
+        if (!ClientPartPolicy.canReadPaymentAccount(actor.sensitive()))
             throw CodeFailure.invalid("accountNumber", "지급 계좌 전체 보기 권한이 없습니다.");
         var row = require(id);
         var account = new Account(value(row.bankCode), value(cipher.decrypt(row.encryptedAccount)), value(row.accountHolder));
@@ -79,6 +79,8 @@ public class CommonClientService {
     }
     public String currentUserId() { return actor.userId(); }
     private String summary(ClientRows.Client row) {
+        // 민감 체크가 없으면 끝 4자리도 응답에서 뺀다(명세 ⑨-2·⑨-3).
+        if (!ClientPartPolicy.canReadPaymentAccount(actor.sensitive())) return null;
         if (row.encryptedAccount == null) return "";
         try {
             return value(row.bankName) + " " + cipher.lastFour(row.encryptedAccount);
@@ -161,9 +163,9 @@ public class CommonClientService {
         var old = mapper.lockClient(id);
         if (old == null) throw CodeFailure.invalid("clientId", "거래처를 찾을 수 없습니다.");
         if (!Objects.equals(old.modifiedAt, update.modifiedAt())) throw CodeFailure.conflict();
-        Input input = update.input();
-        allowed(input);
         String plain = cipher.decrypt(old.encryptedAccount);
+        Input input = keepAccount(update.input(), old, plain);
+        allowed(input);
         String encrypted = Objects.equals(plain, input.accountNumber())
             ? old.encryptedAccount : cipher.encrypt(input.accountNumber());
         var before = fields(old);
@@ -196,6 +198,22 @@ public class CommonClientService {
             if (holderChanged) history(id, "UPD", "예금주", "", "예금주 바뀜");
         }
         return new Save(getCommonClient(id), warnings(input, id));
+    }
+    /**
+     * 민감 체크가 없는 사용자는 계좌번호·예금주를 볼 수 없으니(명세 ⑨-2) 보내온 값은 보지 않고 저장된 값을 그대로 둔다.
+     * 저장된 계좌가 없을 때(매입처로 새로 바꿀 때)만 넣은 값을 받는다. 은행은 화면에 보이므로 넣은 값, 없으면 옛 값.
+     */
+    private Input keepAccount(Input in, ClientRows.Client old, String plain) {
+        if (actor.sensitive() || !ClientRules.vendor(in.clientTypeCode())) return in;
+        if (old.encryptedAccount == null) {
+            if (in.bankCode() == null) throw ClientRules.invalid("bankCode");
+            if (in.accountNumber() == null) throw ClientRules.invalid("accountNumber");
+            if (in.accountHolder() == null) throw ClientRules.invalid("accountHolder");
+            return in;
+        }
+        return new Input(in.clientTypeCode(), in.clientName(), in.businessNumber(), in.representativeName(),
+            in.industryCode(), in.contactName(), in.contactPhone(), in.taxEmail(),
+            in.bankCode() != null ? in.bankCode() : old.bankCode, plain, old.accountHolder);
     }
     private LinkedHashMap<String, String> fields(ClientRows.Client row) {
         var fields = new LinkedHashMap<String, String>();

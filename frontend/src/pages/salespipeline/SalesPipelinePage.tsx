@@ -1,3 +1,4 @@
+import { useCanViewScreen } from "../../shared/permission";
 import {
   useEffect,
   useMemo,
@@ -183,6 +184,8 @@ export function SalesPipelinePage({
 }) {
   const root = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  // 다른 화면으로 가는 단추는 그 화면 조회 권한이 있을 때만(⑦-5).
+  const canView = useCanViewScreen();
   const [tab, setTab] = useState<Tab>("ongoing");
   const [revision, setRevision] = useState(0);
   const refresh = () => setRevision((v) => v + 1);
@@ -582,7 +585,7 @@ export function SalesPipelinePage({
             value={`${Number(summary.weightedManpower).toFixed(1)}명`}
             description="필요 인원 × 월 MM × 수주 확률"
             testId="sales-kpi-manpower"
-            onClick={() => navigate("/screens/UI-17")}
+            onClick={canView("UI-17") ? () => navigate("/screens/UI-17") : undefined}
           />
         </KpiCards>
       ) : (
@@ -729,6 +732,7 @@ export function SalesPipelinePage({
                             <button
                               type="button"
                               className="ls-btn ls-btn-sm"
+                              hidden={!canView("UI-30")}
                               data-testid={`sales-recommend-${card.opportunityId}`}
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -1041,7 +1045,9 @@ export function SalesPipelinePage({
                               )}
                             </td>
                             <td>
-                              {row.candidateCount ? (
+                              {row.candidateCount && !canView("UI-33") ? (
+                                <span>{row.candidateCount}명</span>
+                              ) : row.candidateCount ? (
                                 <button
                                   type="button"
                                   className="ls-btn ls-btn-sm"

@@ -9,6 +9,8 @@ import {
   within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+import { testAccount, WithTestAccount } from "../../test/testAccounts";
+import { screenPermission } from "../../shared/permission";
 import { CandidatePage } from "./CandidatePage";
 import { CandidateForm } from "./CandidateForm";
 import { CandidateDetail, CandidateContactForm } from "./CandidateDetail";
@@ -1074,8 +1076,17 @@ it("409 contact closes dialog and refreshes detail", async () => {
     expect(calls("/api/common/candidates/candidate")).toBe(2),
   );
 });
-it("PM policy hides amount headers and values and edit controls without adding HTTP auth", async () => {
-  render(<CandidatePage futureRoles={["PM"]} />);
+it("an account without 민감 체크 and 등록·수정 hides amounts and edit controls without adding HTTP auth", async () => {
+  // PM 처음 권한에는 외부 인력 후보(M012) 등록·수정이 있으므로, 조회만 있는 표로 본다(서버 값만 쓴다).
+  const viewOnly = testAccount(["PM"]);
+  viewOnly.meta.permissions = viewOnly.meta.permissions!.map((p) =>
+    p.screenId === "UI-33" ? { ...p, createYn: "N", updateYn: "N" } : p,
+  );
+  render(
+    <WithTestAccount account={viewOnly}>
+      <CandidatePage />
+    </WithTestAccount>,
+  );
   fireEvent.click(await screen.findByTestId("list-row-candidate"));
   expect(screen.queryByText("희망 단가")).not.toBeInTheDocument();
   expect(screen.queryByTestId("candidate-register")).not.toBeInTheDocument();
@@ -1215,6 +1226,7 @@ it("cancel unchanged form never calls API", async () => {
 it("payload deduplicates skills and removes primary-equal secondary job", () => {
   const result = candidatePayload({
     ...row,
+    desiredMonthlyRate: row.desiredMonthlyRate ?? 0,
     secondaryJobCode: row.primaryJobCode,
     companyId: "not-outsourcing",
     skills: ["Java", " Java "],
@@ -1224,19 +1236,19 @@ it("payload deduplicates skills and removes primary-equal secondary job", () => 
   expect(result.companyId).toBeNull();
   expect(result).not.toHaveProperty("candidateId");
 });
-it("policy seam supports administrators and part leaders while PM is masked", () => {
-  expect(candidatePolicy(["ADMIN"])).toEqual({
-    canManage: true,
-    showAmounts: true,
-  });
-  expect(candidatePolicy(["SALES_LDR"])).toEqual({
-    canManage: true,
-    showAmounts: true,
-  });
-  expect(candidatePolicy(["PM"])).toEqual({
-    canManage: false,
-    showAmounts: false,
-  });
+it("policy uses the server permission table and 민감 flag, not role names", () => {
+  const of = (roles: Parameters<typeof testAccount>[0]) => {
+    const account = testAccount(roles);
+    return candidatePolicy(
+      screenPermission(account.meta.permissions, "UI-33"),
+      account.meta.sensitive === true,
+    );
+  };
+  expect(of(["ADMIN"])).toEqual({ canManage: true, showAmounts: true });
+  // 파트장: 등록·수정은 있지만 민감 체크 N이라 희망 단가는 숨김(⑨-1, 파트장 예외 없음).
+  expect(of(["SALES_LDR"])).toEqual({ canManage: true, showAmounts: false });
+  // 경영진: 조회만, 민감 Y.
+  expect(of(["EXEC"])).toEqual({ canManage: false, showAmounts: true });
 });
 it("extraction merger ignores unknown/duplicate fields, invalid money, grade and consent", () => {
   const initial = candidateDefaults(options);

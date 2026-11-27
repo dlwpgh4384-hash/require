@@ -1,5 +1,7 @@
 package com.company.common.users.controller;
 
+import com.company.common.support.service.CurrentBusinessActor;
+
 import com.company.common.users.service.CommonUserService;
 import com.company.common.users.dto.UserRequests;
 
@@ -24,7 +26,6 @@ import static com.company.common.users.dto.UserContracts.*;
 @RequestMapping(produces = "application/json")
 public class CommonUserController {
     /** 로그인(UI-22) 전까지 서버 사용자는 admin으로 고정한다. */
-    static final String CURRENT_USER = "admin";
     private static final Map<String, String> STATE_NAMES = Map.of("USE", "사용", "LOCK", "잠김", "STOP", "중지");
     /** 엑셀 열: 화면 열 key → (머리글, 값). 화면에서 보이는 열 순서대로 받는다. */
     private static final Map<String, Map.Entry<String, Function<ListItem, String>>> EXCEL_COLUMNS = new LinkedHashMap<>();
@@ -68,12 +69,12 @@ public class CommonUserController {
         for (String key : keys) if (!EXCEL_COLUMNS.containsKey(key))
             throw com.company.common.users.service.UserFailure.invalid("columns", "내려받을 열을 확인해 주세요.");
         var filter = UserRequests.filter(1, 20, roleCd, userStatCd, keyword, includeStopped, sort, dir);
-        var items = service.getCommonUsersForDownload(filter, CURRENT_USER);
+        var items = service.getCommonUsersForDownload(filter, CurrentBusinessActor.id());
         var rows = new ArrayList<List<String>>();
         for (var item : items) rows.add(keys.stream().map(key -> EXCEL_COLUMNS.get(key).getValue().apply(item)).toList());
         var now = Instant.now();
         byte[] body = excel.write("사용자", keys.stream().map(key -> EXCEL_COLUMNS.get(key).getKey()).toList(),
-            rows, CURRENT_USER, now);
+            rows, CurrentBusinessActor.id(), now);
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                 .filename(excel.fileName("사용자", null, now), StandardCharsets.UTF_8).build().toString())

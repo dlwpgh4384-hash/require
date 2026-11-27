@@ -36,8 +36,7 @@ import { AssignmentForm } from "./AssignmentForm";
 import {
   EXT_KIND,
   EXT_LABEL,
-  assignmentDevelopmentRoles,
-  assignmentPriceEditable,
+  useAssignmentPriceEditable,
   getCommonAssignmentCandidates,
   getCommonAssignments,
   getCommonAssignmentsExcel,
@@ -112,10 +111,11 @@ const sortValue = (a: Assignment, key: string): string | number => {
 
 /** 시안 투입 배정(UI-12): 연도 줄, 조건, 배정 후보 카드, 공통 목록, 상세·배정 창. */
 export function AssignmentPage({
-  roles = assignmentDevelopmentRoles,
+  canRate: canRateOverride,
 }: {
-  roles?: readonly string[];
-}) {
+  /** 청구 단가 직접 입력. 안 주면 민감 체크 + 투입 배정 수정 권한(⑨-5). */
+  canRate?: boolean;
+} = {}) {
   const host = useAssignmentTitleHost();
   const presentation = useListPresentation();
   const currentYear = Number(koreanToday().slice(0, 4));
@@ -155,7 +155,8 @@ export function AssignmentPage({
   const [noticeKind, setNoticeKind] = useState<ToastKind>("ok");
   const [downloading, setDownloading] = useState(false);
   const readOnly = year < currentYear;
-  const canRate = assignmentPriceEditable(roles);
+  const priceEditable = useAssignmentPriceEditable();
+  const canRate = canRateOverride ?? priceEditable;
   const refresh = () => setRevision((n) => n + 1);
   // 다른 화면(AI 인력 추천 [배정]·[가배정], 철수 리스트)이 배정·가배정을 바꾸면 열린 탭도 다시 읽는다.
   useEffect(() => {
@@ -734,7 +735,7 @@ export function AssignmentPage({
             ["ING", "PRE"].includes(p.statusCode),
           )}
           candidate={form.candidate}
-          roles={roles}
+          canRate={canRate}
           onClose={() => setForm(null)}
           onConflict={(reason) => {
             setForm(null);
@@ -758,7 +759,7 @@ export function AssignmentPage({
           key={detail.id}
           id={detail.id}
           initialTab={detail.tab}
-          roles={roles}
+          canRate={canRate}
           readOnly={readOnly}
           onClose={() => setDetail(null)}
           onChanged={(message, kind) => {

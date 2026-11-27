@@ -66,7 +66,7 @@ const sortValue = (row: WithdrawalRow, key: string): string | number => {
 };
 
 /** 시안 철수 리스트(UI-05): 연도 줄, 안내 띠 2개, 조건, 공통 목록, 다음 자리 추천 창. */
-export function WithdrawalPage({ roles = [] }: { roles?: readonly string[] }) {
+export function WithdrawalPage() {
   const currentYear = Number(koreanToday().slice(0, 4));
   // 고른 연도를 기억한다(FR-0105, 2026-11-24 사용자 결정).
   const [year, setYear] = useSavedYear("UI-05", currentYear, 1, currentYear + 1, () => setPage(1));
@@ -569,7 +569,6 @@ export function WithdrawalPage({ roles = [] }: { roles?: readonly string[] }) {
         <AssignmentDetail
           key={detail}
           id={detail}
-          roles={roles}
           readOnly={false}
           onClose={() => setDetail(null)}
           onChanged={(message, kind) => {

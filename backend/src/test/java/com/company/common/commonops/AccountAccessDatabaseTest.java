@@ -43,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(AccountAccessController.class)
 @ContextConfiguration(classes = {AccountAccessController.class, AccountAccessExceptionHandler.class,
     AccountAccessService.class, AccountLoginCompletion.class, AccountSessions.class, AccountApiPolicy.class,
-    LoginFailureDelay.class, BusinessCalendar.class, AccountAccessConfiguration.class, AccountAccessDatabaseTest.Persistence.class})
+    LoginAttemptLimit.class, BusinessCalendar.class, AccountAccessConfiguration.class, AccountAccessDatabaseTest.Persistence.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class AccountAccessDatabaseTest {
     @Autowired MockMvc mvc;
@@ -59,6 +59,8 @@ class AccountAccessDatabaseTest {
     @TestConfiguration(proxyBeanMethods = false)
     @EnableTransactionManagement
     static class Persistence {
+        // 비밀번호 찾기는 응답 뒤 처리지만 시험에서는 같은 스레드로 바로 돌려 결과를 본다.
+        @Bean java.util.concurrent.Executor accountFindExecutor() { return Runnable::run; }
         @Bean OwnedSchema ownedSchema() { return new OwnedSchema("accounts_" + UUID.randomUUID().toString().replace("-", "")); }
         @Bean DataSource dataSource(OwnedSchema owned) throws Exception {
             String url = System.getenv("NAVIGATION_TEST_DB_URL");
@@ -122,6 +124,12 @@ class AccountAccessDatabaseTest {
             .andExpect(status().isUnauthorized());
         assertThat(mapper.account("reader").status).isEqualTo("LOCK"); assertThat(mapper.account("reader").failures).isEqualTo(5);
         assertThat(db.queryForObject("SELECT count(*) FROM TB_SY_ACCS_LOG WHERE user_id='reader' AND act_type_cd='LOGIN_FAIL'", Long.class)).isEqualTo(1L);
+    }
+    @Test void wrongPasswordAuditUsesSpecWordingWithCommittedCount() throws Exception {
+        mvc.perform(postJson("/api/common/login", new MockHttpSession(), Map.of("userId", "reader", "password", UUID.randomUUID().toString())))
+            .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.message").value(AccountAccessService.INVALID));
+        assertThat(db.queryForObject("SELECT trgt_desc FROM TB_SY_ACCS_LOG WHERE user_id='reader' AND act_type_cd='LOGIN_FAIL'", String.class))
+            .isEqualTo("비밀번호 오류 (3/5)");
     }
     @Test void changeCommitsNewHashAndInvalidatesOnlyOtherDevice() throws Exception {
         var current = login(); var other = login(); String next = UUID.randomUUID() + "A2!"; var before = mapper.account("reader");

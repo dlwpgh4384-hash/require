@@ -6,6 +6,21 @@ import { ShellIcon } from "../../shared/layout/ShellIcon";
 import { AiAnalysisDrawer } from "../aianalysis/AiAnalysisDrawer";
 import { useOptionalAccountSession } from "../commonops/AccountSessionBoundary";
 import {
+  AccountLogout,
+  AccountMyInfo,
+  AccountPasswordDialog,
+} from "../commonops/AccountAccessPages";
+import {
+  firstRoleLabel,
+  PASSWORD_CHANGED_MESSAGE,
+  roleLabels,
+  roleShortLabels,
+} from "../commonops/accountAccessApi";
+import { NotificationBell } from "../notifications/NotificationBell";
+import { SessionTimer, useOptionalSession } from "../session/SessionProvider";
+import { Toast, type ToastKind } from "../../shared/feedback/Dialog";
+import { useCanViewScreen } from "../../shared/permission";
+import {
   AiAnalysisWorkspaceProvider,
   useOptionalAiAnalysis,
 } from "../aianalysis/AiAnalysisWorkspace";
@@ -117,6 +132,7 @@ export function UserPreferenceTools({
   menuLoading = false,
   menuError,
   onDirtyChange,
+  dirty = false,
 }: {
   screenId?: string;
   menus: PreferenceMenu[];
@@ -126,8 +142,13 @@ export function UserPreferenceTools({
   menuLoading?: boolean;
   menuError?: string;
   onDirtyChange?: (dirty: boolean) => void;
+  /** 저장하지 않은 탭이 있으면 로그아웃 전에 확인한다(명세 ③-4). */
+  dirty?: boolean;
 }) {
   const account = useOptionalAccountSession();
+  const session = useOptionalSession();
+  const canView = useCanViewScreen();
+  const [notice, setNotice] = useState<{ message: string; kind: ToastKind }>();
   const [menuOpen, setMenuOpen] = useState(false);
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const analysis = useOptionalAiAnalysis();
@@ -150,8 +171,10 @@ export function UserPreferenceTools({
     };
   }, [menuOpen]);
   const [dialog, setDialog] = useState<
-    "settings" | "search" | "shortcuts" | null
+    "settings" | "search" | "shortcuts" | "info" | "password" | null
   >(null);
+  const info = account?.info;
+  const accountApi = account?.api;
   useEffect(() => {
     if (mobile || dialog) return;
     const openSearch = (event: KeyboardEvent) => {
@@ -176,16 +199,29 @@ export function UserPreferenceTools({
           <ShellIcon name="search" />
         </button>
       )}
-      <button
-        type="button"
-        className="hd-ai"
-        data-testid="ai-analysis-open"
-        aria-label="AI에게 묻기"
-        onClick={() => setAnalysisOpen(true)}
-      >
-        <ShellIcon name="spark" />
-        {!mobile && <span>AI에게 묻기</span>}
-      </button>
+      {/* [AI에게 묻기]는 AI 분석 도우미(UI-26) 조회 권한이 있을 때만(⑦-5). */}
+      {canView("UI-26") && (
+        <button
+          type="button"
+          className="hd-ai"
+          data-testid="ai-analysis-open"
+          aria-label="AI에게 묻기"
+          onClick={() => setAnalysisOpen(true)}
+        >
+          <ShellIcon name="spark" />
+          {!mobile && <span>AI에게 묻기</span>}
+        </button>
+      )}
+
+      {/* 시안 renderHeader: 종은 [AI에게 묻기] 오른쪽. 로그인한 사람에게만(알림은 사람마다). */}
+      {info && (
+        <NotificationBell
+          onNavigate={(path) => {
+            const id = /^\/screens\/([^/?#]+)$/.exec(path)?.[1];
+            if (id) onNavigate(id);
+          }}
+        />
+      )}
 
       <div className="hd-anchor" ref={menuAnchor}>
         <button
@@ -198,20 +234,14 @@ export function UserPreferenceTools({
         >
           <ShellIcon name="user" />
           {!mobile && (
-            <span>
-              {account?.info?.name ?? "사용자 메뉴"}
-              {account?.info && (
-                <span className="hd-sub">
-                  ({account.info.roles[0] ?? "역할 없음"}
-                  {account.info.roles.length > 1
-                    ? ` 외 ${account.info.roles.length - 1}`
-                    : ""}
-                  )
-                </span>
+            <span data-testid="account-identity">
+              {info?.name ?? "사용자 메뉴"}
+              {info && (
+                <span className="hd-sub"> ({firstRoleLabel(roleShortLabels(info))})</span>
               )}
             </span>
           )}
-          <ShellIcon name="chevronDown" />
+          <ShellIcon name="chevronDown" className="hd-umenu-chev" />
         </button>
         {menuOpen && (
           <div
@@ -219,32 +249,88 @@ export function UserPreferenceTools({
             className="preference-user-menu"
             role="menu"
           >
+            {/* 시안 userPop 머리: 이름 + 「첫 역할 외 n」(마우스를 올리면 역할 전체, 명세 ④-1) */}
             <div className="hd-pop-h">
-              {account?.info?.name ?? "사용자 메뉴"}
+              <span>{info?.name ?? "사용자 메뉴"}</span>
+              {info && (
+                <span
+                  className="hd-cap"
+                  title={roleLabels(info).join(", ") || undefined}
+                >
+                  {firstRoleLabel(roleLabels(info))}
+                </span>
+              )}
             </div>
             {(
               [
-                ["screen-settings-open", "화면 설정", "settings"],
-                ["shortcut-help-open", "단축키 보기", "shortcuts"],
+                ["account-open-info", "내 정보", "info", Boolean(accountApi)],
+                [
+                  "account-open-password",
+                  "비밀번호 변경",
+                  "password",
+                  Boolean(accountApi),
+                ],
+                ["screen-settings-open", "화면 설정", "settings", true],
+                ["shortcut-help-open", "단축키 보기", "shortcuts", true],
               ] as const
-            ).map(([testId, label, target]) => (
-              <button
-                key={testId}
-                type="button"
-                role="menuitem"
+            )
+              .filter((item) => item[3])
+              .map(([testId, label, target]) => (
+                <button
+                  key={testId}
+                  type="button"
+                  role="menuitem"
+                  className="hd-pop-i"
+                  data-testid={testId}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setDialog(target);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            {accountApi && account?.signOut && (
+              <AccountLogout
+                api={accountApi}
+                dirty={dirty}
+                menuItem
                 className="hd-pop-i"
-                data-testid={testId}
-                onClick={() => {
-                  setMenuOpen(false);
-                  setDialog(target);
-                }}
-              >
-                {label}
-              </button>
-            ))}
+                onLoggedOut={account.signOut}
+              />
+            )}
+            {session && (
+              <SessionTimer
+                onExtended={(message) => setNotice({ message, kind: "ok" })}
+              />
+            )}
           </div>
         )}
       </div>
+      {dialog === "info" && accountApi && (
+        <AccountMyInfo api={accountApi} onClose={() => setDialog(null)} />
+      )}
+      {dialog === "password" && accountApi && account && (
+        <AccountPasswordDialog
+          api={accountApi}
+          meta={account.meta}
+          onClose={() => setDialog(null)}
+          onCompleted={() => {
+            setDialog(null);
+            setNotice({ message: PASSWORD_CHANGED_MESSAGE, kind: "ok" });
+            // 바뀐 수정 시각·변경 날짜를 다시 받는다(다음 변경 때 409가 나지 않게).
+            void account.refresh().catch(() => undefined);
+          }}
+        />
+      )}
+      {notice && (
+        <Toast
+          message={notice.message}
+          kind={notice.kind}
+          testId="account-header-message"
+          onDismiss={() => setNotice(undefined)}
+        />
+      )}
       {analysisOpen &&
         (analysis ? (
           <AiAnalysisDrawer

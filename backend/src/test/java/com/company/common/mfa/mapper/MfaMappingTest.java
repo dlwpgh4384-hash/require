@@ -20,7 +20,7 @@ class MfaMappingTest {
         var statement = configuration.getMappedStatement(MfaMapper.class.getName() + ".lockAccount");
         var result = statement.getResultMaps().get(0);
         String sql = statement.getBoundSql(Map.of("userId", "mfa-admin")).getSql().toLowerCase();
-        var row = Map.<String, Object>of("user_id", "mfa-admin", "email_addr", "actor@example.invalid",
+        var row = Map.<String, Object>of("user_id", "mfa-admin", "user_nm", "관리자", "email_addr", "actor@example.invalid",
             "user_stat_cd", "USE", "mfa_code_hash", "non-default-hash", "mfa_expr_dttm", Instant.parse("2026-01-02T03:04:05Z"),
             "mfa_err_cnt", 3, "temp_pwd_yn", "Y", "administrator", true);
         var account = new MfaRows.Account();

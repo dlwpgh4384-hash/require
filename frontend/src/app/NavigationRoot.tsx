@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -22,6 +23,7 @@ import {
   MENU_REFRESH_EVENT,
 } from "./menuRefresh";
 import { MenuBadge, MenuBadgeContext, useMenuBadgeCounts } from "./menuBadges";
+import { useOptionalAccountSession } from "../pages/commonops/AccountSessionBoundary";
 
 export interface ShellMenuItem {
   menuId: string;
@@ -55,6 +57,8 @@ export interface ShellContext {
   screenId: string | null;
   available: (screenId: string) => boolean;
   open: (screenId: string) => void;
+  /** 저장하지 않은 탭(●)이 하나라도 있는지(헤더 로그아웃 확인, 명세 ③-4). */
+  dirty?: boolean;
 }
 export interface ShellExtensions {
   quickAccess?: ReactNode;
@@ -212,9 +216,25 @@ export function NavigationRoot({
   const [current, setCurrent] = useState<string | null>(null);
   const [dirty, setDirtyState] = useState<Set<string>>(() => new Set());
   const [pending, setPending] = useState<Pending>(null);
-  const [allowedScreens, setAllowedScreens] = useState<Set<string> | null>(
+  const [reconciledScreens, setAllowedScreens] = useState<Set<string> | null>(
     null,
   );
+  // 로그인 틀 안이면 내 정보의 조회 권한 화면만 메뉴·탭·배지·즐겨찾기·최근·메뉴 찾기에 쓴다(⑦-4·⑦-5).
+  const account = useOptionalAccountSession();
+  const accountPermissions = account?.meta.permissions;
+  const inAccount = !!account;
+  const accountScreens = useMemo(
+    () =>
+      inAccount
+        ? new Set(
+            (accountPermissions ?? [])
+              .filter((item) => item.readYn === "Y")
+              .map((item) => item.screenId),
+          )
+        : null,
+    [inAccount, accountPermissions],
+  );
+  const allowedScreens = accountScreens ?? reconciledScreens;
   const seen = useRef<Record<string, number>>({});
   const tick = useRef(0);
   const autoOpened = useRef(false);
@@ -346,6 +366,7 @@ export function NavigationRoot({
   }, [state.status, location.pathname, hashScreen, first?.scrnId, navigate]);
 
   // FR-0101: 지금 화면이 속한 메뉴 묶음은 자동으로 펼친다.
+  // 시안 go()/navg: 대메뉴는 하나만 열린다. 화면을 옮기면 그 화면의 묶음만 열고 나머지는 닫는다(55번 2-2).
   const pathKey = menuPath(raw, screenId)
     .slice(0, -1)
     .map((item) => item.menuId)
@@ -354,12 +375,30 @@ export function NavigationRoot({
     if (!pathKey) return;
     setOpen((previous) => {
       const ids = pathKey.split(",");
-      if (ids.every((id) => previous.has(id))) return previous;
-      const next = new Set(previous);
-      ids.forEach((id) => next.add(id));
-      return next;
+      if (previous.size === ids.length && ids.every((id) => previous.has(id)))
+        return previous;
+      return new Set(ids);
     });
   }, [pathKey]);
+  /** 묶음 하나를 열면 그 묶음과 그 위 묶음만 남기고 다른 묶음은 닫는다(시안 S.openG 하나). */
+  const toggleGroup = (id: string) =>
+    setOpen((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) {
+        next.delete(id);
+        return next;
+      }
+      const keep = new Set<string>([id]);
+      const visited = new Set<string>();
+      let parent = raw.find((item) => item.menuId === id)?.upperMenuId ?? null;
+      while (parent && !visited.has(parent)) {
+        visited.add(parent);
+        keep.add(parent);
+        const upper: string | null = parent;
+        parent = raw.find((item) => item.menuId === upper)?.upperMenuId ?? null;
+      }
+      return keep;
+    });
 
   const markSeen = (id: string) => {
     tick.current += 1;
@@ -626,14 +665,7 @@ export function NavigationRoot({
           parent={null}
           open={open}
           current={shown}
-          toggle={(id) =>
-            setOpen((previous) => {
-              const next = new Set(previous);
-              if (next.has(id)) next.delete(id);
-              else next.add(id);
-              return next;
-            })
-          }
+          toggle={toggleGroup}
         />
       </MenuBadgeContext.Provider>
     );
@@ -647,6 +679,7 @@ export function NavigationRoot({
     screenId: shownAvailable ? shown : null,
     available,
     open: (id) => go(id),
+    dirty: dirty.size > 0,
   });
   const tabItems: ScreenTab[] = tabList.map((id) => ({
     id,

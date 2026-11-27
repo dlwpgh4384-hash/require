@@ -13,13 +13,9 @@ import {
   useAccountSession,
 } from "../pages/commonops/AccountSessionBoundary";
 import { firstAccountScreen } from "../pages/commonops/accountAccessApi";
-import {
-  SessionProvider,
-  SessionTimer,
-} from "../pages/session/SessionProvider";
+import { SessionProvider } from "../pages/session/SessionProvider";
 import { createSessionApi, sessionTiming } from "../pages/session/sessionApi";
 import { NotificationPopup } from "../pages/notifications/NotificationsPage";
-import { NotificationBell } from "../pages/notifications/NotificationBell";
 import { createNotificationApi } from "../pages/notifications/notificationApi";
 import { Toast } from "../shared/feedback/Dialog";
 import { reconcileAccountScreens } from "./menuRefresh";
@@ -54,7 +50,6 @@ function AccountApplication() {
 function AuthenticatedApplication() {
   const { info, meta } = useAccountSession();
   const navigate = useNavigate();
-  const location = useLocation();
   const api = useMemo(() => createSessionApi((...args) => fetch(...args)), []);
   const initial = useMemo(
     () => sessionTiming(meta) ?? undefined,
@@ -73,12 +68,7 @@ function AuthenticatedApplication() {
         navigate("/screens/UI-22", { replace: true });
       }}
     >
-      <div data-testid="account-session-tools">
-        <SessionTimer />
-        {location.pathname !== "/screens/UI-42" && (
-          <NotificationBell onNavigate={(path) => navigate(path)} />
-        )}
-      </div>
+      {/* 자동 로그아웃 시계·알림 종은 헤더(사용자 메뉴·종)에 있다(시안 renderHeader). 따로 줄을 두지 않는다. */}
       <UserPreferencesProvider key={generation}>
         <Outlet context={{ notify: setNotice }} />
         {notice && (

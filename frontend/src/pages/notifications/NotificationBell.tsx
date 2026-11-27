@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NotificationPopup, notificationCount } from "./NotificationsPage";
 import { notificationApi, type NotificationApi } from "./notificationApi";
 import { Toast } from "../../shared/feedback/Dialog";
 
+/** 시안 renderHeader 종: 안 읽은 수 빨간 점(99+), 누르면 바로 아래 알림 팝업. */
 export function NotificationBell({
   onNavigate,
   api = notificationApi,
@@ -14,6 +15,7 @@ export function NotificationBell({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const anchor = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let active = true;
     api
@@ -33,39 +35,48 @@ export function NotificationBell({
       active = false;
     };
   }, [api]);
+  const unread = count ?? 0;
   return (
-    <div className="notification-bell" data-testid="notification-bell">
+    <div
+      className="hd-anchor notification-bell"
+      data-testid="notification-bell"
+      ref={anchor}
+    >
       <button
         type="button"
+        className="hd-ibtn"
         data-testid="M25-521"
-        aria-label="알림"
+        aria-label={`알림 ${unread}건`}
         aria-expanded={open}
-        title={error || "알림"}
+        title={error || undefined}
         onClick={() => {
-          setOpen(true);
+          setOpen(!open);
           setError("");
         }}
       >
         <svg
-          width="18"
-          height="18"
+          width="20"
+          height="20"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
           strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
           aria-hidden="true"
         >
-          <path d="M18 8a6 6 0 0 0-12 0v5l-2 3h16l-2-3V8M10 20h4" />
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4" />
         </svg>
-        {count !== null && count > 0 && (
-          <span data-testid="notification-badge">
-            {notificationCount(count)}
+        {unread > 0 && (
+          <span className="hd-dot" data-testid="notification-badge">
+            {notificationCount(unread)}
           </span>
         )}
       </button>
       {open && (
         <NotificationPopup
           api={api}
+          anchor={anchor}
           onClose={() => setOpen(false)}
           onCountChange={setCount}
           onNotice={setNotice}

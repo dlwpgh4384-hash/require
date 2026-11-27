@@ -28,6 +28,7 @@ import { PeriodSelector } from "../../shared/period/PeriodSelector";
 import { formatDateTime } from "../../shared/time";
 import { useScreenPeriod } from "../userpreferences/useScreenPeriod";
 import { DeveloperDetail } from "../developers/DeveloperDetail";
+import { useOpenDeveloperAction } from "../developers/developerRequest";
 import { getCommonCodes } from "../codegroups/codeGroups";
 import { ProjectRequestError, isProjectConflict } from "../projects/projects";
 import * as api from "./partSettlements";
@@ -38,6 +39,7 @@ import {
   partSettlementFormulaFoot,
   partSettlementFormulas,
 } from "./partSettlementFormulas";
+import { useSensitiveView } from "../../shared/permission";
 import "./partSettlements.css";
 
 const message = (error: unknown) =>
@@ -61,9 +63,19 @@ const moneyKeys = [
   "profitShare",
 ] as const;
 type MoneyKey = (typeof moneyKeys)[number];
+const SENSITIVE_ROW_KEYS = new Set<string>([
+  "salary",
+  "retirementAmount",
+  "totalCost",
+  "profit",
+  "profitShare",
+]);
 
 /** UI-19 원가·수익 › 영업 파트 이익금(시안 SCR['UI-19']). */
 export function PartSettlementPage() {
+  // 민감 칸을 볼 수 없으면 서버가 급여·퇴직금·비용 계·이익·이익금을 보내지 않는다 → 그 열을 숨긴다.
+  const sensitive = useSensitiveView();
+  const openDeveloperAction = useOpenDeveloperAction();
   const period = useScreenPeriod("UI-19", { kind: "yearMonth" });
   const yearMonth =
     period.state.status === "ready"
@@ -329,7 +341,7 @@ export function PartSettlementPage() {
     calc,
     render: (row) => <Money value={row[key]} unit={unit} />,
   });
-  const columns: ListColumn<api.PartSettlementRow>[] = [
+  const allColumns: ListColumn<api.PartSettlementRow>[] = [
     {
       key: "developerName",
       label: "이름",
@@ -409,6 +421,9 @@ export function PartSettlementPage() {
       ),
     },
   ];
+  const columns = allColumns.filter(
+    (column) => sensitive || !SENSITIVE_ROW_KEYS.has(column.key),
+  );
   // 열 설정·쪽당 건수·좁게 보기는 공통 사용자 설정에 저장한다(다른 목록 화면과 같음).
   const columnState = useListColumns("UI-19", columns);
   const presentation = useListPresentation();
@@ -603,7 +618,9 @@ export function PartSettlementPage() {
           value={summary ? formatKoreanMoney(summary.partProfitAmount) : "–"}
           description={
             detail
-              ? `인력별 이익금 ${formatKoreanMoney(sum("profitShare"))} − 법인카드 ${won(detail.corpCardAmount)}원`
+              ? sensitive
+                ? `인력별 이익금 ${formatKoreanMoney(sum("profitShare"))} − 법인카드 ${won(detail.corpCardAmount)}원`
+                : `인력별 이익금 − 법인카드 ${won(detail.corpCardAmount)}원`
               : "–"
           }
         />
@@ -778,10 +795,25 @@ export function PartSettlementPage() {
         />
       )}
       {developerId && (
+        // 시안 openPerson: 다른 화면처럼 [수정]·[⋯ 사용 중지]·근무 상태 [상태 등록]을 쓴다(55번 5-2).
         <DeveloperDetail
+          key={developerId}
           developerId={developerId}
-          readOnly
           onClose={() => guard(() => setDeveloperId(null))}
+          onEdit={(developer) => {
+            setDeveloperId(null);
+            openDeveloperAction({ developer, action: "edit" });
+          }}
+          onStop={(developer) => {
+            setDeveloperId(null);
+            openDeveloperAction({ developer, action: "stop" });
+          }}
+          onNotice={(text) => toast(text, "warn")}
+          onChanged={(text) => {
+            // 상세 안에서 저장한 뒤 정산 표를 다시 읽고 알린다(개발자 풀과 같은 알림 종류).
+            retry();
+            if (text) toast(text, text.includes("투입 배정이") ? "info" : "ok");
+          }}
         />
       )}
       {pending && (

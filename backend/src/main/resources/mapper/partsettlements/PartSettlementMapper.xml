@@ -76,7 +76,7 @@
     FROM TB_BS_PART p LEFT JOIN LATERAL (
       SELECT x.* FROM TB_BS_PART_STD x WHERE x.part_id=p.part_id AND x.aply_bgn_ym &lt;= #{month}
         AND (x.aply_end_ym IS NULL OR x.aply_end_ym &gt;= #{month}) ORDER BY x.aply_bgn_ym DESC LIMIT 1
-    ) s ON true LEFT JOIN TB_SY_USER u ON u.user_id=s.part_ldr_user_id ORDER BY p.part_nm, p.part_id
+    ) s ON true LEFT JOIN TB_SY_USER u ON u.user_id=s.part_ldr_user_id WHERE TRUE <include refid="partScope"><property name="part" value="p.part_id"/></include> ORDER BY p.part_nm, p.part_id
   </select>
   <select id="selectHeader" resultMap="header">
     <include refid="headerSource"/>
@@ -87,7 +87,7 @@
     FROM TB_CO_PART_SETL s LEFT JOIN TB_SY_USER u ON u.user_id=s.cnfm_user_id
   </sql>
   <select id="selectHeaders" resultMap="header">
-    <include refid="headerSource"/> WHERE s.setl_ym=#{month}
+    <include refid="headerSource"/> WHERE s.setl_ym=#{month} <include refid="partScope"><property name="part" value="s.part_id"/></include>
   </select>
   <select id="isClosed" resultType="boolean">
     SELECT EXISTS(SELECT 1 FROM TB_CL_CLOSE WHERE close_ym=#{month} AND close_stat_cd='CLOSE')
@@ -206,7 +206,17 @@
     VALUES('TB_CO_PART_SETL',#{key},'UPD',#{item},#{before,jdbcType=VARCHAR},#{after},#{reason,jdbcType=VARCHAR},#{actor},clock_timestamp())
   </insert>
   <insert id="insertAccess">
-    INSERT INTO TB_SY_ACCS_LOG(user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm)
-    VALUES(#{actor},'DNLD','UI-19',#{target},clock_timestamp(),#{actor},clock_timestamp())
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
+    INSERT INTO TB_SY_ACCS_LOG(user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm,client_ip)
+    VALUES(#{actor},'DNLD','UI-19',#{target},clock_timestamp(),#{actor},clock_timestamp(),#{accessIp,jdbcType=VARCHAR})
   </insert>
+  <!-- 데이터 범위(명세 ⑧): 전체가 아니면 「내 파트」만. ${part}: 파트 ID 칸 -->
+  <sql id="partScope">
+    <bind name="scopeAll" value="@com.company.common.support.auth.RequestAccess@scopeAll()"/>
+    <bind name="scopeParts" value="@com.company.common.support.auth.RequestAccess@scopeParts()"/>
+    <if test="!scopeAll">
+      AND <choose><when test="scopeParts.isEmpty()">FALSE</when>
+      <otherwise>${part} IN <foreach collection="scopeParts" item="scopePart" open="(" separator="," close=")">#{scopePart}</foreach></otherwise></choose>
+    </if>
+  </sql>
 </mapper>

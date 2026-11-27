@@ -101,6 +101,7 @@ export function MfaPage({
     event.preventDefault();
     void run("verify");
   }
+  // 시안 renderMfa: 로고 카드, 「○○로 인증번호 6자리를 보냈습니다…」, 칸 옆 남은 시간, [확인], 아래 [다시 보내기]·[처음으로], 안내.
   return (
     <main
       className="account-access mfa-page"
@@ -108,77 +109,110 @@ export function MfaPage({
       data-screen-id="UI-39"
     >
       <section className="account-card mfa-card" aria-labelledby="mfa-title">
+        <div className="account-brand">
+          <span className="account-logo" aria-hidden="true">
+            SI
+          </span>
+          <span>프로젝트·원가 관리</span>
+        </div>
         <h1 id="mfa-title">인증번호 확인</h1>
-        {delivery && (
-          <p>
-            등록 이메일 <strong>{delivery.maskedEmail}</strong>
-          </p>
-        )}
-        <p>등록 이메일로 보낸 6자리 인증번호를 입력해 주세요.</p>
+        <p className="account-sub">
+          {delivery ? (
+            <>
+              <strong>{delivery.maskedEmail}</strong>로 인증번호 6자리를
+              보냈습니다.{" "}
+            </>
+          ) : null}
+          시스템 관리자 계정은 2단계 인증이 필요합니다.
+        </p>
         {!initial && !deliveryError && (
-          <p role="alert">
+          <p role="alert" className="account-error">
             진행 중인 인증이 없습니다. 처음부터 다시 로그인해 주세요.
           </p>
         )}
-        <form onSubmit={submit}>
-          <label htmlFor="mfa-code">인증번호</label>
-          <input
-            id="mfa-code"
-            data-testid="mfa-code-input"
-            value={code}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            aria-invalid={Boolean(fieldError)}
-            aria-describedby="mfa-code-error"
-            disabled={busy || failedDelivery || restartRequired}
-            onChange={(event) => {
-              setCode(event.target.value);
-              setFieldError("");
-            }}
-          />
-          <p id="mfa-code-error" data-testid="mfa-code-error">
-            {fieldError}
-          </p>
-          {delivery && (
-            <p data-testid="mfa-remaining">
-              남은 시간 {Math.floor(remaining / 60)}:
-              {String(remaining % 60).padStart(2, "0")}
-            </p>
-          )}
-          {delivery && remaining === 0 && !failedDelivery && (
-            <p>인증번호 시간이 지났습니다. [다시 보내기]를 눌러 주세요.</p>
-          )}
-          {message && (
-            <p role="status" data-testid="mfa-message">
-              {message}
-            </p>
-          )}
+        <form onSubmit={submit} className="account-form" noValidate>
+          <div className="account-field">
+            <label htmlFor="mfa-code">인증번호</label>
+            <div className="mfa-code-row">
+              <input
+                id="mfa-code"
+                data-testid="mfa-code-input"
+                value={code}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                aria-invalid={Boolean(fieldError)}
+                aria-describedby="mfa-code-error"
+                disabled={busy || failedDelivery || restartRequired}
+                onChange={(event) => {
+                  setCode(event.target.value);
+                  setFieldError("");
+                }}
+              />
+              {delivery && (
+                <span className="account-sub mfa-left" data-testid="mfa-remaining">
+                  {remaining > 0
+                    ? `남은 시간 ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}`
+                    : "시간이 지났습니다"}
+                </span>
+              )}
+            </div>
+            <span
+              id="mfa-code-error"
+              className="account-error"
+              data-testid="mfa-code-error"
+            >
+              {fieldError}
+            </span>
+            {delivery && remaining === 0 && !failedDelivery && (
+              <span className="account-error">
+                인증번호 시간이 지났습니다. [다시 보내기]를 눌러 주세요.
+              </span>
+            )}
+            {message && (
+              <span
+                role="status"
+                className="mfa-message"
+                data-testid="mfa-message"
+              >
+                {message}
+              </span>
+            )}
+          </div>
           <button
             type="submit"
+            className="account-primary"
             data-testid="mfa-verify-button"
             disabled={
               busy || failedDelivery || restartRequired || remaining === 0
             }
           >
-            인증번호 확인
+            확인
           </button>
-          <button
-            type="button"
-            data-testid="mfa-resend-button"
-            disabled={busy || restartRequired || wait > 0}
-            onClick={() => void run("resend")}
-          >
-            다시 보내기{wait > 0 ? ` (${wait}초 뒤)` : ""}
-          </button>
-          <button
-            type="button"
-            data-testid="mfa-restart-button"
-            disabled={busy}
-            onClick={() => void onRestart()}
-          >
-            처음으로
-          </button>
+          <div className="account-row account-row-between">
+            <button
+              type="button"
+              className="mfa-small"
+              data-testid="mfa-resend-button"
+              disabled={busy || restartRequired || wait > 0}
+              onClick={() => void run("resend")}
+            >
+              다시 보내기{wait > 0 ? ` (${wait}초 뒤)` : ""}
+            </button>
+            <button
+              type="button"
+              className="account-text-button"
+              data-testid="mfa-restart-button"
+              disabled={busy}
+              onClick={() => void onRestart()}
+            >
+              처음으로
+            </button>
+          </div>
+          <p className="account-cap">
+            5분 안에 넣어 주세요. 다시 보내면 이전 번호는 쓸 수 없습니다. 5번
+            틀리면 처음부터 다시 로그인합니다.
+          </p>
         </form>
       </section>
     </main>

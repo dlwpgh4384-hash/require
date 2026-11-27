@@ -30,6 +30,10 @@
     SELECT r.role_id FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.role_id=ur.role_id
     WHERE ur.user_id=#{id} AND r.use_yn='Y' ORDER BY r.sort_ord,r.role_id
   </select>
+  <select id="roleNames" resultType="string">
+    SELECT r.role_nm FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.role_id=ur.role_id
+    WHERE ur.user_id=#{id} AND r.use_yn='Y' ORDER BY r.sort_ord,r.role_id
+  </select>
   <resultMap id="permission" type="com.company.common.commonops.mapper.AccountAccessMapper$Permission" autoMapping="false">
     <id column="menu_id" property="menuId"/>
     <result column="scrn_id" property="screenId"/>
@@ -74,6 +78,24 @@
     SELECT EXISTS (SELECT 1 FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.role_id=ur.role_id
       WHERE ur.user_id=#{id} AND r.use_yn='Y' AND r.snstv_view_yn='Y')
   </select>
+  <select id="projectOf" resultType="string">
+    <choose>
+      <when test="kind == 'BILL'">SELECT proj_id FROM TB_BL_BILL WHERE bill_id=#{id}</when>
+      <when test="kind == 'RCPT'">SELECT b.proj_id FROM TB_BL_RCPT r JOIN TB_BL_BILL b ON b.bill_id=r.bill_id WHERE CAST(r.rcpt_id AS TEXT)=#{id}</when>
+      <when test="kind == 'ASGN'">SELECT proj_id FROM TB_PJ_ASGN WHERE asgn_id=#{id}</when>
+      <when test="kind == 'ISSUE'">SELECT proj_id FROM TB_PJ_ISSUE WHERE CAST(issue_id AS TEXT)=#{id}</when>
+      <otherwise>SELECT proj_id FROM TB_PJ_PROJ WHERE proj_id=#{id}</otherwise>
+    </choose>
+  </select>
+  <select id="opportunityPart" resultType="string">SELECT part_id FROM TB_SL_OPP WHERE opp_id=#{id}</select>
+  <select id="developerPart" resultType="string">SELECT COALESCE(part_id,'') FROM TB_HR_DEV WHERE dev_id=#{id}</select>
+  <select id="projectInParts" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM TB_PJ_PROJ_PART h WHERE h.proj_id=#{projectId}
+      AND h.aply_bgn_ym=COALESCE((SELECT max(x.aply_bgn_ym) FROM TB_PJ_PROJ_PART x WHERE x.proj_id=#{projectId}
+          AND x.aply_bgn_ym &lt;= to_char(clock_timestamp() AT TIME ZONE 'Asia/Seoul','YYYYMM')),
+        (SELECT min(x.aply_bgn_ym) FROM TB_PJ_PROJ_PART x WHERE x.proj_id=#{projectId}))
+      AND h.part_id IN <foreach collection="parts" item="part" open="(" separator="," close=")">#{part}</foreach>)
+  </select>
   <select id="uploadForm" resultType="string">
     SELECT form_type_cd FROM TB_SY_UPLD WHERE upld_id=#{uploadId} AND reg_user_id=#{userId}
   </select>
@@ -81,13 +103,12 @@
     SELECT count(*) FROM TB_SY_ROLE WHERE use_yn='Y' AND role_id IN
     <foreach collection="roles" item="role" open="(" separator="," close=")">#{role}</foreach>
   </select>
-  <insert id="upsertSmoke">
+  <!-- 시험 계정은 새로 넣기만 한다. 이미 있는 계정의 비밀번호·잠금·역할은 절대 바꾸지 않는다(보안 검토). -->
+  <insert id="insertSmoke">
     INSERT INTO TB_SY_USER(user_id,user_nm,email_addr,pwd_hash,temp_pwd_yn,pwd_err_cnt,mfa_err_cnt,user_stat_cd,pwd_chg_dttm,reg_user_id)
     VALUES (#{id},#{id},concat(#{id},'@example.invalid'),#{hash},'N',0,0,'USE',clock_timestamp(),'SYSTEM')
-    ON CONFLICT(user_id) DO UPDATE SET pwd_hash=EXCLUDED.pwd_hash,temp_pwd_yn='N',pwd_err_cnt=0,mfa_err_cnt=0,
-      user_stat_cd='USE',pwd_chg_dttm=clock_timestamp(),mod_dttm=clock_timestamp(),mod_user_id='SYSTEM'
+    ON CONFLICT(user_id) DO NOTHING
   </insert>
-  <delete id="clearSmokeRoles">DELETE FROM TB_SY_USER_ROLE WHERE user_id=#{id}</delete>
   <insert id="assignSmokeRoles">
     INSERT INTO TB_SY_USER_ROLE(user_id,role_id,reg_user_id) VALUES
     <foreach collection="roles" item="role" separator=",">(#{id},#{role},'SYSTEM')</foreach>
@@ -98,6 +119,8 @@
     WHERE user_id=#{id}
   </update>
   <update id="complete">
+    <!-- 로그인에 성공하면 그 사람의 화면 기간 기억(PERIOD)을 지워 모든 화면이 처음 기간으로 연다(2차 SFR-005-05·06). -->
+    WITH cleared_period AS (DELETE FROM TB_SY_USER_PREF WHERE user_id=#{id} AND pref_type_cd='PERIOD')
     UPDATE TB_SY_USER SET pwd_err_cnt=0,mfa_err_cnt=0,last_login_dttm=#{now},
       mfa_code_hash=NULL,mfa_expr_dttm=NULL WHERE user_id=#{id}
   </update>

@@ -23,6 +23,7 @@ import {
   type DeveloperRequest,
 } from "./developerRequest";
 import { DeveloperForm } from "./DeveloperForm";
+import { useSensitiveView } from "../../shared/permission";
 import {
   developerFailure,
   developerRequest,
@@ -75,6 +76,8 @@ const icon = (d: string) => (
 const downIcon = icon("M12 3v12M7 10l5 5 5-5M5 21h14");
 const upIcon = icon("M12 21V9M7 14l5-5 5 5M5 3h14");
 const plusIcon = icon("M12 5v14M5 12h14");
+/** 이름순 정렬: 비교마다 localeCompare(…, "ko")로 비교기를 새로 만들지 않고 하나를 같이 쓴다(55번 5-3). */
+const koreanOrder = new Intl.Collator("ko");
 
 export function DeveloperPage({
   createSignal = 0,
@@ -116,22 +119,37 @@ export function DeveloperPage({
   const [noticeKind, setNoticeKind] = useState<ToastKind>("ok");
   const [downloading, setDownloading] = useState(false);
   const presentation = useListPresentation();
-  const refresh = () => setRevision((v) => v + 1);
+  // 고르기 목록(공통코드 7묶음·거래처·영업 파트 = 요청 9개)은 화면을 열 때 한 번만 읽는다.
+  // 전에는 검색·저장 뒤 다시 읽기마다 목록과 함께 9개를 다시 읽고, 가장 늦은 응답까지 표를 비워 두었다(55번 5-3).
+  const [optionsRevision, setOptionsRevision] = useState(0);
+  const refresh = () => {
+    setRevision((v) => v + 1);
+    if (!options) setOptionsRevision((v) => v + 1);
+  };
   useEffect(() => {
     if (createSignal) setForm({});
   }, [createSignal]);
   useEffect(() => {
+    let active = true;
+    getDeveloperOptions()
+      .then((o) => {
+        if (active) setOptions(o);
+      })
+      .catch((reason) => {
+        if (active) setError(developerFailure(reason));
+      });
+    return () => {
+      active = false;
+    };
+  }, [optionsRevision]);
+  useEffect(() => {
     const controller = new AbortController();
     setError("");
     setRows(null);
-    Promise.all([
-      getCommonDevelopers(applied, controller.signal),
-      getDeveloperOptions(),
-    ])
-      .then(([r, o]) => {
+    getCommonDevelopers(applied, controller.signal)
+      .then((r) => {
         if (!controller.signal.aborted) {
           setRows(r.items);
-          setOptions(o);
           setSelected([]);
         }
       })
@@ -140,8 +158,9 @@ export function DeveloperPage({
       });
     return () => controller.abort();
   }, [applied, revision]);
+  const sensitive = useSensitiveView();
   const columns = useMemo<ListColumn<DeveloperListRow>[]>(
-    () => [
+    () => ([
       {
         key: "name",
         label: "이름",
@@ -212,8 +231,11 @@ export function DeveloperPage({
         align: "right",
         render: (r) => won(r.monthlyRate),
       },
-    ],
-    [],
+    ] as ListColumn<DeveloperListRow>[]).filter(
+      (column) => sensitive || column.key !== "monthlyRate",
+    ),
+    // 민감 칸을 볼 수 없으면 서버가 월 단가를 보내지 않는다 → 열을 숨긴다.
+    [sensitive],
   );
   const cols = useListColumns("UI-02", columns);
   const sorted = useMemo(() => {
@@ -228,7 +250,7 @@ export function DeveloperPage({
       const order =
         typeof x === "number" && typeof y === "number"
           ? x - y
-          : String(x).localeCompare(String(y), "ko");
+          : koreanOrder.compare(String(x), String(y));
       return sort?.dir === "desc" ? -order : order;
     });
     return list;
@@ -593,7 +615,7 @@ export function DeveloperPage({
                   .filter(Boolean)
                   .join(" · ")}
               </span>
-              <b>{won(r.monthlyRate)}</b>
+              {sensitive && <b>{won(r.monthlyRate)}</b>}
             </div>
             <div className="ls-r2">
               <span>

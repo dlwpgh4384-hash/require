@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { useNavigate } from "react-router-dom";
-import { Dialog, Toast } from "../../shared/feedback/Dialog";
+import { Toast } from "../../shared/feedback/Dialog";
 import {
   notificationApi,
   type NotificationApi,
@@ -44,9 +44,37 @@ export interface NotificationPopupProps {
   onNotice?: (message: string) => void;
   onCountChange?: (count: number) => void;
   isMobile?: boolean;
+  /** 팝업을 연 자리(종 단추 묶음). 이 안을 누르면 바깥 누름으로 보지 않는다. */
+  anchor?: RefObject<HTMLElement>;
 }
 
-// UI-42: the header popup and the route-backed popup use exactly this component.
+const ICON = {
+  warn: "M12 8v5 M12 17h.01 M10.3 3.9 2 18.2A1.2 1.2 0 0 0 3 20h18a1.2 1.2 0 0 0 1-1.8L13.7 3.9a2 2 0 0 0-3.4 0",
+  read: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6",
+};
+function RowIcon({ unread }: { unread: boolean }) {
+  return (
+    <span
+      className={unread ? "notification-icon-warn" : "notification-icon-read"}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d={unread ? ICON.warn : ICON.read} />
+      </svg>
+    </span>
+  );
+}
+
+// UI-42: 시안 notifPop — 종 아래 작은 팝업. 머리 「알림」+[모두 읽음], 줄마다 아이콘·내용·작은 날짜, 맨 아래 보관 안내.
 export function NotificationPopup({
   api = notificationApi,
   onClose,
@@ -54,6 +82,7 @@ export function NotificationPopup({
   onNotice,
   onCountChange,
   isMobile = window.matchMedia?.("(max-width: 767px)").matches ?? false,
+  anchor,
 }: NotificationPopupProps) {
   const [listing, setListing] = useState<NotificationListing | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,8 +91,28 @@ export function NotificationPopup({
   const [message, setMessage] = useState("");
   const mounted = useRef(false);
   const pending = useRef(false);
+  const root = useRef<HTMLDivElement>(null);
   const countChanged = useRef(onCountChange);
   countChanged.current = onCountChange;
+  const close = useRef(onClose);
+  close.current = onClose;
+
+  useEffect(() => {
+    const outside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const area = anchor?.current ?? root.current;
+      if (area && !area.contains(target)) close.current();
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close.current();
+    };
+    document.addEventListener("mousedown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("mousedown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [anchor]);
 
   async function load() {
     setLoading(true);
@@ -163,39 +212,50 @@ export function NotificationPopup({
   }
 
   return (
-    <Dialog title="알림" onClose={onClose} testId="notifications-popup">
-      <section
+    <div
+      ref={root}
+      role="dialog"
+      aria-label="알림"
+      data-testid="notifications-popup"
+      className="hd-pop notifications-pop"
+    >
+      <div
         data-testid="notifications-page"
         data-screen-id="UI-42"
         className="notifications-content"
         aria-busy={loading || busy}
       >
-        <div className="notifications-toolbar">
-          <span>
-            미읽음{" "}
-            <strong data-testid="notification-unread-count">
-              {listing ? notificationCount(listing.unreadCount) : "–"}
-            </strong>
+        <div className="hd-pop-h">
+          <span>알림</span>
+          <span className="visually-hidden" data-testid="notification-unread-count">
+            안 읽은 알림{" "}
+            {listing ? notificationCount(listing.unreadCount) : "–"}건
           </span>
           <button
             type="button"
+            className="notifications-read-all"
             data-testid="M25-523"
             disabled={loading || busy || !listing?.unreadCount}
             onClick={() => void readAll()}
           >
             모두 읽음
           </button>
-          <button type="button" data-testid="M25-524" onClick={onClose}>
-            닫기
-          </button>
         </div>
-        {loading && (
-          <p role="status" data-testid="notifications-loading">
+        {loading && !listing && (
+          <p
+            role="status"
+            className="notifications-note"
+            data-testid="notifications-loading"
+          >
             알림을 불러오는 중입니다.
           </p>
         )}
         {error && (
-          <div role="alert" data-testid="notifications-error">
+          <div
+            role="alert"
+            className="notifications-note notifications-error"
+            data-testid="notifications-error"
+          >
             <p>{error}</p>
             <button
               type="button"
@@ -208,9 +268,11 @@ export function NotificationPopup({
           </div>
         )}
         {!loading && listing?.items.length === 0 && (
-          <p data-testid="notifications-empty">알림이 없습니다.</p>
+          <p className="notifications-note" data-testid="notifications-empty">
+            알림이 없습니다.
+          </p>
         )}
-        {listing && (
+        {listing && listing.items.length > 0 && (
           <ul className="notifications-list">
             {listing.items.map((item) => (
               <li
@@ -225,13 +287,16 @@ export function NotificationPopup({
                   disabled={busy || loading}
                   onClick={() => void select(item.notificationId)}
                 >
-                  <span>{item.content}</span>
-                  <small>
-                    <time dateTime={item.notifiedAt}>
+                  <RowIcon unread={item.readYn === "N"} />
+                  <span className="notification-body">
+                    <span className="notification-text">{item.content}</span>
+                    <time
+                      className="notification-time"
+                      dateTime={item.notifiedAt}
+                    >
                       {notificationTime(item.notifiedAt)}
                     </time>
-                    {item.readYn === "N" && <span> · 미읽음</span>}
-                  </small>
+                  </span>
                 </button>
               </li>
             ))}
@@ -246,8 +311,8 @@ export function NotificationPopup({
             onDismiss={() => setMessage("")}
           />
         )}
-      </section>
-    </Dialog>
+      </div>
+    </div>
   );
 }
 

@@ -49,28 +49,31 @@
     ORDER BY CASE WHEN e.rslt_type_cd='ERR' THEN 0 ELSE 1 END, e.rslt_sn
   </select>
   <insert id="insertUpload">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_UPLD
       (upld_id, form_type_cd, scrn_id, file_nm, file_size, trgt_ym, tot_row_cnt,
        succ_cnt, warn_cnt, err_cnt, upld_stat_cd, reg_user_id, reg_dttm)
     VALUES (#{uploadId}, #{formTypeCode}, #{screenId}, #{fileName}, #{fileSize}, #{targetMonth},
       #{inspection.totalCount}, #{inspection.successCount}, #{inspection.warningCount},
-      #{inspection.errorCount}, 'CHECKED', 'admin', clock_timestamp())
+      #{inspection.errorCount}, 'CHECKED', #{actorId}, clock_timestamp())
   </insert>
   <update id="completeUpload">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     UPDATE TB_SY_UPLD SET tot_row_cnt=#{inspection.totalCount},
       succ_cnt=#{inspection.successCount}, warn_cnt=#{inspection.warningCount}, err_cnt=#{inspection.errorCount},
       upld_stat_cd=<choose><when test="applied">'APPLIED'</when><otherwise>'CHECKED'</otherwise></choose>,
       aply_dttm=<choose><when test="applied">clock_timestamp()</when><otherwise>NULL</otherwise></choose>,
-      mod_user_id='admin', mod_dttm=GREATEST(clock_timestamp(), COALESCE(mod_dttm,reg_dttm) + INTERVAL '1 microsecond')
+      mod_user_id=#{actorId}, mod_dttm=GREATEST(clock_timestamp(), COALESCE(mod_dttm,reg_dttm) + INTERVAL '1 microsecond')
     WHERE upld_id=#{uploadId}
   </update>
   <delete id="deleteIssues">DELETE FROM TB_SY_UPLD_ERR WHERE upld_id=#{uploadId}</delete>
   <insert id="insertIssue">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_UPLD_ERR
       (upld_id, rslt_sn, rslt_type_cd, row_no, col_nm, input_val, rsn_cn, reg_user_id, reg_dttm)
     VALUES (#{uploadId}, #{sequence},
       CASE WHEN #{issue.severity}='오류' THEN 'ERR' ELSE 'WARN' END,
-      #{issue.row}, #{issue.column}, #{issue.inputValue}, #{issue.reason}, 'admin', clock_timestamp())
+      #{issue.row}, #{issue.column}, #{issue.inputValue}, #{issue.reason}, #{actorId}, clock_timestamp())
   </insert>
   <update id="storeProjectReceipt">
     UPDATE TB_SY_UPLD SET TRGT_PROJ_ID=#{projectId}, TRGT_DSTRB_STEP_CD=#{distributionStepCode}

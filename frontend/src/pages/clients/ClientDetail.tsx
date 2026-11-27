@@ -15,6 +15,7 @@ import {
   type ClientCode,
 } from "./clients";
 import { historyValue } from "../../shared/historyValue";
+import { useSensitiveView } from "../../shared/permission";
 
 const dash = (value: string | null | undefined) => (value ? value : "–");
 
@@ -37,6 +38,7 @@ export function ClientDetail({
   /** 시안 알림(toast). [보기]로 계좌 전체를 본 뒤 안내한다. */
   onNotice?: (message: string, kind?: "ok" | "info" | "warn") => void;
 }) {
+  const sensitive = useSensitiveView();
   const [client, setClient] = useState<Client | null>(null);
   const [assignments, setAssignments] = useState<ClientAssignment[]>([]);
   const [changes, setChanges] = useState<ClientChange[]>([]);
@@ -137,7 +139,9 @@ export function ClientDetail({
     </>
   );
 
-  const vendor = client ? client.clientTypeCode !== "CUST" : false;
+  // 지급 계좌 줄은 민감 칸을 볼 수 있을 때만(아니면 서버가 계좌를 보내지 않는다).
+  const vendor =
+    sensitive && (client ? client.clientTypeCode !== "CUST" : false);
   const customer = client ? client.clientTypeCode !== "VNDR" : false;
   const basicTab = client && (
     <>

@@ -11,6 +11,8 @@ import * as api from "./projects";
 import { ProjectField } from "./ProjectField";
 import { useOpenProjectDistribution } from "./projectEdit";
 import { ProjectProgressPanel } from "./ProjectProgressPanel";
+import { useCanViewScreen } from "../../shared/permission";
+import { useOpenProjectCostAnalysis } from "../projectcostanalyses/projectCostRequest";
 import "./projects.css";
 
 type Code = { code: string; codeName: string };
@@ -110,6 +112,9 @@ export function ProjectDetail({
       onClose();
       openDistribution(id);
     });
+  // 시안 「원가 사용률」 줄 [원가 분석]: 프로젝트 원가 분석(UI-04) 조회 권한이 있을 때만, 그 프로젝트 상세로 간다(⑦-5).
+  const canView = useCanViewScreen();
+  const openCostAnalysis = useOpenProjectCostAnalysis();
   const [p, setP] = useState<api.Project | null>(null);
   const [tab, setTab] = useState(initialTab);
   const [expenses, setExpenses] = useState<api.ProjectExpense[]>([]);
@@ -840,6 +845,22 @@ export function ProjectDetail({
                         : ""}
                       누적 원가 ÷ 예산
                     </span>
+                    {canView("UI-04") && (
+                      <>
+                        {" "}
+                        <button
+                          type="button"
+                          className="project-lnk"
+                          data-testid="project-cost-analysis-open"
+                          onClick={() => {
+                            onClose();
+                            openCostAnalysis(p.projectId);
+                          }}
+                        >
+                          원가 분석
+                        </button>
+                      </>
+                    )}
                   </>,
                 ] as [string, ReactNode],
               ]

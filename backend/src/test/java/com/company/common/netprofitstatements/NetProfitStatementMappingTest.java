@@ -44,7 +44,7 @@ class NetProfitStatementMappingTest {
         var sql = statement.getBoundSql(Map.of("userId", "admin", "target", "순이익표"));
         assertThat(sql.getSql()).contains("'UI-09'", "'DNLD'", "clock_timestamp()").doesNotContain("UI-08", "UI-07");
         assertThat(sql.getParameterMappings()).extracting(p -> p.getProperty())
-            .containsExactly("userId", "target", "userId");
+            .containsExactly("userId", "target", "userId", "accessIp");
     }
     private Configuration configuration() throws Exception {
         var config = new Configuration();

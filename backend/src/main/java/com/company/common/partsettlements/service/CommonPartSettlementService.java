@@ -124,7 +124,8 @@ public class CommonPartSettlementService {
         return inputs.stream().filter(i->"TK".equals(i.contractType) && nz(i.mm).signum()>0 && people.contains(i.developerId))
             .map(i->i.developerId).distinct().sorted().toList();
     }
-    public record Performance(String partId, String partName, BigDecimal revenue, BigDecimal profitRate) {}
+    /** profit: 이익 합(매출 − 원가). 대시보드 파트장 모양의 요약·추이(SFR-116-08)에 쓴다. */
+    public record Performance(String partId, String partName, BigDecimal revenue, BigDecimal profitRate, BigDecimal profit) {}
     /** 同一 인력 계산/확정 스냅샷. 파트별 DB 반복 조회 없이 입력을 공유한다. */
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public List<Performance> performance(String yearMonth) {
@@ -156,7 +157,7 @@ public class CommonPartSettlementService {
                 }
             }
             result.add(new Performance(part.partId, part.partName, revenue, revenue.signum() == 0 ? null
-                : profit.multiply(BigDecimal.valueOf(100)).divide(revenue, 1, java.math.RoundingMode.HALF_UP)));
+                : profit.multiply(BigDecimal.valueOf(100)).divide(revenue, 1, java.math.RoundingMode.HALF_UP), profit));
         }
         return result;
     }

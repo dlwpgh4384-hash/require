@@ -352,6 +352,28 @@ describe("personal lists and tools", () => {
     ).not.toBeInTheDocument();
     expect(puts()).toHaveLength(0);
   });
+  it("55번 2-1: 지금 보는 화면은 즐겨찾기·최근 본 화면에서도 시안 .ni.on처럼 칠한다", async () => {
+    rows.set("FAV", row("FAV", '["UI-12","UI-14"]'));
+    rows.set("RECENT", row("RECENT", '["UI-14","UI-12"]'));
+    wrap(
+      <PersonalScreenLists
+        menus={menus}
+        available={available}
+        mobile={false}
+        collapsed={false}
+        onNavigate={vi.fn()}
+        current="UI-12"
+      />,
+    );
+    const fav = await screen.findByTestId("fav-open-ui-12");
+    expect(fav).toHaveClass("is-current");
+    expect(fav).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("recent-open-ui-12")).toHaveClass("is-current");
+    expect(screen.getByTestId("fav-open-ui-14")).not.toHaveClass("is-current");
+    expect(screen.getByTestId("recent-open-ui-14")).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
   it("collapsed lists are hidden", () => {
     wrap(
       <PersonalScreenLists

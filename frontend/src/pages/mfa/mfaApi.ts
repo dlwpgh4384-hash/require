@@ -5,6 +5,7 @@ export interface MfaDelivery {
 }
 export interface MfaLogin {
   nextScreenId: string;
+  userName: string;
 }
 export interface MfaResponse<T> {
   success: true;

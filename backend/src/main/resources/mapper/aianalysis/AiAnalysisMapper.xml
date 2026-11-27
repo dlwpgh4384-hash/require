@@ -34,10 +34,11 @@
     WHERE q.USER_ID = #{actor} AND q.QNA_ID = CAST(#{id} AS NUMERIC)
   </select>
   <insert id="download">
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
     INSERT INTO TB_SY_ACCS_LOG
-      (LOG_ID, USER_ID, ACT_TYPE_CD, SCRN_ID, TRGT_DESC, ACT_DTTM, REG_USER_ID, REG_DTTM)
+      (LOG_ID, USER_ID, ACT_TYPE_CD, SCRN_ID, TRGT_DESC, ACT_DTTM, REG_USER_ID, REG_DTTM,CLIENT_IP)
     VALUES (nextval('SQ_TB_SY_ACCS_LOG'), #{actor}, 'DNLD', 'UI-26',
-      'AI 분석 도우미 답 ' || CAST(#{count} AS TEXT) || '건', clock_timestamp(), #{actor}, clock_timestamp())
+      'AI 분석 도우미 답 ' || CAST(#{count} AS TEXT) || '건', clock_timestamp(), #{actor}, clock_timestamp(),#{accessIp,jdbcType=VARCHAR})
   </insert>
   <resultMap id="identity" type="com.company.common.aianalysis.mapper.AiAnalysisRows$Identity" autoMapping="false">
     <constructor><arg column="name" javaType="string"/><arg column="replacement" javaType="string"/></constructor>

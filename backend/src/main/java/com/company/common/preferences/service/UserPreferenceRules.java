@@ -41,6 +41,45 @@ public class UserPreferenceRules {
         }
     }
 
+    /** FAV·RECENT 저장 값(화면 번호 배열)에서 지금 볼 수 있는 화면만 남긴다. 형식이 깨진 옛 값은 그대로. */
+    public String readableScreens(String value) {
+        if (com.company.common.support.auth.RequestAccess.current() == null) return value;
+        try {
+            JsonNode array = json.readTree(value);
+            if (array == null || !array.isArray()) return value;
+            var kept = json.createArrayNode();
+            for (JsonNode item : array)
+                if (!item.isTextual() || com.company.common.support.auth.RequestAccess.screenReadable(item.textValue())) kept.add(item);
+            return json.writeValueAsString(kept);
+        } catch (JsonProcessingException failure) {
+            return value;
+        }
+    }
+
+    /**
+     * 화면이 보낸 목록은 볼 수 있는 화면만 담고 있으므로, 저장돼 있던 볼 수 없는 화면을 뒤에 붙여 지우지 않는다.
+     * 개수 한도를 넘으면 볼 수 없는 화면부터 뺀다.
+     */
+    public String keepHidden(String type, String input, String stored) {
+        if (!(type.equals("FAV") || type.equals("RECENT")) || stored == null
+            || com.company.common.support.auth.RequestAccess.current() == null) return input;
+        try {
+            JsonNode next = json.readTree(input);
+            JsonNode old = json.readTree(stored);
+            if (next == null || !next.isArray() || old == null || !old.isArray()) return input;
+            int limit = type.equals("FAV") ? 10 : 5;
+            var merged = json.createArrayNode();
+            var seen = new HashSet<String>();
+            next.forEach(item -> { merged.add(item); seen.add(item.asText()); });
+            for (JsonNode item : old)
+                if (merged.size() < limit && item.isTextual() && !seen.contains(item.textValue())
+                    && !com.company.common.support.auth.RequestAccess.screenReadable(item.textValue())) merged.add(item);
+            return json.writeValueAsString(merged);
+        } catch (JsonProcessingException failure) {
+            return input;
+        }
+    }
+
     private JsonNode parse(String value) {
         try {
             return json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)

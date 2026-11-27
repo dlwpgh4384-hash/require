@@ -19,6 +19,14 @@
   padding: 24px;
   box-shadow: 0 12px 36px var(--scrim);
 }
+/* 창 안 fieldset은 칸 묶음일 뿐이다: 브라우저 기본 테두리·여백이 창 전체를 감싸 보이지 않게 한다(시안에 없음).
+   화면별 규칙(.code-page·.developer-workspace·.client-part-workspace 등)은 더 구체적이라 그대로 덮어쓴다. */
+.app-dialog fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
 /* 시안 모달 제목: 16px·600. */
 .app-dialog h2 {
   margin: 0 0 20px;

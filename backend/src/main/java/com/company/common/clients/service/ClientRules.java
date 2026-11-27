@@ -52,15 +52,19 @@ public final class ClientRules {
         boolean customer = customer(type);
         boolean vendor = vendor(type);
         if (!customer && !vendor) throw invalid("clientTypeCode");
+        // 민감 체크가 없는 사용자의 수정: 계좌번호·예금주는 볼 수 없으므로 비어 와도 되고,
+        // 저장된 계좌가 있으면 서비스에서 옛 값을 그대로 둔다(명세 ⑨-2).
+        boolean keepAccount = update && !com.company.common.support.auth.RequestAccess.sensitiveVisible();
+        boolean accountRequired = vendor && !keepAccount;
         var input = new Input(type, text(body, "clientName", 50, true), business,
             text(body, "representativeName", 20, false), text(body, "industryCode", 10, false),
             text(body, "contactName", 20, false), text(body, "contactPhone", 20, false),
             customer ? text(body, "taxEmail", 100, true) : null,
-            vendor ? text(body, "bankCode", 10, true) : null,
-            vendor ? text(body, "accountNumber", 20, true) : null,
-            vendor ? text(body, "accountHolder", 30, true) : null);
+            vendor ? text(body, "bankCode", 10, accountRequired) : null,
+            vendor ? text(body, "accountNumber", 20, accountRequired) : null,
+            vendor ? text(body, "accountHolder", 30, accountRequired) : null);
         if (customer && !input.taxEmail().matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) throw invalid("taxEmail");
-        if (vendor && !input.accountNumber().matches("[0-9-]{8,20}")) throw invalid("accountNumber");
+        if (vendor && input.accountNumber() != null && !input.accountNumber().matches("[0-9-]{8,20}")) throw invalid("accountNumber");
         return input;
     }
     public static Update update(JsonNode body) {

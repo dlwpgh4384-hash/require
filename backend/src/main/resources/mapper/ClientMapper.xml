@@ -176,7 +176,8 @@
     ORDER BY c.clnt_nm, c.clnt_id
   </select>
   <insert id="insertAccess">
-    INSERT INTO TB_SY_ACCS_LOG (user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm)
-    VALUES (#{userId},#{action},'UI-15',#{target},clock_timestamp(),#{userId},clock_timestamp())
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
+    INSERT INTO TB_SY_ACCS_LOG (user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm,client_ip)
+    VALUES (#{userId},#{action},'UI-15',#{target},clock_timestamp(),#{userId},clock_timestamp(),#{accessIp,jdbcType=VARCHAR})
   </insert>
 </mapper>

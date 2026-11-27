@@ -37,15 +37,23 @@ public class CommonCandidateController {
     @GetMapping(value = "/api/common/candidates/excel", produces = {XLSX, "application/json"})
     public ResponseEntity<byte[]> getCommonCandidatesExcel(@ModelAttribute Filter filter) {
         var items = service.getCommonCandidates(filter).items();
-        var rows = items.stream().map(r -> List.of(text(r.name()),
-            text(r.employeeTypeName()) + (r.companyName() == null || r.companyName().isBlank() ? "" : " · " + r.companyName()),
-            text(r.primaryJobName()), text(r.gradeName()), String.join(", ", r.skills()), text(r.homeAddress()),
-            amount(r.desiredMonthlyRate()), text(r.availableDate()), text(r.contactStatusName()),
-            text(r.lastContactDate()), text(r.sourceName()))).toList();
+        // 민감 체크가 없으면 희망 단가 열을 엑셀에서 뺀다(명세 ⑨-2).
+        boolean sensitive = actor.sensitive();
+        var rows = items.stream().map(r -> {
+            var row = new java.util.ArrayList<>(List.of(text(r.name()),
+                text(r.employeeTypeName()) + (r.companyName() == null || r.companyName().isBlank() ? "" : " · " + r.companyName()),
+                text(r.primaryJobName()), text(r.gradeName()), String.join(", ", r.skills()), text(r.homeAddress()),
+                amount(r.desiredMonthlyRate()), text(r.availableDate()), text(r.contactStatusName()),
+                text(r.lastContactDate()), text(r.sourceName())));
+            if (!sensitive) row.remove(6);
+            return (List<String>) row;
+        }).toList();
+        var titles = new java.util.ArrayList<>(List.of("이름", "구분", "직무", "등급", "기술", "거주지", "희망 단가",
+            "투입 가능일", "연락 상태", "최근 연락", "출처"));
+        if (!sensitive) titles.remove(6);
         var now = service.now();
         service.recordDownload(actor.userId(), items.size());
-        byte[] bytes = excel.write(TITLE, List.of("이름", "구분", "직무", "등급", "기술", "거주지", "희망 단가",
-            "투입 가능일", "연락 상태", "최근 연락", "출처"), rows, actor.userId(), now);
+        byte[] bytes = excel.write(TITLE, titles, rows, actor.userId(), now);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(XLSX))
             .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                 .filename(excel.fileName(TITLE, null, now), StandardCharsets.UTF_8).build().toString())

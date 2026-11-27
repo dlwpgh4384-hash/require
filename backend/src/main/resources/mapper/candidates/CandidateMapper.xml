@@ -84,6 +84,7 @@
     WHERE c.cand_id=#{id} FOR UPDATE OF c
   </select>
   <insert id="insertCandidate">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_HR_CAND(cand_id,cand_nm,emp_type_cd,blng_clnt_id,telno,email_addr,
       prvc_agre_yn,prvc_agre_dt,prvc_agre_user_id,job_cd,sub_job_cd,grade_cd,home_area_cd,
       home_addr,hope_uprc,input_psbl_dt,cntc_stat_cd,last_cntc_dt,cand_src_cd,memo_cn,reg_user_id,reg_dttm)
@@ -91,28 +92,30 @@
       #{input.phone,jdbcType=VARCHAR},#{input.email,jdbcType=VARCHAR},
       CASE WHEN #{input.privacyAgreement} THEN 'Y' ELSE 'N' END,
       CASE WHEN #{input.privacyAgreement} THEN #{today} ELSE NULL END,
-      CASE WHEN #{input.privacyAgreement} THEN 'admin' ELSE NULL END,
+      CASE WHEN #{input.privacyAgreement} THEN #{actorId} ELSE NULL END,
       #{input.primaryJobCode},#{input.secondaryJobCode,jdbcType=VARCHAR},#{input.gradeCode},
       #{input.homeAreaCode,jdbcType=VARCHAR},#{input.homeAddress,jdbcType=VARCHAR},
       #{input.desiredMonthlyRate},#{input.availableDate},'BEFORE',#{today},#{input.sourceCode},
-      #{input.memo,jdbcType=VARCHAR},'admin',clock_timestamp())
+      #{input.memo,jdbcType=VARCHAR},#{actorId},clock_timestamp())
     ON CONFLICT ON CONSTRAINT PK_TB_HR_CAND DO NOTHING
   </insert>
   <update id="updateCandidate">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     UPDATE TB_HR_CAND SET cand_nm=#{input.name},emp_type_cd=#{input.employeeTypeCode},
       blng_clnt_id=#{input.companyId,jdbcType=VARCHAR},telno=#{input.phone,jdbcType=VARCHAR},
       email_addr=#{input.email,jdbcType=VARCHAR},prvc_agre_yn=CASE WHEN #{input.privacyAgreement} THEN 'Y' ELSE 'N' END,
       prvc_agre_dt=CASE WHEN prvc_agre_dt IS NULL AND #{input.privacyAgreement} THEN #{today} ELSE prvc_agre_dt END,
-      prvc_agre_user_id=CASE WHEN prvc_agre_dt IS NULL AND #{input.privacyAgreement} THEN 'admin' ELSE prvc_agre_user_id END,
+      prvc_agre_user_id=CASE WHEN prvc_agre_dt IS NULL AND #{input.privacyAgreement} THEN #{actorId} ELSE prvc_agre_user_id END,
       job_cd=#{input.primaryJobCode},sub_job_cd=#{input.secondaryJobCode,jdbcType=VARCHAR},grade_cd=#{input.gradeCode},
       home_area_cd=#{input.homeAreaCode,jdbcType=VARCHAR},home_addr=#{input.homeAddress,jdbcType=VARCHAR},
       hope_uprc=#{input.desiredMonthlyRate},input_psbl_dt=#{input.availableDate},cand_src_cd=#{input.sourceCode},
-      memo_cn=#{input.memo,jdbcType=VARCHAR},mod_user_id='admin',
+      memo_cn=#{input.memo,jdbcType=VARCHAR},mod_user_id=#{actorId},
       mod_dttm=GREATEST(clock_timestamp(),mod_dttm+INTERVAL '1 microsecond') WHERE cand_id=#{candidateId}
   </update>
   <delete id="deleteSkills">DELETE FROM TB_HR_CAND_SKILL WHERE cand_id=#{id}</delete>
   <insert id="insertSkill">
-    INSERT INTO TB_HR_CAND_SKILL(cand_id,skill_nm,sort_ord,reg_user_id,reg_dttm) VALUES(#{id},#{name},#{sort},'admin',clock_timestamp())
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
+    INSERT INTO TB_HR_CAND_SKILL(cand_id,skill_nm,sort_ord,reg_user_id,reg_dttm) VALUES(#{id},#{name},#{sort},#{actorId},clock_timestamp())
   </insert>
   <select id="selectSkills" resultType="string">
     SELECT s.skill_nm FROM TB_HR_CAND_SKILL s WHERE s.cand_id=#{id} ORDER BY s.sort_ord,s.skill_nm
@@ -123,7 +126,8 @@
     FROM TB_HR_CAND_CNTC h WHERE h.cand_id=#{candidateId}
   </insert>
   <update id="updateContact">
-    UPDATE TB_HR_CAND SET cntc_stat_cd=#{status},last_cntc_dt=#{today},mod_user_id='admin',
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
+    UPDATE TB_HR_CAND SET cntc_stat_cd=#{status},last_cntc_dt=#{today},mod_user_id=#{actorId},
       mod_dttm=GREATEST(clock_timestamp(),mod_dttm+INTERVAL '1 microsecond') WHERE cand_id=#{candidateId}
   </update>
   <select id="selectContacts" resultMap="contact">
@@ -148,7 +152,8 @@
       AND c.use_yn='Y' AND c.del_yn='N'
   </select>
   <insert id="insertAccess">
-    INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM)
-    VALUES (#{userId},'DNLD','UI-33',#{target},clock_timestamp(),#{userId},clock_timestamp())
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
+    INSERT INTO TB_SY_ACCS_LOG (USER_ID,ACT_TYPE_CD,SCRN_ID,TRGT_DESC,ACT_DTTM,REG_USER_ID,REG_DTTM,CLIENT_IP)
+    VALUES (#{userId},'DNLD','UI-33',#{target},clock_timestamp(),#{userId},clock_timestamp(),#{accessIp,jdbcType=VARCHAR})
   </insert>
 </mapper>

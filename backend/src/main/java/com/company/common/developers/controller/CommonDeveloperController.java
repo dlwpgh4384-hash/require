@@ -35,8 +35,14 @@ public class CommonDeveloperController {
             value(r.primaryJobName),value(r.workStatusName)+(r.retirementScheduled?" · 퇴사 예정":""),
             value(r.currentProjectName)+(r.additionalProjectCount>0?" 외 "+r.additionalProjectCount+"건":""),
             value(r.currentMonthMm)+(r.overOneMm?" · 1.0 초과":""),value(r.withdrawalDate),value(r.monthlyRate))).toList();
+        var titles=List.of("이름","관리번호","소속","직원구분","등급","주 직무","상태","현재 프로젝트","이번 달 MM","철수 예정일","월 단가");
+        // 민감 체크가 없으면 월 단가 열을 엑셀에서 뺀다(명세 ⑨-2).
+        if (!com.company.common.support.auth.RequestAccess.sensitiveVisible()) {
+            titles=titles.subList(0,titles.size()-1);
+            rows=rows.stream().map(row -> row.subList(0,row.size()-1)).toList();
+        }
         var now=service.now();
-        byte[] bytes=excel.write("개발자 풀",List.of("이름","관리번호","소속","직원구분","등급","주 직무","상태","현재 프로젝트","이번 달 MM","철수 예정일","월 단가"),rows,service.currentUserId(),now);
+        byte[] bytes=excel.write("개발자 풀",titles,rows,service.currentUserId(),now);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
             .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(excel.fileName("개발자 풀",null,now),StandardCharsets.UTF_8).build().toString()).body(bytes);
     }

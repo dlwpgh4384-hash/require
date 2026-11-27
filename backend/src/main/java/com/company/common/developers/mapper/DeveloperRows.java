@@ -14,7 +14,9 @@ public final class DeveloperRows {
         public LocalDate hireDate, retirementDate;
         public String homeAreaCode, homeAddress, organizationName, employeeTypeName, gradeName,
             primaryJobName, workStatusName, useYn;
-        public BigDecimal monthlyRate, monthlyPay;
+        // 월 단가·월 급여는 민감 칸: 민감 체크가 없는 사용자 응답에서 뺀다(명세 ⑨-1·⑨-2).
+        @com.fasterxml.jackson.annotation.JsonInclude(value = com.fasterxml.jackson.annotation.JsonInclude.Include.CUSTOM, valueFilter = com.company.common.support.auth.SensitiveValueFilter.class) public BigDecimal monthlyRate;
+        @com.fasterxml.jackson.annotation.JsonInclude(value = com.fasterxml.jackson.annotation.JsonInclude.Include.CUSTOM, valueFilter = com.company.common.support.auth.SensitiveValueFilter.class) public BigDecimal monthlyPay;
         public List<String> skillCodes;
         /** 보유 스킬 이름(시안 상세 칩). */
         public List<String> skillNames;
@@ -37,7 +39,8 @@ public final class DeveloperRows {
             gradeCode, primaryJobCode, secondaryJobCode, positionCode, directClassCode, salesPartId;
         public LocalDate hireDate, retirementDate;
         public String organizationName, employeeTypeName, gradeName, primaryJobName, workStatusName, useYn;
-        public BigDecimal monthlyRate, currentMonthMm;
+        @com.fasterxml.jackson.annotation.JsonInclude(value = com.fasterxml.jackson.annotation.JsonInclude.Include.CUSTOM, valueFilter = com.company.common.support.auth.SensitiveValueFilter.class) public BigDecimal monthlyRate;
+        public BigDecimal currentMonthMm;
         public boolean retirementScheduled, overOneMm;
         public String currentProjectName, currentProjectId;
         public int additionalProjectCount;

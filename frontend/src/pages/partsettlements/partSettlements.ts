@@ -26,12 +26,13 @@ export interface PartSettlementRow {
   projectNames: string[];
   monthlyMm: number;
   unitPrice: number;
-  salary: number;
+  // 급여·퇴직금·비용 계·이익·이익금: 민감 칸을 볼 수 없는 사람에게는 서버가 보내지 않는다.
+  salary?: number | null;
   salesExpense: number;
-  retirementAmount: number;
-  totalCost: number;
-  profit: number;
-  profitShare: number;
+  retirementAmount?: number | null;
+  totalCost?: number | null;
+  profit?: number | null;
+  profitShare?: number | null;
   notes: string[];
   missingMonthlySalary: boolean;
 }

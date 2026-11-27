@@ -13,6 +13,7 @@ import { MemoryRouter } from "react-router-dom";
 import { RateRenegotiationPage } from "./RateRenegotiationPage";
 import type { RateRenegotiationResult } from "./rateRenegotiations";
 import { downloadFile } from "../../shared/list/download";
+import { testAccount, WithTestAccount } from "../../test/testAccounts";
 
 vi.mock("../../shared/layout/useViewport", () => ({
   useViewport: () => ({ mobile: false, tablet: false }),
@@ -420,4 +421,21 @@ it("shows MM with two decimals and a negative profit rate with the mockup minus 
   expect(screen.getByTestId("list-cell-assignment-a-monthlyMm")).toHaveTextContent(/^0\.50$/);
   expect(screen.getByTestId("list-cell-assignment-a-profitRate")).toHaveTextContent("−5.0%");
   expect(screen.getByTestId("rate-average")).toHaveTextContent("−5.0%");
+});
+
+it("hides 현재 단가·월 원가·목표 단가 columns when the account cannot see sensitive values (server omits monthlyCost)", async () => {
+  const account = testAccount(["SALES_LDR"]);
+  render(
+    <WithTestAccount account={{ ...account, meta: { ...account.meta, sensitive: false } }}>
+      <MemoryRouter>
+        <RateRenegotiationPage />
+      </MemoryRouter>
+    </WithTestAccount>,
+  );
+  await ready();
+  expect(screen.queryByTestId("list-head-monthlyCost")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("list-head-currentUnitPrice")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("list-head-targetUnitPrice")).not.toBeInTheDocument();
+  expect(screen.getByTestId("list-head-profitRate")).toBeInTheDocument();
+  expect(screen.getByTestId("rate-renegotiation-page")).not.toHaveTextContent("NaN");
 });

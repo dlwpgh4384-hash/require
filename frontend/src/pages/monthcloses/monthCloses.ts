@@ -86,5 +86,3 @@ export const getCommonMonthCloseHistory = (
       : "/api/common/month-close-history",
     { signal },
   );
-export const canReopenMonthClose = (roles: readonly string[]) =>
-  roles.includes("ADMIN");

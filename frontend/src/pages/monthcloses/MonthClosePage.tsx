@@ -23,8 +23,8 @@ import {
 } from "../userpreferences/userPreferences";
 import { usePreferenceBusinessShortcuts } from "../userpreferences/UserPreferenceTools";
 import { ProjectField } from "../projects/ProjectField";
+import { useCanViewScreen, usePermission } from "../../shared/permission";
 import {
-  canReopenMonthClose,
   getCommonMonthClose,
   getCommonMonthCloseHistory,
   getCommonMonthCloseReopenImpact,
@@ -48,7 +48,6 @@ const message = (failure: unknown) =>
 const isConflict = (failure: unknown) =>
   isMonthCloseConflict(failure) ||
   (failure instanceof Error && failure.message === feedbackMessages.conflict);
-const developmentRoles = ["ADMIN", "FIN", "SALES_LDR"];
 const WARN = "확인 필요";
 /** 시안 ic(): 띠·점검 줄·배지에 쓰는 선 아이콘. */
 const iconPaths = {
@@ -84,10 +83,10 @@ function closedBy(row: MonthClose) {
   return at ? ` ${at}에 마감했습니다.` : " 마감했습니다.";
 }
 
-/** UI-14 월 마감(시안 SCR['UI-14']). 로그인 연결 전에는 서버와 같은 개발 실행 문맥을 사용한다. */
-export function MonthClosePage({
-  roles = developmentRoles,
-}: { roles?: readonly string[] } = {}) {
+/** UI-14 월 마감(시안 SCR['UI-14']). 단추는 서버가 준 메뉴 × 동작 권한으로만 고른다(역할 이름 안 봄, ⑦-9). */
+export function MonthClosePage() {
+  const permission = usePermission("UI-14");
+  const canView = useCanViewScreen();
   const root = useRef<HTMLDivElement>(null);
   const reasonRef = useRef<HTMLTextAreaElement>(null);
   const writing = useRef(false);
@@ -365,7 +364,7 @@ export function MonthClosePage({
           마감하기
         </button>
       </>
-    ) : row.reopenable === true && canReopenMonthClose(roles) ? (
+    ) : row.reopenable === true && permission.can("CNFM") ? (
       <button
         type="button"
         className="ls-btn ls-btn-dt"
@@ -486,7 +485,7 @@ export function MonthClosePage({
                     <strong>{check.name}</strong>
                     <div className="ls-cap">{check.description}</div>
                   </div>
-                  {warn && check.targetScreenId ? (
+                  {warn && check.targetScreenId && canView(check.targetScreenId) ? (
                     <button
                       type="button"
                       className="ls-btn ls-btn-sm"

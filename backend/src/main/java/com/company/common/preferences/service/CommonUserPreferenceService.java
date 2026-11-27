@@ -24,7 +24,7 @@ public class CommonUserPreferenceService {
 
     public UserPreferenceResponse getCommonUserPreference(String type, String key) {
         rules.validateKey(type, key);
-        var response = UserPreferenceResponse.from(type, key, mapper.selectPreference(type, key));
+        var response = visible(type, key, mapper.selectPreference(type, key));
         return type.equals("PERIOD")
             ? new UserPreferenceResponse(true, periodBasis.metadata(), response.data()) : response;
     }
@@ -40,9 +40,21 @@ public class CommonUserPreferenceService {
             } catch (DuplicateKeyException failure) {
                 throw UserPreferenceFailure.conflict();
             }
-        } else if (mapper.updatePreference(type, key, input.prefVal(), input.modDttm()) != 1) {
+        } else if (mapper.updatePreference(type, key, rules.keepHidden(type, input.prefVal(), current.getPrefVal()),
+            input.modDttm()) != 1) {
             throw UserPreferenceFailure.conflict();
         }
-        return UserPreferenceResponse.from(type, key, mapper.selectPreference(type, key));
+        return visible(type, key, mapper.selectPreference(type, key));
+    }
+
+    /** 즐겨찾기·최근은 지금 조회 권한 있는 화면만 준다. 저장 값은 그대로 둔다(명세 ⑦-5). */
+    private UserPreferenceResponse visible(String type, String key, UserPreferenceRow row) {
+        if (row != null && (type.equals("FAV") || type.equals("RECENT"))) {
+            var shown = new UserPreferenceRow();
+            shown.setPrefVal(rules.readableScreens(row.getPrefVal()));
+            shown.setModDttm(row.getModDttm());
+            row = shown;
+        }
+        return UserPreferenceResponse.from(type, key, row);
     }
 }

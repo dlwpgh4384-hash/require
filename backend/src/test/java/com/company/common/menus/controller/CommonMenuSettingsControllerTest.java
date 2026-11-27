@@ -106,7 +106,7 @@ class CommonMenuSettingsControllerTest {
         ordered.verify(mapper).selectSettings();
         var sql = new ClassPathResource("mapper/MenuSettingsMapper.xml")
             .getContentAsString(StandardCharsets.UTF_8);
-        assertThat(sql).contains("mod_user_id='admin'", "mod_dttm=clock_timestamp()");
+        assertThat(sql).contains("mod_user_id=#{actorId}", "mod_dttm=clock_timestamp()").doesNotContain("'admin'");
     }
     @Test void partialAnonymousUpdatePreservesUnsubmittedRows() throws Exception {
         var untouched = data.rows.get("M001");

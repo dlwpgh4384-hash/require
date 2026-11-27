@@ -56,9 +56,6 @@ class OperatingProfitStatementProjectionTest {
         assertThat(ProfitStructureRules.completeSum(values,1,Snapshot::grossProfit)).isNull();
     }
     @Test void futureReadAndUploadPolicyArePureAndDistinct() {
-        for(var role:List.of("FIN","EXEC","ADMIN")) assertThat(ProfitStructureRules.projectedRoleAllows(Set.of(role))).isTrue();
-        assertThat(ProfitStructureRules.projectedRoleAllows(Set.of("DEV"))).isFalse();
-        assertThat(ProfitStructureRules.projectedRoleAllows(Set.of())).isFalse();
         assertThat(OperatingProfitStatementUploadForm.projectedUploadAllows(Set.of("ADMIN"))).isTrue();
         assertThat(OperatingProfitStatementUploadForm.projectedUploadAllows(Set.of("FIN","EXEC"))).isFalse();
     }

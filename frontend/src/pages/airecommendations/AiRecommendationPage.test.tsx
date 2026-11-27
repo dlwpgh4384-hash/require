@@ -48,7 +48,7 @@ type FormProps = {
   onClose: () => void;
   onSaved: (row: unknown, message: string) => void;
   initialValues: { developerId: string; startDate: string };
-  roles: readonly string[];
+  canRate?: boolean;
   subtitle?: string;
   screenId?: string;
   extraWarning?: string;
@@ -57,7 +57,7 @@ vi.mock("../assignments/AssignmentForm", () => ({
   AssignmentForm: (props: FormProps) => (
     <section data-testid="assignment-form">
       <p>{props.initialValues.startDate}</p>
-      <p data-testid="form-roles">{props.roles.join(",")}</p>
+      <p data-testid="form-rate">{String(props.canRate)}</p>
       <p data-testid="form-subtitle">{props.subtitle}</p>
       <p data-testid="form-screen">{props.screenId}</p>
       <p data-testid="form-warning">{props.extraWarning ?? ""}</p>
@@ -782,16 +782,15 @@ it("cancel exclusion performs no write or refill and provides no undo", async ()
   expect(recommendation()).toHaveBeenCalledTimes(1);
   expect(screen.queryByText("되돌리기")).toBeNull();
 });
-it("the assignment drawer gets UI-12 roles, the mockup subtitle, UI-30 dirty mark and the keep-tentative line", async () => {
+it("the assignment drawer decides the price field from UI-12 permission itself, the mockup subtitle, UI-30 dirty mark and the keep-tentative line", async () => {
   requestAiRecommendation({ targetType: "project", targetId: "project" });
   page();
   await settled();
   expect(screen.getByTestId("ai-assign-person")).toHaveTextContent("배정");
   fireEvent.click(screen.getByTestId("ai-assign-person"));
   const form = await screen.findByTestId("assignment-form");
-  expect(within(form).getByTestId("form-roles")).toHaveTextContent(
-    "FIN,SALES_LDR",
-  );
+  // 역할 이름을 넘기지 않는다: 배정 창이 민감 체크 + 투입 배정 수정 권한으로 정한다(⑨-5).
+  expect(within(form).getByTestId("form-rate")).toHaveTextContent("undefined");
   expect(within(form).getByTestId("form-subtitle")).toHaveTextContent(
     "AI 인력 추천에서 채움",
   );

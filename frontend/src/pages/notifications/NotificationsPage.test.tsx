@@ -300,11 +300,43 @@ describe("UI-42 own notifications", () => {
     );
     expect(onNavigate).not.toHaveBeenCalled();
   });
-  it("close returns to the caller", async () => {
+  it("Esc or a click outside closes the popup (시안: [닫기] 단추 없음)", async () => {
     show();
     await ready();
-    fireEvent.click(screen.getByTestId("M25-524"));
+    expect(screen.queryByText("닫기")).not.toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalledOnce();
+    fireEvent.mouseDown(document.body);
+    expect(onClose).toHaveBeenCalledTimes(2);
+    fireEvent.mouseDown(screen.getByTestId("notification-read-12"));
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+  it("matches the mockup popup: header, row icons, small dates, retention", async () => {
+    show();
+    await ready();
+    const popup = screen.getByRole("dialog", { name: "알림" });
+    expect(popup).toHaveTextContent(/^알림/);
+    expect(screen.getByTestId("M25-523")).toHaveTextContent("모두 읽음");
+    expect(popup).not.toHaveTextContent("· 미읽음");
+    expect(
+      screen
+        .getByTestId("notification-read-12")
+        .querySelector(".notification-icon-warn"),
+    ).not.toBeNull();
+    expect(screen.getByTestId("notification-read-12")).toHaveTextContent(
+      /새 알림(오늘|어제|\d{2}-\d{2}) \d{2}:\d{2}/,
+    );
+  });
+  it("bell label states the unread count and toggles the popup under it", async () => {
+    render(<NotificationBell api={api} onNavigate={onNavigate} />);
+    const bell = await screen.findByRole("button", { name: "알림 2건" });
+    fireEvent.click(bell);
+    expect(await screen.findByRole("dialog", { name: "알림" })).toBeVisible();
+    fireEvent.mouseDown(bell);
+    fireEvent.click(bell);
+    expect(
+      screen.queryByRole("dialog", { name: "알림" }),
+    ).not.toBeInTheDocument();
   });
   it("formats today yesterday and older times in Korea", () => {
     const now = new Date("2026-11-26T01:00:00Z");

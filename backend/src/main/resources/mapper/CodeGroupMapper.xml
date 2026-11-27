@@ -44,26 +44,30 @@
     SELECT COALESCE(max(sort_ord),0)+1 FROM TB_SY_CODE WHERE code_grp_id=#{groupId}
   </select>
   <insert id="insertGroup">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_CODE_GRP (code_grp_id,code_grp_nm,sys_code_yn,val_code_yn,sort_ord,use_yn,reg_user_id,reg_dttm)
-    VALUES (#{groupId},#{groupName},'N','N',#{sortOrd},'Y','admin',clock_timestamp())
+    VALUES (#{groupId},#{groupName},'N','N',#{sortOrd},'Y',#{actorId},clock_timestamp())
   </insert>
   <insert id="insertCode">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_SY_CODE (code_grp_id,code,code_nm,sort_ord,use_yn,del_yn,code_val,unit_nm,
       add_val1,add_val2,add_val3,reg_user_id,reg_dttm)
     VALUES (#{groupId},#{code},#{codeName},#{sortOrd},#{useYn},'N',#{codeVal,jdbcType=NUMERIC},
       #{unitNm,jdbcType=VARCHAR},#{addVal1,jdbcType=VARCHAR},#{addVal2,jdbcType=VARCHAR},
-      #{addVal3,jdbcType=VARCHAR},'admin',clock_timestamp())
+      #{addVal3,jdbcType=VARCHAR},#{actorId},clock_timestamp())
   </insert>
   <update id="updateCode">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     UPDATE TB_SY_CODE SET code_nm=#{codeName},sort_ord=#{sortOrd},use_yn=#{useYn},
       code_val=#{codeVal,jdbcType=NUMERIC},unit_nm=#{unitNm,jdbcType=VARCHAR},
       add_val1=#{addVal1,jdbcType=VARCHAR},add_val2=#{addVal2,jdbcType=VARCHAR},
-      add_val3=#{addVal3,jdbcType=VARCHAR},mod_user_id='admin',
+      add_val3=#{addVal3,jdbcType=VARCHAR},mod_user_id=#{actorId},
       mod_dttm=GREATEST(clock_timestamp(), COALESCE(mod_dttm, reg_dttm) + INTERVAL '1 microsecond')
     WHERE code_grp_id=#{groupId} AND code=#{code} AND del_yn='N'
   </update>
   <update id="deleteCode">
-    UPDATE TB_SY_CODE SET del_yn='Y',mod_user_id='admin',mod_dttm=clock_timestamp()
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
+    UPDATE TB_SY_CODE SET del_yn='Y',mod_user_id=#{actorId},mod_dttm=clock_timestamp()
     WHERE code_grp_id=#{groupId} AND code=#{code} AND del_yn='N'
   </update>
   <select id="relationExists" resultType="boolean">

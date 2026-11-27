@@ -3,6 +3,7 @@
 <mapper namespace="com.company.common.mfa.mapper.MfaMapper">
   <resultMap id="account" type="com.company.common.mfa.mapper.MfaRows$Account" autoMapping="false">
     <id column="user_id" property="userId" javaType="java.lang.String"/>
+    <result column="user_nm" property="name" javaType="java.lang.String"/>
     <result column="email_addr" property="email" javaType="java.lang.String"/>
     <result column="user_stat_cd" property="status" javaType="java.lang.String"/>
     <result column="mfa_code_hash" property="codeHash" javaType="java.lang.String"/>
@@ -12,7 +13,7 @@
     <result column="administrator" property="administrator" javaType="_boolean"/>
   </resultMap>
   <select id="lockAccount" resultMap="account">
-    SELECT u.user_id, u.email_addr, u.user_stat_cd, u.mfa_code_hash,
+    SELECT u.user_id, u.user_nm, u.email_addr, u.user_stat_cd, u.mfa_code_hash,
       u.mfa_expr_dttm, u.mfa_err_cnt, u.temp_pwd_yn,
       EXISTS (SELECT 1 FROM TB_SY_USER_ROLE ur JOIN TB_SY_ROLE r ON r.role_id=ur.role_id
         WHERE ur.user_id=u.user_id AND r.role_id='ADMIN' AND r.use_yn='Y') AS administrator
@@ -27,12 +28,14 @@
     WHERE user_id=#{userId}
   </update>
   <update id="wrongCode">
-    UPDATE TB_SY_USER SET mfa_err_cnt=mfa_err_cnt+1 WHERE user_id=#{userId}
+    UPDATE TB_SY_USER SET mfa_err_cnt=LEAST(mfa_err_cnt+1,99) WHERE user_id=#{userId}
   </update>
   <update id="clear">
     UPDATE TB_SY_USER SET mfa_code_hash=NULL, mfa_expr_dttm=NULL WHERE user_id=#{userId}
   </update>
   <update id="complete">
+    <!-- 로그인에 성공하면 그 사람의 화면 기간 기억(PERIOD)을 지워 모든 화면이 처음 기간으로 연다(2차 SFR-005-05·06). -->
+    WITH cleared_period AS (DELETE FROM TB_SY_USER_PREF WHERE user_id=#{userId} AND pref_type_cd='PERIOD')
     UPDATE TB_SY_USER SET pwd_err_cnt=0, mfa_err_cnt=0, last_login_dttm=#{now},
       mfa_code_hash=NULL, mfa_expr_dttm=NULL WHERE user_id=#{userId}
   </update>

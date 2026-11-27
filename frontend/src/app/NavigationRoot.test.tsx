@@ -289,3 +289,73 @@ describe("menu badge (SFR-001-04)", () => {
     expect(screen.queryByTestId("menu-badge-UI-13")).not.toBeInTheDocument();
   });
 });
+
+describe("55번 메뉴·화면 이동", () => {
+  function twoGroups(): ShellMenuResponse {
+    const item = (
+      menuId: string,
+      upperMenuId: string | null,
+      menuNm: string,
+      scrnId: string | null,
+      sortOrd: number,
+    ) => ({
+      menuId,
+      upperMenuId,
+      menuNm,
+      scrnId,
+      menuLvl: upperMenuId ? 2 : 1,
+      sortOrd,
+      pcOnlyYn: "N" as const,
+      iconNm: null,
+    });
+    return {
+      success: true,
+      data: [
+        item("GA", null, "묶음 가", null, 1),
+        item("MA", "GA", "가 화면", "UI-A", 1),
+        item("GB", null, "묶음 나", null, 2),
+        item("MB", "GB", "나 화면", "UI-B", 1),
+      ],
+      meta: {
+        screenAccess: [
+          { scrnId: "UI-A", available: true, pcOnlyYn: "N" },
+          { scrnId: "UI-B", available: true, pcOnlyYn: "N" },
+        ],
+      },
+    };
+  }
+  it("2-2: 대메뉴를 하나 열면 다른 대메뉴는 닫힌다(시안 openG 하나)", async () => {
+    respond(twoGroups());
+    mount("/screens/UI-A");
+    const groupA = await screen.findByTestId("menu-toggle-ga");
+    const groupB = screen.getByTestId("menu-toggle-gb");
+    await waitFor(() => expect(groupA).toHaveAttribute("aria-expanded", "true"));
+    expect(groupB).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(groupB);
+    expect(groupB).toHaveAttribute("aria-expanded", "true");
+    expect(groupA).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(groupB);
+    expect(groupB).toHaveAttribute("aria-expanded", "false");
+  });
+  it("3-2: 화면을 옮기면 새 화면은 맨 위부터 열린다", async () => {
+    respond(twoGroups());
+    mount("/screens/UI-A");
+    await screen.findByTestId("menu-toggle-ga");
+    const main = screen.getByTestId("app-main");
+    main.scrollTop = 400;
+    fireEvent.click(screen.getByTestId("menu-toggle-gb"));
+    fireEvent.click(screen.getByRole("link", { name: "나 화면" }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-B"),
+    );
+    expect(main.scrollTop).toBe(0);
+    expect(screen.getByTestId("menu-toggle-gb")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(screen.getByTestId("menu-toggle-ga")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+});

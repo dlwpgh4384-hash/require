@@ -9,6 +9,7 @@ public final class ClientContracts {
     public record Item(String clientId, String clientTypeCode, String clientName, String businessNumber,
         String representativeName, String industryCode, String contactName, String contactPhone,
         String taxEmail, String bankCode, String useYn, String modifiedAt,
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         String paymentAccountSummary, long projectCount, long personCount) {}
     public record Items<T>(List<T> items) {}
     public record Account(String bankCode, String accountNumber, String accountHolder) {}

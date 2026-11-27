@@ -191,7 +191,7 @@ class UserCommandBoundaryTest {
         assertThat(data.accesses).containsExactly("abcd:USER_REG");
         verify(mapper).insertAccess(eq("abcd"), eq("USER_REG"), contains("abcd"));
         assertThat(userSql()).contains("INSERT INTO TB_SY_USER (", "reg_user_id,reg_dttm",
-            "INSERT INTO TB_SY_ACCS_LOG", "'USE','N',0,'admin'");
+            "INSERT INTO TB_SY_ACCS_LOG", "'USE','N',0,#{actorId}");
         assertThat(TemporaryUserPassword.class.getDeclaredFields())
             .noneMatch(field -> field.getType().getName().contains("MailSender")
                 || field.getType().getName().contains("Transport"));
@@ -378,7 +378,7 @@ class UserCommandBoundaryTest {
         assertThat(data.accesses).isEmpty();
         verify(mapper).resetPassword(eq("member"), eq(TOKEN), anyString());
         verify(mapper, never()).insertAccess(anyString(), anyString(), anyString());
-        assertThat(userSql()).contains("temp_pwd_yn='Y'", "mod_user_id='admin'", "mod_dttm=GREATEST");
+        assertThat(userSql()).contains("temp_pwd_yn='Y'", "mod_user_id=#{actorId}", "mod_dttm=GREATEST");
         mvc.perform(get("/api/common/users/member"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.modDttm").value(TOKEN.plusNanos(1000).toString()));
@@ -398,7 +398,7 @@ class UserCommandBoundaryTest {
         assertThat(data.accesses).isEmpty();
         verify(mapper).changeState("member", TOKEN, "USE", true);
         verify(mapper, never()).insertAccess(anyString(), anyString(), anyString());
-        assertThat(userSql()).contains("pwd_err_cnt=0", "mod_user_id='admin'", "mod_dttm=GREATEST");
+        assertThat(userSql()).contains("pwd_err_cnt=0", "mod_user_id=#{actorId}", "mod_dttm=GREATEST");
         mvc.perform(get("/api/common/users/member"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.userStatCd").value("USE"));
@@ -468,7 +468,7 @@ class UserCommandBoundaryTest {
             "TB_SY_USER", "member", "RESUME", "상태", "중지", "사용"));
         assertThat(data.projects.get("member")).isEmpty();
         verify(mapper, never()).insertScope(anyString(), anyString(), anyString());
-        assertThat(userSql()).contains("mod_user_id='admin'", "mod_dttm=GREATEST", "INSERT INTO TB_SY_CHG_HIST");
+        assertThat(userSql()).contains("mod_user_id=#{actorId}", "mod_dttm=GREATEST", "INSERT INTO TB_SY_CHG_HIST");
         mvc.perform(get("/api/common/users/member")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.userStatCd").value("USE"))
             .andExpect(jsonPath("$.data.projectIds").isEmpty());

@@ -15,7 +15,8 @@ public final class CandidateContracts {
         String companyId, String phone, String email, boolean privacyAgreement, String primaryJobCode,
         String secondaryJobCode, List<String> skills, String gradeCode, LocalDate availableDate,
         String homeAreaCode, String homeAddress, String sourceCode, String memo) {}
-    public record Candidate(String candidateId, String name, BigDecimal desiredMonthlyRate,
+    // 희망 단가는 민감 칸: 민감 체크가 없으면 응답에서 뺀다(명세 ⑨-1 UI-33).
+    public record Candidate(String candidateId, String name, @com.fasterxml.jackson.annotation.JsonInclude(value = com.fasterxml.jackson.annotation.JsonInclude.Include.CUSTOM, valueFilter = com.company.common.support.auth.SensitiveValueFilter.class) BigDecimal desiredMonthlyRate,
         String employeeTypeCode, String companyId, String phone, String email, boolean privacyAgreement,
         String primaryJobCode, String secondaryJobCode, List<String> skills, String gradeCode,
         LocalDate availableDate, String homeAreaCode, String homeAddress, String sourceCode, String memo,

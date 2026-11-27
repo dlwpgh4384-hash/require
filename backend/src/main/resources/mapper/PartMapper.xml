@@ -79,30 +79,35 @@
       <if test="exceptId != null">AND p.part_id != #{exceptId}</if>)
   </select>
   <insert id="insertPart">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_BS_PART (part_id,part_nm,hq_yn,use_yn,reg_user_id,reg_dttm)
-    VALUES (#{id},#{name},'N','Y','admin',clock_timestamp())
+    VALUES (#{id},#{name},'N','Y',#{actorId},clock_timestamp())
   </insert>
   <insert id="insertPeriod">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     INSERT INTO TB_BS_PART_STD
       (part_id,aply_bgn_ym,aply_end_ym,part_ldr_user_id,prft_dstrb_rt,sales_exps_amt,reg_user_id,reg_dttm)
     VALUES (#{partId},#{month},#{endMonth,jdbcType=CHAR},#{values.leaderUserId},
-      #{values.distributionRate},#{values.salesExpense},'admin',clock_timestamp())
+      #{values.distributionRate},#{values.salesExpense},#{actorId},clock_timestamp())
   </insert>
   <update id="updatePeriod">
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
     UPDATE TB_BS_PART_STD SET part_ldr_user_id=#{values.leaderUserId},
       prft_dstrb_rt=#{values.distributionRate},sales_exps_amt=#{values.salesExpense},
-      mod_user_id='admin',mod_dttm=clock_timestamp()
+      mod_user_id=#{actorId},mod_dttm=clock_timestamp()
     WHERE part_id=#{partId} AND aply_bgn_ym=#{month}
   </update>
   <update id="endPeriod">
-    UPDATE TB_BS_PART_STD SET aply_end_ym=#{end},mod_user_id='admin',mod_dttm=clock_timestamp()
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
+    UPDATE TB_BS_PART_STD SET aply_end_ym=#{end},mod_user_id=#{actorId},mod_dttm=clock_timestamp()
     WHERE part_id=#{id} AND aply_bgn_ym=#{month}
   </update>
   <delete id="deletePeriod">
     DELETE FROM TB_BS_PART_STD WHERE part_id=#{id} AND aply_bgn_ym=#{month}
   </delete>
   <update id="touch">
-    UPDATE TB_BS_PART SET mod_user_id='admin',
+    <bind name="actorId" value="@com.company.common.support.service.CurrentBusinessActor@id()"/>
+    UPDATE TB_BS_PART SET mod_user_id=#{actorId},
       mod_dttm=GREATEST(clock_timestamp(),COALESCE(mod_dttm,reg_dttm)+INTERVAL '1 microsecond')
     WHERE part_id=#{id} AND mod_dttm IS NOT DISTINCT FROM #{token,jdbcType=TIMESTAMP_WITH_TIMEZONE}
   </update>
@@ -131,7 +136,8 @@
     ORDER BY h.reg_dttm DESC,h.hist_id DESC
   </select>
   <insert id="insertAccess">
-    INSERT INTO TB_SY_ACCS_LOG (user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm)
-    VALUES (#{userId},#{action},'UI-15',#{target},clock_timestamp(),#{userId},clock_timestamp())
+    <bind name="accessIp" value="@com.company.common.support.auth.RequestAccess@ip()"/>
+    INSERT INTO TB_SY_ACCS_LOG (user_id,act_type_cd,scrn_id,trgt_desc,act_dttm,reg_user_id,reg_dttm,client_ip)
+    VALUES (#{userId},#{action},'UI-15',#{target},clock_timestamp(),#{userId},clock_timestamp(),#{accessIp,jdbcType=VARCHAR})
   </insert>
 </mapper>

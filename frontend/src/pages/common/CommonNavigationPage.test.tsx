@@ -927,7 +927,12 @@ async function expectScreenContent(id: string) {
   }
 }
 function Position() {
-  return <div aria-label="주소">{useLocation().pathname}</div>;
+  // 주소 확인은 시험 ID로 찾는다. getByLabelText는 열린 탭 8개의 모든 입력 칸·라벨을 훑어 한 번에 1초까지 걸린다.
+  return (
+    <div aria-label="주소" data-testid="address">
+      {useLocation().pathname}
+    </div>
+  );
 }
 function mount(path = "/") {
   return render(
@@ -1006,7 +1011,7 @@ describe("common placeholder screen contract", () => {
         url.startsWith("/api/common/finance-items"),
       ),
     ).toBe(false);
-    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-10");
+    expect(screen.getByTestId("address")).toHaveTextContent("/screens/UI-10");
   });
 
   it("UI-12 keyword filtering keeps the registered screen and uses only relative read requests", async () => {
@@ -1034,7 +1039,7 @@ describe("common placeholder screen contract", () => {
     );
     await expectScreenContent("UI-12");
     expect(screen.getByRole("textbox", { name: "이름" })).toHaveValue("D-0001");
-    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-12");
+    expect(screen.getByTestId("address")).toHaveTextContent("/screens/UI-12");
     expect(screen.getAllByRole("main")).toHaveLength(1);
     expect(
       request.mock.calls.every(
@@ -1053,7 +1058,7 @@ describe("common placeholder screen contract", () => {
       "개발자 등록",
     );
     expect(screen.queryByTestId("developer-list")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-02");
+    expect(screen.getByTestId("address")).toHaveTextContent("/screens/UI-02");
     fireEvent.click(screen.getByTestId("developer-cancel"));
     await expectScreenContent("UI-02");
     expect(
@@ -1108,7 +1113,7 @@ describe("common placeholder screen contract", () => {
     expect(
       screen.queryByTestId("code-group-title-add"),
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-27");
+    expect(screen.getByTestId("address")).toHaveTextContent("/screens/UI-27");
     for (const path of [
       "/api/common/code-maps",
       "/api/common/operating-standards",
@@ -1142,9 +1147,9 @@ describe("common placeholder screen contract", () => {
           within(limit).getByRole("button", { name: "닫고 열기" }),
         );
       await expectScreenContent(id);
-      expect(screen.getByLabelText("주소")).toHaveTextContent(`/screens/${id}`);
+      expect(screen.getByTestId("address")).toHaveTextContent(`/screens/${id}`);
     }
-  }, 15000); // 모든 처음 화면을 차례로 열어 보는 긴 시험: 전체 시험을 함께 돌릴 때 5초를 넘길 수 있다
+  }, 30000); // 모든 처음 화면을 차례로 열어 보는 긴 시험: 혼자 5초쯤(주소는 시험 ID로 찾는다), 전체 시험 때 17초쯤
 
   it("a PC-only duplicate representative cannot be replaced by another mobile link", async () => {
     mobile = true;
@@ -1163,7 +1168,7 @@ describe("common placeholder screen contract", () => {
     expect(
       screen.queryByRole("link", { name: "시험 메뉴 later" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/SAME");
+    expect(screen.getByTestId("address")).toHaveTextContent("/screens/SAME");
   });
 
   it("a rejected envelope is an error, never a fabricated empty success", async () => {
@@ -1223,7 +1228,7 @@ describe("common placeholder screen contract", () => {
       first.unmount();
       mount(`/screens/${id}`);
       await expectScreenContent(id);
-      expect(screen.getByLabelText("주소")).toHaveTextContent(`/screens/${id}`);
+      expect(screen.getByTestId("address")).toHaveTextContent(`/screens/${id}`);
     },
   );
 
@@ -1259,7 +1264,7 @@ describe("common placeholder screen contract", () => {
     expect(
       await screen.findByRole("region", { name: "FIRST 본문" }),
     ).toHaveTextContent("준비 중");
-    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/FIRST");
+    expect(screen.getByTestId("address")).toHaveTextContent("/screens/FIRST");
   });
 
   it("initial menu fixture opens the developed UI-16 dashboard", async () => {
@@ -1317,7 +1322,7 @@ describe("common placeholder screen contract", () => {
     ).not.toBeInTheDocument();
     fireEvent.click(body().getByRole("button", { name: "다시 시도" }));
     expect(await screen.findByText("사용할 수 없는 화면입니다")).toBeVisible();
-    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-10");
+    expect(screen.getByTestId("address")).toHaveTextContent("/screens/UI-10");
     expect(request).toHaveBeenCalledTimes(2);
   });
 
@@ -1339,7 +1344,7 @@ describe("common placeholder screen contract", () => {
     expect(
       await screen.findByRole("region", { name: "RECOVERED 본문" }),
     ).toHaveTextContent("준비 중");
-    expect(screen.getByLabelText("주소")).toHaveTextContent(
+    expect(screen.getByTestId("address")).toHaveTextContent(
       "/screens/RECOVERED",
     );
   });
@@ -1407,7 +1412,7 @@ describe("common placeholder screen contract", () => {
           ).not.toBeInTheDocument();
       }
       expect(screen.getByRole("complementary")).toBeInTheDocument();
-      expect(screen.getByLabelText("주소")).toHaveTextContent(
+      expect(screen.getByTestId("address")).toHaveTextContent(
         "/screens/TARGET",
       );
     },
@@ -1421,7 +1426,7 @@ describe("common placeholder screen contract", () => {
     expect(
       await screen.findByRole("region", { name: "UI-16 본문" }),
     ).toHaveAttribute("data-testid", "dashboard-page");
-    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-16");
+    expect(screen.getByTestId("address")).toHaveTextContent("/screens/UI-16");
   });
 
   it.each(["empty", "mobile-only-hidden"])(
@@ -1433,12 +1438,12 @@ describe("common placeholder screen contract", () => {
       );
       mount("/screens/UNKNOWN");
       expect(await screen.findByText("없는 화면입니다")).toBeVisible();
-      expect(screen.getByLabelText("주소")).toHaveTextContent(
+      expect(screen.getByTestId("address")).toHaveTextContent(
         "/screens/UNKNOWN",
       );
       fireEvent.click(screen.getByRole("link", { name: "첫 화면으로 가기" }));
       await waitFor(() =>
-        expect(screen.getByLabelText("주소").textContent).toBe("/"),
+        expect(screen.getByTestId("address").textContent).toBe("/"),
       );
       expect(
         body().getByText(
@@ -1471,7 +1476,7 @@ describe("common placeholder screen contract", () => {
     expect(
       screen.queryByRole("button", { name: "시험 메뉴 group" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-10");
+    expect(screen.getByTestId("address")).toHaveTextContent("/screens/UI-10");
     width(false);
     await expectScreenContent("UI-10");
     expect(
@@ -1528,7 +1533,7 @@ describe("common placeholder screen contract", () => {
     ).not.toBeInTheDocument();
     fireEvent.click(group);
     expect(screen.getByRole("link", { name: "시험 메뉴 child" })).toBeVisible();
-    expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/CHILD");
+    expect(screen.getByTestId("address")).toHaveTextContent("/screens/CHILD");
   });
 
   it("mixed group cannot turn into a selectable leaf when its only child was removed server-side", async () => {
@@ -1551,11 +1556,12 @@ describe("common placeholder screen contract", () => {
     mount();
     await screen.findByRole("region", { name: "UI-16 본문" });
     expect(screen.getByTestId("screen-tab-list")).toBeInTheDocument();
+    // 55번 3-5: 대시보드 [엑셀 다운로드]는 뺐다.
     expect(
-      within(screen.getByTestId("screen-actions")).getByTestId(
+      within(screen.getByTestId("screen-actions")).queryByTestId(
         "dashboard-excel",
       ),
-    ).toBeDisabled();
+    ).not.toBeInTheDocument();
     for (const name of ["즐겨찾기", "최근 본 화면", "단축키", "알림"]) {
       const control = screen.getByRole("button", { name: `${name} 준비 중` });
       expect(control).toBeDisabled();
@@ -1576,7 +1582,7 @@ describe("common placeholder screen contract", () => {
     await ensureOpen("시험 메뉴 group");
     fireEvent.click(screen.getByRole("link", { name: "시험 메뉴 leaf-01" }));
     await waitFor(() =>
-      expect(screen.getByLabelText("주소")).toHaveTextContent("/screens/UI-15"),
+      expect(screen.getByTestId("address")).toHaveTextContent("/screens/UI-15"),
     );
     await expectScreenContent("UI-15");
     expect(setItem).not.toHaveBeenCalled();

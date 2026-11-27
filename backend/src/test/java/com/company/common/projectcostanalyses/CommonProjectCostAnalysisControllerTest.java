@@ -482,10 +482,4 @@ class CommonProjectCostAnalysisControllerTest {
         assertThat(with).isEqualTo(without);
         assertThat(with.isNumber()).isTrue();
     }
-    @Test void independentRolePolicyPermitsUnionOfFinanceExecutiveAdminButNotPmOrSalesLeader() {
-        for (String role : List.of("FIN","EXEC","ADMIN"))
-            assertThat(ProjectCostAnalysisPolicy.canView(List.of(new Role(role,role,"ALL","Y","Y",true)))).isTrue();
-        for (String role : List.of("PM","SALES_LDR"))
-            assertThat(ProjectCostAnalysisPolicy.canView(List.of(new Role(role,role,"ALL","Y","Y",true)))).isFalse();
-    }
 }

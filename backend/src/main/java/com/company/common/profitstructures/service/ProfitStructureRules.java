@@ -14,10 +14,7 @@ public final class ProfitStructureRules {
     private ProfitStructureRules() {}
     public static final String OTHER_PREFIX = "그 밖 ";
     public static final String SALES_PART_NOTICE ="영업 파트 이익금은 사람 소속 파트 기준이라 이 숫자와 다를 수 있습니다";
-    /** UI-22 integration projection only; neither development GET calls this policy. */
-    public static boolean projectedRoleAllows(Set<String> roles) {
-        return roles != null && roles.stream().anyMatch(Set.of("FIN", "EXEC", "ADMIN")::contains);
-    }
+    // 화면을 볼 수 있는지는 역할 목록이 아니라 메뉴 권한(M019 조회)으로 API 검사 한 곳이 정한다(명세 ⑦-10).
     /** 비율(%)은 소수 첫째 자리 반올림(식-36 「소수 첫째 자리 반올림」·시안, 2026-11-24 사용자 결정). 금액 버림(SFR-006-03)과 다름. */
     public static BigDecimal ratio(BigDecimal numerator, BigDecimal denominator) {
         return numerator == null || denominator == null || denominator.signum() == 0 ? null

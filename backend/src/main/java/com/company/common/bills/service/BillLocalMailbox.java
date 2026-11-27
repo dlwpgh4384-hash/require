@@ -72,6 +72,9 @@ public class BillLocalMailbox {
         sender.setPort(Integer.parseInt(port));
         sender.setUsername(environment.getProperty("smtp.username", "").strip());
         sender.setPassword(password);
+        // 한글 제목·본문이 깨지지 않게 UTF-8로 보낸다(기본값은 플랫폼 인코딩, 2026-11-27 실제 메일에서 깨짐).
+        sender.setDefaultEncoding(java.nio.charset.StandardCharsets.UTF_8.name());
+        sender.getJavaMailProperties().setProperty("mail.mime.charset", java.nio.charset.StandardCharsets.UTF_8.name());
         sender.getJavaMailProperties().setProperty("mail.smtp.auth", "true");
         sender.getJavaMailProperties().setProperty("mail.smtp.starttls.enable", "true");
         sender.getJavaMailProperties().setProperty("mail.smtp.connectiontimeout", "10000");

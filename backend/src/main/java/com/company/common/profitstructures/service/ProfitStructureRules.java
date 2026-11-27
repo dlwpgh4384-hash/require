@@ -68,10 +68,25 @@ public final class ProfitStructureRules {
         var values = months.stream().flatMap(month -> month.projects().stream()).toList();
         return new Composition(group(values, v -> v.project().contractType(), v -> v.project().contractName(), false),
             group(values, v -> v.project().clientId(), v -> v.project().clientName(), true),
-            group(values, v -> v.project().partId(), v -> v.project().partName(), false), SALES_PART_NOTICE);
+            salesParts(months).stream().map(PartRow::row).toList(), SALES_PART_NOTICE);
+    }
+    /** 영업 파트별 한 줄과 파트 ID(미지정은 ""). 대시보드(UI-16)가 범위로 거를 때 쓴다. */
+    public record PartRow(String partId, CompositionRow row) {}
+    /** 영업 파트별(프로젝트를 따온 파트 기준, 시안 byP) — 전체 수익 구조와 대시보드가 같이 쓴다. */
+    public static List<PartRow> salesParts(List<Month> months) {
+        var values = months.stream().flatMap(month -> month.projects().stream()).toList();
+        var ids = new ArrayList<String>();
+        var rows = group(values, v -> v.project().partId(), v -> v.project().partName(), false, ids);
+        var result = new ArrayList<PartRow>();
+        for (int i = 0; i < rows.size(); i++) result.add(new PartRow(ids.get(i), rows.get(i)));
+        return List.copyOf(result);
     }
     private static List<CompositionRow> group(List<ProjectValue> values, Function<ProjectValue, String> identity,
         Function<ProjectValue, String> name, boolean topFive) {
+        return group(values, identity, name, topFive, new ArrayList<>());
+    }
+    private static List<CompositionRow> group(List<ProjectValue> values, Function<ProjectValue, String> identity,
+        Function<ProjectValue, String> name, boolean topFive, List<String> ids) {
         var groups = new TreeMap<String, Group>();
         BigDecimal total = ZERO;
         for (var value : values) {
@@ -91,6 +106,7 @@ public final class ProfitStructureRules {
             ranked = new ArrayList<>(ranked.subList(0, 5)); ranked.add(other);
         }
         BigDecimal denominator = total;
+        ranked.forEach(g -> ids.add(g.id()));
         return ranked.stream().map(g -> new CompositionRow(g.name(), g.revenue(), ratio(g.revenue(), denominator),
             ratio(g.revenue().subtract(g.cost()), g.revenue()))).toList();
     }

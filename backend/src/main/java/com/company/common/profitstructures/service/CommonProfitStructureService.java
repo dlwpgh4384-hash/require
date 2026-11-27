@@ -61,6 +61,16 @@ public class CommonProfitStructureService {
             ProfitStructureTable.of(numeric, bucketProjects, compositionVisible));
         return new Response<>(true, Map.of("previousPeriodAvailable", prevAvailable), result);
     }
+    /** 대시보드(UI-16) 「영업 파트별」: 이 화면 월 보기의 영업 파트별과 같은 달·같은 계산(옮겨 온 달은 빈 목록). */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public List<PartRow> monthSalesParts(YearMonth month) {
+        if (!(periods.metadata().get("periodBasis") instanceof UserPreferencePeriodBasis.Basis basis))
+            throw CodeFailure.invalid("baseMonth", "기간 기준을 확인해 주세요.");
+        definitions.require();
+        var source = monthly.year(month.getYear(), month.getMonthValue(), basis.cashBaseYm());
+        var selected = select(new ProfitStructurePeriod(month, month, "month"), source);
+        return selected.stream().anyMatch(Month::migrated) ? List.of() : salesParts(selected);
+    }
     private static boolean available(List<Month> months) { return !months.isEmpty() && months.stream().allMatch(Month::available); }
     private static List<Month> select(ProfitStructurePeriod period, Map<String, Month> source) {
         List<Month> result = new ArrayList<>();

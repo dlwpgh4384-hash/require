@@ -6,7 +6,9 @@ import com.company.common.cashflowstatements.dto.CashFlowStatementContracts;
 import com.company.common.cashflowstatements.service.CommonCashFlowStatementService;
 import com.company.common.manpowerforecasts.dto.ManpowerForecastContracts;
 import com.company.common.manpowerforecasts.service.CommonManpowerForecastService;
-import com.company.common.partsettlements.service.CommonPartSettlementService;
+import com.company.common.profitstructures.dto.ProfitStructureContracts.CompositionRow;
+import com.company.common.profitstructures.service.CommonProfitStructureService;
+import com.company.common.profitstructures.service.ProfitStructureRules.PartRow;
 import com.company.common.projectcostanalyses.dto.ProjectCostAnalysisContracts;
 import com.company.common.projectcostanalyses.service.CommonProjectCostAnalysisService;
 import com.company.common.salespipeline.dto.SalesPipelineContracts;
@@ -28,7 +30,7 @@ class DashboardOutlookTest {
         var json = new ObjectMapper();
         var forecast = mock(CommonManpowerForecastService.class);
         var cash = mock(CommonCashFlowStatementService.class);
-        var parts = mock(CommonPartSettlementService.class);
+        var parts = mock(CommonProfitStructureService.class);
         var pipeline = mock(CommonSalesPipelineService.class);
         var projects = mock(CommonProjectCostAnalysisService.class);
         var opportunities = mock(CommonSalesOpportunityService.class);
@@ -46,7 +48,9 @@ class DashboardOutlookTest {
         when(cash.forward(current, 3)).thenReturn(new CashFlowStatementContracts.Result(2026, BigDecimal.TEN,
             List.of(december, january, february),
             List.of(new CashFlowStatementContracts.Warning("202702", new BigDecimal("8"), BigDecimal.TEN)), null));
-        when(parts.performance(selected.toString())).thenReturn(List.of());
+        when(parts.monthSalesParts(selected)).thenReturn(List.of(
+            new PartRow("P1", new CompositionRow("금융", new BigDecimal("74800000"), new BigDecimal("61.4"), new BigDecimal("23.9"))),
+            new PartRow("", new CompositionRow("미지정", new BigDecimal("1000"), BigDecimal.ZERO, new BigDecimal("-5.0")))));
         // 시안 soon: 오늘+3개월(2027-03) 안 시작(이미 시작 포함), 확률 높은 순 3건. 2027-04는 빠진다.
         var cards = List.of(card(json, "future", "2027-03", 30, "DONE"), card(json, "late", "2027-04", 95, "DONE"),
             card(json, "past", "2026-11", 90, "WAIT"), card(json, "first", "2026-12", 10, "DONE"),
@@ -91,14 +95,19 @@ class DashboardOutlookTest {
         assertThat(result.alerts().get(1).marginRate()).isEqualByComparingTo("11.0");
         verify(cash).forward(current, 3);
         verify(forecast).forward(current, 6);
-        verify(parts).performance("2026-10");
+        verify(parts).monthSalesParts(selected);
+        // 전체 수익 구조(UI-07) 영업 파트별 그대로(프로젝트를 따온 파트 기준), 전체 범위면 미지정 줄도.
+        assertThat(result.parts()).extracting(p -> p.partId(), p -> p.partName())
+            .containsExactly(org.assertj.core.groups.Tuple.tuple("P1", "금융"), org.assertj.core.groups.Tuple.tuple("", "미지정"));
+        assertThat(result.parts().get(0).revenue()).isEqualByComparingTo("74800000");
+        assertThat(result.parts().get(0).profitRate()).isEqualByComparingTo("23.9");
     }
 
     @Test void cashStartsAfterLastClosedMonthAndShortageLooksAtEveryOpenMonthThisYear() {
         var json = new ObjectMapper();
         var forecast = mock(CommonManpowerForecastService.class);
         var cash = mock(CommonCashFlowStatementService.class);
-        var parts = mock(CommonPartSettlementService.class);
+        var parts = mock(CommonProfitStructureService.class);
         var pipeline = mock(CommonSalesPipelineService.class);
         var projects = mock(CommonProjectCostAnalysisService.class);
         var current = YearMonth.of(2026, 11);
@@ -109,7 +118,7 @@ class DashboardOutlookTest {
             Map.of("yearMonth", String.format("2026%02d", m), "closingBalance", 100 - m), CashFlowStatementContracts.Month.class)).toList();
         when(cash.forward(firstOpen, 3)).thenReturn(new CashFlowStatementContracts.Result(2026, new BigDecimal("89"),
             months, List.of(new CashFlowStatementContracts.Warning("202612", new BigDecimal("88"), new BigDecimal("89"))), null));
-        when(parts.performance(any())).thenReturn(List.of());
+        when(parts.monthSalesParts(any())).thenReturn(List.of());
         when(pipeline.getCommonSalesPipeline()).thenReturn(new SalesPipelineContracts.Pipeline(
             new SalesPipelineContracts.Summary(0, 0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0), List.of()));
         when(projects.getCommonProjectCostAnalyses(any())).thenReturn(json.convertValue(Map.of("items", List.of()),

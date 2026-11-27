@@ -322,7 +322,7 @@ class RoleSecurityIntegrationTest {
         assertThat(fin.path("closing").isObject()).isTrue();
         assertThat(fin.path("summary").path("unpaidCount").asInt()).isGreaterThanOrEqualTo(2);
         assertThat(todoKeys(fin)).contains("taxPayment", "cashShortage");
-        // 영업 파트별(SFR-116-07): 마감 전 달도 영업 파트 이익금의 실시간 계산 값(잠정)이 나온다 — 파트마다 월단위 배정 7,000,000원.
+        // 영업 파트별(SFR-116-07, 시안 byP): 전체 수익 구조와 같은 계산(프로젝트를 따온 파트 기준), 마감 전 달은 실시간(잠정) — 파트마다 월단위 배정 7,000,000원.
         var finParts = new java.util.HashMap<String, Long>();
         fin.path("salesParts").forEach(p -> finParts.put(p.path("partId").asText(), p.path("revenue").asLong()));
         assertThat(finParts).containsEntry("rs-part-a", 7000000L).containsEntry("rs-part-b", 7000000L);

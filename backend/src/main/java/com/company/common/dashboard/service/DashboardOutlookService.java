@@ -3,7 +3,8 @@ package com.company.common.dashboard.service;
 import com.company.common.dashboard.dto.DashboardContracts.*;
 import com.company.common.manpowerforecasts.service.CommonManpowerForecastService;
 import com.company.common.cashflowstatements.service.CommonCashFlowStatementService;
-import com.company.common.partsettlements.service.CommonPartSettlementService;
+import com.company.common.profitstructures.service.CommonProfitStructureService;
+import com.company.common.support.auth.RequestAccess;
 import com.company.common.salespipeline.service.CommonSalesPipelineService;
 import com.company.common.salespipeline.dto.SalesPipelineContracts.Card;
 import com.company.common.projectcostanalyses.service.CommonProjectCostAnalysisService;
@@ -21,15 +22,15 @@ import org.springframework.stereotype.Service;
 public class DashboardOutlookService {
     private final CommonManpowerForecastService forecast;
     private final CommonCashFlowStatementService cash;
-    private final CommonPartSettlementService parts;
+    private final CommonProfitStructureService structures;
     private final CommonSalesPipelineService pipeline;
     private final CommonProjectCostAnalysisService projects;
     private final CommonSalesOpportunityService opportunities;
     private final DashboardFilters filters;
     public DashboardOutlookService(CommonManpowerForecastService forecast, CommonCashFlowStatementService cash,
-        CommonPartSettlementService parts, CommonSalesPipelineService pipeline,
+        CommonProfitStructureService structures, CommonSalesPipelineService pipeline,
         CommonProjectCostAnalysisService projects, CommonSalesOpportunityService opportunities, DashboardFilters filters) {
-        this.forecast = forecast; this.cash = cash; this.parts = parts; this.pipeline = pipeline;
+        this.forecast = forecast; this.cash = cash; this.structures = structures; this.pipeline = pipeline;
         this.projects = projects; this.opportunities = opportunities; this.filters = filters;
     }
     /** 자금수지표의 첫 부족 예상 달(식-51): 마감 안 된 달 중 월말 잔액이 최소 운영자금보다 적은 첫 달. */
@@ -58,8 +59,12 @@ public class DashboardOutlookService {
         var shortMonths = balances.warnings().stream().filter(w -> !cashMonth(w.yearMonth()).isBefore(firstOpen)).toList();
         var cashShortage = shortMonths.isEmpty() ? null : new CashShortage(cashMonth(shortMonths.get(0).yearMonth()),
             shortMonths.get(0).expectedBalance(), shortMonths.get(0).minimumCash(), shortMonths.size());
-        var salesParts = parts.performance(selected.toString()).stream()
-            .map(p -> new SalesPart(p.partId(), p.partName(), p.revenue(), p.profitRate())).toList();
+        // 영업 파트별 = 전체 수익 구조(UI-07) 월 보기의 영업 파트별(프로젝트를 따온 파트 기준, 시안 byP, 내부 제외).
+        // 담당 파트 범위면 자기 파트 줄만(시안 myParts), 미지정 줄은 전체 범위에서만 보인다.
+        var scope = RequestAccess.currentScope();
+        var salesParts = structures.monthSalesParts(selected).stream()
+            .filter(p -> scope.all() || scope.partIds().contains(p.partId()))
+            .map(p -> new SalesPart(p.partId(), p.row().name(), p.row().revenue(), p.row().profitRate())).toList();
         var sales = pipeline.getCommonSalesPipeline();
         var stageNames = new java.util.HashMap<String, String>();
         sales.stages().forEach(s -> s.items().forEach(c -> stageNames.put(c.opportunityId(), s.stageName())));

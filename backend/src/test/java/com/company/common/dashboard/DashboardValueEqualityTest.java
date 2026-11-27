@@ -14,7 +14,8 @@ import com.company.common.manpowerboard.service.CommonManpowerBoardService;
 import com.company.common.manpowerforecasts.service.CommonManpowerForecastService;
 import com.company.common.operatingprofitstatements.dto.OperatingProfitStatementContracts;
 import com.company.common.operatingprofitstatements.service.CommonOperatingProfitStatementService;
-import com.company.common.partsettlements.service.CommonPartSettlementService;
+import com.company.common.profitstructures.dto.ProfitStructureContracts;
+import com.company.common.profitstructures.service.CommonProfitStructureService;
 import com.company.common.preferences.service.UserPreferencePeriodBasis;
 import com.company.common.projects.service.CommonProjectService;
 import com.company.common.schema.SchemaPreparation;
@@ -63,7 +64,7 @@ class DashboardValueEqualityTest {
     @Autowired CommonManpowerForecastService forecasts;
     @Autowired CommonManpowerBoardService board;
     @Autowired CommonBillService bills;
-    @Autowired CommonPartSettlementService parts;
+    @Autowired CommonProfitStructureService structures;
     @Autowired CommonProjectService projects;
     @Autowired UserPreferencePeriodBasis periods;
 
@@ -216,20 +217,20 @@ class DashboardValueEqualityTest {
         }
     }
 
-    @Test void salesPartsEqualPartSettlementsPerPart() {
-        var month = selected().toString();
-        var tabs = parts.getCommonPartSettlements(month).data().items();
+    /** 시안 byP: 영업 파트별은 전체 수익 구조(UI-07) 월 보기의 영업 파트별(프로젝트를 따온 파트 기준)과 같은 줄·같은 값. */
+    @Test void salesPartsEqualProfitStructureProjectSalesParts() {
+        var month = selected();
+        var composition = structures.getCommonProfitStructures(new ProfitStructureContracts.Filter(month.getYear(), "month",
+            month.toString().replace("-", ""))).data().composition();
+        var expected = composition == null ? java.util.List.<ProfitStructureContracts.CompositionRow>of() : composition.projectSalesParts();
         var rows = read().salesParts();
-        assertThat(rows).extracting(DashboardContracts.SalesPart::partId)
-            .containsExactlyInAnyOrderElementsOf(tabs.stream().map(t -> t.partId()).toList());
-        for (var row : rows) {
-            var detail = parts.getCommonPartSettlement(row.partId(), month);
-            var revenue = detail.items().stream().map(w -> w.unitPrice()).reduce(BigDecimal.ZERO, BigDecimal::add);
-            var profit = detail.items().stream().map(w -> w.profit()).reduce(BigDecimal.ZERO, BigDecimal::add);
-            assertSame(row.revenue(), revenue);
-            assertSame(row.profitRate(), revenue.signum() == 0 ? null
-                : profit.multiply(BigDecimal.valueOf(100)).divide(revenue, 1, RoundingMode.HALF_UP));
+        assertThat(rows).extracting(DashboardContracts.SalesPart::partName)
+            .containsExactlyElementsOf(expected.stream().map(ProfitStructureContracts.CompositionRow::name).toList());
+        for (int i = 0; i < rows.size(); i++) {
+            assertSame(rows.get(i).revenue(), expected.get(i).revenue());
+            assertSame(rows.get(i).profitRate(), expected.get(i).profitRate());
         }
+        // 파트별 실제 값(전체 7,000,000원·파트장은 자기 파트만)은 RoleSecurityIntegrationTest가 본다.
     }
 
     @Test void unassignedSalesPartEqualsProjectListAndExcludesInternal() {
